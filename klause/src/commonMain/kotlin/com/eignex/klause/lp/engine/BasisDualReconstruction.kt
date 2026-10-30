@@ -6,6 +6,8 @@ import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.basis.RationalBasisStats
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
+import kotlin.math.abs
 
 private class BasisDualStop(val reason: String) : RuntimeException()
 
@@ -224,7 +226,7 @@ private class BasisDualRun(
                     decline = "DIMENSION"
                     continue
                 }
-                val matched = matchOpen(group, open)
+                val matched = selectOpenPivots(group, open)
                 if (matched == null) {
                     decline = "OPEN_RANK"
                     continue
@@ -238,36 +240,70 @@ private class BasisDualRun(
         }
     }
 
-    private fun matchOpen(group: List<Int>, selected: List<Int>): List<Int>? {
+    private fun selectOpenPivots(group: List<Int>, selected: List<Int>): List<Int>? {
         if (selected.isEmpty()) return emptyList()
-        meter.step(a.m.toLong())
-        meter.storage(a.m * 8L + selected.size * 8L)
-        val matched = IntArray(a.m) { -1 }
-        val seen = IntArray(a.m)
-        var stamp = 0
-        fun augment(index: Int): Boolean {
-            for ((row, _) in equations[selected[index]]) {
+        val cells = selected.size.toLong() * group.size
+        if (cells > minOf(meter.limits.maxEntries, 16384)) return null
+        meter.step(cells + a.m)
+        meter.storage(128L + cells * 8L + a.m * 4L + selected.size * 80L + group.size)
+        val local = IntArray(a.m) { -1 }
+        for (column in group.indices) local[group[column]] = column
+        val projected = Array(selected.size) { DoubleArray(group.size) }
+        for (index in selected.indices) {
+            var scale = 0.0
+            for ((row, value) in equations[selected[index]]) {
                 meter.step()
-                if (!activeRow[row] || seen[row] == stamp) continue
-                seen[row] = stamp
-                val previous = matched[row]
-                if (previous < 0 || augment(previous)) {
-                    matched[row] = index
-                    return true
+                val column = local[row]
+                if (column < 0) continue
+                val words = (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 63L) / 64L
+                meter.step(1L + words * words)
+                val scalar = value.toDouble()
+                if (!scalar.isFinite()) return null
+                projected[index][column] = scalar
+                scale = maxOf(scale, abs(scalar))
+            }
+            if (scale == 0.0) return null
+            for (column in group.indices) {
+                meter.step()
+                projected[index][column] /= scale
+            }
+        }
+        val used = BooleanArray(group.size)
+        val result = ArrayList<Int>(selected.size)
+        // Projected pivots propose a square subsystem; exact factors and the full dual check authorize it.
+        for (index in selected.indices) {
+            var pivotRow = -1
+            var pivotColumn = -1
+            var largest = 1e-10
+            for (row in index until selected.size) for (column in group.indices) {
+                meter.step()
+                val magnitude = abs(projected[row][column])
+                if (!used[column] && magnitude > largest) {
+                    largest = magnitude
+                    pivotRow = row
+                    pivotColumn = column
                 }
             }
-            return false
+            if (pivotRow < 0) return null
+            val previous = projected[index]
+            projected[index] = projected[pivotRow]
+            projected[pivotRow] = previous
+            used[pivotColumn] = true
+            result += group[pivotColumn]
+            for (row in index + 1 until selected.size) {
+                meter.step()
+                val multiplier = projected[row][pivotColumn] / projected[index][pivotColumn]
+                for (column in group.indices) {
+                    meter.step()
+                    if (used[column]) continue
+                    val value = projected[row][column] - multiplier * projected[index][column]
+                    if (!value.isFinite()) return null
+                    projected[row][column] = value
+                }
+                projected[row][pivotColumn] = 0.0
+            }
         }
-        for (index in selected.indices) {
-            stamp++
-            if (!augment(index)) return null
-        }
-        val result = IntArray(selected.size) { -1 }
-        for (row in group) {
-            meter.step()
-            if (matched[row] >= 0) result[matched[row]] = row
-        }
-        return result.toList()
+        return result
     }
 
     private fun solve(

@@ -428,7 +428,11 @@ reusing logical-column layout, peeling singleton equations and variables without
 fill, and solving admitted residual components with the rational basis factors.
 Factorization and complete verification share the certificate budget; an unresolved
 component retains its proposed entries. A dimension-limited component can instead
-match its open basic directions to an admitted subset of dual coordinates. Other
+propose an admitted subset of dual coordinates for its open basic directions.
+Row-scaled floating elimination selects those coordinates within 16,384 projected
+cells and the containing certificate budget. Nonfinite or weak projected pivots
+decline; the selected exact submatrix must still factor and solve under the
+ordinary rational limits. Other
 proposed multipliers stay fixed; finite column boxes account for their residual
 reduced costs. This proposal retains the dimension, fill, scalar and cumulative
 spending limits and must pass the complete exact dual check. Basis-derived bounds

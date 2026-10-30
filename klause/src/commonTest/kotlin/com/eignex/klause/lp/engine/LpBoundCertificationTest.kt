@@ -44,6 +44,41 @@ class LpBoundCertificationTest {
     }
 
     @Test
+    fun `open direction repair should avoid a structurally matched singular subsystem`() {
+        val size = 129
+        val zero = ExactLpNumber.of(0L)
+        val source = assertNotNull(LpExactState(ExactLpModel(
+            List(size) { column ->
+                val entries = when (column) {
+                    0 -> listOf(0 to 1L, 1 to 1L, 2 to 1L)
+                    1 -> listOf(0 to 1L, 1 to 1L, 2 to 2L)
+                    2 -> listOf(0 to 1L, 1 to 2L, 2 to 4L, 3 to 1L)
+                    else -> listOf(column to 2L, (column + 1) % size to 1L)
+                }
+                entries.sortedBy { it.first }.map { (row, coefficient) ->
+                    ExactLpEntry(row, ExactLpNumber.of(coefficient))
+                }
+            },
+            List(size) { zero },
+            List(size) { column -> ExactLpColumn(ExactLpBounds(ExactLpSide(zero),
+                ExactLpSide(ExactLpNumber.of(1L)).takeIf { column >= 2 })) } +
+                List(size) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            List(size) { ExactLpRow() },
+            ExactLpObjective(List(size) { ExactLpNumber.of(if (it == 1) -4L else -3L) } +
+                List(size) { zero }),
+        )).toWorkingModel())
+        val basis = Basis(IntArray(size) { it },
+            Array(size * 2) { if (it < size) VarStatus.BASIC else VarStatus.AT_LOWER })
+
+        val result = certifyLpBoundOnly(source, DoubleArray(size) { -0.99 },
+            ReconstructionLimits(maxAttempts = 1), basis = basis)
+
+        assertTrue(assertNotNull(result.bound).value < BigFraction.ZERO)
+        assertEquals(2, assertNotNull(result.metrics.basisRepair).restrictedColumns)
+        assertEquals(0, result.metrics.pointChecks)
+    }
+
+    @Test
     fun `retained basis should recover coupled dual equations without a primal`() {
         val zero = ExactLpNumber.of(0L)
         val source = assertNotNull(LpExactState(ExactLpModel(
