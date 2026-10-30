@@ -347,7 +347,7 @@ class RootInprocessingTest {
                 Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
             ))
             val session = PropagationSession(source.bake())
-            if (atMost) session.boundLeLit(0, 0) else session.boundGeLit(0, 1)
+            if (atMost) session.boundLeLit(0, 0, true) else session.boundGeLit(0, 1, true)
 
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2), null)
 
@@ -363,8 +363,8 @@ class RootInprocessingTest {
             Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
         ))
         val session = PropagationSession(source.bake())
-        val first = session.boundLeLit(0, 0)
-        val second = session.boundLeLit(1, 0)
+        val first = session.boundLeLit(0, 0, true)
+        val second = session.boundLeLit(1, 0, true)
         session.addLearnedClause(Clause(intArrayOf(Lit.negate(first), second)), 2)
 
         RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1), null)
@@ -380,7 +380,7 @@ class RootInprocessingTest {
             Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
         ))
         val session = PropagationSession(source.bake())
-        session.boundLeLit(0, 0)
+        session.boundLeLit(0, 0, true)
 
         RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1, rootProbeWork = 1), null)
 
