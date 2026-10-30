@@ -195,10 +195,14 @@ closed unconditional linear sources. Emphasis levels leave it disabled. Admissio
 source assembly, then inspects emitted nonzeros, connected-component dimensions,
 exact scalar width and row-intersection fill risk. Custom emitters decline before
 trial assembly because they have no source-size reservation. Sparse storage is reserved
-independently of the ordinary dense cost proxy. The root trial uses the ordinary
-bound, fixing and conflict consumers with their existing exact checks; cuts,
-expanded hulls and primal probes stay outside its allowance. The initial root
-bound and subsequent root propagation share the existing scoped numerical owner;
+before assembly, along with its construction work. Assembly cancellation and numerical
+admission refusal retain that work charge; cooperative preparation polls cancellation
+before publishing another chunk. The sparse storage allowance is independent of the
+ordinary dense cost proxy. The root trial uses the ordinary
+bound, fixing and conflict consumers with their existing exact checks; cuts and
+expanded hulls stay outside its allowance. Root rounding preserves the ordinary
+admission's probe intent; sources declined by that guard gain no automatic probe.
+The initial root bound and subsequent root propagation share the existing scoped numerical owner;
 handoff requires matching source identities and root scopes, and live bound adoption
 rechecks authority before reusing its basis. A declined retained source layout
 retires that attempt and uses the existing standalone numerical route within the
@@ -211,6 +215,22 @@ the operation keeps its original cumulative work and pivot limits. Consultations
 continue only within the remaining root, invocation and cancellation allowances.
 Authority edits discard the cursor before adoption. Completed floating results
 enter the existing exact bound check, independently of dense exact continuation.
+The sparse root charges its last numerical delta before admitting bound-only
+rational checking under the remaining work and a 16 MiB checking reservation
+inside the trial's storage cap. Exhaustion,
+cancellation or certificate refusal withholds the root bound; checking acquires
+no dense basis continuation.
+
+Completed root points can supply private rounding guidance under the same
+objective identity. A live root owner copies at most one MiB within the remaining
+root and LP allowance. A closed auxiliary rounding solver transfers its completed
+output array into the same private storage cap after its work is charged. The
+constant-size handoff can preserve a completed point across a slice interruption;
+later pinning still polls its fresh token. Rounding uses the stored coordinates
+without another numerical solve; its propagation and source-publication checks
+still run. An incomplete or differently optimized point supplies no retained guidance.
+Rounding pins use probe fixpoints without materializing implication lists;
+an interrupted pin restores the last complete propagation state and withholds its proposal.
 
 Preparation is capped at eight million modeled work units; root and node LP work
 stop at 150 million units or the containing invocation's smaller allowance.
@@ -230,7 +250,9 @@ never changes the dense exact-continuation cell or column caps.
 
 The explicit `lp-component-ownership=true` setting lets finite node bounding retain
 one numerical owner per independent row-coupled block. Each child keeps its basis
-and exact result authority. Bound, cost, row activation and premise changes
+and exact result authority. Empty structural rows form one logical-column child;
+its ordinary solve and exact checks retain feasibility, strict sides and logical
+objective costs. Bound, cost, row activation and premise changes
 invalidate only affected children; unchanged exact child states reuse optimal
 floating results and successful bounds under the same certification policy.
 Global trail revision numbers alone do not invalidate an unchanged child.
@@ -239,14 +261,51 @@ revision is nonzero.
 Explicit query work and pivot allowances cover the collection, including failed
 children, for retained node queries and fresh root tableau queries. Reused results
 add no numerical work or factorization charges.
+Each consultation binds its current cancellation token, including unchanged
+children; identical exact authority retains their factors and completed evidence.
+An ordinary component root uses the same scoped owner for its initial bound and later
+node queries. Selected global cuts enter through the retained cut adapter before the
+root solve; the passed selection also governs an empty cut list.
+When no numerical owner exists, preparation partitions the complete source and cut
+layout together. A declined live component append falls back to the ordinary owner.
+The original node-depth and cut policies remain in force. This root-bound operation
+shares the bounded retained-root work,
+factor storage and checking envelope; incompatible source or cut layouts use a fresh root
+solver within the remaining allowance.
+Scoped preparation reserves the graph scan, partition scratch and child restriction
+storage before constructing children. A declined or interrupted split retains its
+spent preparation work; child numerical preparation receives the remaining grant.
+Explicit component ownership funds cold preparation from the remaining shared LP
+and invocation allowances, separately from the adaptive numerical query quantum.
+Without a timed shared LP allowance, preparation uses the remaining bounded root
+work grant. Ordinary component roots make one adaptive numerical query before
+primal heuristics run; unfinished owners remain available to later node queries.
+Ordinary node queries keep their individual numerical limits. Sparse-trial root-bound
+consultations retain a cumulative continuation grant.
+Preparation is charged before the query receives its remaining allowance.
+The first scoped query completes this charge before freezing a continuation grant;
+an interrupted preparation supplies neither a numerical query nor a prior query's charge.
 Finite basis entry limits are divided among the immutable column blocks; local
-cut replacements retain those shares.
+cut replacements retain those shares. A logical-only child reserves its identity
+factor share first, within the same containing entry limit.
 
 Child bounds remain exact rationals until their sum, isolated-column contributions
 and the original objective constant, scale and sense are combined. Rounding applies
 to that aggregate. Bound support lifts every contributing row and side to the
 current parent state, including its current assertion witnesses. Floating child
 optima alone supply no global optimum or conflict authority.
+
+Completed exact integer components can retain node deductions separately from their
+numerical results. A query uses the parent's common dual-rounding scale and reuses
+compatible child deductions. The aggregate maps multipliers and reduced costs back
+to the current parent authority; each child alternative is combined with the other
+children's strongest bounds for fixing. An alternative visits only its changed
+child's columns; its other reduced costs are already covered by the stronger
+primary deduction. Retained deduction payloads occupy at most eight
+MiB inside the shared 16 MiB checking envelope, and assembly and checking work are
+charged even on a decline. Mixed columns, non-unit objective scaling and unsupported
+integer certificates use the whole-model deduction route. The independent safe
+objective check remains part of the node bound decision.
 
 At owner construction, blocks are ordered by row-and-column dimensions. After a work or
 pivot stop, completed blocks can contribute their checked dual bounds while
@@ -387,7 +446,9 @@ objective shaving and incumbent-relative fixings are optimization work. Root
 preparation runs once, under a common time and work allowance, before shared
 initialization publishes its bounds; a cancelled phase contributes only completed
 deductions. Interrupted root rounding retains its relaxation layout and basis for
-later slices, charging every retry to the remaining root and LP work allowances.
+later slices. A completed rounding LP can retain its coordinates under the same
+bounded guidance allowance after charging the solve, avoiding another LP solve
+when pinning resumes. Every retry consumes the remaining root and LP allowances.
 Root rounding and pumping propose discrete assignments for mixed
 models, but a relaxation point supplies a target, never witness authority.
 
@@ -552,11 +613,16 @@ hold bound trails, active-row identity and verification caches.
 Checked packages retain accepted bounds and witnesses under the same exact state
 and production acceptance policy. Immutable exact-state identity admits reuse without
 serializing the source matrix; retained vectors and support share a 4,096-unit,
-64-KiB storage envelope. Mutable working models require a complete bounded value key.
+64-KiB modeled storage envelope. Mutable working models require a complete bounded value key.
 A distinct exact state invalidates the package even when it shares source definitions.
 A weaker checked bound cannot satisfy an
 attainment request. Continuation retains cumulative import and feasibility work;
 an unfinished import requires the same authority, ordered headings and statuses.
+A fixed-width overflow promotes the last complete tableau to arbitrary precision,
+retaining imported columns, basis order, statuses and strict-side infinitesimals.
+Promotion and abandoned arithmetic spend the same cumulative work and allocation
+allowance; interrupted conversion publishes no partial tableau. Compact cases keep
+fixed-width arithmetic. Fresh source verification still governs acceptance.
 A ready feasibility tableau can rebind compatible bounds under its remaining
 allowance, with publication checked against the current source. Refinement admits
 one unseeded and one exact-point-seeded attempt per state, limits and claim, while
@@ -836,8 +902,9 @@ its separate source-defined verdict and supplies no exact attainment claim.
 
 Retained certification owners reuse the existing single-package counter-result store.
 A checked bound can answer a bound request, but cannot answer a completion or attainment
-request by itself. Reuse requires the identical immutable exact state, complete capture
-key and production acceptance policy. Bounds, scope, active rows, matrix, objective,
+request by itself. Reuse requires the production acceptance policy. Immutable exact
+authority matches by state identity; mutable working models require a complete
+bounded capture key. Bounds, scope, active rows, matrix, objective,
 origins, strictness and integrality remain part of that authority. These independent
 packages retain no floating vectors or ordered basis; exact factor reuse still requires
 its existing matrix and ordered-basis compatibility checks. Edits and owner retirement
@@ -887,8 +954,9 @@ stall heuristics only schedule work; they never authorize proofs.
 | Rational basis verification | Exact FTRAN gives basics; BTRAN gives duals or Farkas candidates. Singularity requests repair. |
 | Exact continuation | Import the numerical basis pivot by pivot, repairing unseatable basics with logicals, then run Bland feasibility. |
 
-Rational work escalates from `Frac128` to `BigFraction`; fixed-width overflow
-restarts the operation from authority, and every attempt is charged. An internal
+Rational work escalates from `Frac128` to `BigFraction`. Production exact
+continuation promotes a retained complete tableau on fixed-width overflow; other
+bounded operations restart from authority. Every attempt is charged. An internal
 consumer context or continuation request can opt into arbitrary precision before
 the first tableau. This selects arithmetic without changing cumulative limits,
 import identity or current-source verification. A retained tableau keeps its

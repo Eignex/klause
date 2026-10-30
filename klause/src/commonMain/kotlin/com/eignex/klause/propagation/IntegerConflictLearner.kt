@@ -30,10 +30,14 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         currentLevel: Int,
         fallback: ConflictAnalyzer.AnalysisResult.Learned,
     ): ConflictAnalyzer.AnalysisResult.LearnedIntegerRow? {
-        if (currentLevel !in 1..INTEGER_LEARNING_LEVELS || !fallback.asserting || fallback.literals.isEmpty()) {
+        if (currentLevel !in 1..INTEGER_LEARNING_LEVELS || !fallback.asserting || fallback.literals.isEmpty() ||
+            fallback.backjumpLevel !in 0 until currentLevel) {
             return decline("level-or-fallback")
         }
         if ((state.learned.integerRows?.size ?: 0) >= INTEGER_LEARNING_ROWS) return decline("store-capacity")
+        val target = fallback.backjumpLevel
+        val trail = state.integerLearningTrailAtLevel?.invoke(target) ?: return decline("assertion-unavailable")
+        state.arithmeticLearningTrace?.record("integer.fallback-target", target.toLong(), trail.toLong())
         val source = sourceFactor(factorId) ?: return decline("seed-source")
         var row = when (source.linear.op) {
             LinearOp.LE -> source.row(useLo = true)
@@ -55,24 +59,17 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             row = row.resolve(event.row, event.variable) ?: return decline("combination-shape-or-guard")
             if (row.minimum(state) <= row.bound) return decline("combination-lost-conflict")
             if (state.learned.integerRows?.any { it.row.subsumes(row) } == true) return decline("duplicate")
-            for (level in 0 until currentLevel) {
-                val trail = state.integerLearningTrailAtLevel?.invoke(level)
-                if (trail == null) {
-                    state.arithmeticLearningTrace?.record("integer.assertion-unavailable", level.toLong())
-                    continue
-                }
-                val asserts = row.assertsAt(state, trail)
-                state.arithmeticLearningTrace?.record("integer.assertion", level.toLong(), trail.toLong(),
-                    if (asserts) 1 else 0)
-                if (!asserts) continue
-                val levels = row.variables.indices.map { index ->
-                    val variable = row.variables[index]
-                    val lower = row.coefficients[index] > 0L
-                    val domain = state.intDomains[variable]
-                    state.boundEstablishmentLevel(variable, if (lower) domain.min else domain.max, lower) ?: 0
-                }.plus(fallback.decisionLevels.toList()).distinct().sorted().toIntArray()
-                return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(row, level, levels.size, levels, fallback)
-            }
+            val asserts = row.assertsAt(state, trail)
+            state.arithmeticLearningTrace?.record("integer.assertion", target.toLong(), trail.toLong(),
+                if (asserts) 1 else 0)
+            if (!asserts) return@repeat
+            val levels = row.variables.indices.map { index ->
+                val variable = row.variables[index]
+                val lower = row.coefficients[index] > 0L
+                val domain = state.intDomains[variable]
+                state.boundEstablishmentLevel(variable, if (lower) domain.min else domain.max, lower) ?: 0
+            }.plus(fallback.decisionLevels.toList()).distinct().sorted().toIntArray()
+            return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(row, target, levels.size, levels, fallback)
         }
         return decline("step-limit-without-assertion")
     }

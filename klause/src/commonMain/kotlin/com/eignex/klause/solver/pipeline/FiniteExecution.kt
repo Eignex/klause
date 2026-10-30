@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.SearchOutcome
 import com.eignex.klause.backtrack.toBacktrackParams
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.ObjectiveSense
@@ -901,13 +902,16 @@ private fun executeSourceMinimum(
 }
 
 private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecutionCallbacks): FiniteExecutionResult {
+    val options = if (request.optimize && request.problem.fixedCumulativeScheduling()) {
+        ExecutionOptions(ExecutionOption.costAwarePropagation(true)).overriddenBy(request.executionOptions)
+    } else request.executionOptions
     val plan = FinitePipeline.planFixedBacktrack(
         FixedBacktrackPlanRequest(
             annotatedParams = request.searchHints?.toBacktrackParams(
                 request.problem.numBoolVars,
                 request.problem.numIntVars,
             ),
-            executionOptions = request.executionOptions,
+            executionOptions = options,
             randomSeed = request.randomSeed,
             cancellation = request.cancellation,
             nodeBudget = request.nodeBudget,
@@ -927,6 +931,20 @@ private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecu
     } else {
         executeFixedSatisfy(solver, params, request, callbacks, start)
     }
+}
+
+private fun Problem.fixedCumulativeScheduling(): Boolean {
+    if (numRealVars != 0) return false
+    var found = false
+    for (factor in factors) {
+        if (factor is Diffn) return false
+        if (factor !is Cumulative) continue
+        if (factor.presents.isNotEmpty() || factor.durationVars.isNotEmpty() ||
+            factor.resourceVars.isNotEmpty() || factor.capacityVar >= 0
+        ) return false
+        found = true
+    }
+    return found
 }
 
 private fun executeFixedSatisfy(
@@ -1070,6 +1088,12 @@ private fun executePortfolio(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
+    val admission = request.executionOptions.reader()[ExecutionOption.companionAdmission]
+    val fundedCompanions = when (admission) {
+        null, "ordinary" -> false
+        "funded" -> true
+        else -> pipelineConfigError("companion-admission expects ordinary|funded, got `$admission`")
+    }
     val probePolicy = when (val probes = request.executionOptions.reader()[ExecutionOption.portfolioProbes]) {
         null, "ordinary" -> InitialProbePolicy.ORDINARY
         "leader-half" -> InitialProbePolicy.LEADER_HALF
@@ -1113,8 +1137,10 @@ private fun executePortfolio(
             engine = request.engine,
             optimize = request.optimize,
             cores = request.cores,
-            executionOptions = request.executionOptions.without("portfolio-proof-share", "portfolio-proof-workers",
-                "portfolio-lp-start", "portfolio-probes", "boolean-proof-tasks"),
+            executionOptions = request.executionOptions.without(
+                "portfolio-proof-share", "portfolio-proof-workers", "portfolio-lp-start", "portfolio-probes",
+                "boolean-proof-tasks", "companion-admission",
+            ),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpCeiling = request.lpConfig,
@@ -1187,6 +1213,7 @@ private fun executePortfolio(
         includeRestartingProof = includeRestartingProof,
         probePolicy = probePolicy,
         booleanProofTasks = booleanProofTasks,
+        fundedCompanions = fundedCompanions,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

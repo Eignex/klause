@@ -52,6 +52,9 @@ class PrivateRebuildSatisfactionTest {
             assertEquals(1L, stats["privateRebuildRetired"])
             assertTrue(stats.getValue("privateRebuildProgressPins") > 0L)
             assertTrue(stats.getValue("privateRebuildWarmClausesRetained") > 0L)
+            assertTrue(stats.getValue("privateRebuildBakeConstructionEntries") > 0L)
+            assertTrue(stats.getValue("privateRebuildOpeningConstructionWork") > 0L)
+            assertTrue(stats.getValue("privateRebuildMappingPreparationWork") > 0L)
             assertEquals(1, opens)
             assertEquals(1, closes)
         }

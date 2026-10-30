@@ -111,18 +111,19 @@ internal class FamilyPolicy(
      * Record one segment of [family]: whether it [progressed], and [plateau] once an incumbent exists, when a
      * segment without progress counts against an observable family. Before that, only an observable family's
      * progress counts; complete-search deductions supply no evidence that its family is closer to a witness.
+     * An explicit [reward] prices zero-yield segments of every family after an incumbent.
      */
-    fun record(family: ArmFamily, progressed: Boolean, plateau: Boolean) {
+    fun record(family: ArmFamily, progressed: Boolean, plateau: Boolean,
+        reward: Double? = null) {
+        require(reward == null || reward in 0.0..1.0) { "family reward must be in [0, 1]" }
+        val success = reward ?: if (progressed) 1.0 else 0.0
         val retained = 2.0.pow(-1.0 / halfLife)
         for (i in successes.indices) {
             successes[i] *= retained
             failures[i] *= retained
         }
-        if (progressed && (plateau || family.observable)) {
-            successes[family.ordinal] += 1.0
-        } else if (plateau && family.observable) {
-            failures[family.ordinal] += 1.0
-        }
+        if (plateau || family.observable) successes[family.ordinal] += success
+        if (plateau && (family.observable || progressed || reward != null)) failures[family.ordinal] += 1.0 - success
     }
 
     private companion object {

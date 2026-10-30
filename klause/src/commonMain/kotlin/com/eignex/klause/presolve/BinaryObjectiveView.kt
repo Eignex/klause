@@ -20,20 +20,31 @@ internal class BinaryObjectiveView(
     val numBoolVars: Int,
 ) {
     companion object {
-        fun create(problem: BakedProblem, objective: LinearObjective): BinaryObjectiveView? {
+        fun create(
+            problem: BakedProblem,
+            objective: LinearObjective,
+            allowMixedObjective: Boolean = false,
+        ): BinaryObjectiveView? {
             if (problem.numRealVars > 0 || problem.semantics.isApproximate ||
                 objective.realCoefficientValues.any { it != 0.0 } ||
                 objective.boolWeightValues.size > problem.numBoolVars ||
                 objective.intCoefficientValues.none { it != 0L }
             ) return null
             val ranges = ColumnRanges.of(problem.rootIntDomainsInPlace)
+            var hasBinaryCost = false
+            var hasNonbinaryCost = false
             for (v in objective.intCoefficientValues.indices) {
                 if (v % 256 == 0 && problem.cancellation()) return null
                 if (objective.intCoefficientValues[v] == 0L) continue
-                if (v >= problem.numIntVars || !ranges.isClosed(v) || ranges.min(v) < 0L || ranges.max(v) > 1L) {
-                    return null
+                if (v >= problem.numIntVars) return null
+                if (ranges.isClosed(v) && ranges.min(v) >= 0L && ranges.max(v) <= 1L) {
+                    hasBinaryCost = true
+                } else {
+                    if (!allowMixedObjective) return null
+                    hasNonbinaryCost = true
                 }
             }
+            if (!hasBinaryCost) return null
             val literals = IntArray(problem.numIntVars) { Lit.NONE }
             for ((index, factor) in problem.factors.withIndex()) {
                 if (index % 256 == 0 && problem.cancellation()) return null
@@ -46,14 +57,25 @@ internal class BinaryObjectiveView(
                 factors.add(Clause(intArrayOf(Lit.make(id, value))))
             }
             var constant = bigIntOf(objective.constant)
+            val retainedCosts = objective.intCoefficientValues.copyOf()
+            var changed = false
             for (v in objective.intCoefficientValues.indices) {
                 val coefficient = bigIntOf(objective.intCoefficientValues[v])
                 if (v % 256 == 0 && problem.cancellation()) return null
                 if (objective.intCoefficientValues[v] == 0L) continue
-                if (ranges.max(v) == 0L) continue
+                if (hasNonbinaryCost &&
+                    (!ranges.isClosed(v) || ranges.min(v) < 0L || ranges.max(v) > 1L)
+                ) continue
+                if (ranges.max(v) == 0L) {
+                    retainedCosts[v] = 0L
+                    changed = true
+                    continue
+                }
                 val shifted = constant + coefficient
                 if (ranges.min(v) == 1L && shifted.fitsLong()) {
                     constant = shifted
+                    retainedCosts[v] = 0L
+                    changed = true
                     continue
                 }
                 val literal = literals[v]
@@ -68,18 +90,24 @@ internal class BinaryObjectiveView(
                     weights[id] = merged
                     if (!positive) constant = shifted
                 } else {
+                    // Mixed objectives reuse existing channels without adding another representation.
+                    if (hasNonbinaryCost) continue
                     // A fresh positive channel retains the source coefficient when signed reuse would overflow.
                     factors.add(ReifiedLinear(weights.size, longArrayOf(1), intArrayOf(v), LinearOp.EQ, 1))
                     weights.add(coefficient)
                 }
+                retainedCosts[v] = 0L
+                changed = true
             }
+            if (!changed || problem.cancellation()) return null
+            val projected = objective.copy(
+                boolWeights = LongArray(weights.size) { weights[it].toLongExact() },
+                intCoefficients = retainedCosts,
+                constant = constant.toLongExact(),
+            )
             return BinaryObjectiveView(
                 factors,
-                objective.copy(
-                    boolWeights = LongArray(weights.size) { weights[it].toLongExact() },
-                    intCoefficients = LongArray(objective.intCoefficientValues.size),
-                    constant = constant.toLongExact(),
-                ).captureBinaryIntegerView(problem, objective),
+                if (hasNonbinaryCost) projected else projected.captureBinaryIntegerView(problem, objective),
                 weights.size,
             )
         }
