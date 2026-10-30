@@ -448,8 +448,9 @@ construction, preparation, checking and retirement retain their ordinary account
 
 `portfolio-reward=source-rate` prices finite positive accepted objective gains against
 observed factory and segment time. Segment time includes preparation, initialization
-and coordinator checks. Unproductive time and feasibility setup remain owed until
-that worker's next priced gain. Its gain rate is compared with other workers'
+and coordinator checks. Failed and refuted segments earn zero reward while their
+cost remains in the peer comparison. Unproductive time and feasibility setup remain
+owed until that worker's next priced gain. Its gain rate is compared with other workers'
 cumulative accepted-gain rate; common objective rescaling preserves this comparison.
 Feasibility retains ordinary rewards, idle credit earns no improvement reward, and
 accepted terminal closure earns unit reward. Accounting is private to an invocation.

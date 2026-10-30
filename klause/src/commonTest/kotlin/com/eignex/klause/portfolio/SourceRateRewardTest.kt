@@ -7,8 +7,50 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class SourceRateRewardTest {
+    @Test
+    fun `retired failure costs should remain in peer gain rates without earning reward`() {
+        for (refuted in listOf(false, true)) {
+            val observed = mutableListOf<PortfolioProgress>()
+            var stop = false
+            val workers = listOf(
+                trackingWorker("failed", 0, ScriptedSearch({ refuted }, start = 2_000.0) {
+                    if (!refuted) error("fixture failure")
+                }).also { it.constructionNanos = 30_000_000 },
+                trackingWorker("finder", 1, ScriptedSearch({ true }, perSlice = 10) {})
+                    .also { it.restartingSearch = true },
+                trackingWorker("peer", 2, ScriptedSearch({ true }, start = 990.0) {})
+                    .also { it.restartingSearch = true },
+            )
+
+            val result = Portfolio(workers, fixedBandit(3, 1), baseSliceWork = 1, maxSliceWork = 1,
+                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(100),
+                witnessCheck = WitnessCheck { _, objective -> if (objective == 1_999.0) "refuted fixture" else null },
+                onProgress = { event ->
+                    if (event is PortfolioEvent.Progressed && !event.progress.idleCredit) {
+                        observed += event.progress
+                        if (event.progress.arm == 1 && event.progress.phase == PortfolioPhase.IMPROVEMENT) stop = true
+                    }
+                }, rewardPolicy = SourceRateReward()).use { it.minimize(Cancellation { stop }) }
+
+            val failed = observed.single { it.arm == 0 }
+            val own = observed.filter { it.arm == 1 }
+            val peer = observed.single { it.arm == 2 }
+            val ownCost = own.sumOf { it.nanos.toDouble() + it.constructionNanos }
+            val peerCost = peer.nanos.toDouble() + peer.constructionNanos + failed.nanos + failed.constructionNanos
+            val ownRate = requireNotNull(own.last().credit["Improvement"]) / ownCost
+            val peerRate = requireNotNull(peer.credit["Improvement"]) / peerCost
+            val expected = ownRate / (ownRate + peerRate)
+            assertTrue(failed.failed || failed.refuted)
+            assertEquals(0.0, result.stats.portfolio.arms[0].meanReward)
+            assertEquals(2, own.size)
+            assertEquals((own.first().ordinaryReward + expected) / 2,
+                result.stats.portfolio.arms[1].meanReward, 1e-12)
+        }
+    }
+
     @Test
     fun `each invocation should price its own observations when a configured policy is reused`() {
         val configured = SourceRateReward()
