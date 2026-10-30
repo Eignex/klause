@@ -128,6 +128,25 @@ class BooleanSatisfactionRepairTest {
     }
 
     @Test
+    fun `direct satisfaction tasks should recover lost coverage before reporting source exhaustion`() {
+        val contradiction = Problem(4, 0, emptyArray(), Array(8) { mask ->
+            Clause(IntArray(3) { bit -> Lit.make(bit + 1, mask and (1 shl bit) != 0) })
+        }).bake()
+        val context = BooleanProofContext(SourceScope(SourceRevision("fixture", "exact-cnf")), "identity:0")
+        val params = List(2) { BacktrackParams(nativeSat = false) }
+        BooleanProofScheduler(contradiction, context, listOf(0, 1), params, true).use { scheduler ->
+            scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 1L)
+            scheduler.loseWorker(0)
+            val result = scheduler.run(Cancellation.Never, 10000L)
+
+            assertTrue(result is SolveResult.Unsat)
+            assertEquals(4, scheduler.completed)
+            assertTrue(scheduler.nativeCoverageComplete)
+            assertFalse(scheduler.independentlyCheckedCoverageComplete)
+        }
+    }
+
+    @Test
     fun `direct satisfaction tasks should retain caller pins and checked witnesses`() {
         val pins = mapOf(1 to false)
         val context = BooleanProofContext(SourceScope(SourceRevision("fixture", "exact-cnf"),
