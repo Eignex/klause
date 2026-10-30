@@ -1165,6 +1165,11 @@ historical or uncompiled records mean unavailable, not equal. Match original
 sources/dependencies, compiler/library identities, these compiled bytes, runtime
 bytes/options and resource/deadline controls before a solver-only comparison.
 Installed solver distribution hashes are expected to change across revisions.
+Runtime identity retains the CLI launchers and non-solver distribution libraries.
+`harnessFingerprint` hashes the bench class bytes independently of archive timestamps;
+`libraryFingerprint` hashes the ordered non-solver bench classpath. Their retained
+entries populate `buildProvenance.harness`. Solver and CLI implementation JARs stay
+separate from those identities. Missing historical entries cannot establish equality.
 
 The CLI deadline includes frontend construction/preparation/search; compressed
 source decoding reduces its remaining allowance. MiniZinc compilation, preflight,
