@@ -57,6 +57,10 @@ internal expect fun profileAllocatedBytes(): Long?
 /** Runs bounded cold and retained LP lifecycle observations for one hash-pinned source. */
 fun main(args: Array<String>) {
     val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
+    if (options["mode"] == "library") {
+        libraryCaller(options)
+        return
+    }
     require(options.keys - "mode" == setOf("source64", "source", "sha256", "repeats"))
     val mode = options["mode"] ?: "lifecycle"
     val checkpoint = mode == "checkpoint" || mode == "checkpoint-feasibility"
