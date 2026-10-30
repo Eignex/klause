@@ -94,6 +94,8 @@ internal class FiniteNumericalCompanions private constructor(
     class Preparation(val companions: FiniteNumericalCompanions?, val elapsedNanos: Long)
 
     val incumbents = PortfolioIncumbents.exact(objective)
+    private val completionSharing = if (params.sourceIncumbentCompletion && incumbentCompletionCheck != null)
+        LinearIncumbentSharing() else null
 
     fun factories(plan: PreparedSourcePlan, firstArm: Int): List<PortfolioArmFactory> {
         val identity = ModelIdentity.of(model, objective)
@@ -159,6 +161,7 @@ internal class FiniteNumericalCompanions private constructor(
             }, onIncumbentUse = {
                 companion().observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
             }, publicationLifetime = limits.cancellation or limits.timeout, observeExternalIncumbents = true,
+            sharedCompletions = completionSharing,
             incumbentCompletionCheck = incumbentCompletionCheck))
         return exactNeighborhoodWorker("ls/finite-joint-companion", arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
@@ -183,7 +186,8 @@ internal class FiniteNumericalCompanions private constructor(
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
                 }, onIncumbentUse = {
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
-                }, observeExternalIncumbents = true, incumbentCompletionCheck = incumbentCompletionCheck)
+                }, observeExternalIncumbents = true, sharedCompletions = completionSharing,
+                incumbentCompletionCheck = incumbentCompletionCheck)
             private var result: MinimizeResult? = null
             override val isDone: Boolean get() = result != null
             override val stats get() = search.stats

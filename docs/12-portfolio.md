@@ -154,6 +154,16 @@ Advisory keys retain value snapshots without producer certificates. Unsupported
 symbolic payloads, integers outside the recovery scalar limit and keys beyond the
 remaining modeled allocation are refused before retention.
 
+The admitted pair can reuse at most sixteen successful original-source completions
+under that same full identity and original-check callback. Each retained point belongs
+to its producing completion owner and is removed when that owner closes. Only immutable
+coordinate snapshots cross workers; producer certificates and failed or pending work
+stay private. Lookup and copied snapshots debit the consumer's existing funding, and
+each consumer retains its source witness and objective admission checks. Sharing grants
+no work, lifetime, bound or terminal authority.
+Completion statistics distinguish shared checked reuse from private recovery; both
+remain inside the consuming owner's completion time.
+
 `companion-integers=true` trials the same bounded companion pair on finite general
 integer/continuous sources. It changes only the binary-fragment restriction; size,
 source capture, objective, LP ceiling, single-lane mixed pool and explicit-recipe
