@@ -31,10 +31,14 @@ internal class DeferredCompanionSearch(
         advance(global, sliceMillis) { search, millis -> search.runSlice(global, millis, sliceNodes, onIncumbent) }
 
     override fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long,
-        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? = advance(global, sliceMillis) { search, millis ->
-        if (search is InstructionSlicedSearch) search.runInstructionSlice(global, millis, sliceInstructions, onIncumbent)
-        else search.runSlice(global, millis, sliceInstructions, onIncumbent)
-    }
+        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
+        advance(global, sliceMillis) { search, millis ->
+            if (search is InstructionSlicedSearch) {
+                search.runInstructionSlice(global, millis, sliceInstructions, onIncumbent)
+            } else {
+                search.runSlice(global, millis, sliceInstructions, onIncumbent)
+            }
+        }
 
     private fun advance(global: Cancellation, sliceMillis: Long,
         run: (ResumableSearch, Long) -> MinimizeResult?): MinimizeResult? {

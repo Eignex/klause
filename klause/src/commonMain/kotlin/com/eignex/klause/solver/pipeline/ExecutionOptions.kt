@@ -516,7 +516,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Active companion lifetime in milliseconds, contained by the ordinary solve deadline. */
         val companionActiveMillis: ExecutionOption<Long> = ExecutionOption("companion-active-ms", ValueKind.LONG)
 
-        internal val companionAdmission: ExecutionOption<String> = ExecutionOption("companion-admission", ValueKind.STRING)
+        internal val companionAdmission: ExecutionOption<String> =
+            ExecutionOption("companion-admission", ValueKind.STRING)
 
         /** Stream physical phase and lifecycle progress independently of deterministic work diagnostics. */
         val portfolioProgress: ExecutionOption<Boolean> = ExecutionOption("portfolio-progress", ValueKind.BOOLEAN)

@@ -72,7 +72,8 @@ class FiniteNumericalCompanionsTest {
             plan, lifetime, numericalCompletion = true)
         val candidate = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null,
             { _, event -> if (event is SearchEvent.WorkerAdmission) events += event }, null,
-            plan, lifetime, numericalCompletion = true, numericalCompanions = TheoryParams(), fundedCompanions = true)
+            plan, lifetime, numericalCompletion = true, numericalCompanions = TheoryParams(),
+            fundedCompanions = true)
 
         baseline.use { before -> candidate.use { after ->
             assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })
@@ -80,7 +81,9 @@ class FiniteNumericalCompanionsTest {
 
         val declined = events.filter { it.recipe.endsWith("finite-companion") || it.recipe.endsWith("joint-companion") }
         assertEquals(2, declined.size)
-        assertTrue(declined.all { !it.admitted && !it.selected && it.declines == listOf("companion-lifetime-unfunded") })
+        assertTrue(declined.all {
+            !it.admitted && !it.selected && it.declines == listOf("companion-lifetime-unfunded")
+        })
     }
 
     @Test
@@ -97,7 +100,8 @@ class FiniteNumericalCompanionsTest {
             val baseline = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
                 plan, lifetime, numericalCompletion = true)
             val candidate = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
-                plan, lifetime, numericalCompletion = true, numericalCompanions = TheoryParams(), fundedCompanions = true)
+                plan, lifetime, numericalCompletion = true, numericalCompanions = TheoryParams(),
+                fundedCompanions = true)
 
             baseline.use { before -> candidate.use { after ->
                 assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })
