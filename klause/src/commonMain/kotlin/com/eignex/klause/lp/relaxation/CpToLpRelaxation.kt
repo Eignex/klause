@@ -679,7 +679,7 @@ internal class CpToLpRelaxation(
     private val projections: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
     elementIndexes: Set<Int>? = null,
     private val templateStats: LpStatsSink? = null,
-    private val reuseSourceTemplates: Boolean = false,
+    private val reuseSourceTemplates: Boolean = true,
     private val preparationCancellation: Cancellation = Cancellation.Never,
     private val reuseTemplateIndexes: Boolean = true,
     private val reuseTemplateMetadata: Boolean = false,
