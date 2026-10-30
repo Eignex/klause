@@ -114,8 +114,10 @@ class LpRetainedSourcesTest {
                 assertEquals(BigFraction.ofLong(2L * origin + 3L), result.lowerBound)
                 assertEquals(BigFraction.ofLong(origin), owner.state.model.column(0).origin.value)
                 assertEquals(open, owner.state.model.column(1).bounds.upper == null)
-                if (templates && !metadata) assertSame(assertNotNull(consumer.preparationTemplates).bounds.getValue(0).column,
-                    owner.state.model.column(0))
+                if (templates && !metadata) {
+                    assertSame(assertNotNull(consumer.preparationTemplates).bounds.getValue(0).column,
+                        owner.state.model.column(0))
+                }
             }
         }
     }
