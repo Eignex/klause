@@ -3,6 +3,7 @@ set -euo pipefail
 
 proof_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 proof_output=${OUT:?OUT must name the retained lab output directory}
+: "${LAB_CORPUS:?LAB_CORPUS must name the maintained lab corpus directory}"
 proof_java="${JAVA_HOME:+$JAVA_HOME/bin/}java"
 proof_seeds=1,3
 proof_repeats=2
@@ -48,6 +49,7 @@ for proof_seed in "${proof_seed_values[@]}"; do
                 "$proof_java" -Xmx2560m -XX:ActiveProcessorCount=1 \
                 --enable-native-access=ALL-UNNAMED --add-modules=jdk.incubator.vector \
                 "-Dklause.workspace.root=$proof_root" \
+                "-Dklause.bench.corpusCache=$LAB_CORPUS" \
                 -cp "$proof_root/klause-bench/build/install/klause-bench/lib/*" \
                 com.eignex.klause.bench.profile.BooleanProofSchedulerProfile \
                 "${proof_arguments[@]}" "seed=$proof_seed" "control=$proof_mode" warmups=0 repeats=1 \
