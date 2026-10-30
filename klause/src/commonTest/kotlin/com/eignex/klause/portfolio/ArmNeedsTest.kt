@@ -32,6 +32,17 @@ import kotlin.test.assertTrue
 
 class ArmNeedsTest {
     @Test
+    fun `integer only coordinates should exclude Boolean and empty integer projections`() {
+        for ((booleans, integers) in listOf(0 to 2, 1 to 2, 1 to 0)) {
+            val model = Problem(booleans, integers, Array(integers) { IntDomain(0, 1) }, emptyArray()).bake()
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.OFF)
+
+            assertEquals(booleans == 0 && integers > 0, facts.integerColumnsOnly)
+        }
+    }
+
+    @Test
     fun `curated eligibility should identify the missing objective without changing explicit recipes`() {
         val facts = ProblemFacts.assumed(Kind.CSP)
         val required = setOf(ArmNeed.Objective)
