@@ -88,7 +88,7 @@ internal class PrivateRebuildSatisfaction(
                 return true
             }
         }
-        if (binaryCount == session.learnedClauseCount && binaryRevision == session.learnedClauseRevision ||
+        if ((binaryCount == session.learnedClauseCount && binaryRevision == session.learnedClauseRevision) ||
             attemptedBinaryCount == PrivateRebuildBinaryLearning.MAX_RELATIONS) return false
         binaryCount = session.learnedClauseCount
         binaryRevision = session.learnedClauseRevision

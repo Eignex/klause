@@ -3,7 +3,6 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.OWN_ORIGIN
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import kotlin.test.Test
@@ -67,8 +66,8 @@ class PrivateRebuildBinaryLearningTest {
             )).bake()
             val session = PropagationSession(source, nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
-            session.addLearnedClause(Clause(intArrayOf(0, 3)), 2,
-                origin = if (permanent) OWN_ORIGIN else 1, permanent = permanent)
+            if (permanent) session.addLearnedClause(Clause(intArrayOf(0, 3)), 2, permanent = true)
+            else session.addLearnedClause(Clause(intArrayOf(0, 3)), 2, origin = 1)
 
             val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true }
 
