@@ -43,6 +43,41 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `ordinary component roots retain global cuts for later node queries`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
+            Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 3),
+            Linear(intArrayOf(2, 2), intArrayOf(2, 3), LinearOp.LE, 3),
+        ))
+        val factory = RecordingLpEngineFactory()
+        val sink = SolveStatsSink("ordinary-root-cuts")
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(4) { -1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false), solveBudgetMillis = 30_000L),
+            sink, LpSolveContext(factory)).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            SearchSession(listOf(cp, engine.propagator)).initialize()
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val base = relaxer.build(cp.session)
+            val cut = engine.dualSimplex(base.model, Cancellation.Never).use { simplex ->
+                assertNotNull(simplex.solve())
+                simplex.gomoryCuts(8).first()
+            }
+            assertTrue(engine.cutPool.add(cut, base))
+            assertEquals(1, engine.lpGlobalCuts.size)
+
+            val bound = engine.rootLpRelaxationBound(relaxer, engine.lpGlobalCuts)
+            val constructed = factory.calls.size
+            val pruned = engine.pruneNode(cp.session, -1.0, -1, true)
+
+            assertEquals(-2.0, bound)
+            assertFalse(pruned)
+            assertEquals(constructed, factory.calls.size)
+            assertEquals(2L, sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes?.get("REUSED"))
+        }
+    }
+
+    @Test
     fun `an ordinary component root solves only the child narrowed by a later decision`() {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
