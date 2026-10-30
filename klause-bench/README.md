@@ -110,6 +110,10 @@ classification. Fetched suites download their corpus during resolution.
 Named sets contain one `<suite>/<problem>` per line; `@name` includes another set
 and `#` starts a comment. They bypass default suite family caps.
 
+`suite=maxsat-maxcut` selects the [MaxSAT LIB weighted MaxCut family](https://www.cs.toronto.edu/maxsat-lib/maxsat-instances/master-set/weighted/maxcut/)
+from its compact archive. Names include `dimacs_mod/MANN_a9.clq` and
+`random/max_cut_60_500_9.asc`; model hashes identify the fetched bytes in lab records.
+
 `solve-one suite=ID problem=NAME out=DIR` accepts these controls:
 
 | Option | Purpose |
