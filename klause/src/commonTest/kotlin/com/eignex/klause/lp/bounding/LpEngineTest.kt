@@ -43,6 +43,26 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `ordinary component roots yield after their adaptive numerical query`() {
+        val problem = Problem(0, 120, Array(120) { IntDomain(0, 1) }, (0 until 120).map { variable ->
+            val next = (variable / 60) * 60 + (variable + 1) % 60
+            Linear(intArrayOf(1, 1), intArrayOf(variable, next), LinearOp.GE, 1)
+        })
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(120) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false), solveBudgetMillis = 30_000L),
+            SolveStatsSink("ordinary-root-query-quantum")).use { engine ->
+            engine.observeNodeWork(reachedOptimum = true, degenerateColumns = 0, columns = 1, rows = 1)
+
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            assertTrue(bound.isNaN())
+            assertEquals(LpFloatTermination.WORK, engine.propagator.floatTermination)
+            assertFalse(engine.propagator.floatPaused)
+        }
+    }
+
+    @Test
     fun `ordinary component roots honor an empty cut selection from a nonempty pool`() {
         val problem = boundedProblem()
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),

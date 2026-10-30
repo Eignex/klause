@@ -1414,9 +1414,10 @@ private fun LpEngine.retainedRootLpRelaxationBound(
         return standaloneRootLpRelaxationBound(relaxer, globalCuts, cancellation)
     }
     if (relaxation.model.n == 0) return Double.NaN
+    val continuation = if (sparseTrialActive) ::retainedRootRemainingWork else null
     try {
         while (retainedRootRemainingWork() > 0L && !cancellation()) {
-            val attempt = solveNode(relaxation.model, null, cancellation, ::retainedRootRemainingWork)
+            val attempt = solveNode(relaxation.model, null, cancellation, continuation)
             if (attempt == null) {
                 val metrics = propagator.lastMetrics.copy(preparationOps = 0L)
                 observeRootWork(metrics, finished = !propagator.floatPaused)
