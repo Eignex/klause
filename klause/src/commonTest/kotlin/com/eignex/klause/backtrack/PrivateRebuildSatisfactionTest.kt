@@ -161,6 +161,32 @@ class PrivateRebuildSatisfactionTest {
     }
 
     @Test
+    fun `cancellation during canonical checking should withhold the private witness and release its generation`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
+                Clause(intArrayOf(4, 6)), Clause(intArrayOf(5, 7)),
+            )).bake()
+            var live: ResumableSolve? = null
+            val cancellation = Cancellation {
+                (live?.stats?.search?.learning?.get("privateRebuildSourceCheckWork") ?: 0L) > 0L
+            }
+            val search = BacktrackSolver(source).resumableSolve(BacktrackParams(
+                nativeSat = native, privateRebuildWork = 65_536L,
+                variableSelector = InputOrder, valueSelector = IndomainMin,
+            ))
+            live = search
+
+            val result = search.use { it.runSlice(cancellation, Long.MAX_VALUE, -1L) }
+
+            val stopped = assertIs<SolveResult.Unknown>(result)
+            assertTrue(stopped.stats.search.learning.getValue("privateRebuildSourceCheckWork") > 0L)
+            assertEquals(1L, stopped.stats.search.learning["privateRebuildRetired"])
+            assertNull(stopped.stats.search.learning["privateRebuildSourceAccepted"])
+        }
+    }
+
+    @Test
     fun `cancellation after private opening should release the generation without publishing a point`() {
         for (lifetime in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(
