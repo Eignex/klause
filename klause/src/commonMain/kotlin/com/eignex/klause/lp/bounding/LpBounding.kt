@@ -1480,8 +1480,11 @@ private fun LpEngine.sparseRootLowerBound(
     result: FloatLpResult,
     cancellation: Cancellation,
 ): Double? {
+    val projectionWork = model.extent() * LpNodeOverhead.EXACT
+    if (sparseTrialRemainingWork() <= projectionWork || cancellation()) return null
+    // Source-range and objective projection scans share the existing whole-model overhead charge.
+    model.alsoCharged(this)
     val remaining = sparseTrialRemainingWork()
-    if (remaining <= 0L || cancellation()) return null
     val defaults = ReconstructionLimits()
     val storage = sink.lp.sparseTrial["CheckingReservedBytes"] ?: 0L
     val checked = certifyLpBoundOnly(
@@ -1517,10 +1520,9 @@ private fun LpEngine.recordRootQueryBound(relaxation: LpRelaxation, result: Floa
 
 private fun LpEngine.projectCertifiedLowerBound(relaxation: LpRelaxation, lower: Double?): Double {
     val full = lower?.let { BigFraction.ofDouble(it) }?.plus(BigFraction.ofLong(relaxation.objectiveConstant))
-    val projected = full?.lowerBoundDouble()
+    val projected = full?.lowerBoundDouble() ?: return Double.NaN
     val integral = relaxation.model.hasIntegralObjective()
     return when {
-        projected == null -> Double.NaN
         integral && sourceObjectiveRange(relaxation) == null -> Double.NaN
         integral && abs(projected) >= EXACT_INTEGER_DOUBLE_LIMIT -> projected.nextDown()
         else -> projected
