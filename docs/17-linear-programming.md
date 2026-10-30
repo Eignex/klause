@@ -122,6 +122,9 @@ declared root domains, and live source bounds enter through the scoped adapter.
 Noncompact exact and IEEE layouts use retained source emission.
 An incomplete attempt publishes no snapshot. Compatible views share one atomic
 publication slot per source/finite scope, including temporary presolve bakes.
+An emission update attempts missing template preparation once before its first dirty
+region. A refusal leaves all its regions on ordinary emission; a later dirty update
+can retry under its current allowance.
 Preparation and
 actual row/bound emission have separate observations in the existing LP phase ledger;
 they do not establish numerical result reuse or certified deduction consumption.

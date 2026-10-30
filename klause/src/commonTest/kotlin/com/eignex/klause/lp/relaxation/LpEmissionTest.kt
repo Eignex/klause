@@ -8,7 +8,9 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.authoritativeModel
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -17,6 +19,58 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpEmissionTest {
+    @Test
+    fun `declined preparation should charge once for each dirty emission update`() {
+        val row = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
+        val expensive = object : Factor by row {
+            override val structuralKeyWeight: Int = 262_144
+        }
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            expensive,
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8),
+        ))
+        val projections = FactorProjectionProviders.Default.prepare(problem)
+        var attemptWork = 0L
+        projections.prepareLpTemplates(null, Cancellation.Never) { attemptWork = it }
+        var work = 0L
+        val relaxer = CpToLpRelaxation(problem, null, projections = projections, onTemplateWork = { work += it })
+        val cache = LpEmissionCache(relaxer)
+        var pin: Boolean? = null
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = problem.finiteIntDomain(varId)
+            override fun boolValue(varId: Int): Boolean? = pin
+        }
+
+        cache.refresh(domains, 0)
+        cache.refresh(domains, 0)
+        pin = true
+        cache.refresh(domains, 1)
+
+        assertTrue(attemptWork > 0L)
+        assertEquals(2L * attemptWork, work)
+    }
+
+    @Test
+    fun `interrupted template preparation should allow a later emission update`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+        ))
+        val projections = FactorProjectionProviders.Default.prepare(problem)
+        val relaxer = CpToLpRelaxation(problem, null, projections = projections)
+        val cache = LpEmissionCache(relaxer)
+        var work = 0L
+        val meter = WorkMeter { work += it }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = work > 0L
+            override fun workMeter(): WorkMeter = meter
+        }
+        assertFailsWith<LpAssemblyCancelled> { cache.prepare(RootDomains(problem), 0, token) }
+
+        cache.refresh(RootDomains(problem), 0)
+
+        assertNotNull(relaxer.preparationTemplates)
+    }
+
     @Test
     fun `emission cache should restore the enclosing emission on nested retracts`() {
         val problem = Problem(

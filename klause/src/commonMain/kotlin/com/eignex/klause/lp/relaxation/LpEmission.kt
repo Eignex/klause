@@ -95,10 +95,15 @@ internal class LpEmissionCache(private val relaxer: CpToLpRelaxation) {
         }
         val changes = ArrayList<Change>()
         val changed = ArrayList<Int>()
+        var templatePreparationAttempted = false
         for (index in next.indices) {
             if (cancellation()) throw LpAssemblyCancelled()
             val previous = next[index]
             if (previous == null || !previous.dependencies.matches(domains)) {
+                if (!templatePreparationAttempted) {
+                    relaxer.prepareEmissionTemplates(cancellation)
+                    templatePreparationAttempted = true
+                }
                 val emitted = relaxer.emitRegion(relaxer.emissionRegions[index], domains, cancellation)
                 emittedRegions++
                 if (targetDepth > 0 && saved.add(index)) changes.add(Change(targetDepth, index, previous))

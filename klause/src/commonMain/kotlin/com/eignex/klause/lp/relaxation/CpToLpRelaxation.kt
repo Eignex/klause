@@ -847,12 +847,15 @@ internal class CpToLpRelaxation(
         }
     }
 
+    fun prepareEmissionTemplates(cancellation: Cancellation) {
+        if (preparationTemplates == null) prepareTemplates(cancellation or preparationCancellation)
+    }
+
     fun emitRegion(
         region: LpEmissionRegion,
         domains: RelaxationDomains,
         cancellation: Cancellation = Cancellation.Never,
     ): LpEmission {
-        if (preparationTemplates == null) prepareTemplates(cancellation or preparationCancellation)
         val tracked = LpEmissionDomains(domains)
         val relaxation = Assembler(
             tracked,
