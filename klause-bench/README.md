@@ -1307,3 +1307,13 @@ Only this explicit content policy permits path-only comment differences; changed
 predicates, declarations, annotations, literals or remaining comments change the
 content identity. Ordinary inputs without this exact three-line header retain
 their raw identity. No source or compiled program is rewritten.
+
+Ordinary CLI qualification can request `param.boolean-proof-tasks=true` alongside
+`engines=cp`, `param.bt-arm=first-fail` and `param.arms=2`; the control defaults to
+false. Use the canonical lab runtime, source-checking and physical controls.
+Statistics expose `booleanProof.N.tasks`, `nativeRefutations`, `probeSegments`,
+`probeWork`, `workerWork` and an optional `decline`. A requested setting can decline
+or finish probing without a partition; require actual task observations before
+claiming task use. Probe work is a subset of worker work, while ordinary schedule
+charges retain reservations and coordinator checks. Native closures do not supply
+independent proof checking.

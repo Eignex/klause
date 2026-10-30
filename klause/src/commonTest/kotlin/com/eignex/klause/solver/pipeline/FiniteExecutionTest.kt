@@ -1,6 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -13,9 +15,77 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
+    @Test
+    fun `Boolean proof controls should reach actual source portfolio probing`() {
+        for ((enabled, options) in listOf(
+            false to ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail", "boolean-proof-tasks=false")),
+            true to ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail", "boolean-proof-tasks=true")),
+            true to ExecutionOptions(ExecutionOption.arms(2),
+                ExecutionOption.backtrackArmsByLabel(listOf("first-fail")), ExecutionOption.booleanProofTasks(true)),
+        )) {
+            val problem = Problem(2, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ))
+            val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            val observations = completed.stats.portfolio.booleanProof
+
+            assertEquals(if (enabled) 1 else 0, observations.size)
+            if (enabled) {
+                assertEquals(1, observations.single().probeSegments)
+                assertEquals(0, observations.single().tasks)
+                assertNull(observations.single().decline)
+                assertTrue(observations.single().workerWork >= observations.single().probeWork)
+            }
+        }
+    }
+
+    @Test
+    fun `unsupported source models should record a Boolean proof decline and keep ordinary solving`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
+        val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+            shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
+            executionOptions = ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail",
+                "boolean-proof-tasks=true")),
+        )
+
+        val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+        val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        val observation = completed.stats.portfolio.booleanProof.single()
+
+        assertEquals("model-ineligible", observation.decline)
+        assertEquals(0, observation.tasks)
+        assertEquals(0, observation.probeSegments)
+    }
+
+    @Test
+    fun `Boolean proof controls should reject optimization and parallel lanes`() {
+        for ((optimize, cores) in listOf(true to 1, false to 2)) {
+            val problem = Problem(2, 0, emptyArray(), emptyArray())
+            val objective = LinearObjective(boolWeights = longArrayOf(1L, 0L)).takeIf { optimize }
+            val shape = FiniteSolveShape(problem, optimize, false, null, objective, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE, cores = cores,
+                executionOptions = ExecutionOptions.parse(listOf("boolean-proof-tasks=true")),
+            )
+
+            assertFailsWith<PipelineConfigException> {
+                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            }
+        }
+    }
+
     @Test
     fun `leading probe budgets should require a containing time deadline`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())

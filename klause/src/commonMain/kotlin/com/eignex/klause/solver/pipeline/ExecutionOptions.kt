@@ -533,6 +533,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val portfolioProofWorkers: ExecutionOption<String> =
             ExecutionOption("portfolio-proof-workers", ValueKind.STRING)
 
+        /** Opt-in disjoint queries for eligible single-core Boolean satisfaction portfolios. */
+        val booleanProofTasks: ExecutionOption<Boolean> = ExecutionOption("boolean-proof-tasks", ValueKind.BOOLEAN)
+
         /** Select ordinary LP probes or defer them until the other initial probes finish or find an incumbent. */
         val portfolioLpStart: ExecutionOption<String> = ExecutionOption("portfolio-lp-start", ValueKind.STRING)
 
@@ -587,6 +590,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
                 coreRefinement, companionAfterIncumbent, companionActiveMillis, portfolioProgress,
                 phaseRetention, portfolioReward, portfolioProofShare, portfolioProofWorkers, portfolioLpStart,
+                booleanProofTasks,
                 portfolioProbes, reseedStaleThreshold,
                 lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
             ).associateBy { it.id }

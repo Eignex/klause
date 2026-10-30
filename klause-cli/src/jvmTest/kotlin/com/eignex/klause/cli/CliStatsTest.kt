@@ -8,6 +8,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
+import com.eignex.klause.solver.result.BooleanProofStats
 import com.eignex.klause.solver.result.CoreGuidedStats
 import com.eignex.klause.solver.result.LocalSearchResidual
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
@@ -40,6 +41,18 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class CliStatsTest {
+    @Test
+    fun `Boolean proof output should retain native closures and probe subsets separately`() {
+        val proof = BooleanProofStats(2, 2, 1, 5000L, 22000L)
+        val stats = SolveStats(portfolio = PortfolioStats(booleanProof = listOf(proof)))
+
+        val pairs = portfolioStatPairs(stats).toMap().filterKeys { it.startsWith("booleanProof.") }
+
+        assertEquals(mapOf("booleanProof.0.tasks" to "2", "booleanProof.0.nativeRefutations" to "2",
+            "booleanProof.0.probeSegments" to "1", "booleanProof.0.probeWork" to "5000",
+            "booleanProof.0.workerWork" to "22000"), pairs)
+    }
+
     @Test
     fun `geometric counters remain absent until a consumer requests qualification`() {
         for (requested in listOf(false, true)) {

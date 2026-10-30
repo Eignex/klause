@@ -21,6 +21,7 @@ import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
+import com.eignex.klause.solver.result.BooleanProofStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -379,7 +380,14 @@ class Portfolio(
             throw failure
         }
         cleanup.getOrThrow()
-        val stats = run.folded()
+        val stats = run.folded().let { folded ->
+            if (!disjointBooleanProof) folded else folded.copy(portfolio = folded.portfolio.copy(
+                booleanProof = folded.portfolio.booleanProof + BooleanProofStats(
+                    lastBooleanProofTasks, lastBooleanProofCompleted, lastBooleanProofProbeSegments,
+                    lastBooleanProofProbeWork, lastBooleanProofWork, lastBooleanProofDecline,
+                ),
+            ))
+        }
         return when (val r = decided) {
             is SolveResult.Sat -> r.copy(stats = stats)
 

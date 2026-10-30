@@ -81,6 +81,7 @@ internal fun FinitePipeline.portfolioExecutor(
     improvementProofShare: Double = 0.5,
     deferLpProbes: Boolean = false,
     includeRestartingProof: Boolean = false,
+    booleanProofTasks: Boolean = false,
     leadingProbeBudget: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
@@ -154,6 +155,7 @@ internal fun FinitePipeline.portfolioExecutor(
             rewardPolicy = scenario.rewardPolicy,
             improvementProofShare = improvementProofShare,
             includeRestartingProof = includeRestartingProof,
+            booleanProofTasks = booleanProofTasks,
             onProgress = if (scenario.reportPortfolioProgress) { event ->
                 onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))
             } else null,

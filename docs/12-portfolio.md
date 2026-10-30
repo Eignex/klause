@@ -491,6 +491,8 @@ retains no trace buffer. Finite source invocations forward these events through
 `SearchEvent.PortfolioDiagnostic`; CLI verbose output renders them without a clock.
 The ordinary scheduler remains the default.
 
+### Boolean task sharing
+
 Boolean region attribution uses the [task coverage protocol](08-search.md#boolean-task-coverage)
 with the same source, full assumptions, objective cutoff and mapping identity. Schedule
 events and read/import/use counts do not establish duplicate region coverage. The task
@@ -499,8 +501,8 @@ terminal admission and owns no retained solver state. The internal Boolean task
 executor keeps one repair handle per worker, including a direct Boolean satisfaction
 implementation, and rotates ordinary-sized bounded
 slices across disjoint tasks, reusing each private session for sibling cubes.
-Construction, reseeding, failed attempts, checks and retirement remain inside
-its containing work and physical cost observations; it supplies no independent
+Construction, reseeding, failed attempts, checks and retirement retain their
+containing allowances and cumulative worker counters; it supplies no independent
 proof certificate or automatic admission policy. An internal portfolio coordinator
 keeps source bindings, seed positions and channel origins on the original workers.
 Each lane holds its original session's exclusive owner, reports only its own work
@@ -521,8 +523,15 @@ region for the retained probe engine before exposing the opposite region to its
 peer. The original builder solver and immutable native projection remain available
 through the transfer. Probe work is a subset of each worker's cumulative work, not
 a refunded or additional charge. Without a live decision the same source query
-continues; fast completion creates no board. The integration switches are internal
-and disabled.
+continues; fast completion creates no board.
+
+The direct integration switches are internal and disabled by default. The source
+pipeline exposes `boolean-proof-tasks=true` for opt-in single-core satisfaction
+execution under the same admission guards; optimization and parallel requests
+reject this control. Result statistics distinguish actual partitions, native task
+closures, probe effort and declines. Combining schedules preserves their distinct
+observations.
+These counters do not establish independent checking or confer proof authority.
 
 ### Slice accounting and coverage
 
