@@ -1,5 +1,6 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -7,6 +8,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchConflictResolution
@@ -23,6 +26,57 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class GuardedIntegerSourceTest {
+    @Test
+    fun `compact exact integer sources should derive a mapped consumed row`() {
+        val native = PropagationSession(Problem(0, 3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
+                ExactLinear.of(IntArray(3) { Term.ofIntVar(it) },
+                    listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.MINUS_ONE),
+                    LinearOp.LE, BigFraction.ZERO),
+                ExactLinear.of(IntArray(2) { Term.ofIntVar(it) },
+                    listOf(BigFraction.ofLong(2), BigFraction.MINUS_ONE), LinearOp.LE, BigFraction.ZERO),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
+        val cp = CpSearchComponent(native, intArrayOf(4, 7, 9))
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(9, 7)))
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(4, 2)))
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+        assertEquals(1L, shared.intUpperBound(4))
+        assertTrue((native.learnedLifecycle()["learningIntegerConsumed"] ?: 0L) > 0L)
+    }
+
+    @Test
+    fun `activated exact rows should retain clause fallback in either guard state`() {
+        for (truth in listOf(false, true)) {
+            val state = PropagationState(Problem(1, 1, arrayOf(IntDomain(0, 6)), arrayOf(
+                ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.LE, BigFraction.ofLong(3), activator = 0),
+            )), Assumptions.None)
+            assertTrue(state.pinBool(0, truth))
+
+            val source = GuardedIntegerSource(state).source(0)
+
+            assertNull(source)
+        }
+    }
+
+    @Test
+    fun `a wide exact projection should retain clause fallback`() {
+        val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 6)), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ofLong(Long.MIN_VALUE)),
+                LinearOp.LE, BigFraction.ZERO),
+        )), Assumptions.None)
+
+        val source = GuardedIntegerSource(state).source(0)
+
+        assertNull(source)
+    }
+
     @Test
     fun `a guard pinned after the historical boundary should withhold the source row`() {
         val state = PropagationState(Problem(1, 1, arrayOf(IntDomain(0, 6)), arrayOf(

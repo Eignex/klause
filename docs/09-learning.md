@@ -307,7 +307,10 @@ kinds or unnameable atoms withhold a complete-incidence claim.
 
 `integerRowLearning` is opt-in and independent of pseudo-Boolean learning. Mandatory
 finite `Linear` inequalities and the explaining half of equalities provide integer
-rows. Reified integer rows preserve the signed indicator selecting the inequality
+rows. Mandatory `ExactLinear` rows provide the same source when every coordinate is
+integer and the complete compact projection preserves their word-sized constants,
+term order and relation. Wide, real or activated exact rows retain clause fallback.
+Reified integer rows preserve the signed indicator selecting the inequality
 or equality side, including the strict integer complement of an inequality. Each
 resolved endpoint must name an unextended historical linear reason from the same
 source row, with its exact guard false-literal and historical guard truth.
