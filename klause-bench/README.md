@@ -1038,7 +1038,8 @@ proposal frees at most two connected integers under the same repair allowance;
 record completed checked improvements separately from proposal/import counts.
 The first pending checked-center proposal receives continuation behind complete-worker
 coverage within the unchanged companion cap, including root and center preparation
-when an exact-coordinate incumbent is available.
+when a compatible advisory or exact-coordinate incumbent is available. Advisory
+coordinates still require completion and exact original-source checking before use.
 `jointRepairIncumbentPreparationStarts` counts these preparation requests, before
 source checking admits a center. Retain unsuccessful and paused preparation/proposal
 costs; continuation alone establishes no checked progress.

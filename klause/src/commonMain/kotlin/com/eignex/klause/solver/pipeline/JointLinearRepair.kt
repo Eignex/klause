@@ -212,7 +212,7 @@ internal class JointLinearRepair(
         budget.observe(preparation = 1L)
         val seed = external() ?: return
         if (seed.numBoolVars == model.numBoolVars && seed.numIntVars == model.numIntVars &&
-            seed.exactReals?.size == model.numRealVars
+            seed.numRealVars == model.numRealVars && seed.algebraicReals == null && seed.symbolicReals == null
         ) {
             incumbentTrialPending = true
             observe("jointRepairIncumbentPreparationStarts")
