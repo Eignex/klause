@@ -878,6 +878,8 @@ Selection retains original MPS bytes; the lab planner records each source SHA-25
 Afiro and Adlittle share the source identities in the basis-corpus manifest.
 Avgas supplies a separate linear source. Atwood0 contains a quadratic objective
 and retains its unsupported-input outcome; it does not qualify LP admission.
+`lp-lifecycle-heldout-v1` freezes Avgas and Blending as original linear controls
+at the same revision, independently of the `lp-lifecycle-v1` membership.
 
 `scripts/lp-lifecycle-profile.sh mps-NAME 1 both checkpoint` compares complete
 tableau promotion on actual overflow with fixed-width replay under the same
