@@ -1,5 +1,7 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -25,6 +27,32 @@ class BooleanSatisfactionRepairTest {
     private val problem = Problem(2, 0, emptyArray(), arrayOf(
         Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
     )).bake()
+
+    @Test
+    fun `sibling queries should preserve their scope across restarts`() {
+        val guarded = Problem(5, 0, emptyArray(), Array(8) { mask ->
+            Clause(intArrayOf(Lit.make(0, true)) +
+                IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
+        }).bake()
+        for (native in listOf(false, true)) {
+            val params = BacktrackParams(nativeSat = native, lubyRestartBase = 1L,
+                variableSelector = InputOrder,
+                valueSelector = IndomainMin)
+            BacktrackSolver(guarded).openBooleanProof(params).use { search ->
+                search.begin(Assumptions(bools = mapOf(0 to false)), Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY, Cancellation.Never)
+                val refuted = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+                assertNull(refuted.sample)
+                assertEquals(TerminationReason.SearchExhausted, refuted.reason)
+
+                search.begin(Assumptions(bools = mapOf(0 to true)), Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY, Cancellation.Never)
+                val sibling = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+                assertTrue(assertNotNull(sibling.sample).boolValue(0))
+            }
+        }
+    }
 
     @Test
     fun `an unpinned first query should remain reusable after completion`() {
