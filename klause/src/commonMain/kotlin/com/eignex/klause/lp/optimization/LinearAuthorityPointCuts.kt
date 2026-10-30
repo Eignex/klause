@@ -22,6 +22,10 @@ internal class LinearAuthorityPointCuts(
     )
     private val counts = linkedMapOf<String, Long>()
     val observations: Map<String, Long> get() = counts.toMap()
+    private var family: List<LinearAuthorityCut>? = null
+    private var cooldown = 0
+    private var misses = 0
+    private var retired = false
 
     fun observe(name: String, amount: Long = 1L) {
         val key = "numericalCutSelection$name"
@@ -66,6 +70,21 @@ internal class LinearAuthorityPointCuts(
     ): Set<Int> {
         if (installed.size >= maximumCuts || rows.isEmpty()) {
             if (installed.size >= maximumCuts) observe("PoolLimited")
+            return installed
+        }
+        if (family !== rows) {
+            family = rows
+            cooldown = 0
+            misses = 0
+            retired = false
+        }
+        if (retired) {
+            observe("RetiredQueries")
+            return installed
+        }
+        if (cooldown > 0) {
+            cooldown--
+            observe("CooldownQueries")
             return installed
         }
         val meter = Meter(cancellation)
@@ -153,6 +172,16 @@ internal class LinearAuthorityPointCuts(
             }
             observe("Selected", selected.size.toLong())
             for (cut in selected) onCut(rows[cut.id].family, "POINT_SELECTED", 1L)
+            if (!meter.limited && !cancellation()) {
+                misses = if (selected.isEmpty()) misses + 1 else 0
+                if (misses >= 4) {
+                    retired = true
+                    observe("RetiredFamilies")
+                    for (family in visitedFamilies) onCut(family, "POINT_CANDIDATES_RETIRED", 1L)
+                } else {
+                    cooldown = 7
+                }
+            }
             return installed + selected.map { it.id }
         } finally {
             budget.observe(preparation = meter.work)
