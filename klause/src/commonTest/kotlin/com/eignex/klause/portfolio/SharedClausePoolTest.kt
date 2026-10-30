@@ -292,6 +292,31 @@ class SharedClausePoolTest {
     }
 
     @Test
+    fun `closing after terminal learning records pool capacity without sampling the store`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(4, 0, emptyArray(), emptyList())
+            val pool = SharedClausePool(measureMemory = true)
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+            val session = PropagationSession(problem, nativeSat = native)
+            exchange.onSearchStart(session)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+
+            exchange.onSearchClose(session)
+
+            val stats = meter.snapshot().clauses
+            assertEquals(pool.memory().getValue("poolOwnedBytes"), stats.getValue("poolOwnedBytes"))
+            assertTrue(stats.getValue("poolPrivateIndexBytes") > 0L)
+            assertTrue(stats.getValue("peakSeenCapacityBytes") > 0L)
+            assertEquals(0L, stats.getValue("seenCapacityBytes"))
+            assertEquals(1L, stats.getValue("memorySampleStale"))
+            assertEquals(0L, stats.getValue("memorySampleComplete"))
+            assertEquals(0L, stats.getValue("memorySampleWork"))
+            assertTrue("ownedPrimitiveBytes" !in stats)
+        }
+    }
+
+    @Test
     fun `retiring a search should release its duplicate filter`() {
         val problem = Problem(4, 0, emptyArray(), emptyList())
         val pool = SharedClausePool(measureMemory = true)

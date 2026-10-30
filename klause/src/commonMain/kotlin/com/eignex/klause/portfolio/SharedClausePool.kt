@@ -445,16 +445,18 @@ internal class PoolClauseExchange(
         return object : ClauseExchange by exchange, ConditionedClauseExchange {}
     }
 
+    private fun ownedMemory(): Map<String, Long> = pool.memory() + mapOf(
+        "seenKeys" to seen.size.toLong(),
+        "seenCapacityBytes" to seen.allocatedBytes,
+    )
+
     private fun observe(session: PropagationSession) {
         val m = meter ?: return
         if (!pool.measureMemory) return
         val sample = session.sharingMemory(pool.memorySampleWork, pool.memorySampleScratchEntries)
         val work = sample.work
         m.clauseCount("accountingWork", work)
-        m.clauseMemorySample(pool.memory() + mapOf(
-            "seenKeys" to seen.size.toLong(),
-            "seenCapacityBytes" to seen.allocatedBytes,
-        ) + sample.telemetry())
+        m.clauseMemorySample(ownedMemory() + sample.telemetry())
     }
 
     private fun retainSession(session: PropagationSession) {
@@ -549,7 +551,7 @@ internal class PoolClauseExchange(
             export(session)
         }
         if (pool.measureMemory) meter?.clauseMemorySample(
-            SharingMemorySnapshot(SharingMemoryStatus.STALE, emptyMap(), 0L, 0).telemetry(),
+            ownedMemory() + SharingMemorySnapshot(SharingMemoryStatus.STALE, emptyMap(), 0L, 0).telemetry(),
         )
         if (sessionIdentity == null || sessionIdentity === session.sharingIdentity) {
             session.retainedSharingMemory = null

@@ -239,8 +239,9 @@ filter, including exported and evicted keys. Its lifetime is the native session,
 not the pool generation. Compaction invalidates the drain cursor but preserves
 that filter. Reseeding a retained repair session keeps the filter with its
 learned database. A fresh session releases its backing arrays and reimports the current
-pool; resuming the same session retains both cursor and filter. Retirement releases
-the filter without sampling. An uncancelled retirement also drains uses and exports
+pool; resuming the same session retains both cursor and filter. Retirement records
+the pool and filter capacity counters, then releases the filter without traversing
+the store. An uncancelled retirement also drains uses and exports
 remaining glue; a cancelled retirement skips those scans.
 
 Glue export probes that same filter with the portable content key before copying
@@ -321,8 +322,8 @@ Telemetry exports mutually exclusive `memorySampleComplete`,
 `memorySamplePartial` and `memorySampleStale` flags, plus `memorySampleWork` and
 `memorySampleScratchEntries`. Each observation replaces current sample fields;
 partial samples cannot inherit absent fields from an earlier complete sample.
-Close removes current fields and marks the sample stale without a diagnostic
-scan. Retained `peak*` values remain historical per-field maxima and must never
+Close replaces current fields with pool and filter counters and marks the worker
+sample stale without a diagnostic scan. Retained `peak*` values remain historical per-field maxima and must never
 be used as a complete byte total or added into concurrent high-water marks.
 `drain*` fields describe
 transient batch storage. ALNS repair pools remain worker-private, skip search-conditioned permanent clauses
