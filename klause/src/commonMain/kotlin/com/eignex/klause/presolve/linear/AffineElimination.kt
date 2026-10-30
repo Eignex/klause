@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve.linear
 
+import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
@@ -56,7 +57,8 @@ internal object AffineSingletons {
      * For the **alias** case `x = y` (`n = 2`, `A = 1`, `B = 0`) the substitution `x → y` is a plain
      * variable rename, applied to *every* factor via `Factor.remap` regardless of type.
      * Otherwise the relation folds into every other [Linear], and the rewrite-cost policy also
-     * retains [ReifiedLinear] channels through the fold. A **single-partner** `x = a·y + b`
+     * retains [ReifiedLinear] channels through the fold and unit views through [ComparisonClause].
+     * A **single-partner** `x = a·y + b`
      * additionally projects out of any non-linear factor that can represent the affine view via
      * `Factor.substituteAffine` (an Element index shift, a Table column rewrite). A multi-partner
      * `B + Σ A_j·y_j` only folds into admitted linear rows — a global keyed on `x`'s value as a sum can't
@@ -636,9 +638,10 @@ internal object AffineSingletons {
             // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
             // only folds into admitted linear rows. The global's affine view is an index/position shift in
             // Int space, so a scale or offset beyond Int range takes the Linear-fold path instead.
-            val singlePartnerSubstitutable = termVars.size == 1 &&
+            val singlePartnerSubstitutable = !isAlias && termVars.size == 1 &&
                 termCoeffs[0] in INT_RANGE && constTerm in INT_RANGE &&
-                ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0].toInt(), constTerm.toInt(), termVars[0])
+                ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0].toInt(), constTerm.toInt(),
+                    termVars[0], cancellation)
             if (isAlias || ws.otherOccurrencesAllLinear(di, x) || singlePartnerSubstitutable) {
                 return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
             }
@@ -731,7 +734,14 @@ internal object AffineSingletons {
         }
         fun isContained(defIdx: Int, x: Int): Boolean
         fun otherOccurrencesAllLinear(defIdx: Int, x: Int): Boolean
-        fun otherOccurrencesAffineSubstitutable(defIdx: Int, x: Int, scale: Int, offset: Int, replacement: Int): Boolean
+        fun otherOccurrencesAffineSubstitutable(
+            defIdx: Int,
+            x: Int,
+            scale: Int,
+            offset: Int,
+            replacement: Int,
+            cancellation: Cancellation,
+        ): Boolean
 
         /** Whether any [Linear] factor other than [defIdx] that mentions [x] has already absorbed
          *  [FOLD_ABSORB_CAP] folds — a fold on [x] would rewrite that row once more. Always `false` before any
@@ -819,7 +829,7 @@ internal object AffineSingletons {
     private class SeedOcc(
         private val factors: Array<Factor>,
         private val occ: SharedIntOccurrence,
-        private val foldReified: Boolean,
+        private val rewriteStructured: Boolean,
     ) : FactorOcc {
         override val size: Int get() = factors.size
         override fun factorAt(id: Int): Factor = factors[id]
@@ -847,7 +857,7 @@ internal object AffineSingletons {
                 val id = occ.flat[k]
                 val f = factors[id]
                 // The integer kernel cannot replace a factor whose complete declaration needs real arithmetic.
-                if (id != defIdx && affineFoldRow(f, foldReified) == null) return false
+                if (id != defIdx && affineFoldRow(f, rewriteStructured) == null) return false
             }
             return true
         }
@@ -868,7 +878,7 @@ internal object AffineSingletons {
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
                 cancellation.charge(AFFINE_WORK_WEIGHT)
                 val id = occ.flat[k]
-                val f = affineFoldRow(factors[id], foldReified)
+                val f = affineFoldRow(factors[id], rewriteStructured)
                 if (id != defIdx && f != null && foldRowOverflowsLong(
                         f,
                         x,
@@ -898,23 +908,20 @@ internal object AffineSingletons {
             scale: Int,
             offset: Int,
             replacement: Int,
+            cancellation: Cancellation,
         ): Boolean {
             for (k in occ.offsets[x] until occ.offsets[x + 1]) {
+                cancellation.charge(AFFINE_WORK_WEIGHT)
+                if ((k and CANCEL_POLL_MASK) == 0 && cancellation()) return false
                 val id = occ.flat[k]
                 if (id == defIdx) continue
                 val f = factors[id]
                 // Every occurrence must support an exact replacement or its own affine substitution.
-                if (affineFoldRow(f, foldReified) == null && !f.canSubstituteAffine(
-                        x,
-                        scale,
-                        offset,
-                        replacement,
-                    )
-                ) {
+                if (!affineConsumerAccepts(f, rewriteStructured, x, scale, offset, replacement, cancellation)) {
                     return false
                 }
             }
-            return true
+            return !cancellation()
         }
 
         // The seed is the pristine input before any fold, so no row has absorbed one yet.
@@ -943,7 +950,7 @@ internal object AffineSingletons {
         base: Array<Factor>,
         nVars: Int,
         seed: SharedIntOccurrence?,
-        private val foldReified: Boolean,
+        private val rewriteStructured: Boolean,
     ) : FactorOcc {
         private val slots = ArrayList<Factor?>(base.size + 1).apply { addAll(base) }
         private val intOcc = Array(nVars) { IntArrayList(0) }
@@ -984,7 +991,7 @@ internal object AffineSingletons {
         // of every candidate pivot. Only admitted word-sized rows are counted, matching that predicate.
         private val atCapCount = IntArray(nVars)
 
-        private fun isCappable(f: Factor?): Boolean = affineFoldRow(f, foldReified) != null
+        private fun isCappable(f: Factor?): Boolean = affineFoldRow(f, rewriteStructured) != null
 
         init {
             // The seed's CSR is over the pristine input in input (= stable-id) order, so its dense indices
@@ -1057,7 +1064,7 @@ internal object AffineSingletons {
             for (k in 0 until occ.size) {
                 val id = occ[k]
                 val f = slots[id]
-                if (id != defIdx && affineFoldRow(f, foldReified) == null) return false
+                if (id != defIdx && affineFoldRow(f, rewriteStructured) == null) return false
             }
             return true
         }
@@ -1079,7 +1086,7 @@ internal object AffineSingletons {
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
                 cancellation.charge(AFFINE_WORK_WEIGHT)
                 val id = occ[k]
-                val f = affineFoldRow(slots[id], foldReified)
+                val f = affineFoldRow(slots[id], rewriteStructured)
                 if (id != defIdx && f != null && foldRowOverflowsLong(
                         f,
                         x,
@@ -1113,23 +1120,20 @@ internal object AffineSingletons {
             scale: Int,
             offset: Int,
             replacement: Int,
+            cancellation: Cancellation,
         ): Boolean {
             val occ = intOcc[x]
             for (k in 0 until occ.size) {
+                cancellation.charge(AFFINE_WORK_WEIGHT)
+                if ((k and CANCEL_POLL_MASK) == 0 && cancellation()) return false
                 val id = occ[k]
                 if (id == defIdx) continue
                 val f = slots[id] ?: continue
-                if (affineFoldRow(f, foldReified) == null && !f.canSubstituteAffine(
-                        x,
-                        scale,
-                        offset,
-                        replacement,
-                    )
-                ) {
+                if (!affineConsumerAccepts(f, rewriteStructured, x, scale, offset, replacement, cancellation)) {
                     return false
                 }
             }
-            return true
+            return !cancellation()
         }
 
         override fun anyOtherLinearAtAbsorbCap(defIdx: Int, x: Int): Boolean {
@@ -1160,7 +1164,7 @@ internal object AffineSingletons {
             for (id in toRewrite) {
                 if (id == c.defIdx) continue
                 val f = slots[id] ?: continue
-                val linear = affineFoldRow(f, foldReified)
+                val linear = affineFoldRow(f, rewriteStructured)
                 val next = when {
                     linear != null -> if (linear.intIndexOf(c.x) >= 0) foldAffineIntoRow(linear, c) else f
 
@@ -1359,6 +1363,22 @@ private fun affineFoldRow(factor: Factor?, reified: Boolean): LinearRow? {
         return if (factor.integerConstants != null) factor.linearRows.single() else null
     }
     return factor?.equivalentLinear()?.takeIf { it.integerConstants != null }
+}
+
+private fun affineConsumerAccepts(
+    factor: Factor,
+    rewriteStructured: Boolean,
+    x: Int,
+    scale: Int,
+    offset: Int,
+    replacement: Int,
+    cancellation: Cancellation,
+): Boolean {
+    if (affineFoldRow(factor, rewriteStructured) != null) return true
+    if (factor is ComparisonClause) {
+        return rewriteStructured && factor.canSubstituteAffine(x, scale, offset, cancellation)
+    }
+    return factor.canSubstituteAffine(x, scale, offset, replacement)
 }
 
 private fun LinearRow.intIndexOf(variable: Int): Int {

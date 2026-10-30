@@ -101,8 +101,12 @@ The same policy can fold an asserted integer definition through word-sized
 `ReifiedLinear` consumers. The replacement retains the channel's Boolean output
 and comparison in both directions; conditional equalities never supply asserted
 pivots. Coefficient checks, the per-row absorption cap and carried domain bounds
-apply to these consumers as they do to unconditional rows. Other pivot policies
-retain their consumer admission.
+apply to these consumers as they do to unconditional rows. Single-partner unit
+translations and sign reversals also retain native `ComparisonClause`
+disjunctions, translating every affected bound and reversing inequality direction
+for negative scale. Unrepresentable bounds decline the pivot. Clause analysis
+charges and polls the same allowance without allocating prospective factors.
+Other pivot policies retain their consumer admission.
 
 `PresolveConfig.preserveStructure` is an opt-in performance control for affine and
 structural reduction. Structured factors are all factors except plain `Linear`
