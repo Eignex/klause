@@ -277,7 +277,7 @@ internal class LinearAuthority(
             point[prepared.coordinates[index]] = value.toDouble().takeIf(Double::isFinite) ?: return null
         }
         val directed = family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
-        val refined = withAdditionalCuts(directed, funded) ?: return null
+        val refined = withAdditionalCuts(directed, funded, point) ?: return null
         if (funded()) return null
         val previous = template
         adoptTemplate(refined)
@@ -440,6 +440,7 @@ internal class LinearAuthority(
 
     private fun withAdditionalCuts(
         prepared: LinearAuthorityTemplate, cancellation: Cancellation,
+        point: Map<SourceCoordinate, Double>? = null,
     ): LinearAuthorityTemplate? {
         val generateAggregates = aggregateCuts && !deferAggregatePreparation
         if (!generateAggregates && additionalCuts.isEmpty()) return prepared
@@ -454,7 +455,7 @@ internal class LinearAuthority(
                         cutEligibility[key] = (cutEligibility[key] ?: 0L) + count
                     }
                 }
-            }, maximumCandidates = 64 - additionalCuts.size) else emptyList()
+            }, maximumCandidates = 64 - additionalCuts.size, point = point) else emptyList()
         if (funded()) return null
         val additional = if (generated.isEmpty()) additionalCuts else {
             cutCost(1L, 64L + (generated.size + additionalCuts.size) * 8L)

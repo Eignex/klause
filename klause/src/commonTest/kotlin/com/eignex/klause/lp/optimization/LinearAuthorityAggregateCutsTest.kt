@@ -94,6 +94,38 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `point directed pair preparation should retain a later separating proposal before its pool fills`() {
+        val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val continuous = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(x, y, real, a, b, continuous), linkedMapOf(
+            "first left" to SourcePremise(SourceInequality(
+                mapOf(a to BigFraction.ofLong(2), continuous to BigFraction.ONE), BigFraction.ofLong(3))),
+            "first right" to SourcePremise(SourceInequality(
+                mapOf(b to BigFraction.ofLong(2), continuous to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+        val point = mapOf(a to 0.0, b to 0.0, continuous to 0.0, x to 0.75, y to 0.75, real to 1.5)
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            maximumCandidates = 1, point = point).single()
+
+        assertEquals(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), cut.inequality.coefficients)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `point directed pair preparation should decline proposals with an unavailable point coordinate`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            point = mapOf(x to 0.75, real to 1.5))
+
+        assertTrue(cuts.isEmpty())
+    }
+
+    @Test
     fun `source pair preparation should retain its containing work and storage limits`() {
         val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
             "left" to SourcePremise(left), "right" to SourcePremise(right)))

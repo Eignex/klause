@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.optimization
 
+import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -16,6 +17,7 @@ import com.eignex.klause.util.div
 import com.eignex.klause.util.gcd
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.times
+import kotlin.math.sqrt
 
 internal data class LinearAuthorityAggregateTerm(
     val owner: Int,
@@ -52,6 +54,7 @@ internal object LinearAuthorityAggregateCuts {
         observe: (String, Long) -> Unit = { _, _ -> }, maximumCandidates: Int = 64,
         limits: LinearAuthorityAggregateLimits = LinearAuthorityAggregateLimits(
             work = 500_000L, allocation = 8_388_608L),
+        point: Map<SourceCoordinate, Double>? = null,
     ): List<LinearAuthorityCut> {
         require(maximumCandidates in 0..64)
         val meter = AggregateMeter(limits, cancellation, observe)
@@ -128,6 +131,7 @@ internal object LinearAuthorityAggregateCuts {
                         val cut = derive(listOf(row.term.copy(weight = leftWeight),
                             other.term.copy(weight = rightWeight)), derivedStop, charge, attemptLimits,
                             allowMixed = true, continuousBounds = bounds) ?: continue
+                        if (point != null && !separates(cut, point, meter, observe)) continue
                         meter.reserve(1L, 128L + cut.inequality.supportSize * 64L)
                         candidates += cut
                     }
@@ -138,6 +142,34 @@ internal object LinearAuthorityAggregateCuts {
             observe("AggregatePair${stop.reason}", 1L)
         }
         return candidates.toList()
+    }
+
+    private fun separates(
+        cut: LinearAuthorityCut, point: Map<SourceCoordinate, Double>, meter: AggregateMeter,
+        observe: (String, Long) -> Unit,
+    ): Boolean {
+        meter.reserve(1L, 128L + cut.inequality.supportSize * 64L)
+        var activity = 0.0
+        var normSquared = 0.0
+        for ((id, value) in cut.inequality.coefficients) {
+            meter.reserve(4L)
+            val coordinate = point[id] ?: run {
+                observe("AggregatePairPointUnavailable", 1L)
+                return false
+            }
+            val coefficient = value.toDouble()
+            activity += coefficient * coordinate
+            normSquared += coefficient * coefficient
+        }
+        meter.reserve(1L)
+        val efficacy = (activity - cut.inequality.rhs.toDouble()) / sqrt(normSquared)
+        if (!efficacy.isFinite()) {
+            observe("AggregatePairPointUnavailable", 1L)
+            return false
+        }
+        val eligible = efficacy >= CutPool.MIN_EFFICACY
+        observe(if (eligible) "AggregatePairPointEligible" else "AggregatePairLowEfficacy", 1L)
+        return eligible
     }
 
     private class ProbeRow(

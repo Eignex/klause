@@ -394,6 +394,9 @@ per-attempt limits shared with explicit aggregation. Stopped or limited
 preparation reports its decline and leaves only completed proposals available.
 Point selection obtains its initial point from the current individual-cut recipe,
 then constructs and checks aggregates alongside point-directed row alternatives.
+Aggregate proposal retention requires the same finite normalized violation used
+by point selection, so satisfied proposals leave room for later separating pairs.
+Projection and declined proposals spend the containing generation allowance.
 Only proposals selected against that point enter the replacement mask. An
 unproductive attempt retains the current recipe and its checked bound; selected
 aggregates follow the same bounded scoring, aging and retirement as other rows.

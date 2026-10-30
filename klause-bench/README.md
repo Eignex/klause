@@ -770,6 +770,12 @@ generated aggregates. Discovery and fresh candidate checks are charged before
 point scoring; selected rows enter a subsequent masked query. A fallback can retain
 the individual-cut recipe after paying discovery costs, so retain both recipe
 totals and report actual selected/installed/retired rows separately.
+Point-directed generation applies the ordinary normalized efficacy threshold before
+retaining a proposal. `AggregatePairLowEfficacy` and `AggregatePairPointUnavailable`
+retain rejected projections; `AggregatePairPointEligible` counts proposals admitted
+to the bounded candidate pool. All derivation and projection costs, including those
+without retained rows, remain in the existing generation work/allocation totals.
+Aggregate-only generation retains its source-order proposal policy.
 Repeated `AggregatePairAttempts` or construction observations for one unchanged
 point-prepared template indicate reconstruction cost, rather than additional unique
 candidates. Retain these charges alongside template replacements and masked queries.
