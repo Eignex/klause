@@ -27,6 +27,9 @@ internal class LinearAuthorityPointCuts(
     private var misses = 0
     private var retired = false
 
+    fun candidatesRetired(rows: List<LinearAuthorityCut>?): Boolean =
+        rows != null && family === rows && retired
+
     fun releaseCandidates() {
         family = null
     }

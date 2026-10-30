@@ -145,7 +145,8 @@ internal class LinearAuthority(
             pointFamily = template
         }
         var pending = pointRound?.takeIf {
-            it.query.matches(source, cuts = true, cutMask = it.query.cutMask)
+            it.query.matches(source, cuts = true, cutMask = it.query.cutMask,
+                checkUnselectedCuts = checkUnselectedCuts(it.query.cutMask))
         }
         if (pending == null) {
             pointRound = null
@@ -168,7 +169,8 @@ internal class LinearAuthority(
             }
             pointFamily = family
             if (family.cuts == null ||
-                !prepared.matches(source, cuts = true, cutMask = pointMask)) {
+                !prepared.matches(source, cuts = true, cutMask = pointMask,
+                    checkUnselectedCuts = checkUnselectedCuts(pointMask))) {
                 policy.observe("PointUnavailable")
                 return base
             }
@@ -355,6 +357,9 @@ internal class LinearAuthority(
         return recovered
     }
 
+    private fun checkUnselectedCuts(mask: Set<Int>?): Boolean =
+        mask == null || pointPolicy?.candidatesRetired(template?.cuts?.rows) != true
+
     private fun prepareQuery(
         source: SourceProofContext, cancellation: Cancellation, cuts: Boolean, cutMask: Set<Int>?,
     ): LinearAuthorityQuery? {
@@ -397,7 +402,8 @@ internal class LinearAuthority(
             for (family in prepared?.cuts?.rows.orEmpty().mapTo(HashSet()) { it.family }) {
                 cutLifecycle.observe(family, "ProofVerificationWork", work)
             }
-        }, cutMask = cutMask, onCut = cutLifecycle::observe)?.also {
+        }, cutMask = cutMask, onCut = cutLifecycle::observe,
+            checkUnselectedCuts = checkUnselectedCuts(cutMask))?.also {
             cutLifecycle.families = it.cutFamilies.values.toSet()
             activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong())
             activeMixedCutPeak = maxOf(activeMixedCutPeak, it.activeMixedCuts.toLong())
@@ -439,7 +445,9 @@ internal class LinearAuthority(
         source: SourceProofContext, cancellation: Cancellation, guidance: Boolean = false, cuts: Boolean = false,
         cutMask: Set<Int>? = null,
     ): LinearAuthorityResult {
-        val cached = if (retainLp || guidance) query?.takeIf { it.matches(source, cuts, cutMask) } else null
+        val cached = if (retainLp || guidance) query?.takeIf {
+            it.matches(source, cuts, cutMask, checkUnselectedCuts(cutMask))
+        } else null
         val prepared = cached ?: prepareQuery(source, cancellation, cuts, cutMask)?.also {
             if (retainLp || guidance) query = it
         } ?: return LinearAuthorityResult()

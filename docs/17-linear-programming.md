@@ -339,7 +339,10 @@ candidate generation. Four completed scans without an addition retire that
 generation's unselected candidates from further scoring. A replacement generation
 receives its own lifetime. Installed cuts remain in the selected mask and keep
 their ordinary source checks and scope retraction; candidate retirement changes
-neither their definitions nor checked coverage.
+neither their definitions nor checked coverage. Retired unselected candidates
+are omitted from proof replay as well as scoring. Masked-query reuse distinguishes
+whether unselected candidates are checked; installed cuts retain fresh source
+verification under the current scope.
 Preparation visits at most 65,536 modeled row/support operations with
 4,096-bit input, denominator and intermediate scalar limits. Cut definitions and source-row ownership
 stay in the retained template, ahead of changing invocation-bound rows. Every
