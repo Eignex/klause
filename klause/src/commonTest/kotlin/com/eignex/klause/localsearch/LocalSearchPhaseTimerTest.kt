@@ -1,11 +1,33 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.formats.dimacs.Dimacs
+import com.eignex.klause.formats.dimacs.toProblem
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.objective.FunctionalObjective
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 
 class LocalSearchPhaseTimerTest {
+    @Test
+    fun `generic functional scoring should report completed evaluator calls`() {
+        val source = Dimacs.parseWcnf("7 1 2 0\n").toProblem()
+        val sweep = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = source.boolFolds))
+        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(source.objective))
+        val state = LocalSearchState(source.problem.bake(), Random(0))
+        val timer = LocalSearchPhaseTimer { 0L }
+        state.phaseTimer = timer
+
+        state.objectiveDelta(objective, Move.BoolFlip(0))
+        state.objectiveDelta(objective, Move.BoolFlip(1))
+
+        assertEquals(2L, timer.objectiveScoringSnapshot().getValue("generic"))
+    }
+
     @Test
     fun `objective scoring snapshots should retain completed counts across later observations`() {
         val timer = LocalSearchPhaseTimer { 0L }
