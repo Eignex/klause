@@ -27,6 +27,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.search.BooleanCoverageAttribution
 import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.util.Cancellation
 import com.sun.management.OperatingSystemMXBean
@@ -44,14 +45,18 @@ object BooleanProofSchedulerProfile {
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "work", "seed", "splits", "repeats")
-        require(options.keys.containsAll(required) &&
-            (options.keys - required).all { it in setOf("recipe", "native", "driver", "control", "warmups") })
+        val optional = setOf("recipe", "native", "driver", "control", "warmups", "capture")
+        require(options.keys.containsAll(required) && (options.keys - required).all { it in optional })
         val driver = options["driver"] ?: "repair"
         require(driver in setOf("repair", "satisfaction", "portfolio", "portfolio-probe"))
         val portfolioDriver = driver in setOf("portfolio", "portfolio-probe")
         val probeFirst = driver == "portfolio-probe"
         val control = options["control"] ?: "paired"
         require(control in setOf("paired", "tasks", "replicas"))
+        val captureMode = options["capture"] ?: "none"
+        require(captureMode in setOf("none", "overlap"))
+        val captureOverlap = captureMode == "overlap"
+        require(!captureOverlap || (portfolioDriver && control == "replicas"))
         val warmups = options["warmups"]?.toInt() ?: 1
         require(warmups in 0..1)
         val recipe = options["recipe"] ?: "input-order"
@@ -87,6 +92,8 @@ object BooleanProofSchedulerProfile {
                 // Each control pays its own source construction, bake, private setup, checking and retirement.
                 val problem = Dimacs.parse(bytes.decodeToString()).toProblem().bake(cancellation = stop)
                 val budget = NodeBudget(limit)
+                require(!captureOverlap || problem.numBoolVars in 1..4096)
+                val capture = if (captureOverlap) BooleanCoverageAttribution(context) else null
                 val parameters = if (portfolioDriver) emptyList() else List(2) { worker ->
                     val params = if (recipe == "input-order") BacktrackParams(
                         randomSeed = seed + worker, variableSelector = InputOrder, valueSelector = IndomainMin,
@@ -107,14 +114,20 @@ object BooleanProofSchedulerProfile {
                             randomSeed = workerSeed, onEvent = event,
                             variableSelector = InputOrder, valueSelector = IndomainMin,
                         ) else BacktrackCatalog.byLabel(recipe).build(workerSeed, event)
-                        params.copy(nativeSat = native)
+                        params.copy(nativeSat = native, branchObserver = capture?.observer(
+                            (workerSeed - seed - 1000L).toInt(), problem.numBoolVars,
+                        ) ?: params.branchObserver)
                     }
                     val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK, seed = seed,
                         nodeBudget = budget, btPool = listOf { recipeFactory })
                     val workers = PortfolioBuilder.build(problem, scenario)
+                    val diagnostics = if (capture == null) PortfolioDiagnostics(limit, seed) else {
+                        val trace = out.resolve("overlap-schedule-$iteration.txt")
+                        PortfolioDiagnostics(limit, seed) { trace.appendText("$it\n") }
+                    }
                     Portfolio.thompson(workers, baseSliceWork = 5000L, maxSliceWork = 150000L,
                         sliceGrowth = 1.5, reseedStaleThreshold = 0,
-                        diagnostics = PortfolioDiagnostics(limit, seed)).use { portfolio ->
+                        diagnostics = diagnostics).use { portfolio ->
                         val access = PortfolioAccess(portfolio)
                         access.enable(mode == "tasks", probeFirst)
                         portfolio.solve(stop).also {
@@ -147,6 +160,9 @@ object BooleanProofSchedulerProfile {
                         sliceGrowth = 1.5, reseedStaleThreshold = 0,
                         diagnostics = PortfolioDiagnostics(limit, seed)).use { it.solve(stop) }
                 }
+                val capturedRegions = capture?.regions
+                val capturedLiteralBytes = capture?.literalBytes
+                capture?.clear()
                 val elapsed = System.nanoTime() - started
                 val bytesAllocated = allocation.getThreadAllocatedBytes(Thread.currentThread().threadId()) - allocated
                 val cpuElapsed = process.processCpuTime - cpu
@@ -162,6 +178,13 @@ object BooleanProofSchedulerProfile {
                     put("taskRouteAdmitted", admitted)
                     put("taskRouteDecline", decline)
                     put("sharing", portfolioDriver)
+                    put("regionCapture", captureMode)
+                    put("observedRegionEntries", capture?.entries)
+                    put("duplicateRegionEntries", capture?.duplicateEntries)
+                    put("repeatedRegionEntries", capture?.repeatedEntries)
+                    put("declinedRegionEntries", capture?.declinedEntries)
+                    put("retainedRegions", capturedRegions)
+                    put("retainedRegionLiteralBytes", capturedLiteralBytes)
                     put("presolve", false)
                     put("iteration", iteration)
                     put("warmup", iteration < 0)
