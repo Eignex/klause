@@ -1123,7 +1123,11 @@ retirement. Its live window admits 1,024 events and 65,536 words. Clauses above
 64 literals and endpoint markers above 32 words produce explicit omission events
 and a payload-omission count. A
 trace with omissions cannot establish the omitted premises. The selector wrapper
-delegates all decisions and notifications. Branch records keep only the chosen
+attaches capture when its fresh native session is created, before LP proposals,
+and delegates all decisions and notifications. The record reports that attachment
+and the admitted-row count at that boundary. Actual branch attempts carry their
+shared Boolean name when available, including LP-guided choices that bypass the
+selector. Branch records keep only the chosen
 coordinate and its domain; typed-row records keep their historical endpoints.
 The integer arm's `trace=first-integer` keeps the most recent conflict window until
 an integer object is admitted, then keeps its consumers, branch markers and

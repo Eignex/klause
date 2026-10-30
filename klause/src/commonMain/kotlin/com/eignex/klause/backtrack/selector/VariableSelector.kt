@@ -28,6 +28,13 @@ interface VariableSelector : VariableBranching<PropagationSession> {
      *  rebuild from their config so no per-search state leaks across reuse. */
     override fun fresh(): VariableSelector
 
+    /**
+     * Observation hook called once when this fresh selector is attached to its native session, before
+     * search and LP branch proposals. The session may still await root initialization; this hook must
+     * not mutate it.
+     */
+    fun onSessionCreated(session: PropagationSession) {}
+
     /** Called once per SAT leaf reached by the search. Solution-guided heuristics snapshot
      *  the assignment here so they can bias future picks toward it. Default no-op. */
     fun onSolution(snapshot: Sample) {}

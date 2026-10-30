@@ -59,6 +59,38 @@ import kotlin.test.assertTrue
 
 class BacktrackSolverTest {
     @Test
+    fun `a finite selector should attach to its session before branching`() {
+        for (optimize in listOf(false, true)) {
+            val attached = ArrayList<PropagationSession>()
+            val events = ArrayList<String>()
+            val selector = object : VariableSelector by InputOrder {
+                override fun fresh(): VariableSelector = this
+                override fun onSessionCreated(session: PropagationSession) {
+                    attached += session
+                    events += "attach"
+                }
+                override fun pick(session: PropagationSession, rng: Random): VarRef? {
+                    assertSame(attached.single(), session)
+                    events += "pick"
+                    return InputOrder.pick(session, rng)
+                }
+            }
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, arrayOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            ))
+            val solver = BacktrackSolver(problem.bake())
+            val params = BacktrackParams(variableSelector = selector, valueSelector = IndomainMin, randomSeed = 3L)
+
+            if (optimize) assertIs<MinimizeResult.Optimal>(solver.minimize(minimizeInt(0), params))
+            else assertIs<SolveResult.Sat>(solver.solve(params))
+
+            assertEquals(1, attached.size)
+            assertEquals("attach", events.first())
+            assertTrue("pick" in events)
+        }
+    }
+
+    @Test
     fun `LP free satisfaction should consume a cumulative subset conflict before deciding`() {
         val problem = Problem(0, 4, arrayOf(
             IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(100, 100),

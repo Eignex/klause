@@ -526,6 +526,8 @@ new deductions to propagation-aware selectors. Phase saving captures values befo
 retraction, so propagated as well as decided polarities survive backjumps and
 restarts. Dom/wdeg failure weights belong to the solve and survive restarts; fresh
 selectors isolate solves that share a projection.
+Each fresh finite selector receives its native-session attachment before search
+and LP branch proposals; the attachment can precede root initialization.
 
 Circuit propagation removes targets claimed by fixed incoming edges and premature
 chain closures throughout successor domains, including interior values. Full

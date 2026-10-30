@@ -661,6 +661,7 @@ internal class BacktrackBrancher(
 
     init {
         session.completeAtLeaves(leafColumns)
+        variables.onSessionCreated(session)
         if (params.phaseSaving || params.targetPhasing) {
             session.retractingListener = { phase.capture(it, session) }
         }
