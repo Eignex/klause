@@ -765,6 +765,11 @@ exactly. A fresh positive channel retains the source coefficient when signed reu
 or a constant shift exceeds the objective's storage width. Mixed
 integer readers retain their columns and channels. Substituted values are
 reconstructed from their literals, preserving original costs and source coordinates.
+The rewrite-cost policy also projects binary costs within a mixed integer
+objective when existing signed channels carry them exactly. It retains nonbinary
+costs and any binary cost whose channel reuse would overflow, protecting their
+integer columns from substitution. This mixed view adds no Boolean channels and
+does not carry the pure binary-objective LP admission marker.
 Continuous models, approximate semantics and solution-set-sensitive invocations
 retain their objective form.
 
