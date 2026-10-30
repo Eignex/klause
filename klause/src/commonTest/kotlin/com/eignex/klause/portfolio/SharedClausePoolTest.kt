@@ -325,13 +325,14 @@ class SharedClausePoolTest {
     }
 
     @Test
-    fun `closing after terminal learning records pool capacity without sampling the store`() {
+    fun `closing after terminal learning publishes without allocating a retiring filter`() {
         for (native in listOf(false, true)) {
-            val problem = Problem(4, 0, emptyArray(), emptyList())
+            val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
             val pool = SharedClausePool(measureMemory = true)
             val meter = SharingMeter()
             val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
             val session = PropagationSession(problem, nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             exchange.onSearchStart(session)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
 
@@ -340,13 +341,138 @@ class SharedClausePoolTest {
             val stats = meter.snapshot().clauses
             assertEquals(pool.memory().getValue("poolOwnedBytes"), stats.getValue("poolOwnedBytes"))
             assertTrue(stats.getValue("poolPrivateIndexBytes") > 0L)
-            assertTrue(stats.getValue("peakSeenCapacityBytes") > 0L)
+            assertEquals(1, pool.drainSince(0).clauses.size)
+            assertEquals(0L, stats.getValue("peakSeenCapacityBytes"))
             assertEquals(0L, stats.getValue("seenCapacityBytes"))
             assertEquals(1L, stats.getValue("memorySampleStale"))
             assertEquals(0L, stats.getValue("memorySampleComplete"))
             assertEquals(0L, stats.getValue("memorySampleWork"))
             assertTrue("ownedPrimitiveBytes" !in stats)
         }
+    }
+
+    @Test
+    fun `retiring batches deduplicate fresh repeated clauses in the pool`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
+            val pool = SharedClausePool(measureMemory = true)
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+            val session = PropagationSession(problem, nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            exchange.onSearchStart(session)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+            session.addLearnedClause(Clause(intArrayOf(2, 0)), 2)
+            assertEquals(2, session.learnedClauseCount)
+
+            exchange.onSearchClose(session)
+
+            val shared = pool.drainSince(0).clauses.single()
+            assertContentEquals(intArrayOf(0, 2), shared.boolLits)
+            assertEquals(1, shared.lbd)
+            assertEquals(1L, meter.snapshot().channels.getValue(SharingChannel.Clauses).exported)
+            assertEquals(0L, meter.snapshot().clauses.getValue("peakSeenCapacityBytes"))
+        }
+    }
+
+    @Test
+    fun `retiring producers keep fresh learning available for later consumers`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
+            val pool = SharedClausePool(measureMemory = true)
+            pool.publish(listOf(boolClause(0, 1)), origin = 7)
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+            val session = PropagationSession(problem, nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            exchange.onSearchStart(session)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+            session.addLearnedClause(Clause(intArrayOf(4, 6)), 1)
+
+            exchange.onSearchClose(session)
+            val consumer = PropagationSession(problem, nativeSat = native)
+            assertEquals(native, consumer.usesNativeSat)
+            PoolClauseExchange(pool, origin = 2).onSearchStart(consumer)
+            consumer.pinBool(2, false)
+
+            assertEquals(true, consumer.boolValue(3))
+            assertEquals(1L, meter.snapshot().clauses.getValue("exportDuplicates"))
+            assertEquals(1L, meter.snapshot().clauses.getValue("peakSeenKeys"))
+        }
+    }
+
+    @Test
+    fun `retirement publication preserves atom remapping for a later consumer`() {
+        val problem = twoIntVars()
+        val pool = SharedClausePool()
+        val source = PropagationSession(problem)
+        val exchange = PoolClauseExchange(pool, origin = 1)
+        exchange.onSearchStart(source)
+        source.addLearnedClause(Clause(intArrayOf(source.boundGeLit(0, 3, true), source.boundLeLit(1, 2, true))), 1)
+
+        exchange.onSearchClose(source)
+        val consumer = PropagationSession(problem)
+        consumer.boundGeLit(1, 4, true)
+        PoolClauseExchange(pool, origin = 2).onSearchStart(consumer)
+        consumer.pinIntAtMost(0, 2)
+
+        assertEquals(2L, consumer.intDomain(1).max)
+    }
+
+    @Test
+    fun `retiring batches retain private deduplication across entry compaction`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
+            val pool = SharedClausePool(cap = 1, measureMemory = true)
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+            val session = PropagationSession(problem, nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            exchange.onSearchStart(session)
+            for (literals in listOf(intArrayOf(0, 2), intArrayOf(2, 0), intArrayOf(4, 6), intArrayOf(0, 2))) {
+                session.addLearnedClause(Clause(literals), 1)
+            }
+
+            exchange.onSearchClose(session)
+
+            assertContentEquals(intArrayOf(4, 6), pool.drainSince(0).clauses.single().boolLits)
+            assertEquals(2L, meter.snapshot().channels.getValue(SharingChannel.Clauses).exported)
+            assertTrue(meter.snapshot().clauses.getValue("peakSeenCapacityBytes") > 0L)
+        }
+    }
+
+    @Test
+    fun `byte limited retirement retains funded private admission`() {
+        val problem = Problem(4, 0, emptyArray(), emptyList())
+        val pool = SharedClausePool(softLimitBytes = 65536L, measureMemory = true)
+        val meter = SharingMeter()
+        val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+        val session = PropagationSession(problem)
+        exchange.onSearchStart(session)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+
+        exchange.onSearchClose(session)
+
+        assertEquals(1, pool.drainSince(0).clauses.size)
+        assertTrue(meter.snapshot().clauses.getValue("peakSeenCapacityBytes") > 0L)
+        assertEquals(0L, meter.snapshot().clauses.getValue("seenCapacityBytes"))
+    }
+
+    @Test
+    fun `unfunded terminal publication does not allocate a private filter`() {
+        val problem = Problem(4, 0, emptyArray(), emptyList())
+        val pool = SharedClausePool(reclamationWork = 0L, measureMemory = true)
+        val meter = SharingMeter()
+        val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+        val session = PropagationSession(problem)
+        exchange.onSearchStart(session)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+
+        exchange.onSearchClose(session)
+
+        assertTrue(pool.drainSince(0).clauses.isEmpty())
+        assertEquals(1L, meter.snapshot().clauses.getValue("poolReclamationDeferred"))
+        assertEquals(0L, meter.snapshot().clauses.getValue("peakSeenCapacityBytes"))
     }
 
     @Test

@@ -100,6 +100,29 @@ internal class SharedClausePool(
         cancelled: () -> Boolean = { false },
         charge: () -> Unit = {},
     ): Int = lock.withLock {
+        publishLocked(batch, origin, isGlobal, maxWork, maxScratchEntries, cancelled, charge)
+    }
+
+    internal fun publishRetiring(
+        batch: List<SharedClause>,
+        origin: Int,
+        cancelled: () -> Boolean,
+        charge: () -> Unit,
+    ): Int? = lock.withLock {
+        if (softLimitBytes != null || batch.size > cap - store.size) return@withLock null
+        // A stable generation deduplicates the whole batch without another retiring key index.
+        publishLocked(batch, origin, false, reclamationWork, reclamationScratchEntries, cancelled, charge)
+    }
+
+    private fun publishLocked(
+        batch: List<SharedClause>,
+        origin: Int,
+        isGlobal: Boolean,
+        maxWork: Long,
+        maxScratchEntries: Int,
+        cancelled: () -> Boolean,
+        charge: () -> Unit,
+    ): Int {
         val budget = Budget(maxWork, maxScratchEntries, cancelled, charge)
         var published = 0
         try {
@@ -122,7 +145,7 @@ internal class SharedClausePool(
         } catch (_: Stopped) {
             deferred++
         }
-        published
+        return published
     }
 
     internal fun reclaim(
@@ -565,7 +588,7 @@ internal class PoolClauseExchange(
         if (sessionIdentity != null && sessionIdentity !== session.sharingIdentity) return@metered
         if (!session.cancelRequested) {
             countUses(session)
-            export(session)
+            export(session, retiring = true)
         }
         if (pool.measureMemory) meter?.clauseMemorySample(
             ownedMemory() + SharingMemorySnapshot(SharingMemoryStatus.STALE, emptyMap(), 0L, 0).telemetry(),
@@ -602,8 +625,17 @@ internal class PoolClauseExchange(
 
     /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
      *  trail). The `seen` set guards against re-export within a session; the pool de-dups globally. */
-    private fun export(session: PropagationSession) {
+    private fun export(session: PropagationSession, retiring: Boolean = false) {
         val candidates = exportCandidates(session) ?: return
+        if (retiring && candidates.isNotEmpty() && pool.softLimitBytes == null) {
+            pool.publishRetiring(candidates, origin,
+                cancelled = { session.cancelRequested },
+                charge = { session.chargeSharingWork(1L) },
+            )?.let {
+                meter?.exported(SharingChannel.Clauses, it)
+                return
+            }
+        }
         val fresh = candidates.filter { admit(it.key, session) == true }
         val published = if (fresh.isEmpty()) 0 else pool.publish(
             fresh,
