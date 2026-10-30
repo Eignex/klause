@@ -21,6 +21,7 @@ class ClauseMinimizerTest {
                 else -> 1
             }
             override fun knownLeaf(v: Int): Boolean = v == 3
+            override fun deferredReason(v: Int): Boolean = v == 2
             override fun antecedentsOf(v: Int): IntArray? = when (v) {
                 0 -> intArrayOf(Lit.make(2, false), Lit.make(3, false))
                 2 -> {
@@ -44,6 +45,35 @@ class ClauseMinimizerTest {
 
         assertContentEquals(ordinary, preflight)
         assertEquals(0, expensiveBuilds)
+    }
+
+    @Test
+    fun `eager reasons should not trigger speculative sibling inspection`() {
+        val state = PropagationState(Problem(4, 0, emptyArray(), emptyList()), Assumptions.None)
+        state.reasonPreflight = true
+        var siblingQueries = 0
+        val graph = object : ReasonGraph {
+            override fun universeSize(): Int = 4
+            override fun levelOf(v: Int): Int = if (v == 1) 2 else 1
+            override fun knownLeaf(v: Int): Boolean {
+                siblingQueries++
+                return v == 3
+            }
+            override fun antecedentsOf(v: Int): IntArray? = when (v) {
+                0 -> intArrayOf(Lit.make(2, false), Lit.make(3, false))
+                2 -> intArrayOf()
+                else -> null
+            }
+        }
+        val learned = IntArrayList().also {
+            it.add(Lit.make(0, false))
+            it.add(Lit.make(1, false))
+        }
+
+        val reduced = ClauseMinimizer(state, graph).reduce(learned, 2)
+
+        assertContentEquals(learned.toIntArray(), reduced.toIntArray())
+        assertEquals(0, siblingQueries)
     }
 
     @Test
