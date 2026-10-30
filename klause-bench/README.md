@@ -303,6 +303,14 @@ children retain their output and later controls still run. Keep the lab's comple
 preparation and kernel resource receipts; these cold profile controls do not supply
 ordinary CLI or independent source-checking qualification.
 
+Optional `capture=overlap` is restricted to a bound portfolio driver with
+`control=replicas`. It records bounded exact Boolean regions with original source
+coordinates, duplicate/repeat/declined entry counts and the normal schedule trace.
+Capture retirement is inside the control observation. These observed controls
+include attribution work and allocation and must stay separate from task-versus-
+replica timing comparisons. Declines make overlap a lower bound; entries prove
+neither native refutation nor saved work.
+
 `lab/recipes/` contains the migrated lab recipes. `scripts/convert-lab-recipe.sh`
 translates legacy experiments or schedules from stdin without submitting them;
 exact legacy confirmation lists require a newly pinned SDK plan and are refused.
