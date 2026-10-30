@@ -273,7 +273,6 @@ internal class LpEngine(
         relaxation: LpRelaxation,
         result: FloatLpResult?,
         cancellation: Cancellation,
-        guidanceObjective: LinearObjective = objective,
     ) {
         if (!params.lpPlan.probe || result?.optimal != true || cancellation()) return
         val work = result.primal.size.toLong()
@@ -284,7 +283,24 @@ internal class LpEngine(
         noteNodeOverhead(work)
         val primal = result.primal.copyOf()
         if (cancellation()) return
-        rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation, result.basis, primal)
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal)
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
+    }
+
+    internal fun retainRoundingPrimalGuidance(
+        relaxation: LpRelaxation,
+        result: FloatLpResult,
+        guidanceObjective: LinearObjective,
+    ) {
+        if (!params.lpPlan.probe || !result.optimal ||
+            result.primal.size.toLong() * Double.SIZE_BYTES > ROOT_PRIMAL_GUIDANCE_BYTES || lpWorkAllowanceSpent(1L)
+        ) return
+        val remaining = if (retainedRootEnabled) retainedRootRemainingWork() else rootPrimalWorkBudget()
+        if ((retainedRootEnabled || remaining > 0L) && remaining <= 1L) return
+        val started = TimeSource.Monotonic.markNow()
+        // The auxiliary solver has closed; its completed output buffer belongs to this private worker.
+        noteNodeOverhead(1L)
+        rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation, result.basis, result.primal)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 

@@ -42,6 +42,44 @@ import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
     @Test
+    fun `an optimal rounding point survives interruption while its solver closes`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        var stopped = false
+        var solves = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newTableauSolver(
+                model: LpModel, cancellation: Cancellation, iterationLimit: Int, workLimit: Long,
+                trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): TableauCutSolver {
+                solves++
+                val delegate = ProductionLpEngineFactory.newTableauSolver(
+                    model, cancellation, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : TableauCutSolver by delegate {
+                    override fun close() {
+                        delegate.close()
+                        stopped = true
+                    }
+                }
+            }
+        }
+        val token = Cancellation { stopped }
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
+            SolveStatsSink("closed-rounding-point"), LpSolveContext(factory)).use { engine ->
+            assertNull(engine.lpRoundingProbe(objective, token))
+            assertTrue(engine.rootRoundingInterrupted)
+            stopped = false
+
+            val sample = engine.lpRoundingProbe(objective, token)
+
+            assertEquals(listOf(1L, 0L), assertNotNull(sample).ints.toList())
+            assertEquals(1, solves)
+        }
+    }
+
+    @Test
     fun `completed rounding LP resumes without solving its original objective again`() {
         for (sameObjective in listOf(true, false)) {
             val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
