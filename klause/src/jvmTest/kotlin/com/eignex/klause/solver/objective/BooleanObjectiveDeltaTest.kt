@@ -14,6 +14,7 @@ import org.junit.runners.Parameterized
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -83,6 +84,24 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
         }
 
         assertEquals(if (minimize) 7.0 else -7.0, delta)
+        assertFalse(assignment.boolValue(0))
+    }
+
+    @Test
+    fun `compound scoring should honor cancellation while collecting repeated flips`() {
+        val evaluator = assertNotNull(
+            BooleanObjectiveDelta.preparation(
+                emptyList(), intArrayOf(0), longArrayOf(1L), minimize, 1,
+            ).filterNotNull().last().evaluator,
+        )
+        val assignment = Assignment(1, 0)
+        val move = Move.Compound(List(1024) { Move.BoolFlip(0) })
+        var polls = 0
+
+        assertFailsWith<IllegalStateException> {
+            evaluator.delta(assignment, move) { check(++polls < 16) { "cancelled" } }
+        }
+
         assertFalse(assignment.boolValue(0))
     }
 

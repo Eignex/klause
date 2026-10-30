@@ -35,6 +35,7 @@ internal class BooleanObjectiveDelta private constructor(
         } else {
             val flipped = IntHashSet()
             fun collect(part: Move) {
+                poll()
                 when (part) {
                     is Move.BoolFlip -> if (!flipped.remove(part.varId)) flipped.add(part.varId)
                     is Move.Compound -> part.parts.forEach(::collect)
