@@ -50,18 +50,26 @@ internal object NativeLpSuite : BenchSuite {
         Files.writeString(context.outputDirectory.resolve("input.json"),
             BenchProtocol.json.encodeToString(BenchCase.serializer(), case))
         val record = record(case, context)
+        val adapter = ComparisonProvenance.current
+        val identities = ComparisonProvenance.Identities(adapter.harness,
+            adapter.libraries + record.buildProvenance?.runtime.orEmpty().mapKeys { "native/${it.key}" })
+        val provenance = record.buildProvenance?.let { it.copy(harness = it.harness + identities.retained) }
         val retained = record.copy(stats = record.stats + mapOf(
             "cliRuntime" to "kotlin-native-linux-x86_64",
             "nativeAdapterElapsedNs" to (System.nanoTime() - started).toString(),
             "nativeGcPolicy" to "compiled-default",
-        ), comparisonControls = KlauseLabSuite.comparisonControls(case) + buildMap {
+        ), buildProvenance = provenance, buildFingerprint = provenance?.fingerprint,
+            comparisonControls = KlauseLabSuite.comparisonControls(case) + buildMap {
             put("series", "${case.parameters["comparison-series"] ?: "sdk-v1"}-native-lp")
             put("cliRuntime", "kotlin-native-linux-x86_64")
             put("heap-mib", "not-applicable-native")
             put("gc", "kotlin-native-compiled-default")
             put("harnessHeapMiB", "512")
-            record.buildProvenance?.let { build ->
-                put("runtimeFingerprint", build.copy(distribution = emptyMap(), harness = emptyMap()).fingerprint)
+            provenance?.let { build ->
+                put("runtimeFingerprint",
+                    ComparisonProvenance.runtimeFingerprint(build.copy(distribution = emptyMap())))
+                put("harnessFingerprint", identities.harnessFingerprint)
+                put("libraryFingerprint", identities.libraryFingerprint)
             }
         })
         Files.writeString(report.resolve("solve-record.json"),
