@@ -5,13 +5,14 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.lp.compactRelaxationSupported
 import com.eignex.klause.lp.emitExactLpRelaxation
 import com.eignex.klause.lp.emitLpRelaxation
 import com.eignex.klause.lp.engine.ExactLpBounds
@@ -30,75 +31,100 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.toLongExact
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 internal fun LpRelaxation.authoritativeWithTemplates(
     cancellation: Cancellation,
+    onWork: (Long) -> Unit = {},
     onReuse: (Int) -> Unit = {},
 ): ExactLpModel? {
     if (cancellation()) return null
     val templates = preparationTemplates ?: return model.authoritativeModel()
     var reused = 0
+    var work = 0L
+    val token = object : Cancellation by cancellation {
+        override fun charge(units: Long) {
+            work += units
+            cancellation.charge(units)
+        }
+    }
     fun prepared(index: Int): LpIntegerBoundTemplate? = if (index < model.n && colVarId[index] >= 0 &&
         !colIsBool[index] && colRealId[index] < 0
     ) templates.bound(colVarId[index]) else null
-    if (templates.objectiveIndependent && model.exactState == null && model.doubleView == null) {
-        val imported = try {
+    val imported = try {
+        if (model.exactState == null && model.doubleView == null) {
             model.authoritativeModel { index ->
-                cancellation.charge(1L)
-                if (cancellation()) throw LpTemplateImportCancelled()
-                prepared(index)?.compatibleColumn(model, index)?.also { reused++ }
+                token.charge(1L)
+                if (token()) throw LpTemplateImportCancelled()
+                prepared(index)?.compatibleColumn(model, index, token).also {
+                    if (token()) throw LpTemplateImportCancelled()
+                    if (it != null) reused++
+                }
             }
-        } catch (_: LpTemplateImportCancelled) {
-            return null
+        } else {
+            val original = model.authoritativeModel() ?: return null
+            val columns = List(original.numVars) { index ->
+                token.charge(1L)
+                if (token()) return null
+                val current = original.column(index)
+                val prepared = prepared(index)?.compatibleColumn(current, token)
+                if (token()) return null
+                if (prepared != null) reused++
+                prepared ?: current
+            }
+            if (reused == 0) original else original.withBoundColumns(columns)
         }
-        if (cancellation()) return null
-        onReuse(reused)
-        return imported
+    } catch (_: LpTemplateImportCancelled) {
+        null
+    } finally {
+        onWork(work)
     }
-    val original = model.authoritativeModel() ?: return null
-    val columns = List(original.numVars) { index ->
-        cancellation.charge(1L)
-        if (cancellation()) return null
-        val current = original.column(index)
-        val prepared = prepared(index)?.compatibleColumn(current)
-        if (prepared != null) reused++
-        prepared ?: current
-    }
+    if (cancellation() || imported == null) return null
     onReuse(reused)
-    return if (reused == 0) original else original.withBoundColumns(columns)
+    return imported
 }
 
 private class LpTemplateImportCancelled : RuntimeException()
 
 internal class LpSourceRowTemplate(private val row: LinearRow) {
     private val compactExact = row is ExactLinear && !row.strict && row.activator == LinearRow.ALWAYS &&
-        row.isIntegerOnly && row.compactRelaxationSupported()
+        row.isIntegerOnly && row.constants.let {
+            it is IntegerConstants && it.bound in -9_007_199_254_740_992L..9_007_199_254_740_992L &&
+                it.maxAbsCoeff <= 9_007_199_254_740_992L
+        }
     private val integers = if (compactExact ||
         (row !is ExactLinear && row.isLongUnconditional && row.isIntegerOnly)
     ) {
-        IntArray(row.size) { Term.intVar(row.ref(it)) }
+        when (row) {
+            is ExactLinear -> row.intVars
+            is Linear -> row.vars
+            else -> IntArray(row.size) { Term.intVar(row.ref(it)) }
+        }
     } else null
     private val coefficients = integers?.let {
         LongArray(row.size) {
-            if (compactExact) (row as ExactLinear).constants.exactCoeff(it).toLongExact() else row.coeff(it)
+            if (compactExact) (row.constants as IntegerConstants).coeff(it) else row.coeff(it)
         }
     }
     private val bound = when {
-        compactExact -> (row as ExactLinear).constants.exactBound.toLongExact()
+        compactExact -> (row.constants as IntegerConstants).bound
         integers != null -> row.bound
         else -> 0L
     }
     val storageUnits: Long = 2L + (integers?.size ?: 0) * 2L
 
     fun emit(builder: RelaxationBuilder, projection: LinearLpProjection) {
-        if (integers != null) builder.linearRow(row.relation, integers, requireNotNull(coefficients), bound)
-        else if (row is ExactLinear) row.emitExactLpRelaxation(builder)
+        if (integers != null) {
+            if (row.relation == LinearOp.NE) return
+            val columns = IntArray(integers.size) { builder.intColumn(integers[it]) }
+            builder.row(columns, requireNotNull(coefficients), row.relation, bound)
+        } else if (row is ExactLinear) row.emitExactLpRelaxation(builder)
         else row.emitLpRelaxation(builder, projection)
     }
 }
 
+@OptIn(ExperimentalAtomicApi::class)
 internal data class LpIntegerBoundTemplate(
     val variable: Int,
     val lower: Long,
@@ -106,38 +132,81 @@ internal data class LpIntegerBoundTemplate(
     val statedLower: Boolean,
     val statedUpper: Boolean,
 ) {
-    val column = ExactLpColumn(
-        ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)),
-            ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(upper) - BigFraction.ofLong(lower)))),
-        origin = ExactLpNumber.of(lower), integral = true, tag = variable,
-    )
-    private val openColumn = column.copy(bounds = column.bounds.copy(upper = null))
+    private val completedColumn = AtomicReference<ExactLpColumn?>(null)
+    val column: ExactLpColumn get() = requireNotNull(column(false, Cancellation.Never))
 
-    fun compatibleColumn(current: ExactLpColumn): ExactLpColumn? = when (current) {
-        column -> column
-        openColumn -> openColumn
-        else -> null
+    private fun column(open: Boolean, cancellation: Cancellation): ExactLpColumn? {
+        val previous = completedColumn.load()
+        if (previous != null && (previous.bounds.upper == null) == open) return previous
+        cancellation.charge(COLUMN_WORK)
+        if (cancellation()) return null
+        val width = upper - lower
+        val current = ExactLpColumn(
+            ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)), if (open) null else ExactLpSide(
+                if (width >= 0L) ExactLpNumber.of(width)
+                else ExactLpNumber.of(BigFraction.ofLong(upper) - BigFraction.ofLong(lower)),
+            )),
+            origin = ExactLpNumber.of(lower), integral = true, tag = variable,
+        )
+        completedColumn.compareAndSet(previous, current)
+        return current
     }
 
-    fun compatibleColumn(model: LpModel, index: Int): ExactLpColumn? {
+    fun compatibleColumn(current: ExactLpColumn, cancellation: Cancellation = Cancellation.Never): ExactLpColumn? {
+        val previous = completedColumn.load()
+        if (previous == current) return previous
+        if (!matchesColumn(current, cancellation) || cancellation()) return null
+        completedColumn.compareAndSet(previous, current)
+        return current
+    }
+
+    private fun matchesColumn(current: ExactLpColumn, cancellation: Cancellation): Boolean =
+        current.integral && current.tag == variable && current.origin.legacyLong() == lower &&
+            matchesLower(current.bounds.lower) && matchesUpper(current.bounds.upper, cancellation)
+
+    private fun matchesLower(side: ExactLpSide?): Boolean = side != null &&
+        !side.strict && side.premises == null && side.number.legacyLong() == 0L
+
+    private fun matchesUpper(side: ExactLpSide?, cancellation: Cancellation): Boolean {
+        if (side == null) return true
+        if (side.strict || side.premises != null || side.number.ieeeBits != null) return false
+        val width = upper - lower
+        if (width >= 0L) return side.number.legacyLong() == width
+        cancellation.charge(COLUMN_WORK)
+        if (cancellation()) return false
+        return side.number.value == BigFraction.ofLong(upper) - BigFraction.ofLong(lower)
+    }
+
+    fun compatibleColumn(model: LpModel, index: Int, cancellation: Cancellation): ExactLpColumn? {
         val width = upper - lower
         if (model.doubleView != null || model.exactState != null || model.colContinuous[index] ||
             model.probeClampedLo[index] || model.tag[index] != variable || model.loShift[index] != lower || width < 0L
         ) return null
-        return if (!model.hasFiniteUpper(index) || model.probeClampedHi[index]) {
-            openColumn
-        } else {
-            column.takeIf { model.upper[index] == width }
-        }
+        val open = !model.hasFiniteUpper(index) || model.probeClampedHi[index]
+        if (!open && model.upper[index] != width) return null
+        return column(open, cancellation)
+    }
+
+    companion object {
+        const val STORAGE_UNITS = 24L
+        const val COLUMN_WORK = 23L
     }
 }
 
 internal class LpFactorTemplate(
     val factor: Factor,
-    val support: List<Int>,
     val rows: List<LpSourceRowTemplate>?,
 ) {
-    val storageUnits: Long = 3L + support.size + (rows?.sumOf { it.storageUnits } ?: 0L)
+    private val integerVariables = factor.intVars
+    private val booleanVariables = factor.boolVars
+    val supportSize: Int get() = integerVariables.size + booleanVariables.size
+    val storageUnits: Long = 4L + supportSize + (rows?.sumOf { it.storageUnits } ?: 0L)
+
+    fun reference(index: Int): Int = if (index < integerVariables.size) {
+        Term.ofIntVar(integerVariables[index])
+    } else {
+        Term.ofLit(booleanVariables[index - integerVariables.size] shl 1)
+    }
 }
 
 internal class LpTemplateComponent(
@@ -176,48 +245,6 @@ internal class LpPreparationTemplates private constructor(
 
     companion object {
         private const val MAX_UNITS = 262_144L
-        private const val BOUND_UNITS = 24L
-
-        @Suppress("CyclomaticComplexMethod") // The work lower bound covers each cold preparation stage.
-        private fun coldPreparationFits(
-            selection: PreparedFactorProjections,
-            visit: (Long) -> Boolean,
-            remaining: () -> Long,
-        ): Boolean {
-            val problem = selection.problem
-            var minimum = 2L * problem.numFactors + 1L
-            if (!visit(18L) || minimum > remaining()) return false
-            val owners = MutableIntIntMap()
-            fun reference(value: Int, factor: Int): Boolean {
-                if (!visit(1L) || minimum > remaining()) return false
-                val previous = owners.getOrDefault(value, -1)
-                if (previous == factor) return true
-                // Bounds, incidence and component assembly each revisit distinct factor support.
-                minimum += 3L
-                if (previous < 0) {
-                    minimum += 1L + if (Term.isInt(value)) BOUND_UNITS else 0L
-                    if (!visit(8L)) return false
-                }
-                if (minimum > remaining()) return false
-                owners.put(value, factor)
-                return true
-            }
-            for ((index, factor) in problem.factors.withIndex()) {
-                if (!visit(1L)) return false
-                minimum += factor.structuralKeyWeight.toLong()
-                if (minimum > remaining()) return false
-                val integers = factor.intVars
-                val booleans = factor.boolVars
-                minimum += integers.size.toLong() + booleans.size
-                if (selection.capabilities(index).relaxation == RelaxationCapability.SOUND &&
-                    (factor is Linear || factor is ExactLinear)
-                ) minimum += 1L + (factor as LinearRow).size
-                if (minimum > remaining()) return false
-                for (variable in integers) if (!reference(Term.ofIntVar(variable), index)) return false
-                for (variable in booleans) if (!reference(Term.ofLit(variable shl 1), index)) return false
-            }
-            return minimum <= remaining()
-        }
 
         fun prepare(
             selection: PreparedFactorProjections,
@@ -239,13 +266,17 @@ internal class LpPreparationTemplates private constructor(
                     it.source.numIntVars == problem.numIntVars && it.source.numRealVars == problem.numRealVars
             }
             var units = 0L
+            var pendingColumnWork = 0L
             try {
                 fun visit(count: Long = 1L): Boolean {
                     units += count
                     token.charge(count)
-                    return units <= MAX_UNITS && !token()
+                    return units + pendingColumnWork <= MAX_UNITS && !token()
                 }
-                if (old == null && !coldPreparationFits(selection, ::visit) { MAX_UNITS - units }) return null
+                fun reserveBound(): Boolean {
+                    pendingColumnWork += LpIntegerBoundTemplate.COLUMN_WORK
+                    return visit()
+                }
                 fun unchanged(): Boolean {
                     if (old == null || old.objectiveIndependent || old.factors.size != problem.numFactors ||
                         old.objectiveConstant != (objective?.constant ?: 0L)
@@ -280,7 +311,9 @@ internal class LpPreparationTemplates private constructor(
                     }
                     var changedBounds: MutableMap<Int, LpIntegerBoundTemplate>? = null
                     var reusedBounds = old.bounds.size
-                    for ((variable, bound) in old.bounds) {
+                    val stableBounds = problem.declaredIntDomains.stableEndpoints &&
+                        old.source.declaredIntDomains === problem.declaredIntDomains
+                    if (!stableBounds) for ((variable, bound) in old.bounds) {
                         if (!visit()) return null
                         val domain = problem.rootDomainOf(variable)
                         val lower = problem.statesLowerBound(variable)
@@ -292,41 +325,16 @@ internal class LpPreparationTemplates private constructor(
                             if (!visit(old.bounds.size.toLong())) return null
                             changedBounds = LinkedHashMap(old.bounds)
                         }
-                        if (!visit(BOUND_UNITS)) return null
+                        if (!reserveBound()) return null
                         changedBounds[variable] = LpIntegerBoundTemplate(variable, domain.min, domain.max, lower, upper)
                         reusedBounds--
-                    }
-                    var changedComponents: MutableList<LpTemplateComponent>? = null
-                    var reusedComponents = old.components.size
-                    if (changedBounds != null) for ((componentId, component) in old.components.withIndex()) {
-                        if (!visit()) return null
-                        var componentBounds: MutableMap<Int, LpIntegerBoundTemplate>? = null
-                        for ((variable, bound) in component.bounds) {
-                            if (!visit()) return null
-                            val current = changedBounds.getValue(variable)
-                            if (current === bound) continue
-                            if (componentBounds == null) {
-                                if (!visit(component.bounds.size.toLong())) return null
-                                componentBounds = LinkedHashMap(component.bounds)
-                            }
-                            componentBounds[variable] = current
-                        }
-                        if (componentBounds == null) continue
-                        if (changedComponents == null) {
-                            if (!visit(old.components.size.toLong())) return null
-                            changedComponents = old.components.toMutableList()
-                        }
-                        if (!visit()) return null
-                        changedComponents[componentId] = LpTemplateComponent(component.factors,
-                            componentBounds, component.references, component.costs)
-                        reusedComponents--
                     }
                     if (!visit()) return null
                     return LpPreparationTemplates(
                         problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
                         0L, true, old.factors, changedBounds ?: old.bounds,
-                        changedComponents ?: old.components, old.source !== problem, old.factors.size, reusedBounds,
-                        reusedComponents, old.storageUnits, changedBounds == null && changedComponents == null)
+                        emptyList(), old.source !== problem, old.factors.size, reusedBounds,
+                        0, old.storageUnits, changedBounds == null)
                 }
                 if (reuseMetadata) {
                     val rebound = rebind()
@@ -342,7 +350,7 @@ internal class LpPreparationTemplates private constructor(
                             it.storageUnits, true)
                     }
                 }
-                if (units > MAX_UNITS || token()) return null
+                if (units + pendingColumnWork > MAX_UNITS || token()) return null
                 val oldFactors = HashMap<Factor, LpFactorTemplate>()
                 for (entry in old?.factors.orEmpty()) {
                     if (!visit()) return null
@@ -361,15 +369,6 @@ internal class LpPreparationTemplates private constructor(
                         retained
                     } else {
                         if (!visit(factor.structuralKeyWeight.toLong())) return null
-                        val support = ArrayList<Int>()
-                        for (variable in factor.intVars) {
-                            if (!visit()) return null
-                            support.add(Term.ofIntVar(variable))
-                        }
-                        for (variable in factor.boolVars) {
-                            if (!visit()) return null
-                            support.add(Term.ofLit(variable shl 1))
-                        }
                         val declared = if (selection.capabilities(factorId).relaxation != RelaxationCapability.SOUND ||
                             factor is LinearIndicator ||
                             factor is ReifiedPseudoBoolean
@@ -379,16 +378,19 @@ internal class LpPreparationTemplates private constructor(
                             if (!visit(1L + row.size)) return null
                             LpSourceRowTemplate(row)
                         }
-                        LpFactorTemplate(factor, support.distinct(), rows)
+                        LpFactorTemplate(factor, rows)
                     }
                     storage += entry.storageUnits
                     if (storage > MAX_UNITS) return null
                     factors.add(entry)
-                    for (reference in entry.support) {
+                    for (supportId in 0 until entry.supportSize) {
+                        val reference = entry.reference(supportId)
                         if (!visit()) return null
                         if (!Term.isInt(reference)) continue
                         val variable = Term.intVar(reference)
                         if (variable in bounds) continue
+                        storage += LpIntegerBoundTemplate.STORAGE_UNITS
+                        if (storage > MAX_UNITS) return null
                         val domain = problem.rootDomainOf(variable)
                         val statedLower = problem.statesLowerBound(variable)
                         val statedUpper = problem.statesUpperBound(variable)
@@ -397,13 +399,19 @@ internal class LpPreparationTemplates private constructor(
                                 it.statedLower == statedLower && it.statedUpper == statedUpper
                         }
                         if (retainedBound != null) reusedBounds++
-                        if (retainedBound == null && !visit(BOUND_UNITS)) return null
+                        if (retainedBound == null && !reserveBound()) return null
                         bounds[variable] = retainedBound ?: LpIntegerBoundTemplate(variable, domain.min, domain.max,
                             statedLower, statedUpper)
-                        storage += BOUND_UNITS
                     }
                 }
-                val unchangedIncidence = old != null && old.factors.size == factors.size && factors.indices.all {
+                if (reuseMetadata) {
+                    if (!visit()) return null
+                    return LpPreparationTemplates(problem, namespace, rowScope, problem.semantics,
+                        problem is BakedProblem, 0L, true, factors, bounds, emptyList(),
+                        old != null && old.source !== problem, reusedFactors, reusedBounds, 0, storage)
+                }
+                val unchangedIncidence = old != null && !old.objectiveIndependent &&
+                    old.factors.size == factors.size && factors.indices.all {
                     if (!visit()) return null
                     old.factors[it] === factors[it]
                 }
@@ -421,7 +429,8 @@ internal class LpPreparationTemplates private constructor(
                         return current
                     }
                     val owners = HashMap<Int, Int>()
-                    for (index in factors.indices) for (reference in factors[index].support) {
+                    for (index in factors.indices) for (supportId in 0 until factors[index].supportSize) {
+                        val reference = factors[index].reference(supportId)
                         if (!visit()) return null
                         val owner = owners.put(reference, index) ?: continue
                         val first = root(index)
@@ -445,7 +454,8 @@ internal class LpPreparationTemplates private constructor(
                     val componentBounds = LinkedHashMap<Int, LpIntegerBoundTemplate>()
                     val costs = ArrayList<Long>()
                     val seen = LinkedHashSet<Int>()
-                    for (entry in group) for (reference in entry.support) {
+                    for (entry in group) for (supportId in 0 until entry.supportSize) {
+                        val reference = entry.reference(supportId)
                         if (!visit()) return null
                         if (!seen.add(reference)) continue
                         if (Term.isInt(reference)) {

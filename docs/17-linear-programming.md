@@ -49,16 +49,30 @@ retract with the search scope while definitions stay available to siblings. Thes
 definitions supply no witness authority: publication checks the original rows.
 
 Compatible discrete preparation views retain immutable source-row templates and exact
-integer endpoint metadata through their selected projections. Compact integer rows
-reuse their source-coordinate and coefficient buffers in presolve harvest and later
-LP assembly; guarded rows read the current pin on every emission. Each build maps
-those definitions into its own columns, bounds, premises and numerical owner.
+integer endpoint metadata through their selected projections. Compact rows retain
+canonical integer memberships and reusable coefficient buffers, reading primitive
+source constants at their declared width. Each build maps source coordinates into
+its own columns; the numerical builder copies coefficients into its private rows.
+Guarded rows read the current pin on every emission. Bounds, premises and numerical
+owners belong to the current build.
 Templates retain neither a basis nor a checked claim.
+Exact bound columns materialize only when an import needs them. Each endpoint
+definition retains one completed normalized column; changing an open upper side
+replaces the cached column without linking prior versions. Preparation reserves
+pending construction work and retained storage inside its existing ceilings;
+actual construction charges the consuming import. An already exact import retains
+its matching column directly, without constructing a duplicate definition.
+Completed and interrupted template preparation and import work also debit the owning
+LP allowance. Import reports its actual charges before publishing authority and
+rechecks cancellation after that debit.
 Retained-source assembly and fixed-layout installation adopt the same immutable exact bound objects after a
 complete match against the current normalized column, including its origin, tag,
 integrality and both bound sides.
 
-Factor identity preserves a row definition; row rewrites replace it. Component
+Factor identity preserves a row definition; row rewrites replace it. Factor
+memberships retain their source integer and Boolean arrays without rebuilding a
+tagged list. Component construction folds repeated factor roles, and integer and
+Boolean coordinates remain distinct even when their numeric IDs coincide. Component
 snapshots retain their row definitions, exact endpoints, stated bound sides and
 objective coefficients. Unchanged row incidence retains the component partition.
 Bound or objective changes replace affected snapshots;
@@ -67,7 +81,7 @@ remaps, changed dimensions or semantics and source-to-finite transitions reject 
 prior binding. A foreign source cannot use a prepared template index. Continuous,
 custom and unsupported projections retain their ordinary emission paths.
 
-An unchanged preparation validates ordered factor identities, integer endpoints,
+Ordinary unchanged preparation validates ordered factor identities, integer endpoints,
 stated bound sides, the objective constant and every component cost before sharing
 the completed collections. Source-factor order indexes rows directly, and the
 integer-bound map indexes exact endpoints without component lookup maps.
@@ -77,33 +91,39 @@ authorize reuse. The new source binding owns no predecessor snapshot, so repeate
 compatible preparations retain no generation chain.
 
 An internal selective-metadata preparation mode validates row identity and exact
-bound sides before retaining the row index. A selected view whose handoff checked
+bound sides before retaining the row index. Node engines use this mode and own
+their numerical component partitions. A selected view whose handoff checked
 ordered factor identities carries the same immutable layout token, so subsequent
 template preparations need no duplicate row scan. Other rewrites and explicit
 namespace remaps carry fresh tokens and validate their actual factor identities.
-Bound changes replace their exact
-objects and component metadata. Its source definitions carry no objective authority:
+Bound changes replace their exact objects and retain unrelated row and bound definitions.
+This mode retains no duplicate component partition or component-bound maps; numerical
+consumers assemble those definitions in their own layout. Template component observations
+therefore describe only the ordinary mode. Switching back to that mode constructs its
+partition before complete-index reuse. The selective mode's source definitions carry no objective authority:
 every assembly reads costs and the objective constant from its current objective,
 so changing that objective requires no source-template cost scan or replacement.
-Compact integer import can adopt exact bound columns during construction after
+Every templated mode can adopt compact integer bound columns during construction after
 checking the normalized origin, width, stated sides, integrality and source tag.
-It creates no temporary exact column for a matching template. IEEE and retained
-exact-state imports keep the full exact-column compatibility check.
-Bound endpoints are checked even on the same finite
-view, whose domains can follow its owning presolve session. The ordinary mode
-retains its complete-match check. Both modes publish only completed immutable
+Fixed-layout imports and retained source-fragment imports create no temporary exact
+column for a matching template. IEEE and retained exact-state imports keep the
+full exact-column compatibility check.
+An identical stable source-domain table authorizes endpoint metadata reuse without
+a repeated scan. Shared domain arrays require endpoint checks, including raw views
+carrying a finite session's table; model identity or type alone supplies no such proof.
+The ordinary mode retains its complete-match check. Both modes publish only completed immutable
 snapshots within the same containing allowance and storage cap.
 
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.
-Cold preparation inspects mandatory support, bound and component visits before
-allocating a snapshot that cannot fit the remaining work cap. Engine-owned
-consumers charge completed and declined template attempts to their LP allowance.
 An incomplete attempt publishes no snapshot. Compatible views share one atomic
 publication slot per source/finite scope, including temporary presolve bakes.
 Preparation and
 actual row/bound emission have separate observations in the existing LP phase ledger;
 they do not establish numerical result reuse or certified deduction consumption.
+Template observations accumulate fixed scalar totals per owning sink; immutable
+phase maps materialize at snapshot, retaining declined preparation work and observed
+zero emissions without a map allocation per consumer.
 Sparse-trial assembly uses the same source templates and keeps its own admission,
 factorization and certification allowances.
 

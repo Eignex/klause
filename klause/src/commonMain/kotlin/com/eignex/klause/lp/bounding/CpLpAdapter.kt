@@ -210,7 +210,8 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         }
         val core = engine.propagator
         if (!persistentState) core.reset()
-        if (core.state == null && !core.install(base, base.authoritativeWithTemplates(engine.params.cancellation) {
+        if (core.state == null && !core.install(base, base.authoritativeWithTemplates(engine.params.cancellation,
+            onWork = engine::noteNodeOverhead) {
                 engine.sink.lp.observeTemplateUse(exactBounds = it)
             } ?: return null)
         ) return null
@@ -235,7 +236,8 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         if (weakens) {
             if (!core.resetRoot()) {
                 cuts = newCuts()
-                if (!core.install(base, base.authoritativeWithTemplates(engine.params.cancellation) {
+                if (!core.install(base, base.authoritativeWithTemplates(engine.params.cancellation,
+                    onWork = engine::noteNodeOverhead) {
                         engine.sink.lp.observeTemplateUse(exactBounds = it)
                     } ?: return null)
                 ) return null

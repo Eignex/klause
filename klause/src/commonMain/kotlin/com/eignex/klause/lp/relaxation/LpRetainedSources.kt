@@ -238,7 +238,13 @@ internal class LpRetainedSources(
             val fragment = emission.relaxation
             emittedExtent += fragment.model.n.toLong() + fragment.model.m +
                 (fragment.model.doubleView?.colVal?.size ?: fragment.model.csc.rowIdx.size)
-            val source = fragment.model.authoritativeModel() ?: return null
+            val source = if (fragment.preparationTemplates != null &&
+                fragment.model.exactState == null && fragment.model.doubleView == null
+            ) {
+                fragment.authoritativeWithTemplates(cancellation, onWork = relaxer::observeTemplateWork)
+            } else {
+                fragment.model.authoritativeModel()
+            } ?: return null
             require(source.objective.scale.value == BigFraction.ONE && source.objective.externalConstant.value.isZero)
             val mapped = IntArray(source.n)
             for (local in mapped.indices) {
@@ -255,8 +261,9 @@ internal class LpRetainedSources(
                         val current = source.column(local)
                         val prepared = if (!fragment.colIsBool[local] && fragment.colRealId[local] < 0) {
                             relaxer.preparationTemplates?.bound(fragment.colVarId[local])
-                                ?.compatibleColumn(current)
+                                ?.compatibleColumn(current, cancellation)
                         } else null
+                        checkCancellation(cancellation)
                         if (prepared != null) boundTemplates++
                         prepared ?: current
                     } else {
@@ -320,7 +327,7 @@ internal class LpRetainedSources(
             if (state.depth > 0 && saved.add(index)) changes.add(Change(state.depth, index, previous))
             next[index] = Binding(emission, mapped, rowIds)
         }
-        if (cancellation()) throw LpAssemblyCancelled()
+        checkCancellation(cancellation)
         relaxer.observeBoundTemplates(boundTemplates)
         val uses = columnUses.copyOf(staged.size)
         var owned = ownedStorageUnits + staged.drop(columns.size).sumOf { it.storageUnits }
@@ -369,6 +376,10 @@ internal class LpRetainedSources(
             cached = null
             compactionView = null
         }
+    }
+
+    private fun checkCancellation(cancellation: Cancellation) {
+        if (cancellation()) throw LpAssemblyCancelled()
     }
 
     private fun Column.reclaimable(): Boolean = variable < 0 && real < 0 && cost.value.isZero

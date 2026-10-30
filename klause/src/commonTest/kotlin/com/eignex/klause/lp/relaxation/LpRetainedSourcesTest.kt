@@ -13,6 +13,7 @@ import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -25,6 +26,36 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
+    @Test
+    fun `retained template imports should preserve wide exact origins and open sides`() {
+        val modes = listOf(false to false, true to false, true to true)
+        for ((templates, metadata) in modes) for (open in listOf(false, true)) {
+            val origin = 9_007_199_254_740_993L
+            val problem = Problem(0, 2, Array(2) { IntDomain(origin, origin + 4L) }, arrayOf<Factor>(
+                Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 2L * origin + 3L),
+            ), openIntHi = booleanArrayOf(false, open))
+            val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L, 1L)),
+                projections = FactorProjectionProviders.Default.prepare(problem),
+                reuseSourceTemplates = templates, reuseTemplateMetadata = metadata)
+            val sources = LpRetainedSources(problem, consumer)
+            LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+                val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)))
+                val assertions = assertNotNull(edit.boundAssertions(0L))
+                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false,
+                    permanentRows = edit.permanentRows, objective = edit.objective, assertions = assertions))
+                edit.commit()
+
+                val result = assertNotNull(owner.solve())
+
+                assertEquals(BigFraction.ofLong(2L * origin + 3L), result.lowerBound)
+                assertEquals(BigFraction.ofLong(origin), owner.state.model.column(0).origin.value)
+                assertEquals(open, owner.state.model.column(1).bounds.upper == null)
+                if (templates) assertSame(assertNotNull(consumer.preparationTemplates).bounds.getValue(0).column,
+                    owner.state.model.column(0))
+            }
+        }
+    }
+
     @Test
     fun `selected element groups retain exact joint bounds across holes and pop`() {
         val problem = Problem(
