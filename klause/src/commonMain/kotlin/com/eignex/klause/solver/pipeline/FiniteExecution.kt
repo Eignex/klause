@@ -1088,6 +1088,11 @@ private fun executePortfolio(
     if (deferLpProbes && (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
         pipelineConfigError("portfolio-lp-start requires curated single-core mixed optimization")
     }
+    val booleanProofTasks = request.executionOptions.reader()[ExecutionOption.booleanProofTasks] ?: false
+    if (booleanProofTasks && (request.optimize || request.cores != 1 ||
+            request.engine !in setOf(FiniteEngine.MIXED, FiniteEngine.BACKTRACK))) {
+        pipelineConfigError("boolean-proof-tasks requires single-core finite satisfaction")
+    }
     val proofShare = request.executionOptions.reader()[ExecutionOption.portfolioProofShare]
     val proofWorkers = request.executionOptions.reader()[ExecutionOption.portfolioProofWorkers]
     val includeRestartingProof = when (proofWorkers) {
@@ -1109,7 +1114,7 @@ private fun executePortfolio(
             optimize = request.optimize,
             cores = request.cores,
             executionOptions = request.executionOptions.without("portfolio-proof-share", "portfolio-proof-workers",
-                "portfolio-lp-start", "portfolio-probes"),
+                "portfolio-lp-start", "portfolio-probes", "boolean-proof-tasks"),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpCeiling = request.lpConfig,
@@ -1181,6 +1186,7 @@ private fun executePortfolio(
         deferLpProbes = deferLpProbes,
         includeRestartingProof = includeRestartingProof,
         probePolicy = probePolicy,
+        booleanProofTasks = booleanProofTasks,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

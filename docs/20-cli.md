@@ -121,6 +121,8 @@ this is separate from heap measurements and diagnostic payload-category sums.
   [phase accounting](12-portfolio.md#phase-progress-and-cost)), weighted objective controls
   (`core-early`, `core-refinement`, see [core search](12-portfolio.md#boolean-objective-core-search)), resource work
   (`node-limit`, `presolve-work-limit`, see [resource allowances](06-sessions.md#resource-allowances)),
+  `boolean-proof-tasks=true` for eligible single-core satisfaction portfolios
+  ([Boolean task coverage](12-portfolio.md#boolean-task-sharing)),
   `dry-run-presolve=true` for a preparation summary without solving, and presolve
   effort ([presolve](07-presolve.md)).
 - `--ozn FILE` (MiniZinc mode): render output with the native `.ozn` applier
