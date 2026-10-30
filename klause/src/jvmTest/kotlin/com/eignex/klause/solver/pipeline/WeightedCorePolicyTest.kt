@@ -59,6 +59,7 @@ class WeightedCorePolicyTest(private val variant: String, private val automatic:
         val booleans = when (variant) {
             "boundary" -> 16_384
             "column-cap" -> 16_385
+            "entry-cap" -> 128
             else -> 3
         }
         val factorCount = when (variant) {
@@ -70,7 +71,7 @@ class WeightedCorePolicyTest(private val variant: String, private val automatic:
         val reals = if (variant == "real") 1 else 0
         val literals = intArrayOf(Lit.make(1, true), Lit.make(2, true))
         val factor: Factor = when (variant) {
-            "entry-cap" -> Clause(IntArray(128) { Lit.make(it % 3, true) })
+            "entry-cap" -> Clause(IntArray(128) { Lit.make(it, true) })
             "unsupported-row" -> Xor(literals, targetParity = 1)
             "cardinality" -> Cardinality(literals, min = 1, max = 2)
             "reified-cardinality" -> ReifiedCardinality(0, literals, min = 1, max = 2)
