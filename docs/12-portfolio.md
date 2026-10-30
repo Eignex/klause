@@ -979,11 +979,14 @@ ordinary complete workers stall, with the allowance described in
 [resources](06-sessions.md#resource-allowances); parallel pools admit it immediately, and `core-guided`
 selects it directly.
 
-`core-early=true` removes only the first-incumbent admission condition in a mixed
-optimization pool on one lane with automatic backtrack workers and an eligible
-Boolean objective. Worker order, seeds, initial complete-worker coverage and the
-bounded auxiliary allowance stay fixed. The control also preserves the containing
-work allowance in diagnostic schedules. It does not expand core eligibility.
+`core-early=true` admits the eligible bounded core trial after initial ordinary
+complete-worker coverage, before heuristic first probes, in a mixed optimization pool
+on one lane with automatic backtrack workers and a Boolean objective. The trial keeps
+its opportunity across retained preparation and query slices until it finishes or
+its cumulative allowance stops it, on either side of the first incumbent. Worker
+positions, seeds, complete-worker coverage and auxiliary limits stay fixed, including
+the containing work allowance in diagnostic schedules. The control does not expand
+core eligibility.
 
 ### Exact theory strategy execution
 
