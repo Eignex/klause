@@ -813,7 +813,7 @@ class BtResolution(
  *    rejects the COP-only LP/LinUCB arms); an unknown label is a hard usage error.
  *  - the per-solver override keys ([BACKTRACK_OVERRIDE_KEYS] — `var-selector`/`val-selector`/`luby`/…)
  *    *edit* the arms ([backtrackOverride]): every arm keeps its own seed/lp/luby diversity with the override
- *    pinned across it, so `-p8 -e cp --param var-selector=vsids` stays a full 8-worker pool. An edit without
+ *    pinned across it, retaining the configured worker count. An edit without
  *    `bt-arm` edits the curated pool after it is composed, so the arms the model offers nothing to stay out.
  *
  * A pinned pool is the *set* of arms; the worker *count* still comes from `arms=`/`bt=`/the default and wraps
