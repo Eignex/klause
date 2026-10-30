@@ -1217,6 +1217,10 @@ The CLI deadline includes frontend construction/preparation/search; compressed
 source decoding reduces its remaining allowance. MiniZinc compilation, preflight,
 artifact hashing and output reconstruction are outside that deadline and inside
 the containing case/job allowance. Independent checking is separate lab work.
+JFR measurements retain phase, caller and allocation summaries in `solve.log`.
+Summary analysis runs after CLI exit, outside its elapsed time and inside the
+containing case/job allowance. Sample shares and estimated allocations diagnose
+cost; instrumented timings do not qualify an ordinary production speedup.
 Retain complete active preparation/execution/checking charges, failures and
 retirement alongside CLI elapsed time; overlapping stage counters must not be
 summed as disjoint costs. Native proof flags do not certify source optimality or
