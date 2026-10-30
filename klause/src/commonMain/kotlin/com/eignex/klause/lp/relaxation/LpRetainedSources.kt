@@ -238,7 +238,7 @@ internal class LpRetainedSources(
             val fragment = emission.relaxation
             emittedExtent += fragment.model.n.toLong() + fragment.model.m +
                 (fragment.model.doubleView?.colVal?.size ?: fragment.model.csc.rowIdx.size)
-            val source = if (fragment.preparationTemplates?.objectiveIndependent == true &&
+            val source = if (fragment.preparationTemplates != null &&
                 fragment.model.exactState == null && fragment.model.doubleView == null
             ) {
                 fragment.authoritativeWithTemplates(cancellation)

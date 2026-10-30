@@ -99,7 +99,7 @@ therefore describe only the ordinary mode. Switching back to that mode construct
 partition before complete-index reuse. The selective mode's source definitions carry no objective authority:
 every assembly reads costs and the objective constant from its current objective,
 so changing that objective requires no source-template cost scan or replacement.
-Compact integer import can adopt exact bound columns during construction after
+Every templated mode can adopt compact integer bound columns during construction after
 checking the normalized origin, width, stated sides, integrality and source tag.
 Fixed-layout imports and retained source-fragment imports create no temporary exact
 column for a matching template. IEEE and retained exact-state imports keep the

@@ -393,6 +393,30 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `repeated ordinary compact imports should amortize charged bound construction`() {
+        for (reuseIndexes in listOf(false, true)) {
+            val captured = FactorProjectionProviders.Default.prepare(source)
+            val first = CpToLpRelaxation(source, objective, projections = captured,
+                reuseTemplateIndexes = reuseIndexes).build(RootDomains(source))
+            var work = 0L
+            val meter = WorkMeter { work += it }
+            val token = object : Cancellation {
+                override fun isCancelled(): Boolean = false
+                override fun workMeter(): WorkMeter = meter
+            }
+            assertNotNull(first.authoritativeWithTemplates(token))
+            val constructionWork = work
+            val second = CpToLpRelaxation(source, objective, projections = captured,
+                reuseTemplateIndexes = reuseIndexes).build(RootDomains(source))
+            work = 0L
+
+            assertNotNull(second.authoritativeWithTemplates(token))
+
+            assertTrue(work < constructionWork)
+        }
+    }
+
+    @Test
     fun `fixed layout consumers should adopt exact bound templates without changing authority`() {
         val relaxation = CpToLpRelaxation(source, objective, projections = selection).build(RootDomains(source))
         var reused = 0

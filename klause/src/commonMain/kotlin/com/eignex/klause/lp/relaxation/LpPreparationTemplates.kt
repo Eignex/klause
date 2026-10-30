@@ -44,7 +44,7 @@ internal fun LpRelaxation.authoritativeWithTemplates(
     fun prepared(index: Int): LpIntegerBoundTemplate? = if (index < model.n && colVarId[index] >= 0 &&
         !colIsBool[index] && colRealId[index] < 0
     ) templates.bound(colVarId[index]) else null
-    if (templates.objectiveIndependent && model.exactState == null && model.doubleView == null) {
+    if (model.exactState == null && model.doubleView == null) {
         val imported = try {
             model.authoritativeModel { index ->
                 cancellation.charge(1L)

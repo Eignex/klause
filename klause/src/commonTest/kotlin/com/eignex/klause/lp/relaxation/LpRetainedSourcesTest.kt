@@ -28,14 +28,15 @@ import kotlin.test.assertTrue
 class LpRetainedSourcesTest {
     @Test
     fun `retained template imports should preserve wide exact origins and open sides`() {
-        for (templates in listOf(false, true)) for (open in listOf(false, true)) {
+        val modes = listOf(false to false, true to false, true to true)
+        for ((templates, metadata) in modes) for (open in listOf(false, true)) {
             val origin = 9_007_199_254_740_993L
             val problem = Problem(0, 2, Array(2) { IntDomain(origin, origin + 4L) }, arrayOf<Factor>(
                 Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 2L * origin + 3L),
             ), openIntHi = booleanArrayOf(false, open))
             val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L, 1L)),
                 projections = FactorProjectionProviders.Default.prepare(problem),
-                reuseSourceTemplates = templates, reuseTemplateMetadata = true)
+                reuseSourceTemplates = templates, reuseTemplateMetadata = metadata)
             val sources = LpRetainedSources(problem, consumer)
             LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
                 val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)))
