@@ -7,12 +7,14 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.localsearch.ObjectiveGuidance
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ObjectiveCoordinateView
@@ -119,12 +121,18 @@ internal class LocalSearchWorkerConfig private constructor(
         } else {
             problem to null
         }
+        // Functional recipes propose the free leaves; other recipes retain their searched outputs.
+        val sweep = definitionalSweep ?: (lsObjective as? FunctionalObjective)?.booleanCostSweep?.takeIf {
+            objective != null && recipe.perMoveInvariants &&
+                recipe.objectiveGuidance == ObjectiveGuidance.Functional &&
+                recipe.feasibleDescent == FeasibleDescent.SelfOwned
+        }
         val session = LocalSearchSolver(
             effectiveProblem,
             strategy = recipe.strategy,
             optimizeStrategy = recipe.optimizeStrategy,
-            definitionalSweep = definitionalSweep,
-            perMoveInvariants = definitionalSweep != null && recipe.perMoveInvariants,
+            definitionalSweep = sweep,
+            perMoveInvariants = sweep != null && recipe.perMoveInvariants,
             seedImplicitOnRestart = recipe.seedImplicitOnRestart,
             // Floating scores guide candidates; the residual LP retains the configured source guarantee.
             completion = if (problem.numRealVars > 0) LeafRealCompletion(problem, objective, toleranceCheck) else null,
@@ -132,7 +140,9 @@ internal class LocalSearchWorkerConfig private constructor(
             objectiveBound = boundHandle
             if (effectiveProblem === problem) {
                 matchedPools?.localSearchProjection?.let { engine.projection = it }
-                matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
+                if (sweep === definitionalSweep) {
+                    matchedPools?.localSearchInvariants?.let { engine.invariantNetwork = it }
+                }
             }
         }.session()
         val workerLabel = "ls/$label"

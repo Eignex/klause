@@ -21,10 +21,49 @@ import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class DefinitionalSweepTest {
+    @Test
+    fun `nested Boolean costs should decline a complete flat cost sweep`() {
+        val problem = Problem(3, 0, emptyArray(), emptyArray())
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(1, intArrayOf(Lit.make(0, true)), true),
+            BoolFoldDefinition(2, intArrayOf(Lit.make(1, true)), false),
+        )))
+
+        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(LinearObjective(longArrayOf(0, 0, 7))))
+
+        assertNull(objective.booleanCostSweep)
+    }
+
+    @Test
+    fun `a bare Boolean cost should retain the ordinary definition view`() {
+        val problem = Problem(3, 0, emptyArray(), emptyArray())
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(2, intArrayOf(Lit.make(0, true), Lit.make(1, false)), true),
+        )))
+
+        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(LinearObjective(longArrayOf(3, 0, 7))))
+
+        assertNull(objective.booleanCostSweep)
+    }
+
+    @Test
+    fun `an unpriced definition should prevent complete Boolean cost maintenance`() {
+        val problem = Problem(4, 0, emptyArray(), emptyArray())
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(2, intArrayOf(Lit.make(0, true)), true),
+            BoolFoldDefinition(3, intArrayOf(Lit.make(1, true)), false),
+        )))
+
+        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(LinearObjective(longArrayOf(0, 0, 7))))
+
+        assertNull(objective.booleanCostSweep)
+    }
+
     @Test
     fun `definition inference should not spend work after its containing allowance stops`() {
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(10, 20)),
