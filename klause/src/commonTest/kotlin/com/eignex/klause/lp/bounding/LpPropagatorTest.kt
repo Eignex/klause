@@ -29,6 +29,7 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.authoritativeModel
@@ -67,6 +68,66 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpPropagatorTest {
+    @Test
+    fun `cold preparation is charged before query and continuation grants are read`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
+            .build(PropagationSession(problem))
+        for (continuation in listOf(false, true)) {
+            val factory = RecordingLpEngineFactory()
+            var reported = 0L
+            var queryGrant = 0L
+            var continuationGrant = 0L
+            LpPropagator(
+                object : LpSearchPolicy {},
+                effort = { LpEffortProfile(work = 100_000L) },
+                solveContext = LpSolveContext(factory),
+                queryWorkAllowance = { (100_000L - reported).also { queryGrant = it } },
+                continuationAllowance = {
+                    (100_000L - reported).takeIf { continuation }?.also { continuationGrant = it }
+                },
+                onPreparation = { reported += it.workOps },
+            ).use { lp ->
+                assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+
+                val solved = assertNotNull(lp.solveFloat())
+
+                assertTrue(reported > 0L)
+                assertEquals(100_000L - reported, queryGrant)
+                if (continuation) assertEquals(queryGrant, continuationGrant)
+                assertEquals(queryGrant, assertNotNull(factory.floatAllowances.single()).work)
+                assertEquals(solved.first.lastMetrics.workOps, lp.lastMetrics.workOps)
+            }
+        }
+    }
+
+    @Test
+    fun `interrupted cold preparation cannot repeat a previous query charge`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
+            .build(PropagationSession(problem))
+        var stopped = false
+        var reported = 0L
+        var queries = 0
+        LpPropagator(
+            object : LpSearchPolicy {},
+            cancellation = Cancellation { stopped },
+            queryWorkAllowance = { queries++; 100_000L },
+            onPreparation = { reported += it.workOps },
+        ).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+            assertNotNull(lp.solveFloat())
+            val charged = reported
+            stopped = true
+
+            assertNull(lp.solveFloat())
+
+            assertEquals(1, queries)
+            assertEquals(charged, reported)
+            assertEquals(0L, lp.lastMetrics.workOps)
+        }
+    }
+
     @Test
     fun `declined source preparation should report its spent work`() {
         val problem = Problem(0, 8, Array(8) { IntDomain(0, 3) }, arrayOf(

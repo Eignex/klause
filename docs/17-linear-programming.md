@@ -256,6 +256,8 @@ spent preparation work; child numerical preparation receives the remaining grant
 Explicit component ownership funds cold preparation from the remaining shared LP
 and invocation allowances, separately from the adaptive numerical query quantum.
 Preparation is charged before the query receives its remaining allowance.
+The first scoped query completes this charge before freezing a continuation grant;
+an interrupted preparation supplies neither a numerical query nor a prior query's charge.
 Finite basis entry limits are divided among the immutable column blocks; local
 cut replacements retain those shares. A logical-only child reserves its identity
 factor share first, within the same containing entry limit.
