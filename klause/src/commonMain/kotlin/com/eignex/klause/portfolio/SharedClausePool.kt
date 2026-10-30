@@ -87,39 +87,19 @@ internal class SharedClausePool(
 
     /** Append the unseen clauses of [batch] (by key) as published by arm [origin], compacting on overflow.
      *  [isGlobal] marks a globally-published nogood for retention priority over filtered glue. A clause
-     *  already pooled keeps the arm that published it first. */
+     *  already pooled keeps the arm that published it first. With [stableGenerationOnly], a batch that
+     *  could require compaction returns -1 before publication. */
     fun publish(
         batch: List<SharedClause>,
         origin: Int = NO_ORIGIN,
         isGlobal: Boolean = false,
         maxWork: Long = reclamationWork,
         maxScratchEntries: Int = reclamationScratchEntries,
+        stableGenerationOnly: Boolean = false,
         cancelled: () -> Boolean = { false },
         charge: () -> Unit = {},
     ): Int = lock.withLock {
-        publishLocked(batch, origin, isGlobal, maxWork, maxScratchEntries, cancelled, charge)
-    }
-
-    internal fun publishRetiring(
-        batch: List<SharedClause>,
-        origin: Int,
-        cancelled: () -> Boolean,
-        charge: () -> Unit,
-    ): Int? = lock.withLock {
-        if (softLimitBytes != null || batch.size > cap - store.size) return@withLock null
-        // A stable generation deduplicates the whole batch without another retiring key index.
-        publishLocked(batch, origin, false, reclamationWork, reclamationScratchEntries, cancelled, charge)
-    }
-
-    private fun publishLocked(
-        batch: List<SharedClause>,
-        origin: Int,
-        isGlobal: Boolean,
-        maxWork: Long,
-        maxScratchEntries: Int,
-        cancelled: () -> Boolean,
-        charge: () -> Unit,
-    ): Int {
+        if (stableGenerationOnly && (softLimitBytes != null || batch.size > cap - store.size)) return@withLock -1
         val budget = Budget(maxWork, maxScratchEntries, cancelled, charge)
         var published = 0
         try {
@@ -142,7 +122,7 @@ internal class SharedClausePool(
         } catch (_: Stopped) {
             deferred++
         }
-        return published
+        published
     }
 
     internal fun reclaim(
@@ -625,11 +605,12 @@ internal class PoolClauseExchange(
     private fun export(session: PropagationSession, retiring: Boolean = false) {
         val candidates = exportCandidates(session) ?: return
         if (retiring && candidates.isNotEmpty() && pool.softLimitBytes == null) {
-            pool.publishRetiring(candidates, origin,
+            val published = pool.publish(candidates, origin, stableGenerationOnly = true,
                 cancelled = { session.cancelRequested },
                 charge = { session.chargeSharingWork(1L) },
-            )?.let {
-                meter?.exported(SharingChannel.Clauses, it)
+            )
+            if (published >= 0) {
+                meter?.exported(SharingChannel.Clauses, published)
                 return
             }
         }
