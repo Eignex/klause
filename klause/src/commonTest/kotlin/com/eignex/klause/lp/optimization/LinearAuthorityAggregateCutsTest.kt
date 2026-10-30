@@ -41,10 +41,14 @@ class LinearAuthorityAggregateCutsTest {
         BigFraction.ZERO)
 
     @Test
-    fun `automatic source pairs should strengthen a checked bound without continuous endpoints`() {
+    fun `automatic source pairs should strengthen a checked bound across an unbounded continuous coordinate`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val mixed = SourceInequality(left.coefficients + (residual to BigFraction.MINUS_ONE), left.rhs)
+        val bound = SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)
         val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
-            setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right)),
-            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+            setOf(x, y, real, residual), mapOf("left" to SourcePremise(mixed),
+                "right" to SourcePremise(right), "bound" to SourcePremise(bound)),
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE, residual to BigFraction.ONE))
 
         for ((aggregate, expected) in listOf(false to (BigFraction.ofLong(-3) *
             BigFraction.ofLong(2).reciprocal()), true to BigFraction.MINUS_ONE)) {
