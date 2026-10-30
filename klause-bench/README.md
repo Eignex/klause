@@ -258,6 +258,9 @@ Compressed corpus storage is decoded through the ordinary source-invocation path
 which charges decoding to the remaining source budget and preserves the packed input.
 JVM staged-file identities live in `report/jvm-profile-files.json`; the record binds
 that full manifest by digest instead of repeating thousands of class entries.
+Combined Linux LP preparation finishes Native linking before compiling the JVM library
+and harness. The ordering keeps the Native compiler ahead of retained JVM compiler
+state without changing compiler flags or preparation resource caps.
 
 `bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
 work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,
