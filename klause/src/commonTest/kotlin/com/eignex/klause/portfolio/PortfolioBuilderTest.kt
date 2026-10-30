@@ -125,6 +125,8 @@ class PortfolioBuilderTest {
             assertTrue(ordinary.improvementOnly)
             assertFalse(candidate.improvementOnly)
             assertTrue(ordinary.auxiliaryProof && candidate.auxiliaryProof)
+            assertFalse(ordinary.earlyCoreTrial)
+            assertTrue(candidate.earlyCoreTrial)
         } finally {
             baseline.forEach { it.close() }
             early.forEach { it.close() }
