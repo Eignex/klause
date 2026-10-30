@@ -3,10 +3,14 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.linearRows
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -18,6 +22,9 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.util.Cancellation
 import java.io.File
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -78,6 +85,8 @@ internal object RewriteStructureProfile {
             val preparationNs = System.nanoTime() - started
             val diagnostics = PresolveBudget(1_000_000)
             val diagnosticStop = diagnostics.orSpent(stop)
+            writeModel(out.resolve("before-$label.json"), requireNotNull(plan.model), objective, diagnosticStop)
+            writeModel(out.resolve("after-$label.json"), prepared.problem, prepared.objective, diagnosticStop)
             val hints = LocalSearchTrajectory.heuristicHints(invocation, prepared, diagnosticStop)
             val sweep = hints?.let { get(it, "Sweep") as DefinitionalSweep? }
             val network = sweep?.network(prepared.problem.numIntVars, prepared.problem.numBoolVars)
@@ -153,6 +162,50 @@ internal object RewriteStructureProfile {
             println(report)
             check(!diagnosticStop())
         }
+    }
+
+    private fun writeModel(file: File, problem: Problem, objective: LinearObjective?, stop: Cancellation) {
+        val snapshot = buildJsonObject {
+            put("objective", objective.toString())
+            put("booleans", problem.numBoolVars)
+            put("integers", problem.numIntVars)
+            put("domains", JsonArray((0 until problem.numIntVars).map { variable ->
+                stop.charge(1)
+                check(!stop())
+                JsonPrimitive(problem.intDomainOrNull(variable).toString())
+            }))
+            put("factors", buildJsonArray {
+                for (factor in problem.factors) {
+                    stop.charge(1L + factor.intVars.size + factor.boolVars.size)
+                    check(!stop())
+                    add(buildJsonObject {
+                        put("kind", factor::class.simpleName)
+                        put("integers", JsonArray(factor.intVars.map { JsonPrimitive(it) }))
+                        put("booleans", JsonArray(factor.boolVars.map { JsonPrimitive(it) }))
+                        put("rows", buildJsonArray {
+                            for (row in factor.linearRows) {
+                                stop.charge(1L + 2L * row.size)
+                                check(!stop())
+                                add(buildJsonObject {
+                                    put("relation", row.relation.name)
+                                    put("activator", row.activator)
+                                    put("constants", row.constants::class.simpleName)
+                                    put("refs", JsonArray((0 until row.size).map { JsonPrimitive(row.ref(it)) }))
+                                    if (row.constants is IntegerConstants) {
+                                        put("bound", row.bound)
+                                        put("coefficients", JsonArray((0 until row.size).map {
+                                            JsonPrimitive(row.coeff(it))
+                                        }))
+                                    }
+                                })
+                            }
+                        })
+                    })
+                }
+            })
+        }
+        check(!stop())
+        file.writeText(snapshot.toString())
     }
 
     private fun get(owner: Any, property: String): Any? =

@@ -449,6 +449,9 @@ protection disabled instead of comparing blanket protection. At most two arms ru
 Optional `source64=BASE64` or `sourceGzip64=BASE64` supplies hash-checked source bytes
 through the existing trajectory input reader. The input receipt records source size,
 load time and cancellation before enforcing the capture's source bounds.
+Before/after model snapshots retain objective, domains, factor kinds, support and
+word-sized declared rows, charging the same consumer-diagnostic allowance without
+materializing structural keys.
 Each arm has a 30-second containing
 deadline, five million preparation work units and one million consumer-diagnostic
 units; the whole capture has 120 seconds. Sources, lowered coordinates and factors
