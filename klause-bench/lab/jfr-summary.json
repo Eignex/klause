@@ -1,0 +1,7 @@
+{
+  "main": "com.eignex.klause.bench.profile.JfrCaptureSummary",
+  "classpath": ["klause-bench/build/install/klause-bench/lib/*"],
+  "buildTasks": [":klause-bench:installDist"],
+  "jvmArgs": ["-Xmx512m"],
+  "runtime": {"java": 25, "tools": ["jfr", "jq", "base64", "gzip", "sha256sum"], "environment": {}}
+}
