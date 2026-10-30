@@ -27,6 +27,8 @@ internal class LinearAuthorityPointCuts(
     private var misses = 0
     private var retired = false
     private val inactiveScans = HashMap<Int, Int>()
+    var adoptedCurrent: Boolean = false
+        private set
 
     fun candidatesRetired(rows: List<LinearAuthorityCut>?): Boolean =
         rows != null && family === rows && retired
@@ -76,7 +78,9 @@ internal class LinearAuthorityPointCuts(
         point: List<BigFraction>,
         installed: Set<Int>,
         cancellation: Cancellation,
+        adoptCurrent: Boolean = false,
     ): Set<Int> {
+        adoptedCurrent = false
         if (rows.isEmpty()) return installed
         if (installed.size >= maximumCuts) observe("PoolLimited")
         if (family !== rows) {
@@ -106,7 +110,9 @@ internal class LinearAuthorityPointCuts(
             val values = HashMap<SourceCoordinate, Double>()
             val objective = HashMap<SourceCoordinate, Double>()
             var objectiveNormSquared = 0.0
+            var integerOnly = adoptCurrent
             for (id in coordinates.indices) {
+                integerOnly = integerOnly && coordinates[id].kind == SourceCoordinate.Kind.Integer
                 val value = meter.scalar(point[id]) ?: run {
                     observe("PointUnavailable")
                     return installed
@@ -115,6 +121,17 @@ internal class LinearAuthorityPointCuts(
                 val cost = meter.scalar(costs[id]) ?: 0.0
                 objective[coordinates[id]] = cost
                 objectiveNormSquared += cost * cost
+            }
+            if (integerOnly && installed.isEmpty() && rows.size <= maximumCuts && checked.size == rows.size) {
+                if (!meter.charge(rows.size.toLong(), 128L + rows.size * 64L) ||
+                    rows.indices.any { it !in checked }) return installed
+                for (row in rows) {
+                    visitedFamilies.add(row.family)
+                    onCut(row.family, "POINT_ADOPTED_INSTALLED", 1L)
+                }
+                adoptedCurrent = true
+                observe("AdoptedInstalled", rows.size.toLong())
+                return checked.toSet()
             }
             val objectiveNorm = sqrt(objectiveNormSquared)
             val candidates = ArrayList<Scored>()

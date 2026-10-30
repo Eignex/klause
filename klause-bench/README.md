@@ -745,6 +745,10 @@ Point selection starts from the current checked recipe. `CurrentFallback` and
 `BaseQueries` counts base relaxation attempts. A point-selection arm can therefore
 contain both CURRENT and POINT_SELECTION recipe work; retain the ordinary source
 totals and both disjoint recipe costs.
+`numericalCutSelectionAdoptedInstalled` counts already-installed pure cuts entering
+the bounded mask from an integer-only current recipe. Adoption adds no LP query or
+root miss; later completed points supply aging observations. These rows are not
+newly separated cuts. Keep their subsequent scoring, proof and retirement costs.
 `numericalCutSelectionPointPrepared` counts one successful point-directed candidate
 preparation per immutable source template. It chooses each available continuous
 endpoint independently from the point. Its generation shares the original

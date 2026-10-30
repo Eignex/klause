@@ -190,7 +190,8 @@ internal class LinearAuthority(
             val baselineFamily = family
             val baselineQuery = prepared
             if (!checkNotNull(family.cuts).pointDirected && directedFamily !== family && pointMask == null &&
-                (aggregateCuts || checkNotNull(family.cuts).rows.any { it.mixed })) {
+                ((aggregateCuts && prepared.coordinates.any { it.kind == SourceCoordinate.Kind.Real }) ||
+                    checkNotNull(family.cuts).rows.any { it.mixed })) {
                 directedFamily = family
                 cutLifecycle.families = checkNotNull(family.cuts).rows.mapTo(HashSet()) { it.family }
                 val refined = cutLifecycle.containing("POINT_SELECTION") {
@@ -207,9 +208,14 @@ internal class LinearAuthority(
             val selected = cutLifecycle.containing("POINT_SELECTION") {
                 policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
                     prepared.checkedCuts, observed.second, pointMask.orEmpty().intersect(prepared.checkedCuts),
-                    cancellation)
+                    cancellation, adoptCurrent = baselineMask == null && family === baselineFamily &&
+                        prepared.activeCuts == checkNotNull(family.cuts).rows.size)
             }
             if (budget.funding?.exhausted == true || cancellation()) return base
+            if (policy.adoptedCurrent) {
+                pointMask = selected
+                return base.copy(paused = base.paused || budget.funding?.paused == true)
+            }
             if (baselineMask == null && selected.isEmpty()) {
                 template = baselineFamily
                 query = baselineQuery
@@ -418,7 +424,8 @@ internal class LinearAuthority(
         }
         val prepared = if (retainLp || cuts) {
             template?.takeIf { it.matches(source) && (it.cuts != null) == cuts &&
-                (!cuts || it.cuts?.complementary == (cutMask != null)) }
+                (!cuts || it.cuts?.complementary == (cutMask != null) ||
+                    it.coordinates.all { coordinate -> coordinate.kind == SourceCoordinate.Kind.Integer }) }
                 ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts, cutMask != null) { work ->
                     cutPreparationWork += work
                     budget.observe(preparation = work)
