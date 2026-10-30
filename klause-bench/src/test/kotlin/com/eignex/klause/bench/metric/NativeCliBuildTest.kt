@@ -2,6 +2,8 @@ package com.eignex.klause.bench.metric
 
 import java.io.File
 import java.nio.file.Files
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -27,8 +29,9 @@ class NativeCliBuildTest {
         }
     }
 
-    @Test
-    fun `changed native executable or runtime bytes should change the fingerprint`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["klause-cli.kexe", "libc.so.6"])
+    fun `changed native executable or runtime bytes should change the fingerprint`(name: String) {
         val root = Files.createTempDirectory("native-cli-identity").toFile()
         try {
             val executable = root.resolve("klause-cli.kexe").apply { writeText("native executable") }
@@ -36,18 +39,14 @@ class NativeCliBuildTest {
             val harness = mapOf("bench.jar" to "harness identity")
             val before = NativeCliBuild.capture(executable, listOf(library), harness, emptyMap())
 
-            for (file in listOf(executable, library)) {
-                val bytes = file.readBytes()
-                val modified = file.lastModified()
-                file.writeText("changed bytes")
-                file.setLastModified(modified)
+            val file = root.resolve(name)
+            val modified = file.lastModified()
+            file.writeText("changed bytes")
+            file.setLastModified(modified)
 
-                val after = NativeCliBuild.capture(executable, listOf(library), harness, emptyMap())
+            val after = NativeCliBuild.capture(executable, listOf(library), harness, emptyMap())
 
-                assertNotEquals(before.fingerprint, after.fingerprint, file.name)
-                file.writeBytes(bytes)
-                file.setLastModified(modified)
-            }
+            assertNotEquals(before.fingerprint, after.fingerprint, name)
         } finally {
             root.deleteRecursively()
         }
