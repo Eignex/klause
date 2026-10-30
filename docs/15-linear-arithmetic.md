@@ -77,7 +77,7 @@ A check proceeds in four steps:
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
 
-An opt-in partial-state probe can imply a uniquely represented comparison guard
+A partial-state probe can imply a uniquely represented comparison guard
 from exact intervals over its terms. Coefficient signs select the bounding sides;
 strict endpoints and every active bound premise enter the explanation. Missing
 bounds or ambiguous guards decline. The probe publishes through the shared Boolean
@@ -97,7 +97,7 @@ normalization's declared-fixing premises. Probing creates no LP definition and
 retains no reason. It precedes individual-coordinate decline reuse, so an unchanged
 coordinate interval cannot hide a newly bounded affine expression.
 
-The incremental opt-in indexes prepared rows by their Boolean activators and
+The incremental route indexes prepared rows by their Boolean activators and
 coefficient inputs. A literal change schedules only those source rows; retraction
 also schedules every assertion whose LP scope was popped. A change in the exact
 closed root-fixed source values schedules all rows for substitution. The component
@@ -109,9 +109,9 @@ the pending rows are asserted. Interrupted preparation or assertion leaves pendi
 work available for a later operation and publishes no assertion marker for an
 uncommitted bound batch.
 
-Ordinary complete traversal selects this combined route with
-`open-linear-incremental=true`. Positive-depth committed assertion markers follow
-a source-index trail in scope order; retraction removes only the suffix belonging
+Ordinary complete traversal selects this combined route by default;
+`open-linear-incremental=false` disables it. Positive-depth committed assertion
+markers follow a source-index trail in scope order; retraction removes only the suffix belonging
 to popped scopes. Root markers stay outside that trail. Interrupted batches append
 only their committed markers, so retry and backtrack keep the same assertion
 authority. Source-row visits, invalidations, interval visits, compatible declines

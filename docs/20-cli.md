@@ -147,7 +147,8 @@ has its own work currency, separate from `node-limit`:
 | Quadratic optimization | the polynomial limits; open integers also use `nia-*` | [Quadratic execution](16-nonlinear-arithmetic.md#quadratic-strategy-execution) |
 | Transcendental | `nra-*` limits and shared exact-satisfaction controls | [Function checks](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) |
 
-`open-linear-incremental` is inactive when source preparation selects a finite route.
+`open-linear-incremental` defaults to true for complete open-linear traversal and
+is inactive when source preparation selects a finite route.
 
 Omitted limits use each route's defaults: linear and polynomial work are unlimited,
 nonlinear integer search caps candidates at 1,024 and heuristic moves at 256, and
