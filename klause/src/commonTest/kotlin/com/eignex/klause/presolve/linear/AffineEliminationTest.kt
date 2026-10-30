@@ -33,6 +33,44 @@ import kotlin.test.assertTrue
 
 class AffineEliminationTest {
     @Test
+    fun `unnegatable affine constants should retain their source equality`() {
+        for ((coefficients, bound) in listOf(
+            longArrayOf(1, -1) to Long.MIN_VALUE,
+            longArrayOf(1, Long.MIN_VALUE) to 0L,
+        )) {
+            val source = Problem(0, 2, arrayOf(IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 1), IntDomain(0, 1)),
+                listOf(Linear(coefficients, intArrayOf(0, 1), LinearOp.EQ, bound)))
+
+            val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
+                pivotOrder = AffinePivotOrder.REWRITE_COST)
+
+            assertTrue(delta.isEmpty)
+        }
+    }
+
+    @Test
+    fun `overflowing carried bounds should retain the source definition`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(-2, 0), IntDomain(Long.MIN_VALUE, -Long.MAX_VALUE)),
+            listOf(Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, Long.MAX_VALUE)))
+
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(source, objectiveIntVars = setOf(1),
+            pivotOrder = AffinePivotOrder.REWRITE_COST)
+
+        assertTrue(delta.isEmpty)
+    }
+
+    @Test
+    fun `wide residue intermediates should not exclude representable source values`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, Long.MAX_VALUE), IntDomain(-1, 1)),
+            listOf(Linear(longArrayOf(2, Long.MAX_VALUE), intArrayOf(0, 1), LinearOp.EQ, Long.MAX_VALUE)))
+
+        val delta = AffineSingletons.eliminateAffineSingletons(source.bake(),
+            pivotOrder = AffinePivotOrder.REWRITE_COST)
+
+        assertTrue(delta.isEmpty)
+    }
+
+    @Test
     fun `affine elimination should fold declared rows and reconstruct a feasible assignment`() {
         val rows = listOf(
             Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1),
