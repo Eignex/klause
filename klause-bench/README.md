@@ -52,10 +52,19 @@ diagnosis; these observations do not retire the rebuilding objective.
 ## Build and run
 
 `param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
-trial after new global root pins, with actual source BVE and a fresh consuming
+trial after new global root pins or an owned learned equivalence, with source reduction and a fresh consuming
 worker. Zero is the default. `ProgressPins` excludes baked-root facts;
 `RootScanWork` and `RootScanNanos` retain the eligibility cost. An unchanged
-baked root keeps its canonical traversal.
+baked root without a captured equivalence keeps its canonical traversal.
+`BinaryScanWork` and `BinaryScanNanos` retain bounded discovery costs;
+`BinaryRelations` counts captured reciprocal implications and `EquivalentColumns`
+counts actual source implication-graph merges. Discovery accepts only owned global
+binary learning and checks at most 128 binaries within 32,768 work per observation.
+`BinaryHistoryWork` and `BinaryHistoryBytes` retain the fixed history's initialization
+and primitive storage. At most 32 relations are attempted in one worker. Its history
+and the 16 KiB discovery scratch model spend the existing byte grant. These work
+counters are subsets of worker work, not additional totals to sum. Missing relations
+after a bounded scan do not establish an absence of opportunities.
 Use the same source, engine, presolve, seeds, processors, heap, containing allowance
 and deadline in the zero/trial arms. `nativePrivateRebuildAttempts`, `Consumers`,
 `Eliminated`, `SourceAccepted`, `RefutationDeferred`, `Declined` and `Retired`

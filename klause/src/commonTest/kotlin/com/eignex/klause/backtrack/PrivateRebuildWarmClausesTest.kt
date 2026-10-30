@@ -21,6 +21,35 @@ import kotlin.test.assertTrue
 
 class PrivateRebuildWarmClausesTest {
     @Test
+    fun `equivalent literal reconstruction should translate owned learning in either polarity`() {
+        for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
+            val source = Problem(3, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(1, replacement)), Clause(intArrayOf(0, Lit.negate(replacement))),
+                Clause(intArrayOf(1, 4)),
+            )).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(1, 4)), 2)
+
+            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session,
+                SourceRebuilds(listOf(RebuildStep.CopyLiteral(0, replacement))), arrayOfNulls(3),
+                1_048_576L, 65_536L, Cancellation.Never))
+
+            assertContentEquals(intArrayOf(Lit.negate(replacement), 4), (warm.clauses.single() as Clause).literals)
+            assertEquals(1, warm.translated)
+            for (mask in 0 until 8) {
+                val point = BooleanArray(3) { mask and (1 shl it) != 0 }
+                if (source.factors.all { factor ->
+                        (factor as Clause).literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
+                    }) {
+                    assertTrue((warm.clauses.single() as Clause).literals.any {
+                        Lit.evaluate(it, point[Lit.variable(it)])
+                    })
+                }
+            }
+        }
+    }
+
+    @Test
     fun `only owned consequences should enter the private generation`() {
         for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(
