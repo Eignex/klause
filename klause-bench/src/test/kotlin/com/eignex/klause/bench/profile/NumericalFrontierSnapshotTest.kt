@@ -42,18 +42,15 @@ class NumericalFrontierSnapshotTest {
     )
 
     @Test
-    fun `an opened profile frontier should publish a checked source bound`() {
+    fun `opening a profile frontier should not consume source LP operations`() {
         val invocation = NumericalFrontierSnapshot.open(context, TheoryParams(sourceLpOperations = 2),
             frontier = true) as AutoCloseable
 
-        val bound = invocation.use {
-            val result = NumericalFrontierSnapshot.run(it, onIncumbent = { _, _ -> })
-            NumericalFrontierSnapshot.field(result, "bound") as SourceEvidence
+        val operations = invocation.use {
+            NumericalFrontierSnapshot.stats(it).smt.sourceLp.operations
         }
 
-        val inspected = NumericalFrontierSnapshot(context, Cancellation.Never).bound(bound)
-        assertEquals("1", inspected.getValue("nativeValue").jsonPrimitive.content)
-        assertEquals("true", inspected.getValue("checked").jsonPrimitive.content)
+        assertEquals(0L, operations)
     }
 
     @Test
