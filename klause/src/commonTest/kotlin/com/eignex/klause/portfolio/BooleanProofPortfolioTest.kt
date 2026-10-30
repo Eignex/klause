@@ -29,6 +29,54 @@ class BooleanProofPortfolioTest {
     }).bake()
 
     @Test
+    fun `branched conditional refutations should preserve feasible sibling queries`() {
+        val guarded = Problem(5, 0, emptyArray(), Array(8) { mask ->
+            Clause(intArrayOf(Lit.make(0, true)) +
+                IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
+        }).bake()
+        for (native in listOf(false, true)) {
+            val pool = SharedClausePool()
+            val params = List(2) { worker -> BacktrackParams(randomSeed = worker.toLong(), nativeSat = native,
+                variableSelector = InputOrder, valueSelector = IndomainMin,
+                clauseExchange = PoolClauseExchange(pool, origin = worker).conditioned()) }
+            BooleanProofPortfolio(guarded, context, listOf(0, 1), params).use { tasks ->
+                val first = tasks.open(0, Cancellation.Never)
+                val second = tasks.open(1, Cancellation.Never)
+                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+                assertEquals(0, tasks.completed)
+                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
+                assertNull(second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
+                val result = first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+                assertTrue(result is SolveResult.Sat)
+                assertTrue(result.assignment.boolValue(0))
+            }
+        }
+    }
+
+    @Test
+    fun `repeated source invocations should preserve feasible models after scoped learning`() {
+        val guarded = Problem(5, 0, emptyArray(), Array(8) { mask ->
+            Clause(intArrayOf(Lit.make(0, true)) +
+                IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
+        }).bake()
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false)
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+            btPool = listOf { BacktrackWorkerConfig.ofParams("fixed", params) })
+        val workers = PortfolioBuilder.build(guarded, scenario)
+        Portfolio.thompson(workers, diagnostics = PortfolioDiagnostics(100000L, 1L)).use { portfolio ->
+            portfolio.disjointBooleanProof = true
+            repeat(2) {
+                val result = portfolio.solve(Cancellation.Never)
+
+                assertTrue(result is SolveResult.Sat)
+                assertTrue(result.assignment.boolValue(0))
+                assertEquals(4, portfolio.lastBooleanProofTasks, portfolio.lastBooleanProofDecline)
+            }
+        }
+    }
+
+    @Test
     fun `bound deterministic workers should preserve ordinary portfolio proof admission`() {
         val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false)
         val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
