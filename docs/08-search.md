@@ -254,10 +254,13 @@ The `lp-default` and `lp-aggressive` optimization recipes enable the finite cons
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
 and branching must be enabled. Two recent samples in each direction permit a
-variable's balanced gain score. Variables without that history use a same-scope prior
-only after two samples in each direction within their Boolean or integer coordinate
-class; otherwise reduced-cost/fractionality scoring and the configured selector keep
-their precedence. Reliable variable history takes precedence over its class prior.
+variable's balanced gain score. A variable with at least one recent sample can fill
+missing confidence from a same-scope prior after two samples in each direction within
+its Boolean or integer coordinate class. Each direction weights its own mean by
+`min(count, 2) / 2` and the prior by the remaining weight. A fully observed direction
+uses only its own mean. Unobserved variables retain reduced-cost/fractionality scoring
+and the configured selector's precedence. Reliable variable history takes precedence
+over its class prior.
 Directional scores compete with each other before fallback, so objective units are
 not mixed with reduced costs.
 An invocation-local readiness check skips directional candidate lookups when no
