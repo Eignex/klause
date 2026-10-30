@@ -26,7 +26,8 @@ internal object RewriteStructureProfile {
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "presolve")
-        require(options.keys.containsAll(required) && (options.keys - required - "orders").isEmpty())
+        require(options.keys.containsAll(required) &&
+            (options.keys - required - setOf("orders", "source64", "sourceGzip64")).isEmpty())
         val arms = options["orders"]?.split(',')?.map { name ->
             val order = AffinePivotOrder.valueOf(name.uppercase())
             Triple(order.name.lowercase(), false, order)
@@ -39,8 +40,15 @@ internal object RewriteStructureProfile {
         val containing = Cancellation.after(120.seconds)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
+        val sourceStarted = System.nanoTime()
         val bytes = trajectorySourceBytes(options.getValue("suite"), options.getValue("problem"),
-            options.getValue("sha256"), null)
+            options.getValue("sha256"), options["source64"], options["sourceGzip64"])
+        out.resolve("input.json").writeText(buildJsonObject {
+            put("sourceSha256", options.getValue("sha256"))
+            put("sourceBytes", bytes.size)
+            put("sourceLoadNs", System.nanoTime() - sourceStarted)
+            put("cancelled", containing())
+        }.toString())
         require(bytes.size <= 1024 * 1024 && !containing())
         out.resolve("source.xml").writeBytes(bytes)
         for ((label, preserve, order) in arms) {
