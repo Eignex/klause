@@ -30,9 +30,13 @@ done
 mkdir -p "$proof_output/preparation"
 printf '%s\n' "$@" > "$proof_output/request.txt"
 proof_time_format='elapsedSeconds\t%e\nuserCpuSeconds\t%U\nsystemCpuSeconds\t%S\nmaxResidentKiB\t%M\nexitStatus\t%x'
+proof_jvm=(-Xmx2560m -XX:ActiveProcessorCount=1
+    --enable-native-access=ALL-UNNAMED --add-modules=jdk.incubator.vector
+    "-Dklause.workspace.root=$proof_root" "-Dklause.bench.corpusCache=$LAB_CORPUS"
+    -cp "$proof_root/klause-bench/build/install/klause-bench/lib/*")
 # Resolve the common corpus before either cold control; retain this preparation cost separately.
 /usr/bin/time -f "$proof_time_format" -o "$proof_output/preparation/process.tsv" \
-    "$proof_root/klause-bench/build/install/klause-bench/bin/klause-bench" select \
+    "$proof_java" "${proof_jvm[@]}" com.eignex.klause.bench.target.BenchCli select \
     "suite=$proof_suite" "name=$proof_problem" files=true \
     > "$proof_output/preparation/files.jsonl" 2> "$proof_output/preparation/stderr.txt"
 [[ -s "$proof_output/preparation/files.jsonl" ]]
@@ -46,11 +50,7 @@ for proof_seed in "${proof_seed_values[@]}"; do
             mkdir -p "$proof_case"
             proof_status=0
             env OUT="$proof_case" /usr/bin/time -f "$proof_time_format" -o "$proof_case/process.tsv" \
-                "$proof_java" -Xmx2560m -XX:ActiveProcessorCount=1 \
-                --enable-native-access=ALL-UNNAMED --add-modules=jdk.incubator.vector \
-                "-Dklause.workspace.root=$proof_root" \
-                "-Dklause.bench.corpusCache=$LAB_CORPUS" \
-                -cp "$proof_root/klause-bench/build/install/klause-bench/lib/*" \
+                "$proof_java" "${proof_jvm[@]}" \
                 com.eignex.klause.bench.profile.BooleanProofSchedulerProfile \
                 "${proof_arguments[@]}" "seed=$proof_seed" "control=$proof_mode" warmups=0 repeats=1 \
                 > "$proof_case/stdout.txt" 2> "$proof_case/stderr.txt" || proof_status=$?
