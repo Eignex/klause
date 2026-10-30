@@ -134,7 +134,7 @@ object BacktrackCatalog {
     private fun lpArm(emphasis: LpEmphasis) = BacktrackRecipe("lp-${emphasis.name.lowercase()}") { seed, onEvent ->
         BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(
             lpConfig = LpConfig(emphasis),
-            lpDirectionalGains = emphasis == LpEmphasis.DEFAULT,
+            lpDirectionalGains = emphasis != LpEmphasis.CONSERVATIVE,
         )
     }
 

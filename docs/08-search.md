@@ -250,7 +250,7 @@ sample. These advisory observations supply no certified bound or pruning authori
 The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
 
-The `lp-default` optimization recipe enables the finite consumer; direct
+The `lp-default` and `lp-aggressive` optimization recipes enable the finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
 and branching must be enabled. Two recent samples
