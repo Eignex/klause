@@ -48,10 +48,7 @@ internal fun bindSourceExecutionControls(
     val stop = cancellation or timeout or invocation.cancellation
     val companions = invocation.requestsFiniteNumericalCompanions
     val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve").let {
-        if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
-            "source-cuts", "source-point-cuts", "source-aggregate-cuts",
-            "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
-            "source-incumbent-completion") else it
+        if (companions) it.withoutSourceCompanionControls() else it
     }
         .overriddenBy(ExecutionOptions(ExecutionOption.seed(seed)))
     val finite: (FiniteSolveShape) -> FiniteSolveRequest = { shape ->
@@ -255,8 +252,7 @@ private fun FiniteSolveRequest.withSourceControls(
         executionOptions = policy.options(
             engine,
             executionOptions.withoutPresolve().without("node-limit", "dry-run-presolve").let {
-                if (numericalCompanions) it.without("source-lp-work-limit", "source-lp-allocation-limit",
-                    "source-lp-operations", "source-incumbent-completion") else it
+                if (numericalCompanions) it.withoutSourceCompanionControls() else it
             }.overriddenBy(options),
         ),
         randomSeed = seed, defaultArms = policy.arms(engine, cores, defaultArms),
@@ -269,3 +265,10 @@ private fun FiniteSolveRequest.withSourceControls(
         toleranceCheck = toleranceCheck,
     )
 }
+
+private fun ExecutionOptions.withoutSourceCompanionControls(): ExecutionOptions = without(
+    "source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
+    "source-cuts", "source-point-cuts", "source-aggregate-cuts",
+    "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
+    "source-incumbent-completion",
+)

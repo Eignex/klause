@@ -42,14 +42,21 @@ class SourceExecutionControlsTest {
             LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
             LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
         ), emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))))
-        for ((options, expected) in listOf(
-            emptyList<String>() to listOf(true, false, false),
-            listOf("source-cuts=false", "source-point-cuts=true", "source-aggregate-cuts=true") to
-                listOf(false, true, true),
+        for ((supplied, options, expected) in listOf(
+            Triple(false, emptyList<String>(), listOf(true, false, false)),
+            Triple(true, emptyList<String>(), listOf(true, false, false)),
+            Triple(false, listOf("source-cuts=false", "source-point-cuts=true", "source-aggregate-cuts=true"),
+                listOf(false, true, true)),
+            Triple(true, listOf("source-cuts=false", "source-point-cuts=true", "source-aggregate-cuts=true"),
+                listOf(false, true, true)),
         )) {
             val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
                 ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
-            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
+            val executionOptions = ExecutionOptions.parse(options)
+            val request = SourceExecutionRequest(invocation, executionOptions, finiteRequest = if (supplied) {
+                { shape -> SourceExecutionPolicy().finiteRequest(shape, FiniteEngine.MIXED,
+                    executionOptions = executionOptions) }
+            } else null)
             val finite = assertNotNull(request.finiteRequest).invoke(invocation.finiteShape())
 
             val scenario = buildPortfolioScenario(finite.executionOptions.reader(), finite.randomSeed,
