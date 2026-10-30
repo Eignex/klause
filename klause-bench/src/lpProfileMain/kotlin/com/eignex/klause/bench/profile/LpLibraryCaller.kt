@@ -28,9 +28,9 @@ internal fun libraryCaller(options: Map<String, String>) {
         .copy(maxInstructions = 1000L)
     val result = solver.minimize(objective, controls)
     val witness = result.assignment?.let { sample ->
-        val coordinates = compiled.columns.map { column ->
+        val coordinates: List<BigFraction> = compiled.columns.map { column ->
             if (column.real) {
-                sample.exactReals?.get(column.id) ?: BigFraction.ofDouble(sample.reals[column.id])
+                sample.exactReals?.get(column.id) ?: requireNotNull(BigFraction.ofDouble(sample.reals[column.id]))
             } else {
                 sample.exactInts?.get(column.id)?.let { BigFraction.of(it, BIG_ONE) }
                     ?: BigFraction.ofLong(sample.ints[column.id])
@@ -60,9 +60,11 @@ internal fun libraryCaller(options: Map<String, String>) {
     } else {
         println("o ${witness.objective}")
         println("s SATISFIABLE")
-        println(compiled.columns.zip(witness.values).joinToString(" ", prefix = "v ") { (column, value) ->
+        println(
+            compiled.columns.zip(witness.values).joinToString(" ", prefix = "v ") { (column, value) ->
             "${column.name}=$value"
-        })
+        }
+        )
     }
     println("c libraryElapsedNs=${started.elapsedNow().inWholeNanoseconds}")
 }
