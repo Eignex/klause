@@ -252,7 +252,7 @@ class Portfolio(
             maxSliceWork == 150000L && sliceGrowth == 1.5) {
             lastBooleanProofDecline = null
             proofTasks = BooleanProofPortfolio.forWorkers(workers, disjointBooleanProbe,
-                nativeOnly = automaticBooleanProof) {
+                nativeOnly = automaticBooleanProof, cancellation = cancellation) {
                 lastBooleanProofDecline = it
             }
             proofTasks?.let { run.restrictAvailability(it::available) }

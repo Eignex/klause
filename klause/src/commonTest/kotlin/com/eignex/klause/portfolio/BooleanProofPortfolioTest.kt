@@ -103,6 +103,27 @@ class BooleanProofPortfolioTest {
     }
 
     @Test
+    fun `cancelled task admission should leave original worker sessions available`() {
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+            btPool = listOf { BacktrackCatalog.byLabel("first-fail") })
+        val workers = PortfolioBuilder.build(problem, scenario)
+        try {
+            var decline: String? = null
+            val tasks = BooleanProofPortfolio.forWorkers(workers, probeFirst = true, nativeOnly = true,
+                cancellation = Cancellation { true },
+                newIdentity = { error("cancelled admission allocated task authority") }) {
+                decline = it
+            }
+
+            assertNull(tasks)
+            assertEquals("source-admission-cancelled", decline)
+            assertNotNull(workers[0].newResumableSolve()).close()
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
     fun `a completed source probe should preserve caller pins without allocating task authority`() {
         val pins = Assumptions(bools = mapOf(0 to true))
         val params = BacktrackCatalog.byLabel("first-fail").build(0L, null).copy(assumptions = pins)
