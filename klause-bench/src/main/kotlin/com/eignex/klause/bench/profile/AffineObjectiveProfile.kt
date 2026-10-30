@@ -19,6 +19,7 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
+import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
@@ -60,8 +61,12 @@ internal object AffineObjectiveProfile {
         for ((index, request) in requests.withIndex()) {
             val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
             val required = setOf("suite", "problem", "sha256")
-            require(options.keys.containsAll(required) && (options.keys - required - "presolve").isEmpty())
-            val presolve = options["presolve"]?.let { PresolveConfig.parse(it) } ?: PresolveConfig.DEFAULT
+            require(options.keys.containsAll(required) &&
+                (options.keys - required - setOf("presolve", "pivotOrder")).isEmpty())
+            val order = options["pivotOrder"]?.let { AffinePivotOrder.valueOf(it.uppercase()) }
+                ?: AffinePivotOrder.MARKOWITZ
+            val presolve = (options["presolve"]?.let { PresolveConfig.parse(it) } ?: PresolveConfig.DEFAULT)
+                .withAffinePivotOrder(order)
             val source = Catalog.uncapped(options.getValue("suite")).problems
                 .single { it.name == options.getValue("problem") }
             val bytes = CorpusFiles.open(CorpusFetcher.resolve(source.source)).use { it.readBytes() }
@@ -101,7 +106,8 @@ internal object AffineObjectiveProfile {
                     val started = System.nanoTime()
                     val prepared = FinitePipeline.prepare(FinitePipelineRequest(
                         model, FiniteEngine.BACKTRACK, objective,
-                        presolveConfig = presolve, explicitPresolveConfig = options.containsKey("presolve"),
+                        presolveConfig = presolve,
+                        explicitPresolveConfig = options.keys.any { it == "presolve" || it == "pivotOrder" },
                         cancellation = stop, solveCancellation = stop, presolveBudget = budget,
                         preparedPlan = plan, transformObjective = rewrite,
                     ))
@@ -115,6 +121,7 @@ internal object AffineObjectiveProfile {
                         put("exact", exact)
                         put("rewrite", rewrite)
                         put("presolve", options["presolve"] ?: "default")
+                        put("affinePivotOrder", order.name)
                         put("preparationNs", elapsed)
                         put("preparationWork", budget.spent())
                         put("cancelled", stop())
@@ -196,7 +203,10 @@ internal object AffineObjectiveProfile {
         put("reals", model.numRealVars)
         put("realLower", JsonArray(model.realLower.map { JsonPrimitive(it.toString()) }))
         put("realUpper", JsonArray(model.realUpper.map { JsonPrimitive(it.toString()) }))
-        put("semantics", model.semantics.toString())
+        put("semantics", buildJsonObject {
+            put("declared", model.semantics.declared.toString())
+            put("effective", model.semantics.effective.toString())
+        })
         put("integerBounds", buildJsonArray {
             for (variable in 0 until model.numIntVars) add(buildJsonObject {
                 put("lower", model.intBounds.lowerAsBigInteger(variable)?.toString())

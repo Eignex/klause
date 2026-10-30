@@ -63,6 +63,7 @@ internal class Inprocessing(
     private var debt = 0L
     private var lastWork = 0L
     private var lastCount = 0
+    private var initialWork = -1L
     private var pendingRoot: InprocessingPass? = null
     private var remaining = 0L
     private var publication: Iterator<ComponentResult?>? = null
@@ -163,9 +164,20 @@ internal class Inprocessing(
             return false
         }
         stats?.noteInprocessing("inprocessRootOpportunities", 1L)
+        val work = (session.work - spent).coerceAtLeast(0L)
+        if (initialWork < 0L) {
+            initialWork = work
+            if (params.inprocessingWarmupWork > 0L) {
+                lastWork = work
+                lastCount = session.learnedClauseCount
+            }
+        }
+        if ((work - initialWork).coerceAtLeast(0L) < params.inprocessingWarmupWork) {
+            stats?.noteInprocessing("inprocessWarmupRoots", 1L)
+            return false
+        }
         val restartDue = restart && --restartsUntilRun <= 0
         if (restartDue) restartsUntilRun = cadence
-        val work = (session.work - spent).coerceAtLeast(0L)
         val elapsed = (work - lastWork).coerceAtLeast(0L)
         val intervalDue = params.inprocessingInterval > 0L && elapsed >= params.inprocessingInterval
         val growthDue = params.inprocessingGrowth > 0 &&
@@ -225,6 +237,7 @@ internal class Inprocessing(
         nextPass = 0
         lastWork = 0L
         lastCount = 0
+        initialWork = -1L
         pendingRoot = null
         remaining = 0L
         publication = null

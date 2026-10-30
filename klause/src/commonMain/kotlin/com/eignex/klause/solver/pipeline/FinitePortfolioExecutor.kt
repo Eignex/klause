@@ -83,6 +83,7 @@ internal fun FinitePipeline.portfolioExecutor(
     includeRestartingProof: Boolean = false,
     probePolicy: InitialProbePolicy = InitialProbePolicy.ORDINARY,
     booleanProofTasks: Boolean = false,
+    fundedCompanions: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -104,14 +105,27 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionEligibility = numericalCompanions?.let {
         finiteNumericalCompanionEligibility(problem, scenario, objective, it)
     }
-    val companionPreparation = if (companionEligibility?.admitted == true) {
+    if (fundedCompanions && (!scenario.companionAfterIncumbent || cancellation.deadline() == null)) {
+        pipelineConfigError("companion-admission=funded requires companion-after-incumbent and a solve deadline")
+    }
+    val companionAdmission = if (fundedCompanions && companionEligibility?.admitted == true) {
+        FiniteNumericalCompanions.admission(problem, requireNotNull(objective),
+            cancellation or requireNotNull(numericalCompanions).cancellation or numericalCompanions.timeout,
+            companionEligibility.requirements.construction)
+    } else null
+    val companionPreparation = if (!fundedCompanions && companionEligibility?.admitted == true) {
         FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, companionEligibility.requirements.construction, scenario.companionAfterIncumbent,
             incumbentCompletionCheck)
     } else null
-    val companions = companionPreparation?.companions
+    val companions = if (companionAdmission?.initiallyFunded == true) {
+        FiniteNumericalCompanions.deferred(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
+            cancellation, requireNotNull(companionEligibility).requirements.construction, companionAdmission,
+            incumbentCompletionCheck)
+    } else companionPreparation?.companions
     companionEligibility?.let { eligibility ->
-        val declines = if (eligibility.admitted && companions == null) listOf("complete-affine-capture-unavailable")
+        val declines = if (companionAdmission?.initiallyFunded == false) listOf("companion-lifetime-unfunded")
+        else if (eligibility.admitted && companions == null) listOf("complete-affine-capture-unavailable")
         else eligibility.declines
         val frontier = eligibility.requirements
         val repair = frontier.copy(authority = WorkerProofAuthority.WITNESS_ONLY,
@@ -180,6 +194,7 @@ internal fun FinitePipeline.portfolioExecutor(
                 "finiteCompanionPreparationReady" to if (companions != null) 1L else 0L,
                 "finiteCompanionPreparationUnavailable" to if (companions == null) 1L else 0L)
         }.orEmpty(),
+        livePreparationStages = companionAdmission?.let { it::stages },
     ) { workers ->
         val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
         val shares = if (proofShares.isEmpty()) {

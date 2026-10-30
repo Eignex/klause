@@ -345,6 +345,10 @@ its own mutable selectors. Node allowances, cancellation and lane counts remain
 invocation arguments owned by [resources](06-sessions.md#resource-allowances) and
 [portfolios](12-portfolio.md).
 
+When preparation selects a finite route, `open-linear-incremental` stays at the
+source boundary and is omitted from finite engine settings. This filtering covers
+both default requests and application-supplied finite requests.
+
 ---
 
 Previous: [1. Introduction](01-introduction.md) · [Contents](README.md) · Next: [3. Input semantics and the schema DSL](03-input-semantics.md)

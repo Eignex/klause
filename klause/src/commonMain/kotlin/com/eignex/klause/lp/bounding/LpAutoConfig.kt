@@ -408,7 +408,7 @@ object LpAutoConfig {
         } else null
         if (sparse?.admitted == true) {
             plan = LpPlan(
-                bounding = true, boundMaxDepth = 0, learn = true, probe = false, rootCutHarvest = false,
+                bounding = true, boundMaxDepth = 0, learn = true, probe = plan.probe, rootCutHarvest = false,
                 rootMaxWork = minOf(base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK, SPARSE_LP_MAX_WORK),
                 rootBudgetFraction = base.rootBudgetFraction, rootBudgetMillis = base.rootBudgetMillis,
                 lpWorkBudgetFraction = base.lpWorkBudgetFraction, boundMaxPivots = base.boundMaxPivots,

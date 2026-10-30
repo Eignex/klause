@@ -26,6 +26,15 @@ internal class ElementResultDefinition(val factor: Element) : SweepNode {
         return factor.arrIsVars && factor.arr[(index - factor.indexOffset).toInt()].toInt() == variable
     }
 
+    fun compute(intOf: (Int) -> Long): Long {
+        val index = intOf(factor.idx)
+        if (index < factor.indexOffset || index >= factor.indexOffset.toLong() + factor.arr.size) {
+            return SweepNode.NO_WRITE
+        }
+        val entry = factor.arr[(index - factor.indexOffset).toInt()]
+        return if (factor.arrIsVars) intOf(entry.toInt()) else entry
+    }
+
     override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long {
         val index = assignment.intValue(factor.idx)
         if (index < factor.indexOffset || index >= factor.indexOffset.toLong() + factor.arr.size) {

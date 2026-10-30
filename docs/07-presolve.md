@@ -87,6 +87,27 @@ default round cap; an explicit zero round cap still suppresses those schedules.
 
 ### Rewrite representation controls
 
+`AffinePivotOrder.REWRITE_COST` retains Markowitz ordering between definitions and
+tries the smallest rewrite payload among an equality's unit pivots first. It sums
+the current incident factors' `structuralKeyWeight`,
+excluding the definition, through the maintained occurrence index. Ties retain
+declaration order. Scoring charges and polls the phase allowance and never builds
+factor keys or speculative replacements. The ordinary admissibility, domain,
+objective and reconstruction checks apply to the preferred pivot; a rejected pivot
+falls back to the first admitted declaration-order pivot. An equality without an
+admitted pivot performs no payload scoring. This opt-in estimate
+describes construction size; active downstream search still determines total cost.
+The same policy can fold an asserted integer definition through word-sized
+`ReifiedLinear` consumers. The replacement retains the channel's Boolean output
+and comparison in both directions; conditional equalities never supply asserted
+pivots. Coefficient checks, the per-row absorption cap and carried domain bounds
+apply to these consumers as they do to unconditional rows. Single-partner unit
+translations and sign reversals also retain native `ComparisonClause`
+disjunctions, translating every affected bound and reversing inequality direction
+for negative scale. Unrepresentable bounds decline the pivot. Clause analysis
+charges and polls the same allowance without allocating prospective factors.
+Other pivot policies retain their consumer admission.
+
 `PresolveConfig.preserveStructure` is an opt-in performance control for affine and
 structural reduction. Structured factors are all factors except plain `Linear`
 and `Clause`; binary partition rows have equal nonzero coefficients and right-hand
@@ -139,6 +160,10 @@ Binary substitution restores later Boolean reductions before reading carrying
 literals, then truncates appended Booleans, preserving the earliest namespace.
 Definition hints can rename retained aliases and substitute a single affine
 reconstruction over retained columns; a rebuilt output passes to its single partner.
+Boolean comparison hints can substitute unit-divisor affine inputs over retained
+columns while preserving their Boolean output, relation and strictness. Expansion
+charges the preparation allowance and declines cancellation or checked overflow;
+other divisors retain ordinary hint admission.
 Ordered search hints can follow `x = y + c` aliases only for translation-invariant
 variable selectors with minimum/maximum values. Bound-based selectors and other
 value choices require direct coordinates. Untouched columns retain their orientation;
@@ -232,15 +257,79 @@ opens a consumer. Assumptions, external components, arithmetic and LP-enabled
 workers retain their canonical traversal. Enumeration and optimization do not use
 this trial.
 
+Pinning retains unchanged immutable source clauses by reference and copies only
+shortened rows. Column counts stay identical, preserving the clauses' plain-Boolean
+classification. Each new baked model owns its projection, watches and search state;
+the shared factor input carries no mutable search state.
+
 A trial requires global root pins beyond the baked root and the last attempted
 view. An unchanged baked root performs no BVE. The root-pin scan charges its full
 column visit count and records its time; an insufficient grant skips the scan.
 An unchanged root trail retains a completed miss. All attempts share one
-cumulative preparation, trial and checking allowance. BVE
-receives half the allowance remaining after the private source copy. Its local cap
+cumulative preparation, trial and checking allowance. A bounded admission scan
+uses saturated occurrence counts and parent literal volumes over the residual
+clauses. It admits a non-growing raw resolution shape: a single parent on one
+side satisfying `n * (w - 2) <= w`, or two parents on each side with total width
+at most eight. Tautology and
+duplicate savings can admit other useful pivots, so a proxy refusal establishes
+no absence of opportunities. Width and per-pivot budgets still apply. Temporary
+arrays own `24 * columns` primitive bytes inside the declared admission model;
+initialization, disposal and visits consume the containing allowance.
+The scan retains a protected-column set for every refused shape inside that
+model. BVE restricts this trial to the initially admitted columns, so an unrelated
+declined pivot cannot consume its resolution allowance. Later opportunities among
+protected columns wait for a fresh root view. This selection is a heuristic, not
+an exhaustive elimination pass.
+
+When one column is admitted, the pass indexes its complete incident-clause
+neighborhood. Outside rows contain no pivot literal and remain unchanged; resolving
+the pivot commutes with those rows. The neighborhood keeps canonical column slots
+and transports every dropped local factor index back to its captured full source.
+An incomplete scan publishes no view. Multiple admitted columns retain the full
+database path. Neighborhood scanning and index transport debit preparation, while
+the kernel retains its local pass cap.
+
+BVE receives half the allowance remaining after source and neighborhood preparation. Its local cap
 retains complete earlier pivots when later analysis stops; cancellation of the
 containing call declines the generation. Baking, opening and canonical checks
 share the remaining containing allowance.
+Private baking adapts the root engine's construction and propagation meter into
+that allowance; those visits join preparation work rather than remaining on an
+unobserved temporary root state.
+Opening reserves another construction visit count for the fresh consumer before
+allocating its state. Reconstruction charges the larger of the source-entry model
+and a bound covering all composed sample copies and eliminated-clause replay.
+The latter uses the actual reconstruction descriptors; repeated elimination can
+retain more replay literals than one source view contains.
+Mapping composition separately charges its descriptor copies during preparation,
+including trials that produce no witness. The descriptors add their modeled
+primitive/reference storage before composition and copied-learning admission.
+
+Unused BVE allowance can copy globally learned clauses into the private model.
+Only this canonical worker's non-permanent clauses over Boolean source columns
+qualify. Global pins remove satisfied clauses and false literals. A clause that
+mentions an eliminated column can follow the actual BVE parent descriptors in
+elimination order. A pure pivot's satisfying value lifts every projected model,
+so substituting it preserves learned consequences. Other pivots use one shortest
+opposite-polarity source parent to derive a resolvent; each such consequence is
+entailed by the projected source. The transfer produces at most one clause per
+learned input and admits at most 64 literals per intermediate clause. A tautological
+or wider selected resolvent withholds that input, without excluding other useful
+translations. Every result contains only retained columns. An empty consequence
+declines the generation and grants no source refutation authority.
+
+Parent indexing, literal visits and normalization consume the transfer allowance.
+Final clause-input normalization reserves work from the resulting literal count
+before constructing its owned factor, including when resolution widens the input.
+Projection reserves 16 KiB of modeled scratch inside the remaining private byte
+grant; its temporary buffers are released after transfer. This reservation joins
+the conservative private peak model, including when a projection copies nothing.
+Each copied consequence owns its literal buffer and consumes the same
+work and modeled-memory grants; an exhausted local transfer grant retains the
+completed subset. The mapping composes through the enriched model's exact identity.
+These copies preserve consequences without sharing learned-store indexes or
+exchange cursors. Their work and time are preparation subsets; private baking
+and propagation include the added clauses.
 
 The private worker owns fresh watches, learning and search state. Canonical exchange
 cursors and pooled incumbent guidance stay with the retained canonical worker;
@@ -447,6 +536,10 @@ Bound fusion combines matching sides into an equality or refutes crossing bounds
 These reductions preserve the solution set. Affine singleton elimination and
 singleton inequality projection require reconstruction; projection stays off for
 solution-set-sensitive queries.
+Unrepresentable affine constants, partner coefficients or carried-bound arithmetic
+retain the source definition. A residue projection whose numerator exceeds the
+signed word retains its equality, since division can still yield a representable
+source value. Partner spans must fit the bounded scan without subtraction overflow.
 Singleton projection meters occurrence construction, row specialization, candidate
 and rewrite scans through the invocation token in both lanes. It polls at bounded
 strides and before publishing each row with its reconstruction; an interrupted
@@ -687,6 +780,11 @@ exactly. A fresh positive channel retains the source coefficient when signed reu
 or a constant shift exceeds the objective's storage width. Mixed
 integer readers retain their columns and channels. Substituted values are
 reconstructed from their literals, preserving original costs and source coordinates.
+The rewrite-cost policy also projects binary costs within a mixed integer
+objective when existing signed channels carry them exactly. It retains nonbinary
+costs and any binary cost whose channel reuse would overflow, protecting their
+integer columns from substitution. This mixed view adds no Boolean channels and
+does not carry the pure binary-objective LP admission marker.
 Continuous models, approximate semantics and solution-set-sensitive invocations
 retain their objective form.
 
