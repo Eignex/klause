@@ -52,6 +52,7 @@ class LpRetainedSourcesTest {
             val stats = sink.snapshot()
             assertFalse(stats.phases.containsKey("TEMPLATE_PREPARATION_NODE"))
             assertEquals(2L, stats.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes["RETAINED_BOUND_REUSES"])
+            assertEquals(1L, stats.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes["RETAINED_FULL_BOUND_CHECKS"])
         }
     }
 
@@ -218,13 +219,16 @@ class LpRetainedSourcesTest {
 
     @Test
     fun `live integer bounds should preserve exact origins and earlier snapshots through nested pops`() {
-        for (origin in listOf(5L, Long.MIN_VALUE + 1L, Long.MAX_VALUE - 5L)) {
-            val problem = Problem(0, 1, arrayOf(IntDomain(origin, origin + 4L)), emptyArray())
+        for (imported in listOf(false, true)) for (origin in listOf(5L, Long.MIN_VALUE + 1L, Long.MAX_VALUE - 5L)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(origin, origin + 4L)), arrayOf<Factor>(
+                Linear(longArrayOf(1L), intArrayOf(0), LinearOp.GE, origin),
+            ))
             val session = PropagationSession(problem)
             val domains = SessionDomains(session)
             val sources = LpRetainedSources(
                 problem,
-                CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L))),
+                CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)),
+                    retainImportedDefinitions = imported),
             )
             LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
                 val edit = assertNotNull(sources.prepare(owner.state, domains))
@@ -385,6 +389,7 @@ class LpRetainedSourcesTest {
                 problem,
                 LinearObjective(intCoefficients = longArrayOf(1, 0, 0)),
                 linMaxTightFace = true,
+                retainImportedDefinitions = true,
             ),
         )
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->

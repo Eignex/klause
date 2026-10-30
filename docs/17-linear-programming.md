@@ -122,6 +122,13 @@ Conditional, auxiliary, IEEE and noncompact columns keep ordinary construction.
 An empty catalog creates no speculative definitions. Each lookup charges the current
 allowance; interrupted imports report that work and withhold publication after debit.
 These reuses have their own observation, separate from introductions into the owner.
+After a complete definition match, the column's existing live-bound memo can retain
+the identical immutable source-bound pair and its primitive endpoints. Subsequent
+imports check their current tag, origin and open or finite width against those
+endpoints. A changed live-bound request replaces the memo; earlier bound snapshots
+remain immutable. Successful imports carry the known catalog index in the existing
+column-mapping scratch, avoiding a second lookup. Full definition checks and reused
+imports have separate observations, including checks in interrupted attempts.
 The catalog retains no additional cache or numerical result authority.
 An internal retained-only admission policy uses this catalog path and omits source
 template preparation from whole-model builds. Its complete layouts keep ordinary

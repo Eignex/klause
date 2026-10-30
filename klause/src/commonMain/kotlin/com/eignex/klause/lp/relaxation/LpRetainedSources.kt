@@ -107,6 +107,39 @@ internal class LpRetainedSources(
         private var lastOpenUpper = false
         private var lastBounds: ExactLpBounds? = null
         val storageUnits: Long = 16L + (required?.size ?: 0) + (definition?.storageUnits ?: 0L)
+        val sourceBoundsMemoized: Boolean get() = lastBounds === source.bounds
+
+        fun compactColumn(model: LpModel, index: Int): ExactLpColumn? {
+            val origin = model.loShift[index]
+            val open = !model.hasFiniteUpper(index) || model.probeClampedHi[index]
+            if (sourceBoundsMemoized) {
+                return source.takeIf {
+                    source.tag == model.tag[index] && lastLower == origin && lastOpenUpper == open &&
+                        (open || (model.upper[index] >= 0L && lastUpper - lastLower == model.upper[index]))
+                }
+            }
+            if (!matchesCompactColumn(model, index)) return null
+            val width = model.upper[index]
+            if (open || origin <= Long.MAX_VALUE - width) {
+                lastLower = origin
+                lastUpper = if (open) 0L else origin + width
+                lastOpenUpper = open
+                lastBounds = source.bounds
+            }
+            return source
+        }
+
+        private fun matchesCompactColumn(model: LpModel, index: Int): Boolean {
+            if (!source.integral || source.tag != model.tag[index] ||
+                source.origin.legacyLong() != model.loShift[index] || !source.bounds.lower.matchesCompactSide(0L)
+            ) return false
+            return if (!model.hasFiniteUpper(index) || model.probeClampedHi[index]) source.bounds.upper == null else {
+                model.upper[index] >= 0L && source.bounds.upper.matchesCompactSide(model.upper[index])
+            }
+        }
+
+        private fun ExactLpSide?.matchesCompactSide(bound: Long): Boolean = this != null &&
+            !strict && premises == null && number.legacyLong() == bound
 
         fun bounds(lower: Long, upper: Long, openUpper: Boolean = false): ExactLpBounds {
             val finiteUpper = if (openUpper) 0L else upper
@@ -240,12 +273,20 @@ internal class LpRetainedSources(
             val fragment = emission.relaxation
             emittedExtent += fragment.model.n.toLong() + fragment.model.m +
                 (fragment.model.doubleView?.colVal?.size ?: fragment.model.csc.rowIdx.size)
-            val source = importFragment(fragment, staged, keys, epoch, cancellation) ?: return null
+            val hints = if (relaxer.reuseRetainedDefinitions && keys.isNotEmpty() &&
+                fragment.model.exactState == null && fragment.model.doubleView == null
+            ) IntArray(fragment.model.n) else null
+            val source = importFragment(fragment, staged, keys, hints, cancellation) ?: return null
             require(source.objective.scale.value == BigFraction.ONE && source.objective.externalConstant.value.isZero)
-            val mapped = IntArray(source.n)
+            val mapped = hints ?: IntArray(source.n)
             for (local in mapped.indices) {
-                val key = columnKey(fragment, local, epoch)
-                val old = keys[key]
+                val known = if (hints == null) -1 else mapped[local] - 1
+                var key: ColumnKey? = null
+                val old = if (known >= 0) known else {
+                    val currentKey = columnKey(fragment, local, epoch)
+                    key = currentKey
+                    keys[currentKey]
+                }
                 if (old != null) {
                     // Integer and mixed emitters can encode the same coordinate in Long and IEEE forms.
                     check(staged[old].source.origin.value == source.column(local).origin.value)
@@ -270,7 +311,7 @@ internal class LpRetainedSources(
                     }
                     val cost = source.objective.cost(local)
                     mapped[local] = staged.size
-                    keys[key] = staged.size
+                    keys[requireNotNull(key)] = staged.size
                     staged.add(Column(
                         column, cost, fragment.colVarId[local], fragment.colIsBool[local],
                         fragment.colRealId[local], fragment.colRealSign[local], fragment.colReq[local]?.copyOf(),
@@ -378,13 +419,11 @@ internal class LpRetainedSources(
         fragment: LpRelaxation,
         staged: List<Column>,
         keys: Map<ColumnKey, Int>,
-        epoch: Long,
+        hints: IntArray?,
         cancellation: Cancellation,
     ): ExactLpModel? {
         val model = fragment.model
-        if (relaxer.reuseRetainedDefinitions && keys.isNotEmpty() &&
-            model.exactState == null && model.doubleView == null
-        ) {
+        if (hints != null) {
             var work = 0L
             var reused = 0
             val source = try {
@@ -392,10 +431,15 @@ internal class LpRetainedSources(
                     work++
                     cancellation.charge(1L)
                     checkCancellation(cancellation)
-                    if (!fragment.canBorrowIntegerColumn(local)) null else {
-                        keys[columnKey(fragment, local, epoch)]?.let { staged[it].source }
-                            ?.takeIf { it.matchesCompactColumn(model, local) }?.also { reused++ }
-                    }
+                    if (!fragment.canBorrowIntegerColumn(local)) return@authoritativeModel null
+                    val global = keys[ColumnKey.Source(CutSourceKind.INTEGER, fragment.colVarId[local])]
+                        ?: return@authoritativeModel null
+                    val column = staged[global]
+                    if (!column.sourceBoundsMemoized) relaxer.observeRetainedBoundCheck()
+                    val definition = column.compactColumn(model, local) ?: return@authoritativeModel null
+                    hints[local] = global + 1
+                    reused++
+                    definition
                 }
             } finally {
                 relaxer.observeTemplateWork(work)
@@ -413,18 +457,6 @@ internal class LpRetainedSources(
         colVarId[index] >= 0 && !colIsBool[index] && colRealId[index] < 0 && colReq[index] == null &&
             !model.colContinuous[index] && !model.probeClampedLo[index] &&
             problem.intBounds.hasLower(colVarId[index])
-
-    private fun ExactLpColumn.matchesCompactColumn(model: LpModel, index: Int): Boolean {
-        if (!integral || tag != model.tag[index] || origin.legacyLong() != model.loShift[index] ||
-            !bounds.lower.matchesCompactSide(0L)
-        ) return false
-        return if (!model.hasFiniteUpper(index) || model.probeClampedHi[index]) bounds.upper == null else {
-            model.upper[index] >= 0L && bounds.upper.matchesCompactSide(model.upper[index])
-        }
-    }
-
-    private fun ExactLpSide?.matchesCompactSide(bound: Long): Boolean = this != null &&
-        !strict && premises == null && number.legacyLong() == bound
 
     private fun checkCancellation(cancellation: Cancellation) {
         if (cancellation()) throw LpAssemblyCancelled()

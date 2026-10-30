@@ -879,6 +879,8 @@ It uses retained-only admission, which also leaves a preceding whole-model build
 ordinary construction.
 `retainedBoundDefinitionsReused` counts those avoided constructions separately from
 `exactBoundsAdopted`, which counts introductions backed by prepared definitions.
+`retainedFullBoundChecks` counts complete catalog-definition checks; memoized imports
+still check their current normalized coordinates and sides.
 The standalone candidate uses selective metadata reuse. Pin the revision when
 comparing these mode records; a shared label does not establish equal algorithms.
 It isolates root installation; ordinary CLI preparation, propagation and route

@@ -231,6 +231,7 @@ internal object LpTemplatePreparationProfile {
                             put("exactBoundsAdopted", assembly?.outcomes?.get("EXACT_BOUND_OBJECTS") ?: 0L)
                             put("retainedBoundDefinitionsReused",
                                 assembly?.outcomes?.get("RETAINED_BOUND_REUSES") ?: 0L)
+                            put("retainedFullBoundChecks", assembly?.outcomes?.get("RETAINED_FULL_BOUND_CHECKS") ?: 0L)
                             put("peakRetainedTemplateUnits", retainedUnits)
                             put("nativeResults", results.joinToString(","))
                             put("independentProofCheck", false)

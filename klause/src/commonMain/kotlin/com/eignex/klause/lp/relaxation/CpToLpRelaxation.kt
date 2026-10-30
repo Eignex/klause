@@ -702,6 +702,10 @@ internal class CpToLpRelaxation(
         templateStats?.observeTemplateUse(retainedBounds = count)
     }
 
+    internal fun observeRetainedBoundCheck() {
+        templateStats?.observeTemplateUse(retainedFullChecks = 1)
+    }
+
     internal fun observeTemplateWork(work: Long) {
         onTemplateWork(work)
     }
