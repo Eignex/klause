@@ -1422,18 +1422,19 @@ private fun LpEngine.sparseRootLpRelaxationBound(
                 observeNodePause()
                 continue
             }
-            return try {
-                val lower = attempt.second?.let {
+            val lower = try {
+                attempt.second?.let {
                     certifiedTightObjectiveLowerBound(relaxation.model, it.duals,
                         rootCertificationObserver(), solveContext.certificationPolicy)
                 }
-                if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
             } finally {
                 // Scoped preparation has already charged its scaling-construction reservation.
                 val metrics = if (nodeUsesTrail) propagator.lastMetrics.copy(preparationOps = 0L)
                     else attempt.first.lastMetrics
                 observeRootSolve(attempt.first, metrics)
             }
+            retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
+            return if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
         }
         return Double.NaN
     } finally {
@@ -1469,6 +1470,7 @@ private fun LpEngine.standaloneRootLpRelaxationBound(
                 solveContext.certificationPolicy,
             )
         }
+        retainRootPrimalGuidance(relaxation, result, cancellation)
         projectCertifiedLowerBound(relaxation, lower)
     }
 }

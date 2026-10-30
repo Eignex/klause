@@ -35,6 +35,7 @@ import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
+import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
@@ -83,6 +84,9 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.constructionLongArray
 import kotlin.math.abs
+import kotlin.time.TimeSource
+
+private const val ROOT_PRIMAL_GUIDANCE_BYTES = 1024L * 1024L
 
 /** The persistent gated-residual float filter: the node-invariant [relaxation], the ONE [simplex]
  *  instance re-solving it with its kept factorization, and the reusable per-row [enforced] buffer
@@ -102,6 +106,7 @@ internal class RootRoundingWarmStart(
     val objective: LinearObjective,
     val relaxation: LpRelaxation,
     val basis: Basis,
+    val primal: DoubleArray? = null,
 )
 
 internal enum class LpRootQueryPolicy {
@@ -262,6 +267,24 @@ internal class LpEngine(
             saturatingAdd(metrics.workOps, metrics.preparationOps)) else metrics
         sink.lp.observeEngineCost(LpRoute.ROOT, charged, finished)
         chargeWork(charged.workOps)
+    }
+
+    internal fun retainRootPrimalGuidance(
+        relaxation: LpRelaxation,
+        result: FloatLpResult?,
+        cancellation: Cancellation,
+    ) {
+        if (!params.lpPlan.probe || result?.optimal != true || cancellation()) return
+        val work = result.primal.size.toLong()
+        if (work * Double.SIZE_BYTES > ROOT_PRIMAL_GUIDANCE_BYTES || lpWorkAllowanceSpent(work)) return
+        val remaining = if (sparseTrialActive) sparseTrialRemainingWork() else rootPrimalWorkBudget()
+        if ((sparseTrialActive || remaining > 0L) && remaining <= work) return
+        val started = TimeSource.Monotonic.markNow()
+        noteNodeOverhead(work)
+        val primal = result.primal.copyOf()
+        if (cancellation()) return
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal)
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
     internal fun observeSparseTrial(solver: LpSolver) {
