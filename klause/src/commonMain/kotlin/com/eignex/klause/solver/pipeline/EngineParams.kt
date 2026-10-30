@@ -59,6 +59,7 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.SourceProgressReward
+import com.eignex.klause.portfolio.SourceRateReward
 
 /** Invalid solver-policy configuration. */
 class PipelineConfigException(message: String) : RuntimeException(message)
@@ -719,7 +720,8 @@ internal fun buildPortfolioScenario(
     val rewardPolicy = when (val reward = p[ExecutionOption.portfolioReward]?.lowercase()) {
         null, "ordinary" -> null
         "source" -> SourceProgressReward
-        else -> pipelineConfigError("portfolio-reward expects ordinary|source, got `$reward`")
+        "source-rate" -> SourceRateReward()
+        else -> pipelineConfigError("portfolio-reward expects ordinary|source|source-rate, got `$reward`")
     }
     val reseedStaleThreshold = p[ExecutionOption.reseedStaleThreshold]
     val reportLsResiduals = p[ExecutionOption.lsResiduals] ?: false

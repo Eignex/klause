@@ -813,6 +813,7 @@ class Portfolio(
      */
     @Suppress("TooGenericExceptionCaught")
     private inner class Schedule<H : AutoCloseable>(cancellation: Cancellation, val handles: Array<H?>) {
+        private val scopedReward = if (rewardPolicy is SourceRateReward) SourceRateReward() else rewardPolicy
         private var availability: ((Int) -> Boolean)? = null
 
         fun restrictAvailability(available: (Int) -> Boolean) { availability = available }
@@ -1429,7 +1430,7 @@ class Portfolio(
         }
 
         private fun rewardFor(progress: PortfolioProgress): Double =
-            (rewardPolicy?.reward(progress) ?: progress.ordinaryReward).also {
+            (scopedReward?.reward(progress) ?: progress.ordinaryReward).also {
                 require(it.isFinite() && it in 0.0..1.0) { "portfolio reward must be finite and in [0, 1]" }
             }
     }

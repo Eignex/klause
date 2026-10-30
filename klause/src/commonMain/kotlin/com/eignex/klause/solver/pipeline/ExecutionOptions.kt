@@ -523,7 +523,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `phase-retention` execution setting. */
         val phaseRetention: ExecutionOption<Double> = ExecutionOption("phase-retention", ValueKind.DOUBLE)
 
-        /** Select ordinary rewards or the opt-in source-progress reward ablation. */
+        /** Select ordinary rewards or opt-in accepted-source and gain-rate rewards. */
         val portfolioReward: ExecutionOption<String> = ExecutionOption("portfolio-reward", ValueKind.STRING)
 
         /** Opt-in retained proof coverage share in [0.5, 1] for curated single-core finite optimization. */

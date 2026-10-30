@@ -446,6 +446,16 @@ credit stay observable without earning improvement turns. Ordinary rewards remai
 the default. The experiment changes neither admission nor complete-worker coverage;
 construction, preparation, checking and retirement retain their ordinary accounting.
 
+`portfolio-reward=source-rate` prices finite positive accepted objective gains against
+observed factory and segment time. Segment time includes preparation, initialization
+and coordinator checks. Unproductive time and feasibility setup remain owed until
+that worker's next priced gain. Its gain rate is compared with other workers'
+cumulative accepted-gain rate; common objective rescaling preserves this comparison.
+Feasibility retains ordinary rewards, idle credit earns no improvement reward, and
+accepted terminal closure earns unit reward. Accounting is private to an invocation.
+Source preparation, final retirement and independent checking keep their containing
+run costs; this score supplies neither witness nor proof authority.
+
 ### Reproducible diagnostics
 
 `portfolio-work=N` opts finite Boolean/integer portfolios into a single-lane
