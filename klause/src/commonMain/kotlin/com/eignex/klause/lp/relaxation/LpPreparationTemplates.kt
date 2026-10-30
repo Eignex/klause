@@ -235,7 +235,9 @@ internal class LpPreparationTemplates private constructor(
                     }
                     var changedBounds: MutableMap<Int, LpIntegerBoundTemplate>? = null
                     var reusedBounds = old.bounds.size
-                    for ((variable, bound) in old.bounds) {
+                    val stableBounds = problem.declaredIntDomains.stableEndpoints &&
+                        old.source.declaredIntDomains === problem.declaredIntDomains
+                    if (!stableBounds) for ((variable, bound) in old.bounds) {
                         if (!visit()) return null
                         val domain = problem.rootDomainOf(variable)
                         val lower = problem.statesLowerBound(variable)

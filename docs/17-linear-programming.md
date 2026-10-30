@@ -89,9 +89,10 @@ Compact integer import can adopt exact bound columns during construction after
 checking the normalized origin, width, stated sides, integrality and source tag.
 It creates no temporary exact column for a matching template. IEEE and retained
 exact-state imports keep the full exact-column compatibility check.
-Bound endpoints are checked even on the same finite
-view, whose domains can follow its owning presolve session. The ordinary mode
-retains its complete-match check. Both modes publish only completed immutable
+An identical stable source-domain table authorizes endpoint metadata reuse without
+a repeated scan. Shared domain arrays require endpoint checks, including raw views
+carrying a finite session's table; model identity or type alone supplies no such proof.
+The ordinary mode retains its complete-match check. Both modes publish only completed immutable
 snapshots within the same containing allowance and storage cap.
 
 Template construction polls and charges the containing token, including failed
