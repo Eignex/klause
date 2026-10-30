@@ -38,7 +38,7 @@ class JointLinearRepairTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
         val seed = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(0.75),
-            exactReals = listOf(BigFraction.ofLong(3) / BigFraction.ofLong(4)))
+            exactReals = listOf(BigFraction.ofLong(3) * BigFraction.ofLong(4).reciprocal()))
         var paused = false
 
         JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
@@ -66,7 +66,7 @@ class JointLinearRepairTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
         val seed = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(0.75),
-            exactReals = listOf(BigFraction.ofLong(3) / BigFraction.ofLong(4)))
+            exactReals = listOf(BigFraction.ofLong(3) * BigFraction.ofLong(4).reciprocal()))
 
         for (completion in listOf(false, true)) {
             val result = JointLinearRepair(model, source, objective,
