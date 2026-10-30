@@ -19,6 +19,7 @@ import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.executionCapabilities
+import com.eignex.klause.solver.objective.BooleanObjectiveDelta
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -765,8 +766,26 @@ class LocalSearchState private constructor(
         if (feedsDefinitions(move)) return evaluateMove(move, scored).objectiveDelta
         return when (scored) {
             is LinearObjective -> linearObjectiveDelta(move, scored)
+            is FunctionalObjective -> if (booleanDeltaOf === scored) {
+                booleanDelta?.delta(assignment, move, ::checkScoringWork) ?: scored.deltaIfApplied(assignment, move)
+            } else scored.deltaIfApplied(assignment, move)
             is IncrementalObjective -> scored.deltaIfApplied(assignment, move)
             else -> null
+        }
+    }
+
+    private var booleanDeltaOf: FunctionalObjective? = null
+    private var booleanDelta: BooleanObjectiveDelta? = null
+
+    internal fun prepareObjectiveDelta(objective: Objective): Sequence<Unit> = sequence {
+        val functional = objective as? FunctionalObjective ?: return@sequence
+        if (scoringView(functional) is LinearObjective) return@sequence
+        for (prepared in functional.prepareBooleanDelta(problem.numBoolVars)) {
+            if (prepared != null) {
+                booleanDeltaOf = functional
+                booleanDelta = prepared.evaluator
+            }
+            yield(Unit)
         }
     }
 

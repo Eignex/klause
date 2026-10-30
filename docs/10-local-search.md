@@ -233,6 +233,15 @@ search. Each variable's occurrence index lists each active factor once, so a mov
 updates every invariant reading the coordinate exactly once. Assignments, random
 generators, weights and invariant payloads belong to each live state.
 
+Unmaintained flat Boolean objective folds have a private reader index from leaf
+coordinates to priced terms. A primitive flip evaluates only those terms; compound
+flips combine parity and visit each affected term once. Cost differences retain exact
+integer cancellation before conversion to a score. Preparation resumes in batches
+of 256 entries and admits at most one million Boolean coordinates, 250,000 terms
+and two million reader entries. Nested, mixed or opaque cones and maintained-network
+probes use the generic objective evaluator. The index supplies heuristic scores;
+source witness and objective checks retain admission authority.
+
 Invariants substitute a new value into every position that reads the moved
 coordinate. Product residuals are computed exactly, with a private 128-bit
 temporary on overflow, so an overflowing product cannot satisfy a signed-word
