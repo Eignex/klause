@@ -40,9 +40,13 @@ object BooleanProofSchedulerProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "work", "seed", "splits", "repeats")
         require(options.keys.containsAll(required) &&
-            (options.keys - required).all { it in setOf("recipe", "native", "driver") })
+            (options.keys - required).all { it in setOf("recipe", "native", "driver", "control", "warmups") })
         val driver = options["driver"] ?: "repair"
         require(driver in setOf("repair", "satisfaction"))
+        val control = options["control"] ?: "paired"
+        require(control in setOf("paired", "tasks", "replicas"))
+        val warmups = options["warmups"]?.toInt() ?: 1
+        require(warmups in 0..1)
         val recipe = options["recipe"] ?: "input-order"
         val native = options["native"]?.toBooleanStrict() ?: false
         val limit = options.getValue("work").toLong().also { require(it in 10000L..2000000L) }
@@ -63,8 +67,10 @@ object BooleanProofSchedulerProfile {
         allocation.isThreadAllocatedMemoryEnabled = true
         val process = ManagementFactory.getOperatingSystemMXBean() as OperatingSystemMXBean
         val report = out.resolve("records.jsonl")
-        for (iteration in -1 until repeats) {
-            val modes = if (iteration and 1 == 0) listOf("replicas", "tasks") else listOf("tasks", "replicas")
+        var controlsStarted = 0
+        for (iteration in -warmups until repeats) {
+            val modes = if (control != "paired") listOf(control)
+                else if (iteration and 1 == 0) listOf("replicas", "tasks") else listOf("tasks", "replicas")
             for (mode in modes) {
                 if (stop()) return
                 val allocated = allocation.getThreadAllocatedBytes(Thread.currentThread().threadId())
@@ -105,6 +111,10 @@ object BooleanProofSchedulerProfile {
                 val cpuElapsed = process.processCpuTime - cpu
                 report.appendText(buildJsonObject {
                     put("mode", mode)
+                    put("controlPolicy", control)
+                    put("warmupCount", warmups)
+                    put("firstControlInProcess", controlsStarted++ == 0)
+                    put("processCpuAtControlStartNs", cpu)
                     put("recipe", recipe)
                     put("taskDriver", driver)
                     put("nativeSat", native)
@@ -128,12 +138,22 @@ object BooleanProofSchedulerProfile {
                     put("inclusiveControlElapsedNs", elapsed)
                     put("inclusiveControlProcessCpuNs", cpuElapsed)
                     put("threadAllocatedBytes", bytesAllocated)
+                    processPeakRssBytes()?.let { put("wholeProcessPeakRssBytes", it) }
                     put("heapUsedBytes", ManagementFactory.getMemoryMXBean().heapMemoryUsage.used)
                     put("processors", Runtime.getRuntime().availableProcessors())
                     put("maxHeapBytes", Runtime.getRuntime().maxMemory())
                     put("emergencyStopped", stop())
                 }.toString() + "\n")
             }
+        }
+    }
+
+    private fun processPeakRssBytes(): Long? {
+        val status = File("/proc/self/status")
+        if (!status.isFile) return null
+        return status.useLines { lines ->
+            lines.firstOrNull { it.startsWith("VmHWM:") }
+                ?.substringAfter(":")?.trim()?.substringBefore(" ")?.toLongOrNull()?.times(1024L)
         }
     }
 
