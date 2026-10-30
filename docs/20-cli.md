@@ -147,7 +147,8 @@ has its own work currency, separate from `node-limit`:
 | Quadratic optimization | the polynomial limits; open integers also use `nia-*` | [Quadratic execution](16-nonlinear-arithmetic.md#quadratic-strategy-execution) |
 | Transcendental | `nra-*` limits and shared exact-satisfaction controls | [Function checks](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) |
 
-`open-linear-incremental` is inactive when source preparation selects a finite route.
+`open-linear-incremental` defaults to true for complete open-linear traversal and
+is inactive when source preparation selects a finite route.
 
 Omitted limits use each route's defaults: linear and polynomial work are unlimited,
 nonlinear integer search caps candidates at 1,024 and heuristic moves at 256, and
@@ -181,8 +182,11 @@ and the historical Table retry. Both default to false. Attribution exports spars
 [attribution ownership](09-learning.md#propagation-and-explanation-attribution).
 
 `cost-aware-propagation=true` independently enables the bounded finite worklist
-policy described in [finite propagation](08-search.md#finite-propagation). It
-defaults to false and does not require attribution or historical refinement.
+policy described in [finite propagation](08-search.md#finite-propagation). Fixed
+integer optimization enables it for mandatory cumulative tasks with constant
+durations, demands and capacities and no placement constraints. Explicit `false`
+retains FIFO. Other routes default to false. The policy requires neither attribution
+nor historical refinement.
 
 `reason-preflight=true` independently checks recorded redundancy failures before
 historical sibling reconstruction. It defaults to false; see

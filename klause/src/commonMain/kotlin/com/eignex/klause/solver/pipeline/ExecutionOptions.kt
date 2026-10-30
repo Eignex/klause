@@ -337,6 +337,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val inprocessingGrowth: ExecutionOption<Int> = ExecutionOption("inprocessing-growth", ValueKind.INT)
         /** Non-inprocessing work required after a simplification attempt. */
         val inprocessingCooldown: ExecutionOption<Long> = ExecutionOption("inprocessing-cooldown", ValueKind.LONG)
+        /** Non-inprocessing work after the first complete root before optional slices. */
+        val inprocessingWarmupWork: ExecutionOption<Long> = ExecutionOption("inprocessing-warmup-work", ValueKind.LONG)
 
         /** The `lp-objective-cone` execution setting. */
         val lpObjectiveCone: ExecutionOption<Boolean> = ExecutionOption("lp-objective-cone", ValueKind.BOOLEAN)

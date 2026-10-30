@@ -12,6 +12,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -45,6 +46,63 @@ class PrivateRebuildGenerationTest {
                 (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
             })
             assertEquals(null, session.boolValue(0))
+        }
+    }
+
+    @Test
+    fun `unchanged clauses should remain shared and unmodified in a private consumer`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(6, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(3, 5, 6)), Clause(intArrayOf(0, 2)),
+                Clause(intArrayOf(3, 5, 7)), Clause(intArrayOf(1, 2)),
+                Clause(intArrayOf(2, 4, 6)), Clause(intArrayOf(2, 4, 7)),
+                Clause(intArrayOf(8, 10)), Clause(intArrayOf(8, 11)),
+            )).bake()
+            val unchanged = source.factors.take(6).map { it as Clause }
+                .filter { clause -> clause.literals.none { Lit.variable(it) == 0 } }
+            val literals = unchanged.map { it.literals.copyOf() }
+            val session = PropagationSession(source, nativeSat = native)
+            session.addRootDerivedClause(Clause(intArrayOf(8)), 1, OWN_ORIGIN, false)
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never))
+
+            val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
+                BacktrackParams(nativeSat = native),
+            ))
+            val point = generation.reconstruct(reduced.assignment)
+
+            for (index in unchanged.indices) {
+                assertTrue(generation.problem.factors.any { it === unchanged[index] })
+                assertContentEquals(literals[index], unchanged[index].literals)
+            }
+            assertTrue(source.factors.all { factor ->
+                (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+            })
+        }
+    }
+
+    @Test
+    fun `translated learning should enter a reconstructed private consumer`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(6, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(3, 5, 6)), Clause(intArrayOf(0, 2)),
+                Clause(intArrayOf(3, 5, 7)), Clause(intArrayOf(1, 2)),
+                Clause(intArrayOf(2, 4, 6)), Clause(intArrayOf(2, 4, 7)),
+                Clause(intArrayOf(8, 10)), Clause(intArrayOf(8, 11)),
+            )).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addRootDerivedClause(Clause(intArrayOf(8)), 1, OWN_ORIGIN, false)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never))
+            val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
+                BacktrackParams(nativeSat = native),
+            ))
+            val point = generation.reconstruct(reduced.assignment)
+
+            assertEquals(1, generation.warmClauses.translated)
+            assertTrue(source.factors.all { factor ->
+                (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+            })
         }
     }
 

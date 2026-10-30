@@ -115,12 +115,13 @@ class EngineParamsTest {
         val configured = applyBacktrackParams(com.eignex.klause.backtrack.BacktrackParams(), EngineParams(listOf(
             "inprocessing-work=100", "inprocessing-root-work=11", "inprocessing-probe-work=12",
             "inprocessing-subsume-work=13", "inprocessing-vivify-work=14", "inprocessing-interval=15",
-            "inprocessing-growth=16", "inprocessing-cooldown=17",
+            "inprocessing-growth=16", "inprocessing-cooldown=17", "inprocessing-warmup-work=18",
         )))
 
-        assertEquals(listOf(100L, 11L, 12L, 13L, 14L, 15L, 17L), listOf(configured.inprocessingWork,
+        assertEquals(listOf(100L, 11L, 12L, 13L, 14L, 15L, 17L, 18L), listOf(configured.inprocessingWork,
             configured.inprocessingRootWork, configured.inprocessingProbeWork, configured.inprocessingSubsumeWork,
-            configured.inprocessingVivifyWork, configured.inprocessingInterval, configured.inprocessingCooldown))
+            configured.inprocessingVivifyWork, configured.inprocessingInterval, configured.inprocessingCooldown,
+            configured.inprocessingWarmupWork))
         assertEquals(16, configured.inprocessingGrowth)
     }
 

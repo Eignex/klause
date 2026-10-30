@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -336,6 +337,130 @@ class RootInprocessingTest {
             assertEquals(true, session.boolValue(7))
             assertEquals(0, session.decisionLevel)
         }
+    }
+
+    @Test
+    fun `an existing integer bound should yield a proved root bound`() {
+        for (atMost in listOf(false, true)) {
+            val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ))
+            val session = PropagationSession(source.bake())
+            if (atMost) session.boundLeLit(0, 0, true) else session.boundGeLit(0, 1, true)
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2), null)
+
+            assertEquals(1L, session.intDomain(0).min)
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `integer endpoint progress should survive unrelated atom growth between slices`() {
+        for (unrelated in listOf(1, 8)) {
+            val source = Problem(0, 2 + unrelated,
+                Array(2 + unrelated) { if (it < 2) IntDomain(0, 2) else IntDomain(0, 16) }, arrayOf<Factor>(
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                    Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ))
+            val session = PropagationSession(source.bake())
+            session.boundGeLit(2, 1, true)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 1)
+
+            pass.run(session, params, null)
+            for (variable in 3 until 2 + unrelated) session.boundGeLit(variable, 1, true)
+            pass.run(session, params, null)
+
+            assertEquals(1L, session.intDomain(0).min)
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `integer endpoints should yield root bounds without existing atoms`() {
+        for (lower in listOf(false, true)) {
+            val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), if (lower) LinearOp.GE else LinearOp.LE,
+                    if (lower) 1 else 3),
+                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), if (lower) LinearOp.LE else LinearOp.GE, 0),
+            ))
+            val session = PropagationSession(source.bake())
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 4), null)
+
+            assertEquals(if (lower) 1L else 0L, session.intDomain(0).min)
+            assertEquals(if (lower) 2L else 1L, session.intDomain(0).max)
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `consistent endpoint probes should preserve the root domain`() {
+        for (domain in listOf(IntDomain(0, 2), IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 1L),
+            IntDomain(Long.MAX_VALUE - 1L, Long.MAX_VALUE))) {
+            val session = PropagationSession(Problem(0, 1, arrayOf(domain), emptyArray()).bake())
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2), null)
+
+            assertEquals(domain.min, session.intDomain(0).min)
+            assertEquals(domain.max, session.intDomain(0).max)
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `a locally capped endpoint probe should restore the complete root`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+        ))
+        val session = PropagationSession(source.bake())
+        val pass = RootProbingPass()
+
+        pass.run(session, BacktrackParams(rootProbeBatch = 4, rootProbeWork = 1), null)
+
+        assertEquals(0L, session.intDomain(0).min)
+        assertEquals(2L, session.intDomain(0).max)
+        assertEquals(0, session.decisionLevel)
+        pass.run(session, BacktrackParams(rootProbeBatch = 4), null)
+        assertEquals(1L, session.intDomain(0).min)
+    }
+
+    @Test
+    fun `a learned bound neighborhood should reach a failed bound within one funded probe`() {
+        val source = Problem(4, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+        ))
+        val session = PropagationSession(source.bake())
+        val first = session.boundLeLit(0, 0, true)
+        val second = session.boundLeLit(1, 0, true)
+        session.addLearnedClause(Clause(intArrayOf(Lit.negate(first), second)), 2)
+
+        RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1), null)
+
+        assertEquals(1L, session.intDomain(0).min)
+        assertEquals(0, session.decisionLevel)
+    }
+
+    @Test
+    fun `a locally capped bound probe should restore the complete root`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+        ))
+        val session = PropagationSession(source.bake())
+        session.boundLeLit(0, 0, true)
+
+        RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1, rootProbeWork = 1), null)
+
+        assertEquals(0L, session.intDomain(0).min)
+        assertEquals(2L, session.intDomain(0).max)
+        assertEquals(0, session.decisionLevel)
+        RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1), null)
+        assertEquals(1L, session.intDomain(0).min)
     }
 
     @Test

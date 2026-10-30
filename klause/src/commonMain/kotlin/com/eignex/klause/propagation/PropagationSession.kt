@@ -216,7 +216,17 @@ class PropagationSession private constructor(
         state.work += count
     }
 
-    internal fun rootClauseLiterals(factor: Int, limit: Int, includePermanent: Boolean = false): IntArray? {
+    internal val rootProbeVariableCount: Int get() = problem.numBoolVars + state.atoms.intVar.size
+
+    internal fun canProbeRootAtom(variable: Int): Boolean =
+        state.atoms.kind[variable - problem.numBoolVars] != AtomKind.EQ
+
+    internal fun rootClauseLiterals(
+        factor: Int,
+        limit: Int,
+        includePermanent: Boolean = false,
+        includeAtoms: Boolean = false,
+    ): IntArray? {
         if (simplifiedRootSources?.contains(factor) == true) return null
         if (factor < problem.numFactors) {
             val literals = if (usesNativeSat) (problem.factors[factor] as? Clause)?.literals
@@ -234,7 +244,8 @@ class PropagationSession private constructor(
         if (size > limit) return null
         state.work += size.toLong() * (if (usesNativeSat) 2L else 1L)
         val literals = learnedClauseLiterals(index)
-        if (!literals.all { lit -> Lit.variable(lit) < problem.numBoolVars }) {
+        val variables = if (includeAtoms) rootProbeVariableCount else problem.numBoolVars
+        if (!literals.all { lit -> Lit.variable(lit) < variables }) {
             return null
         }
         return literals
@@ -831,6 +842,33 @@ class PropagationSession private constructor(
     internal fun probeInt(v: Int, value: Long): PropagationResult? =
         probeFixpoint { pushInt(v, value, reportImplied = false) }
 
+    internal fun probeRootLiteral(literal: Int): PropagationResult? {
+        check(canSimplifyRoot)
+        val variable = Lit.variable(literal)
+        val positive = Lit.isPositive(literal)
+        if (variable < problem.numBoolVars) return probeBool(variable, positive)
+        val atom = variable - problem.numBoolVars
+        val intVar = state.atoms.intVar[atom]
+        val threshold = state.atoms.threshold[atom]
+        val kind = state.atoms.kind[atom]
+        val atMost = when (kind) {
+            AtomKind.GE -> !positive
+            AtomKind.LE -> positive
+            AtomKind.EQ -> return null
+        }
+        val bound = when {
+            positive -> threshold
+            kind == AtomKind.GE -> if (threshold == Long.MIN_VALUE) return null else threshold - 1L
+            else -> if (threshold == Long.MAX_VALUE) return null else threshold + 1L
+        }
+        return probeRootBound(intVar, bound, atMost)
+    }
+
+    internal fun probeRootBound(variable: Int, bound: Long, atMost: Boolean): PropagationResult? {
+        check(canSimplifyRoot)
+        return probeFixpoint { pushIntBound(variable, bound, atMost, reportImplied = false) }
+    }
+
     /**
      * One probe pin: the fixpoint polls the deadline from its first fire (no [PROPAGATION_CANCEL_FLOOR]
      * wait, since a probe over a wide domain is exactly the runaway that floor hides), and a cut fixpoint
@@ -865,25 +903,17 @@ class PropagationSession private constructor(
      * to any conflict it seeds — letting CDCL learn an asserting clause where an equality
      * pin (two same-level bound atoms) could not. The complementary branch is [pinIntAtLeast].
      */
-    fun pinIntAtMost(v: Int, hi: Long): PropagationResult {
-        bakedUnsat?.let { return it }
-        val base = state.undoTop
-        val pinned = applyDecision { state.setIntMaxAsDecision(v, hi) }
-        if (pinned == false) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
-        val conflict = if (pinned == null) null else {
-            state.runToFixpoint(allFactors = false, cancellation = cancellation)
-        }
-        if (conflict != null) return revertAndUnsat(conflict)
-        trail.add(encInt(v))
-        levelPush(state.mark())
-        return impliedSince(base)
-    }
+    fun pinIntAtMost(v: Int, hi: Long): PropagationResult = pushIntBound(v, hi, atMost = true)
 
     /** Decide `v ≥ lo` at a fresh decision level. See [pinIntAtMost]. */
-    fun pinIntAtLeast(v: Int, lo: Long): PropagationResult {
+    fun pinIntAtLeast(v: Int, lo: Long): PropagationResult = pushIntBound(v, lo, atMost = false)
+
+    private fun pushIntBound(v: Int, bound: Long, atMost: Boolean, reportImplied: Boolean = true): PropagationResult {
         bakedUnsat?.let { return it }
         val base = state.undoTop
-        val pinned = applyDecision { state.setIntMinAsDecision(v, lo) }
+        val pinned = applyDecision {
+            if (atMost) state.setIntMaxAsDecision(v, bound) else state.setIntMinAsDecision(v, bound)
+        }
         if (pinned == false) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
         val conflict = if (pinned == null) null else {
             state.runToFixpoint(allFactors = false, cancellation = cancellation)
@@ -891,7 +921,7 @@ class PropagationSession private constructor(
         if (conflict != null) return revertAndUnsat(conflict)
         trail.add(encInt(v))
         levelPush(state.mark())
-        return impliedSince(base)
+        return if (reportImplied) impliedSince(base) else PropagationResult.Implied.EMPTY
     }
 
     /**
@@ -1324,7 +1354,10 @@ class PropagationSession private constructor(
                     false -> Unit
                 }
             }
-            out.add(asSharedClause(literals ?: checkNotNull(native).literalsOf(i), lbd, key))
+            val exported = literals ?: checkNotNull(native).literalsOf(i)
+            out.add(if (native != null && exported.isNotEmpty()) {
+                SharedClause(exported, EmptyLongArray, lbd, key)
+            } else asSharedClause(exported, lbd, key))
         }
         return out.takeUnless { cancelled() }
     }
@@ -1368,28 +1401,32 @@ class PropagationSession private constructor(
      * atom space. Call at a restart or the post-assumption root of a compatible search scope.
      * Attachment evaluates existing root facts, including an immediate unit or conflict, at the
      * next fixpoint. Native SAT attachment can pin the unit during registration.
+     * The receiving store owns its literal copy independently of the portable payload.
      *
      * [origin] names the arm the clause came from, a non-negative id, and is counted each time the clause is used;
      * see [drainImportUses].
      */
     fun importClause(shared: SharedClause, origin: Int = OWN_ORIGIN) {
         state.work += shared.boolLits.size.toLong() + shared.atomQuads.size
-        val lits = IntArray(shared.boolLits.size + shared.atomQuads.size / SharedClause.QUAD)
-        var j = 0
-        for (l in shared.boolLits) lits[j++] = l
-        var i = 0
-        while (i < shared.atomQuads.size) {
-            val intVar = shared.atomQuads[i].toInt()
-            val kind = shared.atomQuads[i + 1].toInt()
-            val threshold = shared.atomQuads[i + 2]
-            val positive = shared.atomQuads[i + 3] == 0L
-            val virtualVar = when (kind) {
-                0 -> state.atomVarGe(intVar, threshold)
-                1 -> state.atomVarLe(intVar, threshold)
-                else -> state.atomVarEq(intVar, threshold)
+        val lits = if (shared.atomQuads.isEmpty()) shared.boolLits else {
+            val translated = IntArray(shared.boolLits.size + shared.atomQuads.size / SharedClause.QUAD)
+            var j = 0
+            for (l in shared.boolLits) translated[j++] = l
+            var i = 0
+            while (i < shared.atomQuads.size) {
+                val intVar = shared.atomQuads[i].toInt()
+                val kind = shared.atomQuads[i + 1].toInt()
+                val threshold = shared.atomQuads[i + 2]
+                val positive = shared.atomQuads[i + 3] == 0L
+                val virtualVar = when (kind) {
+                    0 -> state.atomVarGe(intVar, threshold)
+                    1 -> state.atomVarLe(intVar, threshold)
+                    else -> state.atomVarEq(intVar, threshold)
+                }
+                translated[j++] = Lit.make(virtualVar, positive)
+                i += SharedClause.QUAD
             }
-            lits[j++] = Lit.make(virtualVar, positive)
-            i += SharedClause.QUAD
+            translated
         }
         val fid = state.addLearnedClause(Clause(lits), shared.lbd, permanent = false, origin = origin)
         if (state.nativeEngine == null) state.learned.pendingAttach.add(fid)

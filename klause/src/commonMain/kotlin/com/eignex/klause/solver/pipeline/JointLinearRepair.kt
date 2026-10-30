@@ -49,6 +49,7 @@ internal class JointLinearRepair(
     private val onIncumbentImport: (() -> Unit)? = null,
     private val onIncumbentUse: (() -> Unit)? = null,
     private val observeExternalIncumbents: Boolean = false,
+    sharedCompletions: LinearIncumbentSharing? = null,
     private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
@@ -61,7 +62,7 @@ internal class JointLinearRepair(
         onWork = state.smt::observeSourceLp, funding = funding)
     private val stages = linkedMapOf<String, Long>()
     private val completion = if (params.sourceIncumbentCompletion)
-        LinearIncumbentCompletion(budget, incumbentCompletionCheck) { stage, count ->
+        LinearIncumbentCompletion(budget, incumbentCompletionCheck, sharedCompletions) { stage, count ->
             val key = "jointRepairExternalCompletion$stage"
             stages[key] = combine(key, stages[key] ?: 0L, count)
         } else null

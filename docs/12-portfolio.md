@@ -154,6 +154,17 @@ Advisory keys retain value snapshots without producer certificates. Unsupported
 symbolic payloads, integers outside the recovery scalar limit and keys beyond the
 remaining modeled allocation are refused before retention.
 
+The admitted pair can reuse at most sixteen successful original-source completions
+under that same full identity and original-check callback. Each retained point belongs
+to its producing completion owner and is removed when that owner closes. Only immutable
+coordinate snapshots cross workers; producer certificates and failed or pending work
+stay private. Lookup and copied snapshots debit the consumer's existing funding, and
+each consumer retains its source witness and objective admission checks. Sharing grants
+no work, lifetime, bound or terminal authority.
+Consumers reserve the retained exact scalar payload under their own allocation ceiling.
+Completion statistics distinguish shared checked reuse from private recovery; both
+remain inside the consuming owner's completion time.
+
 `companion-integers=true` trials the same bounded companion pair on finite general
 integer/continuous sources. It changes only the binary-fragment restriction; size,
 source capture, objective, LP ceiling, single-lane mixed pool and explicit-recipe
@@ -272,6 +283,10 @@ probing. One temporary token buffer is
 reused across the scan and released with it; no second retained duplicate index is
 needed. Only completed export preparation admits publication keys. Pool eviction,
 session reseeding and reason retention follow the same filter lifetime.
+Native Boolean exports transfer the arena's fresh literal copy into the portable
+payload. Boolean-only imports pass that payload to the receiving store's owning
+copy; atom imports first translate the session-local literals. General-store
+exports build separate portable arrays.
 `exportDuplicates` counts previously shared candidates skipped before payload construction.
 With a byte limit, key probes charge work and poll cancellation under one lookup
 allowance per scan. Exhaustion discards the prepared export before admitting keys.
@@ -485,7 +500,13 @@ and coordinator checks. Failed and refuted segments earn zero reward while their
 cost remains in the peer comparison. Unproductive time and feasibility setup remain
 owed until that worker's next priced gain. Its gain rate is compared with other workers'
 cumulative accepted-gain rate; common objective rescaling preserves this comparison.
-Feasibility retains ordinary rewards, idle credit earns no improvement reward, and
+Segments without a strict gain retain ordinary feasibility rewards. A segment
+that finds the first witness and then improves it prices those later accepted
+gains against its full startup and segment cost. The first witness itself supplies
+no invented objective gain. Publication gains accumulate in a common normalized
+scale, including batches whose raw sum would overflow. Phase diagnostics retain
+the segment's selection phase, and the ordinary ledger keeps its phase boundary.
+Idle credit earns no improvement reward, and
 accepted terminal closure earns unit reward. Accounting is private to an invocation.
 Source preparation, final retirement and independent checking keep their containing
 run costs; this score supplies neither witness nor proof authority.
@@ -493,10 +514,11 @@ run costs; this score supplies neither witness nor proof authority.
 `portfolio-reward=source-rate-family` retains the worker rate and also prices gains
 by family. Observed factory and segment costs from every sibling remain owed until
 the family's next accepted gain, whose rate is compared with other families'
-cumulative rates. After an incumbent, accepted gains supply fractional success and
-failure evidence. Silent complete workers receive no failure evidence; observable
-plateaus do.
-Feasibility feedback, family priors and silent complete-worker coverage retain
+cumulative rates. After an incumbent, every paid segment supplies fractional success
+and failure evidence, including zero-yield complete-search segments. This prices
+objective yield without changing the selected complete-worker coverage scope or
+share; silence supplies no proof verdict.
+Before a strict gain, feasibility feedback, family priors and silent complete-worker coverage retain
 their ordinary rules. Shared source preparation, retirement and independent checks
 remain in containing-run accounting.
 
