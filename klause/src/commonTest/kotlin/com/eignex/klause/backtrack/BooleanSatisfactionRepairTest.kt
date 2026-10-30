@@ -138,7 +138,8 @@ class BooleanSatisfactionRepairTest {
             val paused = scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 1L)
             assertNull(paused.reason)
             scheduler.loseWorker(0)
-            val result = scheduler.run(Cancellation.Never, 10000L)
+            repeat(4) { scheduler.runSlice((it + 1) % 2, Cancellation.Never, Long.MAX_VALUE, 5000L) }
+            val result = scheduler.run(Cancellation.Never, 0L)
 
             assertTrue(result is SolveResult.Unsat)
             assertEquals(4, scheduler.completed)
