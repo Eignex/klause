@@ -80,6 +80,7 @@ internal fun FinitePipeline.portfolioExecutor(
     incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
     improvementProofShare: Double = 0.5,
     deferLpProbes: Boolean = false,
+    includeRestartingProof: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -147,6 +148,7 @@ internal fun FinitePipeline.portfolioExecutor(
             reseedStaleThreshold = scenario.reseedStaleThreshold,
             rewardPolicy = scenario.rewardPolicy,
             improvementProofShare = improvementProofShare,
+            includeRestartingProof = includeRestartingProof,
             onProgress = if (scenario.reportPortfolioProgress) { event ->
                 onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))
             } else null,

@@ -172,6 +172,7 @@ class Portfolio(
             require(value.isFinite() && value in 0.5..1.0)
             field = value
         }
+    internal var includeRestartingProof: Boolean = false
 
     internal var evidenceVerification: PortfolioEvidence? = workers.firstNotNullOfOrNull { it.evidenceModel }?.let {
         val verifier = PortfolioEvidence(it, CandidateVerifier.trusting())
@@ -1142,7 +1143,7 @@ class Portfolio(
             val active = eligibleArms.filter { !retired[it] && !workers[it].auxiliaryProof }
             val complete = active.filter {
                 val worker = workers[it]
-                worker.family == ArmFamily.Backtrack && !worker.restartingSearch &&
+                worker.family == ArmFamily.Backtrack && (!worker.restartingSearch || includeRestartingProof) &&
                     !worker.improvementOnly && worker.permitsSourceProofs && handles[it] is ResumableSearch &&
                     !(it in incumbentProbeArms && !productive[it])
             }
