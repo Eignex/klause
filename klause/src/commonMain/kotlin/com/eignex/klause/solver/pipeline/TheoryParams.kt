@@ -116,7 +116,7 @@ data class TheoryParams(
     /** Complete advisory discrete incumbent coordinates before exact companion admission. */
     val sourceIncumbentCompletion: Boolean = false,
     /** Schedule touched linear rows and deliver explained interval consequences before numerical checks. */
-    val openLinearIncremental: Boolean = false,
+    val openLinearIncremental: Boolean = true,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)
