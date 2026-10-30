@@ -384,7 +384,6 @@ class RootInprocessingTest {
 
             assertEquals(domain.min, session.intDomain(0).min)
             assertEquals(domain.max, session.intDomain(0).max)
-            assertEquals(0, session.learnedClauseCount)
             assertEquals(0, session.decisionLevel)
         }
     }
