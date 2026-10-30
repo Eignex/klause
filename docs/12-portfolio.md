@@ -278,6 +278,13 @@ pool; resuming the same session retains both cursor and filter. Retirement recor
 the pool and filter capacity counters, then releases the filter without traversing
 the store. An uncancelled retirement also drains uses and exports
 remaining glue; a cancelled retirement skips those scans.
+If a retirement batch fits the remaining entry capacity and has no byte limit,
+the pool's key index deduplicates it directly under the publication lock. The
+generation cannot compact during that batch, so fresh keys need not enter the
+worker's retiring filter. Existing private keys still suppress earlier imports
+and exports. Entry pressure and byte limits keep the ordinary private admission
+and reclamation path. Every candidate visit and pool operation retains its
+publication work, scratch and cancellation bounds.
 
 Glue export probes that same filter with the portable content key before copying
 native literals or constructing portable payloads. An empty filter skips duplicate
