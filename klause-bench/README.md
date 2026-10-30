@@ -752,6 +752,16 @@ endpoint independently from the point. Its generation shares the original
 and any resulting owner replacement retain their containing source/recipe costs.
 `PointPreparationUnavailable` does not establish complete ineligibility.
 
+[9554](https://lab.eignex.com/jobs/9554) captures original `pp08aCUTS` and `egout`
+source-pair applicability. A wide pp08 source row prevents pair discovery under
+the 128-coordinate cap; incomplete inspection establishes no absence of cuts.
+Egout yields 33 source-checked mixed aggregate proposals and a stronger checked
+root bound on replay, with extra discovery and solve cost. Its captured point has
+nonzero source residuals, and the scan has limited attempts. These instrumented
+20-million-work/64-MiB diagnostics establish neither production affordability nor
+later pruning. Keep the ordinary source comparison and independent invalid-point
+verdicts when qualifying a production policy.
+
 [9277](https://lab.eignex.com/jobs/9277) exercises both sources at `0af8492830`
 with ownership and root cuts toggled independently. With root cuts off, node
 queries reuse 4 and 27 child results; with cuts on, 2 and 3 cuts become active.

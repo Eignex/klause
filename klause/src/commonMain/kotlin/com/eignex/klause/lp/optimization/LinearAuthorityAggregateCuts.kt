@@ -159,7 +159,12 @@ internal object LinearAuthorityAggregateCuts {
                 if (term.owner in inactive) continue
                 if (term.weight != BigFraction.ONE) stopAggregate("ProbeSourceWeight")
                 val row = term.inequality
-                if (row.supportSize > limits.support) stopAggregate("SupportLimit")
+                if (row.supportSize > limits.support) {
+                    observe("AggregateProbeSupportLimit", 1L)
+                    pointKnown = false
+                    eligibilityKnown = false
+                    continue
+                }
                 meter.reserve(row.supportSize.toLong(), row.supportSize * 64L)
                 val coefficients = row.coefficients
                 val value = residual(row, coefficients)
