@@ -1324,7 +1324,12 @@ class PropagationSession private constructor(
                     false -> Unit
                 }
             }
-            out.add(asSharedClause(literals ?: checkNotNull(native).literalsOf(i), lbd, key))
+            val exported = literals ?: checkNotNull(native).literalsOf(i)
+            out.add(if (native != null && exported.isNotEmpty() &&
+                exported.all { Lit.variable(it) < problem.numBoolVars }
+            ) {
+                SharedClause(exported, EmptyLongArray, lbd, key)
+            } else asSharedClause(exported, lbd, key))
         }
         return out.takeUnless { cancelled() }
     }
@@ -1368,28 +1373,32 @@ class PropagationSession private constructor(
      * atom space. Call at a restart or the post-assumption root of a compatible search scope.
      * Attachment evaluates existing root facts, including an immediate unit or conflict, at the
      * next fixpoint. Native SAT attachment can pin the unit during registration.
+     * The receiving store owns its literal copy independently of the portable payload.
      *
      * [origin] names the arm the clause came from, a non-negative id, and is counted each time the clause is used;
      * see [drainImportUses].
      */
     fun importClause(shared: SharedClause, origin: Int = OWN_ORIGIN) {
         state.work += shared.boolLits.size.toLong() + shared.atomQuads.size
-        val lits = IntArray(shared.boolLits.size + shared.atomQuads.size / SharedClause.QUAD)
-        var j = 0
-        for (l in shared.boolLits) lits[j++] = l
-        var i = 0
-        while (i < shared.atomQuads.size) {
-            val intVar = shared.atomQuads[i].toInt()
-            val kind = shared.atomQuads[i + 1].toInt()
-            val threshold = shared.atomQuads[i + 2]
-            val positive = shared.atomQuads[i + 3] == 0L
-            val virtualVar = when (kind) {
-                0 -> state.atomVarGe(intVar, threshold)
-                1 -> state.atomVarLe(intVar, threshold)
-                else -> state.atomVarEq(intVar, threshold)
+        val lits = if (shared.atomQuads.isEmpty()) shared.boolLits else {
+            val translated = IntArray(shared.boolLits.size + shared.atomQuads.size / SharedClause.QUAD)
+            var j = 0
+            for (l in shared.boolLits) translated[j++] = l
+            var i = 0
+            while (i < shared.atomQuads.size) {
+                val intVar = shared.atomQuads[i].toInt()
+                val kind = shared.atomQuads[i + 1].toInt()
+                val threshold = shared.atomQuads[i + 2]
+                val positive = shared.atomQuads[i + 3] == 0L
+                val virtualVar = when (kind) {
+                    0 -> state.atomVarGe(intVar, threshold)
+                    1 -> state.atomVarLe(intVar, threshold)
+                    else -> state.atomVarEq(intVar, threshold)
+                }
+                translated[j++] = Lit.make(virtualVar, positive)
+                i += SharedClause.QUAD
             }
-            lits[j++] = Lit.make(virtualVar, positive)
-            i += SharedClause.QUAD
+            translated
         }
         val fid = state.addLearnedClause(Clause(lits), shared.lbd, permanent = false, origin = origin)
         if (state.nativeEngine == null) state.learned.pendingAttach.add(fid)

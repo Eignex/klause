@@ -19,6 +19,40 @@ import kotlin.test.assertTrue
 
 class PropagationSessionTest {
     @Test
+    fun `imported boolean clauses own their literals independently of the portable buffer`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
+            val session = PropagationSession(problem, nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            val shared = SharedClause(intArrayOf(0, 2), longArrayOf(), 1)
+            session.importClause(shared, origin = 2)
+
+            shared.boolLits[0] = 4
+            shared.boolLits[1] = 6
+            session.pinBool(0, false)
+
+            assertEquals(true, session.boolValue(1))
+        }
+    }
+
+    @Test
+    fun `exported boolean payloads survive learned store replacement`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
+            val session = PropagationSession(problem, nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+            val exported = session.exportGlueClauses(6, 12).single()
+
+            session.forgetLearnedClauses { _, _ -> false }
+            assertEquals(0, session.learnedClauseCount)
+            session.addLearnedClause(Clause(intArrayOf(4, 6)), 1)
+
+            assertEquals(listOf(0, 2), exported.boolLits.toList())
+        }
+    }
+
+    @Test
     fun `stopped duplicate lookup should decline export without consuming new learning`() {
         val session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()))
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)

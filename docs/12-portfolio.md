@@ -256,6 +256,10 @@ probing. One temporary token buffer is
 reused across the scan and released with it; no second retained duplicate index is
 needed. Only completed export preparation admits publication keys. Pool eviction,
 session reseeding and reason retention follow the same filter lifetime.
+Native Boolean exports transfer the arena's fresh literal copy into the portable
+payload. Boolean-only imports pass that payload to the receiving store's owning
+copy; atom imports first translate the session-local literals. General-store
+exports build separate portable arrays.
 `exportDuplicates` counts previously shared candidates skipped before payload construction.
 With a byte limit, key probes charge work and poll cancellation under one lookup
 allowance per scan. Exhaustion discards the prepared export before admitting keys.
