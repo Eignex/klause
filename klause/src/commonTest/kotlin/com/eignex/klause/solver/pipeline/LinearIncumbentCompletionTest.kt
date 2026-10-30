@@ -42,6 +42,155 @@ class LinearIncumbentCompletionTest {
     private val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.333))
 
     @Test
+    fun `companions should reuse an original checked completion of the same full point`() {
+        val shared = LinearIncumbentSharing()
+        var checks = 0
+        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> checks++; true }
+        val producerBudget = SourceLpBudget(maxOperations = 0)
+        val budget = SourceLpBudget(maxOperations = 0)
+        val offered = seed.copy(reals = doubleArrayOf(third.toDouble()))
+
+        LinearIncumbentCompletion(producerBudget, originalCheck, shared) { _, _ -> }.use { producer ->
+            assertNotNull(producer.complete(source, offered, Cancellation.Never))
+            LinearIncumbentCompletion(budget, originalCheck, shared) { _, _ -> }.use { consumer ->
+                val point = assertNotNull(consumer.complete(source, offered.copy(), Cancellation.Never))
+
+                assertEquals(listOf(third), point.exactReals)
+                assertEquals(1, checks)
+                assertEquals(0L, budget.measuredRefinementWork)
+            }
+        }
+    }
+
+    @Test
+    fun `shared lookup and snapshots should spend consumer funding without charging the producer`() {
+        val shared = LinearIncumbentSharing()
+        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
+        val producerFunding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L).also { it.grant(2_000_000L) }
+        val consumerFunding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L).also { it.grant(2_000_000L) }
+
+        LinearIncumbentCompletion(SourceLpBudget(funding = producerFunding), originalCheck, shared) { _, _ -> }
+            .use { producer ->
+                assertNotNull(producer.complete(source, seed, Cancellation.Never))
+                val spent = producerFunding.spent
+                LinearIncumbentCompletion(SourceLpBudget(funding = consumerFunding), originalCheck, shared) { _, _ -> }
+                    .use { consumer -> assertNotNull(consumer.complete(source, seed, Cancellation.Never)) }
+
+                assertTrue(consumerFunding.spent > 0L)
+                assertTrue(consumerFunding.allocated > 0L)
+                assertEquals(spent, producerFunding.spent)
+            }
+    }
+
+    @Test
+    fun `shared completions should not cross a changed original checker`() {
+        val shared = LinearIncumbentSharing()
+        var rejectedChecks = 0
+        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
+
+        LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
+            assertNotNull(producer.complete(source, seed, Cancellation.Never))
+            LinearIncumbentCompletion(SourceLpBudget(), { _, _, _ -> rejectedChecks++; false }, shared) { _, _ -> }
+                .use { consumer -> assertNull(consumer.complete(source, seed, Cancellation.Never)) }
+        }
+
+        assertEquals(1, rejectedChecks)
+    }
+
+    @Test
+    fun `shared completions should not cross changed source restrictions or rows`() {
+        val contexts = listOf(
+            SourceProofContext(scope.copy(condition = scope.condition.bound(integer, BigFraction.ZERO, true)),
+                source.coordinates, source.premises, source.objective, source.objectiveConstant),
+            SourceProofContext(scope, source.coordinates, source.premises +
+                ("restricted" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ZERO))),
+                source.objective, source.objectiveConstant),
+        )
+        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
+        val shared = LinearIncumbentSharing()
+
+        LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
+            assertNotNull(producer.complete(source, seed, Cancellation.Never))
+            for (context in contexts) {
+                LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { consumer ->
+                    assertNull(consumer.complete(context, seed, Cancellation.Never))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `shared completion should retain the offered coordinate frame identity`() {
+        val shared = LinearIncumbentSharing()
+        var checks = 0
+        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> checks++; true }
+
+        LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
+            assertNotNull(producer.complete(source, seed.withCoordinateFrame(Any()), Cancellation.Never))
+            LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { consumer ->
+                assertNotNull(consumer.complete(source, seed.withCoordinateFrame(Any()), Cancellation.Never))
+            }
+        }
+
+        assertEquals(2, checks)
+    }
+
+    @Test
+    fun `shared completion should not bypass an unfunded consumer snapshot`() {
+        val shared = LinearIncumbentSharing()
+        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
+        val funding = SourceLpFunding(2_000_000L, 100L).also { it.grant(2_000_000L) }
+
+        LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
+            assertNotNull(producer.complete(source, seed, Cancellation.Never))
+            LinearIncumbentCompletion(SourceLpBudget(funding = funding), originalCheck, shared) { _, _ -> }
+                .use { consumer -> assertNull(consumer.complete(source, seed, Cancellation.Never)) }
+        }
+
+        assertEquals(0L, funding.allocated)
+    }
+
+    @Test
+    fun `closing a producer should release its shared completions`() {
+        val shared = LinearIncumbentSharing()
+        var checks = 0
+        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> checks++; true }
+
+        LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
+            assertNotNull(producer.complete(source, seed, Cancellation.Never))
+        }
+        LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { consumer ->
+            assertNotNull(consumer.complete(source, seed, Cancellation.Never))
+        }
+
+        assertEquals(2, checks)
+    }
+
+    @Test
+    fun `full shared retention should preserve older points without refusing fresh completion`() {
+        val shared = LinearIncumbentSharing()
+        var checks = 0
+        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> checks++; true }
+        val first = Sample(booleanArrayOf(), longArrayOf(3), doubleArrayOf(1.0))
+        val producerBudget = SourceLpBudget(maxOperations = 0)
+
+        LinearIncumbentCompletion(producerBudget, originalCheck, shared) { _, _ -> }.use { producer ->
+            for (value in 1L..16L) {
+                val offered = Sample(booleanArrayOf(), longArrayOf(3 * value), doubleArrayOf(value.toDouble()))
+                assertNotNull(producer.complete(source, offered, Cancellation.Never))
+            }
+            LinearIncumbentCompletion(SourceLpBudget(maxOperations = 0), originalCheck, shared) { _, _ -> }
+                .use { consumer ->
+                    assertNotNull(consumer.complete(source,
+                        Sample(booleanArrayOf(), longArrayOf(51), doubleArrayOf(17.0)), Cancellation.Never))
+                    assertNotNull(consumer.complete(source, first, Cancellation.Never))
+                }
+        }
+
+        assertEquals(17, checks)
+    }
+
+    @Test
     fun `an advisory continuous point should reconstruct without a residual LP operation`() {
         val offered = seed.copy(reals = doubleArrayOf(third.toDouble()))
         val funding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L).also { it.grant(2_000_000L) }
