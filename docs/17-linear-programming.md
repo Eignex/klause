@@ -126,7 +126,8 @@ After a complete definition match, the column's existing live-bound memo can ret
 the identical immutable source-bound pair and its primitive endpoints. Subsequent
 imports check their current tag, origin and open or finite width against those
 endpoints. A changed live-bound request replaces the memo; earlier bound snapshots
-remain immutable. Successful imports carry the known catalog index in the existing
+remain immutable. Imports preserve a memo of a different live restriction.
+Successful imports carry the known catalog index in the existing
 column-mapping scratch, avoiding a second lookup. Full definition checks and reused
 imports have separate observations, including checks in interrupted attempts.
 The catalog retains no additional cache or numerical result authority.

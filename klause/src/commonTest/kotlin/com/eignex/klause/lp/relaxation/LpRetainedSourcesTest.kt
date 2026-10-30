@@ -2,6 +2,7 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
@@ -28,6 +29,40 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
+    @Test
+    fun `source imports should preserve an unchanged live bound memo during unrelated row churn`() {
+        val problem = Problem(1, 2, Array(2) { IntDomain(0, 10) }, arrayOf<Factor>(
+            ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 8),
+        ))
+        val live = Array(2) { problem.finiteIntDomain(it) }
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = live[varId]
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L, 0L)),
+            retainImportedDefinitions = true)
+        val sources = LpRetainedSources(problem, consumer)
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val initial = assertNotNull(sources.prepare(owner.state, domains))
+            assertTrue(owner.replaceRows(initial.retired, initial.columns, initial.rows, false,
+                objective = initial.objective))
+            initial.commit()
+            assertTrue(owner.push())
+            live[0] = live[0].withMinAtLeast(2)
+            val child = assertNotNull(sources.prepare(owner.state, domains))
+            assertTrue(owner.replaceRows(child.retired, child.columns, child.rows, true,
+                objective = child.objective, assertions = assertNotNull(child.boundAssertions(100L))))
+            child.commit()
+            val column = sources.relaxation(owner.state, domains).intColOf[0]
+            val before = sources.liveBounds(domains)[column]
+
+            live[1] = live[1].withMinAtLeast(1)
+            assertNotNull(sources.prepare(owner.state, domains))
+
+            assertSame(before, sources.liveBounds(domains)[column])
+        }
+    }
+
     @Test
     fun `retained candidate imports should reuse actual columns without preparing source metadata`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(

@@ -120,7 +120,9 @@ internal class LpRetainedSources(
             }
             if (!matchesCompactColumn(model, index)) return null
             val width = model.upper[index]
-            if (open || origin <= Long.MAX_VALUE - width) {
+            val matchingMemo = lastBounds == null || (lastLower == origin && lastOpenUpper == open &&
+                (open || lastUpper - lastLower == width))
+            if (matchingMemo && (open || origin <= Long.MAX_VALUE - width)) {
                 lastLower = origin
                 lastUpper = if (open) 0L else origin + width
                 lastOpenUpper = open
