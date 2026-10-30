@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.ConditionedClauseExchange
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.RepairSearchStep
 import com.eignex.klause.solver.SolveResult
@@ -22,7 +23,8 @@ internal class BooleanSatisfactionRepair(
             !params.integerRowLearning)
         require(params.objectiveBoundSupplier == null && params.objectiveLowerBoundSupplier == null &&
             params.globalVarLowerSupplier == null && params.globalVarUpperSupplier == null &&
-            params.toleranceCheck == null && params.clauseExchange == null && params.cutExchange == null &&
+            params.toleranceCheck == null && params.cutExchange == null &&
+            (params.clauseExchange == null || params.clauseExchange is ConditionedClauseExchange) &&
             params.improvedSolutionSink == null && params.pooledIncumbents == null)
     }
 

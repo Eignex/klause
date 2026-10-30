@@ -11,6 +11,7 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.StatelessSession
 import com.eignex.klause.solver.incumbent.CompletedEnginePublication
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
@@ -159,15 +160,23 @@ internal class BacktrackWorkerConfig(
         // A pure CSP has no bound to prune on, so withBound is wired only when optimising.
         val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =
             if (objective != null) { p, supplier -> p.copy(objectiveBoundSupplier = supplier) } else null
+        val solver = matchedPools?.nativeProjection?.let { BacktrackSolver(problem, it) } ?: BacktrackSolver(problem)
+        val session = StatelessSession(solver)
         worker = PortfolioWorker.of(
             workerLabel,
             armId,
-            (matchedPools?.nativeProjection?.let { BacktrackSolver(problem, it) }
-                ?: BacktrackSolver(problem)).session(),
+            session,
             params,
             objective = objective,
             withBound = withBound,
         ).bindEvidence(evidenceModel).also {
+            if (objective == null) it.booleanProofRecipe = BooleanProofRecipe(problem, params) { cancellation, open ->
+                session.openOwnedSolve(params.withCancellation(cancellation)) { scoped ->
+                    check(scoped.assumptions.numInts == 0 && scoped.assumptions.deductions.isEmpty &&
+                        scoped.assumptions.bools == params.assumptions.bools) { "worker source condition changed" }
+                    open()
+                }
+            }
             it.controlsObjectiveCutoff = objective != null
             it.restartingSearch = params.modeSwitchingRestart || params.emaRestart || params.adaptiveRestart ||
                 params.lubyRestartBase != null

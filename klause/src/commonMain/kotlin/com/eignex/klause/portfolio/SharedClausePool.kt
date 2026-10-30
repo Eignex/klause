@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.propagation.ClauseExchange
+import com.eignex.klause.propagation.ConditionedClauseExchange
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.solver.result.SharingChannel
@@ -437,6 +438,12 @@ internal class PoolClauseExchange(
     private var cursor = 0L
     private val seen = LongHashSet()
     private var sessionIdentity: Any? = null
+
+    internal fun conditioned(): ClauseExchange {
+        val exchange = PoolClauseExchange(pool, origin, tally, maxLbd, maxLen,
+            skipPermanent = true, shareGlobalNogoods = false, meter = meter)
+        return object : ClauseExchange by exchange, ConditionedClauseExchange {}
+    }
 
     private fun observe(session: PropagationSession) {
         val m = meter ?: return

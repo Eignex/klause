@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.selector.IndomainMin
@@ -14,8 +15,12 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.portfolio.BacktrackCatalog
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.Portfolio
+import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioDiagnostics
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
@@ -42,7 +47,7 @@ object BooleanProofSchedulerProfile {
         require(options.keys.containsAll(required) &&
             (options.keys - required).all { it in setOf("recipe", "native", "driver", "control", "warmups") })
         val driver = options["driver"] ?: "repair"
-        require(driver in setOf("repair", "satisfaction"))
+        require(driver in setOf("repair", "satisfaction", "portfolio"))
         val control = options["control"] ?: "paired"
         require(control in setOf("paired", "tasks", "replicas"))
         val warmups = options["warmups"]?.toInt() ?: 1
@@ -52,6 +57,7 @@ object BooleanProofSchedulerProfile {
         val limit = options.getValue("work").toLong().also { require(it in 10000L..2000000L) }
         val seed = options.getValue("seed").toLong()
         val splits = options.getValue("splits").toInt().also { require(it in 1..8) }
+        require(driver != "portfolio" || splits == 2)
         val repeats = options.getValue("repeats").toInt().also { require(it in 1..6) }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val stop = Cancellation.after(120.seconds)
@@ -79,7 +85,7 @@ object BooleanProofSchedulerProfile {
                 // Each control pays its own source construction, bake, private setup, checking and retirement.
                 val problem = Dimacs.parse(bytes.decodeToString()).toProblem().bake(cancellation = stop)
                 val budget = NodeBudget(limit)
-                val parameters = List(2) { worker ->
+                val parameters = if (driver == "portfolio") emptyList() else List(2) { worker ->
                     val params = if (recipe == "input-order") BacktrackParams(
                         randomSeed = seed + worker, variableSelector = InputOrder, valueSelector = IndomainMin,
                     ) else BacktrackCatalog.byLabel(recipe).build(seed + worker, null)
@@ -88,7 +94,31 @@ object BooleanProofSchedulerProfile {
                 var completedTasks = 0
                 var totalTasks = 0
                 var schedulerWork = 0L
-                val result = if (mode == "tasks") {
+                var admitted = false
+                val result = if (driver == "portfolio") {
+                    val recipeFactory = BacktrackRecipe(recipe) { workerSeed, event ->
+                        val params = if (recipe == "input-order") BacktrackParams(
+                            randomSeed = workerSeed, onEvent = event,
+                            variableSelector = InputOrder, valueSelector = IndomainMin,
+                        ) else BacktrackCatalog.byLabel(recipe).build(workerSeed, event)
+                        params.copy(nativeSat = native)
+                    }
+                    val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK, seed = seed,
+                        nodeBudget = budget, btPool = listOf { recipeFactory })
+                    val workers = PortfolioBuilder.build(problem, scenario)
+                    Portfolio.thompson(workers, baseSliceWork = 5000L, maxSliceWork = 150000L,
+                        sliceGrowth = 1.5, reseedStaleThreshold = 0,
+                        diagnostics = PortfolioDiagnostics(limit, seed)).use { portfolio ->
+                        val access = PortfolioAccess(portfolio)
+                        access.enable(mode == "tasks")
+                        portfolio.solve(stop).also {
+                            completedTasks = access.completed
+                            totalTasks = access.size
+                            schedulerWork = access.work
+                            admitted = access.size > 0
+                        }
+                    }
+                } else if (mode == "tasks") {
                     val scheduler = SchedulerAccess(problem, context, (0 until splits).toList(), parameters,
                         driver == "satisfaction")
                     scheduler.use {
@@ -96,6 +126,7 @@ object BooleanProofSchedulerProfile {
                             completedTasks = scheduler.completed
                             totalTasks = scheduler.size
                             schedulerWork = scheduler.work
+                            admitted = true
                         }
                     }
                 } else {
@@ -118,13 +149,15 @@ object BooleanProofSchedulerProfile {
                     put("recipe", recipe)
                     put("taskDriver", driver)
                     put("nativeSat", native)
-                    put("sharing", false)
+                    put("taskRouteAdmitted", admitted)
+                    put("sharing", driver == "portfolio")
                     put("presolve", false)
                     put("iteration", iteration)
                     put("warmup", iteration < 0)
                     put("sourceSha256", sha256(bytes))
                     put("seed", seed)
-                    put("workerSeeds", "$seed,${seed + 1}")
+                    put("workerSeeds", (if (driver == "portfolio") listOf(seed + 1000, seed + 1001)
+                        else listOf(seed, seed + 1)).joinToString(","))
                     put("result", result::class.simpleName)
                     put("nativeCoverageComplete", result is SolveResult.Unsat)
                     put("independentlyCheckedCoverageComplete", false)
@@ -146,6 +179,17 @@ object BooleanProofSchedulerProfile {
                 }.toString() + "\n")
             }
         }
+    }
+
+    private class PortfolioAccess(private val target: Portfolio) {
+        private val type = target.javaClass
+        fun enable(value: Boolean) {
+            type.methods.single { it.name.startsWith("setDisjointBooleanProof") }.invoke(target, value)
+        }
+        val completed: Int get() = read("getLastBooleanProofCompleted") as Int
+        val size: Int get() = read("getLastBooleanProofTasks") as Int
+        val work: Long get() = read("getLastBooleanProofWork") as Long
+        private fun read(prefix: String): Any = type.methods.single { it.name.startsWith(prefix) }.invoke(target)
     }
 
     private fun processPeakRssBytes(): Long? {

@@ -6,6 +6,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.ConditionedClauseExchange
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
@@ -85,7 +86,8 @@ internal class BooleanProofScheduler(
             require(params.componentFactory == null && params.objectiveBoundSupplier == null &&
                 params.objectiveLowerBoundSupplier == null && params.globalVarLowerSupplier == null &&
                 params.globalVarUpperSupplier == null && params.toleranceCheck == null &&
-                params.clauseExchange == null && params.cutExchange == null &&
+                params.cutExchange == null &&
+                (params.clauseExchange == null || params.clauseExchange is ConditionedClauseExchange) &&
                 params.improvedSolutionSink == null && params.pooledIncumbents == null)
         }
     }
@@ -183,6 +185,14 @@ internal class BooleanProofScheduler(
             if (cancellation()) TerminationReason.Cancelled else TerminationReason.BudgetExhausted,
             stats = stats, semantics = problem.semantics,
         )
+    }
+
+    internal fun hasTask(worker: Int): Boolean = workers[worker].lease != null || pending > 0
+
+    internal fun workerWork(worker: Int): Long = workers[worker].let { it.retiredWork + (it.search?.work ?: 0L) }
+
+    internal fun workerStats(worker: Int): SolveStats = workers[worker].let {
+        it.retiredStats.mergedWith(it.search?.stats ?: SolveStats.EMPTY)
     }
 
     private val started = arrayOfNulls<BooleanTaskLease>(parameters.size)
