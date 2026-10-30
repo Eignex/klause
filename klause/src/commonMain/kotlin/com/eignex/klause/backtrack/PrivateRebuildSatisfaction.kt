@@ -248,7 +248,7 @@ internal class PrivateRebuildSatisfaction(
         note("Eliminated", prepared.eliminated.toLong())
         note("EquivalentColumns", prepared.equivalenceMerges.toLong())
         note("AdmittedColumns", prepared.admittedColumns.toLong())
-        note("ModeledPrivateBytes", prepared.modeledBytes)
+        note("ModeledPrivateBytes", prepared.modeledBytes + attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong())
         note("WarmClausesRetained", session.learnedClauseCount.toLong())
         note("WarmClausesCopied", prepared.warmClauses.clauses.size.toLong())
         note("WarmClauseLiterals", prepared.warmClauses.literals)
