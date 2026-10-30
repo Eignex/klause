@@ -776,6 +776,11 @@ retain rejected projections; `AggregatePairPointEligible` counts proposals admit
 to the bounded candidate pool. All derivation and projection costs, including those
 without retained rows, remain in the existing generation work/allocation totals.
 Aggregate-only generation retains its source-order proposal policy.
+Point-directed aggregation selects each coordinate's nearer established source
+endpoint when both distances are finite. `AggregatePointLowerBounds` and
+`AggregatePointUpperBounds` count these indexed choices; endpoint projection and
+map ownership debit the same containing generation grant. `AggregateCandidates`
+counts completed derivations before the point filter, rather than retained rows.
 Repeated `AggregatePairAttempts` or construction observations for one unchanged
 point-prepared template indicate reconstruction cost, rather than additional unique
 candidates. Retain these charges alongside template replacements and masked queries.

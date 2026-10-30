@@ -394,6 +394,9 @@ per-attempt limits shared with explicit aggregation. Stopped or limited
 preparation reports its decline and leaves only completed proposals available.
 Point selection obtains its initial point from the current individual-cut recipe,
 then constructs and checks aggregates alongside point-directed row alternatives.
+When both source endpoints are stated, aggregate rounding selects the endpoint
+nearest the point independently for each continuous coordinate. One-sided coordinates
+retain their stated side; unavailable finite distances retain the ordinary choice.
 Aggregate proposal retention requires the same finite normalized violation used
 by point selection, so satisfied proposals leave room for later separating pairs.
 Projection and declined proposals spend the containing generation allowance.

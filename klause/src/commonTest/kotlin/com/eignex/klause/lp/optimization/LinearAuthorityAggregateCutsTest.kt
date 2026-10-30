@@ -115,6 +115,33 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `point directed aggregate bounds should combine different established endpoint sides`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
+        val mixed = SourceInequality(left.coefficients + mapOf(
+            residual to BigFraction.MINUS_ONE, other to BigFraction.MINUS_ONE), left.rhs)
+        val source = SourceProofContext(scope, setOf(x, y, real, residual, other), linkedMapOf(
+            "left" to SourcePremise(mixed), "right" to SourcePremise(right),
+            "lower" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.ONE),
+                BigFraction.ofLong(2))),
+            "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+            "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE),
+                BigFraction.ofLong(2))),
+        ))
+        val point = mapOf(x to 1.25, y to 1.25, real to 2.5, residual to 2.0, other to 0.0)
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never, point = point).single()
+
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE,
+            other to BigFraction.MINUS_ONE), BigFraction.ofLong(2)), cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `an unavailable point coordinate should withhold complete proposal coverage`() {
         val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
             "left" to SourcePremise(left), "right" to SourcePremise(right)))

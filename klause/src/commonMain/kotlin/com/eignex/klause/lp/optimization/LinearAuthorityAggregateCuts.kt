@@ -17,6 +17,7 @@ import com.eignex.klause.util.div
 import com.eignex.klause.util.gcd
 import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.times
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 internal data class LinearAuthorityAggregateTerm(
@@ -108,6 +109,7 @@ internal object LinearAuthorityAggregateCuts {
                 override fun isCancelled(): Boolean = cancellation()
                 override fun deadline() = cancellation.deadline()
             }
+            val selectedBounds = if (point == null) bounds else pointBounds(bounds, point, meter, observe)
             for (row in rows) {
                 meter.reserve(1L)
                 if (!row.hasInteger) continue
@@ -130,7 +132,7 @@ internal object LinearAuthorityAggregateCuts {
                         meter.reserve(1L, 256L)
                         val cut = derive(listOf(row.term.copy(weight = leftWeight),
                             other.term.copy(weight = rightWeight)), derivedStop, charge, attemptLimits,
-                            allowMixed = true, continuousBounds = bounds) ?: continue
+                            allowMixed = true, continuousBounds = selectedBounds) ?: continue
                         if (point != null) {
                             val separating = separates(cut, point, meter, observe)
                             if (separating == null) eligibilityKnown = false
@@ -146,6 +148,38 @@ internal object LinearAuthorityAggregateCuts {
             observe("AggregatePair${stop.reason}", 1L)
         }
         return candidates.toList()
+    }
+
+    private fun pointBounds(
+        bounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
+        point: Map<SourceCoordinate, Double>, meter: AggregateMeter, observe: (String, Long) -> Unit,
+    ): Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm> {
+        meter.reserve(bounds.size.toLong(), 128L + bounds.size * 96L)
+        val selected = HashMap(bounds)
+        for ((side, lower) in bounds) {
+            meter.reserve(1L)
+            if (side.second) continue
+            val id = side.first
+            val upper = bounds[id to true] ?: continue
+            val value = point[id]?.takeIf { it.isFinite() } ?: continue
+            fun distance(bound: LinearAuthorityAggregateTerm): Double {
+                meter.reserve(4L, 128L)
+                val coefficient = meter.number(bound.inequality.coefficients.getValue(id)).toDouble()
+                val rhs = meter.number(bound.inequality.rhs).toDouble()
+                return abs(value - rhs / coefficient)
+            }
+            val lowerDistance = distance(lower)
+            val upperDistance = distance(upper)
+            if (!lowerDistance.isFinite() || !upperDistance.isFinite()) {
+                observe("AggregatePointBoundUnavailable", 1L)
+                continue
+            }
+            val lowerChosen = lowerDistance <= upperDistance
+            meter.reserve(1L, 64L)
+            if (lowerChosen) selected.remove(id to true) else selected.remove(id to false)
+            observe(if (lowerChosen) "AggregatePointLowerBounds" else "AggregatePointUpperBounds", 1L)
+        }
+        return selected
     }
 
     private fun separates(
