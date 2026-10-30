@@ -102,6 +102,7 @@ internal class RootRoundingWarmStart(
     val objective: LinearObjective,
     val relaxation: LpRelaxation,
     val basis: Basis,
+    val primal: DoubleArray? = null,
 )
 
 internal enum class LpRootQueryPolicy {

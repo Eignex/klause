@@ -72,6 +72,7 @@ import kotlin.math.abs
 import kotlin.math.nextDown
 import kotlin.math.nextUp
 import kotlin.math.round
+import kotlin.time.TimeSource
 
 /**
  * Sound lower bound on a [LinearObjective] given the current partial assignment in
@@ -1386,18 +1387,19 @@ private fun LpEngine.sparseRootLpRelaxationBound(
                 observeNodePause()
                 continue
             }
-            return try {
-                val lower = attempt.second?.let {
+            val lower = try {
+                attempt.second?.let {
                     certifiedTightObjectiveLowerBound(relaxation.model, it.duals,
                         rootCertificationObserver(), solveContext.certificationPolicy)
                 }
-                if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
             } finally {
                 // Scoped preparation has already charged its scaling-construction reservation.
                 val metrics = if (nodeUsesTrail) propagator.lastMetrics.copy(preparationOps = 0L)
                     else attempt.first.lastMetrics
                 observeRootSolve(attempt.first, metrics)
             }
+            retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
+            return if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
         }
         return Double.NaN
     } finally {
@@ -1433,9 +1435,30 @@ private fun LpEngine.standaloneRootLpRelaxationBound(
                 solveContext.certificationPolicy,
             )
         }
+        retainRootPrimalGuidance(relaxation, result, cancellation)
         projectCertifiedLowerBound(relaxation, lower)
     }
 }
+
+private fun LpEngine.retainRootPrimalGuidance(
+    relaxation: LpRelaxation,
+    result: FloatLpResult?,
+    cancellation: Cancellation,
+) {
+    if (!params.lpPlan.probe || result?.optimal != true || cancellation()) return
+    val work = result.primal.size.toLong()
+    if (work * Double.SIZE_BYTES > ROOT_PRIMAL_GUIDANCE_BYTES || lpWorkAllowanceSpent(work)) return
+    val remaining = if (sparseTrialActive) sparseTrialRemainingWork() else rootPrimalWorkBudget()
+    if ((sparseTrialActive || remaining > 0L) && remaining <= work) return
+    val started = TimeSource.Monotonic.markNow()
+    noteNodeOverhead(work)
+    val primal = result.primal.copyOf()
+    if (cancellation()) return
+    rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal)
+    sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
+}
+
+private const val ROOT_PRIMAL_GUIDANCE_BYTES = 1024L * 1024L
 
 private fun LpEngine.recordRootQueryBound(relaxation: LpRelaxation, result: FloatLpResult) {
     if (!measuresRootQueries) return

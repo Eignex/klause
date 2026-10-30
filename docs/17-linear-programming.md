@@ -196,9 +196,10 @@ source assembly, then inspects emitted nonzeros, connected-component dimensions,
 exact scalar width and row-intersection fill risk. Custom emitters decline before
 trial assembly because they have no source-size reservation. Sparse storage is reserved
 independently of the ordinary dense cost proxy. The root trial uses the ordinary
-bound, fixing and conflict consumers with their existing exact checks; cuts,
-expanded hulls and primal probes stay outside its allowance. The initial root
-bound and subsequent root propagation share the existing scoped numerical owner;
+bound, fixing and conflict consumers with their existing exact checks; cuts and
+expanded hulls stay outside its allowance. Root rounding preserves the ordinary
+admission's probe intent; sources declined by that guard gain no automatic probe.
+The initial root bound and subsequent root propagation share the existing scoped numerical owner;
 handoff requires matching source identities and root scopes, and live bound adoption
 rechecks authority before reusing its basis. A declined retained source layout
 retires that attempt and uses the existing standalone numerical route within the
@@ -211,6 +212,12 @@ the operation keeps its original cumulative work and pivot limits. Consultations
 continue only within the remaining root, invocation and cancellation allowances.
 Authority edits discard the cursor before adoption. Completed floating results
 enter the existing exact bound check, independently of dense exact continuation.
+
+Completed root points can supply private rounding guidance under the same
+objective identity. Retention copies at most one MiB within the remaining root
+and LP allowance. Rounding uses the stored coordinates without another numerical
+solve; its propagation and source-publication checks still run. A cancelled,
+incomplete or differently optimized point supplies no retained rounding guidance.
 
 Preparation is capped at eight million modeled work units; root and node LP work
 stop at 150 million units or the containing invocation's smaller allowance.
