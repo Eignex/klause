@@ -919,8 +919,19 @@ An interrupted point check keeps its candidate for the next slice; each attempt
 retains its construction and propagation charges. Closing discards query pins,
 auxiliary buffers and preparation cursors while keeping completed observations.
 
-Core refinement is disabled by default; `core-refinement=none|reasons|deletion`
-selects the private policy for curated and directly selected core workers.
+Curated single-lane mixed source execution selects an early reason-refined core
+trial for nonuniform Boolean objectives over at most 16,384 Boolean columns and
+16,384 factors. It excludes integer and real columns and requires the sum of the
+absolute objective coefficients and constant to fit the exact scalar range below
+`2^53`. Eligibility scanning is cancellable and charges the containing invocation.
+The trial retains ordinary complete-worker coverage, worker positions, seeds and
+its existing auxiliary allowance. Explicit core settings, arm counts, recipes,
+annotations, backtrack edits and work-driven diagnostics retain their selected
+policy. Unsupported or interrupted eligibility retains the ordinary delayed,
+unrefined core policy.
+
+`core-refinement=none|reasons|deletion` explicitly selects the private policy for
+curated and directly selected core workers.
 Seed-proof projection uses the
 [historical reasons](09-learning.md#explanation-lifetime) of the existing query,
 without another propagation session or solve; unsupported seed conflicts and tree

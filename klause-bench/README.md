@@ -546,6 +546,14 @@ an installation. Without it, each process captures its own installed-build hashe
 `set=weighted-search-qualification-v1` fixes an easy WCNF control, the scheduling
 WBO and haplotyping MaxSAT tails, and the weighted `mprime` incumbent control.
 
+The scoped automatic weighted-core source policy is described in
+[portfolios](../docs/12-portfolio.md#boolean-objective-core-search). Compare the
+default run against `param.core-early=false` and `param.core-refinement=none` at
+the same source revision, seeds, resources and containing allowance. That control
+retains delayed, unrefined core search. Keep actual admission/refinement consumption,
+checked outcomes and full preparation/checking/disposal costs; configured policy
+alone does not qualify production benefit.
+
 `bench.profile.WeightedSearchProfile` qualifies one hash-pinned WCNF/WBO source
 through ordinary finite preparation and retained core search. Arguments are
 `suite=ID problem=NAME sha256=HEX format=wcnf|wbo policy=ordinary|stratified|reasons|deletion
@@ -587,9 +595,10 @@ LS and ALNS retain larger feasible objectives. On `mprime`, the mixed pool repor
 without a witness. On the MaxSAT tail, direct controls reach floor 5 without a
 witness, while every curated core receives zero segments. The candidate delayed
 case has no witness where its parent has one, so this elapsed run does not establish
-incumbent protection. Retain delayed admission and unrefined cores as defaults;
-reason projection remains an opt-in source-specific control, and direct core search
-does not replace the primal pool.
+incumbent protection. Those legacy controls do not qualify the scoped automatic
+source policy; it needs fresh applicable-source evidence and hold-outs. Explicit
+core settings retain source-specific controls, and direct core search does not
+replace the primal pool.
 
 These historical runs predate the lab's independent WBO/WCNF point checks. A fresh
 adapter run requests `sourceValidation=true` and complete assignments; qualification
