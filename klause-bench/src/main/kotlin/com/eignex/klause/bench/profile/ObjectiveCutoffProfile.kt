@@ -30,7 +30,7 @@ import java.io.File
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -41,7 +41,9 @@ internal object ObjectiveCutoffProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all { it in setOf("suite", "problem", "sha256", "source64", "sourceGzip64",
             "cutoff", "seed", "order", "presolve", "presolve-work", "work", "slice-work", "timeout-ms") })
-        val cutoff = options.getValue("cutoff").toLong().also { require(it in -9_007_199_254_740_991..9_007_199_254_740_991) }
+        val cutoff = options.getValue("cutoff").toLong().also {
+            require(it in -9_007_199_254_740_991..9_007_199_254_740_991)
+        }
         val seed = (options["seed"] ?: "1").toLong()
         val timeout = (options["timeout-ms"] ?: "10000").toLong().also { require(it in 1..30_000L) }
         val maximumWork = (options["work"] ?: "150000").toLong().also { require(it in 1..1_000_000L) }
@@ -217,6 +219,6 @@ private class BooleanBoundAudit(private val weights: LongArray) {
         put("observations", observations)
         put("visits", visits)
         put("stopped", stopped)
-        put("overshoot", failure)
+        put("overshoot", failure ?: JsonNull)
     }
 }
