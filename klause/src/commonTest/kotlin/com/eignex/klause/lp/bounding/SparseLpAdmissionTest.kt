@@ -9,7 +9,18 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.RelaxationProjection
 import com.eignex.klause.lp.RelaxationProjectionProvider
+import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpCertifier
+import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpFloatAllowance
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveMetrics
+import com.eignex.klause.lp.engine.PersistentLpSolver
+import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.propagation.PropagationSession
@@ -25,6 +36,75 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
+    @Test
+    fun `completed sparse root work leaves checking inside the same grant`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        for (checkingWork in listOf(0L, 1L)) {
+            lateinit var engine: LpEngine
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                        model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    )
+                    return object : PersistentLpSolver by delegate {
+                        private var completed: LpSolveMetrics? = null
+                        override val lastMetrics get() = completed ?: delegate.lastMetrics
+                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                            delegate.resolveBounds(allowance).also {
+                                completed = delegate.lastMetrics.copy(
+                                    workOps = engine.sparseTrialRemainingWork() - checkingWork,
+                                )
+                            }
+                    }
+                }
+            }
+            engine = LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
+                LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+                SolveStatsSink("funded-sparse-root"), LpSolveContext(factory))
+
+            val (bound, work) = engine.use {
+                it.rootLpRelaxationBound(requireNotNull(it.lpRelaxer), emptyList()) to it.totalSolveWork()
+            }
+
+            assertTrue(bound.isNaN())
+            assertTrue(work <= SPARSE_LP_MAX_WORK)
+            assertTrue(work >= SPARSE_LP_MAX_WORK - checkingWork)
+        }
+    }
+
+    @Test
+    fun `sparse root bounds honor bounded certificate refusal`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        var refusals = 0
+        val policy = LpCertificationPolicy { certifier, successful ->
+            if (certifier == LpCertifier.RATIONAL && successful) {
+                refusals++
+                false
+            } else successful
+        }
+
+        val bound = LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            SolveStatsSink("refused-sparse-root"), LpSolveContext(certificationPolicy = policy)).use {
+            it.rootLpRelaxationBound(requireNotNull(it.lpRelaxer), emptyList())
+        }
+
+        assertTrue(bound.isNaN())
+        assertTrue(refusals > 0)
+    }
+
     @Test
     fun `sparse trials preserve the ordinary root probe intent`() {
         for (ceiling in listOf(1L, 1_000_000L)) {

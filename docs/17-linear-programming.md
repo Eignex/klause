@@ -212,6 +212,11 @@ the operation keeps its original cumulative work and pivot limits. Consultations
 continue only within the remaining root, invocation and cancellation allowances.
 Authority edits discard the cursor before adoption. Completed floating results
 enter the existing exact bound check, independently of dense exact continuation.
+The sparse root charges its last numerical delta before admitting bound-only
+rational checking under the remaining work and a 16 MiB checking reservation
+inside the trial's storage cap. Exhaustion,
+cancellation or certificate refusal withholds the root bound; checking acquires
+no dense basis continuation.
 
 Completed root points can supply private rounding guidance under the same
 objective identity. Retention copies at most one MiB within the remaining root
