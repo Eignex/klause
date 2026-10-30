@@ -52,6 +52,46 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `source root bounds exclude live search restrictions`() {
+        val problem = boundedProblem()
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)),
+            SolveStatsSink("unconditional-source-root")).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            shared.push(SearchDecision.IntAtLeast(0, 1L))
+
+            val root = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            val child = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), cp.session))
+            val childBound = assertNotNull(engine.solveNode(child.model, null, Cancellation.Never)?.second).objective
+
+            assertEquals(3.0, root)
+            assertEquals(4.0, childBound)
+        }
+    }
+
+    @Test
+    fun `source root bounds accept noncompact exact rows`() {
+        val coefficient = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, (0 until 2).map { block ->
+            ExactLinear.of(intArrayOf(Term.ofIntVar(2 * block), Term.ofIntVar(2 * block + 1)),
+                listOf(coefficient, coefficient + BigFraction.ONE), LinearOp.GE, coefficient)
+        })
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(4) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)),
+            SolveStatsSink("noncompact-source-root")).use { engine ->
+
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            assertTrue(bound in 1.0..2.0)
+        }
+    }
+
+    @Test
     fun `retained layouts accept noncompact exact source rows`() {
         val coefficient = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, (0 until 2).map { block ->

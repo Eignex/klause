@@ -803,21 +803,39 @@ internal class LpEngine(
     }
 
     private fun buildNodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {
-        if (persistentRelaxer !== relaxer) {
-            cpAdapter.reset()
-            persistentRelaxation = null
-            val base = relaxer.build(RootDomains(problem), cancellation = params.cancellation)
-            if (base.persistentEligible && !base.model.hasContinuous) {
-                persistentRelaxation = base
-            }
-            persistentRelaxer = relaxer
-        }
+        preparePersistentLayout(relaxer, params.cancellation)
         persistentRelaxation?.let {
             return cpAdapter.relaxation(it, session)?.also { rebound ->
                 noteNodeOverhead(rebound.model.numVars.toLong() * LpNodeOverhead.EDIT)
             }
         }
         return cpAdapter.relaxation(relaxer, session)
+    }
+
+    internal fun sourceRootRelaxation(
+        relaxer: CpToLpRelaxation,
+        selectedCuts: List<Cut>,
+        cancellation: Cancellation,
+    ): LpRelaxation? {
+        preparePersistentLayout(relaxer, cancellation)
+        val fixed = persistentRelaxation
+        val base = if (fixed != null) cpAdapter.sourceRootRelaxation(fixed, cancellation)
+            else cpAdapter.sourceRootRelaxation(relaxer, cancellation)
+        return base?.let { cpAdapter.sourceRootCuts(it, selectedCuts, cancellation) }
+            ?.also { it.sourceMap?.let(cutPool::remap) }
+    }
+
+    private fun preparePersistentLayout(relaxer: CpToLpRelaxation, cancellation: Cancellation) {
+        if (persistentRelaxer !== relaxer) {
+            cpAdapter.reset()
+            persistentRelaxation = null
+            val base = relaxer.build(RootDomains(problem), cancellation = cancellation)
+            noteNodeOverhead(base.model.extent() * LpNodeOverhead.BUILD)
+            if (base.persistentEligible && !base.model.hasContinuous) {
+                persistentRelaxation = base
+            }
+            persistentRelaxer = relaxer
+        }
     }
 
     internal var lpCounterResults = LpCounterResults()
