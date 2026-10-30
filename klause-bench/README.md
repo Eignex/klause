@@ -123,6 +123,14 @@ distinct methods. Capture truncation and the analysis depth limit are reported
 separately. Large captures must not be passed through profile arguments:
 the generated shell command is subject to the operating system's argument-size limit.
 
+`param.ls-phase-times=true` also reports `lsObjectiveScoring.*`. `plain` and
+`functional` count the selected objective views; `maintained` counts functional
+views using maintained linear terms. `declined` and `prepared` count terminal Boolean
+index preparation outcomes. `indexed` and `generic` count completed candidate scores
+through the Boolean index and generic functional evaluator. Paused preparation and
+cancelled scoring do not count as completed outcomes. Counts accumulate across live
+states and workers; they establish execution, not a checked point or performance gain.
+
 `solve-one suite=ID problem=NAME out=DIR` accepts these controls:
 
 | Option | Purpose |

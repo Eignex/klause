@@ -254,6 +254,19 @@ class CliStatsTest {
     }
 
     @Test
+    fun `objective scoring observations should print explicit zero indexed use before any move`() {
+        val stats = SolveStats(
+            run = RunStats(backend = "mixed"),
+            ls = LocalSearchStats(objectiveScoring = mapOf("plain" to 1L, "indexed" to 0L)),
+        )
+
+        val pairs = lsStatPairs(stats, solveTimeMs = 0).toMap()
+
+        assertEquals("1", pairs["lsObjectiveScoring.plain"])
+        assertEquals("0", pairs["lsObjectiveScoring.indexed"])
+    }
+
+    @Test
     fun `a residual observation should print its cost and kind totals before any move`() {
         val stats = SolveStats(
             run = RunStats(backend = "mixed"),

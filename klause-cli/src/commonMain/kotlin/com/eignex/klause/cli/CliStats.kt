@@ -271,6 +271,9 @@ internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     for ((phase, nanos) in stats.ls.phaseNanos.entries.sortedBy { it.key }) {
         out += "lsPhaseNanos.$phase" to nanos.toString()
     }
+    for ((outcome, count) in stats.ls.objectiveScoring.entries.sortedBy { it.key }) {
+        out += "lsObjectiveScoring.$outcome" to count.toString()
+    }
     if (solveTimeMs > 0L) out += "lsMovesPerSec" to round4(moves / (solveTimeMs / 1000.0))
     if (stats.ls.timeToBestMs >= 0L) out += "lsTimeToBest" to round4(stats.ls.timeToBestMs / 1000.0)
     if (stats.ls.incumbentObjective.isFinite()) out += "lsIncumbentObjective" to round4(stats.ls.incumbentObjective)
