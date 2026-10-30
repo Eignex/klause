@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.objective.objectiveBoundOverlay
+import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.localsearch.CostShaping
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -121,9 +122,9 @@ internal class LocalSearchWorkerConfig private constructor(
         } else {
             problem to null
         }
-        // Functional recipes propose the free leaves; other recipes retain their searched outputs.
+        // WCNF indicators are private penalties; general defined outputs can also need hard-constraint repairs.
         val sweep = definitionalSweep ?: (lsObjective as? FunctionalObjective)?.booleanCostSweep?.takeIf {
-            objective != null && recipe.perMoveInvariants &&
+            problem.semantics.effective.format == SourceFormat.WCNF && objective != null && recipe.perMoveInvariants &&
                 recipe.objectiveGuidance == ObjectiveGuidance.Functional &&
                 recipe.feasibleDescent == FeasibleDescent.SelfOwned
         }
