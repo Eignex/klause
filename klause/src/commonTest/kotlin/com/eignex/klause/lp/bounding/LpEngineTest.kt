@@ -36,6 +36,7 @@ import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.SearchDecision
@@ -81,7 +82,8 @@ class LpEngineTest {
         }
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
             LpParams(lpPlan = LpPlan(bounding = true), cancellation = token),
-            SolveStatsSink("cancelled-template-charge")).use { engine ->
+            SolveStatsSink("cancelled-template-charge"),
+            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
             val before = engine.totalSolveWork()
             work = 0L
 
