@@ -397,6 +397,20 @@ work and allocation ceilings equally and retain their query funding across slice
 They consume the finite scheduler's checked exact incumbent exchange. Joint repair
 has witness authority. Its full-source check of a completed point uses the containing
 lifetime as an atomic publication step; this time belongs to its active allowance.
+
+Opt-in `source-incumbent-completion=true` reconstructs advisory real coordinates
+before residual LP completion. Reconstructed advisory seeds require exact working
+and original-source feasibility plus adjusted objective agreement. Source scope, conditions,
+semantics and coordinate frame identify retained attempts; failed attempts cannot
+renew their allowance.
+
+Enabled repair's first checked center frees at most two connected integers.
+An available exact-coordinate incumbent requests continuation through root and center
+preparation and the first proposal, behind owed complete-worker coverage and within
+the existing active cap. Availability grants no import authority; the source checks
+still admit the center. A declined center clears the preparation request, and a
+completed or declined first proposal returns to ordinary selection.
+
 A numerical optimum or refutation can complete the finite
 invocation only after its typed terminal verifies against the same captured working
 model and objective; the finite pipeline retains original-source reconstruction and

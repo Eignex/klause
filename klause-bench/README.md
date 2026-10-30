@@ -1022,8 +1022,19 @@ proposal from a checked pooled center, skipping its all-pinned bootstrap. The fi
 proposal frees at most two connected integers under the same repair allowance;
 record completed checked improvements separately from proposal/import counts.
 The first pending checked-center proposal receives continuation behind complete-worker
-coverage within the unchanged companion cap. Retain unsuccessful and paused proposal
+coverage within the unchanged companion cap, including root and center preparation
+when an exact-coordinate incumbent is available.
+`jointRepairIncumbentPreparationStarts` counts these preparation requests, before
+source checking admits a center. Retain unsuccessful and paused preparation/proposal
 costs; continuation alone establishes no checked progress.
+
+[9455](https://lab.eignex.com/jobs/9455) records ordinary binary-admitted `dcmulti`
+at thirty seconds, seeds 1 and 3. In the connected seed-1 control, an incumbent is
+available at 14.29 seconds, repair first queries at 16.11 seconds and consumes its
+center at 28.10 seconds in a 28.49-second portfolio invocation. One repair candidate
+remains unresolved, with no accepted repair improvement. Completion has no offered
+incumbent in seed 3. The witness checks are `UNKNOWN` because the independent MPS
+parser rejects data after `ENDATA`; native values establish no checked benefit.
 
 [9366](https://lab.eignex.com/jobs/9366) exercises ordinary finite producers on
 `bell3a` and `bell5`, with completion off/on at `89d5153cd9`, seed 1, one core and
