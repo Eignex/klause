@@ -140,6 +140,7 @@ class LpDirectionalHistoryTest {
         }
 
         assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+        assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
     }
 
     @Test
