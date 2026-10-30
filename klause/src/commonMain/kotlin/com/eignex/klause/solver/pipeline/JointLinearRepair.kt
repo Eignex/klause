@@ -189,8 +189,8 @@ internal class JointLinearRepair(
                     observe("jointRepairSourceInputPasses")
                 }
                 val checkedStart = pooled != null && completion != null && round == 0L
+                if (round == 0L && completion != null) incumbentTrialPending = checkedStart
                 val width = if (checkedStart) {
-                    incumbentTrialPending = true
                     observe("jointRepairCheckedCenterStarts")
                     minOf(count, 2)
                 } else if (sourceInputPass && !adaptive && round > 0L && focusedRemaining > 0) {
@@ -205,6 +205,18 @@ internal class JointLinearRepair(
                 requireNotNull(selection).propose(from, pooled?.bools ?: bools, width, proposalRound, radius, limit)
             },
         )
+    }
+
+    private fun requestIncumbentPreparation() {
+        if (completion == null || incumbentTrialPending) return
+        budget.observe(preparation = 1L)
+        val seed = external() ?: return
+        if (seed.numBoolVars == model.numBoolVars && seed.numIntVars == model.numIntVars &&
+            seed.exactReals?.size == model.numRealVars
+        ) {
+            incumbentTrialPending = true
+            observe("jointRepairIncumbentPreparationStarts")
+        }
     }
 
     private fun prepare(cancellation: Cancellation): Boolean {
@@ -229,6 +241,7 @@ internal class JointLinearRepair(
         }
         if (rootPoint == null) {
             funding.grant(20_000_000L)
+            requestIncumbentPreparation()
             if (!rootStarted) {
                 if (!state.work.theoryCheck()) return false
                 rootStarted = true

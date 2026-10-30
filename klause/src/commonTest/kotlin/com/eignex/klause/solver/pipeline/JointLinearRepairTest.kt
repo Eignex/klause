@@ -30,6 +30,57 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `a rejected center should clear its preparation continuation request`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(3.0),
+            exactReals = listOf(BigFraction.ofLong(3)))
+        var consumed = false
+
+        JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
+            external = { seed }, onIncumbentUse = { consumed = true }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                search.advance(Cancellation.Never, 1)
+                assertTrue(repair.incumbentTrialPending)
+                var done = false
+                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+
+                assertFalse(consumed)
+                assertFalse(repair.incumbentTrialPending)
+            }
+        }
+    }
+
+    @Test
+    fun `an exact pooled incumbent should request preparation continuation only with enabled completion`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(0.75),
+            exactReals = listOf(BigFraction.ofLong(3) * BigFraction.ofLong(4).reciprocal()))
+
+        for (completion in listOf(false, true)) {
+            var consumed = false
+            JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = completion),
+                external = { seed }, onIncumbentUse = { consumed = true }).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    search.advance(Cancellation.Never, 1)
+
+                    assertFalse(consumed)
+                    assertEquals(completion, repair.incumbentTrialPending)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `a checked center trial should retain its condition after a publication pause`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
             factors = arrayOf(
