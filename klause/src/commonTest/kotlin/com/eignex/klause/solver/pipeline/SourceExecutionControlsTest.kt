@@ -26,7 +26,7 @@ class SourceExecutionControlsTest {
             "(assert (<= (+ (* 2 x) (* 3 y)) 1))")
         val invocation = SourceSetup.prepare(SourceSetupRequest(parsed.source,
             ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
-        for ((options, expected) in listOf(emptyList<String>() to false,
+        for ((options, expected) in listOf(emptyList<String>() to true,
             listOf("open-linear-incremental=true") to true, listOf("open-linear-incremental=false") to false)) {
             val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
 
