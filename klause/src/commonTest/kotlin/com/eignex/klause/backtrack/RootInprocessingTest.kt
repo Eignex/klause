@@ -361,7 +361,7 @@ class RootInprocessingTest {
         for (lower in listOf(false, true)) {
             val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), if (lower) LinearOp.GE else LinearOp.LE,
-                    if (lower) 1L else 3L),
+                    if (lower) 1 else 3),
                 Linear(intArrayOf(-1, 1), intArrayOf(0, 1), if (lower) LinearOp.LE else LinearOp.GE, 0),
             ))
             val session = PropagationSession(source.bake())
