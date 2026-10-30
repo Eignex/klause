@@ -7,6 +7,8 @@ import kotlin.math.floor
 internal class LpDirectionalHistory(
     private val observe: (String) -> Unit,
     private val maxAge: Long = 256L,
+    private val charge: (Long) -> Unit = {},
+    private val useClassPriors: Boolean = true,
 ) {
     private class Direction {
         var count = 0
@@ -19,6 +21,8 @@ internal class LpDirectionalHistory(
     private class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
 
     private val gains = HashMap<VarRef, Gains>()
+    private var integerPrior: Gains? = null
+    private var booleanPrior: Gains? = null
     private val parents = HashMap<Int, Parent>()
     private var pending: Pending? = null
     private var stamp = 0L
@@ -32,10 +36,13 @@ internal class LpDirectionalHistory(
         if (pending?.depth != level) pending = null
     }
 
-    val retainedEntries: Int get() = gains.size + parents.size
+    val retainedEntries: Int get() = gains.size + parents.size +
+        (if (integerPrior != null) 1 else 0) + (if (booleanPrior != null) 1 else 0)
 
     fun clear(report: Boolean = true) {
         gains.clear()
+        integerPrior = null
+        booleanPrior = null
         parents.clear()
         pending = null
         objective = Double.NaN
@@ -53,11 +60,15 @@ internal class LpDirectionalHistory(
             return
         }
         val history = gains.getOrPut(child.parent.variable, ::Gains)
-        val direction = if (child.up) history.up else history.down
-        expire(direction)
-        direction.count = minOf(direction.count + 1, 8)
-        direction.mean += (normalized - direction.mean) / direction.count
-        direction.stamp = stamp
+        update(if (child.up) history.up else history.down, normalized)
+        if (useClassPriors) {
+            charge(1L)
+            val prior = when (child.parent.variable) {
+                is VarRef.Bool -> booleanPrior ?: Gains().also { booleanPrior = it }
+                is VarRef.IntVar -> integerPrior ?: Gains().also { integerPrior = it }
+            }
+            update(if (child.up) prior.up else prior.down, normalized, prior = true)
+        }
         observe(if (child.up) "UP" else "DOWN")
     }
 
@@ -108,23 +119,43 @@ internal class LpDirectionalHistory(
 
     fun score(variable: VarRef, value: Double): Double {
         if (!value.isFinite()) return Double.NaN
-        val history = gains[variable] ?: return Double.NaN
-        expire(history.down)
-        expire(history.up)
-        if (history.down.count < RELIABILITY || history.up.count < RELIABILITY) return Double.NaN
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return Double.NaN
+        val history = reliable(gains[variable]) ?: run {
+            if (!useClassPriors) return Double.NaN
+            charge(1L)
+            reliable(if (variable is VarRef.Bool) booleanPrior else integerPrior, prior = true)
+        } ?: return Double.NaN
         val down = history.down.mean * fraction
         val up = history.up.mean * (1.0 - fraction)
         val score = minOf(down, up) + maxOf(down, up) / 6.0
         return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
     }
 
-    private fun expire(direction: Direction) {
+    fun usesPrior(variable: VarRef): Boolean = gains[variable]?.let {
+        it.down.count < RELIABILITY || it.up.count < RELIABILITY ||
+            stamp - it.down.stamp > maxAge || stamp - it.up.stamp > maxAge
+    } ?: true
+
+    private fun reliable(history: Gains?, prior: Boolean = false): Gains? {
+        history ?: return null
+        expire(history.down, prior)
+        expire(history.up, prior)
+        return history.takeIf { it.down.count >= RELIABILITY && it.up.count >= RELIABILITY }
+    }
+
+    private fun update(direction: Direction, value: Double, prior: Boolean = false) {
+        expire(direction, prior)
+        direction.count = minOf(direction.count + 1, 8)
+        direction.mean += (value - direction.mean) / direction.count
+        direction.stamp = stamp
+    }
+
+    private fun expire(direction: Direction, prior: Boolean = false) {
         if (direction.count > 0 && stamp - direction.stamp > maxAge) {
             direction.count = 0
             direction.mean = 0.0
-            observe("EXPIRED")
+            observe(if (prior) "PRIOR_EXPIRED" else "EXPIRED")
         }
     }
 
