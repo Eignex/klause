@@ -84,6 +84,59 @@ class ExactContinuationTest {
     }
 
     @Test
+    fun `cancelled overflow promotion should keep a complete checkpoint and cumulative spending`() {
+        val initial = ExactContinuationInput(
+            listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(null),
+            emptyList(), listOf(ContinuationStatus.LOWER),
+        )
+        val huge = BigFraction.of(BIG_ONE shl 140, BIG_ONE)
+        val changed = ExactContinuationInput(
+            initial.columns, initial.rhs, listOf(huge), initial.upper,
+            initial.headings, initial.statuses,
+        )
+        val probe = ExactContinuation(initial)
+        assertNotNull(probe.resume().values)
+        var checks = 0
+        assertNotNull(probe.resume(replacement = changed, cancellation = Cancellation {
+            checks++
+            false
+        }).values)
+        var promotionInterruptions = 0
+        var previousCheckpoints = 0
+
+        for (cancelAt in 1..checks) {
+            val session = ExactContinuation(initial)
+            assertNotNull(session.resume().values)
+            val priorWork = session.usedWork
+            val priorAllocation = session.usedAllocation
+            var observed = 0
+
+            val cancelled = session.resume(
+                replacement = changed,
+                cancellation = Cancellation { ++observed == cancelAt },
+            )
+            if (cancelled.metrics.phase != ContinuationPhase.PROMOTION) continue
+            val retained = session.resume()
+
+            promotionInterruptions++
+            assertEquals(ContinuationDecline.CANCELLED, cancelled.metrics.decline)
+            assertNull(cancelled.values)
+            val point = assertNotNull(retained.values)
+            if (point == listOf(BigFraction.ZERO)) previousCheckpoints++ else assertEquals(listOf(huge), point)
+            assertEquals(0, retained.metrics.builds)
+            assertTrue(cancelled.metrics.work > 0L)
+            assertTrue(cancelled.metrics.allocation > 0L)
+            assertEquals(priorWork + cancelled.metrics.work + retained.metrics.work, session.usedWork)
+            assertEquals(
+                priorAllocation + cancelled.metrics.allocation + retained.metrics.allocation,
+                session.usedAllocation,
+            )
+        }
+        assertTrue(promotionInterruptions > 0)
+        assertTrue(previousCheckpoints > 0)
+    }
+
+    @Test
     fun `rebound open sides should reseat nonbasic coordinates`() {
         val initial = ExactContinuationInput(
             listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(null),
