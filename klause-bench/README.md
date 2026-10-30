@@ -1355,14 +1355,24 @@ the investigation cost rather than becoming a solver regression.
 
 `bench.profile.OrdinaryArithmeticLearningProfile` takes `suite=ID problem=NAME
 sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off trace=first-integer|initial
-attribution=false|true recipe=source|satOptimized|conflictDriven seed=3 worker-seed=3`.
+attribution=false|true recipe=source|satOptimized|conflictDriven seed=3 worker-seed=3
+route=single|portfolio`.
 The source recipe uses its search hints or the conflict-driven preset; the explicit
 recipes use the existing SAT or conflict-driven preset. Preparation uses `seed`,
 and native traversal uses `worker-seed` (defaulting to the preparation seed), so a portfolio worker's
 position-derived seed can be captured without changing source preparation.
-It runs clause and opt-in
+The default `single` route runs clause and opt-in
 integer-row arms through ordinary finite preparation and backtrack traversal,
-without a decision replay. The existing bounded arithmetic trace records source
+without a decision replay. The `portfolio` route requires unannotated pure binary
+integer optimization. It retains the six curated CP slots, sharing, position-derived seeds and
+one containing node allowance; the trial preserves automatic learning and the
+control overrides it to false. Capture selects the first SAT or conflict-driven
+slot; `recipe` identifies that expected slot rather than replacing the pool. Its default target is `conflictDriven` at `seed + 1001`;
+`lp=auto` retains the ordinary portfolio LP ceiling. Capture observes only that
+slot's first native session and reports ignored later session attachments. Captured
+work and lifecycle counts cover that session; invocation CPU, elapsed time and
+thread allocation cover the whole portfolio. Instrumentation supplies no exact
+portfolio replay or performance qualification. The existing bounded arithmetic trace records source
 conflicts, historical endpoint rows, mapped admission, retained consumers and
 retirement. Its live window admits 1,024 events and 65,536 words. Clauses above
 64 literals and endpoint markers above 32 words produce explicit omission events
