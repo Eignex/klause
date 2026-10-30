@@ -1025,11 +1025,17 @@ schedule does not reproduce mixed numerical elapsed schedules. Full-trace claims
 require the capture's complete artifact marker; source outcome claims require the
 corresponding independent checker receipts.
 
-`param.portfolio-reward=ordinary|source` varies rewards independently of admission
+`param.portfolio-reward=ordinary|source|source-rate` varies rewards independently of admission
 and coverage. `source` retains ordinary feasibility rewards, then rewards only
 accepted incumbent improvements and terminal closure. Retain phase/cost counters
 and source checks, including initialization, reseeding and retirement, when comparing
 it with ordinary rewards. Counter changes alone do not establish a benefit.
+`source-rate` prices finite positive accepted gain per observed factory and segment
+time, retaining unproductive and feasibility setup costs until the next gain.
+Initialization and checking are already inside segment time. Compare it separately
+at fixed coverage, admission and reseeding, and retain the full containing-run ledger
+for source preparation, retirement and independent checking. Time-sensitive rewards
+make fixed-work traces sensitive to measured segment costs.
 
 `param.portfolio-proof-workers=retained|complete` selects coverage of non-restarting
 workers or all complete retained sessions, including internal restarts. Both scopes

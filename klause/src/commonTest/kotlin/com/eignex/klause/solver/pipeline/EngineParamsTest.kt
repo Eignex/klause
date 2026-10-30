@@ -8,15 +8,26 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.SourceProgressReward
+import com.eignex.klause.portfolio.SourceRateReward
 import com.eignex.klause.portfolio.editing
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class EngineParamsTest {
+    @Test
+    fun `source rate rewards should be an independent opt in`() {
+        val ordinary = scenario(cores = 1)
+        val source = scenario(cores = 1, params = listOf("portfolio-reward=source-rate"))
+
+        assertIs<SourceRateReward>(source.rewardPolicy)
+        assertEquals(ordinary, source.copy(rewardPolicy = null))
+    }
+
     @Test
     fun `source progress rewards should be an independent opt in`() {
         val ordinary = scenario(cores = 1)
