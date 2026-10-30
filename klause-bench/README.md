@@ -703,6 +703,10 @@ counts source rows once; `MixedCandidates`, `MixedComplementaryAttempts` and
 `MixedComplementaryRetained` distinguish candidate work and retained alternatives.
 Bound-side alternatives and selected rows establish no useful bound or cost gain
 without subsequent checked support and actual frontier consumption.
+`numericalCutSelectionRetiredInstalled` counts installed rows expired at the
+generation's retirement scan; `POINT_INSTALLED_RETIRED` attributes them by family.
+Retained tight rows still require current-source checks. Keep subsequent row-layout
+replacement, proof-mode changes and factor work in the containing cost comparison.
 Point selection starts from the current checked recipe. `CurrentFallback` and
 `CurrentFallbackQueries` report retaining that recipe after an unproductive trial;
 `BaseQueries` counts base relaxation attempts. A point-selection arm can therefore

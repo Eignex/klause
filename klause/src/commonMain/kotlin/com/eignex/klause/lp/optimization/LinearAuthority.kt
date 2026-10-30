@@ -83,7 +83,7 @@ internal class LinearAuthority(
     private var pointFamily: LinearAuthorityTemplate? = null
     private var pointFallback: LinearAuthorityTemplate? = null
     private var directedFamily: LinearAuthorityTemplate? = null
-    private var pointMask: Set<Int> = emptySet()
+    private var pointMask: Set<Int>? = null
     private class PointRound(
         val query: LinearAuthorityQuery, val base: LinearAuthorityResult, val mask: Set<Int>,
     ) {
@@ -133,7 +133,7 @@ internal class LinearAuthority(
         pointFamily = null
         pointFallback = null
         directedFamily = null
-        pointMask = emptySet()
+        pointMask = null
         primalAttempt = null
         cutLifecycle.containing("RETIREMENT") { lp.close() }
     }
@@ -146,7 +146,7 @@ internal class LinearAuthority(
             return advance(source, cancellation, cuts = true)
         }
         if (pointFamily !== template || template?.matches(source) != true || template?.cuts == null) {
-            pointMask = emptySet()
+            pointMask = null
             pointFallback = null
             pointRound = null
             pointFamily = template
@@ -159,7 +159,7 @@ internal class LinearAuthority(
             pointRound = null
             var point: Pair<LinearAuthorityQuery, List<BigFraction>>? = null
             pointListener = { query, values -> if (point == null) point = query to values }
-            val baselineMask = pointMask.takeIf { it.isNotEmpty() }
+            val baselineMask = pointMask
             policy.observe("BaseQueries")
             val base = try {
                 advance(source, cancellation, cuts = true, cutMask = baselineMask)
@@ -185,7 +185,7 @@ internal class LinearAuthority(
             }
             val baselineFamily = family
             val baselineQuery = prepared
-            if (!checkNotNull(family.cuts).pointDirected && directedFamily !== family && pointMask.isEmpty() &&
+            if (!checkNotNull(family.cuts).pointDirected && directedFamily !== family && pointMask == null &&
                 checkNotNull(family.cuts).rows.any { it.mixed }) {
                 directedFamily = family
                 cutLifecycle.families = checkNotNull(family.cuts).rows.mapTo(HashSet()) { it.family }
@@ -202,7 +202,8 @@ internal class LinearAuthority(
             }
             val selected = cutLifecycle.containing("POINT_SELECTION") {
                 policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
-                    prepared.checkedCuts, observed.second, pointMask.intersect(prepared.checkedCuts), cancellation)
+                    prepared.checkedCuts, observed.second, pointMask.orEmpty().intersect(prepared.checkedCuts),
+                    cancellation)
             }
             if (budget.funding?.exhausted == true || cancellation()) return base
             if (baselineMask == null && selected.isEmpty()) {

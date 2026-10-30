@@ -230,20 +230,111 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
-    fun `candidate retirement should preserve installed rows`() {
+    fun `candidate retirement should preserve tight installed rows`() {
         val rows = listOf(LinearAuthorityCut(0,
             SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
         val selection = LinearAuthorityPointCuts(SourceLpBudget())
         repeat(25) {
             selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ONE), setOf(0), Cancellation.Never)
+        }
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ONE), setOf(0), Cancellation.Never)
+
+        assertEquals(setOf(0), selected)
+        assertEquals(1L, selection.observations["numericalCutSelectionRetiredFamilies"])
+    }
+
+    @Test
+    fun `slack installed rows should expire at retirement even in a full pool`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumCuts = 1)
+        var installed = setOf(0)
+        repeat(25) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), installed, Cancellation.Never)
+        }
+        val work = selection.observations["numericalCutSelectionWork"]
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ofLong(2)), installed, Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+        assertEquals(1L, selection.observations["numericalCutSelectionRetiredInstalled"])
+        assertEquals(work, selection.observations["numericalCutSelectionWork"])
+    }
+
+    @Test
+    fun `a tight observation should interrupt installed row aging`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        repeat(24) {
+            selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
                 listOf(BigFraction.ZERO), setOf(0), Cancellation.Never)
         }
 
         val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
-            listOf(BigFraction.ZERO), setOf(0), Cancellation.Never)
+            listOf(BigFraction.ONE), setOf(0), Cancellation.Never)
 
         assertEquals(setOf(0), selected)
-        assertEquals(1L, selection.observations["numericalCutSelectionRetiredFamilies"])
+        assertEquals(null, selection.observations["numericalCutSelectionRetiredInstalled"])
+    }
+
+    @Test
+    fun `an incomplete scoring scan should not age installed rows`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
+                BigFraction.ONE), SourceDerivation.Premise("sum")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.MINUS_ONE),
+                BigFraction.ONE), SourceDerivation.Premise("difference")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumSupport = 2)
+        var installed = setOf(0, 1)
+
+        repeat(25) {
+            installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+                List(2) { BigFraction.ZERO }, installed, Cancellation.Never)
+        }
+
+        assertEquals(setOf(0, 1), installed)
+        assertEquals(null, selection.observations["numericalCutSelectionRetiredInstalled"])
+        assertEquals(null, selection.observations["numericalCutSelectionRetiredFamilies"])
+    }
+
+    @Test
+    fun `an empty aged mask should retain its checked relaxation without reinstalling cuts`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val triangle = listOf(y, z, w)
+        val premises = mixedMaximum.premises.toMutableMap()
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE),
+                BigFraction.ONE))
+        }
+        val root = SourceProofContext(mixedMaximum.scope, mixedMaximum.coordinates + triangle, premises,
+            (triangle + x).associateWith { BigFraction.ONE })
+        val child = root.atScope(root.scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO))))
+        val capture = LinearAuthorityCapture(128, 100_000L, 10_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithPointCuts(root, Cancellation.Never)
+            repeat(32) { authority.advanceWithPointCuts(child, Cancellation.Never) }
+            val work = authority.cutObservations()["numericalCutSelectionWork"]
+
+            val result = authority.advanceWithPointCuts(child, Cancellation.Never)
+
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
+            assertTrue(capture.records.last().cuts.none { it.installed })
+            assertEquals(work, authority.cutObservations()["numericalCutSelectionWork"])
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(child.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
     }
 
     @Test

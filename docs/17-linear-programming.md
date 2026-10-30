@@ -336,10 +336,15 @@ limit and retains the source-row template; unavailable preparation leaves its pr
 candidates intact. Each immutable template attempts this preparation once.
 Point scoring waits seven completed point queries between scans of one immutable
 candidate generation. Four completed scans without an addition retire that
-generation's unselected candidates from further scoring. A replacement generation
-receives its own lifetime. Installed cuts remain in the selected mask and keep
-their ordinary source checks and scope retraction; candidate retirement changes
-neither their definitions nor checked coverage. Retired unselected candidates
+generation's unselected candidates from further scoring. At that scan, installed
+rows also retire when they have been slack in four usable scoring scans without
+an intervening tight observation. Tightness uses the model-facing pool's tolerance.
+Full pools remain eligible for aging; incomplete scans do not advance it. A
+replacement generation receives its own lifetime. Remaining installed cuts keep
+their ordinary source checks and scope retraction. Retirement only weakens the
+relaxation, retaining cut definitions and checked coverage. An empty selected mask
+stays distinct from the ordinary all-cut recipe and cannot reinstall expired rows.
+Retired unselected candidates
 are omitted from proof replay as well as scoring. Masked-query reuse distinguishes
 whether unselected candidates are checked; installed cuts retain fresh source
 verification under the current scope.
