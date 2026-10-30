@@ -792,9 +792,21 @@ class LocalSearchState private constructor(
 
     internal fun prepareObjectiveDelta(objective: Objective): Sequence<Unit> = sequence {
         val functional = objective as? FunctionalObjective ?: return@sequence
-        if (scoringView(functional) is LinearObjective) {
-            phaseTimer?.recordObjectiveScoring("maintained")
-            return@sequence
+        val net = invariants
+        val linear = functional.termForm
+        if (net != null && linear != null) {
+            for (maintained in functional.coneMaintenanceSteps(net::maintains)) {
+                if (maintained != null) {
+                    termViewOf = functional
+                    termViewNetwork = net
+                    termView = if (maintained) linear else null
+                }
+                yield(Unit)
+            }
+            if (termView != null) {
+                phaseTimer?.recordObjectiveScoring("maintained")
+                return@sequence
+            }
         }
         for (prepared in functional.prepareBooleanDelta(problem.numBoolVars)) {
             if (prepared != null) {

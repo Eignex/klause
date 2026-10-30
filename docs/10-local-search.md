@@ -242,7 +242,8 @@ and two million reader entries. A maintained-network probe uses its saved coordi
 to score the actual changed Boolean leaves, then restores the committed state.
 Nested, mixed and opaque objective cones use the generic evaluator. The index
 supplies heuristic scores;
-source witness and objective checks retain admission authority.
+source witness and objective checks retain admission authority. Maintenance checks
+for the linear term view resume in batches of 256 definitions before move scoring.
 
 Invariants substitute a new value into every position that reads the moved
 coordinate. Product residuals are computed exactly, with a private 128-bit

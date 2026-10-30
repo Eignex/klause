@@ -25,6 +25,28 @@ import kotlin.test.assertTrue
 @RunWith(Parameterized::class)
 class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
     @Test
+    fun `maintained objective preparation should pause before admitting its linear view`() {
+        val source = Dimacs.parseWcnf((1..512).joinToString("\n") { "1 $it 0" }).toProblem()
+        val problem = source.problem
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = source.boolFolds))
+        val functional = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            intArrayOf(), longArrayOf(), 0L, minimize, IntArray(512) { 512 + it }, LongArray(512) { 1L },
+        ))
+        val state = LocalSearchState(problem.bake(), Random(0))
+        state.invariants = sweep.network(0, 1024)
+        val observations = LocalSearchPhaseTimer { 0L }
+        state.phaseTimer = observations
+        val preparation = state.prepareObjectiveDelta(functional).iterator()
+
+        assertTrue(preparation.hasNext())
+        preparation.next()
+        assertEquals(0L, observations.objectiveScoringSnapshot().getValue("maintained"))
+        preparation.forEach { }
+
+        assertEquals(1L, observations.objectiveScoringSnapshot().getValue("maintained"))
+    }
+
+    @Test
     fun `indexed primitive scores should report preparation and completed candidate calls`() {
         val source = Dimacs.parseWcnf("7 1 2 0\n11 -1 2 0\n").toProblem()
         val sweep = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = source.boolFolds))
