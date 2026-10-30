@@ -458,6 +458,12 @@ legacy start-index placement rejected by the independent checker; use
 `suite=rewrite-structure-canonical-v1 problem=element-cone` for its separately
 identified standard-list-index control.
 
+`bench.profile.AffineObjectiveProfile` accepts `batch64=` with a base64 JSON list
+of `suite=ID`, `problem=NAME`, `sha256=HEX` argument lists. Each list can add
+`presolve=CONFIG` and `pivotOrder=markowitz|rewrite_cost` to retain complete MPS
+residuals under those controls. Residual captures diagnose representation changes;
+they do not execute search or validate a source outcome.
+
 ## Corpus and build identity
 
 Compressed file inputs are staged with the existing corpus decoder before CLI

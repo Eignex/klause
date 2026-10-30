@@ -62,6 +62,25 @@ class DefinitionalSweepTest {
     }
 
     @Test
+    fun `element objective gradients should read only the selected variable cell`() {
+        val source = Problem(0, 4,
+            arrayOf(IntDomain(0, 1), IntDomain(10, 20), IntDomain(10, 20), IntDomain(10, 20)),
+            listOf(Element(0, 3, longArrayOf(1, 2), arrIsVars = true, indexOffset = 0)))
+        val sweep = assertNotNull(DefinitionalSweep.infer(source, intArrayOf(3)))
+        val objective = assertNotNull(sweep.functionalObjective(
+            LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))))
+        val assignment = com.eignex.klause.solver.Assignment(0, 4)
+        assignment.setInt(0, 1)
+        assignment.setInt(1, 10)
+        assignment.setInt(2, 20)
+        assignment.setInt(3, 20)
+
+        for ((variable, expected) in listOf(1 to 0.0, 2 to -5.0)) {
+            assertEquals(expected, objective.deltaIfApplied(assignment, Move.IntSet(variable, 15)))
+        }
+    }
+
+    @Test
     fun `definition inference should not spend work after its containing allowance stops`() {
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(10, 20)),
             arrayOf(Element(0, 1, longArrayOf(10, 20), arrIsVars = false, indexOffset = 0)))
