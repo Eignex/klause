@@ -270,7 +270,11 @@ strong catalog recipes before drawing any production-admission conclusion.
 Use the explicit build/classpath and JVM
 controls of `BooleanProofCoverageProfile`. The scheduler is internal and pure Boolean
 satisfaction only; the profile supplies neither independent UNSAT checking nor a
-production activation decision. Sampled heap is not a peak-memory bound.
+production activation decision. Optional `control=tasks|replicas|paired` and `warmups=0|1`
+permit separate fresh-process controls with `repeats=1`; defaults are `paired` and `1`.
+The Linux `wholeProcessPeakRssBytes` reading is the cumulative process high-water
+mark, including startup and every preceding control. It cannot attribute peak memory
+to one arm of a paired process. Sampled heap is not a peak-memory bound.
 
 `lab/recipes/` contains the migrated lab recipes. `scripts/convert-lab-recipe.sh`
 translates legacy experiments or schedules from stdin without submitting them;
