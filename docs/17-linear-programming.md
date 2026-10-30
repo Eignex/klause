@@ -222,10 +222,13 @@ cancellation or certificate refusal withholds the root bound; checking acquires
 no dense basis continuation.
 
 Completed root points can supply private rounding guidance under the same
-objective identity. Retention copies at most one MiB within the remaining root
-and LP allowance. Rounding uses the stored coordinates without another numerical
-solve; its propagation and source-publication checks still run. A cancelled,
-incomplete or differently optimized point supplies no retained rounding guidance.
+objective identity. A live root owner copies at most one MiB within the remaining
+root and LP allowance. A closed auxiliary rounding solver transfers its completed
+output array into the same private storage cap after its work is charged. The
+constant-size handoff can preserve a completed point across a slice interruption;
+later pinning still polls its fresh token. Rounding uses the stored coordinates
+without another numerical solve; its propagation and source-publication checks
+still run. An incomplete or differently optimized point supplies no retained guidance.
 Rounding pins use probe fixpoints without materializing implication lists;
 an interrupted pin restores the last complete propagation state and withholds its proposal.
 
