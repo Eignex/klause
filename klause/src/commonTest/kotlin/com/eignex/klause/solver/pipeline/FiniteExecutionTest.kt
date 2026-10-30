@@ -18,17 +18,19 @@ import kotlin.time.Duration.Companion.seconds
 class FiniteExecutionTest {
     @Test
     fun `leading probe budgets should require a containing time deadline`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-        val shape = FiniteSolveShape(problem, true, false, null,
-            LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
-        val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-            shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-            executionOptions = ExecutionOptions(ExecutionOption.portfolioProbes("leader-half")),
-            nodeBudget = NodeBudget(8),
-        )
+        for (policy in listOf("leader-half", "lp-transfer")) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions(ExecutionOption.portfolioProbes(policy)),
+                nodeBudget = NodeBudget(8),
+            )
 
-        assertFailsWith<PipelineConfigException> {
-            FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            assertFailsWith<PipelineConfigException> {
+                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            }
         }
     }
 
@@ -36,7 +38,10 @@ class FiniteExecutionTest {
     fun `typed and parsed leading probe budgets should execute curated integer optimization`() {
         for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProbes("leader-half")),
             ExecutionOptions.parse(listOf("portfolio-probes=leader-half")),
-            ExecutionOptions.parse(listOf("portfolio-probes=leader-half", "portfolio-lp-start=after-probes")))) {
+            ExecutionOptions.parse(listOf("portfolio-probes=leader-half", "portfolio-lp-start=after-probes")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("lp-transfer")),
+            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer")),
+            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer", "portfolio-lp-start=after-probes")))) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -57,7 +62,10 @@ class FiniteExecutionTest {
         for (settings in listOf(listOf("portfolio-probes=never"),
             listOf("portfolio-probes=leader-half", "arms=2"),
             listOf("portfolio-probes=leader-half", "bt-arm=satOptimized"),
-            listOf("portfolio-probes=leader-half", "portfolio-work=100"))) {
+            listOf("portfolio-probes=leader-half", "portfolio-work=100"),
+            listOf("portfolio-probes=lp-transfer", "arms=2"),
+            listOf("portfolio-probes=lp-transfer", "bt-arm=satOptimized"),
+            listOf("portfolio-probes=lp-transfer", "portfolio-work=100"))) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -94,16 +102,18 @@ class FiniteExecutionTest {
 
     @Test
     fun `leading probe budgets should reject Boolean sources`() {
-        val shape = FiniteSolveShape(Problem(1, 0, emptyArray(), emptyArray()), true, false, null,
-            LinearObjective(longArrayOf(1)), 0, null)
-        val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-            shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-            executionOptions = ExecutionOptions(ExecutionOption.portfolioProbes("leader-half")),
-            cancellation = Cancellation.after(1.seconds),
-        )
+        for (policy in listOf("leader-half", "lp-transfer")) {
+            val shape = FiniteSolveShape(Problem(1, 0, emptyArray(), emptyArray()), true, false, null,
+                LinearObjective(longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions(ExecutionOption.portfolioProbes(policy)),
+                cancellation = Cancellation.after(1.seconds),
+            )
 
-        assertFailsWith<PipelineConfigException> {
-            FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            assertFailsWith<PipelineConfigException> {
+                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            }
         }
     }
 

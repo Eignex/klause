@@ -1070,12 +1070,14 @@ private fun executePortfolio(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
-    val leadingProbeBudget = when (val probes = request.executionOptions.reader()[ExecutionOption.portfolioProbes]) {
-        null, "ordinary" -> false
-        "leader-half" -> true
-        else -> pipelineConfigError("portfolio-probes expects ordinary|leader-half, got `$probes`")
+    val probePolicy = when (val probes = request.executionOptions.reader()[ExecutionOption.portfolioProbes]) {
+        null, "ordinary" -> InitialProbePolicy.ORDINARY
+        "leader-half" -> InitialProbePolicy.LEADER_HALF
+        "lp-transfer" -> InitialProbePolicy.LP_TRANSFER
+        else -> pipelineConfigError("portfolio-probes expects ordinary|leader-half|lp-transfer, got `$probes`")
     }
-    if (leadingProbeBudget && (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
+    if (probePolicy != InitialProbePolicy.ORDINARY &&
+        (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
         pipelineConfigError("portfolio-probes requires curated single-core mixed optimization")
     }
     val deferLpProbes = when (val start = request.executionOptions.reader()[ExecutionOption.portfolioLpStart]) {
@@ -1130,7 +1132,7 @@ private fun executePortfolio(
             plan.scenario.annotationArm != null)) {
         pipelineConfigError("portfolio-lp-start requires a curated recipe pool")
     }
-    if (leadingProbeBudget && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+    if (probePolicy != InitialProbePolicy.ORDINARY && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
             plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
             plan.scenario.annotationArm != null)) {
         pipelineConfigError("portfolio-probes requires a curated recipe pool")
@@ -1178,7 +1180,7 @@ private fun executePortfolio(
         improvementProofShare = proofShare ?: 0.5,
         deferLpProbes = deferLpProbes,
         includeRestartingProof = includeRestartingProof,
-        leadingProbeBudget = leadingProbeBudget,
+        probePolicy = probePolicy,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

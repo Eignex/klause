@@ -597,9 +597,14 @@ With multiple initial workers, `portfolio-probes=leader-half` gives the leading
 initially eligible complete worker half the probe budget; the others share the rest.
 Every sibling still receives a probe. The existing total probe reservation, segment
 caps and containing deadline stay fixed; worker slots and seeds do not change.
-This control requires a containing deadline and curated single-core mixed integer
+`portfolio-probes=lp-transfer` halves each initially eligible LP probe's relative
+weight and transfers that weight to the leading complete non-LP worker. Other
+siblings keep their ordinary relative shares. Deferred LP workers supply no weight;
+without eligible donors, the initial shares remain ordinary. Shares bound each
+offer against remaining time, so they do not fix durations or native work prefixes.
+Both controls require a containing deadline and curated single-core mixed integer
 optimization without Boolean or real columns. Explicit recipes and work diagnostics
-reject it; `ordinary` is the default. Deferred LP admission retains its separate boundary.
+reject them; `ordinary` is the default. Deferred LP admission retains its separate boundary.
 
 Before the first incumbent, an optimization arm with pending private preparation, or
 a local-search arm that has not executed an instruction, receives preparation
