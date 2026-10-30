@@ -17,6 +17,7 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.lab.bench.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonObject
 import java.io.File
 import java.nio.file.Files
@@ -73,12 +74,17 @@ internal object LpLibrarySuite : BenchSuite {
         }
         val harness = NativeCliBuild.harnessIdentity(root)
         val environment = System.getenv() + ("KLAUSE_DEBUG" to p.getValue("debug"))
+        val stagedFiles = if (runtime == "jvm") NativeCliBuild.treeIdentity(profileRoot) else emptyMap()
         val captured = if (runtime == "native") {
             NativeCliBuild.capture(executable = executable, harness = harness, environment = environment)
-        } else BuildProvenance(NativeCliBuild.treeIdentity(profileRoot),
-            NativeCliBuild.treeIdentity(javaHome), runtimeOptions(environment) +
-                ("javaOptions" to options.joinToString(" ")),
-            System.getProperty("os.name"), System.getProperty("os.arch"), harness)
+        } else {
+            val manifest = report.resolve("jvm-profile-files.json")
+            Files.writeString(manifest, Reports.json.encodeToString(stagedFiles))
+            BuildProvenance(SolveEvidence.fileHashes(mapOf("report/jvm-profile-files.json" to manifest.toFile())),
+                NativeCliBuild.treeIdentity(javaHome), runtimeOptions(environment) +
+                    ("javaOptions" to options.joinToString(" ")),
+                System.getProperty("os.name"), System.getProperty("os.arch"), harness)
+        }
         val adapter = ComparisonProvenance.current
         val caller = if (runtime == "jvm") {
             ComparisonProvenance.capture(profileRoot.resolve("classes"), profileClasspath)
@@ -93,7 +99,7 @@ internal object LpLibrarySuite : BenchSuite {
         )
         val provenance = captured.copy(harness = captured.harness + identities.retained)
         val runtimeBuild = provenance.copy(distribution = if (runtime == "jvm") {
-            provenance.distribution.filterKeys { it.startsWith("lib/") }
+            stagedFiles.filterKeys { it.startsWith("lib/") && it.endsWith(".jar") }
         } else emptyMap())
         val record = SolveMetric.solve(Runners.resolve(ref, true), settings, Budget(p.getValue("timeout-ms").toLong()),
             Instant.now().toString(), Reports.readGitSha(), installedBuild = { provenance },
@@ -104,14 +110,13 @@ internal object LpLibrarySuite : BenchSuite {
                         (listOf(profileRoot.resolve("classes")) + profileClasspath)
                             .joinToString(File.pathSeparator) { it.absolutePath },
                         "com.eignex.klause.bench.profile.LpLifecycleProfileKt")
-                SolverInvocation.invoke(command + listOf("mode=library",
-                    "source64=${Base64.getEncoder().encodeToString(input.readBytes())}",
-                    "seed=${settings.seed}", "timeout-ms=${budget.timeoutMillis}"),
-                    SolverInvocation.Dialect.PB_COMPETITION,
-                    hardTimeoutMs = budget.timeoutMillis * 2 + 20_000, captureDirectory = report.toFile(),
-                    measureResources = settings.measureResources, startProcess = { argv ->
-                        ProcessBuilder(argv).apply { environment()["KLAUSE_DEBUG"] = p.getValue("debug") }.start()
-                    }).copy(buildProvenance = provenance)
+                invokeLibrarySource(input, budget, settings.seed) { arguments, remaining ->
+                    SolverInvocation.invoke(command + arguments, SolverInvocation.Dialect.PB_COMPETITION,
+                        hardTimeoutMs = remaining.timeoutMillis * 2 + 20_000, captureDirectory = report.toFile(),
+                        measureResources = settings.measureResources, startProcess = { argv ->
+                            ProcessBuilder(argv).apply { environment()["KLAUSE_DEBUG"] = p.getValue("debug") }.start()
+                        }).copy(buildProvenance = provenance)
+                }
             }).first
         val retained = record.copy(stats = record.stats + mapOf(
             "libraryAdapterElapsedNs" to (System.nanoTime() - started).toString(),
@@ -138,4 +143,14 @@ internal object LpLibrarySuite : BenchSuite {
             details = Reports.json.encodeToJsonElement(SolveRecord.serializer(), retained) as JsonObject,
             message = failure)
     }
+}
+
+internal fun invokeLibrarySource(
+    input: File,
+    budget: Budget,
+    seed: Long,
+    launch: (List<String>, Budget) -> SolverInvocation.Result,
+): SolverInvocation.Result = SolverInvocation.withSourceInput(input, budget) { plain, remaining ->
+    launch(listOf("mode=library", "source64=${Base64.getEncoder().encodeToString(plain.readBytes())}",
+        "seed=$seed", "timeout-ms=${remaining.timeoutMillis}"), remaining)
 }
