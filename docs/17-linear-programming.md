@@ -314,6 +314,12 @@ definitions with independently chosen nearer continuous endpoints. Exact premise
 still authorize every row. The replacement shares the original generation's work
 limit and retains the source-row template; unavailable preparation leaves its prior
 candidates intact. Each immutable template attempts this preparation once.
+Point scoring waits seven completed point queries between scans of one immutable
+candidate generation. Four completed scans without an addition retire that
+generation's unselected candidates from further scoring. A replacement generation
+receives its own lifetime. Installed cuts remain in the selected mask and keep
+their ordinary source checks and scope retraction; candidate retirement changes
+neither their definitions nor checked coverage.
 Preparation visits at most 65,536 modeled row/support operations with
 4,096-bit input, denominator and intermediate scalar limits. Cut definitions and source-row ownership
 stay in the retained template, ahead of changing invocation-bound rows. Every

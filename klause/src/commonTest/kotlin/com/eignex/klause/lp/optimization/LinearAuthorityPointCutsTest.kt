@@ -124,6 +124,73 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `candidate cooldown should avoid repeated scoring work`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), emptySet(), Cancellation.Never)
+        val work = selection.observations["numericalCutSelectionWork"]
+
+        selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), emptySet(), Cancellation.Never)
+
+        assertEquals(work, selection.observations["numericalCutSelectionWork"])
+        assertEquals(1L, selection.observations["numericalCutSelectionCooldownQueries"])
+    }
+
+    @Test
+    fun `four completed unsuccessful scans should retire the candidate generation`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        repeat(25) {
+            selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), emptySet(), Cancellation.Never)
+        }
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ofLong(2)), emptySet(), Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+        assertEquals(4L, selection.observations["numericalCutSelectionVisited"])
+        assertEquals(1L, selection.observations["numericalCutSelectionRetiredFamilies"])
+    }
+
+    @Test
+    fun `a replacement candidate generation should receive its own selection lifetime`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        repeat(25) {
+            selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), emptySet(), Cancellation.Never)
+        }
+
+        val selected = selection.select(ArrayList(rows), listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ofLong(2)), emptySet(), Cancellation.Never)
+
+        assertEquals(setOf(0), selected)
+    }
+
+    @Test
+    fun `candidate retirement should preserve installed rows`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        repeat(25) {
+            selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), setOf(0), Cancellation.Never)
+        }
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), setOf(0), Cancellation.Never)
+
+        assertEquals(setOf(0), selected)
+        assertEquals(1L, selection.observations["numericalCutSelectionRetiredFamilies"])
+    }
+
+    @Test
     fun `point directed sides should strengthen a bound missed by uniform side choices`() {
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
