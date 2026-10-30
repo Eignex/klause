@@ -182,9 +182,10 @@ internal class ComponentLpSolver(
         if (token()) return false
         try {
             for (index in solvers.indices) {
-                if (nextParts[index] === parts[index]) continue
-                reusable[index] = null
-                checkedBounds[index] = null
+                if (nextParts[index] !== parts[index]) {
+                    reusable[index] = null
+                    checkedBounds[index] = null
+                }
                 if (!(solvers[index] as RetainedLpSolver).adopt(
                     checkNotNull(nextParts[index].model.exactState),
                     token,

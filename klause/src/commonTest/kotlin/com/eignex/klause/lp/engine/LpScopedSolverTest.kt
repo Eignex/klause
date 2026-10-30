@@ -18,6 +18,31 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `retained queries can finish after an earlier invocation token expires`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        for (components in listOf(false, true)) {
+            var expired = false
+            val firstToken = Cancellation { expired }
+            LpScopedSolver(LpExactState(source), componentSplit = components).use { owner ->
+                val first = owner.solveFloat(token = firstToken, allowance = LpFloatAllowance(1L, 0))
+                assertFalse(first?.second?.optimal == true)
+                expired = true
+
+                val completed = assertNotNull(owner.solveFloat(token = Cancellation.Never))
+
+                val point = assertNotNull(completed.second)
+                assertTrue(point.optimal)
+                assertEquals(1.0, point.objective)
+            }
+        }
+    }
+
+    @Test
     fun `declined component scans retain their preparation cost`() {
         val builder = LpBuilder()
         val x = builder.addVar(0L, 5L, cost = 1L)
