@@ -84,7 +84,9 @@ rows, symmetry reductions and extra components reject this path. Exchanges requi
 an internal conditioned-export promise; unmarked exchanges reject it. Portfolio task
 lanes can first advance a whole-source query and transfer its retained engine into
 a matching task lease. The original source, caller pins, policy and containing quota
-must match; transfer retains cumulative work and learned state. Lanes acquire the original session owner through the same guarded wrapper as ordinary
+must match; transfer retains cumulative work and learned state. Retained satisfaction
+checks its decision allowance before entering another assertion and charges each
+committed decision through the shared execution controls; reseeding renews neither. Lanes acquire the original session owner through the same guarded wrapper as ordinary
 satisfaction, and release it on terminal completion, failure or explicit retirement.
 
 ALNS records retained repair observations as a best found point or an unknown

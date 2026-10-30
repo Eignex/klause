@@ -94,6 +94,7 @@ class BooleanSatisfactionRepairTest {
                     assertNull(result.sample)
                     assertEquals(TerminationReason.BudgetExhausted, result.reason)
                     assertEquals(1L, budget.spent)
+                    assertEquals(1.0, search.stats.search.nodes.sum)
                 }
             }
         }

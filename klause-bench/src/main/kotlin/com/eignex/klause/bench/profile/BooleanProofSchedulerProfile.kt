@@ -186,6 +186,7 @@ object BooleanProofSchedulerProfile {
                     put("inclusiveControlProcessCpuNs", cpuElapsed)
                     put("threadAllocatedBytes", bytesAllocated)
                     processPeakRssBytes()?.let { put("wholeProcessPeakRssBytes", it) }
+                    put("processPeakRssSamplePhase", "control-end-before-record-and-process-exit")
                     put("heapUsedBytes", ManagementFactory.getMemoryMXBean().heapMemoryUsage.used)
                     put("processors", Runtime.getRuntime().availableProcessors())
                     put("maxHeapBytes", Runtime.getRuntime().maxMemory())
