@@ -1,0 +1,16 @@
+{
+  "main": "com.eignex.klause.bench.lab.NativeLpAdapterKt",
+  "classpath": ["klause-bench/build/install/klause-bench/lib/*"],
+  "buildTasks": [
+    ":klause-cli:linkReleaseExecutableLinuxX64",
+    ":klause-bench:installDist",
+    ":klause-bench:prepareLabRuntime"
+  ],
+  "jvmArgs": [
+    "-Xmx512m",
+    "-XX:ActiveProcessorCount=1",
+    "--enable-native-access=ALL-UNNAMED",
+    "--add-modules=jdk.incubator.vector"
+  ],
+  "runtime": {"java": 25, "tools": ["time", "ldd", "timeout"], "environment": {}}
+}

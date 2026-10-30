@@ -170,15 +170,15 @@ internal object SolverInvocation {
         }
 
     /** klause-cli on the model file (compiled `.fzn` for MiniZinc, else the original source). */
-    private fun klauseCommand(
+    internal fun klauseCommand(
         entry: ResolvedProblem,
         s: Settings,
         budget: Budget,
         optimize: Boolean,
         file: File,
+        bin: File = klauseCliBin(),
     ): List<String> {
-        val bin = klauseCliBin()
-        check(bin.canExecute()) { "klause-cli not installed at $bin (run :klause-cli:installJvmDist)" }
+        check(bin.canExecute()) { "klause-cli is not executable at $bin" }
         return buildList {
             add(bin.absolutePath)
             // MPS instances (notably extension-less MIPLIB files) can't be auto-detected by suffix;
