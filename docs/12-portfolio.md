@@ -486,7 +486,15 @@ implementation, and rotates ordinary-sized bounded
 slices across disjoint tasks, reusing each private session for sibling cubes.
 Construction, reseeding, failed attempts, checks and retirement remain inside
 its containing work and physical cost observations; it supplies no independent
-proof certificate or automatic admission policy.
+proof certificate or automatic admission policy. An internal portfolio coordinator
+keeps source bindings, seed positions and channel origins on the original workers.
+Each lane holds its original session's exclusive owner, reports only its own work
+and emits source exhaustion after whole-board
+coverage. Closing one lane returns its unresolved region; idle lanes are excluded
+from selection. Runtime admission requires one canonical pure Boolean model, exactly
+matching source and execution conditions, absent objectives and identical supported
+deterministic recipes. Private model generations and uncaptured conditions decline.
+The integration switch is internal and disabled.
 
 ### Slice accounting and coverage
 

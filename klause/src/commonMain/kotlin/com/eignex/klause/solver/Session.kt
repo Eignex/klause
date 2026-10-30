@@ -208,6 +208,11 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
         return ownSolve(source) { active = null }.also { active = it }
     }
 
+    internal fun openOwnedSolve(params: P, open: (P) -> ResumableSolve): ResumableSolve {
+        val source = open(applyStack(params))
+        return ownSolve(source) { active = null }.also { active = it }
+    }
+
     override fun resumable(objective: LinearObjective, params: P): ResumableSearch? {
         val source = resumableScoped(objective, applyStack(params)) ?: return null
         return ownSearch(source) { active = null }.also { active = it }

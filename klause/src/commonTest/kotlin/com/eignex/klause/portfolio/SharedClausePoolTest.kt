@@ -38,6 +38,32 @@ class SharedClausePoolTest {
         }
     }
 
+    @Test
+    fun `conditioned exports should withhold permanent scope clauses`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(8, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
+            val pool = SharedClausePool()
+            val exchange = PoolClauseExchange(pool).conditioned()
+            val session = PropagationSession(problem, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+            session.addLearnedClause(Clause(intArrayOf(4, 6)), 1, permanent = true)
+
+            exchange.onSearchStart(session)
+
+            assertEquals(listOf(listOf(0, 2)), pool.drainSince(0).clauses.map { it.boolLits.toList() })
+        }
+    }
+
+    @Test
+    fun `conditioned exports should withhold direct global nogoods`() {
+        val pool = SharedClausePool()
+        val exchange = PoolClauseExchange(pool).conditioned()
+
+        exchange.publishGlobal(boolClause(0, 1))
+
+        assertTrue(pool.drainSince(0).clauses.isEmpty())
+    }
+
     private fun twoIntVars(): Problem = Problem(
         numBoolVars = 0,
         numIntVars = 2,

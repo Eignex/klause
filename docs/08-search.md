@@ -33,13 +33,16 @@ retires private state and returns unresolved coverage while retaining work and
 statistics. Caller-condition replacement retires every worker and invalidates
 closures. Changed source or mapping identities require a fresh scheduler. The
 executor admits identity-mapped pure Boolean clause satisfaction only; objectives,
-numeric restrictions, symmetry reductions, cross-worker exchanges and additional
+numeric restrictions, symmetry reductions, unmarked cross-worker exchanges and additional
 components decline. A checked witness remains terminal until the caller condition
 changes; it cannot become a later sample-free refutation.
 The executor can use either constant-objective repair or a retained pure Boolean
 satisfaction traversal. Both retain conditioned state across siblings; satisfaction
 reseeding clears the preceding query verdict and trail without renewing its
-containing quota.
+containing quota. Pooled task exchanges use a conditioned adapter: permanent
+scope clauses and direct global nogoods stay private, while the same session keeps
+its import filter across sibling queries. Source and mapping admission remain
+separate from that export promise.
 It runs through an explicit internal entry point; ordinary portfolio selection
 retains its existing policy.
 

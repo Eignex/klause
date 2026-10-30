@@ -151,6 +151,13 @@ class Portfolio(
     internal var runTimeSource: TimeSource = TimeSource.Monotonic
     internal var invocationStarted: TimeMark? = null
     internal var reserveBeforeIncumbentOnly: Boolean = false
+    internal var disjointBooleanProof: Boolean = false
+    internal var lastBooleanProofTasks: Int = 0
+        private set
+    internal var lastBooleanProofCompleted: Int = 0
+        private set
+    internal var lastBooleanProofWork: Long = 0L
+        private set
     internal var incumbentProbeArms: Set<Int> = emptySet()
     internal var initialProbeWeights: IntArray = intArrayOf()
         set(value) {
@@ -221,116 +228,137 @@ class Portfolio(
 
     private fun solveRun(cancellation: Cancellation): SolveResult {
         val run = Schedule(cancellation, arrayOfNulls<ResumableSolve>(workers.size))
+        lastBooleanProofTasks = 0
+        lastBooleanProofCompleted = 0
+        lastBooleanProofWork = 0L
+        var proofTasks: BooleanProofPortfolio? = null
+        if (disjointBooleanProof && lanes == 1 && baseSliceWork == 5000L &&
+            maxSliceWork == 150000L && sliceGrowth == 1.5) {
+            proofTasks = BooleanProofPortfolio.forWorkers(workers)
+            proofTasks?.let { run.restrictAvailability(it::available) }
+        }
         val verdicts = ArrayList<SolveResult>()
         var decided: SolveResult? = null
-        run.execute { claim ->
-            val arm = claim.arm
-            val worker = workers[arm]
-            val opening = run.handles[arm] == null
-            val armToken = segmentToken(worker, run.token, claim)
-            val setup = TimeSource.Monotonic.markNow()
-            val opened = runCatching {
-                run.handles[arm] ?: worker.newResumableSolve(armToken)?.also { run.handles[arm] = it }
-            }
-            val handle = opened.getOrNull()
-            val openingFailure = opened.exceptionOrNull()
-            if (opening && (handle != null || openingFailure != null)) {
-                claim.initializationNanos = setup.elapsedNow().inWholeNanoseconds
-                claim.initializationWork = handle?.initialWork
-                    ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
-                run.log.initialized(
-                    arm,
-                    setup.elapsedNow().inWholeMilliseconds,
-                    handle?.initialWork ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L,
-                    openingFailure is SearchInitializationCancelled,
-                )
-            }
-            val r: SolveResult?
-            if (openingFailure == null) run.locked { run.firstQuery(arm) }
-            val failure: Throwable?
-            val work: Long
-            if (openingFailure != null) {
-                r = null
-                failure = openingFailure
-                work = (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
-            } else if (handle != null) {
-                val workBefore = handle.work - if (opening) handle.initialWork else 0L
-                val instructionsBefore = if (worker.acceptsInstructionBudget) handle.stats.ls.moves.sum else 0.0
-                val outcome = runCatching {
-                    val millis = remainingMillis(armToken)
-                    if (worker.acceptsInstructionBudget && handle is InstructionSlicedSolve) {
-                        handle.runInstructionSlice(run.token, millis, instructionsOf(claim))
-                    } else {
-                        handle.runSlice(run.token, millis, claim.handleNodes)
+        val execution = runCatching {
+            run.execute { claim ->
+                val arm = claim.arm
+                val worker = workers[arm]
+                val opening = run.handles[arm] == null
+                val armToken = segmentToken(worker, run.token, claim)
+                val setup = TimeSource.Monotonic.markNow()
+                val opened = runCatching {
+                    run.handles[arm] ?: (proofTasks?.open(arm, armToken) ?: worker.newResumableSolve(armToken))
+                        ?.also { run.handles[arm] = it }
+                }
+                val handle = opened.getOrNull()
+                val openingFailure = opened.exceptionOrNull()
+                if (opening && (handle != null || openingFailure != null)) {
+                    claim.initializationNanos = setup.elapsedNow().inWholeNanoseconds
+                    claim.initializationWork = handle?.initialWork
+                        ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
+                    run.log.initialized(
+                        arm,
+                        setup.elapsedNow().inWholeMilliseconds,
+                        handle?.initialWork ?: (openingFailure as? SearchInitializationCancelled)?.work ?: 0L,
+                        openingFailure is SearchInitializationCancelled,
+                    )
+                }
+                val r: SolveResult?
+                if (openingFailure == null) run.locked { run.firstQuery(arm) }
+                val failure: Throwable?
+                val work: Long
+                if (openingFailure != null) {
+                    r = null
+                    failure = openingFailure
+                    work = (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
+                } else if (handle != null) {
+                    val workBefore = handle.work - if (opening) handle.initialWork else 0L
+                    val instructionsBefore = if (worker.acceptsInstructionBudget) handle.stats.ls.moves.sum else 0.0
+                    val outcome = runCatching {
+                        val millis = remainingMillis(armToken)
+                        if (worker.acceptsInstructionBudget && handle is InstructionSlicedSolve) {
+                            handle.runInstructionSlice(run.token, millis, instructionsOf(claim))
+                        } else {
+                            handle.runSlice(run.token, millis, claim.handleNodes)
+                        }
                     }
-                }
-                r = outcome.getOrNull()
-                failure = outcome.exceptionOrNull()
-                work = if (worker.acceptsInstructionBudget) {
-                    countedInstructions(claim, handle.stats.ls.moves.sum - instructionsBefore)
+                    r = outcome.getOrNull()
+                    failure = outcome.exceptionOrNull()
+                    work = if (worker.acceptsInstructionBudget) {
+                        countedInstructions(claim, handle.stats.ls.moves.sum - instructionsBefore)
+                    } else {
+                        handle.work - workBefore
+                    }
                 } else {
-                    handle.work - workBefore
+                    require(diagnostics == null || worker.acceptsInstructionBudget) {
+                        "diagnostic scheduling requires a counted or resumable worker: ${worker.label}"
+                    }
+                    val outcome = runCatching { worker.solve(armToken, instructionsOf(claim)) }
+                    r = outcome.getOrNull()
+                    failure = outcome.exceptionOrNull()
+                    work = countedWork(claim, r?.stats)
                 }
-            } else {
-                require(diagnostics == null || worker.acceptsInstructionBudget) {
-                    "diagnostic scheduling requires a counted or resumable worker: ${worker.label}"
+                val failed = failure != null && failure !is SearchInitializationCancelled
+                // A failing arm leaves the others to answer; an unsound one answered wrongly, so it is quarantined too.
+                if (failure is UnsoundnessException) claim.fault = failure.message
+                val checkingStarted = TimeSource.Monotonic.markNow()
+                val verification = when (r) {
+                    is SolveResult.Sat -> verifyWitness(worker, r.assignment, null)
+                    is SolveResult.Unsat -> evidenceVerification?.let { verifier ->
+                        worker.evidenceInvocation?.let { invocation ->
+                            verifier.proof(worker, EvidenceKind.Infeasible, CompletedEngineResult.Solve(invocation, r))
+                        } ?: Verification.Indeterminate("worker completion has no runtime invocation")
+                    }
+                    else -> null
                 }
-                val outcome = runCatching { worker.solve(armToken, instructionsOf(claim)) }
-                r = outcome.getOrNull()
-                failure = outcome.exceptionOrNull()
-                work = countedWork(claim, r?.stats)
-            }
-            val failed = failure != null && failure !is SearchInitializationCancelled
-            // A failing arm leaves the others to answer; an unsound one answered wrongly, so it is quarantined too.
-            if (failure is UnsoundnessException) claim.fault = failure.message
-            val checkingStarted = TimeSource.Monotonic.markNow()
-            val verification = when (r) {
-                is SolveResult.Sat -> verifyWitness(worker, r.assignment, null)
-                is SolveResult.Unsat -> evidenceVerification?.let { verifier ->
-                    worker.evidenceInvocation?.let { invocation ->
-                        verifier.proof(worker, EvidenceKind.Infeasible, CompletedEngineResult.Solve(invocation, r))
-                    } ?: Verification.Indeterminate("worker completion has no runtime invocation")
+                claim.verified(verification)
+                if (verification != null) claim.checkingNanos += checkingStarted.elapsedNow().inWholeNanoseconds
+                claim.closedProof = !claim.indeterminate && claim.fault == null && r is SolveResult.Unsat
+                if (!claim.indeterminate && claim.fault == null && r is SolveResult.Sat) {
+                    claim.improved = true
+                    claim.acceptedIncumbents = 1
                 }
-                else -> null
-            }
-            claim.verified(verification)
-            if (verification != null) claim.checkingNanos += checkingStarted.elapsedNow().inWholeNanoseconds
-            claim.closedProof = !claim.indeterminate && claim.fault == null && r is SolveResult.Unsat
-            if (!claim.indeterminate && claim.fault == null && r is SolveResult.Sat) {
-                claim.improved = true
-                claim.acceptedIncumbents = 1
-            }
-            run.locked {
-                run.record(
-                    claim,
-                    handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: r?.stats,
-                    cumulative = handle != null,
-                    work = work,
-                    failed = failed,
-                    failure = failure,
-                    phase = when {
-                        openingFailure != null -> "opening"
-                        handle != null -> "slice"
-                        else -> "one-shot"
-                    },
-                )
-                if (claim.fault != null) {
-                    run.quarantine(claim)
-                    return@locked
-                }
-                if ((r is SolveResult.Sat || r is SolveResult.Unsat) && !claim.indeterminate && decided == null) {
-                    decided = r
-                    run.finish()
-                }
-                // An arm that threw is retired like one that finished: rescheduling it would only fail again.
-                if (failure != null || (handle != null && r != null) ||
-                    (claim.indeterminate && (r is SolveResult.Sat || r is SolveResult.Unsat))
-                ) {
-                    r?.let(verdicts::add)
-                    run.retire(arm)
+                run.locked {
+                    run.record(
+                        claim,
+                        handle?.stats ?: (failure as? SearchInitializationCancelled)?.stats ?: r?.stats,
+                        cumulative = handle != null,
+                        work = work,
+                        failed = failed,
+                        failure = failure,
+                        phase = when {
+                            openingFailure != null -> "opening"
+                            handle != null -> "slice"
+                            else -> "one-shot"
+                        },
+                    )
+                    if (claim.fault != null) {
+                        run.quarantine(claim)
+                        return@locked
+                    }
+                    if ((r is SolveResult.Sat || r is SolveResult.Unsat) && !claim.indeterminate && decided == null) {
+                        decided = r
+                        run.finish()
+                    }
+                    // An arm that threw is retired like one that finished: rescheduling it would only fail again.
+                    if (failure != null || (handle != null && r != null) ||
+                        (claim.indeterminate && (r is SolveResult.Sat || r is SolveResult.Unsat))
+                    ) {
+                        r?.let(verdicts::add)
+                        run.retire(arm)
+                    }
                 }
             }
         }
+        val cleanup = runCatching { proofTasks?.close() }
+        lastBooleanProofTasks = proofTasks?.size ?: 0
+        lastBooleanProofCompleted = proofTasks?.completed ?: 0
+        lastBooleanProofWork = proofTasks?.work ?: 0L
+        execution.exceptionOrNull()?.let { failure ->
+            cleanup.exceptionOrNull()?.takeUnless { it === failure }?.let(failure::addSuppressed)
+            throw failure
+        }
+        cleanup.getOrThrow()
         val stats = run.folded()
         return when (val r = decided) {
             is SolveResult.Sat -> r.copy(stats = stats)
@@ -765,6 +793,9 @@ class Portfolio(
      */
     @Suppress("TooGenericExceptionCaught")
     private inner class Schedule<H : AutoCloseable>(cancellation: Cancellation, val handles: Array<H?>) {
+        private var availability: ((Int) -> Boolean)? = null
+
+        fun restrictAvailability(available: (Int) -> Boolean) { availability = available }
         private val started = runTimeSource.markNow()
         private val epoch = invocationStarted ?: started
         private val lock = (if (lanes > 1) Concurrency.Strict else Concurrency.None).lock()
@@ -995,7 +1026,7 @@ class Portfolio(
             }
             if (remaining == 0) return@locked null
             val dedicated = diagnostics == null && lanes == workers.size && workers.none { it.startAfterIncumbent }
-            val eligible = eligibleArms()
+            val eligible = eligibleArms().let { arms -> availability?.let { arms.filter(it) } ?: arms }
             val probe = if (dedicated) null else eligible.filter { !probed[it] && !busy[it] && !retired[it] }
                 .minByOrNull { if (workers[it].auxiliaryProof) 1 else 0 }
             val revisit = if (dedicated || improving || eligible.any { !probed[it] && !retired[it] }) {
