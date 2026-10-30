@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.ComparisonClause
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
@@ -22,8 +23,10 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
+import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchResult
@@ -49,6 +52,40 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `incremental root refresh should substitute a column fixed by a later source row`() {
+        for (strict in listOf(false, true)) {
+            val source = Problem(3, 0, emptyArray(), arrayOf(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.ofLong(2)), LinearOp.LE, BigFraction.ONE, strict),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(1)), listOf(BigFraction.ONE),
+                    LinearOp.EQ, BigFraction.ZERO),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 1.0, strict),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(2), doubleArrayOf(1.0),
+                    LinearOp.LE, 3.0),
+            ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
+            val trigger = object : SearchComponent {
+                override fun propagate(context: SearchContext): ComponentResult {
+                    if (context.boolValue(1) != null) return ComponentResult.Consistent
+                    val literal = Lit.make(1, true)
+                    return context.imply(literal, SearchExplanation(intArrayOf(literal)))
+                }
+            }
+            ExactLiraSearchComponent(source).use { component ->
+                component.useIncrementalLinearPropagation()
+                val session = SearchSession(listOf(component, trigger))
+
+                assertIs<ComponentResult.Consistent>(session.initialize())
+
+                assertEquals(true, session.boolValue(0))
+                assertContentEquals(intArrayOf(Lit.make(0, true)), assertNotNull(session.reasonFor(0)).literals)
+                assertNull(session.boolValue(2))
+            }
+        }
+    }
+
     @Test
     fun `incremental nested siblings should preserve the surviving source scope`() {
         val source = Problem(3, intBounds = openBounds(), factors = arrayOf(

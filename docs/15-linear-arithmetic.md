@@ -91,9 +91,12 @@ or premise; changed bounds and every successful proof require fresh evaluation.
 
 The incremental opt-in indexes prepared rows by their Boolean activators and
 coefficient inputs. A literal change schedules only those source rows; retraction
-also schedules every assertion whose LP scope was popped. Root substitution still
-visits all rows. Disjunction and disequality rows remain eligible on arithmetic
-changes, which need not assign a source Boolean. Source order is preserved when
+also schedules every assertion whose LP scope was popped. A change in the exact
+closed root-fixed source values schedules all rows for substitution. The component
+compares one bounded snapshot of those values before assertion and publishes it
+only after the selected work succeeds; fixings discovered during that pass remain
+eligible for a later refresh. Disjunction and disequality rows remain eligible on
+arithmetic changes, which need not assign a source Boolean. Source order is preserved when
 the pending rows are asserted. Interrupted preparation or assertion leaves pending
 work available for a later operation and publishes no assertion marker for an
 uncommitted bound batch.
@@ -111,8 +114,9 @@ the explained interval producer before the numerical query. A compatible decline
 retains no reason or numerical authority. A successful implication rebuilds its
 premises from the current trail, publishes through shared search and yields before
 the LP solve. Dependency preparation, row selection and sorting charge the current
-operation; the component owns the index and pending set for its lifetime. Index
-storage is bounded by the prepared rows and their Boolean incidences. Row
+operation, including root-fixing inspection; the component owns the index and
+pending set for its lifetime. Index storage is bounded by the prepared rows and
+their Boolean incidences, and root snapshots by the source columns. Row
 visits, literal touches and retracted assertions distinguish avoided scanning from
 consumed consequences.
 
