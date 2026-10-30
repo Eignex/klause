@@ -1216,9 +1216,10 @@ make fixed-work traces sensitive to measured segment costs.
 
 `source-rate-family` also prices accepted family gains against all observed sibling
 factory and segment costs, retaining failed and unproductive work until the next
-family gain. Family feedback uses the fractional rate score; silent complete
-workers retain coverage. Compare ordinary, worker-rate and family-rate controls on
-the same binary at fixed probes, coverage, admission and reseeding. Full traces
+family gain. Family feedback uses the fractional rate score for every paid
+post-incumbent segment, including silent complete-search segments. Complete workers
+retain the selected coverage scope and share. Compare ordinary, worker-rate and
+family-rate controls on the same binary at fixed probes, coverage, admission and reseeding. Full traces
 retain the phase, gains and inclusive costs needed to reconstruct both rate ledgers.
 
 `param.portfolio-probes=leader-half` redistributes the existing initial probe budget

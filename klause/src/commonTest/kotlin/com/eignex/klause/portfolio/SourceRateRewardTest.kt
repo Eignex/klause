@@ -165,7 +165,9 @@ class SourceRateRewardTest {
 
     @Test
     fun `silent complete workers should retain coverage under gain rate rewards`() {
-        for (priceFamilies in listOf(false, true)) {
+        for ((priceFamilies, restarting) in listOf(
+            false to false, false to true, true to false, true to true,
+        )) {
             var slices = 0
             val base = ScriptedSearch({ false }) {}
             val proof = object : ResumableSearch by base {
@@ -177,13 +179,18 @@ class SourceRateRewardTest {
                 }
             }
             val workers = listOf(
-                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) {}).also { it.restartingSearch = true },
-                trackingWorker("proof", 1, proof),
+                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) {}).also {
+                    it.restartingSearch = true
+                    it.family = ArmFamily.LocalSearch
+                },
+                trackingWorker("proof", 1, proof).also { it.restartingSearch = restarting },
             )
 
             val result = Portfolio(workers, fixedBandit(2, 0), baseSliceWork = 2, maxSliceWork = 2,
                 reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(32),
-                rewardPolicy = SourceRateReward(priceFamilies)).use { it.minimize(Cancellation.Never) }
+                rewardPolicy = SourceRateReward(priceFamilies)).also {
+                it.includeRestartingProof = restarting
+            }.use { it.minimize(Cancellation.Never) }
 
             assertIs<MinimizeResult.Optimal>(result)
         }
