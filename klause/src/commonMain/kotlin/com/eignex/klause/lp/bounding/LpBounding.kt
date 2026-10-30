@@ -27,11 +27,13 @@ import com.eignex.klause.lp.engine.LpRowBound
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.MixedCertificateMeter
+import com.eignex.klause.lp.engine.ReconstructionLimits
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.ceilLong
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
+import com.eignex.klause.lp.engine.certifyLpBoundOnly
 import com.eignex.klause.lp.engine.certifyLpFarkas
 import com.eignex.klause.lp.engine.checkedLpConflict
 import com.eignex.klause.lp.engine.checkedLpWitness
@@ -1422,17 +1424,11 @@ private fun LpEngine.sparseRootLpRelaxationBound(
                 observeNodePause()
                 continue
             }
-            val lower = try {
-                attempt.second?.let {
-                    certifiedTightObjectiveLowerBound(relaxation.model, it.duals,
-                        rootCertificationObserver(), solveContext.certificationPolicy)
-                }
-            } finally {
-                // Scoped preparation has already charged its scaling-construction reservation.
-                val metrics = if (nodeUsesTrail) propagator.lastMetrics.copy(preparationOps = 0L)
-                    else attempt.first.lastMetrics
-                observeRootSolve(attempt.first, metrics)
-            }
+            // Scoped preparation has already charged its scaling-construction reservation.
+            val metrics = if (nodeUsesTrail) propagator.lastMetrics.copy(preparationOps = 0L)
+                else attempt.first.lastMetrics
+            observeRootSolve(attempt.first, metrics)
+            val lower = attempt.second?.let { sparseRootLowerBound(relaxation.model, it, cancellation) }
             retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
             return if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
         }
@@ -1463,16 +1459,49 @@ private fun LpEngine.standaloneRootLpRelaxationBound(
             }
         }
         val lower = result?.let {
-            certifiedTightObjectiveLowerBound(
-                relaxation.model,
-                it.duals,
-                rootCertificationObserver(),
-                solveContext.certificationPolicy,
-            )
+            if (sparseTrialActive) {
+                sparseRootLowerBound(relaxation.model, it, cancellation)
+            } else {
+                certifiedTightObjectiveLowerBound(
+                    relaxation.model,
+                    it.duals,
+                    rootCertificationObserver(),
+                    solveContext.certificationPolicy,
+                )
+            }
         }
         retainRootPrimalGuidance(relaxation, result, cancellation)
         projectCertifiedLowerBound(relaxation, lower)
     }
+}
+
+private fun LpEngine.sparseRootLowerBound(
+    model: LpModel,
+    result: FloatLpResult,
+    cancellation: Cancellation,
+): Double? {
+    val remaining = sparseTrialRemainingWork()
+    if (remaining <= 0L || cancellation()) return null
+    val defaults = ReconstructionLimits()
+    val storage = sink.lp.sparseTrial["CheckingReservedBytes"] ?: 0L
+    val checked = certifyLpBoundOnly(
+        model,
+        result.duals,
+        defaults.copy(
+            maxCoordinates = model.numVars,
+            maxEntries = (model.doubleView?.colPtr ?: model.csc.colPtr)[model.n] + model.m,
+            maxWork = remaining,
+            maxAllocation = minOf(defaults.maxAllocation, storage),
+        ),
+        cancellation,
+        rootCertificationObserver(),
+        solveContext.certificationPolicy,
+    ).bound ?: return null
+    if (cancellation()) return null
+    val lower = if (model.hasIntegralObjective()) {
+        checked.value.ceilLong()?.let(BigFraction::ofLong) ?: checked.value
+    } else checked.value
+    return lower.lowerBoundDouble()
 }
 
 private fun LpEngine.recordRootQueryBound(relaxation: LpRelaxation, result: FloatLpResult) {
