@@ -89,6 +89,14 @@ An optional decline cache reuses only a failed numerical comparison with the sam
 right-hand side and exact bound values and strictness. It retains no consequence
 or premise; changed bounds and every successful proof require fresh evaluation.
 
+The incremental route also reads bounds on existing normalized affine slack
+columns. The normalization's scale selects the bounding side, and its offset
+reconstructs source activity under the same rational-size and operation limits.
+Each successful implication uses the current active bound premise and the
+normalization's declared-fixing premises. Probing creates no LP definition and
+retains no reason. It precedes individual-coordinate decline reuse, so an unchanged
+coordinate interval cannot hide a newly bounded affine expression.
+
 The incremental opt-in indexes prepared rows by their Boolean activators and
 coefficient inputs. A literal change schedules only those source rows; retraction
 also schedules every assertion whose LP scope was popped. A change in the exact
@@ -107,7 +115,8 @@ a source-index trail in scope order; retraction removes only the suffix belongin
 to popped scopes. Root markers stay outside that trail. Interrupted batches append
 only their committed markers, so retry and backtrack keep the same assertion
 authority. Source-row visits, invalidations, interval visits, compatible declines
-and deductions are included in the traversal's stage counters.
+and deductions are included in the traversal's stage counters, with affine probes
+and consumed affine consequences reported separately.
 
 This route combines scoped assertion reuse with the exact-input decline cache and
 the explained interval producer before the numerical query. A compatible decline
