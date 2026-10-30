@@ -299,6 +299,11 @@ It reports feasible points without upgrading solver statuses to source proofs.
 The subprocess includes parsing, exact lowering, baking, solving and source checking;
 the adapter also records source verification, runtime hashing and output decoding.
 Platform series, executable/library identities and runtime controls remain separate.
+Comparison fingerprints reuse `ComparisonProvenance` for the executing adapter and
+dependencies. JVM library callers also retain their compiled caller classes and an
+explicitly ordered classpath. Native caller source hashes identify the harness
+compiled into the separately hashed executable; its machine code remains part of
+that executable. Retained source and runtime identities accompany both series.
 
 `bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
 work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,

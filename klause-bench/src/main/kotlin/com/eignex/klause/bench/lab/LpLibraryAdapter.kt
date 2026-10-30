@@ -7,6 +7,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.metric.BuildProvenance
 import com.eignex.klause.bench.metric.NativeCliBuild
+import com.eignex.klause.bench.metric.SolveEvidence
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
@@ -55,6 +56,11 @@ internal object LpLibrarySuite : BenchSuite {
         val settings = SolverInvocation.Settings(processors = 1, seed = p.getValue("seed").toLong(), exact = true,
             captureDirectory = report.toFile(), measureResources = p.getValue("measurement") != "none")
         val root = CorpusFetcher.workspaceRoot()
+        val profileRoot = root.resolve("klause/build/lp-profile/jvm")
+        val profileClasspath = if (runtime == "jvm") {
+            requireNotNull(profileRoot.resolve("lib").listFiles()).filter { it.isFile && it.extension == "jar" }
+                .sortedBy { it.name }
+        } else emptyList()
         val executable = root.resolve("klause/build/bin/linuxX64/lpProfileReleaseExecutable/klause-lp-profile.kexe")
         val javaHome = File(System.getProperty("java.home"))
         val options = listOf("-Xmx${p.getValue("heap-mib")}m", "-XX:ActiveProcessorCount=1") + when (p.getValue("gc")) {
@@ -67,20 +73,36 @@ internal object LpLibrarySuite : BenchSuite {
         }
         val harness = NativeCliBuild.harnessIdentity(root)
         val environment = System.getenv() + ("KLAUSE_DEBUG" to p.getValue("debug"))
-        val provenance = if (runtime == "native") {
+        val captured = if (runtime == "native") {
             NativeCliBuild.capture(executable = executable, harness = harness, environment = environment)
-        } else BuildProvenance(NativeCliBuild.treeIdentity(root.resolve("klause/build/lp-profile/jvm")),
+        } else BuildProvenance(NativeCliBuild.treeIdentity(profileRoot),
             NativeCliBuild.treeIdentity(javaHome), runtimeOptions(environment) +
                 ("javaOptions" to options.joinToString(" ")),
             System.getProperty("os.name"), System.getProperty("os.arch"), harness)
+        val adapter = ComparisonProvenance.current
+        val caller = if (runtime == "jvm") {
+            ComparisonProvenance.capture(profileRoot.resolve("classes"), profileClasspath)
+        } else ComparisonProvenance.Identities(emptyMap(), captured.runtime)
+        val sources = SolveEvidence.fileHashes(listOf("LpLibraryCaller.kt", "LpLifecycleProfile.kt").associateWith {
+            root.resolve("klause-bench/src/lpProfileMain/kotlin/com/eignex/klause/bench/profile/$it")
+        })
+        val identities = ComparisonProvenance.Identities(
+            adapter.harness.mapKeys { "adapter/${it.key}" } + caller.harness.mapKeys { "caller/${it.key}" } +
+                sources.mapKeys { "caller-source/${it.key}" },
+            adapter.libraries.mapKeys { "adapter/${it.key}" } + caller.libraries.mapKeys { "caller/${it.key}" },
+        )
+        val provenance = captured.copy(harness = captured.harness + identities.retained)
+        val runtimeBuild = provenance.copy(distribution = if (runtime == "jvm") {
+            provenance.distribution.filterKeys { it.startsWith("lib/") }
+        } else emptyMap())
         val record = SolveMetric.solve(Runners.resolve(ref, true), settings, Budget(p.getValue("timeout-ms").toLong()),
             Instant.now().toString(), Reports.readGitSha(), installedBuild = { provenance },
             invoke = { _, _, budget, _ ->
                 val command = if (runtime == "native") listOf(executable.absolutePath) else
                     listOf(javaHome.resolve("bin/java").absolutePath) + options + listOf(
                         "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector", "-cp",
-                        root.resolve("klause/build/lp-profile/jvm/classes").path + File.pathSeparator +
-                            root.resolve("klause/build/lp-profile/jvm/lib/*").path,
+                        (listOf(profileRoot.resolve("classes")) + profileClasspath)
+                            .joinToString(File.pathSeparator) { it.absolutePath },
                         "com.eignex.klause.bench.profile.LpLifecycleProfileKt")
                 SolverInvocation.invoke(command + listOf("mode=library",
                     "source64=${Base64.getEncoder().encodeToString(input.readBytes())}",
@@ -94,11 +116,16 @@ internal object LpLibrarySuite : BenchSuite {
         val retained = record.copy(stats = record.stats + mapOf(
             "libraryAdapterElapsedNs" to (System.nanoTime() - started).toString(),
             "callerRuntime" to runtime,
+            "callerHarnessScope" to if (runtime == "jvm") "compiled classes and source" else
+                "source compiled into the reported Native executable",
         ), comparisonControls = KlauseLabSuite.comparisonControls(case) + mapOf(
             "series" to "lp-public-library-v1-$runtime", "caller" to "baked-backtrack", "runtime" to runtime,
             "libraryPreset" to "satOptimized", "maxInstructions" to "1000",
             "sourceLowering" to "toExactSourceProblem",
-            "runtimeFingerprint" to provenance.copy(distribution = emptyMap(), harness = emptyMap()).fingerprint,
+            "deadlinePolicy" to "public-library-inclusive-v1",
+            "runtimeFingerprint" to ComparisonProvenance.runtimeFingerprint(runtimeBuild),
+            "harnessFingerprint" to identities.harnessFingerprint,
+            "libraryFingerprint" to identities.libraryFingerprint,
             "heap-mib" to if (runtime == "native") "not-applicable-native" else p.getValue("heap-mib"),
             "gc" to if (runtime == "native") "compiled-default" else p.getValue("gc"),
         ))
