@@ -11,10 +11,14 @@ import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.lp.cut.CutSharing
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.util.Cancellation
@@ -31,6 +35,28 @@ class BooleanProofPortfolioTest {
     private val problem = Problem(5, 0, emptyArray(), Array(8) { mask ->
         Clause(IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
     }).bake()
+
+    @Test
+    fun `a separate baked generation should decline despite identical clause objects`() {
+        val foreign = Problem(5, 0, emptyArray(), problem.factors).bake()
+        val invocation = EngineInvocation(foreign.prepareExecutionPlan(), ModelIdentity.of(problem))
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+            btPool = listOf { BacktrackCatalog.byLabel("first-fail") })
+        val factories = PortfolioBuilder.factories(problem, scenario, null, null, null, null,
+            ProblemProfile.of(problem, false))
+        val workers = List(2) { slot ->
+            factories[slot % factories.size].materialize(slot, 1L, null)
+                .bindSource(SourceWorkerBinding(invocation))
+        }
+        try {
+            var decline: String? = null
+            assertNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true) { decline = it })
+
+            assertEquals("source-plan-or-objective-ineligible", decline)
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
 
     @Test
     fun `native first fail workers should preserve full source task coverage`() {

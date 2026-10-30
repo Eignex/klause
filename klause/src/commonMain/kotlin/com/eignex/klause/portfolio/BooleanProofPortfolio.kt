@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.BooleanSatisfactionRepair
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
@@ -224,6 +225,11 @@ internal class BooleanProofPortfolio(
     }
 
     companion object {
+        private fun BakedProblem.matchesPreparedModel(model: Problem?): Boolean = model === this ||
+            (model != null && model !is BakedProblem && model.numBoolVars == numBoolVars &&
+                model.numIntVars == 0 && model.numRealVars == 0 && !model.hasSymmetryBreaking &&
+                model.numFactors == numFactors && factors.indices.all { factors[it] === model.factors[it] })
+
         fun forWorkers(
             workers: List<PortfolioWorker>,
             probeFirst: Boolean = false,
@@ -251,7 +257,7 @@ internal class BooleanProofPortfolio(
                 }) return decline("runtime-invocation-mismatch")
             val plan = invocation.preparedPlan
             if (invocation.hasSourceObjective || invocation.executionObjective != null ||
-                invocation.hasUncapturedSourceRestrictions || plan.model !== problem ||
+                invocation.hasUncapturedSourceRestrictions || !problem.matchesPreparedModel(plan.model) ||
                 plan.sourceBoolCount != problem.numBoolVars || plan.sourceIntCount != 0 || plan.sourceRealCount != 0
             ) return decline("source-plan-or-objective-ineligible")
             val condition = invocation.executionCondition
