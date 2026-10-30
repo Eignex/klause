@@ -259,8 +259,11 @@ Each consultation binds its current cancellation token, including unchanged
 children; identical exact authority retains their factors and completed evidence.
 An ordinary component root uses the same scoped owner for its initial bound and later
 node queries. Selected global cuts enter through the retained cut adapter before the
-root solve; the passed selection also governs an empty cut list. The original
-node-depth and cut policies remain in force. This root-bound operation shares the bounded retained-root work,
+root solve; the passed selection also governs an empty cut list.
+When no numerical owner exists, preparation partitions the complete source and cut
+layout together. A declined live component append falls back to the ordinary owner.
+The original node-depth and cut policies remain in force. This root-bound operation
+shares the bounded retained-root work,
 factor storage and checking envelope; incompatible source or cut layouts use a fresh root
 solver within the remaining allowance.
 Scoped preparation reserves the graph scan, partition scratch and child restriction
