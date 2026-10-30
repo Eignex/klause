@@ -411,7 +411,8 @@ internal class LpRetainedSources(
 
     private fun LpRelaxation.canBorrowIntegerColumn(index: Int): Boolean =
         colVarId[index] >= 0 && !colIsBool[index] && colRealId[index] < 0 && colReq[index] == null &&
-            !model.colContinuous[index] && !model.probeClampedLo[index]
+            !model.colContinuous[index] && !model.probeClampedLo[index] &&
+            problem.intBounds.hasLower(colVarId[index])
 
     private fun ExactLpColumn.matchesCompactColumn(model: LpModel, index: Int): Boolean {
         if (!integral || tag != model.tag[index] || origin.legacyLong() != model.loShift[index] ||

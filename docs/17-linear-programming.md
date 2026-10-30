@@ -117,6 +117,7 @@ For retained source emission, the internal selective mode can use the owner's ex
 column catalog instead of preparing whole-source metadata. A completed earlier fragment
 supplies an immutable bound definition only after its source coordinate, normalized
 origin, integrality and both bound sides match the current compact integer column.
+Its lower endpoint must be a stated source bound; an invented lower clamp supplies no definition.
 Conditional, auxiliary, IEEE and noncompact columns keep ordinary construction.
 An empty catalog creates no speculative definitions. Each lookup charges the current
 allowance; interrupted imports report that work and withhold publication after debit.

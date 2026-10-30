@@ -9,6 +9,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
+import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.propagation.PropagationSession
@@ -55,12 +56,14 @@ class LpRetainedSourcesTest {
     }
 
     @Test
-    fun `retained candidate imports should preserve probe lower sides`() {
+    fun `retained candidate imports should keep invented lower clamps outside source reuse`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, -5),
         ), openIntLo = booleanArrayOf(true))
+        val sink = LpStatsSink()
         val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)),
-            projections = FactorProjectionProviders.Default.prepare(problem), reuseTemplateMetadata = true)
+            projections = FactorProjectionProviders.Default.prepare(problem), templateStats = sink,
+            reuseTemplateMetadata = true)
         val sources = LpRetainedSources(problem, consumer)
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
             val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)))
@@ -69,7 +72,12 @@ class LpRetainedSourcesTest {
 
             val result = assertNotNull(owner.solve())
 
-            assertEquals(BigFraction.ofLong(-5L), result.lowerBound)
+            assertEquals(BigFraction.ZERO, result.lowerBound)
+            val map = assertNotNull(sources.relaxation(owner.state, RootDomains(problem)).sourceMap)
+            val column = assertNotNull(map.columnForInt(0))
+            assertFalse(map.isGlobal(CutPremise.Bound(column.expression(), false, BigFraction.ZERO)))
+            assertEquals(0L, sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE")
+                .outcomes["RETAINED_BOUND_REUSES"] ?: 0L)
         }
     }
 
