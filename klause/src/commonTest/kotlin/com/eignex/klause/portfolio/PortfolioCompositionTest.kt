@@ -21,6 +21,38 @@ import kotlin.test.assertTrue
 
 class PortfolioCompositionTest {
     @Test
+    fun `automatic integer learning should stay in single core CP pools`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+        val scenarios = listOf(
+            PortfolioScenario.sequential(Kind.COP, EngineMix.BACKTRACK) to 1,
+            PortfolioScenario.parallel(2, Kind.COP, EngineMix.BACKTRACK) to 0,
+            PortfolioScenario.sequential(Kind.COP, EngineMix.MIXED, arms = 12) to 0,
+        )
+
+        for ((scenario, expected) in scenarios) {
+            val arms = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+            assertEquals(expected, arms.count { it.recipe.build(1L, null).integerRowLearning })
+        }
+    }
+
+    @Test
+    fun `explicit integer learning should override the automatic execution scope`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+        for (enabled in listOf(false, true)) {
+            val scenario = PortfolioScenario.parallel(2, Kind.COP, EngineMix.BACKTRACK).copy(
+                btEdit = { it.copy(integerRowLearning = enabled) },
+            )
+
+            val arms = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+            assertTrue(arms.all { it.recipe.build(1L, null).integerRowLearning == enabled })
+        }
+    }
+
+    @Test
     fun `model specific replacements should retain clausal learning`() {
         for (packing in listOf(false, true)) {
             val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,

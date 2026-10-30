@@ -211,12 +211,13 @@ internal class BacktrackWorkerConfig(
             nodeBudget: NodeBudget? = null,
             zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
             facts: ProblemFacts = ProblemFacts.assumed(kind),
+            automaticIntegerLearning: Boolean = false,
             edit: ((BacktrackParams) -> BacktrackParams)? = null,
         ): List<BacktrackWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
             val order = BacktrackCatalog.ranked(kind, facts)
-            val arithmeticIndex = if (kind == Kind.COP && facts.integerColumnsOnly && facts.binaryIntegers &&
-                facts.integerLinear && lpCeiling.resolved(LpTechnique.BOUNDING)) {
+            val arithmeticIndex = if (automaticIntegerLearning && kind == Kind.COP && facts.integerColumnsOnly &&
+                facts.binaryIntegers && facts.integerLinear && lpCeiling.resolved(LpTechnique.BOUNDING)) {
                 order.indexOfFirst { it.label == "conflictDriven" }
             } else -1
             return List(count) {
