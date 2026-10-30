@@ -15,23 +15,23 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import java.io.File
-import java.lang.management.ManagementFactory
-import java.security.MessageDigest
-import java.util.HexFormat
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import java.security.MessageDigest
+import java.util.HexFormat
+import kotlin.time.Duration.Companion.seconds
 
 internal object LpTemplatePreparationProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         require(args.size == 4)
         val file = if (args[0].startsWith("selection=")) {
-            val line = File(args[0].removePrefix("selection=")).readLines().filter { it.isNotBlank() }.single()
+            val line = File(args[0].removePrefix("selection=")).readLines().single { it.isNotBlank() }
             val selected = Json.parseToJsonElement(line).jsonObject
             require(selected.getValue("suite").jsonPrimitive.content == "miplib3")
             require(selected.getValue("format").jsonPrimitive.content == "MPS")
