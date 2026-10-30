@@ -97,35 +97,45 @@ internal class BooleanProofPortfolio(
     }
 
     companion object {
-        fun forWorkers(workers: List<PortfolioWorker>): BooleanProofPortfolio? {
+        fun forWorkers(
+            workers: List<PortfolioWorker>,
+            declined: (String) -> Unit = {},
+        ): BooleanProofPortfolio? {
+            fun decline(reason: String): BooleanProofPortfolio? {
+                declined(reason)
+                return null
+            }
             if (workers.size != 2 || workers.any { !it.permitsSourceProofs || it.improvementOnly ||
-                    it.auxiliaryProof || it.startAfterIncumbent || it.firstWitnessOnly }) return null
-            val recipes = workers.map { it.booleanProofRecipe ?: return null }
+                    it.auxiliaryProof || it.startAfterIncumbent || it.firstWitnessOnly })
+                return decline("workers-not-two-canonical-complete")
+            val recipes = workers.map { it.booleanProofRecipe ?: return decline("builder-ownership-unavailable") }
             val problem = recipes.first().problem
-            if (recipes.any { it.problem !== problem || !it.deterministicClauseQuery() }) return null
+            if (recipes.any { it.problem !== problem || !it.deterministicClauseQuery() })
+                return decline("worker-model-or-recipe-mismatch")
             if (problem.numBoolVars !in 2..4096 || problem.numIntVars != 0 || problem.numRealVars != 0 ||
                 problem.hasSymmetryBreaking || problem.rootDeductions is PropagationResult.Unsat ||
-                problem.factors.any { it !is Clause }) return null
-            val invocation = workers.first().evidenceInvocation ?: return null
+                problem.factors.any { it !is Clause }) return decline("model-ineligible")
+            val invocation = workers.first().evidenceInvocation ?: return decline("runtime-invocation-unavailable")
             if (workers.any { worker ->
                     worker.evidenceInvocation?.let(invocation::matches) != true ||
                         worker.evidenceModel?.matches(ModelIdentity.of(problem)) != true
-                }) return null
+                }) return decline("runtime-invocation-mismatch")
             val plan = invocation.preparedPlan
             if (invocation.hasSourceObjective || invocation.executionObjective != null ||
                 invocation.hasUncapturedSourceRestrictions || plan.model !== problem ||
                 plan.sourceBoolCount != problem.numBoolVars || plan.sourceIntCount != 0 || plan.sourceRealCount != 0
-            ) return null
+            ) return decline("source-plan-or-objective-ineligible")
             val condition = invocation.executionCondition
             if (condition != invocation.sourceCondition || condition.lower.isNotEmpty() ||
-                condition.upper.isNotEmpty() || condition.integerRows.isNotEmpty()) return null
+                condition.upper.isNotEmpty() || condition.integerRows.isNotEmpty())
+                return decline("uncaptured-worker-condition")
             val params = recipes.map { recipe ->
                 if (recipe.params.assumptions.numInts != 0 || !recipe.params.assumptions.deductions.isEmpty ||
-                    recipe.params.assumptions.bools != condition.bools) return null
-                recipe.conditioned() ?: return null
+                    recipe.params.assumptions.bools != condition.bools) return decline("worker-assumption-mismatch")
+                recipe.conditioned() ?: return decline("conditioned-sharing-unavailable")
             }
             val splits = (0 until problem.numBoolVars).filter { it !in condition.bools }.take(2)
-            if (splits.size != 2) return null
+            if (splits.size != 2) return decline("insufficient-free-booleans")
             // Runtime bindings own source identity; fresh board ids prevent cross-invocation leases.
             val identity = Uuid.random().toString()
             val scope = invocation.scope?.copy(condition = condition) ?: SourceScope(

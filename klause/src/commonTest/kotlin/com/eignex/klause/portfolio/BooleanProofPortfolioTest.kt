@@ -6,6 +6,8 @@ import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.cut.CutExchange
+import com.eignex.klause.lp.cut.CutSharing
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceRevision
@@ -14,8 +16,8 @@ import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -37,7 +39,7 @@ class BooleanProofPortfolioTest {
             val result = portfolio.solve(Cancellation.Never)
 
             assertTrue(result is SolveResult.Unsat)
-            assertEquals(4, portfolio.lastBooleanProofTasks)
+            assertEquals(4, portfolio.lastBooleanProofTasks, portfolio.lastBooleanProofDecline)
             assertEquals(4, portfolio.lastBooleanProofCompleted)
         }
     }
@@ -49,7 +51,7 @@ class BooleanProofPortfolioTest {
             btPool = listOf { BacktrackWorkerConfig.ofParams("fixed", params) })
         val workers = PortfolioBuilder.build(problem, scenario)
         try {
-            assertNotNull(BooleanProofPortfolio.forWorkers(workers)).use { tasks ->
+            assertNotNull(BooleanProofPortfolio.forWorkers(workers) { error("unexpected decline: " + it) }).use { tasks ->
                 val first = tasks.open(0, Cancellation.Never)
                 assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
 
@@ -57,6 +59,23 @@ class BooleanProofPortfolioTest {
                 first.close()
                 assertNotNull(workers[0].newResumableSolve()).close()
             }
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `opaque cut hooks should decline instead of being ignored`() {
+        val cut = object : CutExchange {
+            override fun exchange(sharing: CutSharing) = Unit
+        }
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+            nativeSat = false, cutExchange = cut)
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK, shareCuts = false,
+            btPool = listOf { BacktrackWorkerConfig.ofParams("fixed", params) })
+        val workers = PortfolioBuilder.build(problem, scenario)
+        try {
+            assertNull(BooleanProofPortfolio.forWorkers(workers))
         } finally {
             workers.forEach { it.close() }
         }

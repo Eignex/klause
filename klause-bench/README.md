@@ -272,7 +272,7 @@ selects constant-objective repair or direct retained satisfaction for task worke
 the default is `repair`. The `portfolio` driver uses builder-owned workers, runtime
 source bindings, ordinary scheduling and clause sharing in both controls, enabling
 the internal task switch only in the task control. It requires `splits=2` and records
-truthful admission declines. Its actual worker seeds are `seed+1000` and `seed+1001`;
+truthful admission declines and their reason. Its actual worker seeds are `seed+1000` and `seed+1001`;
 the direct drivers use `seed` and `seed+1`. The switch remains disabled in ordinary
 production selection. The replica control uses ordinary satisfaction in every case. Qualify against the applicable
 strong catalog recipes before drawing any production-admission conclusion.
