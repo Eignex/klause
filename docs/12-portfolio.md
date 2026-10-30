@@ -503,9 +503,10 @@ run costs; this score supplies neither witness nor proof authority.
 `portfolio-reward=source-rate-family` retains the worker rate and also prices gains
 by family. Observed factory and segment costs from every sibling remain owed until
 the family's next accepted gain, whose rate is compared with other families'
-cumulative rates. After an incumbent, accepted gains supply fractional success and
-failure evidence. Silent complete workers receive no failure evidence; observable
-plateaus do.
+cumulative rates. After an incumbent, every paid segment supplies fractional success
+and failure evidence, including zero-yield complete-search segments. This prices
+objective yield without changing the selected complete-worker coverage scope or
+share; silence supplies no proof verdict.
 Before a strict gain, feasibility feedback, family priors and silent complete-worker coverage retain
 their ordinary rules. Shared source preparation, retirement and independent checks
 remain in containing-run accounting.
