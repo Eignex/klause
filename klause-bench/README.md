@@ -263,7 +263,9 @@ bake, private setup, source witness checking and retirement; process CPU, thread
 allocation, root/total propagation and native coverage remain separate observations.
 One warmup precedes measured repeats. Optional `recipe=LABEL native=true|false`
 selects a fresh catalog recipe and preserves the same propagation backend in both
-controls; defaults are `input-order` and `false`. Qualify against the applicable
+controls; defaults are `input-order` and `false`. Optional `driver=repair|satisfaction`
+selects constant-objective repair or direct retained satisfaction for task workers;
+the default is `repair`. The replica control uses ordinary satisfaction in both cases. Qualify against the applicable
 strong catalog recipes before drawing any production-admission conclusion.
 Use the explicit build/classpath and JVM
 controls of `BooleanProofCoverageProfile`. The scheduler is internal and pure Boolean

@@ -240,6 +240,8 @@ class BacktrackSolver internal constructor(
         }
     }
 
+    internal fun openBooleanProof(params: BacktrackParams): RepairSearch = BooleanSatisfactionRepair(this, params)
+
     override fun describe(params: BacktrackParams): String {
         val lp = params.lpConfig?.let { "config" }
             ?: if (params.lpPlan.bounding) "bounding${if (params.lpPlan.variableShaving) "+shave" else ""}" else "off"
@@ -276,8 +278,9 @@ class BacktrackSolver internal constructor(
         assumptions: Assumptions,
         cancellation: Cancellation,
         sink: SolveStatsSink,
+        finish: Boolean = true,
     ): SolveResult {
-        sink.stop()
+        if (finish) sink.stop()
         val stats = sink.snapshot()
         return when (outcome) {
             // The leaf is the engine's own claim, re-derived here from every factor: an assignment the composed

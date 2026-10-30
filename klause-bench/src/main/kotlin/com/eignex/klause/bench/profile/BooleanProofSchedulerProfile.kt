@@ -40,7 +40,9 @@ object BooleanProofSchedulerProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "work", "seed", "splits", "repeats")
         require(options.keys.containsAll(required) &&
-            (options.keys - required).all { it in setOf("recipe", "native") })
+            (options.keys - required).all { it in setOf("recipe", "native", "driver") })
+        val driver = options["driver"] ?: "repair"
+        require(driver in setOf("repair", "satisfaction"))
         val recipe = options["recipe"] ?: "input-order"
         val native = options["native"]?.toBooleanStrict() ?: false
         val limit = options.getValue("work").toLong().also { require(it in 10000L..2000000L) }
@@ -81,7 +83,8 @@ object BooleanProofSchedulerProfile {
                 var totalTasks = 0
                 var schedulerWork = 0L
                 val result = if (mode == "tasks") {
-                    val scheduler = SchedulerAccess(problem, context, (0 until splits).toList(), parameters)
+                    val scheduler = SchedulerAccess(problem, context, (0 until splits).toList(), parameters,
+                        driver == "satisfaction")
                     scheduler.use {
                         it.run(stop, limit).also {
                             completedTasks = scheduler.completed
@@ -103,6 +106,7 @@ object BooleanProofSchedulerProfile {
                 report.appendText(buildJsonObject {
                     put("mode", mode)
                     put("recipe", recipe)
+                    put("taskDriver", driver)
                     put("nativeSat", native)
                     put("sharing", false)
                     put("presolve", false)
@@ -136,10 +140,12 @@ object BooleanProofSchedulerProfile {
     // The executor remains internal until its source routing and activation policy are qualified.
     private class SchedulerAccess(
         problem: BakedProblem, context: BooleanProofContext, splits: List<Int>, parameters: List<BacktrackParams>,
+        satisfaction: Boolean,
     ) : AutoCloseable {
         private val type = Class.forName("com.eignex.klause.portfolio.BooleanProofScheduler")
         private val target = type.getConstructor(BakedProblem::class.java, BooleanProofContext::class.java,
-            List::class.java, List::class.java).newInstance(problem, context, splits, parameters)
+            List::class.java, List::class.java, Boolean::class.javaPrimitiveType)
+            .newInstance(problem, context, splits, parameters, satisfaction)
         val completed: Int get() = type.getMethod("getCompleted").invoke(target) as Int
         val size: Int get() = type.getMethod("getSize").invoke(target) as Int
         val work: Long get() = type.getMethod("getWork").invoke(target) as Long

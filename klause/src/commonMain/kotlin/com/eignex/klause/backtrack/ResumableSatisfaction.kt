@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.ResumableSolve
@@ -29,6 +30,7 @@ internal class ResumableSatisfaction(
     projectAssumptionCore: Boolean = false,
     preparedSession: PropagationSession? = null,
     preparedSeed: PropagationResult? = null,
+    private val rebindable: Boolean = false,
 ) : ResumableSolve {
     private val lifetimeToken = params0.cancellation.lifetimeCancellation()
     private var globalToken: Cancellation = params0.cancellation
@@ -44,7 +46,7 @@ internal class ResumableSatisfaction(
     private val params = params0.copy(cancellation = cancelledWhen({
         listOfNotNull(globalToken.deadline(), slice.deadline).minOrNull()
     }, { globalToken.workScheduled() }) { globalToken() || slice.expired() })
-    private val assumptions = params0.assumptions
+    private var assumptions = params0.assumptions
     private val traversal: CpSatisfactionTraversal = CpSatisfactionTraversal(
         solver.problem,
         params,
@@ -59,6 +61,7 @@ internal class ResumableSatisfaction(
         projectAssumptionCore = projectAssumptionCore,
         preparedSession = preparedSession,
         preparedSeed = preparedSeed,
+        rebindable = rebindable,
         slice = TraversalSlice(pauses = { !globalToken() }, beforeBranch = {
             slice.charge()
             slice.workExpired()
@@ -88,6 +91,20 @@ internal class ResumableSatisfaction(
         }
     }
 
+    internal fun rebind(assumptions: Assumptions, cancellation: Cancellation) {
+        check(rebindable && !closed)
+        try {
+            globalToken = lifetimeToken or cancellation
+            slice.begin(Long.MAX_VALUE, -1L)
+            traversal.rebind(assumptions)
+            this.assumptions = assumptions
+            done = null
+        } catch (failure: Throwable) {
+            closeAfter(failure)
+            throw failure
+        }
+    }
+
     override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
         done?.let { return it }
         check(!closed) { "search is closed" }
@@ -102,9 +119,11 @@ internal class ResumableSatisfaction(
                 sink.search.observeRootFixed(traversal.rootFixedVariableCount())
                 return null
             }
-            return solver.verdictOf(outcome, assumptions, Cancellation { globalToken() }, sink).also {
+            return solver.verdictOf(
+                outcome, assumptions, Cancellation { globalToken() }, sink, finish = !rebindable,
+            ).also {
                 done = it
-                close()
+                if (!rebindable) close()
             }
         } catch (failure: Throwable) {
             closeAfter(failure)
@@ -115,7 +134,7 @@ internal class ResumableSatisfaction(
     override fun close() {
         if (closed) return
         closed = true
-        if (done == null) sink.stop()
+        if (done == null || rebindable) sink.stop()
         traversal.close()
     }
 
