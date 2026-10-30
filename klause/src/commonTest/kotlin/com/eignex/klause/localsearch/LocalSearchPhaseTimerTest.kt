@@ -7,6 +7,20 @@ import kotlin.test.assertFalse
 
 class LocalSearchPhaseTimerTest {
     @Test
+    fun `objective scoring snapshots should retain completed counts across later observations`() {
+        val timer = LocalSearchPhaseTimer { 0L }
+        timer.recordObjectiveScoring("indexed")
+        val first = timer.objectiveScoringSnapshot()
+
+        timer.recordObjectiveScoring("indexed")
+        val second = timer.objectiveScoringSnapshot()
+
+        assertEquals(1L, first.getValue("indexed"))
+        assertEquals(2L, second.getValue("indexed"))
+        assertEquals(0L, timer.snapshot().values.sum())
+    }
+
+    @Test
     fun `suspended sequence time should be excluded from its active phase`() {
         var clock = 0L
         val timer = LocalSearchPhaseTimer { clock }

@@ -39,6 +39,8 @@ data class LocalSearchStats(
     val geometricProposalDeclines: SumResult = ZERO_COUNT,
     /** Sink-emitted geometric candidates before driver sampling; neither commits nor distinct points. */
     val geometricProposalCandidates: SumResult = ZERO_COUNT,
+    /** Optional objective-view preparation and completed scoring counts, populated with phase reporting. */
+    val objectiveScoring: Map<String, Long> = emptyMap(),
 ) {
     /** Combine two workers: moves/stalls add, earliest time-to-best wins, incumbent from the lower violation. */
     fun mergedWith(o: LocalSearchStats): LocalSearchStats = LocalSearchStats(
@@ -75,6 +77,10 @@ data class LocalSearchStats(
         geometricProposalRuns = SumResult(geometricProposalRuns.sum + o.geometricProposalRuns.sum),
         geometricProposalDeclines = SumResult(geometricProposalDeclines.sum + o.geometricProposalDeclines.sum),
         geometricProposalCandidates = SumResult(geometricProposalCandidates.sum + o.geometricProposalCandidates.sum),
+        objectiveScoring = (objectiveScoring.keys + o.objectiveScoring.keys).associateWith { outcome ->
+            val first = objectiveScoring[outcome] ?: 0L
+            first + minOf(o.objectiveScoring[outcome] ?: 0L, Long.MAX_VALUE - first)
+        },
     )
 }
 
@@ -101,6 +107,7 @@ internal class LocalSearchStatsSink {
     private var geometricProposalCandidates = 0L
     var bestResidual: LocalSearchResidual? = null
     var phaseNanos: (() -> Map<String, Long>)? = null
+    var objectiveScoring: (() -> Map<String, Long>)? = null
 
     /** Count one decided candidate: [refuted] or [undecided] when it was not accepted. */
     fun recordCompletion(refuted: Boolean, undecided: Boolean) {
@@ -151,5 +158,6 @@ internal class LocalSearchStatsSink {
         geometricProposalRuns = SumResult(geometricProposalRuns.toDouble()),
         geometricProposalDeclines = SumResult(geometricProposalDeclines.toDouble()),
         geometricProposalCandidates = SumResult(geometricProposalCandidates.toDouble()),
+        objectiveScoring = objectiveScoring?.invoke() ?: emptyMap(),
     )
 }
