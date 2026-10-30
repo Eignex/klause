@@ -36,6 +36,7 @@ import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.SearchDecision
@@ -72,7 +73,7 @@ class LpEngineTest {
 
     @Test
     fun `cancelled template preparation charges the containing LP allowance`() {
-        val problem = boundedProblem().bake()
+        val problem = boundedProblem().bake(FactorProjectionProviders.Default)
         var work = 0L
         val token = object : Cancellation {
             private val meter = WorkMeter { work += it }
@@ -81,7 +82,8 @@ class LpEngineTest {
         }
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
             LpParams(lpPlan = LpPlan(bounding = true), cancellation = token),
-            SolveStatsSink("cancelled-template-charge"), projections = problem.factorProjections).use { engine ->
+            SolveStatsSink("cancelled-template-charge"),
+            projections = assertNotNull(problem.factorProjections)).use { engine ->
             val before = engine.totalSolveWork()
             work = 0L
 
