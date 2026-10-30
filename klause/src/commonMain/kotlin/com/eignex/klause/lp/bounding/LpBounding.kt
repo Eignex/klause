@@ -1387,8 +1387,8 @@ internal fun LpEngine.rootLpRelaxationBound(
     globalCuts: List<Cut>,
     cancellation: Cancellation = Cancellation.Never,
 ): Double = try {
-    if (sparseTrialActive && globalCuts.isEmpty()) {
-        sparseRootLpRelaxationBound(relaxer, cancellation)
+    if (retainedRootEnabled && globalCuts.isEmpty() && lpGlobalCuts.isEmpty()) {
+        retainedRootLpRelaxationBound(relaxer, cancellation)
     } else {
         standaloneRootLpRelaxationBound(relaxer, globalCuts, cancellation)
     }
@@ -1398,28 +1398,28 @@ internal fun LpEngine.rootLpRelaxationBound(
     Double.NaN
 }
 
-private fun LpEngine.sparseRootLpRelaxationBound(
+private fun LpEngine.retainedRootLpRelaxationBound(
     relaxer: CpToLpRelaxation,
     cancellation: Cancellation,
 ): Double {
-    if (sparseTrialRemainingWork() <= 0L || cancellation()) return Double.NaN
+    if (retainedRootRemainingWork() <= 0L || cancellation()) return Double.NaN
     val root = PropagationSession(problem, cancellation)
     val relaxation = nodeRelaxation(relaxer, root) ?: run {
-        sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootSourceLayoutDeclined" to 1L)
+        if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootSourceLayoutDeclined" to 1L)
         cpAdapter.reset()
-        if (sparseTrialRemainingWork() <= 0L || cancellation()) return Double.NaN
-        sink.lp.sparseTrial = sink.lp.sparseTrial + ("StandaloneRootFallback" to 1L)
+        if (retainedRootRemainingWork() <= 0L || cancellation()) return Double.NaN
+        if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial + ("StandaloneRootFallback" to 1L)
         return standaloneRootLpRelaxationBound(relaxer, emptyList(), cancellation)
     }
     if (relaxation.model.n == 0) return Double.NaN
     try {
-        while (sparseTrialRemainingWork() > 0L && !cancellation()) {
+        while (retainedRootRemainingWork() > 0L && !cancellation()) {
             val attempt = solveNode(relaxation.model, null, cancellation)
             if (attempt == null) {
                 val metrics = propagator.lastMetrics.copy(preparationOps = 0L)
                 observeRootWork(metrics, finished = !propagator.floatPaused)
                 if (!propagator.floatPaused || metrics.workOps == 0L) return Double.NaN
-                sink.lp.sparseTrial = sink.lp.sparseTrial +
+                if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial +
                     ("RootPauses" to ((sink.lp.sparseTrial["RootPauses"] ?: 0L) + 1L))
                 observeNodePause()
                 continue
@@ -1428,14 +1428,16 @@ private fun LpEngine.sparseRootLpRelaxationBound(
             val metrics = if (nodeUsesTrail) propagator.lastMetrics.copy(preparationOps = 0L)
                 else attempt.first.lastMetrics
             observeRootSolve(attempt.first, metrics)
-            val lower = attempt.second?.let { sparseRootLowerBound(relaxation.model, it, cancellation) }
+            val lower = attempt.second?.let { retainedRootLowerBound(relaxation.model, it, cancellation) }
             retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
             return if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
         }
         return Double.NaN
     } finally {
-        val retained = cpAdapter.retainTrialRoot(root)
-        sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootOwnerRetained" to if (retained) 1L else 0L)
+        val retained = cpAdapter.retainRootProbe(root)
+        if (sparseTrialActive) {
+            sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootOwnerRetained" to if (retained) 1L else 0L)
+        }
     }
 }
 
@@ -1459,8 +1461,8 @@ private fun LpEngine.standaloneRootLpRelaxationBound(
             }
         }
         val lower = result?.let {
-            if (sparseTrialActive) {
-                sparseRootLowerBound(relaxation.model, it, cancellation)
+            if (retainedRootEnabled) {
+                retainedRootLowerBound(relaxation.model, it, cancellation)
             } else {
                 certifiedTightObjectiveLowerBound(
                     relaxation.model,
@@ -1475,18 +1477,19 @@ private fun LpEngine.standaloneRootLpRelaxationBound(
     }
 }
 
-private fun LpEngine.sparseRootLowerBound(
+private fun LpEngine.retainedRootLowerBound(
     model: LpModel,
     result: FloatLpResult,
     cancellation: Cancellation,
 ): Double? {
     val projectionWork = model.extent() * LpNodeOverhead.EXACT
-    if (sparseTrialRemainingWork() <= projectionWork || cancellation()) return null
+    if (retainedRootRemainingWork() <= projectionWork || cancellation()) return null
     // Source-range and objective projection scans share the existing whole-model overhead charge.
     model.alsoCharged(this)
-    val remaining = sparseTrialRemainingWork()
+    val remaining = retainedRootRemainingWork()
     val defaults = ReconstructionLimits()
-    val storage = sink.lp.sparseTrial["CheckingReservedBytes"] ?: 0L
+    val storage = if (sparseTrialActive) sink.lp.sparseTrial["CheckingReservedBytes"] ?: 0L else
+        SPARSE_LP_CHECKING_ALLOCATION
     val checked = certifyLpBoundOnly(
         model,
         result.duals,
