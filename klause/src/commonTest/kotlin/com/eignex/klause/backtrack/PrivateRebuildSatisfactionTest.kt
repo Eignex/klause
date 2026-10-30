@@ -100,6 +100,22 @@ class PrivateRebuildSatisfactionTest {
     }
 
     @Test
+    fun `an established root refutation should retain its canonical verdict after cancellation`() {
+        for (work in listOf(0L, 65_536L)) {
+            val source = Problem(1, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0)), Clause(intArrayOf(1)),
+            )).bake()
+
+            val result = BacktrackSolver(source).solve(BacktrackParams(
+                privateRebuildWork = work, cancellation = Cancellation { true },
+            ))
+
+            assertIs<SolveResult.Unsat>(result)
+            assertNull(result.stats.search.learning["privateRebuildConsumers"])
+        }
+    }
+
+    @Test
     fun `an expired opening token should not cancel a later private consumer`() {
         val source = Problem(3, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 4)),
