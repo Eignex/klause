@@ -4,6 +4,19 @@ JVM problem catalog and single-case runner for
 [eignex-lab](https://github.com/Eignex/eignex-lab). Use the lab for experiments,
 revision comparisons, reference solvers, witness checks, schedules and profiling.
 
+Use the authenticated HTTP client at `https://lab.eignex.com`; see the lab's
+[run guide](https://github.com/Eignex/eignex-lab/blob/main/docs/runs.md).
+SSH access, host discovery and server administration belong to agents explicitly
+working on eignex-lab operations. Report operational dependencies to that owner.
+
+A normal A/B case row contains one workload, seed and repetition across all arms.
+The lab runs every arm of that row on the same machine in one worker attempt.
+Other rows, preparation and replacement attempts may use different compatible
+machines; keep automatic placement without pinning the whole job. Worker loss
+replaces the complete unfinished row rather than mixing arms from different
+machines or attempts. Accepted rows remain valid; retain failed and preparation
+costs and report repeated infrastructure losses separately.
+
 A standalone `cp` control sets both `param.bt-arm=LABEL` and `param.arms=1`.
 Named recipes repeat across the configured worker slots otherwise. Check the
 emitted `arm.*` entries to verify the actual worker count before comparing controls.
