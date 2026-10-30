@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
@@ -82,6 +83,37 @@ internal class IntegerConflictRow private constructor(
             if (tightens && state.inDomainAt(variables[index], next, trail, domain)) return true
         }
         return false
+    }
+
+    fun dividedFor(state: PropagationState, variable: Int): IntegerConflictRow? {
+        val divisor = magnitude(coefficient(variable))
+        if (divisor <= 1L) return null
+        return try {
+            val bounds = state.problem.intBounds
+            val terms = mutableMapOf<Int, Long>()
+            var maximum = 0L
+            var dividedMaximum = 0L
+            for (index in variables.indices) {
+                state.checkFiniteWork()
+                val v = variables[index]
+                if (!bounds.hasLower(v) || !bounds.hasUpper(v) || bounds.lower(v) < 0L || bounds.upper(v) > 1L) {
+                    return null
+                }
+                val coefficient = coefficients[index]
+                val endpoint = if (coefficient > 0L) bounds.upper(v) else bounds.lower(v)
+                val dividedMagnitude = ceilDivide(magnitude(coefficient), divisor)
+                val divided = if (coefficient > 0L) dividedMagnitude else -dividedMagnitude
+                maximum = addExact(maximum, mulExact(coefficient, endpoint))
+                dividedMaximum = addExact(dividedMaximum, mulExact(divided, endpoint))
+                terms[v] = divided
+            }
+            // Complementing at model endpoints gives a nonnegative integral cover; ceiling division is implied.
+            val cover = ceilDivide(subExact(maximum, bound), divisor)
+            normalized(terms, subExact(dividedMaximum, cover), guard)
+        } catch (_: CheckedLongOverflowException) {
+            state.arithmeticLearningTrace?.record("integer.division-decline.overflow")
+            null
+        }
     }
 
     fun resolve(other: IntegerConflictRow, variable: Int): IntegerConflictRow? {

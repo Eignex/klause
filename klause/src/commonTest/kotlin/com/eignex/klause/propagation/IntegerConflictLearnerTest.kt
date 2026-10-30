@@ -43,6 +43,22 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `a divided reason that loses conflict should retain exact cancellation`() {
+        val native = PropagationSession(Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(2, 3, 3, 1), intArrayOf(0, 1, 2, 3), LinearOp.LE, 4),
+            Linear(intArrayOf(-1, -1), intArrayOf(1, 2), LinearOp.LE, -1),
+        )), pbLearning = false).apply { enableIntegerRowLearning() }
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 1))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        assertEquals(2L, learned.row.coefficient(0))
+        assertEquals(1L, learned.row.coefficient(3))
+        assertEquals(1L, learned.row.bound)
+        assertEquals(learned.fallbackClause.backjumpLevel, learned.backjumpLevel)
+    }
+
+    @Test
     fun `a learned row should preserve the fallback backjump target`() {
         val native = PropagationSession(Problem(0, 3,
             arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 8)), arrayOf(

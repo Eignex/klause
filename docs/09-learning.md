@@ -336,7 +336,14 @@ remain clause reasons. Support filtering keeps its hole-aware semantics. Repeate
 cells retain their selected index guard, and a result alias supplies no arithmetic row.
 
 Opposite-sign nonnegative combinations use checked signed arithmetic and integer
-gcd normalization. Each combination must remain conflicting. A retained row must
+gcd normalization. On immutable binary model bounds, a reason can first become a
+nonnegative integer cover by complementing terms at their model maximum endpoints.
+Ceiling division by the pivot coefficient gives a source-implied row with a unit
+pivot and retains the source guard. A divided combination is retained only when
+it remains conflicting and asserts at the clause target; otherwise exact cancellation
+uses the remaining combination allowance. Overflow retains exact cancellation;
+exhausting the shared allowance retains clause fallback. Each combination must
+remain conflicting. A retained row must
 propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have

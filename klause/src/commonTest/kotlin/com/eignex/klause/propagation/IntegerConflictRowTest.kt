@@ -15,6 +15,70 @@ import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
     @Test
+    fun `cover division should preserve feasible binary source assignments`() {
+        val variants = listOf(longArrayOf(2, 3, 5), longArrayOf(-2, 3, 5),
+            longArrayOf(2, -3, 5), longArrayOf(-2, -3, -5))
+        val state = PropagationState(Problem(0, 3, Array(3) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        for (coefficients in variants) for (bound in listOf(-5L, -1L, 0L, 1L, 4L, 7L)) {
+            val source = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1, 2),
+                coefficients, intArrayOf(0, 1, 2), LinearOp.LE, bound), useLo = true))
+
+            val divided = requireNotNull(source.dividedFor(state, 0))
+
+            for (x in 0L..1L) for (y in 0L..1L) for (z in 0L..1L) {
+                val assignment = longArrayOf(x, y, z)
+                val sourceActivity = coefficients.indices.sumOf { coefficients[it] * assignment[it] }
+                if (sourceActivity <= bound) {
+                    val activity = divided.variables.indices.sumOf {
+                        divided.coefficients[it] * assignment[divided.variables[it]]
+                    }
+                    assertTrue(activity <= divided.bound)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `cover division should retain the signed source guard`() {
+        val state = PropagationState(Problem(1, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        for (guard in listOf(Lit.NONE, Lit.make(0, true), Lit.make(0, false))) {
+            val source = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
+                longArrayOf(-2, 3), intArrayOf(0, 1), LinearOp.LE, 1), useLo = true, guard = guard))
+
+            val divided = requireNotNull(source.dividedFor(state, 0))
+
+            assertEquals(-1L, divided.coefficient(0))
+            assertEquals(2L, divided.coefficient(1))
+            assertEquals(1L, divided.bound)
+            assertEquals(guard, divided.guard)
+        }
+    }
+
+    @Test
+    fun `cover division should require binary model bounds before trail narrowing`() {
+        val source = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
+            longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 3), useLo = true))
+        for (domain in listOf(IntDomain(-1, 1), IntDomain(0, 2))) {
+            val state = PropagationState(Problem(0, 2, arrayOf(domain, IntDomain(0, 1)), emptyArray()),
+                Assumptions.None)
+            assertTrue(state.tightenIntMin(0, 0))
+            assertTrue(state.tightenIntMax(0, 1))
+
+            assertNull(source.dividedFor(state, 0))
+        }
+    }
+
+    @Test
+    fun `an overflowing cover should retain the exact source`() {
+        val source = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
+            longArrayOf(2, Long.MAX_VALUE), intArrayOf(0, 1), LinearOp.LE, Long.MIN_VALUE), useLo = true))
+        val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+
+        assertNull(source.dividedFor(state, 0))
+        assertEquals(Long.MIN_VALUE, source.bound)
+    }
+
+    @Test
     fun `subsumption should require a stronger bound and an implied guard`() {
         val guards = listOf(Lit.NONE, Lit.make(0, true), Lit.make(0, false), Lit.make(1, true))
         for (guard in guards) for (otherGuard in guards) for (bound in listOf(3L, 5L, 7L)) {
