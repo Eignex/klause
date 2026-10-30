@@ -680,8 +680,11 @@ class ExactLiraSearchComponent private constructor(
         comparison: ExactComparison, point: List<BigFraction>, poll: Cancellation? = null,
     ): Boolean? = hintTruth(comparison, poll) { point.getOrNull(it) }
 
+    private inline fun hintTruth(comparison: ExactComparison, value: (Int) -> BigFraction?): Boolean? =
+        hintTruth(comparison, null, value)
+
     private inline fun hintTruth(
-        comparison: ExactComparison, poll: Cancellation? = null, value: (Int) -> BigFraction?,
+        comparison: ExactComparison, poll: Cancellation?, value: (Int) -> BigFraction?,
     ): Boolean? {
         var activity = BigFraction.ZERO
         for ((column, coefficient) in comparison.terms) {
