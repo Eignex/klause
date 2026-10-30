@@ -2,6 +2,9 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
 
+private const val DECLINE_CENSUS_KINDS = 64
+private const val DECLINE_CENSUS_NAME_LENGTH = 96
+
 internal class ArithmeticLearningTrace(
     private val maxEvents: Int = 128,
     private val maxWords: Int = 8192,
@@ -18,6 +21,20 @@ internal class ArithmeticLearningTrace(
     var omittedPayloads = 0
         private set
     var captureFirstInteger = false
+    var collectDeclines = false
+    private val declineNames = ArrayList<String>()
+    private val declineIndices = HashMap<String, Int>()
+    private val declineTotals = LongArray(DECLINE_CENSUS_KINDS)
+    val declineCensusKindLimit: Int get() = DECLINE_CENSUS_KINDS
+    val declineCensusNameLength: Int get() = DECLINE_CENSUS_NAME_LENGTH
+    var declineCensusTruncated = false
+        private set
+    var declineCensusSaturated = false
+        private set
+    val declineCensus: Map<String, Long> get() = buildMap {
+        for (index in declineNames.indices) put(declineNames[index], declineTotals[index])
+        if (declineTotals.last() != 0L) put("other", declineTotals.last())
+    }
     var focusedIntegerId: Int? = null
         private set
     var discardedWindows = 0L
@@ -59,7 +76,27 @@ internal class ArithmeticLearningTrace(
         return true
     }
 
+    private fun countDecline(kind: String) {
+        if (!collectDeclines) return
+        if (!kind.startsWith("integer.decline.") && !kind.startsWith("integer.source-decline.") &&
+            !kind.startsWith("integer.endpoint-decline.")) return
+        val existing = if (kind.length <= DECLINE_CENSUS_NAME_LENGTH) declineIndices[kind] else null
+        val index = existing ?: if (kind.length <= DECLINE_CENSUS_NAME_LENGTH &&
+            declineNames.size < DECLINE_CENSUS_KINDS - 1) {
+            declineNames.size.also {
+                declineIndices[kind] = it
+                declineNames.add(kind)
+            }
+        } else {
+            declineCensusTruncated = true
+            declineTotals.lastIndex
+        }
+        if (declineTotals[index] == Long.MAX_VALUE) declineCensusSaturated = true
+        else declineTotals[index]++
+    }
+
     fun record(kind: String, vararg data: Long) {
+        countDecline(kind)
         if (!accepting) return
         if (focusedIntegerId != null) {
             if ((kind == "traversal.pick" || kind == "traversal.attempt") && pendingPick) pendingPick = false

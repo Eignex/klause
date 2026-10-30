@@ -253,6 +253,7 @@ internal object PreparedArithmeticLearningProfile {
         init {
             trace.javaClass.getMethod("setCaptureFirstInteger", Boolean::class.javaPrimitiveType)
                 .invoke(trace, captureFirstInteger)
+            trace.javaClass.getMethod("setCollectDeclines", Boolean::class.javaPrimitiveType).invoke(trace, true)
             field.set(LivePropagationState.require(native), trace)
         }
 
@@ -281,6 +282,19 @@ internal object PreparedArithmeticLearningProfile {
                 val getter = "get" + name.replaceFirstChar { it.uppercase() }
                 put(name, trace.javaClass.getMethod(getter).invoke(trace) as Long)
             }
+            put("declineCensusEnabled", trace.javaClass.getMethod("getCollectDeclines").invoke(trace) as Boolean)
+            for (name in listOf("declineCensusTruncated", "declineCensusSaturated")) {
+                val getter = "get" + name.replaceFirstChar { it.uppercase() }
+                put(name, trace.javaClass.getMethod(getter).invoke(trace) as Boolean)
+            }
+            for (name in listOf("declineCensusKindLimit", "declineCensusNameLength")) {
+                val getter = "get" + name.replaceFirstChar { it.uppercase() }
+                put(name, trace.javaClass.getMethod(getter).invoke(trace) as Int)
+            }
+            put("declineCensus", buildJsonObject {
+                val counts = trace.javaClass.getMethod("getDeclineCensus").invoke(trace) as Map<*, *>
+                for ((kind, count) in counts) put(kind as String, (count as Number).toLong())
+            })
             put("words", trace.javaClass.getMethod("getWords").invoke(trace) as Int)
             put("events", buildJsonArray {
                 for (event in trace.javaClass.getMethod("getEvents").invoke(trace) as List<*>) {
