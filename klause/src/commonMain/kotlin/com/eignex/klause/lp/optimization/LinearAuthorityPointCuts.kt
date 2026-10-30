@@ -26,12 +26,14 @@ internal class LinearAuthorityPointCuts(
     private var cooldown = 0
     private var misses = 0
     private var retired = false
+    private val inactiveScans = HashMap<Int, Int>()
 
     fun candidatesRetired(rows: List<LinearAuthorityCut>?): Boolean =
         rows != null && family === rows && retired
 
     fun releaseCandidates() {
         family = null
+        inactiveScans.clear()
     }
 
     fun observe(name: String, amount: Long = 1L) {
@@ -75,15 +77,14 @@ internal class LinearAuthorityPointCuts(
         installed: Set<Int>,
         cancellation: Cancellation,
     ): Set<Int> {
-        if (installed.size >= maximumCuts || rows.isEmpty()) {
-            if (installed.size >= maximumCuts) observe("PoolLimited")
-            return installed
-        }
+        if (rows.isEmpty()) return installed
+        if (installed.size >= maximumCuts) observe("PoolLimited")
         if (family !== rows) {
             family = rows
             cooldown = 0
             misses = 0
             retired = false
+            inactiveScans.clear()
         }
         if (retired) {
             observe("RetiredQueries")
@@ -118,12 +119,15 @@ internal class LinearAuthorityPointCuts(
             val objectiveNorm = sqrt(objectiveNormSquared)
             val candidates = ArrayList<Scored>()
             val forced = ArrayList<Scored>()
+            if (!meter.charge(installed.size.toLong(), 64L + installed.size * 64L)) return installed
+            val observedInactive = HashMap<Int, Int>()
             var support = 0
             for ((id, row) in rows.withIndex()) {
                 if (id !in checked) continue
                 val size = row.inequality.supportSize
                 if (size > maximumSupport - support || !meter.charge(1L, 128L + size * 96L)) {
                     observe("ScanLimited")
+                    meter.limited = true
                     break
                 }
                 support += size
@@ -166,7 +170,11 @@ internal class LinearAuthorityPointCuts(
                     efficacy >= CutPool.MIN_EFFICACY -> "POINT_ELIGIBLE"
                     else -> "POINT_LOW_EFFICACY"
                 }, 1L)
-                if (id in installed) forced += scored else if (efficacy >= CutPool.MIN_EFFICACY) candidates += scored
+                if (id in installed) {
+                    forced += scored
+                    observedInactive[id] = if (activity - checkNotNull(rhs) >= -CutPool.ACTIVE_TOLERANCE) 0
+                        else minOf(4, (inactiveScans[id] ?: 0) + 1)
+                } else if (efficacy >= CutPool.MIN_EFFICACY) candidates += scored
             }
             val selected = selectNonparallelCuts(candidates.sortedWith(compareByDescending<Scored> { it.score }
                 .thenBy { it.id }), maximumCuts - installed.size, 1.0 - CutPool.MIN_ORTHOGONALITY, forced) { a, b ->
@@ -179,17 +187,26 @@ internal class LinearAuthorityPointCuts(
             }
             observe("Selected", selected.size.toLong())
             for (cut in selected) onCut(rows[cut.id].family, "POINT_SELECTED", 1L)
+            var retained = installed
             if (!meter.limited && !cancellation()) {
+                inactiveScans.putAll(observedInactive)
                 misses = if (selected.isEmpty()) misses + 1 else 0
                 if (misses >= 4) {
                     retired = true
                     observe("RetiredFamilies")
                     for (family in visitedFamilies) onCut(family, "POINT_CANDIDATES_RETIRED", 1L)
+                    val expired = observedInactive.filterValues { it >= 4 }.keys
+                    if (expired.isNotEmpty()) {
+                        retained = installed - expired
+                        observe("RetiredInstalled", expired.size.toLong())
+                        for (id in expired) onCut(rows[id].family, "POINT_INSTALLED_RETIRED", 1L)
+                    }
+                    inactiveScans.clear()
                 } else {
                     cooldown = 7
                 }
             }
-            return installed + selected.map { it.id }
+            return retained + selected.map { it.id }
         } finally {
             budget.observe(preparation = meter.work)
             observe("Work", meter.work)
