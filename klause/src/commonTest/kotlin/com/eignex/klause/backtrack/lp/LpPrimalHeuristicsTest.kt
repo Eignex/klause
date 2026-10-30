@@ -66,8 +66,10 @@ class LpPrimalHeuristicsTest {
             }
         }
         val token = Cancellation { stopped }
-        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
-            SolveStatsSink("closed-rounding-point"), LpSolveContext(factory)).use { engine ->
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),
+            SolveStatsSink("closed-rounding-point"), LpSolveContext(factory),
+            nodeWorkAllowance = { if (stopped) 0L else 100_000L }).use { engine ->
             assertNull(engine.lpRoundingProbe(objective, token))
             assertTrue(engine.rootRoundingInterrupted)
             stopped = false
