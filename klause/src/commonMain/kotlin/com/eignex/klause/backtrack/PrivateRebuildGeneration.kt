@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BoundedVariableElimination
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
+import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.propagation.BakedProblem
@@ -27,6 +28,7 @@ internal class PrivateRebuildGeneration private constructor(
     val warmClauses: PrivateRebuildWarmClauses,
     val warmClauseNanos: Long,
     val bakeWork: PrivateRebuildBakeWork,
+    val mappingWork: Long,
 ) {
     fun reconstruct(sample: Sample): Sample = mapping.reconstructFrom(problem, sample)
 
@@ -114,12 +116,29 @@ internal class PrivateRebuildGeneration private constructor(
                 return null
             }
             val passStopped = spent >= allowance
-            cancellation.charge(entries)
+            var descriptorWork = 0L
+            for (step in delta.rebuild.steps) {
+                cancellation.charge(1L)
+                if (cancellation()) return null
+                val eliminated = step as? RebuildStep.SatisfyClauses ?: return null
+                descriptorWork += 8L
+                for (clause in eliminated.clauses) {
+                    cancellation.charge(1L)
+                    if (cancellation()) return null
+                    descriptorWork += (clause.size + 1L) * 4L
+                }
+            }
+            val privateBytes = bytes + descriptorWork * 8L
+            if (privateBytes > byteLimit) {
+                onDecline("Memory")
+                return null
+            }
+            cancellation.charge(entries + descriptorWork)
             if (cancellation()) return null
             val reduced = pinned.withSourcePassDelta(delta) ?: return null
             mapping = mapping.then(SourceMapping(pinned, reduced, guarantees, delta.rebuild))
             val warmStart = TimeSource.Monotonic.markNow()
-            val warm = PrivateRebuildWarmClauses.capture(session, delta.rebuild, fixed, byteLimit - bytes,
+            val warm = PrivateRebuildWarmClauses.capture(session, delta.rebuild, fixed, byteLimit - privateBytes,
                 (allowance - spent).coerceAtLeast(0L), cancellation) ?: return null
             val warmNanos = warmStart.elapsedNow().inWholeNanoseconds
             val enriched = if (warm.clauses.isEmpty()) reduced else reduced.withFactors(reduced.factors + warm.clauses)
@@ -128,8 +147,9 @@ internal class PrivateRebuildGeneration private constructor(
             val baked = enriched.bake(bakeWork)
             if (cancellation()) return null
             mapping = mapping.then(SourceMapping(enriched, baked, TransformationGuarantees.IDENTITY))
-            return PrivateRebuildGeneration(baked, mapping, bytes + warm.modeledBytes, delta.rebuild.steps.size,
-                entries * 4L, passStopped, admission.candidates, warm, warmNanos, bakeWork)
+            return PrivateRebuildGeneration(baked, mapping, privateBytes + warm.modeledBytes, delta.rebuild.steps.size,
+                maxOf(entries * 4L, source.numBoolVars * 12L + descriptorWork), passStopped, admission.candidates,
+                warm, warmNanos, bakeWork, descriptorWork)
         }
     }
 }
