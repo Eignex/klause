@@ -82,6 +82,7 @@ internal object RewriteStructureProfile {
             val sweep = hints?.let { get(it, "Sweep") as DefinitionalSweep? }
             val network = sweep?.network(prepared.problem.numIntVars, prepared.problem.numBoolVars)
             var inputEdges = 0L
+            var elementDefinitions = 0
             var maxDepth = 0
             val integerDepth = IntArray(prepared.problem.numIntVars)
             val booleanDepth = IntArray(prepared.problem.numBoolVars)
@@ -89,6 +90,7 @@ internal object RewriteStructureProfile {
                 diagnosticStop.charge(1)
                 check(!diagnosticStop())
                 val node = network.node(k)
+                if (node::class.simpleName == "ElementResultDefinition") elementDefinitions++
                 var depth = 1
                 for (variable in node.intInputs) {
                     diagnosticStop.charge(1)
@@ -120,8 +122,10 @@ internal object RewriteStructureProfile {
                 put("workingBooleans", prepared.problem.numBoolVars)
                 put("workingIntegers", prepared.problem.numIntVars)
                 put("maintainedDefinitions", network?.size ?: 0)
+                put("maintainedElementDefinitions", elementDefinitions)
                 put("maintainedInputEdges", inputEdges)
                 put("maintainedMaxDepth", maxDepth)
+                put("functionalObjectiveAvailable", hints?.let { get(it, "Objective") } != null)
                 for (table in listOf(false, true)) {
                     val relaxation = MpsLpAdmission.rootRelaxation(prepared.problem, prepared.objective,
                         false, diagnosticStop, element = true, table = table)
