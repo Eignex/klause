@@ -47,7 +47,7 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
             best = VarRef.IntVar(i)
         }
     }
-    hints.selected(directional)
+    hints.selected(directional, best)
     return directional ?: best
 }
 

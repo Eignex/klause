@@ -837,6 +837,11 @@ for three structures, skipped when LP is unavailable, the pool is explicit or
 annotated, or execution is parallel or single-engine. See
 [ordinary tableau admission](17-linear-programming.md).
 
+The `lp-default` optimization recipe consumes scoped passive directional gains
+after both directions have recent usable observations. Missing estimates keep
+current scoring. History spends the existing LP allowance; other recipes require
+an explicit directional setting. See [finite branching](08-search.md#finite-lp-directional-guidance).
+
 - **Binary packing.** For nonnegative integer capacity rows with an objective that
   rewards items, the default LP recipe takes the conflict-driven slot beside the SAT
   guard.
