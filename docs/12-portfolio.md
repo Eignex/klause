@@ -576,7 +576,8 @@ continues; fast completion creates no board.
 
 The source pipeline automatically admits single-core satisfaction portfolios with
 two identical native first-fail recipes and the ordinary work schedule under these
-source guards. Other shapes continue ordinary solving. Explicit
+source guards. Admission polls caller cancellation while checking clauses and source
+mappings. Other shapes continue ordinary solving. Explicit
 `boolean-proof-tasks=false` disables admission; `true` also permits the bare
 non-native recipe and reports declines. Explicit enablement rejects optimization
 and parallel requests; omission leaves them on ordinary execution. Direct internal
