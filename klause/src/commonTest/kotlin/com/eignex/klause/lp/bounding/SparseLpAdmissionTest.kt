@@ -9,6 +9,7 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.RelaxationProjection
 import com.eignex.klause.lp.RelaxationProjectionProvider
+import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationPolicy
@@ -23,8 +24,11 @@ import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.VarStatus
+import com.eignex.klause.lp.engine.continueExactLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
@@ -36,6 +40,28 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
+    @Test
+    fun `a sparse root bound does not admit the same model to dense exact continuation`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            List(256) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1) },
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            SolveStatsSink("separate-exact-envelope")).use { engine ->
+            val relaxer = requireNotNull(engine.lpRelaxer)
+            val model = relaxer.build(PropagationSession(problem)).model
+            val basis = Basis(IntArray(model.m) { model.n + it },
+                Array(model.numVars) { if (it >= model.n) VarStatus.BASIC else VarStatus.AT_LOWER })
+
+            val declined = continueExactLp(model, basis)
+            val bound = engine.rootLpRelaxationBound(relaxer, emptyList())
+
+            assertEquals(ContinuationDecline.DIMENSION, declined.metrics.decline)
+            assertEquals(0, declined.metrics.builds)
+            assertEquals(1.0, bound)
+        }
+    }
+
     @Test
     fun `completed sparse root work leaves checking inside the same grant`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
