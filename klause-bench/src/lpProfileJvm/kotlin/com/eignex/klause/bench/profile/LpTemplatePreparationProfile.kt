@@ -16,6 +16,7 @@ import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import java.io.File
+import java.lang.management.ManagementFactory
 import java.security.MessageDigest
 import java.util.HexFormat
 import kotlin.time.Duration.Companion.seconds
@@ -42,6 +43,9 @@ internal object LpTemplatePreparationProfile {
         val objective = requireNotNull(compiled.objective).toLinearObjective()
             .let { if (compiled.maximize) it.negated() else it }
         val stop = Cancellation.after(120.seconds)
+        val cpu = ManagementFactory.getThreadMXBean().takeIf {
+            it.isCurrentThreadCpuTimeSupported && it.isThreadCpuTimeEnabled
+        }
         val modes = listOf("disabled", "object", "index", "candidate")
         out.resolve("runs.jsonl").bufferedWriter().use { writer ->
             repeat(repeats + 1) { round ->
@@ -50,6 +54,7 @@ internal object LpTemplatePreparationProfile {
                     for (offset in modes.indices) {
                         val mode = modes[(round + offset) % modes.size]
                         val startBytes = profileAllocatedBytes()
+                        val startCpu = cpu?.currentThreadCpuTime?.takeIf { it >= 0L }
                         val start = System.nanoTime()
                         val selected = FactorProjectionProviders.Default.prepare(source)
                         val changedSource = when (change) {
@@ -118,10 +123,12 @@ internal object LpTemplatePreparationProfile {
                             results.add("${result.verdict}:${result.lowerBound}:${result.witness?.objective}")
                             if (step == 0) coldNs = System.nanoTime() - start
                         }
+                        val phases = sink.snapshot().phases
                         val totalNs = System.nanoTime() - start
+                        val endCpu = cpu?.currentThreadCpuTime?.takeIf { it >= 0L }
+                        val threadCpuNs = if (startCpu != null && endCpu != null) endCpu - startCpu else null
                         val allocatedBytes = profileAllocatedBytes()?.let { it - requireNotNull(startBytes) }
                         signatures[mode] = results
-                        val phases = sink.snapshot().phases
                         val preparation = phases["TEMPLATE_PREPARATION_NODE"]
                         val assembly = phases["TEMPLATE_ASSEMBLY_NODE"]
                         val record = buildJsonObject {
@@ -134,6 +141,7 @@ internal object LpTemplatePreparationProfile {
                             put("change", change)
                             put("steps", steps)
                             put("totalNs", totalNs)
+                            put("threadCpuNs", threadCpuNs)
                             put("coldSetupAndConsumerNs", coldNs)
                             put("assemblyIncludingPreparationNs", assemblyNs)
                             put("solveAndCertificationNs", solveNs)
@@ -145,6 +153,7 @@ internal object LpTemplatePreparationProfile {
                             put("componentsDirty", preparation?.outcomes?.get("COMPONENTS_DIRTY") ?: 0L)
                             put("rowsAssembled", assembly?.outcomes?.get("ROWS") ?: 0L)
                             put("boundsAssembled", assembly?.outcomes?.get("BOUNDS") ?: 0L)
+                            put("exactBoundsAdopted", assembly?.outcomes?.get("EXACT_BOUND_OBJECTS") ?: 0L)
                             put("peakRetainedTemplateUnits", retainedUnits)
                             put("nativeResults", results.joinToString(","))
                             put("independentProofCheck", false)
