@@ -257,6 +257,11 @@ children, for retained node queries and fresh root tableau queries. Reused resul
 add no numerical work or factorization charges.
 Each consultation binds its current cancellation token, including unchanged
 children; identical exact authority retains their factors and completed evidence.
+An ordinary component root without active global cuts uses the same scoped owner for
+its initial bound and later node queries. The original node-depth and cut policies
+remain in force. This root-bound operation shares the bounded retained-root work,
+factor storage and checking envelope; incompatible source layouts use a fresh root
+solver within the remaining allowance.
 Scoped preparation reserves the graph scan, partition scratch and child restriction
 storage before constructing children. A declined or interrupted split retains its
 spent preparation work; child numerical preparation receives the remaining grant.

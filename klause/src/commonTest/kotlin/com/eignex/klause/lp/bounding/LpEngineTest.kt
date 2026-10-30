@@ -27,10 +27,13 @@ import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.tightenOpenIntBounds
+import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,6 +42,65 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpEngineTest {
+    @Test
+    fun `an ordinary component root solves only the child narrowed by a later decision`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+        ))
+        val factory = RecordingLpEngineFactory()
+        val sink = SolveStatsSink("ordinary-root-child")
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(4) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false), solveBudgetMillis = 30_000L),
+            sink, LpSolveContext(factory)).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            assertEquals(2.0, engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList()))
+            val constructed = factory.calls.size
+            shared.push(SearchDecision.IntAtLeast(0, 1L))
+
+            val pruned = engine.pruneNode(cp.session, 4.0, -1, true)
+
+            assertFalse(pruned)
+            assertEquals(constructed, factory.calls.size)
+            val outcomes = sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes
+            assertEquals(1L, outcomes?.get("SOLVED"))
+            assertEquals(1L, outcomes?.get("REUSED"))
+        }
+    }
+
+    @Test
+    fun `ordinary component roots retain their owners for later node queries`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+        ))
+        val factory = RecordingLpEngineFactory()
+        val sink = SolveStatsSink("ordinary-root-owner")
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(4) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false), solveBudgetMillis = 30_000L),
+            sink, LpSolveContext(factory)).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            SearchSession(listOf(cp, engine.propagator)).initialize()
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            val constructed = factory.calls.size
+
+            val pruned = engine.pruneNode(cp.session, 3.0, -1, true)
+
+            assertEquals(2.0, bound)
+            assertFalse(pruned)
+            assertEquals(constructed, factory.calls.size)
+            assertEquals(2L, sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes?.get("REUSED"))
+            assertEquals(Int.MAX_VALUE, engine.params.lpPlan.boundMaxDepth)
+            assertFalse(engine.sparseTrialActive)
+        }
+    }
+
     @Test
     fun `ordinary node pruning consumes a checked partial component bound`() {
         val problem = Problem(0, 6, Array(6) { IntDomain(0, 5) }, listOf(

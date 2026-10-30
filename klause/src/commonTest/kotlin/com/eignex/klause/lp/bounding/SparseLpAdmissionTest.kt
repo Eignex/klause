@@ -88,7 +88,7 @@ class SparseLpAdmissionTest {
                         override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
                             delegate.resolveBounds(allowance).also {
                                 completed = delegate.lastMetrics.copy(
-                                    workOps = engine.sparseTrialRemainingWork() - checkingWork,
+                                    workOps = engine.retainedRootRemainingWork() - checkingWork,
                                 )
                             }
                     }
