@@ -42,7 +42,9 @@ reseeding clears the preceding query verdict and trail without renewing its
 containing quota. Pooled task exchanges use a conditioned adapter: permanent
 scope clauses and direct global nogoods stay private, while the same session keeps
 its import filter across sibling queries. Source and mapping admission remain
-separate from that export promise.
+separate from that export promise. Native clause queries retain the original solver's
+immutable projection; sibling restarts stay above their conditioned root and keep
+the containing quota.
 An optional probe-first coordinator advances the whole source under the ordinary
 scheduler grant before creating a partition. A paused query supplies its first live
 Boolean decision after caller pins; root-fixed and unread columns supply no pivot.

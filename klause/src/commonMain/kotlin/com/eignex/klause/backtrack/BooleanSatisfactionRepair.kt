@@ -56,7 +56,9 @@ internal class BooleanSatisfactionRepair(
         try {
             require(cutoff == Double.POSITIVE_INFINITY) { "Boolean satisfaction has no objective cutoff" }
             require(decisionBudget == params.maxDecisions) { "Boolean satisfaction retains its decision policy" }
-            handle.rebind(assumptions, cancellation)
+            if (started || !assumptions.isEmpty || !assumptions.deductions.isEmpty || cancellation()) {
+                handle.rebind(assumptions, cancellation)
+            }
             this.assumptions = assumptions
             started = true
         } catch (failure: Throwable) {
