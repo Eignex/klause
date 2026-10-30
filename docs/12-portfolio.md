@@ -250,7 +250,8 @@ the filter without sampling. An uncancelled retirement also drains uses and expo
 remaining glue; a cancelled retirement skips those scans.
 
 Glue export probes that same filter with the portable content key before copying
-native literals or constructing portable payloads. One temporary token buffer is
+native literals or constructing portable payloads. An empty filter skips duplicate
+probing. One temporary token buffer is
 reused across the scan and released with it; no second retained duplicate index is
 needed. Only completed export preparation admits publication keys. Pool eviction,
 session reseeding and reason retention follow the same filter lifetime.
