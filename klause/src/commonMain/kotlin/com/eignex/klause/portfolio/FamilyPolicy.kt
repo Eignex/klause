@@ -121,7 +121,7 @@ internal class FamilyPolicy(
             failures[i] *= retained
         }
         if (plateau || family.observable) successes[family.ordinal] += reward
-        if (plateau && family.observable) failures[family.ordinal] += 1.0 - reward
+        if (plateau && (family.observable || progressed)) failures[family.ordinal] += 1.0 - reward
     }
 
     private companion object {
