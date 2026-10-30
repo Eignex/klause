@@ -497,8 +497,13 @@ historical reasons and removes obsolete watches; attaching a shortened binary in
 both implication directions and evaluates facts already assigned at the root. There
 is no separate stale binary graph or whole-graph rebuild.
 
-Opt-in failed-literal probing alternates a bounded rotating set of Boolean literals
-with Boolean coordinates from newly examined learned clauses of two to eight literals.
+Opt-in failed-literal probing alternates a bounded rotating set of source Boolean
+and existing integer-bound literals with coordinates from newly examined learned
+clauses of two to eight literals. Each slice snapshots the rotating literal space;
+scanning creates no atoms. Equality atoms decline. Bound probes use ordinary single-bound
+decisions and discard implied-result payloads, retaining the same undo and cancellation
+paths. A proved bound enters as a session-local clause over its existing atom and
+publishes through the original integer coordinate.
 Permanent source replacements supply the same bounded priorities; their clauses and
 ownership remain protected. A priority supplies no deduction without an actual probe conflict.
 The learned cursor advances without replaying an exhausted unchanged neighborhood;

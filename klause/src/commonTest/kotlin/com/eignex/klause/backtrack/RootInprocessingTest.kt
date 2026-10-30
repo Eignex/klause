@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -336,6 +337,58 @@ class RootInprocessingTest {
             assertEquals(true, session.boolValue(7))
             assertEquals(0, session.decisionLevel)
         }
+    }
+
+    @Test
+    fun `an existing integer bound should yield a proved root bound`() {
+        for (atMost in listOf(false, true)) {
+            val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ))
+            val session = PropagationSession(source.bake())
+            if (atMost) session.boundLeLit(0, 0) else session.boundGeLit(0, 1)
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2), null)
+
+            assertEquals(1L, session.intDomain(0).min)
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `a learned bound neighborhood should reach a failed bound within one funded probe`() {
+        val source = Problem(4, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+        ))
+        val session = PropagationSession(source.bake())
+        val first = session.boundLeLit(0, 0)
+        val second = session.boundLeLit(1, 0)
+        session.addLearnedClause(Clause(intArrayOf(Lit.negate(first), second)), 2)
+
+        RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1), null)
+
+        assertEquals(1L, session.intDomain(0).min)
+        assertEquals(0, session.decisionLevel)
+    }
+
+    @Test
+    fun `a locally capped bound probe should restore the complete root`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+        ))
+        val session = PropagationSession(source.bake())
+        session.boundLeLit(0, 0)
+
+        RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1, rootProbeWork = 1), null)
+
+        assertEquals(0L, session.intDomain(0).min)
+        assertEquals(2L, session.intDomain(0).max)
+        assertEquals(0, session.decisionLevel)
+        RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1), null)
+        assertEquals(1L, session.intDomain(0).min)
     }
 
     @Test
