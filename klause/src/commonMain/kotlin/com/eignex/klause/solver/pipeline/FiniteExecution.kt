@@ -1184,6 +1184,11 @@ private fun executePortfolio(
     )
     val scenario = weightedCoreDefaultScenario(baseScenario, request.problem, request.objective,
         request.executionOptions, request.cancellation)
+    if (scenario !== baseScenario) {
+        request.onPortfolioEvent?.invoke("portfolio", SearchEvent.WorkerAdmission("core-guided/weighted-default",
+            admitted = true, requirements = "bounded early trial with historical-reason refinement",
+            declines = emptyList(), selected = true))
+    }
     val executor = FinitePipeline.portfolioExecutor(
         request.problem,
         scenario,

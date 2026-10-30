@@ -1,5 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.ReifiedCardinality
+import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.portfolio.EngineMix
@@ -11,6 +16,7 @@ import kotlin.math.abs
 
 private const val WEIGHTED_CORE_COLUMNS = 16_384
 private const val WEIGHTED_CORE_FACTORS = 16_384
+private const val WEIGHTED_CORE_ENTRIES = 2_000_000L
 private const val WEIGHTED_CORE_SCALAR_MAGNITUDE = 9_007_199_254_740_991L
 
 internal fun weightedCoreDefaultScenario(
@@ -34,6 +40,27 @@ internal fun weightedCoreDefaultScenario(
         objective.intCoefficientValues.isNotEmpty() || objective.realCoefficientValues.isNotEmpty() ||
         objective.constant == Long.MIN_VALUE || abs(objective.constant) > WEIGHTED_CORE_SCALAR_MAGNITUDE
     ) return scenario
+    var entriesLeft = WEIGHTED_CORE_ENTRIES
+    for (factor in problem.factors) {
+        cancellation.charge(1)
+        if (cancellation()) return scenario
+        val entries = when (factor) {
+            is Clause -> factor.literals.size.toLong()
+            is Cardinality -> factor.literals.size.toLong()
+            is ReifiedCardinality -> factor.literals.size.toLong() + 1L
+            is PseudoBoolean -> {
+                if (factor.integerConstants == null) return scenario
+                factor.literals.size.toLong()
+            }
+            is ReifiedPseudoBoolean -> {
+                if (factor.integerConstants == null) return scenario
+                factor.literals.size.toLong() + 1L
+            }
+            else -> return scenario
+        }
+        if (entries > entriesLeft) return scenario
+        entriesLeft -= entries
+    }
     var remaining = WEIGHTED_CORE_SCALAR_MAGNITUDE - abs(objective.constant)
     var first = 0L
     var varied = false

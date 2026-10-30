@@ -921,7 +921,9 @@ auxiliary buffers and preparation cursors while keeping completed observations.
 
 Curated single-lane mixed source execution selects an early reason-refined core
 trial for nonuniform Boolean objectives over at most 16,384 Boolean columns and
-16,384 factors. It excludes integer and real columns and requires the sum of the
+16,384 factors, with at most two million literal entries in clauses, cardinalities
+and pseudo-Boolean rows or their reifications. Pseudo-Boolean row constants must
+fit signed words. It excludes integer and real columns and requires the sum of the
 absolute objective coefficients and constant to fit the exact scalar range below
 `2^53`. Eligibility scanning is cancellable and charges the containing invocation.
 The trial retains ordinary complete-worker coverage, worker positions, seeds and
