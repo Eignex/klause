@@ -23,12 +23,13 @@ internal class BooleanProofRecipe(
         onEvent = null, clauseExchange = null, cutExchange = null, nativeSat = params.nativeSat ?: true,
     )
 
-    fun deterministicClauseQuery(): Boolean {
+    fun deterministicClauseQuery(nativeOnly: Boolean = false): Boolean {
         val query = normalized()
-        val ordered = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false)
         val firstFail = BacktrackParams(variableSelector = SmallestDomain, valueSelector = IndomainMin,
             lubyRestartBase = 256L, nativeSat = true)
-        return query == ordered || query == firstFail
+        return query == firstFail || (!nativeOnly && query == BacktrackParams(
+            variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false,
+        ))
     }
 
     fun matches(other: BooleanProofRecipe): Boolean = normalized() == other.normalized()

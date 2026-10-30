@@ -244,16 +244,21 @@ internal class BooleanProofPortfolio private constructor(
     }
 
     companion object {
-        private fun BakedProblem.matchesPreparedModel(model: Problem?): Boolean = model === this ||
-            (model != null && model !is BakedProblem && model.numBoolVars == numBoolVars &&
+        private inline fun BakedProblem.matchesPreparedModel(model: Problem?, poll: () -> Unit): Boolean =
+            model === this || (model != null && model !is BakedProblem && model.numBoolVars == numBoolVars &&
                 model.numIntVars == 0 && model.numRealVars == 0 && !model.hasSymmetryBreaking &&
                 model.semantics === semantics && model.settings === settings &&
                 model.impliedFactorMask === impliedFactorMask &&
-                model.numFactors == numFactors && factors.indices.all { factors[it] === model.factors[it] })
+                model.numFactors == numFactors && factors.indices.all { index ->
+                    if (index and 63 == 0) poll()
+                    factors[index] === model.factors[index]
+                })
 
         fun forWorkers(
             workers: List<PortfolioWorker>,
             probeFirst: Boolean = false,
+            nativeOnly: Boolean = false,
+            cancellation: Cancellation = Cancellation.Never,
             newIdentity: () -> String = { Uuid.random().toString() },
             declined: (String) -> Unit = {},
         ): BooleanProofPortfolio? {
@@ -261,17 +266,22 @@ internal class BooleanProofPortfolio private constructor(
                 declined(reason)
                 return null
             }
+            if (cancellation()) return decline("source-admission-cancelled")
             if (workers.size != 2 || workers.any { !it.permitsSourceProofs || it.improvementOnly ||
                     it.auxiliaryProof || it.startAfterIncumbent || it.firstWitnessOnly })
                 return decline("workers-not-two-canonical-complete")
             val recipes = workers.map { it.booleanProofRecipe ?: return decline("builder-ownership-unavailable") }
             val problem = recipes.first().problem
-            if (recipes.any { it.problem !== problem || !it.deterministicClauseQuery() ||
+            if (recipes.any { it.problem !== problem || !it.deterministicClauseQuery(nativeOnly) ||
                     !it.matches(recipes.first()) })
                 return decline("worker-model-or-recipe-mismatch")
             if (problem.numBoolVars !in 2..4096 || problem.numIntVars != 0 || problem.numRealVars != 0 ||
-                problem.hasSymmetryBreaking || problem.rootDeductions is PropagationResult.Unsat ||
-                problem.factors.any { it !is Clause }) return decline("model-ineligible")
+                problem.hasSymmetryBreaking || problem.rootDeductions is PropagationResult.Unsat)
+                return decline("model-ineligible")
+            for (index in problem.factors.indices) {
+                if (index and 63 == 0 && cancellation()) return decline("source-admission-cancelled")
+                if (problem.factors[index] !is Clause) return decline("model-ineligible")
+            }
             val invocation = workers.first().evidenceInvocation ?: return decline("runtime-invocation-unavailable")
             if (workers.any { worker ->
                     worker.evidenceInvocation?.let(invocation::matches) != true ||
@@ -281,9 +291,11 @@ internal class BooleanProofPortfolio private constructor(
             val sourceScope = invocation.scope
             if (invocation.hasSourceObjective || invocation.executionObjective != null ||
                 sourceScope?.objective != null || invocation.hasUncapturedSourceRestrictions ||
-                !problem.matchesPreparedModel(plan.model) ||
                 plan.sourceBoolCount != problem.numBoolVars || plan.sourceIntCount != 0 || plan.sourceRealCount != 0
             ) return decline("source-plan-or-objective-ineligible")
+            if (!problem.matchesPreparedModel(plan.model) {
+                    if (cancellation()) return decline("source-admission-cancelled")
+                }) return decline("source-plan-or-objective-ineligible")
             val condition = invocation.executionCondition
             if (condition != invocation.sourceCondition || condition.lower.isNotEmpty() ||
                 condition.upper.isNotEmpty() || condition.integerRows.isNotEmpty())
