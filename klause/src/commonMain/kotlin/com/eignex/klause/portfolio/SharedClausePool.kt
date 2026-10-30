@@ -605,7 +605,11 @@ internal class PoolClauseExchange(
     private fun export(session: PropagationSession, retiring: Boolean = false) {
         val candidates = exportCandidates(session) ?: return
         if (retiring && candidates.isNotEmpty() && pool.softLimitBytes == null) {
-            val published = pool.publish(candidates, origin, stableGenerationOnly = true,
+            val published = pool.publish(candidates, origin,
+                isGlobal = false,
+                maxWork = pool.reclamationWork,
+                maxScratchEntries = pool.reclamationScratchEntries,
+                stableGenerationOnly = true,
                 cancelled = { session.cancelRequested },
                 charge = { session.chargeSharingWork(1L) },
             )
