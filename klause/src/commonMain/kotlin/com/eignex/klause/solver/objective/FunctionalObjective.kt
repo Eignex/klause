@@ -121,6 +121,7 @@ internal class FunctionalObjective internal constructor(
         val outIsBool: Boolean,
         /** The sweep node this definition evaluates, when it was read from a sweep. */
         val origin: DefinitionalSweep.SweepNode? = null,
+        val keepsOutputOnNoWrite: Boolean = false,
         val compute: ((Int) -> Long, (Int) -> Boolean) -> Long,
     )
 
@@ -220,7 +221,13 @@ internal class FunctionalObjective internal constructor(
                 val slot = boolSlots[id]
                 if (slot >= 0) values[slot] != 0L else boolBase(id)
             }
-            for (i in ordered.indices) values[i] = ordered[i].compute(intOf, boolOf)
+            for (i in ordered.indices) {
+                val definition = ordered[i]
+                val value = definition.compute(intOf, boolOf)
+                values[i] = if (definition.keepsOutputOnNoWrite && value == DefinitionalSweep.SweepNode.NO_WRITE) {
+                    intBase(definition.out)
+                } else value
+            }
             try {
                 var total = constant
                 for (k in terms.indices) total = addExact(total, mulExact(termCoeffs[k], intOf(terms[k])))

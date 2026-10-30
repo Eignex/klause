@@ -453,15 +453,51 @@ class QfLiraSolverHintsTest {
 
     @Test
     fun `interrupted point evaluation should spend the existing meter and publish no hints`() {
-        var halted = false
-        var charged = 0L
-        val stop = object : Cancellation {
-            override fun isCancelled(): Boolean = halted
-            override fun workMeter(): WorkMeter = WorkMeter { units ->
-                charged += units
-                if (units >= 4L) halted = true
+        for (incremental in listOf(false, true)) {
+            var halted = false
+            var charged = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled(): Boolean = halted
+                override fun workMeter(): WorkMeter = WorkMeter { units ->
+                    charged += units
+                    if (units >= 4L) halted = true
+                }
+            }
+            val model = Problem(
+                numBoolVars = 1,
+                intBounds = openBounds(0),
+                numRealVars = 1,
+                realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(0.0),
+                factors = arrayOf(
+                    ReifiedRealLinear(
+                        0,
+                        intArrayOf(),
+                        doubleArrayOf(),
+                        intArrayOf(0),
+                        doubleArrayOf(1.0),
+                        LinearOp.LE,
+                        0.0,
+                    ),
+                ),
+            )
+            ExactLiraSearchComponent(model).use { component ->
+                if (incremental) component.useIncrementalLinearPropagation()
+                val hints = assertNotNull(component.partialPointHints(stop)).second
+                component.useSolveStop(stop)
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+
+                assertIs<ComponentResult.Indeterminate>(session.initialize())
+
+                assertTrue(charged > 0L)
+                assertNull(hints.preferredBool(0))
+                assertNull(component.lpMetrics)
             }
         }
+    }
+
+    @Test
+    fun `incremental point hint polling should preserve charged work`() {
         val model = Problem(
             numBoolVars = 1,
             intBounds = openBounds(0),
@@ -469,28 +505,29 @@ class QfLiraSolverHintsTest {
             realLower = doubleArrayOf(0.0),
             realUpper = doubleArrayOf(0.0),
             factors = arrayOf(
-                ReifiedRealLinear(
-                    0,
-                    intArrayOf(),
-                    doubleArrayOf(),
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    LinearOp.LE,
-                    0.0,
-                ),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
             ),
         )
-        ExactLiraSearchComponent(model).use { component ->
-            val hints = assertNotNull(component.partialPointHints(stop)).second
-            component.useSolveStop(stop)
-            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
-
-            assertIs<ComponentResult.Indeterminate>(session.initialize())
-
-            assertTrue(charged > 0L)
-            assertNull(hints.preferredBool(0))
-            assertNull(component.lpMetrics)
+        val work = listOf(false, true).map { incremental ->
+            var charged = 0L
+            val stop = object : Cancellation {
+                override fun isCancelled() = false
+                override fun workMeter() = WorkMeter { charged += it }
+            }
+            ExactLiraSearchComponent(model).use { component ->
+                if (incremental) component.useIncrementalLinearPropagation()
+                val hints = assertNotNull(component.partialPointHints(stop)).second
+                component.useSolveStop(stop)
+                val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertEquals(true, hints.preferredBool(0))
+            }
+            charged
         }
+
+        assertTrue(work.first() > 0L)
+        assertEquals(work.first(), work.last())
     }
 
     @Test

@@ -35,6 +35,7 @@ import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
+import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
@@ -83,6 +84,9 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.constructionLongArray
 import kotlin.math.abs
+import kotlin.time.TimeSource
+
+private const val ROOT_PRIMAL_GUIDANCE_BYTES = 1024L * 1024L
 
 /** The persistent gated-residual float filter: the node-invariant [relaxation], the ONE [simplex]
  *  instance re-solving it with its kept factorization, and the reusable per-row [enforced] buffer
@@ -102,6 +106,7 @@ internal class RootRoundingWarmStart(
     val objective: LinearObjective,
     val relaxation: LpRelaxation,
     val basis: Basis,
+    val primal: DoubleArray? = null,
 )
 
 internal enum class LpRootQueryPolicy {
@@ -258,10 +263,47 @@ internal class LpEngine(
         metrics: com.eignex.klause.lp.engine.LpSolveMetrics,
         finished: Boolean = true,
     ) {
-        val charged = if (sparseTrialActive) metrics.copy(workOps =
+        val charged = if (retainedRootEnabled) metrics.copy(workOps =
             saturatingAdd(metrics.workOps, metrics.preparationOps)) else metrics
         sink.lp.observeEngineCost(LpRoute.ROOT, charged, finished)
         chargeWork(charged.workOps)
+    }
+
+    internal fun retainRootPrimalGuidance(
+        relaxation: LpRelaxation,
+        result: FloatLpResult?,
+        cancellation: Cancellation,
+    ) {
+        if (!params.lpPlan.probe || result?.optimal != true || cancellation()) return
+        val work = result.primal.size.toLong()
+        if (work * Double.SIZE_BYTES > ROOT_PRIMAL_GUIDANCE_BYTES || lpWorkAllowanceSpent(work)) return
+        val remaining = if (retainedRootEnabled) retainedRootRemainingWork() else rootPrimalWorkBudget()
+        if ((retainedRootEnabled || remaining > 0L) && remaining <= work) return
+        val started = TimeSource.Monotonic.markNow()
+        noteNodeOverhead(work)
+        val primal = result.primal.copyOf()
+        if (cancellation()) return
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal)
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
+    }
+
+    internal fun retainRoundingPrimalGuidance(
+        relaxation: LpRelaxation,
+        result: FloatLpResult,
+        guidanceObjective: LinearObjective,
+    ) {
+        if (!params.lpPlan.probe || !result.optimal ||
+            result.primal.size.toLong() * Double.SIZE_BYTES > ROOT_PRIMAL_GUIDANCE_BYTES || lpWorkAllowanceSpent(1L)
+        ) return
+        val remaining = rootPrimalWorkBudget()
+        if (remaining > 0L && remaining <= 1L) return
+        if (retainedRootEnabled && SPARSE_LP_MAX_WORK - minOf(SPARSE_LP_MAX_WORK, totalSolveOps) <= 1L) return
+        val started = TimeSource.Monotonic.markNow()
+        // The auxiliary solver has closed; its completed output buffer belongs to this private worker.
+        // Pause bookkeeping preserves it while future pinning polls the next invocation's token.
+        noteNodeOverhead(1L)
+        rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation, result.basis, result.primal)
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
     internal fun observeSparseTrial(solver: LpSolver) {
@@ -270,7 +312,7 @@ internal class LpEngine(
 
     internal fun rootCertificationObserver(): LpCertificationObserver {
         val observer = sink.lp.certificationObserver(LpRoute.ROOT)
-        if (!sparseTrialActive) return observer
+        if (!retainedRootEnabled) return observer
         return object : LpCertificationObserver by observer {
             override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
                 observer.observe(certifier, success, cost)
@@ -293,8 +335,10 @@ internal class LpEngine(
 
     internal val pricingOptions: LpPricingOptions
         get() = LpPricingOptions(params.zeroObjectivePricing, params.randomSeed ?: 0L,
-            if (sparseTrialActive) SPARSE_LP_MAX_FACTOR_ENTRIES else Long.MAX_VALUE,
-            if (sparseTrialActive) SPARSE_LP_MAX_FACTOR_WORK else Long.MAX_VALUE)
+            if (retainedRootEnabled) SPARSE_LP_MAX_FACTOR_ENTRIES else Long.MAX_VALUE,
+            if (retainedRootEnabled) SPARSE_LP_MAX_FACTOR_WORK else Long.MAX_VALUE)
+
+    internal val retainedRootEnabled: Boolean get() = sparseTrialActive || params.lpPlan.componentOwnership
 
     private val auxiliarySources = LpAuxiliarySources()
     private var structuralCutSupport = params0.lpPlan.cuts || params0.lpPlan.circuit
@@ -520,7 +564,7 @@ internal class LpEngine(
      * solves still advance the next one — so there is nothing to gain from silencing it entirely that a
      * floor does not already get.
      */
-    internal fun sparseTrialRemainingWork(): Long {
+    internal fun retainedRootRemainingWork(): Long {
         val cap = minOf(params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
             SPARSE_LP_MAX_WORK)
         var remaining = (cap - minOf(cap, totalSolveOps)).coerceAtLeast(0L)
@@ -530,7 +574,7 @@ internal class LpEngine(
     }
 
     internal fun nodeWorkBudget(): Long {
-        if (sparseTrialActive) return sparseTrialRemainingWork().coerceAtLeast(1L)
+        if (sparseTrialActive) return retainedRootRemainingWork().coerceAtLeast(1L)
         val budget = when {
             !adaptiveWork -> 0L
             lpEffortGovernor.isDemoted -> MIN_NODE_WORK_OPS
@@ -542,7 +586,7 @@ internal class LpEngine(
     }
 
     internal fun nodeQueryWorkBudget(): Long? {
-        if (sparseTrialActive) return minOf(sparseTrialRemainingWork().coerceAtLeast(1L),
+        if (sparseTrialActive) return minOf(retainedRootRemainingWork().coerceAtLeast(1L),
             if (adaptiveWork) lpWorkBudget.ops() else SPARSE_LP_MAX_WORK)
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L) ?: return null
         val containing = nodeWorkBudget()
@@ -552,7 +596,15 @@ internal class LpEngine(
     internal fun nodePreparationWorkBudget(): Long = if (sparseTrialActive) {
         nodeWorkBudget()
     } else if (separateNodePreparation) {
-        lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: nodeWorkBudget()
+        val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: if (retainedRootEnabled) {
+            retainedRootRemainingWork().coerceAtLeast(1L)
+        } else nodeWorkBudget()
+        val offered = nodeWorkAllowance()?.coerceAtLeast(1L)
+        when {
+            offered == null -> containing
+            containing == 0L -> offered
+            else -> minOf(containing, offered)
+        }
     } else nodeWorkBudget()
 
     internal fun rootPrimalWorkBudget(additionalWork: Long = 0L): Long {
@@ -635,12 +687,12 @@ internal class LpEngine(
     }
 
     internal fun observeNodePause() {
-        if ((sparseTrialActive || rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK) && adaptiveWork &&
+        if ((retainedRootEnabled || rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK) && adaptiveWork &&
             propagator.floatPaused && propagator.lastMetrics.pivots > 0
         ) lpWorkBudget.observeWorkStop()
     }
 
-    private val separateNodePreparation: Boolean get() = sparseTrialRequested ||
+    private val separateNodePreparation: Boolean get() = sparseTrialRequested || requestedPlan.componentOwnership ||
         rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
 
     internal val measuresRootQueries: Boolean get() = sparseTrialActive ||
@@ -731,14 +783,18 @@ internal class LpEngine(
             noteSolveOps(metrics.workOps)
         } else null,
         continuationAllowance = {
-            if (sparseTrialActive) sparseTrialRemainingWork() else
+            if (sparseTrialActive) retainedRootRemainingWork() else
                 lpEffortGovernor.remainingWork()?.takeIf { rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK }
         },
     )
 
-    internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {
+    internal fun nodeRelaxation(
+        relaxer: CpToLpRelaxation,
+        session: PropagationSession,
+        selectedCuts: List<Cut>? = null,
+    ): LpRelaxation? {
         val base = buildNodeRelaxation(relaxer, session) ?: return null
-        val relaxation = cpAdapter.cutRelaxation(base, session) ?: return null
+        val relaxation = cpAdapter.cutRelaxation(base, session, selectedCuts) ?: return null
         relaxation.sourceMap?.let(cutPool::remap)
         return relaxation
     }
@@ -1164,7 +1220,7 @@ internal class LpEngine(
             val plan = with(LpAutoConfig) {
                 prepare(problem, config, requestedPlan, objective, params.cancellation,
                     sparseTrialAllowed = projections?.builtInRelaxation != false,
-                    sparseTrialWork = sparseTrialRemainingWork()) { admission ->
+                    sparseTrialWork = retainedRootRemainingWork()) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted

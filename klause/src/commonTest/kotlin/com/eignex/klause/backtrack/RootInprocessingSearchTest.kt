@@ -2,8 +2,11 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.propagation.Assumptions
@@ -72,6 +75,22 @@ class RootInprocessingSearchTest {
             assertEquals(0.0, result.stats.search.restarts.sum)
             assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
         }
+    }
+
+    @Test
+    fun `ordinary integer search should consume endpoint probing without existing atoms`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+        ))
+        val configured = BacktrackParams(nativeSat = false, variableSelector = InputOrder,
+            valueSelector = IndomainMax, rootProbeBatch = 4, inprocessingInterval = 1L,
+            inprocessingWork = 4096L, inprocessingProbeWork = 512L)
+
+        val result = BacktrackSolver(source.bake()).solve(configured)
+
+        assertIs<SolveResult.Sat>(result)
+        assertTrue(result.stats.search.learning.getValue("inprocessProbeEndpointUnits") > 0L)
     }
 
     @Test

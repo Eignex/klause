@@ -67,9 +67,16 @@ internal fun PreparedSourceInvocation.heuristicHints(
     for (hint in definitions) {
         if (stop()) return null
         stop.charge(1)
-        val mapped = hint.remap(coordinates) ?: (hint.remap(planned) as? DefinitionHint.Linear)
-            ?.takeIf { reconstructions.isNotEmpty() }?.reconstructed(reconstructions)?.remap(projected)
-            ?: hint.remap(aliased)
+        val direct = hint.remap(coordinates)
+        val reconstructed = if (direct != null || reconstructions.isEmpty()) null else {
+            when (val original = hint.remap(planned)) {
+                is DefinitionHint.Linear -> original.reconstructed(reconstructions)
+                is DefinitionHint.Comparison -> original.reconstructed(reconstructions, stop)
+                else -> null
+            }
+        }
+        if (stop()) return null
+        val mapped = direct ?: reconstructed?.remap(projected) ?: hint.remap(aliased)
         mapped?.let(hints::add)
     }
     val references = source.definitionReferences?.let { it.remapped(coordinates, stop) ?: return null }

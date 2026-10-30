@@ -29,6 +29,7 @@ internal const val SPARSE_LP_MAX_WORK = 150_000_000L
 internal const val SPARSE_LP_MAX_ALLOCATION = 2L * 1024L * 1024L * 1024L
 internal const val SPARSE_LP_MAX_FACTOR_ENTRIES = 2_000_000L
 internal const val SPARSE_LP_MAX_FACTOR_WORK = 8_000_000L
+internal const val SPARSE_LP_CHECKING_ALLOCATION = 16L * 1024L * 1024L
 private const val MAX_DIMENSION = 65_536L
 private const val MAX_ENTRIES = 1_000_000L
 private const val MAX_PREPARATION_WORK = 8_000_000L
@@ -51,9 +52,10 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     val rows = problem.factors.size.toLong()
     var entries = 0L
     var inspected = 0L
+    var assemblyWork = 0L
     val preparationAllowance = minOf(MAX_PREPARATION_WORK, workAllowance.coerceAtLeast(0L))
     fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
-        "PreparationWork" to inspected))
+        "PreparationWork" to maxOf(inspected, assemblyWork)))
     if ((problem as? BakedProblem)?.factorProjections?.builtInRelaxation == false) return decline("Projection")
     if (columns + rows > MAX_DIMENSION) {
         return decline("Shape")
@@ -79,24 +81,28 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     }
     val reservation = sparseLpStorage(rows, columns, entries)
     if (reservation > SPARSE_LP_MAX_ALLOCATION) return decline("Storage")
-    val relaxer = CpToLpRelaxation(problem, objective, deferred = true)
-    relaxer.preparation().forEach { yield(Unit) }
+    assemblyWork = 32L * (entries + rows + columns)
     val model = try {
-        relaxer.build(PropagationSession(problem), cancellation = cancellation).model
+        val relaxer = CpToLpRelaxation(problem, objective, deferred = true)
+        relaxer.preparation().forEach {
+            if (cancellation()) return decline("Cancelled")
+            yield(Unit)
+        }
+        relaxer.build(PropagationSession(problem, cancellation), cancellation = cancellation).model
     } catch (_: LpAssemblyCancelled) {
         return decline("Cancelled")
     } catch (_: CheckedLongOverflowException) {
         return decline("ScalarWidth")
     }
     if (cancellation()) return decline("Cancelled")
-    return estimateSparseLpAdmission(model, 32L * (entries + rows + columns), cancellation)
+    return estimateSparseLpAdmission(model, assemblyWork, cancellation)
 }
 
 // Reserve capped factor storage, CSC, exact authority, temporary maps, transforms and scratch.
 // Component counts inform diagnosis; this owner remains monolithic.
 private fun sparseLpStorage(rows: Long, columns: Long, entries: Long): Long =
     minOf(rows * rows * 3L, SPARSE_LP_MAX_FACTOR_ENTRIES) * 256L +
-        entries * 512L + (rows + columns) * 4096L
+        entries * 512L + (rows + columns) * 4096L + SPARSE_LP_CHECKING_ALLOCATION
 
 @Suppress("LongMethod", "CyclomaticComplexMethod")
 internal fun estimateSparseLpAdmission(
@@ -104,8 +110,10 @@ internal fun estimateSparseLpAdmission(
     preparationWork: Long = 0L,
     cancellation: Cancellation = Cancellation.Never,
 ): SparseLpAdmission {
+    fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
+        "PreparationWork" to preparationWork))
     val dimensions = model.n.toLong() + model.m
-    if (dimensions > MAX_DIMENSION) return SparseLpAdmission(mapOf("DeclineShape" to 1L))
+    if (dimensions > MAX_DIMENSION) return decline("Shape")
     val parent = IntArray(dimensions.toInt()) { it }
     val rank = IntArray(parent.size)
     val rowDegree = IntArray(model.m)
@@ -131,8 +139,7 @@ internal fun estimateSparseLpAdmission(
         scalarBits = maxOf(scalarBits, value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
     }
     for (column in 0 until model.n) {
-        if (cancellation()) return SparseLpAdmission(mapOf("DeclineCancelled" to 1L,
-            "PreparationWork" to preparationWork))
+        if (cancellation()) return decline("Cancelled")
         model.forEachRationalColumn(column) { row, value ->
             number(value)
             if (!value.isZero) {
@@ -141,7 +148,7 @@ internal fun estimateSparseLpAdmission(
                 union(row, model.m + column)
             }
         }
-        if (entries > MAX_ENTRIES) return SparseLpAdmission(mapOf("DeclineEntries" to 1L))
+        if (entries > MAX_ENTRIES) return decline("Entries")
     }
     for (row in 0 until model.m) number(model.exactRhs(row))
     for (column in 0 until model.numVars) {
@@ -189,6 +196,7 @@ internal fun estimateSparseLpAdmission(
         put("FactorEntryLimit", SPARSE_LP_MAX_FACTOR_ENTRIES)
         put("FactorWorkLimit", SPARSE_LP_MAX_FACTOR_WORK)
         put("ReservedBytes", storage)
+        put("CheckingReservedBytes", SPARSE_LP_CHECKING_ALLOCATION)
         put("PreparationWork", preparationWork)
         put("WorkLimit", SPARSE_LP_MAX_WORK)
         put("StorageLimit", SPARSE_LP_MAX_ALLOCATION)

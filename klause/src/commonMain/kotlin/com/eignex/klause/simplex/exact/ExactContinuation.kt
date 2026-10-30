@@ -14,7 +14,7 @@ import com.eignex.klause.util.unaryMinus
 import kotlin.time.TimeSource.Monotonic
 
 internal enum class ContinuationStatus { BASIC, LOWER, UPPER, FIXED, FREE }
-internal enum class ContinuationPhase { ADMISSION, INPUT, IMPORT, REPAIR, FEASIBILITY, VERIFY }
+internal enum class ContinuationPhase { ADMISSION, INPUT, IMPORT, PROMOTION, REPAIR, FEASIBILITY, VERIFY }
 internal enum class ContinuationDecline {
     INVALID_INPUT,
     INVALID_BASIS,
@@ -43,6 +43,7 @@ internal data class ExactContinuationLimits(
     val maxImportPivots: Int = 128,
     val maxPivots: Int = 10000,
     val startArbitraryPrecision: Boolean = false,
+    val preserveOverflowCheckpoint: Boolean = true,
 ) {
     init {
         require(maxRows >= 0 && maxColumns >= 0 && maxCells >= 0 && maxBits >= 24)
@@ -260,9 +261,12 @@ internal class ExactContinuation(private var input: ExactContinuationInput) {
                     )
                 } catch (_: ContinuationOverflow) {
                     check(!big)
+                    val current = lane
+                    admitScalarPeak(current?.normalizedScalarPeak ?: 0)
+                    val promoted = if (limits.preserveOverflowCheckpoint) current?.promote(budget) else null
+                    lane = promoted
                     big = true
-                    admitScalarPeak(lane?.normalizedScalarPeak ?: 0)
-                    lane = null
+                    if (promoted != null) builds++
                     restarts++
                 }
             }
@@ -296,9 +300,11 @@ internal class ExactContinuation(private var input: ExactContinuationInput) {
                 current.rebind(next, budget)
             } catch (_: ContinuationOverflow) {
                 check(!big)
-                big = true
                 admitScalarPeak(current.normalizedScalarPeak)
-                lane = null
+                val promoted = if (budget.limits.preserveOverflowCheckpoint) current.promote(budget) else null
+                promoted?.rebind(next, budget)
+                lane = promoted
+                big = true
                 restarts++
             }
         }
@@ -392,6 +398,7 @@ private interface ContinuationLane {
     val pivots: Int
     val position: Int
     val ready: Boolean
+    fun promote(budget: ContinuationBudget): ContinuationLane
     fun rebind(input: ExactContinuationInput, budget: ContinuationBudget)
     fun advance(
         budget: ContinuationBudget,
@@ -403,6 +410,20 @@ private interface ContinuationLane {
     ): LaneResult
 }
 
+private class ContinuationCheckpoint<F>(
+    val table: List<MutableList<F>>,
+    val headings: MutableList<Int>,
+    val seats: MutableList<F>,
+    val seatEpsilon: MutableList<F>?,
+    val statuses: MutableList<ContinuationStatus>,
+    val lower: List<F?>,
+    val upper: List<F?>,
+    val position: Int,
+    val pivots: Int,
+    val ordered: Boolean,
+    val scalarPeak: Int,
+)
+
 // Bounded-variable feasibility simplex with Bland's smallest-index rule on both the leaving and entering choice
 // (R. G. Bland, "New finite pivoting rules for the simplex method", Math. Oper. Res. 2(2), 1977,
 // https://doi.org/10.1287/moor.2.2.103). Strict sides carry a symbolic infinitesimal as in B. Dutertre and
@@ -412,13 +433,14 @@ private class RationalContinuationLane<F>(
     private val ops: FracOps<F>,
     budget: ContinuationBudget,
     private val admitScalarPeak: (Int) -> Unit,
+    checkpoint: ContinuationCheckpoint<F>? = null,
 ) : ContinuationLane {
     private val width = input.total + 1
     private var table: List<MutableList<F>>
-    private var headings = MutableList(input.m) { input.n + it }
+    private var headings = checkpoint?.headings ?: MutableList(input.m) { input.n + it }
     private var seats: MutableList<F>
     private var seatEpsilon: MutableList<F>?
-    private var statuses = MutableList(input.total) { j -> canonical(j) }
+    private var statuses = checkpoint?.statuses ?: MutableList(input.total) { j -> canonical(j) }
     private var lower: List<F?>
     private var upper: List<F?>
     override var position = 0
@@ -435,32 +457,62 @@ private class RationalContinuationLane<F>(
     override val normalizedScalarPeak get() = scalarPeak
 
     init {
-        budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L + input.total * 48L)
-        lower = input.lower.map { it?.let { value -> fromBig(value, budget) } }
-        upper = input.upper.map { it?.let { value -> fromBig(value, budget) } }
-        table = List(input.m) { row ->
-            MutableList(width) { j ->
-                when (j) {
-                    input.n + row -> ops.one
-                    width - 1 -> fromBig(input.rhs[row], budget)
-                    else -> ops.zero
+        if (checkpoint != null) {
+            table = checkpoint.table
+            seats = checkpoint.seats
+            seatEpsilon = checkpoint.seatEpsilon
+            lower = checkpoint.lower
+            upper = checkpoint.upper
+            position = checkpoint.position
+            pivots = checkpoint.pivots
+            ordered = checkpoint.ordered
+            scalarPeak = checkpoint.scalarPeak
+        } else {
+            budget.step(input.m.toLong() * width, input.m.toLong() * width * 8L + input.total * 48L)
+            lower = input.lower.map { it?.let { value -> fromBig(value, budget) } }
+            upper = input.upper.map { it?.let { value -> fromBig(value, budget) } }
+            table = List(input.m) { row ->
+                MutableList(width) { j ->
+                    when (j) {
+                        input.n + row -> ops.one
+                        width - 1 -> fromBig(input.rhs[row], budget)
+                        else -> ops.zero
+                    }
                 }
             }
+            for (j in input.columns.indices) {
+                for ((row, value) in input.columns[j]) table[row][j] = fromBig(value, budget)
+            }
+            seats = MutableList(input.total) { j ->
+                val status = input.statuses[j].takeUnless { it == ContinuationStatus.BASIC } ?: canonical(j)
+                statuses[j] = if (j >= input.n) ContinuationStatus.BASIC else status
+                endpoint(j, status)
+            }
+            seatEpsilon = if (input.hasStrictSides) {
+                budget.step(input.total.toLong(), input.total * 8L)
+                MutableList(input.total) { j -> endpointEpsilon(j, statuses[j]) }
+            } else {
+                null
+            }
         }
-        for (j in input.columns.indices) {
-            for ((row, value) in input.columns[j]) table[row][j] = fromBig(value, budget)
-        }
-        seats = MutableList(input.total) { j ->
-            val status = input.statuses[j].takeUnless { it == ContinuationStatus.BASIC } ?: canonical(j)
-            statuses[j] = if (j >= input.n) ContinuationStatus.BASIC else status
-            endpoint(j, status)
-        }
-        seatEpsilon = if (input.hasStrictSides) {
-            budget.step(input.total.toLong(), input.total * 8L)
-            MutableList(input.total) { j -> endpointEpsilon(j, statuses[j]) }
-        } else {
-            null
-        }
+    }
+
+    override fun promote(budget: ContinuationBudget): ContinuationLane {
+        check(ops !== BigFracOps)
+        budget.phase = ContinuationPhase.PROMOTION
+        // Pivots and rebinds publish atomically, so overflow leaves this checkpoint authoritative.
+        budget.step(input.m.toLong() * width + input.total * 6L, input.m.toLong() * width * 8L + input.total * 64L)
+        val checkpoint = ContinuationCheckpoint(
+            table.map { row -> row.map { toBig(it, budget) }.toMutableList() },
+            headings.toMutableList(),
+            seats.map { toBig(it, budget) }.toMutableList(),
+            seatEpsilon?.map { toBig(it, budget) }?.toMutableList(),
+            statuses.toMutableList(),
+            lower.map { it?.let { value -> toBig(value, budget) } },
+            upper.map { it?.let { value -> toBig(value, budget) } },
+            position, pivots, ordered, scalarPeak,
+        )
+        return RationalContinuationLane(input, BigFracOps, budget, admitScalarPeak, checkpoint)
     }
 
     override fun rebind(input: ExactContinuationInput, budget: ContinuationBudget) {

@@ -470,7 +470,7 @@ class DefinitionalSweep internal constructor(
             if (!(if (isBool) reachableBools else reachableInts).add(id)) continue
             if (definition !is SweepNode.IntDef && definition !is SweepNode.BoolFold &&
                 definition !is LiteralIntDefinition && definition !is UnaryPredicateDefinition &&
-                definition !is CapturedBooleanDefinition
+                definition !is CapturedBooleanDefinition && definition !is ElementResultDefinition
             ) {
                 return null
             }
@@ -508,9 +508,12 @@ class DefinitionalSweep internal constructor(
 
                 is CapturedBooleanDefinition -> { intOf, _ -> if (node.holds(intOf)) 1L else 0L }
 
+                is ElementResultDefinition -> { intOf, _ -> node.compute(intOf) }
+
                 else -> return null
             }
-            cone.add(FunctionalObjective.Definition(node.out, node.outIsBool, node, compute))
+            cone.add(FunctionalObjective.Definition(node.out, node.outIsBool, node,
+                keepsOutputOnNoWrite = node is ElementResultDefinition, compute = compute))
             for (input in node.intInputs) {
                 cancellation.charge(1)
                 if (cancellation()) return null

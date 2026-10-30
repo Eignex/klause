@@ -331,6 +331,7 @@ object PortfolioBuilder {
                     shareMaxLbd = scenario.clauseShareMaxLbd,
                     shareMaxLen = scenario.clauseShareMaxLen,
                     softLimitBytes = scenario.sharingMemoryBytes,
+                    booleanOnly = problem.numIntVars == 0,
                 )
             } else {
                 null

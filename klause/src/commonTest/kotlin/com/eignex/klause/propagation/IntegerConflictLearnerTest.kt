@@ -43,6 +43,22 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `a learned row should preserve the fallback backjump target`() {
+        val native = PropagationSession(Problem(0, 3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 8)), arrayOf(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        assertEquals(1, learned.fallbackClause.backjumpLevel)
+        assertEquals(learned.fallbackClause.backjumpLevel, learned.backjumpLevel)
+    }
+
+    @Test
     fun `a cascaded row with an unavailable shared premise should retain clause fallback`() {
         val native = PropagationSession(Problem(0, 6,
             arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24),

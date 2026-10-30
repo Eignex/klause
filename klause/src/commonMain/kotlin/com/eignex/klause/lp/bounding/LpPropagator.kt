@@ -400,10 +400,14 @@ internal class LpPropagator(
         }
     } == true
 
-    fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? =
-        solveOwned { current ->
+    fun solveFloat(
+        warm: Basis? = null,
+        token: Cancellation = cancellation,
+        continuationWorkAllowance: (() -> Long?)? = null,
+    ): Pair<LpSolver, FloatLpResult?>? =
+        solveOwned(token.takeIf { onPreparation != null }) { current ->
             val offered = queryWorkAllowance()
-            val continuation = continuationAllowance()
+            val continuation = (continuationWorkAllowance ?: continuationAllowance)()
             if (continuation != null && current.state.depth == 0) {
                 val profile = effort()
                 return@solveOwned current.advanceFloat(
@@ -435,11 +439,25 @@ internal class LpPropagator(
             ).also { solved = true }
         }
 
-    private inline fun <T> solveOwned(action: (LpScopedSolver) -> T): T? = withOwner { current ->
+    private inline fun <T> solveOwned(
+        prepareToken: Cancellation? = null,
+        action: (LpScopedSolver) -> T,
+    ): T? = withOwner { current ->
+        var queryStarted = false
         try {
+            if (prepareToken != null) {
+                val ready = try {
+                    current.prepare(prepareToken)
+                } finally {
+                    onPreparation?.invoke(takePreparationMetrics(current))
+                }
+                if (!ready) return@withOwner null
+            }
+            queryStarted = true
             action(current)
         } finally {
-            recordWork(current)
+            lastMetrics = (if (queryStarted) current.lastMetrics else LpSolveMetrics()) +
+                takePreparationMetrics(current)
         }
     }
 
@@ -468,10 +486,6 @@ internal class LpPropagator(
         nextWitness = 0L
         sourcePremises = LpSourcePremises(requireNotNull(modelKey))
         return true
-    }
-
-    private fun recordWork(current: LpScopedSolver) {
-        lastMetrics = current.lastMetrics + takePreparationMetrics(current)
     }
 
     private fun takePreparationMetrics(current: LpScopedSolver): LpSolveMetrics {
