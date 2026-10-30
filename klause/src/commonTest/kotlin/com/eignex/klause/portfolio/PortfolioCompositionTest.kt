@@ -20,6 +20,34 @@ import kotlin.test.assertTrue
 
 class PortfolioCompositionTest {
     @Test
+    fun `an explicit pool should retain its arithmetic settings`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+        val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK).copy(
+            btPool = listOf { BacktrackCatalog.byLabel("lp-default") },
+        )
+
+        val arms = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+        assertTrue(arms.none { it.recipe.build(1L, null).integerRowLearning })
+    }
+
+    @Test
+    fun `an annotation template should retain its arithmetic setting`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+        for (enabled in listOf(false, true)) {
+            val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK).copy(
+                annotationArm = BacktrackParams(integerRowLearning = enabled),
+            )
+
+            val arms = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+            assertEquals(enabled, arms.single { it.label == "annotation" }.recipe.build(1L, null).integerRowLearning)
+        }
+    }
+
+    @Test
     fun `default table satisfaction pools should schedule one support aware worker within the containing allowance`() {
         val budget = NodeBudget(limit = 100)
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile, extensionalSupports = true) { false }
