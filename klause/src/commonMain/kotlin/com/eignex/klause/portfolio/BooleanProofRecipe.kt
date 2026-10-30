@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
@@ -17,10 +18,20 @@ internal class BooleanProofRecipe(
 ) {
     val problem: BakedProblem get() = solver.problem
 
-    fun deterministicClauseQuery(): Boolean = params.copy(
+    private fun normalized(): BacktrackParams = params.copy(
         randomSeed = null, nodeBudget = null, cancellation = Cancellation.Never, assumptions = Assumptions.None,
-        onEvent = null, clauseExchange = null, cutExchange = null,
-    ) == BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false)
+        onEvent = null, clauseExchange = null, cutExchange = null, nativeSat = params.nativeSat ?: true,
+    )
+
+    fun deterministicClauseQuery(): Boolean {
+        val query = normalized()
+        val ordered = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false)
+        val firstFail = BacktrackParams(variableSelector = SmallestDomain, valueSelector = IndomainMin,
+            lubyRestartBase = 256L, nativeSat = true)
+        return query == ordered || query == firstFail
+    }
+
+    fun matches(other: BooleanProofRecipe): Boolean = normalized() == other.normalized()
 
     fun conditioned(): BacktrackParams? {
         if (params.lpConfig != null || params.lpPlan != LpPlan()) return null

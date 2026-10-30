@@ -33,6 +33,60 @@ class BooleanProofPortfolioTest {
     }).bake()
 
     @Test
+    fun `native first fail workers should preserve full source task coverage`() {
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+            btPool = listOf { BacktrackCatalog.byLabel("first-fail") })
+        val workers = PortfolioBuilder.build(problem, scenario)
+        try {
+            assertNotNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true)).use { tasks ->
+                val first = tasks.open(0, Cancellation.Never)
+                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+                assertEquals(2, tasks.size)
+                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
+                val second = tasks.open(1, Cancellation.Never)
+                val result = second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+                assertTrue(result is SolveResult.Unsat)
+                assertEquals(2, tasks.completed)
+                assertEquals(first.work + second.work, tasks.work)
+            }
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `mixed supported recipes should decline a shared task board`() {
+        val ordered = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false)
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK, btPool = listOf(
+            { BacktrackWorkerConfig.ofParams("ordered", ordered) },
+            { BacktrackCatalog.byLabel("first-fail") },
+        ))
+        val workers = PortfolioBuilder.build(problem, scenario)
+        try {
+            assertNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true))
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `unsupported first fail settings should decline task sharing`() {
+        val firstFail = BacktrackCatalog.byLabel("first-fail").build(0L, null)
+        for (params in listOf(firstFail.copy(nativeSat = false), firstFail.copy(lubyRestartBase = 128L),
+            firstFail.copy(phaseSaving = true))) {
+            val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+                btPool = listOf { BacktrackWorkerConfig.ofParams("changed", params) })
+            val workers = PortfolioBuilder.build(problem, scenario)
+            try {
+                assertNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true))
+            } finally {
+                workers.forEach { it.close() }
+            }
+        }
+    }
+
+    @Test
     fun `a source probe should split a live decision beyond caller and root pins`() {
         val pinned = Problem(5, 0, emptyArray(), problem.factors + Clause(intArrayOf(Lit.make(1, true)))).bake()
         val pins = mapOf(0 to true)

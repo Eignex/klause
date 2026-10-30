@@ -28,6 +28,15 @@ for proof_seed in "${proof_seed_values[@]}"; do
     [[ "$proof_seed" =~ ^-?[0-9]+$ ]]
 done
 mkdir -p "$proof_output/preparation"
+uname -a > "$proof_output/kernel.txt"
+for proof_metadata in cpuinfo self/cgroup; do
+    if [[ -r "/proc/$proof_metadata" ]]; then
+        cat "/proc/$proof_metadata" > "$proof_output/${proof_metadata##*/}.txt"
+    fi
+done
+if [[ -r /proc/self/status ]]; then
+    awk '/^Cpus_allowed_list:/ {print}' /proc/self/status > "$proof_output/allowed-cpus.txt"
+fi
 printf '%s\n' "$@" > "$proof_output/request.txt"
 proof_time_format='elapsedSeconds\t%e\nuserCpuSeconds\t%U\nsystemCpuSeconds\t%S\nmaxResidentKiB\t%M\nexitStatus\t%x'
 proof_jvm=(-Xmx2560m -XX:ActiveProcessorCount=1
@@ -49,12 +58,16 @@ for proof_seed in "${proof_seed_values[@]}"; do
             proof_case="$proof_output/seed-$proof_seed/repeat-$proof_repeat/$proof_mode"
             mkdir -p "$proof_case"
             proof_status=0
+            printf '%s\t%s\t%s\t%s\tstart\n' "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)" \
+                "$proof_seed" "$proof_repeat" "$proof_mode" >> "$proof_output/execution.tsv"
             env OUT="$proof_case" /usr/bin/time -f "$proof_time_format" -o "$proof_case/process.tsv" \
                 "$proof_java" "${proof_jvm[@]}" \
                 com.eignex.klause.bench.profile.BooleanProofSchedulerProfile \
                 "${proof_arguments[@]}" "seed=$proof_seed" "control=$proof_mode" warmups=0 repeats=1 \
                 > "$proof_case/stdout.txt" 2> "$proof_case/stderr.txt" || proof_status=$?
             printf '%s\n' "$proof_status" > "$proof_case/exit.txt"
+            printf '%s\t%s\t%s\t%s\tfinish\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%S.%NZ)" \
+                "$proof_seed" "$proof_repeat" "$proof_mode" "$proof_status" >> "$proof_output/execution.tsv"
             if ((proof_status != 0)); then proof_failed=1; fi
         done
     done

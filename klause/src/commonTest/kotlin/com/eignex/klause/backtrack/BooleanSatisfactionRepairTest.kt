@@ -27,6 +27,42 @@ class BooleanSatisfactionRepairTest {
     )).bake()
 
     @Test
+    fun `an unpinned first query should remain reusable after completion`() {
+        for (native in listOf(false, true)) {
+            BacktrackSolver(problem).openBooleanProof(BacktrackParams(nativeSat = native)).use { search ->
+                search.begin(Assumptions.None, Long.MAX_VALUE, Double.POSITIVE_INFINITY, Cancellation.Never)
+                val first = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+                val sample = assertNotNull(first.sample)
+                assertTrue(sample.boolValue(0) || sample.boolValue(1))
+
+                search.begin(Assumptions(bools = mapOf(0 to false, 1 to false)), Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY, Cancellation.Never)
+                val refuted = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+                assertNull(refuted.sample)
+                assertEquals(TerminationReason.SearchExhausted, refuted.reason)
+            }
+        }
+    }
+
+    @Test
+    fun `a root witness should survive an exhausted containing quota`() {
+        for (native in listOf(false, true)) {
+            val budget = NodeBudget(0L)
+            val params = BacktrackParams(nativeSat = native, nodeBudget = budget)
+            BacktrackSolver(problem).openBooleanProof(params).use { search ->
+                search.begin(Assumptions(bools = mapOf(0 to true, 1 to false)), Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY, Cancellation.Never)
+                val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+                assertTrue(assertNotNull(result.sample).boolValue(0))
+                assertEquals(0L, budget.spent)
+                assertEquals(0.0, search.stats.search.nodes.sum)
+            }
+        }
+    }
+
+    @Test
     fun `sibling queries should preserve exactly their own Boolean pins`() {
         for (native in listOf(false, true)) {
             BacktrackSolver(problem).openBooleanProof(BacktrackParams(nativeSat = native)).use { search ->

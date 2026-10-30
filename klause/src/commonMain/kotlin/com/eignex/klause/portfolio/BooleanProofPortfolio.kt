@@ -238,7 +238,8 @@ internal class BooleanProofPortfolio(
                 return decline("workers-not-two-canonical-complete")
             val recipes = workers.map { it.booleanProofRecipe ?: return decline("builder-ownership-unavailable") }
             val problem = recipes.first().problem
-            if (recipes.any { it.problem !== problem || !it.deterministicClauseQuery() })
+            if (recipes.any { it.problem !== problem || !it.deterministicClauseQuery() ||
+                    !it.matches(recipes.first()) })
                 return decline("worker-model-or-recipe-mismatch")
             if (problem.numBoolVars !in 2..4096 || problem.numIntVars != 0 || problem.numRealVars != 0 ||
                 problem.hasSymmetryBreaking || problem.rootDeductions is PropagationResult.Unsat ||

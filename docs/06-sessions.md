@@ -76,7 +76,8 @@ A completed fragment closes its requested strict cutoff only when no improving
 working point was found; a better point and completed optimization remain distinct.
 
 A pure Boolean satisfaction repair retains the satisfaction traversal and its prepared
-clause state across sibling pins. Each query has no objective or finite cutoff; a
+clause state across sibling pins. Its first unpinned query uses the constructed root
+directly; a changed or subsequent condition reseeds it. Each query has no objective or finite cutoff; a
 checked witness and an exhausted sample-free query remain distinct. Reseeding resets
 query traversal and root publications while keeping cumulative work, learned state
 and the containing decision allowance. Numeric restrictions, registered integer

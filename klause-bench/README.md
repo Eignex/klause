@@ -299,7 +299,9 @@ profile's source, work, driver, recipe and split arguments plus `seeds=1,3` and
 GC and no JFR. Balanced order alternates within each seed block. Common corpus
 resolution has a separate preparation receipt; child `process.tsv` retains full
 wall/user/system time, final process maximum RSS in KiB and exit status. Failed
-children retain their output and later controls still run. Keep the lab's complete
+children retain their output and later controls still run. Kernel, CPU identity,
+allowed CPU set, cgroup path and serial start/finish events accompany the process
+receipts when the host exposes them; absent metadata remains unavailable. Keep the lab's complete
 preparation and kernel resource receipts; these cold profile controls do not supply
 ordinary CLI or independent source-checking qualification.
 
