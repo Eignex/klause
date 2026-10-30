@@ -142,6 +142,8 @@ Cold preparation first checks a necessary work lower bound within the same cap.
 The check follows the selected mode's row, bound and component stages and charges
 its own inspection; a refusal publishes no template. Persistent base assembly reads
 declared root domains, and live source bounds enter through the scoped adapter.
+After completed preparation rules out a persistent layout, node assembly skips that
+base construction and emits through the retained source adapter directly.
 Noncompact exact and IEEE layouts use retained source emission.
 An incomplete attempt publishes no snapshot. Compatible views share one atomic
 publication slot per source/finite scope, including temporary presolve bakes.

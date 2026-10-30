@@ -756,6 +756,8 @@ internal class CpToLpRelaxation(
      * column is re-derivable, live column bounds suffice to reuse the fixed relaxation layout.
      */
     private var structurallyPersistent: Boolean = false
+    private var persistencePreparationComplete = false
+    internal val persistentLayoutPossible: Boolean get() = !persistencePreparationComplete || structurallyPersistent
 
     init {
         projections?.requireSource(problem)
@@ -763,6 +765,7 @@ internal class CpToLpRelaxation(
     }
 
     fun preparation(): Iterator<Unit> = sequence {
+        persistencePreparationComplete = false
         if (cumulative || diffn) {
             val owner = CumulativeRelaxation(
                 builtInFamilySource, includeCumulative = cumulative, includeDiffn = diffn, deferred = true,
@@ -781,6 +784,7 @@ internal class CpToLpRelaxation(
             }
             if ((fid + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
         }
+        persistencePreparationComplete = true
     }.iterator()
 
     private val cone: FactorConeProjection? by lazy {

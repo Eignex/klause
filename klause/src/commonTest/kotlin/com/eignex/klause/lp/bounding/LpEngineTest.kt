@@ -11,6 +11,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.OpenIntBounds
+import com.eignex.klause.lp.RelaxationProjection
+import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -37,6 +39,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.SearchDecision
@@ -51,6 +54,28 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpEngineTest {
+    @Test
+    fun `nonpersistent node layouts should emit each factor once`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+        ))
+        var emissions = 0
+        val projections = FactorProjectionProviders(relaxation = RelaxationProjectionProvider {
+            RelaxationProjection(RelaxationCapability.SOUND) { _, builder ->
+                emissions++
+                builder.linearRow(LinearOp.GE, intArrayOf(0), longArrayOf(1), 2)
+            }
+        }).prepare(problem)
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("nonpersistent-emission"),
+            projections = projections).use { engine ->
+
+            assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), PropagationSession(problem)))
+
+            assertEquals(1, emissions)
+        }
+    }
+
     @Test
     fun `retained layouts accept noncompact exact source rows`() {
         val coefficient = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE
