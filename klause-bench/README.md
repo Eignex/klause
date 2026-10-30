@@ -82,6 +82,8 @@ learning over retained columns. `WarmClauseWork` and `WarmClauseNanos` are subse
 of preparation, not additional totals. Copies spend unused local BVE allowance
 and the remaining modeled scratch grant; canonical learning and exchange state
 remain owned by canonical.
+`BakeConstructionEntries` and `BakePropagationWork` expose the private root bake;
+both debit the containing allowance and are preparation subsets.
 
 Run from the repository root with JDK 25 or newer:
 

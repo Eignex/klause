@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.OWN_ORIGIN
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -95,6 +96,31 @@ class PrivateRebuildGenerationTest {
             assertEquals(1, session.problem.numFactors)
             assertNull(session.boolValue(0))
         }
+    }
+
+    @Test
+    fun `cancellation during private baking should withhold the generation`() {
+        val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
+        var stopped = false
+        var constructions = 0
+        val meter = object : RootWorkMeter {
+            override fun charge(units: Long) = Unit
+            override fun propagation(units: Long) = Unit
+            override fun construction(entries: Long) {
+                constructions++
+                stopped = true
+            }
+        }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = stopped
+            override fun workMeter(): RootWorkMeter = meter
+        }
+
+        val generation = PrivateRebuildGeneration.prepare(PropagationSession(source), 1_048_576L, token)
+
+        assertNull(generation)
+        assertEquals(1, constructions)
+        assertEquals(1, source.numFactors)
     }
 
     @Test
