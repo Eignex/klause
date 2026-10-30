@@ -90,6 +90,10 @@ internal sealed interface FetchMethod {
      *  compressed inside, e.g. XCSP3 `*.xml.lzma`). */
     data object Zip : FetchMethod
 
+    /** Fetch the uniquely named ZIP member through bounded HTTP ranges, unpack optional XZ compression,
+     *  and require the original plain bytes to match [sha256]. [name] is a basename, not an archive path. */
+    data class ZipMember(val name: String, val sha256: String) : FetchMethod
+
     /** Download each of [names] from under [ExternalCollection.url] and [convert] it, (file name, text) to
      *  (instance name, file text) pairs written as `<instance>.<extension>`, for a library whose instances need
      *  translating, such as OR-Library's own text formats into MPS. */
