@@ -38,6 +38,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 internal object OrdinaryArithmeticLearningProfile {
@@ -133,10 +135,12 @@ internal object OrdinaryArithmeticLearningProfile {
                     if (native == null) {
                         native = session
                         attachment = origin
-                        integerRowsAtCapture = session.learnedLifecycle()["learningIntegerAdmitted"] ?: 0L
-                        capture = PreparedArithmeticLearningProfile.Capture(
+                        val recorder = PreparedArithmeticLearningProfile.Capture(
                             session, 1024, 65536, captureFirstInteger = learning && traceMode == "first-integer",
                         )
+                        capture = recorder
+                        integerRowsAtCapture = recorder.lifecycle()["learningIntegerAdmitted"]
+                            ?.jsonPrimitive?.longOrNull ?: 0L
                     }
                     check(native === session)
                 }

@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 
 class ArithmeticLearningTraceTest {
     @Test
-    fun `focused branch markers should retain one attempt per consumer within the cap`() {
+    fun `focused capture should retain branch attempts within its allowance`() {
         for (kind in listOf("traversal.pick", "traversal.attempt")) {
             val trace = ArithmeticLearningTrace(maxEvents = 4, maxWords = 16).apply { captureFirstInteger = true }
             trace.stored(4, "integer")
