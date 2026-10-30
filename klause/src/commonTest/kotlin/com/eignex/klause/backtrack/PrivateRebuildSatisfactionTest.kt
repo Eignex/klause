@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -84,7 +85,7 @@ class PrivateRebuildSatisfactionTest {
     @Test
     fun `an unchanged baked root should solve without preparing a private generation`() {
         for (pinned in listOf(false, true)) {
-            val clauses = if (pinned) {
+            val clauses: Array<Factor> = if (pinned) {
                 arrayOf(Clause(intArrayOf(0)), Clause(intArrayOf(2, 4)))
             } else arrayOf(Clause(intArrayOf(0, 2, 4)))
             val source = Problem(3, 0, emptyArray(), clauses).bake()
