@@ -310,7 +310,7 @@ kinds or unnameable atoms withhold a complete-incidence claim.
 `integerRowLearning` controls typed integer learning independently of pseudo-Boolean
 learning. Direct backtrack parameters default it to false; the
 [portfolio policy](12-portfolio.md#model-specific-worker-recipes) selects it for one
-worker on binary integer linear models. Mandatory
+worker in single-core CP over binary integer linear models. Mandatory
 finite `Linear` inequalities and the explaining half of equalities provide integer
 rows. Mandatory `ExactLinear` rows provide the same source when every coordinate is
 integer and the complete compact projection preserves their word-sized constants,
