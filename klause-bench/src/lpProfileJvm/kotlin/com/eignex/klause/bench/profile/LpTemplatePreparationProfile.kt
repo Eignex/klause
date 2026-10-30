@@ -5,9 +5,12 @@ import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.lp.engine.LpExactState
+import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.LpRetainedSources
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.authoritativeWithTemplates
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -29,7 +32,10 @@ import kotlin.time.Duration.Companion.seconds
 internal object LpTemplatePreparationProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size == 4)
+        require(args.size in 4..5)
+        val route = args.getOrElse(4) { "standalone" }.also {
+            require(it in listOf("standalone", "retained"))
+        }
         val file = if (args[0].startsWith("selection=")) {
             val line = File(args[0].removePrefix("selection=")).readLines().single { it.isNotBlank() }
             val selected = Json.parseToJsonElement(line).jsonObject
@@ -118,22 +124,41 @@ internal object LpTemplatePreparationProfile {
                                 projections = selectedView, templateStats = sink,
                                 reuseSourceTemplates = mode != "disabled", reuseTemplateIndexes = mode != "object",
                                 reuseTemplateMetadata = mode == "candidate", preparationCancellation = consumerToken)
-                            val relaxation = try {
-                                consumer.build(RootDomains(view), cancellation = consumerToken)
+                            val result = try {
+                                if (route == "retained") {
+                                    LpScopedSolver(LpExactState(LpRetainedSources.emptyModel()),
+                                        cancellation = consumerToken).use { owner ->
+                                        val sources = LpRetainedSources(view, consumer)
+                                        val edit = sources.prepare(owner.state, RootDomains(view), consumerToken)
+                                            ?: if (consumerToken()) throw LpAssemblyCancelled()
+                                            else error("retained source import declined")
+                                        check(owner.replaceRows(edit.retired, edit.columns, edit.rows, false,
+                                            token = consumerToken, objective = edit.objective))
+                                        edit.commit()
+                                        assemblyNs += System.nanoTime() - opening
+                                        val solving = System.nanoTime()
+                                        requireNotNull(owner.solve(token = token)).also {
+                                            solveNs += System.nanoTime() - solving
+                                        }
+                                    }
+                                } else {
+                                    val relaxation = consumer.build(RootDomains(view), cancellation = consumerToken)
+                                    assemblyNs += System.nanoTime() - opening
+                                    val solving = System.nanoTime()
+                                    val exact = requireNotNull(relaxation.authoritativeWithTemplates(token) {
+                                        consumer.observeBoundTemplates(it)
+                                    })
+                                    solveAndCertify(exact, cancellation = token).also {
+                                        solveNs += System.nanoTime() - solving
+                                    }
+                                }
                             } catch (_: LpAssemblyCancelled) {
                                 check(change == "cancel" && step % 2 == 1)
                                 assemblyNs += System.nanoTime() - opening
                                 results.add("cancelled")
                                 return@consumers
                             }
-                            assemblyNs += System.nanoTime() - opening
                             retainedUnits = maxOf(retainedUnits, consumer.preparationTemplates?.storageUnits ?: 0L)
-                            val solving = System.nanoTime()
-                            val exact = requireNotNull(relaxation.authoritativeWithTemplates(token) {
-                                consumer.observeBoundTemplates(it)
-                            })
-                            val result = solveAndCertify(exact, cancellation = token)
-                            solveNs += System.nanoTime() - solving
                             results.add("${result.verdict}:${result.lowerBound}:${result.witness?.objective}")
                             if (step == 0) coldNs = System.nanoTime() - start
                         }
@@ -147,6 +172,7 @@ internal object LpTemplatePreparationProfile {
                         val assembly = phases["TEMPLATE_ASSEMBLY_NODE"]
                         val record = buildJsonObject {
                             put("source", file.name)
+                            put("route", route)
                             put("sourceSha256", hash)
                             put("parseNs", parseNs)
                             put("round", round)

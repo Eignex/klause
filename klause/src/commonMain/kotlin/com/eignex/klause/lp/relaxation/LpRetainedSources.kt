@@ -238,7 +238,13 @@ internal class LpRetainedSources(
             val fragment = emission.relaxation
             emittedExtent += fragment.model.n.toLong() + fragment.model.m +
                 (fragment.model.doubleView?.colVal?.size ?: fragment.model.csc.rowIdx.size)
-            val source = fragment.model.authoritativeModel() ?: return null
+            val source = if (fragment.preparationTemplates?.objectiveIndependent == true &&
+                fragment.model.exactState == null && fragment.model.doubleView == null
+            ) {
+                fragment.authoritativeWithTemplates(cancellation)
+            } else {
+                fragment.model.authoritativeModel()
+            } ?: return null
             require(source.objective.scale.value == BigFraction.ONE && source.objective.externalConstant.value.isZero)
             val mapped = IntArray(source.n)
             for (local in mapped.indices) {
