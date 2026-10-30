@@ -95,6 +95,7 @@ object BooleanProofSchedulerProfile {
                 var totalTasks = 0
                 var schedulerWork = 0L
                 var admitted = false
+                var decline: String? = null
                 val result = if (driver == "portfolio") {
                     val recipeFactory = BacktrackRecipe(recipe) { workerSeed, event ->
                         val params = if (recipe == "input-order") BacktrackParams(
@@ -116,6 +117,7 @@ object BooleanProofSchedulerProfile {
                             totalTasks = access.size
                             schedulerWork = access.work
                             admitted = access.size > 0
+                            decline = access.decline
                         }
                     }
                 } else if (mode == "tasks") {
@@ -150,6 +152,7 @@ object BooleanProofSchedulerProfile {
                     put("taskDriver", driver)
                     put("nativeSat", native)
                     put("taskRouteAdmitted", admitted)
+                    put("taskRouteDecline", decline)
                     put("sharing", driver == "portfolio")
                     put("presolve", false)
                     put("iteration", iteration)
@@ -186,10 +189,11 @@ object BooleanProofSchedulerProfile {
         fun enable(value: Boolean) {
             type.methods.single { it.name.startsWith("setDisjointBooleanProof") }.invoke(target, value)
         }
+        val decline: String? get() = read("getLastBooleanProofDecline") as String?
         val completed: Int get() = read("getLastBooleanProofCompleted") as Int
         val size: Int get() = read("getLastBooleanProofTasks") as Int
         val work: Long get() = read("getLastBooleanProofWork") as Long
-        private fun read(prefix: String): Any = type.methods.single { it.name.startsWith(prefix) }.invoke(target)
+        private fun read(prefix: String): Any? = type.methods.single { it.name.startsWith(prefix) }.invoke(target)
     }
 
     private fun processPeakRssBytes(): Long? {

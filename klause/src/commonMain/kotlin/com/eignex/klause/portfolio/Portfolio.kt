@@ -158,6 +158,8 @@ class Portfolio(
         private set
     internal var lastBooleanProofWork: Long = 0L
         private set
+    internal var lastBooleanProofDecline: String? = null
+        private set
     internal var incumbentProbeArms: Set<Int> = emptySet()
     internal var initialProbeWeights: IntArray = intArrayOf()
         set(value) {
@@ -226,10 +228,12 @@ class Portfolio(
         lastBooleanProofTasks = 0
         lastBooleanProofCompleted = 0
         lastBooleanProofWork = 0L
+        lastBooleanProofDecline = if (disjointBooleanProof) "unsupported-schedule" else "disabled"
         var proofTasks: BooleanProofPortfolio? = null
         if (disjointBooleanProof && lanes == 1 && baseSliceWork == 5000L &&
             maxSliceWork == 150000L && sliceGrowth == 1.5) {
-            proofTasks = BooleanProofPortfolio.forWorkers(workers)
+            lastBooleanProofDecline = null
+            proofTasks = BooleanProofPortfolio.forWorkers(workers) { lastBooleanProofDecline = it }
             proofTasks?.let { run.restrictAvailability(it::available) }
         }
         val verdicts = ArrayList<SolveResult>()

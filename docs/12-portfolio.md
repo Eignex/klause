@@ -489,6 +489,8 @@ coverage. Closing one lane returns its unresolved region; idle lanes are exclude
 from selection. Runtime admission requires one canonical pure Boolean model, exactly
 matching source and execution conditions, absent objectives and identical supported
 deterministic recipes. Private model generations and uncaptured conditions decline.
+A known pooled cut adapter is dormant under the required LP-off satisfaction
+recipe and is omitted from task queries; active or opaque cut hooks decline.
 The integration switch is internal and disabled.
 
 ### Slice accounting and coverage
