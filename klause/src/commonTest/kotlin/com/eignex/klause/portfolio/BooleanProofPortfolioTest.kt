@@ -39,7 +39,7 @@ class BooleanProofPortfolioTest {
             val params = List(2) { worker -> BacktrackParams(randomSeed = worker.toLong(), nativeSat = native,
                 variableSelector = InputOrder, valueSelector = IndomainMin,
                 clauseExchange = PoolClauseExchange(pool, origin = worker).conditioned()) }
-            BooleanProofPortfolio(guarded, context, listOf(0, 1), params).use { tasks ->
+            BooleanProofPortfolio(guarded, context, listOf(1, 0), params).use { tasks ->
                 val first = tasks.open(0, Cancellation.Never)
                 val second = tasks.open(1, Cancellation.Never)
                 assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
