@@ -233,7 +233,10 @@ the compact immutable layout remains available for later node adoption, while ot
 retain their source emissions. Cut-bearing consultations keep propagation-derived root bounds,
 preserving completed cut-owner results across later node adoption.
 Completed cold layout construction and template imports debit the containing LP allowance, and
-root cancellation withholds an incomplete installation. A declined retained source layout
+the containing worker token and remaining root work cap bound their preparation. The
+root-local clock gates numerical queries and checking. A completed source layout can
+remain private for later node queries after that consultation expires; a containing-phase
+interruption withholds an incomplete installation. A declined retained source layout
 retires that attempt and uses the existing standalone numerical route within the
 same remaining work and storage limits.
 

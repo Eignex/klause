@@ -1214,7 +1214,8 @@ internal class ResumableMinimize(
      */
     private fun initRootLp(token: Cancellation): Boolean {
         val relaxer = lpEngine.harvestRootRelaxation(token) ?: return false
-        val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token)
+        val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token,
+            preparationCancellation = rootLpPreparationBudget())
         sink.lp.observeRootBound(0, rootBound)
         // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound global lower
         // bound on the optimum, so a peer arm can pair it with its own incumbent to prove optimality. A
@@ -1245,14 +1246,17 @@ internal class ResumableMinimize(
         // run, and the search inherits them, so nothing downstream is comparable to itself; bounding it
         // by work makes the harvest a property of the model. The deadline stays as the backstop for
         // cost the meter cannot see.
-        val opsBudget = lpEngine.params.lpPlan.rootMaxWork
-        // The shared LP work allowance caps it too, so an expensive-but-useless root relaxation cannot spend
-        // more than the whole LP subsystem is allotted before search starts.
-        return params.cancellation or
-            Cancellation { lpEngine.workSpentExceeds(opsBudget, sink.lp.standaloneWork) ||
-                lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork) } or
+        return rootLpPreparationBudget() or
             if (params.cancellation.workScheduled()) Cancellation.Never else
                 Cancellation.after(budgetMillis.coerceAtLeast(0).milliseconds)
+    }
+
+    private fun rootLpPreparationBudget(): Cancellation {
+        if (params.lpPlan.rootBudgetFraction <= 0.0) return params.cancellation
+        val opsBudget = lpEngine.params.lpPlan.rootMaxWork
+        return params.cancellation or
+            Cancellation { lpEngine.workSpentExceeds(opsBudget, sink.lp.standaloneWork) ||
+                lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork) }
     }
 
     /** Milliseconds left until the effective deadline: the armed slice end (pausable portfolio path),

@@ -1403,6 +1403,13 @@ internal fun LpEngine.rootLpRelaxationBound(
     relaxer: CpToLpRelaxation,
     globalCuts: List<Cut>,
     cancellation: Cancellation = Cancellation.Never,
+): Double = rootLpRelaxationBound(relaxer, globalCuts, cancellation, cancellation)
+
+internal fun LpEngine.rootLpRelaxationBound(
+    relaxer: CpToLpRelaxation,
+    globalCuts: List<Cut>,
+    cancellation: Cancellation,
+    preparationCancellation: Cancellation,
 ): Double {
     val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.ROOT), LpSolvePhase.ROOT_QUERY)
     val before = totalSolveWork()
@@ -1414,7 +1421,7 @@ internal fun LpEngine.rootLpRelaxationBound(
     var stage = "ENTRY"
     return try {
         if (retainedRootEnabled) {
-            retainedRootLpRelaxationBound(relaxer, globalCuts, cancellation) { stage = it }
+            retainedRootLpRelaxationBound(relaxer, globalCuts, cancellation, preparationCancellation) { stage = it }
         } else {
             stage = "AT_SOURCE_LAYOUT"
             standaloneRootLpRelaxationBound(relaxer, globalCuts, cancellation).also {
@@ -1437,6 +1444,7 @@ private fun LpEngine.retainedRootLpRelaxationBound(
     relaxer: CpToLpRelaxation,
     globalCuts: List<Cut>,
     cancellation: Cancellation,
+    preparationCancellation: Cancellation,
     observeStage: (String) -> Unit,
 ): Double {
     if (retainedRootRemainingWork() <= 0L) {
@@ -1453,8 +1461,11 @@ private fun LpEngine.retainedRootLpRelaxationBound(
         PropagationSession(problem, cancellation)
     }
     observeStage("AT_SOURCE_LAYOUT")
-    val relaxation = (if (root == null) sourceRootRelaxation(relaxer, globalCuts, cancellation)
-        else nodeRelaxation(relaxer, root, globalCuts)) ?: run {
+    val relaxation = (if (root == null) {
+        val preparation = preparationCancellation or params.cancellation or
+            Cancellation { retainedRootRemainingWork() <= 0L }
+        sourceRootRelaxation(relaxer, globalCuts, preparation)
+    } else nodeRelaxation(relaxer, root, globalCuts)) ?: run {
         if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootSourceLayoutDeclined" to 1L)
         cpAdapter.reset()
         if (retainedRootRemainingWork() <= 0L) {

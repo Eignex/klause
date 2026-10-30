@@ -52,6 +52,34 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `root query cancellation preserves completed preparation for node queries`() {
+        val problem = boundedProblem().bake()
+        val sink = SolveStatsSink("retained-root-preparation")
+        var rootPolls = 0
+        val rootToken = Cancellation { rootPolls++ > 0 }
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)), sink,
+            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            SearchSession(listOf(cp, engine.propagator)).initialize()
+            val relaxer = assertNotNull(engine.lpRelaxer)
+
+            val root = engine.rootLpRelaxationBound(relaxer, emptyList(), rootToken,
+                preparationCancellation = Cancellation.Never)
+            val prepared = sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls ?: 0L
+            val node = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
+            val bound = assertNotNull(engine.solveNode(node.model, null, Cancellation.Never)?.second).objective
+
+            assertTrue(root.isNaN())
+            assertTrue(prepared > 0L)
+            assertEquals(prepared, sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls)
+            assertEquals(3.0, bound)
+        }
+    }
+
+    @Test
     fun `source root bounds exclude live search restrictions`() {
         val problem = boundedProblem()
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
