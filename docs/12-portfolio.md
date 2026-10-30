@@ -707,7 +707,8 @@ annotated, or execution is parallel or single-engine. See
   and an unproductive trial retires it without claiming exhaustion.
 
 Curated optimization over binary integer columns and complete unconditional integer
-linear rows uses its first `lp-default` recipe for bounded integer-row learning.
+linear rows uses its first `satOptimized` recipe for bounded integer-row learning
+when the LP ceiling permits bounding.
 It spends the existing slot's allowance and keeps rows private to its prepared
 session. Caller edits follow this policy, so an explicit integer-row setting has
 authority. Named pools and annotation templates supply their own parameters.

@@ -24,7 +24,7 @@ class PortfolioCompositionTest {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
             binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
         val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK).copy(
-            btPool = listOf { BacktrackCatalog.byLabel("lp-default") },
+            btPool = listOf { BacktrackCatalog.byLabel("satOptimized") },
         )
 
         val arms = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()

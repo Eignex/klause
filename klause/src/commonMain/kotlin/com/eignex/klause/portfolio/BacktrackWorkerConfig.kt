@@ -208,7 +208,7 @@ internal class BacktrackWorkerConfig(
             val order = BacktrackCatalog.ranked(kind, facts)
             val arithmeticIndex = if (kind == Kind.COP && facts.integerColumnsOnly && facts.binaryIntegers &&
                 facts.integerLinear && lpCeiling.resolved(LpTechnique.BOUNDING)) {
-                order.indexOfFirst { it.label == "lp-default" }
+                order.indexOfFirst { it.label == "satOptimized" }
             } else -1
             return List(count) {
                 val recipe = order[it % order.size]
