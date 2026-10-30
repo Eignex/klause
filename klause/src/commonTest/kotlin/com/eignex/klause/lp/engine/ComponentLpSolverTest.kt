@@ -15,6 +15,26 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `a completed logical child withholds a point on a strict boundary`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        builder.addRow(intArrayOf(), longArrayOf(), Relation.LE, 0L)
+        val legacy = builder.build(Sense.MINIMIZE)
+        legacy.rowStrict[2] = true
+        val state = LpExactState(assertNotNull(legacy.authoritativeModel()))
+        val owner = assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel())))
+
+        owner.use {
+            assertTrue(assertNotNull(it.solve()).optimal)
+
+            assertNull(it.exactWitness())
+        }
+    }
+
+    @Test
     fun `an isolated improving direction withholds complete component points and tableaux`() {
         val builder = LpBuilder()
         repeat(2) {
