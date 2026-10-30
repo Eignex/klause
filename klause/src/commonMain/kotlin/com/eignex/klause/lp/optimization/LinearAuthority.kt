@@ -80,6 +80,7 @@ internal class LinearAuthority(
     private var capturedTemplate: LinearAuthorityTemplate? = null
     private var pointListener: ((LinearAuthorityQuery, List<BigFraction>) -> Unit)? = null
     private var pointPolicy: LinearAuthorityPointCuts? = null
+    private val retainCurrentCutLayout = false
     private var pointFamily: LinearAuthorityTemplate? = null
     private var pointFallback: LinearAuthorityTemplate? = null
     private var directedFamily: LinearAuthorityTemplate? = null
@@ -401,7 +402,7 @@ internal class LinearAuthority(
         mask == null || pointPolicy?.candidatesRetired(template?.cuts?.rows) != true
 
     private fun retainMaskedCuts(mask: Set<Int>?): Boolean =
-        mask != null && pointPolicy?.managesCurrentRecipe(template?.cuts?.rows) == true
+        retainCurrentCutLayout && mask != null && pointPolicy?.managesCurrentRecipe(template?.cuts?.rows) == true
 
     private fun prepareQuery(
         source: SourceProofContext, cancellation: Cancellation, cuts: Boolean, cutMask: Set<Int>?,

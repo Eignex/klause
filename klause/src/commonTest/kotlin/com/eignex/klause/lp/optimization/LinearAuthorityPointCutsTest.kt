@@ -363,7 +363,7 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
-    fun `retiring an installed source row should suspend it without replacing the numerical owner`() {
+    fun `retiring an installed source row should retain its checked bound after numerical replacement`() {
         val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val premises = linkedMapOf("rounded" to SourcePremise(SourceInequality(
             mapOf(x to BigFraction.ofLong(2), y to BigFraction.ofLong(2)), BigFraction.ofLong(3))),
@@ -390,7 +390,7 @@ class LinearAuthorityPointCutsTest {
 
             assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
             assertTrue(capture.records.last().cuts.none { it.installed })
-            assertEquals(1L, authority.preparations)
+            assertEquals(2L, authority.preparations)
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(child.withLinearAuthority())
                 .verify(assertNotNull(result.bound)))
         }
