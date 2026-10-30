@@ -17,6 +17,7 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Runners
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.bench.tools.CliProfile
 import com.eignex.klause.formats.json.ProblemJson
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.portfolio.BacktrackCatalog
@@ -38,7 +39,10 @@ import com.eignex.klause.util.Cancellation
 import com.sun.management.OperatingSystemMXBean
 import com.sun.management.ThreadMXBean
 import java.io.File
+import java.io.PrintStream
 import java.lang.management.ManagementFactory
+import jdk.jfr.Configuration
+import jdk.jfr.Recording
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.encodeToString
@@ -54,7 +58,7 @@ internal object OrdinaryArithmeticLearningProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
             it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
-                "attribution", "recipe", "seed", "worker-seed", "route")
+                "attribution", "recipe", "seed", "worker-seed", "route", "samples")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -62,7 +66,9 @@ internal object OrdinaryArithmeticLearningProfile {
         val timeout = (options["timeout-ms"] ?: "10000").toLong().also { require(it in 1..30_000L) }
         val nodes = (options["nodes"] ?: "4096").toLong().also { require(it in 1..100_000L) }
         val traceMode = options["trace"] ?: "first-integer"
-        require(traceMode in setOf("initial", "first-integer"))
+        require(traceMode in setOf("initial", "first-integer", "none"))
+        val tracing = traceMode != "none"
+        val samples = (options["samples"] ?: "false").toBooleanStrict()
         val lp = options["lp"] ?: "auto"
         require(lp in setOf("auto", "off"))
         val attribution = (options["attribution"] ?: "false").toBooleanStrict()
@@ -121,6 +127,11 @@ internal object OrdinaryArithmeticLearningProfile {
         val codec = ProblemJson()
         out.resolve("ordinary-learning.jsonl").bufferedWriter().use { output ->
             for (learning in listOf(false, true)) {
+                val label = if (learning) "integer" else "clause"
+                val recording = if (samples) Recording(Configuration.getConfiguration("profile")).apply {
+                    maxSize = 33_554_432L
+                    start()
+                } else null
                 val allocatedBefore = allocationBean?.getThreadAllocatedBytes(thread) ?: -1L
                 val cpuBefore = cpuBean?.processCpuTime ?: -1L
                 val opened = System.nanoTime()
@@ -132,7 +143,6 @@ internal object OrdinaryArithmeticLearningProfile {
                     original, FiniteEngine.BACKTRACK, entry.objective,
                     cancellation = stop, solveCancellation = stop, randomSeed = seed,
                 ))
-                val label = if (learning) "integer" else "clause"
                 val originalJson = codec.encodeToString(original)
                 val preparedJson = codec.encodeToString(prepared.problem)
                 require(originalJson.encodeToByteArray().size <= 131_072 &&
@@ -195,7 +205,9 @@ internal object OrdinaryArithmeticLearningProfile {
                         return picked
                     }
                 }
-                fun observingParams(originalParams: BacktrackParams): BacktrackParams = originalParams.copy(
+                fun observingParams(originalParams: BacktrackParams): BacktrackParams = if (!tracing) {
+                    originalParams.copy(propagationAttribution = attribution)
+                } else originalParams.copy(
                     variableSelector = observing(originalParams.variableSelector),
                     propagationAttribution = attribution,
                     branchObserver = object : SearchBranchAttemptObserver {
@@ -273,6 +285,16 @@ internal object OrdinaryArithmeticLearningProfile {
                 val elapsed = System.nanoTime() - opened
                 val allocatedAfter = allocationBean?.getThreadAllocatedBytes(thread) ?: -1L
                 val cpuAfter = cpuBean?.processCpuTime ?: -1L
+                if (recording != null) {
+                    recording.use {
+                        it.stop()
+                        val file = out.resolve("$label.jfr")
+                        it.dump(file.toPath())
+                        PrintStream(out.resolve("$label-samples.txt")).use { summary ->
+                            CliProfile.summarizeCli(file, summary, "$label invocation")
+                        }
+                    }
+                }
                 val record = buildJsonObject {
                     put("revision", Reports.readGitSha())
                     put("provenanceFingerprint", fingerprint)
@@ -291,12 +313,14 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("recipe", recipe)
                     put("route", route)
                     put("targetRecipe", targetRecipe)
-                    put("ignoredSessionAttachments", ignoredSessionAttachments)
+                    put("ignoredSessionAttachments", if (tracing) ignoredSessionAttachments else null)
                     put("maxDecisions", nodes)
                     put("timeoutMs", timeout)
                     put("traceMode", traceMode)
-                    put("selectorPicks", picks)
-                    put("branchAttempts", attempts)
+                    put("sampleRecording", if (samples) "$label.jfr" else null)
+                    put("sampleRecordingMaxBytes", if (samples) 33_554_432L else null)
+                    put("selectorPicks", if (tracing) picks else null)
+                    put("branchAttempts", if (tracing) attempts else null)
                     put("captureAttachment", attachment)
                     put("integerRowsAtCapture", integerRowsAtCapture)
                     put("verdict", verdict)
