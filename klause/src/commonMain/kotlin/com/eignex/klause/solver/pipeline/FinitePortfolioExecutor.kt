@@ -103,11 +103,12 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionEligibility = numericalCompanions?.let {
         finiteNumericalCompanionEligibility(problem, scenario, objective, it)
     }
-    val companions = if (companionEligibility?.admitted == true) {
+    val companionPreparation = if (companionEligibility?.admitted == true) {
         FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, companionEligibility.requirements.construction, scenario.companionAfterIncumbent,
             incumbentCompletionCheck)
     } else null
+    val companions = companionPreparation?.companions
     companionEligibility?.let { eligibility ->
         val declines = if (eligibility.admitted && companions == null) listOf("complete-affine-capture-unavailable")
         else eligibility.declines
@@ -171,6 +172,12 @@ internal fun FinitePipeline.portfolioExecutor(
         objective,
         onFault,
         optimizationIncumbents = companions?.incumbents,
+        preparationStages = companionPreparation?.let {
+            mapOf("finiteCompanionPreparationAttempts" to 1L,
+                "finiteCompanionPreparationNs" to it.elapsedNanos,
+                "finiteCompanionPreparationReady" to if (companions != null) 1L else 0L,
+                "finiteCompanionPreparationUnavailable" to if (companions == null) 1L else 0L)
+        }.orEmpty(),
     ) { workers ->
         val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
         val shares = if (proofShares.isEmpty()) {

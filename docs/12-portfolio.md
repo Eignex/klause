@@ -83,8 +83,8 @@ checked-reconstruction publication mapping, private resumable state, and structu
 construction dimensions. Dimensions estimate setup
 size rather than elapsed time or retained bytes. Numerical requirements also carry
 the containing per-owner LP work/allocation ceilings, active-time limit and segment
-limits; construction uses those same ceilings. Candidate checks and typed terminal
-verification remain the authority boundary.
+limits; LP construction and retained queries share those ceilings. Candidate checks
+and typed terminal verification remain the authority boundary.
 
 `SearchEvent.WorkerAdmission` reports these requirements and explicit decline causes,
 distinguishing eligible catalog candidates from composition-selected workers.
@@ -93,6 +93,14 @@ their actual worker authority. Explicit named recipes bypass automatic filtering
 An explicit arm count, including the default-sized count, prevents automatic numerical
 companions. A missing complete affine capture declines both companions without
 removing finite workers.
+
+Shared affine preparation precedes worker factories. Final invocation stage
+counters report `finiteCompanionPreparationAttempts`, `finiteCompanionPreparationNs`,
+`finiteCompanionPreparationReady` and `finiteCompanionPreparationUnavailable`,
+including captures whose workers receive no query. The time spans duplicate
+difference-factor filtering and immutable capture; it excludes factories, queries,
+candidate checks and retirement. It belongs to containing solve time and grants no
+new allowance or source authority.
 
 `source-incumbent-completion=true` lets the numerical and joint-repair companions
 use an approximate incumbent's Boolean and finite integer coordinates as advisory

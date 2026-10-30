@@ -34,6 +34,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 internal val PreparedSourceInvocation.requestsFiniteNumericalCompanions: Boolean get() =
     request.linearTraversal == LinearTraversal.FINITE_COMPANIONS ||
@@ -89,6 +90,8 @@ internal class FiniteNumericalCompanions private constructor(
     private val afterIncumbent: Boolean,
     private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?,
 ) {
+    class Preparation(val companions: FiniteNumericalCompanions?, val elapsedNanos: Long)
+
     val incumbents = PortfolioIncumbents.exact(objective)
 
     fun factories(plan: PreparedSourcePlan, firstArm: Int): List<PortfolioArmFactory> {
@@ -189,13 +192,18 @@ internal class FiniteNumericalCompanions private constructor(
             cancellation: Cancellation, cost: WorkerConstructionCost,
             afterIncumbent: Boolean = false,
             incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
-        ): FiniteNumericalCompanions? {
+            clock: TimeSource = TimeSource.Monotonic,
+        ): Preparation {
+            val started = clock.markNow()
             // The propagated difference graph duplicates affine rows and bounds in these coordinates.
             val affine = model.withFactors(model.factors.filterNot { it is DifferenceSystem }.toTypedArray())
             val context = affine.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, cancellation,
-                numericalIndicators = true) ?: return null
-            return FiniteNumericalCompanions(model, objective, context, params, cancellation, cost, afterIncumbent,
-                incumbentCompletionCheck)
+                numericalIndicators = true)
+            val companions = context?.let {
+                FiniteNumericalCompanions(model, objective, it, params, cancellation, cost, afterIncumbent,
+                    incumbentCompletionCheck)
+            }
+            return Preparation(companions, started.elapsedNow().inWholeNanoseconds)
         }
     }
 }

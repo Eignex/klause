@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
@@ -25,8 +26,57 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.microseconds
+import kotlin.time.TestTimeSource
 
 class FiniteNumericalCompanionsTest {
+    @Test
+    fun `preparation should time ready and cancelled affine captures`() {
+        for (ready in listOf(false, true)) {
+            val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1))
+            val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+                objective, TheoryParams()).requirements.construction
+            val clock = TestTimeSource()
+            val cancellation = Cancellation {
+                clock += 1.microseconds
+                !ready
+            }
+
+            val prepared = FiniteNumericalCompanions.prepare(model, objective, TheoryParams(), cancellation, cost,
+                clock = clock)
+
+            assertEquals(ready, prepared.companions != null)
+            assertTrue(prepared.elapsedNanos >= 1_000)
+        }
+    }
+
+    @Test
+    fun `preparation accounting should survive cancellation before any worker query`() {
+        for (unavailable in listOf(false, true)) {
+            val factors = if (unavailable) arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0))
+            else emptyArray()
+            val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), factors, numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1))
+            val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+            val scenario = PortfolioScenario.sequential(Kind.COP).copy(companionAfterIncumbent = true)
+
+            val result = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
+                plan, Cancellation.Never, numericalCompletion = true, numericalCompanions = TheoryParams()).use {
+                it.minimize(Cancellation { true }, null)
+            }
+
+            val stages = result.stats.smt.completeSearchStages.orEmpty()
+            assertEquals(1L, stages["finiteCompanionPreparationAttempts"])
+            assertEquals(if (unavailable) 0L else 1L, stages["finiteCompanionPreparationReady"])
+            assertEquals(if (unavailable) 1L else 0L, stages["finiteCompanionPreparationUnavailable"])
+            assertTrue(requireNotNull(stages["finiteCompanionPreparationNs"]) >= 0L)
+            assertTrue(result.stats.portfolio.arms.all { it.lifecycle.firstQueryNanos == null })
+        }
+    }
+
     @Test
     fun `a finite source invocation should deliver accepted progress to the reward interface`() {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
