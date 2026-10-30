@@ -184,7 +184,8 @@ internal class SharedClausePool(
     private fun exceedsLimit(clause: SharedClause, budget: Budget): Boolean {
         val limit = softLimitBytes ?: return false
         val capacity = if (store.size == store.capacity) nextCapacity() else store.capacity
-        return Store.indexBytes(capacity, booleanOnly) + store.payloadBytes + store.additionalPayload(clause, budget) > limit
+        return Store.indexBytes(capacity, booleanOnly) + store.payloadBytes +
+            store.additionalPayload(clause, budget) > limit
     }
 
     private fun nextCapacity(): Int {
@@ -336,8 +337,12 @@ internal class SharedClausePool(
             val boolOwner = if (booleanOnly && clause.boolLits.isEmpty()) -1 else ownerSlot(clause.boolLits, budget)
             val atomOwner = if (booleanOnly) -1 else
                 ownerSlot(clause.atomQuads, budget, if (owners[boolOwner] == null) boolOwner else -1)
-            val boolBytes = if (boolOwner >= 0 && owners[boolOwner] == null) clause.boolLits.size.toLong() * Int.SIZE_BYTES else 0L
-            val atomBytes = if (atomOwner >= 0 && owners[atomOwner] == null) clause.atomQuads.size.toLong() * Long.SIZE_BYTES else 0L
+            val boolBytes = if (boolOwner >= 0 && owners[boolOwner] == null) {
+                clause.boolLits.size.toLong() * Int.SIZE_BYTES
+            } else 0L
+            val atomBytes = if (atomOwner >= 0 && owners[atomOwner] == null) {
+                clause.atomQuads.size.toLong() * Long.SIZE_BYTES
+            } else 0L
             if (ownedBytes + boolBytes + atomBytes > limit) return false
             budget.step()
             keys[key] = clause.key
