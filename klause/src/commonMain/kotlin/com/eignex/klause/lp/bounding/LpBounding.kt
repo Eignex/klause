@@ -645,9 +645,21 @@ internal fun LpEngine.sparseSafePrune(
     activateCutAttribution(boundRel)
     val additionalCertificates = ArrayList<LpDeductionCertificate>(2)
     val cert = if ((learn && canPropagate) || canFix) {
+        val observer = sink.lp.certificationObserver(LpRoute.NODE)
+        val componentObserver = object : LpCertificationObserver by observer {
+            override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                observer.observe(certifier, success, cost)
+                if (cost is LpCertifierCost.Metered) noteNodeOverhead(cost.work)
+            }
+        }
+        val component = (simplex as? ComponentLpSolverCapability)?.nodeDeductions(
+            boundRes.duals, componentObserver, solveContext.certificationPolicy, cancellation,
+            withAlternatives = canFix, sharedMeter = rowMeter,
+        )?.takeIf { it.primary.belongsTo(boundRel.model) }
+        if (component != null) additionalCertificates.addAll(component.alternatives)
         solveContext.certificationPolicy.acceptNullable(
             LpCertifier.INTEGER,
-            nodeDualCertificate(
+            component?.primary ?: nodeDualCertificate(
                 boundRel.model, boundRes.duals, cancellation, sink.lp.certificationObserver(LpRoute.NODE),
                 eliminateContinuousObjective = !canPrune && objectiveCeiling != null,
                 onAdditionalCertificate = if (canFix) { { additionalCertificates.add(it) } } else null,
