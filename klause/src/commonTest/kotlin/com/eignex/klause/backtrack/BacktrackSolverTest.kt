@@ -81,7 +81,7 @@ class BacktrackSolverTest {
             val solver = BacktrackSolver(problem.bake())
             val params = BacktrackParams(variableSelector = selector, valueSelector = IndomainMin, randomSeed = 3L)
 
-            if (optimize) assertIs<MinimizeResult.Optimal>(solver.minimize(minimizeInt(0), params))
+            if (optimize) assertIs<MinimizeResult.Optimal>(solver.minimize(problem.minimizeInt(0), params))
             else assertIs<SolveResult.Sat>(solver.solve(params))
 
             assertEquals(1, attached.size)
