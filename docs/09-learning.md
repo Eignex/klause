@@ -571,13 +571,19 @@ Restart cadence remains a trigger. Optional propagation-work intervals and learn
 clause growth also request work at natural roots, without forcing a restart. The
 cooldown requires non-inprocessing work after an attempted slice and applies to
 restart requests too. The growth mark excludes the pass's own attachments, so a
-pass cannot earn its own next opportunity. Class rotation
+pass cannot earn its own next opportunity. Optional warmup starts work and growth
+marks at the first eligible complete root and withholds slices until the requested
+non-inprocessing work follows that root. Initialization cannot fund that warmup;
+scope reset renews its origin without forgiving debt. Required attachment and
+publication finish ahead of optional admission. Class rotation
 prevents a cheap pass from always taking the entire offered slice. Work and growth
-triggers and cooldown are disabled by default; the additional work ceilings are
+triggers, cooldown and warmup are disabled by default; the additional work ceilings are
 unlimited unless configured. Existing general off and SAT preset controls remain.
 Per-class attempted, eligible, shortened, unit, stopped and work counters diagnose
-applicability. Attachment, retirement and continuation work are subsets of class
-work, which itself overlaps containing propagation work. Root publication has a
+applicability. Probe outcomes distinguish a consistent fixpoint, a completed
+refutation and an interrupted attempt; these counters add no second work charge.
+Attachment, retirement and continuation work are subsets of class work, which
+overlaps containing propagation work. Root publication has a
 separate containing charge and also cannot earn the next trigger. Per-class, scheduled
 slice, continuation and publication durations keep disjoint latency buckets below
 one, ten, one hundred and one thousand milliseconds, plus a bucket for at least
