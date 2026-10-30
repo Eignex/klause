@@ -16,6 +16,64 @@ import kotlin.test.assertNull
 
 class FiniteExecutionTest {
     @Test
+    fun `typed and parsed proof worker scopes should execute curated optimization`() {
+        for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProofWorkers("complete")),
+            ExecutionOptions.parse(listOf("portfolio-proof-workers=complete")),
+            ExecutionOptions.parse(listOf("portfolio-proof-workers=retained")))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(true, result.completeSearchAdmitted)
+        }
+    }
+
+    @Test
+    fun `proof worker scopes should reject unknown policies and explicit recipes`() {
+        for (settings in listOf(listOf("portfolio-proof-workers=never"),
+            listOf("portfolio-proof-workers=complete", "arms=2"),
+            listOf("portfolio-proof-workers=complete", "bt-arm=satOptimized"),
+            listOf("portfolio-proof-workers=retained", "var-selector=vsids"))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions.parse(settings),
+            )
+
+            assertFailsWith<PipelineConfigException> {
+                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            }
+        }
+    }
+
+    @Test
+    fun `complete proof coverage should reject unsupported operations lanes and engines`() {
+        for ((optimize, cores, engine) in listOf(Triple(false, 1, FiniteEngine.MIXED),
+            Triple(true, 2, FiniteEngine.MIXED), Triple(true, 1, FiniteEngine.LOCAL_SEARCH))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, optimize, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize }, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, engine, cores = cores, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions(ExecutionOption.portfolioProofWorkers("complete")),
+            )
+
+            assertFailsWith<PipelineConfigException> {
+                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            }
+        }
+    }
+
+    @Test
     fun `typed and parsed deferred LP controls should execute a curated finite integer optimization`() {
         for (options in listOf(ExecutionOptions(ExecutionOption.portfolioLpStart("after-probes")),
             ExecutionOptions.parse(listOf("portfolio-lp-start=after-probes")))) {

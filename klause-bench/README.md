@@ -1013,6 +1013,14 @@ accepted incumbent improvements and terminal closure. Retain phase/cost counters
 and source checks, including initialization, reseeding and retirement, when comparing
 it with ordinary rewards. Counter changes alone do not establish a benefit.
 
+`param.portfolio-proof-workers=retained|complete` selects coverage of non-restarting
+workers or all complete retained sessions, including internal restarts. Both scopes
+use `param.portfolio-proof-share=0.5..1` within the same incumbent epoch; the default
+scope is `retained` and share is `0.5`. Audit the actual worker recipes before a
+coverage comparison: a scope with no eligible complete session cannot exercise its
+share. Vary scope at a fixed share before varying share, holding reward, reseeding,
+worker identities and resources fixed. Witness-only workers gain no proof authority.
+
 `param.source-incumbent-completion=true` trials advisory discrete incumbent
 completion under the existing numerical and joint-repair companion allowances.
 The default is false. `numericalExternalCompletion*` and

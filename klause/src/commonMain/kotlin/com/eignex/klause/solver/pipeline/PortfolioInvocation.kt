@@ -40,6 +40,7 @@ internal data class PortfolioInvocationControls(
     val rewardPolicy: PortfolioRewardPolicy? = null,
     val onProgress: ((PortfolioEvent) -> Unit)? = null,
     val improvementProofShare: Double = 0.5,
+    val includeRestartingProof: Boolean = false,
 )
 
 internal class PortfolioInvocationPolicy(
@@ -116,6 +117,7 @@ internal class PortfolioInvocation(
             it.incumbentProbeArms = selected.probes
             it.initialProbeWeights = selected.probeWeights
             it.improvementProofShare = controls.improvementProofShare
+            it.includeRestartingProof = controls.includeRestartingProof
         }
     } catch (failure: Throwable) {
         for (worker in workers.asReversed()) {

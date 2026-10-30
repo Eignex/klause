@@ -602,6 +602,12 @@ It changes only the retained proof floor after an incumbent; rewards, reseeding,
 initial probes, minimum shares and worker admission retain their own policies.
 Work diagnostics apply the same share to charged work.
 
+`portfolio-proof-workers=complete` includes complete retained sessions with internal
+restarts in this floor. The default `retained` covers only non-restarting workers.
+Both scopes require source proof authority and a resumable session, exclude witness
+and improvement-only workers, and use the same incumbent epochs, shares and budget.
+The scope control accepts only the same curated single-core optimization routes.
+
 This share protects exhaustive traversal whose progress can stay invisible until a
 proof completes. Only live resumable backtrack workers with source-proof authority
 qualify; improvement-only workers, auxiliary proof workers and unproductive auxiliary
