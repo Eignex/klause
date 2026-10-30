@@ -216,7 +216,7 @@ class PropagationSession private constructor(
         state.work += count
     }
 
-    internal fun rootClauseLiterals(factor: Int, limit: Int): IntArray? {
+    internal fun rootClauseLiterals(factor: Int, limit: Int, includePermanent: Boolean = false): IntArray? {
         if (simplifiedRootSources?.contains(factor) == true) return null
         if (factor < problem.numFactors) {
             val literals = if (usesNativeSat) (problem.factors[factor] as? Clause)?.literals
@@ -229,7 +229,7 @@ class PropagationSession private constructor(
             return literals
         }
         val index = factor - problem.numFactors
-        if (!isLearnedClause(index) || learnedClausePermanent(index)) return null
+        if (!isLearnedClause(index) || (!includePermanent && learnedClausePermanent(index))) return null
         val size = learnedClauseLiteralCount(index)
         if (size > limit) return null
         state.work += size.toLong() * (if (usesNativeSat) 2L else 1L)

@@ -217,7 +217,7 @@ internal class RootProbingPass : InprocessingPass {
             budget.note("NeighborhoodCandidates")
             if (session.learnedClauseLiteralCount(index) !in 2..PROBE_NEIGHBORHOOD_LITERALS) continue
             val literals = session.rootClauseLiterals(session.problem.numFactors + index,
-                PROBE_NEIGHBORHOOD_LITERALS) ?: continue
+                PROBE_NEIGHBORHOOD_LITERALS, includePermanent = true) ?: continue
             if (literals.size == 2 && literals[0] == Lit.negate(literals[1])) continue
             if (literals.any { budget.truth(it) == true }) continue
             neighborhood = literals
