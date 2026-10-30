@@ -53,7 +53,7 @@ internal class ComponentLpDeductionCache(size: Int) {
         try {
             meter.poll()
             meter.protect(retainedBytes)
-            meter.reserve(model.numVars.toLong() * 8L + model.m * 8L + parts.size * 32L + 256L)
+            meter.reserve(model.numVars.toLong() * 8L + parts.size * 32L + 256L)
             for (column in 0 until model.numVars) {
                 meter.step()
                 if (!state.model.column(column).integral) return null
@@ -61,7 +61,8 @@ internal class ComponentLpDeductionCache(size: Int) {
             if (state.model.objective.scale.value != BigFraction.ONE ||
                 !state.model.objective.externalConstant.value.isZero || !model.hasIntegralObjective()
             ) return null
-            val scaleBits = roundDuals(model, duals)?.scaleBits ?: return null
+            if (duals.size != model.m) return null
+            val scaleBits = dualRoundingScaleBits(duals, inspect = meter::step) ?: return null
             meter.poll()
             val children = ArrayList<ComponentLpDeductions>(parts.size)
             for (index in parts.indices) {

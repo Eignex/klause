@@ -200,11 +200,16 @@ internal class LpRetainedSources(
         state: LpExactState,
         domains: RelaxationDomains,
         cancellation: Cancellation = Cancellation.Never,
+        onEmissionWork: ((Long) -> Unit)? = null,
     ): LpSourceEdit? {
         require(state.depth >= depth && state.model.n == columns.size)
         check(generation < Long.MAX_VALUE)
         val expectedGeneration = generation
-        val update = emissions.prepare(domains, state.depth, cancellation)
+        var charged = 0L
+        val update = emissions.prepare(domains, state.depth, cancellation) {
+            charged += it
+            onEmissionWork?.invoke(it)
+        }
         if (update.changed.isEmpty()) {
             return LpSourceEdit(
                 state, emptySet(), emptyList(), emptyList(), emptySet(), null, liveBounds(domains), 0L,
@@ -229,16 +234,25 @@ internal class LpRetainedSources(
         var lastId = state.rows.lastId
         var epoch = columnEpoch
         var constant = state.model.objective.constant.value
-        var emittedExtent = 0L
+        val emittedExtent = update.changed.sumOf { index ->
+            val model = update.emissions[index].relaxation.model
+            model.n.toLong() + model.m + (model.doubleView?.colVal?.size ?: model.csc.rowIdx.size)
+        }
+        // Cached emissions still need source mapping when their enclosing publication is restored.
+        onEmissionWork?.invoke((emittedExtent - charged).coerceAtLeast(0L))
         var boundTemplates = 0
         for (index in update.changed) {
             if (cancellation()) throw LpAssemblyCancelled()
             check(epoch < Long.MAX_VALUE)
             val emission = update.emissions[index]
             val fragment = emission.relaxation
-            emittedExtent += fragment.model.n.toLong() + fragment.model.m +
-                (fragment.model.doubleView?.colVal?.size ?: fragment.model.csc.rowIdx.size)
-            val source = fragment.model.authoritativeModel() ?: return null
+            val source = if (fragment.preparationTemplates != null &&
+                fragment.model.exactState == null && fragment.model.doubleView == null
+            ) {
+                fragment.authoritativeWithTemplates(cancellation, onWork = relaxer::observeTemplateWork)
+            } else {
+                fragment.model.authoritativeModel()
+            } ?: return null
             require(source.objective.scale.value == BigFraction.ONE && source.objective.externalConstant.value.isZero)
             val mapped = IntArray(source.n)
             for (local in mapped.indices) {
@@ -255,8 +269,9 @@ internal class LpRetainedSources(
                         val current = source.column(local)
                         val prepared = if (!fragment.colIsBool[local] && fragment.colRealId[local] < 0) {
                             relaxer.preparationTemplates?.bound(fragment.colVarId[local])
-                                ?.compatibleColumn(current)
+                                ?.compatibleColumn(current, cancellation)
                         } else null
+                        checkCancellation(cancellation)
                         if (prepared != null) boundTemplates++
                         prepared ?: current
                     } else {
@@ -320,7 +335,7 @@ internal class LpRetainedSources(
             if (state.depth > 0 && saved.add(index)) changes.add(Change(state.depth, index, previous))
             next[index] = Binding(emission, mapped, rowIds)
         }
-        if (cancellation()) throw LpAssemblyCancelled()
+        checkCancellation(cancellation)
         relaxer.observeBoundTemplates(boundTemplates)
         val uses = columnUses.copyOf(staged.size)
         var owned = ownedStorageUnits + staged.drop(columns.size).sumOf { it.storageUnits }
@@ -369,6 +384,10 @@ internal class LpRetainedSources(
             cached = null
             compactionView = null
         }
+    }
+
+    private fun checkCancellation(cancellation: Cancellation) {
+        if (cancellation()) throw LpAssemblyCancelled()
     }
 
     private fun Column.reclaimable(): Boolean = variable < 0 && real < 0 && cost.value.isZero

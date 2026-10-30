@@ -139,7 +139,8 @@ root; `-Dklause.*` properties are forwarded to the bench JVM.
 `list [suite]` lists suites or their problems. `select` emits JSON lines containing
 the `suite` and `problem` identities accepted by `solve-one`.
 `files=true` adds resolved model/data/include paths; `features=true` adds structural
-classification. Fetched suites download their corpus during resolution.
+classification. Fetched suites download their corpus during resolution, with progress
+on stderr so stdout retains selection JSON lines.
 
 | Selection filter | Purpose |
 |---|---|
@@ -941,8 +942,11 @@ The profile retains cold and unchanged requests, authority/bound/row/objective
 edits, retirement, failed work and conversion charges separately. Its worker
 observations require ordinary source-checked CLI controls for source claims.
 
-`scripts/lp-template-preparation-profile.sh <source> [repeats] [steps]` accepts
-`cover-2x3` and `cover-3x3`. It compares disabled
+`scripts/lp-template-preparation-profile.sh <source> [repeats] [steps] [standalone|retained]` accepts
+`cover-2x3`, `cover-3x3`, `miplib3-p0033` and `miplib3-p0201`. The MIPLIB inputs
+resolve through catalog `select files=true`, verify frozen source hashes and retain
+selection time/resource receipts; include `:klause-bench:installDist` in their build tasks.
+It compares disabled
 templates, object reuse, complete index reuse and selective metadata reuse on the
 existing MPS component fixtures. Submit as a lab profile script with build task
 `:klause:stageLpProfileJvm`, Linux x86_64 placement and a 180-second runtime cap.
@@ -953,6 +957,22 @@ retain source bytes/hash, total preparation/assembly/solve work, time, allocatio
 modeled retained units and negative results. One warmup precedes up to five measured
 rounds; mode order rotates. Equal native results across modes check consistency,
 without establishing independent source or optimality validation.
+Total time and allocation include final phase-snapshot publication; exact-bound
+adoption is reported separately from bound-template lookup. Main-thread CPU time
+is separate from elapsed time and excludes helper, compiler and collector threads;
+whole-process and enforced group resource receipts retain their broader costs.
+The retained route prepares the production source regions, installs their exact
+columns and rows into a private scoped owner with source-bound assertions and
+permanent row markers, solves and closes that owner within the measured total.
+It isolates root installation; ordinary CLI preparation, propagation and route
+selection remain separate source-wide costs. The wrapper retains actual JDK file hashes and the cost of
+that shared identity prefix. Its assembly includes fragment import and installation;
+standalone import remains in the solve-and-certification interval. Route timings
+therefore compare modes within one route, not isolated stage names across routes.
+Per-stage thread allocation separates assembly from import, solve and retirement.
+Residual allocation includes view selection, result recording and snapshot publication;
+unavailable counters stay null. The wrapper exports sampled JFR allocation stacks
+after the numerical process, with distinct exit and resource receipts for that analysis.
 
 The unchanged-index controls [9363](https://lab.eignex.com/jobs/9363) and
 [9369](https://lab.eignex.com/jobs/9369), at `69cc7b2250`, compare all three modes
@@ -1151,6 +1171,18 @@ root bound, prunes and fixings establish progress and consumption. An admitted
 trial or completed lab job alone establishes no useful deduction or source proof.
 Keep physical RSS separate from modeled storage reservations. Source checking and
 all preparation, failed work and retirement belong to the containing comparison.
+
+`ROOT_ADMISSION_ROOT` distinguishes duty-cycle skips, declined relaxers and queries.
+`ROOT_LAYOUT_PREPARATION_ROOT` records active cold construction and exact-state
+installation across private worker pauses. Its work and time include completed and
+discarded chunks; waiting between slices is excluded. A ready layout grants no bound.
+These are subsets of containing LP work; nested template costs are not additional totals.
+`ROOT_QUERY_ROOT` records the requested component, sparse or standalone route and
+its work, cancellation, layout, numerical, certification or projection stop.
+A component request does not establish that a component owner was constructed;
+use the component lifecycle counters for that. Query work is the delta of charged
+LP operations and overlaps assembly, numerical and certificate counters. Its time
+also includes nested stages; do not add those observations together.
 
 [9172](https://lab.eignex.com/jobs/9172) compares default and trial at
 `bde182ce9b`, seed 3, ten seconds and one Linux/amd64 processor, with matching
