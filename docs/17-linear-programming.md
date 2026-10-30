@@ -1073,6 +1073,10 @@ cumulative work, allocation, operation and cancellation allowances; it rechecks
 source derivations and cannot publish deductions into the original traversal.
 
 `source-point-cuts=true` opts the retained frontier into point-based separation.
+Ordinary linear-source execution binds the same source-cut controls to its admitted
+numerical companions. The containing source request owns these settings and removes
+them from finite worker recipe options; they change neither companion admission
+nor lifetime.
 The first relaxation uses its retained checked mask; a completed point can add
 one selection round at that node. The score combines normalized violation,
 inverse square-root support and objective parallelism. The model-facing cut pool
