@@ -1045,10 +1045,14 @@ internal fun LpEngine.applySparseReducedCostFixing(
         null
     }
     val canLearn = reasonSupport != null
-    noteNodeOverhead(relaxation.colVarId.size.toLong() * LpNodeOverhead.FIXING)
+    val columns = cert.fixingColumns()
+    val size = columns?.size ?: relaxation.colVarId.size
+    noteNodeOverhead(size.toLong() * LpNodeOverhead.FIXING)
     var cutUseObserved = false
-    for (col in relaxation.colVarId.indices) {
+    for (index in 0 until size) {
         if (cancellation()) return false
+        val col = columns?.get(index) ?: index
+        if (col !in relaxation.colVarId.indices) continue
         val varId = relaxation.colVarId[col]
         if (varId < 0 || relaxation.model.colContinuous[col] ||
             relaxation.model.exactState?.model?.column(col)?.integral == false
