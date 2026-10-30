@@ -612,9 +612,10 @@ internal class PoolClauseExchange(
         meter?.exported(SharingChannel.Clauses, published)
     }
 
-    private fun exportCandidates(session: PropagationSession): List<SharedClause>? {
+    private fun exportLookup(session: PropagationSession): ((Long) -> Boolean?)? {
+        if (seen.isEmpty()) return null
         var lookupWork = pool.reclamationWork
-        val alreadyShared: (Long) -> Boolean? = { key ->
+        return { key ->
             val known = if (pool.softLimitBytes == null) key in seen else seen.containsBounded(
                 key, lookupWork, cancelled = { session.cancelRequested },
                 charge = { lookupWork--; session.chargeSharingWork(1L) },
@@ -622,6 +623,10 @@ internal class PoolClauseExchange(
             if (known == true) meter?.clauseCount("exportDuplicates", 1L)
             known
         }
+    }
+
+    private fun exportCandidates(session: PropagationSession): List<SharedClause>? {
+        val alreadyShared = exportLookup(session)
         if (pool.softLimitBytes == null) return session.exportGlueClausesBounded(
             maxLbd, maxLen, skipPermanent, alreadyShared = alreadyShared, cancelled = { false },
         )

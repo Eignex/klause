@@ -1286,7 +1286,7 @@ class PropagationSession private constructor(
         maxLbd: Int,
         maxLen: Int,
         skipPermanent: Boolean,
-        alreadyShared: (Long) -> Boolean? = { false },
+        alreadyShared: ((Long) -> Boolean?)? = null,
         cancelled: () -> Boolean,
     ): List<SharedClause>? {
         val out = ArrayList<SharedClause>()
@@ -1317,10 +1317,12 @@ class PropagationSession private constructor(
                 }
             }
             val key = SharedClause.contentKey(tokens, length)
-            when (alreadyShared(key)) {
-                true -> continue
-                null -> return null
-                false -> Unit
+            if (alreadyShared != null) {
+                when (alreadyShared(key)) {
+                    true -> continue
+                    null -> return null
+                    false -> Unit
+                }
             }
             out.add(asSharedClause(literals ?: checkNotNull(native).literalsOf(i), lbd, key))
         }
