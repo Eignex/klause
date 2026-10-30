@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.ir.Factor
@@ -130,12 +131,27 @@ internal data class LpIntegerBoundTemplate(
     }
 }
 
-internal class LpFactorTemplate(
+internal class LpFactorTemplate private constructor(
     val factor: Factor,
-    val support: List<Int>,
+    private val integerVariables: IntArray?,
+    private val references: List<Int>?,
     val rows: List<LpSourceRowTemplate>?,
 ) {
-    val storageUnits: Long = 3L + support.size + (rows?.sumOf { it.storageUnits } ?: 0L)
+    constructor(factor: Factor, integerVariables: IntArray, rows: List<LpSourceRowTemplate>?) :
+        this(factor, integerVariables, null, rows)
+
+    constructor(factor: Factor, references: List<Int>, rows: List<LpSourceRowTemplate>?) :
+        this(factor, null, references, rows)
+
+    val supportSize: Int
+        get() = if (integerVariables != null) integerVariables.size else requireNotNull(references).size
+    val storageUnits: Long = 4L + supportSize + (rows?.sumOf { it.storageUnits } ?: 0L)
+
+    fun reference(index: Int): Int = if (integerVariables != null) {
+        Term.ofIntVar(integerVariables[index])
+    } else {
+        requireNotNull(references)[index]
+    }
 }
 
 internal class LpTemplateComponent(
@@ -318,14 +334,19 @@ internal class LpPreparationTemplates private constructor(
                         retained
                     } else {
                         if (!visit(factor.structuralKeyWeight.toLong())) return null
-                        val support = ArrayList<Int>()
-                        for (variable in factor.intVars) {
-                            if (!visit()) return null
-                            support.add(Term.ofIntVar(variable))
-                        }
-                        for (variable in factor.boolVars) {
-                            if (!visit()) return null
-                            support.add(Term.ofLit(variable shl 1))
+                        val integers = factor.intVars
+                        val booleans = factor.boolVars
+                        val coalescedIntegers = booleans.isEmpty() && (factor is Linear || factor is ExactLinear)
+                        val support = if (coalescedIntegers) null else ArrayList<Int>()
+                        if (support != null) {
+                            for (variable in integers) {
+                                if (!visit()) return null
+                                support.add(Term.ofIntVar(variable))
+                            }
+                            for (variable in booleans) {
+                                if (!visit()) return null
+                                support.add(Term.ofLit(variable shl 1))
+                            }
                         }
                         val declared = if (selection.capabilities(factorId).relaxation != RelaxationCapability.SOUND ||
                             factor is LinearIndicator ||
@@ -336,12 +357,14 @@ internal class LpPreparationTemplates private constructor(
                             if (!visit(1L + row.size)) return null
                             LpSourceRowTemplate(row)
                         }
-                        LpFactorTemplate(factor, support.distinct(), rows)
+                        if (coalescedIntegers) LpFactorTemplate(factor, integers, rows)
+                        else LpFactorTemplate(factor, requireNotNull(support).distinct(), rows)
                     }
                     storage += entry.storageUnits
                     if (storage > MAX_UNITS) return null
                     factors.add(entry)
-                    for (reference in entry.support) {
+                    for (supportId in 0 until entry.supportSize) {
+                        val reference = entry.reference(supportId)
                         if (!visit()) return null
                         if (!Term.isInt(reference)) continue
                         val variable = Term.intVar(reference)
@@ -378,7 +401,8 @@ internal class LpPreparationTemplates private constructor(
                         return current
                     }
                     val owners = HashMap<Int, Int>()
-                    for (index in factors.indices) for (reference in factors[index].support) {
+                    for (index in factors.indices) for (supportId in 0 until factors[index].supportSize) {
+                        val reference = factors[index].reference(supportId)
                         if (!visit()) return null
                         val owner = owners.put(reference, index) ?: continue
                         val first = root(index)
@@ -402,7 +426,8 @@ internal class LpPreparationTemplates private constructor(
                     val componentBounds = LinkedHashMap<Int, LpIntegerBoundTemplate>()
                     val costs = ArrayList<Long>()
                     val seen = LinkedHashSet<Int>()
-                    for (entry in group) for (reference in entry.support) {
+                    for (entry in group) for (supportId in 0 until entry.supportSize) {
+                        val reference = entry.reference(supportId)
                         if (!visit()) return null
                         if (!seen.add(reference)) continue
                         if (Term.isInt(reference)) {
