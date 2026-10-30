@@ -52,6 +52,7 @@ class PrivateRebuildSatisfactionTest {
             assertNull(stats["privateRebuildProgressPins"])
             assertEquals(1L, stats["privateRebuildBinaryRelations"])
             assertEquals(1L, stats["privateRebuildEquivalentColumns"])
+            assertEquals(0L, stats["privateRebuildBveIndexedFactors"])
             assertEquals(1L, stats["privateRebuildConsumers"])
             assertEquals(1L, stats["privateRebuildSourceAccepted"])
             assertEquals(1L, stats["privateRebuildRetired"])

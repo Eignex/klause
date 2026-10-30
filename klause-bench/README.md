@@ -80,7 +80,7 @@ still make other eliminations useful.
 `AdmittedColumns` counts the initial pivot set for successful generations;
 the private BVE pass protects other columns rather than analyzing their pivots.
 `BveIndexedFactors` and `BveSourceFactors` compare the indexed neighborhood with
-the pinned source. A single admitted pivot indexes only its incident rows;
+the pinned source; an equivalence-only trial reports zero BVE factors. A single admitted pivot indexes only its incident rows;
 multiple pivots use the full database. `ReusedSourceClauses` counts unchanged
 immutable inputs retained during pinning; later elimination can remove them.
 All scan and source-index transport work remains in preparation.

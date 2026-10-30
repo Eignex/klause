@@ -194,8 +194,8 @@ internal class PrivateRebuildGeneration private constructor(
             mapping = mapping.then(SourceMapping(enriched, baked, TransformationGuarantees.IDENTITY))
             return PrivateRebuildGeneration(baked, mapping, privateBytes + warm.modeledBytes, rebuild.steps.size,
                 maxOf(entries * 4L, source.numBoolVars * 12L + descriptorWork), passStopped, admission?.candidates ?: 0,
-                warm, warmNanos, bakeWork, descriptorWork, reused, neighborhood?.indexedFactors ?: pinned.numFactors,
-                neighborhood?.sourceFactors ?: pinned.numFactors, rebuild.steps.count { it is RebuildStep.CopyLiteral })
+                warm, warmNanos, bakeWork, descriptorWork, reused, neighborhood?.indexedFactors ?: 0,
+                neighborhood?.sourceFactors ?: 0, rebuild.steps.count { it is RebuildStep.CopyLiteral })
         }
     }
 }
