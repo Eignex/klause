@@ -270,6 +270,30 @@ internal class LiveQfLraSystem(
         return !stop() && (batch.flush() || batch.conflict)
     }
 
+    fun affineImplication(comparison: ExactComparison, stop: Cancellation): PartialLinearImplication? {
+        stop.charge(comparison.terms.size.toLong() + 1L)
+        if (stop()) return null
+        val key = preparedTerms[comparison.ordered]?.positive ?: return null
+        val term = (key.slot ?: normalized[key])?.term ?: return null
+        if (term.coefficients.size < 2) return null
+        stop.charge(term.coefficients.size.toLong() + 1L)
+        if (stop()) return null
+        val column = definitions[term.coefficients] ?: return null
+        val state = lp.state ?: return null
+        val arithmetic = PartialImplicationArithmetic(stop)
+        if (!arithmetic.admit(comparison.bound)) return null
+        return partialLinearActivityImplication(comparison, { upper ->
+            val columnUpper = if (term.scale.signum() > 0) upper else !upper
+            val active = state.activeSide(column, columnUpper) ?: return@partialLinearActivityImplication null
+            val value = arithmetic.affineValue(active.side.number.value, term.scale, term.offset)
+                ?: return@partialLinearActivityImplication null
+            val premise = lp.activeBoundPremise(column, columnUpper)
+                ?: return@partialLinearActivityImplication null
+            if (premise === SearchAtomPremise.Unavailable) return@partialLinearActivityImplication null
+            ExplainedLinearBound(value, active.side.strict, term.premise(premise))
+        }, stop)
+    }
+
     fun disequalitySide(comparison: ExactComparison): DerivedDisequalitySide? {
         val key = preparedTerms[comparison.ordered]?.positive ?: SmtTermKey.of(comparison.terms)
         val fixed = rootFixedColumns(key.columns)

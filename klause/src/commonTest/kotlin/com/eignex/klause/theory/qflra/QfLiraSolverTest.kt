@@ -53,6 +53,39 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
     @Test
+    fun `affine guard implications should use current bound premises after backtracking`() {
+        for (strict in listOf(false, true)) {
+            val source = Problem(3, 0, emptyArray(), arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
+                    LinearOp.LE, 1.0, strict),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(-4.0, 6.0),
+                    LinearOp.GE, -2.0, strict),
+            ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+            ExactLiraSearchComponent(source).use { component ->
+                component.useIncrementalLinearPropagation()
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertEquals(true, session.boolValue(1))
+                assertEquals(setOf(Lit.make(0, false), Lit.make(1, true)),
+                    assertNotNull(session.reasonFor(1)).literals.toSet())
+                session.popTo(0)
+
+                for (truth in listOf(false, true)) {
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, truth))))
+
+                    assertEquals(truth, session.boolValue(0))
+                    assertEquals(setOf(Lit.make(1, !truth), Lit.make(0, truth)),
+                        assertNotNull(session.reasonFor(0)).literals.toSet())
+                    assertNull(session.boolValue(2))
+                    session.popTo(0)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `incremental root refresh should substitute a column fixed by a later source row`() {
         for (strict in listOf(false, true)) {
             val source = Problem(3, 0, emptyArray(), arrayOf(
