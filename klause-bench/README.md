@@ -1050,6 +1050,10 @@ make fixed-work traces sensitive to measured segment costs.
 
 `param.portfolio-probes=leader-half` redistributes the existing initial probe budget
 to give its leading complete worker half while retaining every sibling's probe.
+`lp-transfer` instead moves half of eligible LP probes' relative weight to the
+leading complete non-LP worker, retaining other siblings' ordinary relative shares.
+Deferred LP probes supply no weight. Actual durations remain bounded by the
+containing time and segment/work caps; equal relative shares do not fix a work prefix.
 Compare it with `ordinary` at fixed rewards, coverage, admission and reseeding.
 Worker slots, seeds, total reservation and deadlines remain fixed. A containing
 deadline is required; work diagnostics and explicit recipes reject this control.

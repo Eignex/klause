@@ -33,6 +33,58 @@ import kotlin.time.TestTimeSource
 
 class FinitePortfolioExecutorTest {
     @Test
+    fun `LP transfers should preserve non-LP sibling probe shares`() {
+        val labels = listOf("bt/satOptimized", "bt/lp-default", "ls/fixed", "ls/plateau",
+            "ls/smooth", "ls/sa", "alns/balanced", "bt/lp-aggressive")
+        val workers = labels.mapIndexed { arm, label ->
+            trackingWorker(label, arm, ScriptedSearch({ false }) {}).also {
+                if (arm in 2..6) it.family = ArmFamily.LocalSearch
+            }
+        }
+        val initial = workers.indices.toList()
+
+        val weights = lpTransferredProbeWeights(workers)
+
+        assertEquals(0.25, initialProbeFraction(0, initial, weights), 1e-12)
+        for (arm in 2..6) assertEquals(0.125, initialProbeFraction(arm, initial, weights), 1e-12)
+        for (arm in listOf(1, 7)) assertEquals(0.0625, initialProbeFraction(arm, initial, weights), 1e-12)
+        assertEquals(1.0, initial.sumOf { initialProbeFraction(it, initial, weights) }, 1e-12)
+    }
+
+    @Test
+    fun `LP transfers should fund a complete source worker instead of a witness worker`() {
+        val model = ModelIdentity.of(Any())
+        val workers = listOf("witness", "proof", "bt/lp-default", "ls/fixed").mapIndexed { arm, label ->
+            trackingWorker(label, arm, ScriptedSearch({ false }) {}).also {
+                if (arm == 0) it.bindEvidence(model, provesResults = false)
+                if (arm == 3) it.family = ArmFamily.LocalSearch
+            }
+        }
+        val initial = workers.indices.toList()
+
+        val weights = lpTransferredProbeWeights(workers)
+
+        assertEquals(0.25, initialProbeFraction(0, initial, weights), 1e-12)
+        assertEquals(0.375, initialProbeFraction(1, initial, weights), 1e-12)
+    }
+
+    @Test
+    fun `deferred LP probes should leave ordinary initial shares without LP donors`() {
+        val workers = listOf("proof", "bt/lp-default", "ls/fixed", "bt/lp-aggressive")
+            .mapIndexed { arm, label ->
+                trackingWorker(label, arm, ScriptedSearch({ false }) {}).also {
+                    if (arm == 2) it.family = ArmFamily.LocalSearch
+                }
+            }
+        deferredLpProbes(workers)
+
+        val weights = lpTransferredProbeWeights(workers)
+
+        assertEquals(0.5, initialProbeFraction(0, listOf(0, 2), weights), 1e-12)
+        assertEquals(0.5, initialProbeFraction(2, listOf(0, 2), weights), 1e-12)
+    }
+
+    @Test
     fun `the leading complete worker should receive half the initially eligible probe budget`() {
         val model = ModelIdentity.of(Any())
         val workers = List(6) { arm ->
@@ -53,16 +105,20 @@ class FinitePortfolioExecutorTest {
 
     @Test
     fun `weighted probes should still attempt every initially eligible sibling`() {
-        val visits = mutableListOf<Int>()
-        val workers = List(3) { arm ->
-            trackingWorker("worker$arm", arm, ScriptedSearch({ false }) { visits += arm })
+        for (transfer in listOf(false, true)) {
+            val visits = mutableListOf<Int>()
+            val workers = listOf("proof", "bt/lp-default", "ls/fixed").mapIndexed { arm, label ->
+                trackingWorker(label, arm, ScriptedSearch({ false }) { visits += arm })
+                    .also { if (arm == 2) it.family = ArmFamily.LocalSearch }
+            }
+
+            Portfolio(workers, fixedBandit(3, 0)).also {
+                it.initialProbeWeights = if (transfer) lpTransferredProbeWeights(workers)
+                else leadingProbeWeights(workers)
+            }.use { it.minimize(Cancellation { visits.size >= 3 }) }
+
+            assertEquals(listOf(0, 1, 2), visits)
         }
-
-        Portfolio(workers, fixedBandit(3, 0)).also {
-            it.initialProbeWeights = leadingProbeWeights(workers)
-        }.use { it.minimize(Cancellation { visits.size >= 3 }) }
-
-        assertEquals(listOf(0, 1, 2), visits)
     }
 
     @Test
