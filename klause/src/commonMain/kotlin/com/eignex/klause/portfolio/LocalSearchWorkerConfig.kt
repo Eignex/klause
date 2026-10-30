@@ -124,7 +124,9 @@ internal class LocalSearchWorkerConfig private constructor(
         }
         // WCNF indicators are private penalties; general defined outputs can also need hard-constraint repairs.
         val sweep = definitionalSweep ?: (lsObjective as? FunctionalObjective)?.booleanCostSweep?.takeIf {
-            problem.semantics.effective.format == SourceFormat.WCNF && objective != null && recipe.perMoveInvariants &&
+            problem.numBoolVars <= 1_000_000 && problem.numIntVars == 0 && problem.numRealVars == 0 &&
+                problem.semantics.effective.format == SourceFormat.WCNF &&
+                objective != null && recipe.perMoveInvariants &&
                 recipe.objectiveGuidance == ObjectiveGuidance.Functional &&
                 recipe.feasibleDescent == FeasibleDescent.SelfOwned
         }
