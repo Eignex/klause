@@ -319,6 +319,8 @@ translations. Every result contains only retained columns. An empty consequence
 declines the generation and grants no source refutation authority.
 
 Parent indexing, literal visits and normalization consume the transfer allowance.
+Final clause-input normalization reserves work from the resulting literal count
+before constructing its owned factor, including when resolution widens the input.
 Projection reserves 16 KiB of modeled scratch inside the remaining private byte
 grant; its temporary buffers are released after transfer. This reservation joins
 the conservative private peak model, including when a projection copies nothing.

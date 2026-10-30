@@ -15,6 +15,7 @@ internal class PrivateRebuildWarmClauses private constructor(
     val work: Long,
     val translated: Int,
     val projectionScratchBytes: Long,
+    val normalizationWork: Long,
 ) {
     companion object {
         fun capture(
@@ -38,9 +39,10 @@ internal class PrivateRebuildWarmClauses private constructor(
             var bytes = 0L
             var translated = 0
             var scratchBytes = 0L
+            var normalizationWork = 0L
             fun result(): PrivateRebuildWarmClauses? = if (cancellation()) null else {
                 PrivateRebuildWarmClauses(clauses.toTypedArray(), literals, bytes + scratchBytes, spent,
-                    translated, scratchBytes)
+                    translated, scratchBytes, normalizationWork)
             }
             val projection = PrivateRebuildClauseProjection.prepare(rebuild, fixed.size, ::visit) ?: return result()
             for (index in 0 until session.learnedClauseCount) {
@@ -82,6 +84,9 @@ internal class PrivateRebuildWarmClauses private constructor(
                     if (residual.isEmpty()) return null
                 }
                 if ((residual.size + 1L) * 512L > byteLimit - bytes - scratchBytes) continue
+                val copyWork = residual.size * 4L + 1L
+                if (!visit(copyWork)) break
+                normalizationWork += copyWork
                 val copied = Clause(residual)
                 if (copied.tautological) continue
                 clauses.add(copied)
