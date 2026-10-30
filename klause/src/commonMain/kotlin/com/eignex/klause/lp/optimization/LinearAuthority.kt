@@ -128,7 +128,7 @@ internal class LinearAuthority(
         capturedPoint = null
         pointListener = null
         pointRound = null
-        pointPolicy = null
+        pointPolicy?.releaseCandidates()
         pointFamily = null
         directedFamily = null
         pointMask = emptySet()
