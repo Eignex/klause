@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.Sample
@@ -268,6 +269,7 @@ internal class PrivateRebuildSatisfaction(
     companion object {
         fun eligible(problem: BakedProblem, params: BacktrackParams): Boolean =
             params.privateRebuildWork > 0L && problem.numIntVars == 0 && problem.numRealVars == 0 &&
+                problem.rootDeductions is PropagationResult.Implied &&
                 params.assumptions.isEmpty && params.assumptions.deductions.isEmpty &&
                 params.componentFactory == null && params.lpConfig in listOf(null, LpConfig.OFF) &&
                 params.lpPlan == LpPlan()
