@@ -485,7 +485,13 @@ and coordinator checks. Failed and refuted segments earn zero reward while their
 cost remains in the peer comparison. Unproductive time and feasibility setup remain
 owed until that worker's next priced gain. Its gain rate is compared with other workers'
 cumulative accepted-gain rate; common objective rescaling preserves this comparison.
-Feasibility retains ordinary rewards, idle credit earns no improvement reward, and
+Segments without a strict gain retain ordinary feasibility rewards. A segment
+that finds the first witness and then improves it prices those later accepted
+gains against its full startup and segment cost. The first witness itself supplies
+no invented objective gain. Publication gains accumulate in a common normalized
+scale, including batches whose raw sum would overflow. Phase diagnostics retain
+the segment's selection phase, and the ordinary ledger keeps its phase boundary.
+Idle credit earns no improvement reward, and
 accepted terminal closure earns unit reward. Accounting is private to an invocation.
 Source preparation, final retirement and independent checking keep their containing
 run costs; this score supplies neither witness nor proof authority.
@@ -496,7 +502,7 @@ the family's next accepted gain, whose rate is compared with other families'
 cumulative rates. After an incumbent, accepted gains supply fractional success and
 failure evidence. Silent complete workers receive no failure evidence; observable
 plateaus do.
-Feasibility feedback, family priors and silent complete-worker coverage retain
+Before a strict gain, feasibility feedback, family priors and silent complete-worker coverage retain
 their ordinary rules. Shared source preparation, retirement and independent checks
 remain in containing-run accounting.
 

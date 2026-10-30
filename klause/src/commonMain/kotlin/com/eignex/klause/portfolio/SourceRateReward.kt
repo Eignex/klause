@@ -13,6 +13,7 @@ internal class SourceRateReward(
     private val accounts = linkedMapOf<Int, Account>()
     private val families = if (priceFamilies) families.toList() else emptyList()
     private val familyAccounts = linkedMapOf<ArmFamily, Account>()
+    private val acceptedGains = linkedMapOf<Int, Double>()
     private var gainScale = 0.0
     var familyReward: Double? = null
         private set
@@ -20,11 +21,19 @@ internal class SourceRateReward(
     fun fresh(families: List<ArmFamily>): SourceRateReward =
         SourceRateReward(priceFamilies, if (priceFamilies) families else emptyList())
 
+    fun recordAcceptedGain(arm: Int, gain: Double) {
+        if (!gain.isFinite() || gain <= 0.0) return
+        val normalized = normalize(gain)
+        acceptedGains[arm] = (acceptedGains[arm] ?: 0.0) + normalized
+    }
+
     override fun reward(progress: PortfolioProgress): Double {
+        val accepted = if (progress.idleCredit) null else acceptedGains.remove(progress.arm)
         val account = accounts.getOrPut(progress.arm) { Account() }
         val family = families.getOrNull(progress.arm)
         val familyAccount = family?.let { familyAccounts.getOrPut(it) { Account() } }
-        familyReward = if (familyAccount != null && progress.phase != PortfolioPhase.FEASIBILITY) 0.0 else null
+        familyReward = if (familyAccount != null &&
+            (progress.phase != PortfolioPhase.FEASIBILITY || accepted != null)) 0.0 else null
         if (!progress.idleCredit) {
             val cost = progress.nanos.coerceAtLeast(0L).toDouble() +
                 progress.constructionNanos.coerceAtLeast(0L)
@@ -36,14 +45,14 @@ internal class SourceRateReward(
             }
         }
         if (progress.failed || progress.refuted) return 0.0
-        if (progress.phase == PortfolioPhase.FEASIBILITY) return progress.ordinaryReward
+        if (progress.phase == PortfolioPhase.FEASIBILITY && accepted == null) return progress.ordinaryReward
         if (progress.phase == PortfolioPhase.PROOF_CLOSURE) {
             if (familyAccount != null) familyReward = 1.0
             return 1.0
         }
         if (progress.idleCredit || !progress.acceptedIncumbent || account.pendingCost <= 0.0) return 0.0
-        val gain = progress.credit[Signal.Improvement.name]?.takeIf { it.isFinite() && it > 0.0 } ?: return 0.0
-        val normalized = normalize(gain)
+        val normalized = accepted ?: progress.credit[Signal.Improvement.name]
+            ?.takeIf { it.isFinite() && it > 0.0 }?.let(::normalize) ?: return 0.0
         val reward = price(account, normalized, accounts.filterKeys { it != progress.arm }.values)
         if (familyAccount != null) {
             familyReward = price(familyAccount, normalized, familyAccounts.filterKeys { it != family }.values)
@@ -66,6 +75,7 @@ internal class SourceRateReward(
             val scale = gainScale / gain
             for (other in accounts.values) other.gain *= scale
             for (other in familyAccounts.values) other.gain *= scale
+            for (pending in acceptedGains.entries) pending.setValue(pending.value * scale)
             gainScale = gain
         }
         return gain / gainScale

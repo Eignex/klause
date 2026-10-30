@@ -1094,6 +1094,10 @@ and source checks, including initialization, reseeding and retirement, when comp
 it with ordinary rewards. Counter changes alone do not establish a benefit.
 `source-rate` prices finite positive accepted gain per observed factory and segment
 time, retaining unproductive and feasibility setup costs until the next gain.
+Strict accepted improvements after the first witness within the same segment are
+priced in that segment; its complete startup remains charged. The first witness
+has no synthetic gain. Phase labels remain selection-time observations, so use the
+accepted objective sequence as well as ledger credits when auditing that boundary.
 Failed and refuted segments earn zero while retaining their costs in peer pricing.
 Initialization and checking are already inside segment time. Compare it separately
 at fixed coverage, admission and reseeding, and retain the full containing-run ledger
