@@ -682,7 +682,7 @@ internal class CpToLpRelaxation(
     private val reuseSourceTemplates: Boolean = true,
     private val preparationCancellation: Cancellation = Cancellation.Never,
     private val reuseTemplateIndexes: Boolean = true,
-    private val reuseTemplateMetadata: Boolean = false,
+    private val reuseTemplateMetadata: Boolean = true,
 ) {
     private val elementIndexes = elementIndexes?.toSet()
     private val linearProjection = LinearLpProjection()
