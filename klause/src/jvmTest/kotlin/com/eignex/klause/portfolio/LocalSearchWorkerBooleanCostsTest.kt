@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.ObjectiveGuidance
 import com.eignex.klause.localsearch.strategy.Cbls
@@ -34,13 +35,16 @@ class LocalSearchWorkerBooleanCostsTest(
     private val guidance: ObjectiveGuidance,
     private val perMove: Boolean,
     private val existingSweep: Boolean,
+    private val wcnf: Boolean,
 ) {
     @Test
     fun `selected Boolean cost guidance should preserve the original point and objective`() {
         val source = Dimacs.parseWcnf("7 1 2 0\n11 -1 2 0\n").toProblem()
+        val attached = if (wcnf) source.problem else Problem(source.problem.numBoolVars, 0,
+            emptyArray(), source.problem.factors)
         val canonical = source.objective.toLinearObjective().let { if (minimize) it else it.negated() }
         val invocation = SourceSetup.prepare(SourceSetupRequest(
-            SourceAttachment(source.problem, intArrayOf(), source.boolFolds),
+            SourceAttachment(attached, intArrayOf(), source.boolFolds),
             ExecutionOperation.OPTIMIZE, FiniteEngine.LOCAL_SEARCH, canonical,
         ))
         val shape = invocation.finiteShape()
@@ -72,7 +76,7 @@ class LocalSearchWorkerBooleanCostsTest(
         val expected = if (minimize) cost else -cost
         assertEquals(expected, canonical.evaluateLong(point))
         assertEquals(expected.toDouble(), result.objectiveValue)
-        val functional = guidance == ObjectiveGuidance.Functional && perMove
+        val functional = guidance == ObjectiveGuidance.Functional && perMove && (existingSweep || wcnf)
         val observations = result.stats.ls.objectiveScoring
         assertEquals(if (functional) 1L else 0L, observations.getValue("functional"))
         assertEquals(if (functional && !existingSweep) 1L else 0L, observations.getValue("maintained"))
@@ -85,11 +89,14 @@ class LocalSearchWorkerBooleanCostsTest(
 
     companion object {
         @JvmStatic
-        @Parameterized.Parameters(name = "minimize={0}, guidance={1}, perMove={2}, existing={3}")
+        @Parameterized.Parameters(name = "minimize={0}, guidance={1}, perMove={2}, existing={3}, wcnf={4}")
         fun cases(): List<Array<Any>> = listOf(false, true).flatMap { minimize ->
             listOf(ObjectiveGuidance.Functional to true, ObjectiveGuidance.Functional to false,
-                ObjectiveGuidance.Canonical to true, ObjectiveGuidance.Geometric to true).flatMap { (guidance, perMove) ->
-                listOf(false, true).map { existing -> arrayOf<Any>(minimize, guidance, perMove, existing) }
+                ObjectiveGuidance.Canonical to true, ObjectiveGuidance.Geometric to true).flatMap {
+                (guidance, perMove) ->
+                listOf(false, true).flatMap { existing ->
+                    listOf(false, true).map { wcnf -> arrayOf<Any>(minimize, guidance, perMove, existing, wcnf) }
+                }
             }
         }
     }

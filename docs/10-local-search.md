@@ -341,15 +341,15 @@ admits exact alias and affine reconstruction where supported. Construction spend
 containing allowance, cancellation discards the whole view, and a declined view
 keeps ordinary heuristic execution.
 
-When no move sweep survives, a functional, self-owned optimization recipe can use
-the complete Boolean cost sweep captured with its objective. Every definition must
-be a priced flat Boolean fold over free leaves, and every priced term must have
+When no move sweep survives, a functional, self-owned optimization recipe over a
+WCNF source can use the complete Boolean cost sweep captured with its objective.
+Every definition must be a priced flat Boolean fold over free leaves, and every priced term must have
 one unique definition. Capture admits at most one million Boolean coordinates,
 250,000 terms and two million literal readers, charging visits to preparation.
 The worker builds its network through ordinary resumable initialization; source
 validation and the canonical objective still admit incumbents. Existing move
-sweeps, canonical or geometric guidance, ratcheted recipes and recipes without
-per-move invariants retain their selected definition view.
+sweeps, other source formats, canonical or geometric guidance, ratcheted recipes
+and recipes without per-move invariants retain their selected definition view.
 
 Competing, cyclic and cycle-dependent outputs remain searched. Source bounds decide
 when signed-word kernels are safe; wider intermediates use exact evaluation.
