@@ -32,6 +32,7 @@ internal class PrivateRebuildGeneration private constructor(
             session: PropagationSession,
             byteLimit: Long,
             cancellation: Cancellation,
+            onDecline: (String) -> Unit = {},
             passWork: () -> Long = { Long.MAX_VALUE },
         ): PrivateRebuildGeneration? {
             if (!session.canSimplifyRoot || cancellation()) return null
@@ -40,14 +41,21 @@ internal class PrivateRebuildGeneration private constructor(
             var entries = source.numBoolVars.toLong() + source.numFactors + 1L
             for (factor in source.factors) {
                 cancellation.charge(1L)
-                if (cancellation() || factor !is Clause) return null
+                if (cancellation()) return null
+                if (factor !is Clause) {
+                    onDecline("Unsupported${factor::class.simpleName ?: "Factor"}")
+                    return null
+                }
                 entries += factor.literals.size
             }
             // This admission model covers simultaneous primitive buffers and reference slots,
             // including the BVE database, source copies, reconstruction and a fresh native worker.
             // Object headers, the retained canonical worker and allocator overhead are separate.
             val bytes = entries * 512L
-            if (bytes > byteLimit) return null
+            if (bytes > byteLimit) {
+                onDecline("Memory")
+                return null
+            }
             cancellation.charge(source.numBoolVars.toLong())
             if (cancellation()) return null
             val fixed = Array(source.numBoolVars) { session.boolValue(it) }
@@ -85,7 +93,15 @@ internal class PrivateRebuildGeneration private constructor(
             // A local pass boundary retains complete pivots; the containing call still controls
             // publication, opening and checks, and can decline the entire generation.
             val delta = BoundedVariableElimination.eliminateSource(pinned, cancellation = passToken)
-            if (cancellation() || delta.rebuild.steps.isEmpty()) return null
+            if (cancellation()) return null
+            if (delta.infeasible) {
+                onDecline("Refutation")
+                return null
+            }
+            if (delta.rebuild.steps.isEmpty()) {
+                onDecline(if (spent >= allowance) "PassStoppedEmpty" else "PassCompleteEmpty")
+                return null
+            }
             cancellation.charge(entries)
             if (cancellation()) return null
             val reduced = pinned.withSourcePassDelta(delta) ?: return null

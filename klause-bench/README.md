@@ -62,6 +62,10 @@ and deadline in the zero/trial arms. `nativePrivateRebuildAttempts`, `Consumers`
 separate preparation from consumption, canonical publication and fallback.
 `PassStopped` identifies usable generations that retain completed pivots after
 the local BVE cap; later preparation and checks still obey the containing cap.
+`DeclinedUnsupported*` and `DeclinedMemory` identify integration refusals.
+`DeclinedPassStoppedEmpty` and `DeclinedPassCompleteEmpty` distinguish a local
+cap from a completed bounded pass with no elimination; neither excludes other
+structural opportunities.
 Preparation, opening, trial, reconstruction, check and retirement timings have
 separate counters. The propagation ledger includes charged preparation,
 reconstruction and checks; do not add those work subsets again. `ModeledPrivateBytes` excludes the canonical

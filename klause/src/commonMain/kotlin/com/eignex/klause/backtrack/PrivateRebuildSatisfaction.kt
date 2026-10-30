@@ -176,7 +176,8 @@ internal class PrivateRebuildSatisfaction(
             override fun workMeter(): WorkMeter = meter
         }
         val start = TimeSource.Monotonic.markNow()
-        val prepared = PrivateRebuildGeneration.prepare(session, params.learnedMemoryScratchBytes, token) {
+        val prepared = PrivateRebuildGeneration.prepare(session, params.learnedMemoryScratchBytes, token,
+            onDecline = { note("Declined$it") }) {
             (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L) / 2L
         }
         note("PreparationNanos", start.elapsedNow().inWholeNanoseconds)
