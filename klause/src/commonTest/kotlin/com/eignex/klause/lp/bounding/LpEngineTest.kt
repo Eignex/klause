@@ -43,6 +43,29 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `root query observations distinguish work cancellation and checked bounds`() {
+        val cases = listOf(
+            Triple(0L, false, "NO_INITIAL_WORK"),
+            Triple(100_000L, true, "CANCELLED_INITIAL"),
+            Triple(100_000L, false, "BOUND"),
+        )
+        for ((grant, cancelled, outcome) in cases) {
+            val sink = SolveStatsSink("root-query-admission")
+            LpEngine(boundedProblem(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
+                LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                    probe = false, rootCutHarvest = false)), sink,
+                nodeWorkAllowance = { grant }).use { engine ->
+
+                val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(),
+                    Cancellation { cancelled })
+
+                if (outcome == "BOUND") assertEquals(3.0, bound) else assertTrue(bound.isNaN())
+                assertEquals(1L, sink.snapshot().lp.phases["ROOT_QUERY_ROOT"]?.outcomes?.get("COMPONENT_$outcome"))
+            }
+        }
+    }
+
+    @Test
     fun `complete component node deductions honor the injected proof policy`() {
         for (accepted in listOf(false, true)) {
             val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(

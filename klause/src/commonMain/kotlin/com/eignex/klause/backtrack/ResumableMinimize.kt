@@ -1089,10 +1089,17 @@ internal class ResumableMinimize(
         }
         if (unboundedLeaf != null) return null
         val rootToken = rootLpBudget()
+        val admissionStarted = if (lpEngine.lpRelaxer != null || lpEngine.retainedRootEnabled) {
+            TimeSource.Monotonic.markNow()
+        } else null
+        var admissionOutcome = "DUTY_SKIPPED"
         if (rootLpDutyCycle.allows(lpEngine.totalSolveWork())) {
             val before = lpEngine.totalSolveWork()
-            initRootLp(rootToken)
+            admissionOutcome = if (initRootLp(rootToken)) "QUERIED" else "RELAXER_DECLINED"
             rootLpDutyCycle.record(before, lpEngine.totalSolveWork())
+        }
+        admissionStarted?.let {
+            sink.lp.observePrimalPhase("ROOT_ADMISSION", admissionOutcome, it.elapsedNow().inWholeNanoseconds)
         }
         // Objective shaving: raise the objective's proven lower bound before search when the LP +
         // propagation prove lower values infeasible. Sound — every raise is a proof.
@@ -1205,14 +1212,15 @@ internal class ResumableMinimize(
      * capture). [token] is the shared root-LP budget — the slice/global cancellation time-boxed to
      * `LpPlan.rootBudgetFraction`.
      */
-    private fun initRootLp(token: Cancellation) {
-        val relaxer = lpEngine.harvestRootRelaxation(token) ?: return
+    private fun initRootLp(token: Cancellation): Boolean {
+        val relaxer = lpEngine.harvestRootRelaxation(token) ?: return false
         val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token)
         sink.lp.observeRootBound(0, rootBound)
         // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound global lower
         // bound on the optimum, so a peer arm can pair it with its own incumbent to prove optimality. A
         // NaN (no LP structure) carries no information and the sink ignores it.
         if (!rootBound.isNaN()) params.objectiveLowerBoundSink?.invoke(rootBound)
+        return true
     }
 
     /**

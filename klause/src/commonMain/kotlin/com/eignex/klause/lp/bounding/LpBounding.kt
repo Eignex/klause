@@ -1403,41 +1403,86 @@ internal fun LpEngine.rootLpRelaxationBound(
     relaxer: CpToLpRelaxation,
     globalCuts: List<Cut>,
     cancellation: Cancellation = Cancellation.Never,
-): Double = try {
-    if (retainedRootEnabled) {
-        retainedRootLpRelaxationBound(relaxer, globalCuts, cancellation)
-    } else {
-        standaloneRootLpRelaxationBound(relaxer, globalCuts, cancellation)
+): Double {
+    val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.ROOT), LpSolvePhase.ROOT_QUERY)
+    val before = totalSolveWork()
+    val route = when {
+        params.lpPlan.componentOwnership -> "COMPONENT"
+        retainedRootEnabled -> "SPARSE"
+        else -> "STANDALONE"
     }
-} catch (_: CheckedLongOverflowException) {
-    Double.NaN
-} catch (_: LpAssemblyCancelled) {
-    Double.NaN
+    var stage = "ENTRY"
+    return try {
+        if (retainedRootEnabled) {
+            retainedRootLpRelaxationBound(relaxer, globalCuts, cancellation) { stage = it }
+        } else {
+            stage = "AT_SOURCE_LAYOUT"
+            standaloneRootLpRelaxationBound(relaxer, globalCuts, cancellation).also {
+                stage = if (it.isNaN()) "DECLINED" else "BOUND"
+            }
+        }
+    } catch (_: CheckedLongOverflowException) {
+        stage = "SCALAR_WIDTH"
+        Double.NaN
+    } catch (_: LpAssemblyCancelled) {
+        stage = "ASSEMBLY_CANCELLED"
+        Double.NaN
+    } finally {
+        timer.finish("${route}_$stage", totalSolveWork() - before)
+    }
 }
 
+@Suppress("LongMethod", "CyclomaticComplexMethod") // Root ownership cleanup covers every admission boundary.
 private fun LpEngine.retainedRootLpRelaxationBound(
     relaxer: CpToLpRelaxation,
     globalCuts: List<Cut>,
     cancellation: Cancellation,
+    observeStage: (String) -> Unit,
 ): Double {
-    if (retainedRootRemainingWork() <= 0L || cancellation()) return Double.NaN
+    if (retainedRootRemainingWork() <= 0L) {
+        observeStage("NO_INITIAL_WORK")
+        return Double.NaN
+    }
+    if (cancellation()) {
+        observeStage("CANCELLED_INITIAL")
+        return Double.NaN
+    }
+    observeStage("AT_ROOT_PROPAGATION")
     val root = PropagationSession(problem, cancellation)
+    observeStage("AT_SOURCE_LAYOUT")
     val relaxation = nodeRelaxation(relaxer, root, globalCuts) ?: run {
         if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootSourceLayoutDeclined" to 1L)
         cpAdapter.reset()
-        if (retainedRootRemainingWork() <= 0L || cancellation()) return Double.NaN
+        if (retainedRootRemainingWork() <= 0L) {
+            observeStage("SOURCE_LAYOUT_NO_WORK")
+            return Double.NaN
+        }
+        if (cancellation()) {
+            observeStage("SOURCE_LAYOUT_CANCELLED")
+            return Double.NaN
+        }
         if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial + ("StandaloneRootFallback" to 1L)
-        return standaloneRootLpRelaxationBound(relaxer, globalCuts, cancellation)
+        observeStage("AT_FALLBACK")
+        return standaloneRootLpRelaxationBound(relaxer, globalCuts, cancellation).also {
+            observeStage(if (it.isNaN()) "FALLBACK_DECLINED" else "FALLBACK_BOUND")
+        }
     }
-    if (relaxation.model.n == 0) return Double.NaN
+    if (relaxation.model.n == 0) {
+        observeStage("EMPTY_MODEL")
+        return Double.NaN
+    }
     val continuation = if (sparseTrialActive) ::retainedRootRemainingWork else null
     try {
         while (retainedRootRemainingWork() > 0L && !cancellation()) {
+            observeStage("AT_NUMERICAL_QUERY")
             val attempt = solveNode(relaxation.model, null, cancellation, continuation)
             if (attempt == null) {
                 val metrics = propagator.lastMetrics.copy(preparationOps = 0L)
                 observeRootWork(metrics, finished = !propagator.floatPaused)
-                if (!propagator.floatPaused || metrics.workOps == 0L) return Double.NaN
+                if (!propagator.floatPaused || metrics.workOps == 0L) {
+                    observeStage("QUERY_DECLINED_${propagator.floatTermination?.name ?: "NO_TERMINATION"}")
+                    return Double.NaN
+                }
                 if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial +
                     ("RootPauses" to ((sink.lp.sparseTrial["RootPauses"] ?: 0L) + 1L))
                 observeNodePause()
@@ -1447,10 +1492,23 @@ private fun LpEngine.retainedRootLpRelaxationBound(
             val metrics = if (nodeUsesTrail) propagator.lastMetrics.copy(preparationOps = 0L)
                 else attempt.first.lastMetrics
             observeRootSolve(attempt.first, metrics)
+            observeStage("AT_CERTIFICATION")
             val lower = attempt.second?.let { retainedRootLowerBound(relaxation.model, it, cancellation) }
             retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
-            return if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
+            val stopped = cancellation()
+            val bound = if (stopped) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
+            observeStage(
+                when {
+                    stopped -> "CANCELLED_AFTER_QUERY"
+                    attempt.second == null -> "NO_FLOAT_${attempt.first.lastTermination?.name ?: "NO_TERMINATION"}"
+                    lower == null -> "CERTIFICATE_DECLINED"
+                    bound.isNaN() -> "SOURCE_PROJECTION_DECLINED"
+                    else -> "BOUND"
+                },
+            )
+            return bound
         }
+        observeStage("QUERY_LOOP_STOPPED")
         return Double.NaN
     } finally {
         val retained = cpAdapter.retainRootProbe(root)
