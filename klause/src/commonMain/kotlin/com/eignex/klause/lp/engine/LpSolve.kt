@@ -1468,11 +1468,7 @@ internal class LpCounterResults {
     }
 
     fun read(model: LpModel, policy: LpCertificationPolicy): CertifiedLpResult? {
-        val exact = model.exactState
-        if (exact != null && state === exact && acceptedBy === policy &&
-            policy === ProductionLpCertificationPolicy
-        ) return evidence
-        val current = if (exact == null) keyOf(model) else null
+        val current = keyOf(model)
         if (policy !== ProductionLpCertificationPolicy || current == null ||
             key?.contentEquals(current) != true || acceptedBy !== policy || state !== model.exactState
         ) {
@@ -1488,8 +1484,8 @@ internal class LpCounterResults {
     fun remember(model: LpModel, result: CertifiedLpResult, policy: LpCertificationPolicy) {
         if (policy !== ProductionLpCertificationPolicy || (result.witness == null && result.bound == null)) return
         val exact = model.exactState
-        val current = if (exact == null) keyOf(model) else null
-        if ((exact == null && current == null) || (exact != null && !admitsPackage(model, result))) {
+        val current = keyOf(model)
+        if (current == null || (exact != null && !admitsPackage(model, result))) {
             declineStorage()
             return
         }
