@@ -856,7 +856,7 @@ These controls establish no throughput improvement or independent proof validati
 resolve through catalog `select files=true`, verify frozen source hashes and retain
 selection time/resource receipts; include `:klause-bench:installDist` in their build tasks.
 It compares disabled
-templates, object reuse, complete index reuse and selective metadata reuse on the
+templates, object reuse, complete index reuse and the internal candidate mode on the
 existing MPS component fixtures. Submit as a lab profile script with build task
 `:klause:stageLpProfileJvm`, Linux x86_64 placement and a 180-second runtime cap.
 It includes repeated cold preparation, unchanged views, alternating bound, objective
@@ -873,6 +873,12 @@ whole-process and enforced group resource receipts retain their broader costs.
 The retained route prepares the production source regions, installs their exact
 columns and rows into a private scoped owner with source-bound assertions and
 permanent row markers, solves and closes that owner within the measured total.
+Its candidate mode borrows compatible immutable bound definitions from columns that
+earlier fragments actually introduced, without a whole-source metadata preparation.
+`retainedBoundDefinitionsReused` counts those avoided constructions separately from
+`exactBoundsAdopted`, which counts introductions backed by prepared definitions.
+The standalone candidate uses selective metadata reuse. Pin the revision when
+comparing these mode records; a shared label does not establish equal algorithms.
 It isolates root installation; ordinary CLI preparation, propagation and route
 selection remain separate source-wide costs. The wrapper retains actual JDK file hashes and the cost of
 that shared identity prefix. Its assembly includes fragment import and installation;

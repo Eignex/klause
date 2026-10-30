@@ -16,6 +16,7 @@ import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpLayoutStorage
 import com.eignex.klause.lp.engine.LpLayoutWeight
+import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpScopedRows
 import com.eignex.klause.lp.engine.LpStructuralColumn
@@ -239,13 +240,7 @@ internal class LpRetainedSources(
             val fragment = emission.relaxation
             emittedExtent += fragment.model.n.toLong() + fragment.model.m +
                 (fragment.model.doubleView?.colVal?.size ?: fragment.model.csc.rowIdx.size)
-            val source = if (fragment.preparationTemplates != null &&
-                fragment.model.exactState == null && fragment.model.doubleView == null
-            ) {
-                fragment.authoritativeWithTemplates(cancellation, onWork = relaxer::observeTemplateWork)
-            } else {
-                fragment.model.authoritativeModel()
-            } ?: return null
+            val source = importFragment(fragment, staged, keys, epoch, cancellation) ?: return null
             require(source.objective.scale.value == BigFraction.ONE && source.objective.externalConstant.value.isZero)
             val mapped = IntArray(source.n)
             for (local in mapped.indices) {
@@ -378,6 +373,57 @@ internal class LpRetainedSources(
             compactionView = null
         }
     }
+
+    private fun importFragment(
+        fragment: LpRelaxation,
+        staged: List<Column>,
+        keys: Map<ColumnKey, Int>,
+        epoch: Long,
+        cancellation: Cancellation,
+    ): ExactLpModel? {
+        val model = fragment.model
+        if (relaxer.reuseRetainedDefinitions && keys.isNotEmpty() &&
+            model.exactState == null && model.doubleView == null
+        ) {
+            var work = 0L
+            var reused = 0
+            val source = try {
+                model.authoritativeModel { local ->
+                    work++
+                    cancellation.charge(1L)
+                    checkCancellation(cancellation)
+                    if (!fragment.canBorrowIntegerColumn(local)) null else {
+                        keys[columnKey(fragment, local, epoch)]?.let { staged[it].source }
+                            ?.takeIf { it.matchesCompactColumn(model, local) }?.also { reused++ }
+                    }
+                }
+            } finally {
+                relaxer.observeTemplateWork(work)
+            }
+            checkCancellation(cancellation)
+            relaxer.observeRetainedBoundTemplates(reused)
+            return source
+        }
+        return if (fragment.preparationTemplates != null && model.exactState == null && model.doubleView == null) {
+            fragment.authoritativeWithTemplates(cancellation, onWork = relaxer::observeTemplateWork)
+        } else model.authoritativeModel()
+    }
+
+    private fun LpRelaxation.canBorrowIntegerColumn(index: Int): Boolean =
+        colVarId[index] >= 0 && !colIsBool[index] && colRealId[index] < 0 && colReq[index] == null &&
+            !model.colContinuous[index] && !model.probeClampedLo[index]
+
+    private fun ExactLpColumn.matchesCompactColumn(model: LpModel, index: Int): Boolean {
+        if (!integral || tag != model.tag[index] || origin.legacyLong() != model.loShift[index] ||
+            !bounds.lower.matchesCompactSide(0L)
+        ) return false
+        return if (!model.hasFiniteUpper(index) || model.probeClampedHi[index]) bounds.upper == null else {
+            model.upper[index] >= 0L && bounds.upper.matchesCompactSide(model.upper[index])
+        }
+    }
+
+    private fun ExactLpSide?.matchesCompactSide(bound: Long): Boolean = this != null &&
+        !strict && premises == null && number.legacyLong() == bound
 
     private fun checkCancellation(cancellation: Cancellation) {
         if (cancellation()) throw LpAssemblyCancelled()

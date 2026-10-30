@@ -510,6 +510,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     private var templateRows = 0L
     private var templateBounds = 0L
     private var templateExactBounds = 0L
+    private var templateRetainedBounds = 0L
     val cutLifecycle = LpCutStats { key, delta ->
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
@@ -546,7 +547,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         templateRetainedUnits += retainedUnits
     }
 
-    fun observeTemplateUse(rows: Int = 0, bounds: Int = 0, exactBounds: Int = 0) {
+    fun observeTemplateUse(rows: Int = 0, bounds: Int = 0, exactBounds: Int = 0, retainedBounds: Int = 0) {
         if (!templateAssemblySeen) {
             templateAssemblySeen = true
             phases.getOrPut("TEMPLATE_ASSEMBLY_${probeRoute.name}") { LpPhaseStats() }
@@ -554,6 +555,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         templateRows += rows
         templateBounds += bounds
         templateExactBounds += exactBounds
+        templateRetainedBounds += retainedBounds
     }
 
     private fun phaseSnapshot(): Map<String, LpPhaseStats> {
@@ -581,11 +583,12 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
             }
             if (templateAssemblySeen) {
                 val key = "TEMPLATE_ASSEMBLY_${probeRoute.name}"
-                put(key, getValue(key).mergedWith(LpPhaseStats(outcomes = mapOf(
-                    "ROWS" to templateRows,
-                    "BOUNDS" to templateBounds,
-                    "EXACT_BOUND_OBJECTS" to templateExactBounds,
-                ))))
+                put(key, getValue(key).mergedWith(LpPhaseStats(outcomes = buildMap {
+                    put("ROWS", templateRows)
+                    put("BOUNDS", templateBounds)
+                    put("EXACT_BOUND_OBJECTS", templateExactBounds)
+                    if (templateRetainedBounds != 0L) put("RETAINED_BOUND_REUSES", templateRetainedBounds)
+                })))
             }
         }
     }

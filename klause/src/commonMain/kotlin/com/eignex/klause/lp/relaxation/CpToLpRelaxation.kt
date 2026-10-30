@@ -689,9 +689,15 @@ internal class CpToLpRelaxation(
     private val linearProjection = LinearLpProjection()
     internal var preparationTemplates: LpPreparationTemplates? = null
         private set
+    internal val reuseRetainedDefinitions: Boolean get() = reuseSourceTemplates && reuseTemplateMetadata &&
+        problem.numRealVars == 0 && projections?.builtInRelaxation != false
 
     internal fun observeBoundTemplates(count: Int) {
         templateStats?.observeTemplateUse(exactBounds = count)
+    }
+
+    internal fun observeRetainedBoundTemplates(count: Int) {
+        templateStats?.observeTemplateUse(retainedBounds = count)
     }
 
     internal fun observeTemplateWork(work: Long) {
@@ -848,7 +854,9 @@ internal class CpToLpRelaxation(
     }
 
     fun prepareEmissionTemplates(cancellation: Cancellation) {
-        if (preparationTemplates == null) prepareTemplates(cancellation or preparationCancellation)
+        if (!reuseRetainedDefinitions && preparationTemplates == null) {
+            prepareTemplates(cancellation or preparationCancellation)
+        }
     }
 
     fun emitRegion(

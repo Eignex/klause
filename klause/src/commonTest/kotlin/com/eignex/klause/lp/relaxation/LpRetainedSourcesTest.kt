@@ -15,6 +15,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,6 +27,69 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
+    @Test
+    fun `retained candidate imports should reuse actual columns without preparing source metadata`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 8),
+        ))
+        val sink = LpStatsSink()
+        var work = 0L
+        val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)),
+            projections = FactorProjectionProviders.Default.prepare(problem), templateStats = sink,
+            reuseTemplateMetadata = true, onTemplateWork = { work += it })
+        val sources = LpRetainedSources(problem, consumer)
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)))
+            assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+            edit.commit()
+
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(BigFraction.ofLong(2L), result.lowerBound)
+            assertEquals(2L, work)
+            val stats = sink.snapshot()
+            assertFalse(stats.phases.containsKey("TEMPLATE_PREPARATION_NODE"))
+            assertEquals(2L, stats.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes["RETAINED_BOUND_REUSES"])
+        }
+    }
+
+    @Test
+    fun `retained candidate imports should preserve probe lower sides`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, -5),
+        ), openIntLo = booleanArrayOf(true))
+        val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)),
+            projections = FactorProjectionProviders.Default.prepare(problem), reuseTemplateMetadata = true)
+        val sources = LpRetainedSources(problem, consumer)
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)))
+            assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+            edit.commit()
+
+            val result = assertNotNull(owner.solve())
+
+            assertEquals(BigFraction.ofLong(-5L), result.lowerBound)
+        }
+    }
+
+    @Test
+    fun `retained column imports should withhold publication after their work debit cancels`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+        ))
+        var cancelled = false
+        val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)),
+            projections = FactorProjectionProviders.Default.prepare(problem), reuseTemplateMetadata = true,
+            onTemplateWork = { if (it > 0L) cancelled = true })
+        val sources = LpRetainedSources(problem, consumer)
+        val token = Cancellation { cancelled }
+
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            assertFailsWith<LpAssemblyCancelled> { sources.prepare(owner.state, RootDomains(problem), token) }
+        }
+    }
+
     @Test
     fun `retained template imports should preserve wide exact origins and open sides`() {
         val modes = listOf(false to false, true to false, true to true)
@@ -50,7 +114,7 @@ class LpRetainedSourcesTest {
                 assertEquals(BigFraction.ofLong(2L * origin + 3L), result.lowerBound)
                 assertEquals(BigFraction.ofLong(origin), owner.state.model.column(0).origin.value)
                 assertEquals(open, owner.state.model.column(1).bounds.upper == null)
-                if (templates) assertSame(assertNotNull(consumer.preparationTemplates).bounds.getValue(0).column,
+                if (templates && !metadata) assertSame(assertNotNull(consumer.preparationTemplates).bounds.getValue(0).column,
                     owner.state.model.column(0))
             }
         }
@@ -75,7 +139,7 @@ class LpRetainedSourcesTest {
             problem,
             CpToLpRelaxation(
                 problem, LinearObjective(intCoefficients = longArrayOf(0, 1, 1, 0, 1)),
-                elementHull = true, elementIndexes = setOf(0),
+                elementHull = true, elementIndexes = setOf(0), reuseTemplateMetadata = true,
             ),
         )
         LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->

@@ -227,6 +227,7 @@ internal object LpTemplatePreparationProfile {
                             put("rowsAssembled", assembly?.outcomes?.get("ROWS") ?: 0L)
                             put("boundsAssembled", assembly?.outcomes?.get("BOUNDS") ?: 0L)
                             put("exactBoundsAdopted", assembly?.outcomes?.get("EXACT_BOUND_OBJECTS") ?: 0L)
+                            put("retainedBoundDefinitionsReused", assembly?.outcomes?.get("RETAINED_BOUND_REUSES") ?: 0L)
                             put("peakRetainedTemplateUnits", retainedUnits)
                             put("nativeResults", results.joinToString(","))
                             put("independentProofCheck", false)

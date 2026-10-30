@@ -113,6 +113,16 @@ carrying a finite session's table; model identity or type alone supplies no such
 The ordinary mode retains its complete-match check. Both modes publish only completed immutable
 snapshots within the same containing allowance and storage cap.
 
+For retained source emission, the internal selective mode can use the owner's existing
+column catalog instead of preparing whole-source metadata. A completed earlier fragment
+supplies an immutable bound definition only after its source coordinate, normalized
+origin, integrality and both bound sides match the current compact integer column.
+Conditional, auxiliary, IEEE and noncompact columns keep ordinary construction.
+An empty catalog creates no speculative definitions. Each lookup charges the current
+allowance; interrupted imports report that work and withhold publication after debit.
+These reuses have their own observation, separate from introductions into the owner.
+The catalog retains no additional cache or numerical result authority.
+
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.
 Cold preparation first checks a necessary work lower bound within the same cap.

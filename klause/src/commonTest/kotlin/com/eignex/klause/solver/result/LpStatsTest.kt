@@ -38,15 +38,15 @@ class LpStatsTest {
     @Test
     fun `template emission snapshots should remain immutable after further consumers`() {
         val sink = LpStatsSink()
-        sink.observeTemplateUse(rows = 2, bounds = 3, exactBounds = 1)
+        sink.observeTemplateUse(rows = 2, bounds = 3, exactBounds = 1, retainedBounds = 2)
         val before = sink.snapshot()
 
-        sink.observeTemplateUse(rows = 5, exactBounds = 7)
+        sink.observeTemplateUse(rows = 5, exactBounds = 7, retainedBounds = 3)
         val after = sink.snapshot()
 
-        assertEquals(mapOf("ROWS" to 2L, "BOUNDS" to 3L, "EXACT_BOUND_OBJECTS" to 1L),
+        assertEquals(mapOf("ROWS" to 2L, "BOUNDS" to 3L, "EXACT_BOUND_OBJECTS" to 1L, "RETAINED_BOUND_REUSES" to 2L),
             before.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes)
-        assertEquals(mapOf("ROWS" to 7L, "BOUNDS" to 3L, "EXACT_BOUND_OBJECTS" to 8L),
+        assertEquals(mapOf("ROWS" to 7L, "BOUNDS" to 3L, "EXACT_BOUND_OBJECTS" to 8L, "RETAINED_BOUND_REUSES" to 5L),
             after.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes)
     }
 
