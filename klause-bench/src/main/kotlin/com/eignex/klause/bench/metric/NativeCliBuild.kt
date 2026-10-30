@@ -2,7 +2,6 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.source.CorpusFetcher
 import java.io.File
-import java.security.MessageDigest
 
 internal object NativeCliBuild {
     fun executable(root: File = CorpusFetcher.workspaceRoot()): File =
@@ -63,18 +62,7 @@ internal object NativeCliBuild {
         return libraryPaths(output).also { require(it.isNotEmpty()) { "Native runtime dependencies are unavailable" } }
     }
 
-    private fun hash(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val size = input.read(buffer)
-                if (size < 0) break
-                digest.update(buffer, 0, size)
-            }
-        }
-        return digest.digest().joinToString("") { "%02x".format(it) }
-    }
+    private fun hash(file: File): String = SolveEvidence.fileHashes(mapOf("file" to file)).getValue("file")
 
     private val LIBRARY_PATH = Regex("(?:=>\\s+)?(/\\S+)\\s+\\(")
 }
