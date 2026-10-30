@@ -39,6 +39,29 @@ import kotlin.test.assertTrue
 
 class AffinePivotOrderTest {
     @Test
+    fun `an inadmissible equality should leave rewrite scoring allowance for a later fold`() {
+        var stopped = false
+        val table = Table(intArrayOf(0, 1, 2), longArrayOf(0, 0, 4, 1, 1, 2, 2, 2, 0))
+        val consumer = object : Factor by table {
+            override val structuralKeyWeight: Int get() {
+                stopped = true
+                return table.structuralKeyWeight
+            }
+        }
+        val source = Problem(0, 7, Array(7) { IntDomain(0, 4) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 4), consumer,
+            Linear(intArrayOf(1, 1, 1), intArrayOf(3, 4, 5), LinearOp.EQ, 5),
+            Linear(intArrayOf(1, 1), intArrayOf(3, 6), LinearOp.LE, 7),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 6), LinearOp.GE, -2),
+        ))
+
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
+            cancellation = Cancellation { stopped }, pivotOrder = AffinePivotOrder.REWRITE_COST)
+
+        assertFalse(delta.isEmpty)
+    }
+
+    @Test
     fun `an admitted pivot should remain available without scoring a protected objective payload`() {
         var stopped = false
         val table = Table(intArrayOf(0, 3), longArrayOf(0, 0, 1, 1, 2, 2))

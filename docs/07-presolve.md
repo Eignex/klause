@@ -94,8 +94,15 @@ excluding the definition, through the maintained occurrence index. Ties retain
 declaration order. Scoring charges and polls the phase allowance and never builds
 factor keys or speculative replacements. The ordinary admissibility, domain,
 objective and reconstruction checks apply to the preferred pivot; a rejected pivot
-falls back to declaration order. This opt-in estimate
+falls back to the first admitted declaration-order pivot. An equality without an
+admitted pivot performs no payload scoring. This opt-in estimate
 describes construction size; active downstream search still determines total cost.
+The same policy can fold an asserted integer definition through word-sized
+`ReifiedLinear` consumers. The replacement retains the channel's Boolean output
+and comparison in both directions; conditional equalities never supply asserted
+pivots. Coefficient checks, the per-row absorption cap and carried domain bounds
+apply to these consumers as they do to unconditional rows. Other pivot policies
+retain their consumer admission.
 
 `PresolveConfig.preserveStructure` is an opt-in performance control for affine and
 structural reduction. Structured factors are all factors except plain `Linear`

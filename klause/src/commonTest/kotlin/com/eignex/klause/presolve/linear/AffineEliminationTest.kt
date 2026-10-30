@@ -3,6 +3,7 @@ package com.eignex.klause.presolve.linear
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
@@ -15,6 +16,7 @@ import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
+import com.eignex.klause.presolve.asSampleLift
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.Propagator
@@ -32,6 +34,70 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AffineEliminationTest {
+    @Test
+    fun `rewriting an asserted definition through a channel should preserve both channel branches`() {
+        for (finite in listOf(false, true)) for (op in LinearOp.entries) {
+            val source = Problem(1, 3, Array(3) { IntDomain(0, 4) }, listOf(
+                Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(2, -1), intArrayOf(0, 1), op, 2),
+            ))
+            val reduced: Problem
+            val reconstruct: (Sample) -> Sample
+            if (finite) {
+                val baked = source.bake()
+                val delta = AffineSingletons.eliminateAffineSingletons(baked, objectiveIntVars = setOf(1, 2),
+                    pivotOrder = AffinePivotOrder.REWRITE_COST)
+                assertFalse(delta.isEmpty)
+                reduced = baked.withPassDelta(delta, BakeConfig.NONE)
+                reconstruct = assertNotNull(delta.reconstruct)
+            } else {
+                val delta = AffineSingletons.eliminateSourceAffineSingletons(source, objectiveIntVars = setOf(1, 2),
+                    pivotOrder = AffinePivotOrder.REWRITE_COST)
+                assertFalse(delta.isEmpty)
+                reduced = assertNotNull(source.withSourcePassDelta(delta))
+                reconstruct = assertNotNull(delta.rebuild.asSampleLift())
+            }
+
+            for ((a, b) in listOf(0L to 0L, 0L to 1L, 1L to 1L)) for (truth in listOf(false, true)) {
+                val sum = a + 2 * b
+                val holds = when (op) {
+                    LinearOp.LE -> sum <= 2
+                    LinearOp.EQ -> sum == 2L
+                    LinearOp.GE -> sum >= 2
+                    LinearOp.NE -> sum != 2L
+                }
+                val point = Sample(booleanArrayOf(truth), longArrayOf(0, a, b))
+
+                assertEquals(holds == truth, isFeasible(reduced, point))
+                if (holds == truth) assertTrue(isFeasible(source, reconstruct(point)))
+            }
+        }
+    }
+
+    @Test
+    fun `a conditional equality should not supply an asserted affine pivot`() {
+        val source = Problem(1, 2, Array(2) { IntDomain(0, 4) },
+            listOf(ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 1)))
+
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
+            pivotOrder = AffinePivotOrder.REWRITE_COST)
+
+        assertTrue(delta.isEmpty)
+    }
+
+    @Test
+    fun `an overflowing channel coefficient should retain the asserted definition`() {
+        val source = Problem(1, 3, Array(3) { IntDomain(0, 4) }, listOf(
+            Linear(intArrayOf(1, -2, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            ReifiedLinear(0, longArrayOf(Long.MAX_VALUE), intArrayOf(0), LinearOp.LE, 1),
+        ))
+
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(source, objectiveIntVars = setOf(1, 2),
+            pivotOrder = AffinePivotOrder.REWRITE_COST)
+
+        assertTrue(delta.isEmpty)
+    }
+
     @Test
     fun `unnegatable affine constants should retain their source equality`() {
         for ((coefficients, bound) in listOf(
