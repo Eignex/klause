@@ -360,8 +360,8 @@ class SparseLpAdmissionTest {
         assertEquals(1L, sink.snapshot().lp.sparseTrial["Admitted"])
         assertTrue(sink.snapshot().lp.pruned.sum > 0.0)
         assertTrue(sink.snapshot().lp.workOps.sum > 0.0)
-        assertTrue(sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
-            .sumOf { it.outcomes["ROWS"] ?: 0L } > 0L)
+        assertTrue(sink.snapshot().lp.overheadOps.sum > 0.0)
+        assertFalse(sink.snapshot().lp.phases.keys.any { it.startsWith("TEMPLATE_PREPARATION_") })
     }
 
     @Test

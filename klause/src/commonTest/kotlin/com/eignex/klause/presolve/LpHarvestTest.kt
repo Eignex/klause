@@ -5,17 +5,17 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -30,13 +30,15 @@ class LpHarvestTest {
     private val objShavingParams = LpPlan(bounding = true, objectiveShaving = true)
 
     @Test
-    fun `a no op harvest should retain finite templates for the engine bake`() {
+    fun `a no op harvest should retain paid finite templates for the engine bake`() {
         val source = Problem(0, 4, Array(4) { IntDomain(0, 10) }, arrayOf<Factor>(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
             Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
         ))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
         val selection = FactorProjectionProviders.Default.prepare(source)
+        val initial = source.bake(selection)
+        CpToLpRelaxation(initial, objective).build(RootDomains(initial))
         val config = PresolveConfig.parse("off,+lp-harvest")
         val prepared = PresolvePipeline.prepareSource(source, config, objective, finiteLane = true)
 
@@ -53,7 +55,7 @@ class LpHarvestTest {
     }
 
     @Test
-    fun `a consuming LP should reuse templates across incremental presolve preparation`() {
+    fun `incremental harvest should preserve LP pruning without speculative preparation`() {
         val source = Problem(0, 4, Array(4) { IntDomain(0, 10) }, arrayOf<Factor>(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
             Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
@@ -70,18 +72,13 @@ class LpHarvestTest {
         val sink = SolveStatsSink("template-consumer")
 
         val pruned = LpEngine(second.problem, objective, LpParams(lpPlan = plan), sink).use { engine ->
+            assertEquals(6.0, engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList()))
             engine.pruneNode(PropagationSession(second.problem), 5.0, -1, true)
         }
 
         assertTrue(pruned)
-        assertTrue(second.stats.phases.filterKeys { it.startsWith("TEMPLATE_PREPARATION_") }.values
-            .sumOf { it.outcomes["FACTORS_REUSED"] ?: 0L } > 0L)
-        assertTrue(sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_PREPARATION_") }.values
-            .sumOf { it.outcomes["FACTORS_REUSED"] ?: 0L } > 0L)
-        assertTrue(sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
-            .sumOf { it.outcomes["ROWS"] ?: 0L } > 0L)
-        assertTrue(sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
-            .sumOf { it.outcomes["EXACT_BOUND_OBJECTS"] ?: 0L } > 0L)
+        assertFalse(second.stats.phases.keys.any { it.startsWith("TEMPLATE_PREPARATION_") })
+        assertFalse(sink.snapshot().lp.phases.keys.any { it.startsWith("TEMPLATE_PREPARATION_") })
     }
 
     @Test

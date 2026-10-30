@@ -138,13 +138,13 @@ class LpEngineTest {
 
             val root = engine.rootLpRelaxationBound(relaxer, emptyList(), rootToken,
                 preparationCancellation = Cancellation.Never)
-            val prepared = sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls ?: 0L
+            val prepared = assertNotNull(engine.propagator.state)
             val node = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
             val bound = assertNotNull(engine.solveNode(node.model, null, Cancellation.Never)?.second).objective
 
             assertTrue(root.isNaN())
-            assertTrue(prepared > 0L)
-            assertEquals(prepared, sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls)
+            assertSame(prepared, engine.propagator.state)
+            assertFalse(sink.snapshot().lp.phases.containsKey("TEMPLATE_PREPARATION_NODE"))
             assertEquals(3.0, bound)
         }
     }

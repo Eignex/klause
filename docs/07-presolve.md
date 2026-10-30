@@ -50,15 +50,16 @@ propagator-only symmetry does not change that eligibility. Explicit `+lp-harvest
 nonclausal sources and optimization keep harvest eligibility.
 [Wide-integer pre-bake bounds](#pre-bake-lp-bounds) use a separate safety gate.
 
-LP harvest carries compatible immutable source-row and exact-bound templates across
-finite rebuilds through the selected projections. Unchanged definitions retain their
-buffers; changed bounds, rows, objectives and component joins replace the affected
+Selected projections retain completed immutable source-row and exact-bound templates
+across finite rebuilds for explicit preparation consumers. Unchanged definitions retain
+their buffers; changed bounds, rows, objectives and component joins replace the affected
 component snapshots. Namespace remaps and semantic-scope changes require fresh
-bindings. The later model-facing LP consumers instantiate their own mutable owners
-from these definitions; see [LP preparation](17-linear-programming.md#exact-source-row-projections).
-A no-op preparation preserves the canonical model handle. Compatible projections
-share the completed immutable finite-template seed for the later engine bake. That bake rebinds the
-index to its own source and checks its current bounds before reuse.
+bindings. Template consumers instantiate their own mutable owners from these
+definitions; see [LP preparation](17-linear-programming.md#exact-source-row-projections).
+A no-op harvest preserves the canonical model handle and any completed finite-template
+seed. A later template consumer rebinds the index to its own source and checks its
+current bounds before reuse. Bounding engines use ordinary whole-model construction
+and admit definition reuse from actual retained fragment imports.
 Template construction spends the same containing allowance, and unfinished preparation
 publishes no reusable state. Template reuse changes assembly work, not pass admission,
 probe selection, reconstruction guarantees or source authority.
