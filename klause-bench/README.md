@@ -776,6 +776,13 @@ The generated-aggregate replay includes the ordinary opt-in producer's bounded
 source-pair indexing and discovery. Keep this cost separate from replaying supplied
 diagnostic proposals. `AggregatePair*` reports coverage, attempts and limiting
 stages; a partial generation establishes no general absence of useful cuts.
+`MpsProofFrontier certificateState=true` records retained completed guidance's
+certificate refusal, exact-basis repair dimensions and charged work/allocation in
+`certificate-state.json`. This optional post-solve observation issues no query and
+shares the existing capture deadline; scalar strings are capped at 4,096 characters.
+Missing state or a stopped inspection remains unavailable. Its owner scope can
+precede the current frontier leaf. It supplies no certificate authority, independent
+check, performance gain or original tolerant-source claim.
 With both aggregate and point selection enabled, an empty individual-cut family
 installs the bounded aggregate family in the initial CURRENT query. A fully checked
 family of at most 64 rows enters aging while retaining that query. With individual

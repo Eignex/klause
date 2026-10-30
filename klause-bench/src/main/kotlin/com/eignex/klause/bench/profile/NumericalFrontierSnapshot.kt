@@ -37,6 +37,49 @@ internal class NumericalFrontierSnapshot(
     private val checked = IdentityHashMap<SourceEvidence, JsonObject>()
     private var remaining = 4096
 
+    fun certificateState(invocation: Any): JsonObject {
+        fun scalars(owner: Any, names: List<String>): JsonObject = buildJsonObject {
+            for (name in names) {
+                require(!stop())
+                val value = field(owner, name) ?: continue
+                when (value) {
+                    is Int -> put(name, value)
+                    is Long -> put(name, value)
+                    is Boolean -> put(name, value)
+                    else -> put(name, value.toString().also { require(it.length <= 4096) })
+                }
+            }
+        }
+        require(!stop())
+        val authority = checkNotNull(field(checkNotNull(field(invocation, "component")), "authority"))
+        val session = checkNotNull(field(checkNotNull(field(authority, "lp")), "session"))
+        val guide = checkNotNull(field(session, "completed")) { "no retained completed guidance" }
+        val metrics = checkNotNull(field(guide, "certificateMetrics")) { "no retained certificate metrics" }
+        return buildJsonObject {
+            put("diagnosticOnly", true)
+            put("independentProofCheck", false)
+            put("retainedGuidance", scalars(guide, listOf("phase", "paused", "termination", "optimalCandidate")))
+            (field(session, "authority") as SourceScope?)?.let { put("ownerScope", scope(it)) }
+            put("metrics", scalars(metrics, listOf("attempts", "pointChecks", "dualChecks", "rayChecks",
+                "pointSuccesses", "dualSuccesses", "raySuccesses", "vectorRestarts", "verificationRestarts",
+                "work", "allocation", "maxBits", "decline", "phase", "basisWork")))
+            field(metrics, "dualRejection")?.let {
+                put("dualRejection", scalars(it, listOf("column", "upper", "reduced")))
+            }
+            field(metrics, "vectorRejection")?.let {
+                put("vectorRejection", scalars(it, listOf("commonDenominator", "limit")))
+            }
+            field(metrics, "entryRejection")?.let {
+                put("entryRejection", scalars(it, listOf("row", "value")))
+            }
+            field(metrics, "basisRepair")?.let {
+                put("basisRepair", scalars(it, listOf("peeledRows", "peeledColumns", "coreRows", "components",
+                    "largestComponent", "solvedComponents", "factorWork", "factorAllocation", "openBasicColumns",
+                    "decline", "restrictedComponents", "restrictedColumns")))
+            }
+        }
+    }
+
     fun cuts(invocation: Any): JsonObject {
         val authority = checkNotNull(field(checkNotNull(field(invocation, "component")), "authority"))
         val template = field(authority, "template")
