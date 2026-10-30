@@ -1035,6 +1035,15 @@ schedule does not reproduce mixed numerical elapsed schedules. Full-trace claims
 require the capture's complete artifact marker; source outcome claims require the
 corresponding independent checker receipts.
 
+`finiteCompanionPreparationAttempts`, `finiteCompanionPreparationNs`,
+`finiteCompanionPreparationReady` and `finiteCompanionPreparationUnavailable`
+record the invocation's eager affine capture before worker factories. Retain
+unavailable captures and captures followed by no worker query. This duration is
+inside containing solve time, separate from factory, query and retirement counters;
+it does not fund extra active time. Sampled JFR allocations cannot replace it when
+choosing a construction or useful-lifetime policy. Whole-job costs still retain
+exceptions that prevent a final invocation result.
+
 `param.portfolio-reward=ordinary|source|source-rate` varies rewards independently of admission
 and coverage. `source` retains ordinary feasibility rewards, then rewards only
 accepted incumbent improvements and terminal closure. Retain phase/cost counters
