@@ -33,6 +33,17 @@ class FamilyPolicyTest {
     }
 
     @Test
+    fun `equal fractional progress should preserve family balance`() {
+        val policy = FamilyPolicy(Random(3))
+
+        repeat(8) {
+            for (family in pair) policy.record(family, progressed = true, plateau = true, reward = 0.5)
+        }
+
+        assertTrue(choicesOf(policy, ArmFamily.Backtrack) in 400..600)
+    }
+
+    @Test
     fun `complete search deductions should preserve family balance before a witness`() {
         val policy = FamilyPolicy(Random(3))
 
