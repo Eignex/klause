@@ -209,6 +209,51 @@ class LpHintsTest {
     }
 
     @Test
+    fun `baseline calibration applies only to partial directional proposals`() {
+        for ((samples, gain, accepted) in listOf(
+            Triple(1, 1.0, false), Triple(1, 8.0, false), Triple(1, 16.0, true), Triple(2, 1.0, true),
+        )) {
+            val builder = LpBuilder()
+            repeat(3) { builder.addVar(0, 10, cost = if (it == 2) 100 else 1) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, 2),
+                BooleanArray(3), 0L, intArrayOf(0, 1, 2), IntArray(0))
+            val observations = ArrayList<String>()
+            val hints = LpHints(3, 0, directionalGains = true, observe = observations::add)
+            for (variable in 0..1) {
+                repeat(if (variable == 0) 2 else samples) {
+                    hints.beginNode(0, 100.0)
+                    hints.record(relaxation, DoubleArray(3) { 2.25 }, DoubleArray(0))
+                    hints.recordObjective(relaxation, 10.0)
+                    hints.branch(VarRef.IntVar(variable))
+                    for (up in if (variable == 0 || samples == 2) listOf(false, true) else listOf(false)) {
+                        hints.commit(if (up) SearchDecision.IntAtLeast(variable, 3)
+                            else SearchDecision.IntAtMost(variable, 2), 1)
+                        hints.beginNode(1, 100.0)
+                        hints.record(relaxation, DoubleArray(3) { 2.25 }, DoubleArray(0))
+                        val delta = if (variable == 0) {
+                            if (up) 24.0 else 8.0
+                        } else if (up) 3.0 else gain
+                        hints.recordObjective(relaxation, 10.0 + delta)
+                    }
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.0, 2.25, 2.25), DoubleArray(0))
+            hints.recordObjective(relaxation, 10.0)
+            observations.clear()
+            val variable = VarRef.IntVar(1)
+            val baseline = VarRef.IntVar(2)
+
+            val selected = hints.selected(variable, baseline, hints.directionalScore(variable))
+            hints.branch(selected ?: baseline)
+
+            assertEquals(if (accepted) variable else null, selected, "samples=$samples gain=$gain")
+            assertEquals(if (accepted) 1 else 0, observations.count { it == "CONSUMED" })
+        }
+    }
+
+    @Test
     fun `stable objective constants preserve small directional gains`() {
         for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
             val builder = LpBuilder()
