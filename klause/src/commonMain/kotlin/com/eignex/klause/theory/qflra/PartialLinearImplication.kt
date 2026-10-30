@@ -65,8 +65,18 @@ internal fun partialLinearImplication(
 ): PartialLinearImplication? {
     val arithmetic = PartialImplicationArithmetic(stop)
     if (!arithmetic.admit(comparison.bound)) return null
-    val upper by lazy { arithmetic.activity(comparison, upper = true, bound) }
-    val lower by lazy { arithmetic.activity(comparison, upper = false, bound) }
+    return partialLinearActivityImplication(comparison,
+        { upper -> arithmetic.activity(comparison, upper, bound) }, stop)
+}
+
+// Activity providers admit their arithmetic under the same operation allowance as the comparison bound.
+internal fun partialLinearActivityImplication(
+    comparison: ExactComparison,
+    activity: (upper: Boolean) -> ExplainedLinearBound?,
+    stop: Cancellation,
+): PartialLinearImplication? {
+    val upper by lazy { activity(true) }
+    val lower by lazy { activity(false) }
     fun implied(truth: Boolean, vararg sides: ExplainedLinearBound): PartialLinearImplication? =
         if (stop()) null else PartialLinearImplication(truth, SearchAtomPremise.All(sides.map { it.premise }))
     return when (comparison.op) {
@@ -101,11 +111,19 @@ internal fun partialLinearImplication(
     }
 }
 
-private class PartialImplicationArithmetic(private val stop: Cancellation) {
+internal class PartialImplicationArithmetic(private val stop: Cancellation) {
     fun admit(value: BigFraction): Boolean {
         val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         stop.charge(1L + bits / Long.SIZE_BITS)
         return bits <= MAX_BITS && !stop()
+    }
+
+    fun affineValue(value: BigFraction, scale: BigFraction, offset: BigFraction): BigFraction? {
+        if (!admit(value) || !admit(scale) || !admit(offset)) return null
+        val product = value * scale
+        if (!admit(product)) return null
+        val result = product + offset
+        return result.takeIf(::admit)
     }
 
     fun activity(

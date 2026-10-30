@@ -623,7 +623,8 @@ the same original sources, seeds, LP ceilings and containing solve allowance.
 An arm override uses `param.param.open-linear-incremental`: the outer prefix
 selects the adapter parameter.
 This combines touched source rows, exact-input decline reuse and explained
-interval delivery before the numerical query. Traversal stage counters expose
+interval delivery, including existing affine slack bounds, before the numerical
+query. Traversal stage counters expose
 source visits and invalidations, interval visits, retained declines and deductions;
 LP work and certification counters and whole-process measurements retain the cost
 of numerical repair and final completion. The automatic default remains disabled.
@@ -632,8 +633,10 @@ of numerical repair and final completion. The automatic default remains disabled
 SMT source. It compares the existing cached partial interval producer with the
 same producer plus literal-to-row assertion scheduling. Both arms use seed 1,
 one processor, a containing 100,000,000-unit open-work allowance and the same
-forty-second emergency deadline. Fresh ordinary source preparation precedes each
-arm; exact prefix and continuation snapshots must agree. The profile reports row
+forty-second emergency deadline. This assertion-scheduling diagnostic uses
+individual-coordinate interval propagation in both arms; affine consequence
+delivery belongs to the ordinary combined-route controls. Fresh ordinary source
+preparation precedes each arm; exact prefix and continuation snapshots must agree. The profile reports row
 visits, literal touches, retracted assertions, compatible decline reuse, consumed
 guard implications, operation stops and producer/assertion/numerical time separately. These are
 direct library diagnostics; they supply neither a default CLI throughput claim nor

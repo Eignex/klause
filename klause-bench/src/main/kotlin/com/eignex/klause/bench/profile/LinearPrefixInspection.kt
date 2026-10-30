@@ -78,7 +78,7 @@ internal object LinearPrefixInspection {
                         call(requireNotNull(planned.theory), "reusePartialLinearDeclines")
                     }
                     if (incrementalRows) {
-                        call(requireNotNull(planned.theory), "useIncrementalLinearPropagation")
+                        call(requireNotNull(planned.theory), "useIncrementalSourceRows")
                     }
                 }
                 val result = run?.let { call(it, "advance") } ?: member(opening, "getResult")

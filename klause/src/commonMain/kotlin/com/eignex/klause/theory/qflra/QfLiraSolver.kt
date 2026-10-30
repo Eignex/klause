@@ -243,6 +243,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintStop = Cancellation.Never
     private var dirty = true
     private var partialLinearPropagation = false
+    private var partialLinearAffineBounds = false
     private var partialLinearCandidates: List<PreparedSourceRow>? = null
     private var partialLinearInvocations = 0L
     private var partialLinearVisited = 0L
@@ -454,6 +455,11 @@ class ExactLiraSearchComponent private constructor(
     }
 
     internal fun useIncrementalLinearPropagation() {
+        useIncrementalSourceRows()
+        partialLinearAffineBounds = true
+    }
+
+    internal fun useIncrementalSourceRows() {
         usePartialLinearPropagation()
         reusePartialLinearDeclines()
         incrementalSourceRows = true
@@ -532,6 +538,8 @@ class ExactLiraSearchComponent private constructor(
         var visited = 0
         var eligible = 0
         var unexplained = 0
+        var affineProbes = 0
+        var affineDeductions = 0
         val previousUnchanged = partialLinearUnchanged
         val deductions = ArrayList<PartialLinearDeduction>()
         partialLinearInvocations++
@@ -550,14 +558,20 @@ class ExactLiraSearchComponent private constructor(
                 if (prepared.booleans.any { it != variable && bools[it] == UNASSIGNED }) continue
                 eligible++
                 val comparison = prepared.form.comparison(true) { bools[it] == TRUE }
-                val inputs = if (partialLinearCache) partialLinearInputs(comparison) ?: continue else null
+                val affine = if (partialLinearAffineBounds) {
+                    affineProbes++
+                    system.affineImplication(comparison, operationStop)
+                } else null
+                val inputs = if (affine == null && partialLinearCache) {
+                    partialLinearInputs(comparison) ?: continue
+                } else null
                 if (inputs != null && partialLinearDeclines[prepared] == inputs) {
                     partialLinearUnchanged++
                     continue
                 }
                 var unavailable = false
                 partialLinearEvaluations++
-                val implication = partialLinearImplication(comparison, { column, upper ->
+                val implication = affine ?: partialLinearImplication(comparison, { column, upper ->
                     val metadata = state.model.column(column)
                     if (metadata.tag != column || !metadata.origin.value.isZero) null
                     else state.activeSide(column, upper)?.let { active ->
@@ -586,6 +600,7 @@ class ExactLiraSearchComponent private constructor(
                 if (applyLocally && accept(decision, current) !is ComponentResult.Consistent) break
                 deductions += PartialLinearDeduction(prepared.address.factor, prepared.address.row,
                     variable, implication.truth, reason.literals.copyOf())
+                if (affine != null) affineDeductions++
             }
             return PartialLinearProbe(visited, eligible, unexplained, operationStop(), deductions)
         } finally {
@@ -597,6 +612,8 @@ class ExactLiraSearchComponent private constructor(
                 smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_DECLINE_REUSE",
                     partialLinearUnchanged - previousUnchanged)
                 smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_DEDUCTION", deductions.size.toLong())
+                smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_AFFINE_PROBE", affineProbes.toLong())
+                smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_AFFINE_DEDUCTION", affineDeductions.toLong())
             }
         }
     }
