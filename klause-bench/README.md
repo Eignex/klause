@@ -746,7 +746,10 @@ These controls establish no throughput improvement or independent proof validati
 ### Numerical lifecycle profiles
 
 `scripts/lp-template-preparation-profile.sh <source> [repeats] [steps]` accepts
-`cover-2x3` and `cover-3x3`. It compares disabled
+`cover-2x3`, `cover-3x3`, `miplib3-p0033` and `miplib3-p0201`. The MIPLIB inputs
+resolve through catalog `select files=true`, verify frozen source hashes and retain
+selection time/resource receipts; include `:klause-bench:installDist` in their build tasks.
+It compares disabled
 templates, object reuse, complete index reuse and selective metadata reuse on the
 existing MPS component fixtures. Submit as a lab profile script with build task
 `:klause:stageLpProfileJvm`, Linux x86_64 placement and a 180-second runtime cap.
@@ -757,6 +760,10 @@ retain source bytes/hash, total preparation/assembly/solve work, time, allocatio
 modeled retained units and negative results. One warmup precedes up to five measured
 rounds; mode order rotates. Equal native results across modes check consistency,
 without establishing independent source or optimality validation.
+Total time and allocation include final phase-snapshot publication; exact-bound
+adoption is reported separately from bound-template lookup. Main-thread CPU time
+is separate from elapsed time and excludes helper, compiler and collector threads;
+whole-process and enforced group resource receipts retain their broader costs.
 
 The unchanged-index controls [9363](https://lab.eignex.com/jobs/9363) and
 [9369](https://lab.eignex.com/jobs/9369), at `69cc7b2250`, compare all three modes

@@ -67,7 +67,7 @@ remaps, changed dimensions or semantics and source-to-finite transitions reject 
 prior binding. A foreign source cannot use a prepared template index. Continuous,
 custom and unsupported projections retain their ordinary emission paths.
 
-An unchanged preparation validates ordered factor identities, integer endpoints,
+Ordinary unchanged preparation validates ordered factor identities, integer endpoints,
 stated bound sides, the objective constant and every component cost before sharing
 the completed collections. Source-factor order indexes rows directly, and the
 integer-bound map indexes exact endpoints without component lookup maps.
@@ -101,6 +101,9 @@ publication slot per source/finite scope, including temporary presolve bakes.
 Preparation and
 actual row/bound emission have separate observations in the existing LP phase ledger;
 they do not establish numerical result reuse or certified deduction consumption.
+Template observations accumulate fixed scalar totals per owning sink; immutable
+phase maps materialize at snapshot, retaining declined preparation work and observed
+zero emissions without a map allocation per consumer.
 Sparse-trial assembly uses the same source templates and keeps its own admission,
 factorization and certification allowances.
 
