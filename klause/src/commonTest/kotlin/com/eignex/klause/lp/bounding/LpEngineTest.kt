@@ -310,40 +310,52 @@ class LpEngineTest {
     }
 
     @Test
-    fun `separate root preparation should preserve the adaptive float query cap`() {
+    fun `separate preparation should preserve the adaptive float query cap`() {
         val problem = boundedProblem()
-        val factory = RecordingLpEngineFactory()
-        LpEngine(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
-            LpParams(lpPlan = LpPlan(bounding = true, boundMaxDepth = 0), solveBudgetMillis = 30_000L),
-            SolveStatsSink(backend = "root-preparation-cap"),
-            LpSolveContext(factory, decline),
-            rootQueryPolicy = LpRootQueryPolicy.SEPARATE_PREPARATION,
-        ).use { engine ->
-            val queryCap = engine.nodeWorkBudget()
+        for (components in listOf(false, true)) {
+            val factory = RecordingLpEngineFactory()
+            LpEngine(
+                problem,
+                LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L)),
+                LpParams(lpPlan = LpPlan(bounding = true, boundMaxDepth = 0, componentOwnership = components),
+                    solveBudgetMillis = 30_000L),
+                SolveStatsSink(backend = "separate-preparation-cap"),
+                LpSolveContext(factory, decline),
+                rootQueryPolicy = if (components) LpRootQueryPolicy.SHARED_WORK else
+                    LpRootQueryPolicy.SEPARATE_PREPARATION,
+            ).use { engine ->
+                val queryCap = engine.nodeWorkBudget()
 
-            engine.pruneNode(PropagationSession(problem), Double.POSITIVE_INFINITY, -1, true)
+                engine.pruneNode(PropagationSession(problem), Double.POSITIVE_INFINITY, -1, true)
 
-            assertTrue(factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit > queryCap)
-            assertEquals(queryCap, assertNotNull(factory.floatAllowances.single()).work)
+                assertTrue(factory.calls.single { it.kind == EngineConstruction.PERSISTENT }.workLimit > queryCap)
+                assertEquals(queryCap, assertNotNull(factory.floatAllowances.single()).work)
+            }
         }
     }
 
     @Test
-    fun `root preparation should use only the remaining containing LP allowance`() {
-        val plan = LpPlan(bounding = true, boundMaxDepth = 0)
+    fun `separate preparation should respect both remaining containing allowances`() {
         val problem = boundedProblem()
-        LpEngine(
-            problem,
-            LinearObjective(),
-            LpParams(lpPlan = plan, solveBudgetMillis = 4L),
-            SolveStatsSink(backend = "root-preparation-remaining"),
-            rootQueryPolicy = LpRootQueryPolicy.SEPARATE_PREPARATION,
-        ).use { engine ->
-            engine.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 5_000L))
+        for (components in listOf(false, true)) {
+            val plan = LpPlan(bounding = true, boundMaxDepth = 0, componentOwnership = components)
+            var offered: Long? = null
+            LpEngine(
+                problem,
+                LinearObjective(),
+                LpParams(lpPlan = plan, solveBudgetMillis = 4L),
+                SolveStatsSink(backend = "preparation-remaining"),
+                nodeWorkAllowance = { offered },
+                rootQueryPolicy = if (components) LpRootQueryPolicy.SHARED_WORK else
+                    LpRootQueryPolicy.SEPARATE_PREPARATION,
+            ).use { engine ->
+                engine.observeRootSolve(metricSolver(), LpSolveMetrics(workOps = 5_000L))
 
-            assertEquals(15_000L, engine.nodePreparationWorkBudget())
+                for ((grant, expected) in listOf(null to 15_000L, 30_000L to 15_000L, 500L to 500L, 0L to 1L)) {
+                    offered = grant
+                    assertEquals(expected, engine.nodePreparationWorkBudget())
+                }
+            }
         }
     }
 

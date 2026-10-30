@@ -253,6 +253,9 @@ add no numerical work or factorization charges.
 Scoped preparation reserves the graph scan, partition scratch and child restriction
 storage before constructing children. A declined or interrupted split retains its
 spent preparation work; child numerical preparation receives the remaining grant.
+Explicit component ownership funds cold preparation from the remaining shared LP
+and invocation allowances, separately from the adaptive numerical query quantum.
+Preparation is charged before the query receives its remaining allowance.
 Finite basis entry limits are divided among the immutable column blocks; local
 cut replacements retain those shares. A logical-only child reserves its identity
 factor share first, within the same containing entry limit.

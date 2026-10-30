@@ -575,7 +575,13 @@ internal class LpEngine(
     internal fun nodePreparationWorkBudget(): Long = if (sparseTrialActive) {
         nodeWorkBudget()
     } else if (separateNodePreparation) {
-        lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: nodeWorkBudget()
+        val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: nodeWorkBudget()
+        val offered = nodeWorkAllowance()?.coerceAtLeast(1L)
+        when {
+            offered == null -> containing
+            containing == 0L -> offered
+            else -> minOf(containing, offered)
+        }
     } else nodeWorkBudget()
 
     internal fun rootPrimalWorkBudget(additionalWork: Long = 0L): Long {
@@ -663,7 +669,7 @@ internal class LpEngine(
         ) lpWorkBudget.observeWorkStop()
     }
 
-    private val separateNodePreparation: Boolean get() = sparseTrialRequested ||
+    private val separateNodePreparation: Boolean get() = sparseTrialRequested || requestedPlan.componentOwnership ||
         rootQueryPolicy != LpRootQueryPolicy.SHARED_WORK
 
     internal val measuresRootQueries: Boolean get() = sparseTrialActive ||
