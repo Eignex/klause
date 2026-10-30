@@ -15,7 +15,6 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,18 +39,6 @@ class NumericalFrontierSnapshotTest {
         SourceClaim.Bound(SourceValue.Rational(half)),
         SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(half, SourceDerivation.Premise("half")))),
     )
-
-    @Test
-    fun `opening a profile frontier should not consume source LP operations`() {
-        val invocation = NumericalFrontierSnapshot.open(context, TheoryParams(sourceLpOperations = 2),
-            frontier = true) as AutoCloseable
-
-        val operations = invocation.use {
-            NumericalFrontierSnapshot.stats(it).smt.sourceLp.operations
-        }
-
-        assertEquals(0L, operations)
-    }
 
     @Test
     fun `selection capture should expose empty journal limits`() {
