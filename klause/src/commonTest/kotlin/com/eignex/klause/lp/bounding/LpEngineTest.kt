@@ -26,6 +26,8 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
@@ -35,13 +37,55 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpEngineTest {
+    @Test
+    fun `cancelled template preparation charges the containing LP allowance`() {
+        val problem = boundedProblem().bake()
+        var work = 0L
+        val token = object : Cancellation {
+            private val meter = WorkMeter { work += it }
+            override fun isCancelled(): Boolean = work >= 3L
+            override fun workMeter(): WorkMeter = meter
+        }
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true), cancellation = token),
+            SolveStatsSink("cancelled-template-charge")).use { engine ->
+            val before = engine.totalSolveWork()
+            work = 0L
+
+            assertFailsWith<LpAssemblyCancelled> {
+                assertNotNull(engine.lpRelaxer).build(RootDomains(problem), cancellation = token)
+            }
+
+            assertTrue(work >= 3L)
+            assertEquals(work, engine.totalSolveWork() - before)
+        }
+    }
+
+    @Test
+    fun `retained root layouts adopt propagated source bounds`() {
+        val source = boundedProblem()
+        val problem = source.withFactors(source.factors +
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1))
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)),
+            SolveStatsSink("root-layout-propagation")).use { engine ->
+
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            assertEquals(4.0, bound)
+        }
+    }
+
     @Test
     fun `root query observations distinguish work cancellation and checked bounds`() {
         val cases = listOf(

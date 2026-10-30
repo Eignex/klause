@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.ir.Factor
@@ -29,6 +30,7 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.toLongExact
 
 internal fun LpRelaxation.authoritativeWithTemplates(
@@ -174,6 +176,48 @@ internal class LpPreparationTemplates private constructor(
 
     companion object {
         private const val MAX_UNITS = 262_144L
+        private const val BOUND_UNITS = 24L
+
+        @Suppress("CyclomaticComplexMethod") // The work lower bound covers each cold preparation stage.
+        private fun coldPreparationFits(
+            selection: PreparedFactorProjections,
+            visit: (Long) -> Boolean,
+            remaining: () -> Long,
+        ): Boolean {
+            val problem = selection.problem
+            var minimum = 2L * problem.numFactors + 1L
+            if (!visit(18L) || minimum > remaining()) return false
+            val owners = MutableIntIntMap()
+            fun reference(value: Int, factor: Int): Boolean {
+                if (!visit(1L) || minimum > remaining()) return false
+                val previous = owners.getOrDefault(value, -1)
+                if (previous == factor) return true
+                // Bounds, incidence and component assembly each revisit distinct factor support.
+                minimum += 3L
+                if (previous < 0) {
+                    minimum += 1L + if (Term.isInt(value)) BOUND_UNITS else 0L
+                    if (!visit(8L)) return false
+                }
+                if (minimum > remaining()) return false
+                owners.put(value, factor)
+                return true
+            }
+            for ((index, factor) in problem.factors.withIndex()) {
+                if (!visit(1L)) return false
+                minimum += factor.structuralKeyWeight.toLong()
+                if (minimum > remaining()) return false
+                val integers = factor.intVars
+                val booleans = factor.boolVars
+                minimum += integers.size.toLong() + booleans.size
+                if (selection.capabilities(index).relaxation == RelaxationCapability.SOUND &&
+                    (factor is Linear || factor is ExactLinear)
+                ) minimum += 1L + (factor as LinearRow).size
+                if (minimum > remaining()) return false
+                for (variable in integers) if (!reference(Term.ofIntVar(variable), index)) return false
+                for (variable in booleans) if (!reference(Term.ofLit(variable shl 1), index)) return false
+            }
+            return minimum <= remaining()
+        }
 
         fun prepare(
             selection: PreparedFactorProjections,
@@ -201,6 +245,7 @@ internal class LpPreparationTemplates private constructor(
                     token.charge(count)
                     return units <= MAX_UNITS && !token()
                 }
+                if (old == null && !coldPreparationFits(selection, ::visit) { MAX_UNITS - units }) return null
                 fun unchanged(): Boolean {
                     if (old == null || old.objectiveIndependent || old.factors.size != problem.numFactors ||
                         old.objectiveConstant != (objective?.constant ?: 0L)
@@ -247,7 +292,7 @@ internal class LpPreparationTemplates private constructor(
                             if (!visit(old.bounds.size.toLong())) return null
                             changedBounds = LinkedHashMap(old.bounds)
                         }
-                        if (!visit(24L)) return null
+                        if (!visit(BOUND_UNITS)) return null
                         changedBounds[variable] = LpIntegerBoundTemplate(variable, domain.min, domain.max, lower, upper)
                         reusedBounds--
                     }
@@ -352,10 +397,10 @@ internal class LpPreparationTemplates private constructor(
                                 it.statedLower == statedLower && it.statedUpper == statedUpper
                         }
                         if (retainedBound != null) reusedBounds++
-                        if (retainedBound == null && !visit(24L)) return null
+                        if (retainedBound == null && !visit(BOUND_UNITS)) return null
                         bounds[variable] = retainedBound ?: LpIntegerBoundTemplate(variable, domain.min, domain.max,
                             statedLower, statedUpper)
-                        storage += 24L
+                        storage += BOUND_UNITS
                     }
                 }
                 val unchangedIncidence = old != null && old.factors.size == factors.size && factors.indices.all {

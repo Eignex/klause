@@ -683,6 +683,7 @@ internal class CpToLpRelaxation(
     private val preparationCancellation: Cancellation = Cancellation.Never,
     private val reuseTemplateIndexes: Boolean = true,
     private val reuseTemplateMetadata: Boolean = false,
+    private val onTemplateWork: (Long) -> Unit = {},
 ) {
     private val elementIndexes = elementIndexes?.toSet()
     private val linearProjection = LinearLpProjection()
@@ -704,6 +705,7 @@ internal class CpToLpRelaxation(
                 work = it
             }
         } finally {
+            onTemplateWork(work)
             val templates = preparationTemplates
             templateStats?.observeTemplatePreparation(start.elapsedNow().inWholeNanoseconds, work,
                 if (templates == null) mapOf("DECLINED" to 1L) else mapOf(

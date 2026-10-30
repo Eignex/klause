@@ -59,6 +59,7 @@ import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.exactLeafResult
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
@@ -415,6 +416,7 @@ internal class LpEngine(
                 elementIndexes = elementIndexes,
                 templateStats = sink.lp,
                 preparationCancellation = params.cancellation,
+                onTemplateWork = ::noteNodeOverhead,
             )
         } else {
             null
@@ -803,7 +805,7 @@ internal class LpEngine(
         if (persistentRelaxer !== relaxer) {
             cpAdapter.reset()
             persistentRelaxation = null
-            val base = relaxer.build(PropagationSession(problem), cancellation = params.cancellation)
+            val base = relaxer.build(RootDomains(problem), cancellation = params.cancellation)
             if (base.persistentEligible && (!sparseTrialActive || !base.model.hasContinuous)) {
                 persistentRelaxation = base
             }

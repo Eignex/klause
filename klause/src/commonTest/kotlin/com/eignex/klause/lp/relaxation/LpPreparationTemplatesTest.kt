@@ -503,6 +503,22 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `collectively oversized cold preparation should decline with bounded inspection`() {
+        val factors = source.factors.map { original ->
+            object : Factor by original {
+                override val structuralKeyWeight: Int = 100_000
+            }
+        }.toTypedArray()
+        val captured = FactorProjectionProviders.Default.prepare(source.withFactors(factors))
+        var work = 0L
+
+        val result = captured.prepareLpTemplates(objective, Cancellation.Never) { work = it }
+
+        assertNull(result)
+        assertTrue(work in 1L..128L)
+    }
+
+    @Test
     fun `oversized preparation should decline before reading the factor payload`() {
         var payloadRead = false
         val expensive = object : Factor by source.factors[0] {

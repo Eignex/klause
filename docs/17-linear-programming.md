@@ -96,6 +96,9 @@ snapshots within the same containing allowance and storage cap.
 
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.
+Cold preparation inspects mandatory support, bound and component visits before
+allocating a snapshot that cannot fit the remaining work cap. Engine-owned
+consumers charge completed and declined template attempts to their LP allowance.
 An incomplete attempt publishes no snapshot. Compatible views share one atomic
 publication slot per source/finite scope, including temporary presolve bakes.
 Preparation and
@@ -266,6 +269,8 @@ children; identical exact authority retains their factors and completed evidence
 An ordinary component root uses the same scoped owner for its initial bound and later
 node queries. Selected global cuts enter through the retained cut adapter before the
 root solve; the passed selection also governs an empty cut list.
+The fixed layout starts from source-root boxes and adopts the query's propagated
+bounds, without a second root fixpoint for that layout.
 When no numerical owner exists, preparation partitions the complete source and cut
 layout together. A declined live component append falls back to the ordinary owner.
 The original node-depth and cut policies remain in force. This root-bound operation
