@@ -258,6 +258,8 @@ Compressed corpus storage is decoded through the ordinary source-invocation path
 which charges decoding to the remaining source budget and preserves the packed input.
 JVM staged-file identities live in `report/jvm-profile-files.json`; the record binds
 that full manifest by digest instead of repeating thousands of class entries.
+Native SDK preparation finishes the JVM harness distribution before compiling Native
+sources, preventing configuration-cache scheduling from overlapping compiler memory.
 
 `bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
 work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,
