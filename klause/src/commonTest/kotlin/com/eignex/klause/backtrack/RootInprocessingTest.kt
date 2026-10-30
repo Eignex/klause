@@ -322,6 +322,23 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `a shortened source neighborhood should reach a failed literal within one funded probe`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(9, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(17)), Clause(intArrayOf(14, 2)), Clause(intArrayOf(14, 3)),
+                Clause(intArrayOf(14, 12, 16)),
+            ))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+            RootSimplificationPass().run(session, BacktrackParams(), null)
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1), null)
+
+            assertEquals(true, session.boolValue(7))
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
     fun `reset should release a retained probe neighborhood`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(0, 2)).bake(), nativeSat = native)
