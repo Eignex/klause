@@ -216,7 +216,7 @@ class PropagationSession private constructor(
         state.work += count
     }
 
-    internal fun rootClauseLiterals(factor: Int, limit: Int): IntArray? {
+    internal fun rootClauseLiterals(factor: Int, limit: Int, includePermanent: Boolean = false): IntArray? {
         if (simplifiedRootSources?.contains(factor) == true) return null
         if (factor < problem.numFactors) {
             val literals = if (usesNativeSat) (problem.factors[factor] as? Clause)?.literals
@@ -229,7 +229,7 @@ class PropagationSession private constructor(
             return literals
         }
         val index = factor - problem.numFactors
-        if (!isLearnedClause(index) || learnedClausePermanent(index)) return null
+        if (!isLearnedClause(index) || (!includePermanent && learnedClausePermanent(index))) return null
         val size = learnedClauseLiteralCount(index)
         if (size > limit) return null
         state.work += size.toLong() * (if (usesNativeSat) 2L else 1L)
@@ -1286,7 +1286,7 @@ class PropagationSession private constructor(
         maxLbd: Int,
         maxLen: Int,
         skipPermanent: Boolean,
-        alreadyShared: (Long) -> Boolean? = { false },
+        alreadyShared: ((Long) -> Boolean?)? = null,
         cancelled: () -> Boolean,
     ): List<SharedClause>? {
         val out = ArrayList<SharedClause>()
@@ -1317,10 +1317,12 @@ class PropagationSession private constructor(
                 }
             }
             val key = SharedClause.contentKey(tokens, length)
-            when (alreadyShared(key)) {
-                true -> continue
-                null -> return null
-                false -> Unit
+            if (alreadyShared != null) {
+                when (alreadyShared(key)) {
+                    true -> continue
+                    null -> return null
+                    false -> Unit
+                }
             }
             out.add(asSharedClause(literals ?: checkNotNull(native).literalsOf(i), lbd, key))
         }
@@ -1339,8 +1341,10 @@ class PropagationSession private constructor(
         val numBool = problem.numBoolVars
         var boolCount = 0
         for (lit in lits) if (Lit.variable(lit) < numBool) boolCount++
-        val bools = IntArray(boolCount)
-        val quads = LongArray((lits.size - boolCount) * SharedClause.QUAD)
+        val bools = if (boolCount == 0) EmptyIntArray else IntArray(boolCount)
+        val quads = if (boolCount == lits.size) {
+            EmptyLongArray
+        } else LongArray((lits.size - boolCount) * SharedClause.QUAD)
         var bi = 0
         var qi = 0
         for (lit in lits) {

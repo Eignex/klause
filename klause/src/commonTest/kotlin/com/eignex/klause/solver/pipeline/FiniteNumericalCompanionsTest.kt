@@ -27,9 +27,88 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.microseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class FiniteNumericalCompanionsTest {
+    @Test
+    fun `funded companions should avoid capture when cancellation precedes every query`() {
+        for (unavailable in listOf(false, true)) {
+            val factors = if (unavailable) arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0))
+            else emptyArray()
+            val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), factors, numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1))
+            val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+            val scenario = PortfolioScenario.sequential(Kind.COP).copy(companionAfterIncumbent = true)
+            val clock = TestTimeSource()
+
+            val result = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
+                plan, Cancellation.until(clock.markNow() + 30.seconds), numericalCompletion = true,
+                numericalCompanions = TheoryParams(), fundedCompanions = true).use {
+                it.minimize(Cancellation { true }, null)
+            }
+
+            val stages = result.stats.smt.completeSearchStages.orEmpty()
+            assertEquals(0L, stages["finiteCompanionPreparationAttempts"])
+            assertEquals(0L, stages["finiteCompanionPreparationNs"])
+            assertEquals(0L, stages["finiteCompanionPreparationReady"])
+            assertEquals(0L, stages["finiteCompanionPreparationUnavailable"])
+            assertTrue(result.stats.portfolio.arms.all { it.lifecycle.firstQueryNanos == null })
+        }
+    }
+
+    @Test
+    fun `unfunded companion admission should preserve the finite worker slots and seeds`() {
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(companionAfterIncumbent = true)
+        val events = mutableListOf<SearchEvent.WorkerAdmission>()
+        val clock = TestTimeSource()
+        val lifetime = Cancellation.until(clock.markNow() + 5.seconds)
+        val baseline = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
+            plan, lifetime, numericalCompletion = true)
+        val candidate = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null,
+            { _, event -> if (event is SearchEvent.WorkerAdmission) events += event }, null,
+            plan, lifetime, numericalCompletion = true, numericalCompanions = TheoryParams(),
+            fundedCompanions = true)
+
+        baseline.use { before -> candidate.use { after ->
+            assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })
+        } }
+
+        val declined = events.filter { it.recipe.endsWith("finite-companion") || it.recipe.endsWith("joint-companion") }
+        assertEquals(2, declined.size)
+        assertTrue(declined.all {
+            !it.admitted && !it.selected && it.declines == listOf("companion-lifetime-unfunded")
+        })
+    }
+
+    @Test
+    fun `funded admission should preserve an explicit finite selection`() {
+        for (explicit in listOf(PortfolioScenario.sequential(Kind.COP).copy(explicitArms = true),
+            PortfolioScenario.sequential(Kind.COP).copy(arms = 1))) {
+            val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1))
+            val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+            val scenario = explicit.copy(companionAfterIncumbent = true)
+            val clock = TestTimeSource()
+            val lifetime = Cancellation.until(clock.markNow() + 30.seconds)
+            val baseline = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
+                plan, lifetime, numericalCompletion = true)
+            val candidate = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
+                plan, lifetime, numericalCompletion = true, numericalCompanions = TheoryParams(),
+                fundedCompanions = true)
+
+            baseline.use { before -> candidate.use { after ->
+                assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })
+            } }
+        }
+    }
+
     @Test
     fun `preparation should time ready and cancelled affine captures`() {
         for (ready in listOf(false, true)) {

@@ -20,6 +20,41 @@ import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
     @Test
+    fun `funded companion admission should reject missing start contracts`() {
+        for (settings in listOf(listOf("companion-admission=never"), listOf("companion-admission=funded"),
+            listOf("companion-admission=funded", "companion-after-incumbent=true"))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions.parse(settings), nodeBudget = NodeBudget(8),
+            )
+
+            assertFailsWith<PipelineConfigException> { FinitePipeline.solve(request, FiniteSolveCallbacks({}, {})) }
+        }
+    }
+
+    @Test
+    fun `typed and parsed funded admission should reach the source portfolio`() {
+        for (options in listOf(ExecutionOptions(ExecutionOption.companionAdmission("funded"),
+            ExecutionOption.companionAfterIncumbent(true)), ExecutionOptions.parse(listOf(
+            "companion-admission=funded", "companion-after-incumbent=true")))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                cancellation = Cancellation.after(1.seconds), executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        }
+    }
+
+    @Test
     fun `Boolean proof controls should reach actual source portfolio probing`() {
         for ((enabled, options) in listOf(
             false to ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail", "boolean-proof-tasks=false")),

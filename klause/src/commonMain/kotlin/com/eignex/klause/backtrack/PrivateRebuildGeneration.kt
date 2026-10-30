@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BoundedVariableElimination
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
+import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.propagation.BakedProblem
@@ -14,6 +15,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import kotlin.time.TimeSource
 
 internal class PrivateRebuildGeneration private constructor(
     val problem: BakedProblem,
@@ -22,6 +24,11 @@ internal class PrivateRebuildGeneration private constructor(
     val eliminated: Int,
     val reconstructionWork: Long,
     val passStopped: Boolean,
+    val admittedColumns: Int,
+    val warmClauses: PrivateRebuildWarmClauses,
+    val warmClauseNanos: Long,
+    val bakeWork: PrivateRebuildBakeWork,
+    val mappingWork: Long,
 ) {
     fun reconstruct(sample: Sample): Sample = mapping.reconstructFrom(problem, sample)
 
@@ -76,13 +83,10 @@ internal class PrivateRebuildGeneration private constructor(
                 source.numBoolVars, 0, emptyArray(), residual.toTypedArray(),
                 settings = source.settings, semantics = source.semantics,
             )
-            when (PrivateRebuildAdmission.permits(pinned, cancellation)) {
-                false -> {
-                    onDecline("GrowthProxy")
-                    return null
-                }
-                null -> return null
-                true -> Unit
+            val admission = PrivateRebuildAdmission.analyze(pinned, cancellation) ?: return null
+            if (admission.candidates == 0) {
+                onDecline("GrowthProxy")
+                return null
             }
             var mapping = SourceMapping(source, pinned, guarantees, lift = { sample ->
                 Sample(BooleanArray(fixed.size) { fixed[it] ?: sample.boolValue(it) }, longArrayOf())
@@ -100,7 +104,8 @@ internal class PrivateRebuildGeneration private constructor(
             }
             // A local pass boundary retains complete pivots; the containing call still controls
             // publication, opening and checks, and can decline the entire generation.
-            val delta = BoundedVariableElimination.eliminateSource(pinned, cancellation = passToken)
+            val delta = BoundedVariableElimination.eliminateSource(pinned,
+                objectiveBoolVars = admission.protectedColumns, cancellation = passToken)
             if (cancellation()) return null
             if (delta.infeasible) {
                 onDecline("Refutation")
@@ -110,15 +115,41 @@ internal class PrivateRebuildGeneration private constructor(
                 onDecline(if (spent >= allowance) "PassStoppedEmpty" else "PassCompleteEmpty")
                 return null
             }
-            cancellation.charge(entries)
+            val passStopped = spent >= allowance
+            var descriptorWork = 0L
+            for (step in delta.rebuild.steps) {
+                cancellation.charge(1L)
+                if (cancellation()) return null
+                val eliminated = step as? RebuildStep.SatisfyClauses ?: return null
+                descriptorWork += 8L
+                for (clause in eliminated.clauses) {
+                    cancellation.charge(1L)
+                    if (cancellation()) return null
+                    descriptorWork += (clause.size + 1L) * 4L
+                }
+            }
+            val privateBytes = bytes + descriptorWork * 8L
+            if (privateBytes > byteLimit) {
+                onDecline("Memory")
+                return null
+            }
+            cancellation.charge(entries + descriptorWork)
             if (cancellation()) return null
             val reduced = pinned.withSourcePassDelta(delta) ?: return null
             mapping = mapping.then(SourceMapping(pinned, reduced, guarantees, delta.rebuild))
-            val baked = reduced.bake(cancellation)
+            val warmStart = TimeSource.Monotonic.markNow()
+            val warm = PrivateRebuildWarmClauses.capture(session, delta.rebuild, fixed, byteLimit - privateBytes,
+                (allowance - spent).coerceAtLeast(0L), cancellation) ?: return null
+            val warmNanos = warmStart.elapsedNow().inWholeNanoseconds
+            val enriched = if (warm.clauses.isEmpty()) reduced else reduced.withFactors(reduced.factors + warm.clauses)
+            mapping = mapping.then(SourceMapping(reduced, enriched, TransformationGuarantees.IDENTITY))
+            val bakeWork = PrivateRebuildBakeWork(cancellation)
+            val baked = enriched.bake(bakeWork)
             if (cancellation()) return null
-            mapping = mapping.then(SourceMapping(reduced, baked, TransformationGuarantees.IDENTITY))
-            return PrivateRebuildGeneration(baked, mapping, bytes, delta.rebuild.steps.size, entries * 4L,
-                spent >= allowance)
+            mapping = mapping.then(SourceMapping(enriched, baked, TransformationGuarantees.IDENTITY))
+            return PrivateRebuildGeneration(baked, mapping, privateBytes + warm.modeledBytes, delta.rebuild.steps.size,
+                maxOf(entries * 4L, source.numBoolVars * 12L + descriptorWork), passStopped, admission.candidates,
+                warm, warmNanos, bakeWork, descriptorWork)
         }
     }
 }

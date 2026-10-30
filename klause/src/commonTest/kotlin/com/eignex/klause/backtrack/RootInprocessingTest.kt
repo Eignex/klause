@@ -1,7 +1,10 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -11,6 +14,7 @@ import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.forEachBinaryPartner
 import com.eignex.klause.solver.result.SearchStatsSink
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
@@ -233,6 +237,75 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `completed root probes should preserve saved search phases`() {
+        for ((native, conflicting) in listOf(false to false, false to true, true to false, true to true)) {
+            val source = if (conflicting) problem(intArrayOf(1, 2), intArrayOf(1, 3))
+                else problem(intArrayOf(1, 2))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+            val params = BacktrackParams(rootProbeBatch = 1, phaseSaving = true)
+            val phase = PhaseSaving(source.numBoolVars, 0, params)
+            session.retractingListener = { phase.capture(it, session) }
+            session.pinBool(1, false)
+            session.popLast()
+
+            RootProbingPass().run(session, params, null)
+
+            assertEquals(0L, phase.applyPhase(VarRef.Bool(1), sequenceOf(0L, 1L)).first())
+        }
+    }
+
+    @Test
+    fun `root probes should preserve saved integer phases`() {
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+        ))
+        val session = PropagationSession(source.bake(), nativeSat = false)
+        val params = BacktrackParams(rootProbeBatch = 1, phaseSaving = true)
+        val phase = PhaseSaving(source.numBoolVars, source.numIntVars, params)
+        session.retractingListener = { phase.capture(it, session) }
+        session.pinInt(0, 0L)
+        session.popLast()
+
+        RootProbingPass().run(session, params, null)
+
+        assertEquals(0L, phase.applyPhase(VarRef.IntVar(0), sequenceOf(0L, 1L)).first())
+    }
+
+    @Test
+    fun `interrupted root probes should preserve saved search phases`() {
+        for (native in listOf(false, true)) {
+            val source = problem(intArrayOf(1, 2))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+            val params = BacktrackParams(rootProbeBatch = 1, rootProbeWork = 1L, phaseSaving = true)
+            val phase = PhaseSaving(source.numBoolVars, 0, params)
+            session.retractingListener = { phase.capture(it, session) }
+            session.pinBool(0, false)
+            session.popLast()
+
+            RootProbingPass().run(session, params, null)
+
+            assertEquals(0L, phase.applyPhase(VarRef.Bool(0), sequenceOf(0L, 1L)).first())
+        }
+    }
+
+    @Test
+    fun `ordinary retractions after root probing should still save phases`() {
+        for (native in listOf(false, true)) {
+            val source = problem(intArrayOf(1, 2))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+            val params = BacktrackParams(rootProbeBatch = 1, phaseSaving = true)
+            val phase = PhaseSaving(source.numBoolVars, 0, params)
+            session.retractingListener = { phase.capture(it, session) }
+            RootProbingPass().run(session, params, null)
+
+            session.pinBool(1, true)
+            session.popLast()
+
+            assertEquals(1L, phase.applyPhase(VarRef.Bool(1), sequenceOf(0L, 1L)).first())
+        }
+    }
+
+    @Test
     fun `a short learned neighborhood should reach a failed literal within one funded probe`() {
         for (native in listOf(false, true)) {
             val source = Problem(8, 0, emptyArray(), arrayOf<Factor>(
@@ -240,6 +313,23 @@ class RootInprocessingTest {
             ))
             val session = PropagationSession(source.bake(), nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(14, 12)), 2)
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1), null)
+
+            assertEquals(true, session.boolValue(7))
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `a shortened source neighborhood should reach a failed literal within one funded probe`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(9, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(17)), Clause(intArrayOf(14, 2)), Clause(intArrayOf(14, 3)),
+                Clause(intArrayOf(14, 12, 16)),
+            ))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+            RootSimplificationPass().run(session, BacktrackParams(), null)
 
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1), null)
 

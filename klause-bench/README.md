@@ -68,6 +68,8 @@ cap from a completed bounded pass with no elimination; neither excludes other
 structural opportunities. `DeclinedGrowthProxy` records a completed cheap
 count/literal-volume admission refusal; tautology or duplicate savings can
 still make other eliminations useful.
+`AdmittedColumns` counts the initial pivot set for successful generations;
+the private BVE pass protects other columns rather than analyzing their pivots.
 Preparation, opening, trial, reconstruction, check and retirement timings have
 separate counters. The propagation ledger includes charged preparation,
 reconstruction and checks; do not add those work subsets again. `ModeledPrivateBytes` excludes the canonical
@@ -75,6 +77,18 @@ worker, headers and allocator overhead; it is not RSS or a simultaneous heap pea
 The canonical worker retains its warm state during the trial. A private refutation
 resumes it and supplies no independently checked source proof. This control alone
 does not qualify automatic production activation or complete source-cost benefit.
+`WarmClausesCopied` and `WarmClauseLiterals` count bounded copies of owned global
+learning over retained columns. `WarmClauseWork` and `WarmClauseNanos` are subsets
+of preparation, not additional totals. Copies spend unused local BVE allowance
+and the remaining modeled scratch grant; canonical learning and exchange state
+remain owned by canonical.
+`BakeConstructionEntries` and `BakePropagationWork` expose the private root bake;
+both debit the containing allowance and are preparation subsets.
+`OpeningConstructionWork` reserves the fresh consumer's setup visits in the same
+allowance. Reconstruction retains its source-entry charge and raises it when the
+actual replay descriptors and composed sample copies require more work.
+`MappingPreparationWork` includes descriptor ownership copies in preparation;
+their modeled storage also joins `ModeledPrivateBytes`.
 
 Run from the repository root with JDK 25 or newer:
 
@@ -224,6 +238,13 @@ configuration; a problem-level case identity can be shared by several arms.
 Profile mains live in [bench/profile/](src/main/kotlin/com/eignex/klause/bench/profile/)
 and run as lab profile jobs; consult the selected main for its arguments and
 retain its output through `$OUT`.
+
+Suite measurements `jfr`, `compilation` and `compilation+log` retain the CLI recording
+and write CPU, allocation and runtime-event summaries to `cases/N/out/solve.log`.
+Summary generation runs in the bench process after CLI exit, outside the subprocess
+`elapsedMs` and GNU time metrics and inside the containing case and job allowances.
+These instrumented captures support attribution; use separate uninstrumented controls
+for performance comparisons.
 
 Profile reflection reads the session's nullable retained propagation owner through
 `LivePropagationState`; live-only probes fail explicitly after release, and residual
@@ -655,6 +676,19 @@ source visits and invalidations, interval visits, retained declines and deductio
 LP work and certification counters and whole-process measurements retain the cost
 of numerical repair and final completion. The automatic default remains disabled.
 
+[9534](https://lab.eignex.com/jobs/9534) attributes 36–43% of captured CPU samples
+to composed cancellation polls and 10–12% to callback invocation. These diagnostic
+samples motivate bounded polling in unmetered point-hint scans; attached meters
+retain every debit and immediate stop check.
+[9557](https://lab.eignex.com/jobs/9557) records four independently accepted Lin7
+SAT points with the combined route versus four ordinary UNKNOWNs at the same
+ten-second allowance. Both arms' Lin3 and Lin5 held-out points are independently
+accepted. The original LCTES control in [9569](https://lab.eignex.com/jobs/9569) and
+the finite sc control in [9574](https://lab.eignex.com/jobs/9574) remain UNKNOWN.
+These fixed-head observations retain all preparation, failed attempts and checking
+costs. Missing coordinator-owned execution frames withhold final physical
+qualification and automatic activation.
+
 `LinearRootOpeningProfile` accepts `inspect=partial-row-activation` for a pinned
 SMT source. It compares the existing cached partial interval producer with the
 same producer plus literal-to-row assertion scheduling. Both arms use seed 1,
@@ -1085,12 +1119,27 @@ corresponding independent checker receipts.
 
 `finiteCompanionPreparationAttempts`, `finiteCompanionPreparationNs`,
 `finiteCompanionPreparationReady` and `finiteCompanionPreparationUnavailable`
-record the invocation's eager affine capture before worker factories. Retain
+record the invocation's ordinary eager affine capture before worker factories. Retain
 unavailable captures and captures followed by no worker query. This duration is
 inside containing solve time, separate from factory, query and retirement counters;
 it does not fund extra active time. Sampled JFR allocations cannot replace it when
 choosing a construction or useful-lifetime policy. Whole-job costs still retain
 exceptions that prevent a final invocation result.
+
+`param.companion-admission=funded` requires `param.companion-after-incumbent=true`
+and an elapsed deadline. It keeps the capability gate and explicit selections,
+declines a pair without room for both requested active lifetimes, and defers shared
+capture and private service construction until a funded first query. Capture pays
+the current query grant and cannot consume the reserved pair lifetime. Opening a
+later sibling requires room for that worker's requested lifetime. This control does
+not extend any active, work or allocation allowance; ordinary admission is default.
+`finiteCompanionAdmissionDeclined` and `finiteCompanionStartDeclines` distinguish
+initial funding from late opening refusals. Deferred preparation counters are
+inside the opening worker's segment, so do not add them to that segment again.
+Retain zero-query and unavailable captures. Compare ordinary-off, incumbent-gated
+eager construction, funded construction and a useful direct control with the same
+source, budget, reward, coverage and reseed settings before selecting production
+admission. A funded window alone does not establish useful handoff or net benefit.
 
 `param.portfolio-reward=ordinary|source|source-rate|source-rate-family` varies rewards
 independently of admission and coverage. `source` retains ordinary feasibility rewards, then rewards only
@@ -1367,6 +1416,10 @@ The CLI deadline includes frontend construction/preparation/search; compressed
 source decoding reduces its remaining allowance. MiniZinc compilation, preflight,
 artifact hashing and output reconstruction are outside that deadline and inside
 the containing case/job allowance. Independent checking is separate lab work.
+JFR measurements retain phase, caller and allocation summaries in `solve.log`.
+Summary analysis runs after CLI exit, outside its elapsed time and inside the
+containing case/job allowance. Sample shares and estimated allocations diagnose
+cost; instrumented timings do not qualify an ordinary production speedup.
 Retain complete active preparation/execution/checking charges, failures and
 retirement alongside CLI elapsed time; overlapping stage counters must not be
 summed as disjoint costs. Native proof flags do not certify source optimality or

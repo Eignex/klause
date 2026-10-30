@@ -94,13 +94,29 @@ An explicit arm count, including the default-sized count, prevents automatic num
 companions. A missing complete affine capture declines both companions without
 removing finite workers.
 
-Shared affine preparation precedes worker factories. Final invocation stage
+Ordinary shared affine preparation precedes worker factories. Final invocation stage
 counters report `finiteCompanionPreparationAttempts`, `finiteCompanionPreparationNs`,
 `finiteCompanionPreparationReady` and `finiteCompanionPreparationUnavailable`,
 including captures whose workers receive no query. The time spans duplicate
 difference-factor filtering and immutable capture; it excludes factories, queries,
 candidate checks and retirement. It belongs to containing solve time and grants no
 new allowance or source authority.
+
+`companion-admission=funded` requires incumbent-gated starts and a containing
+deadline. The same capability gate admits candidates only when both requested
+active lifetimes fit. Shared affine capture and private service construction wait
+for the first companion query. Capture obeys that query's time grant, the existing
+construction segment ceiling and the time left after both requested lifetimes.
+Each worker rechecks its own remaining lifetime before opening; a late start or
+unavailable capture retires without a source verdict. Finite recipes, indices and
+seed positions remain intact, including explicit selections.
+
+Deferred capture is attempted once for the pair and charged inside the opening
+worker's query and active lifetime. Its preparation counters are subsets of that
+query's time. `finiteCompanionAdmissionDeclined` records an unfunded initial pair;
+`finiteCompanionStartDeclines` records declined opening attempts. A pair receiving
+no query reports zero capture attempts. Final invocation accounting reads these
+shared counters once; worker summaries do not duplicate the capture.
 
 `source-incumbent-completion=true` lets the numerical and joint-repair companions
 use an approximate incumbent's Boolean and finite integer coordinates as advisory
@@ -232,6 +248,12 @@ Clause accounting is reported per worker in `ArmSchedule.sharing.clauses` and as
 `clause*` fields in the CLI arm record. Pool payload belongs to one shared pool;
 primitive payload arrays are counted once by identity. Private clause-reference,
 global-flag, origin, key and payload-owner array capacities are modeled separately.
+Sources with no integer variables use a Boolean-only pool whose payload-owner
+index reserves one array per clause; atom payloads are declined. Empty export
+arrays use shared immutable zero-length arrays. `poolPayloadOwnerCapacityBytes`
+reports that index allocation, included in `poolPrivateIndexBytes`, and
+`poolBooleanOnly` identifies the layout. Growth and reclamation fund the selected
+layout before publishing it; consumers keep the same clauses, origins and cursors.
 `poolOwnedBytes` combines these modeled owners, excluding headers and allocator
 overhead. Repeated worker observations must not be summed.
 Worker `seenKeys` and `seenCapacityBytes` describe the session-spanning duplicate
@@ -239,12 +261,14 @@ filter, including exported and evicted keys. Its lifetime is the native session,
 not the pool generation. Compaction invalidates the drain cursor but preserves
 that filter. Reseeding a retained repair session keeps the filter with its
 learned database. A fresh session releases its backing arrays and reimports the current
-pool; resuming the same session retains both cursor and filter. Retirement releases
-the filter without sampling. An uncancelled retirement also drains uses and exports
+pool; resuming the same session retains both cursor and filter. Retirement records
+the pool and filter capacity counters, then releases the filter without traversing
+the store. An uncancelled retirement also drains uses and exports
 remaining glue; a cancelled retirement skips those scans.
 
 Glue export probes that same filter with the portable content key before copying
-native literals or constructing portable payloads. One temporary token buffer is
+native literals or constructing portable payloads. An empty filter skips duplicate
+probing. One temporary token buffer is
 reused across the scan and released with it; no second retained duplicate index is
 needed. Only completed export preparation admits publication keys. Pool eviction,
 session reseeding and reason retention follow the same filter lifetime.
@@ -321,8 +345,8 @@ Telemetry exports mutually exclusive `memorySampleComplete`,
 `memorySamplePartial` and `memorySampleStale` flags, plus `memorySampleWork` and
 `memorySampleScratchEntries`. Each observation replaces current sample fields;
 partial samples cannot inherit absent fields from an earlier complete sample.
-Close removes current fields and marks the sample stale without a diagnostic
-scan. Retained `peak*` values remain historical per-field maxima and must never
+Close replaces current fields with pool and filter counters and marks the worker
+sample stale without a diagnostic scan. Retained `peak*` values remain historical per-field maxima and must never
 be used as a complete byte total or added into concurrent high-water marks.
 `drain*` fields describe
 transient batch storage. ALNS repair pools remain worker-private, skip search-conditioned permanent clauses
@@ -543,7 +567,9 @@ recipe and is omitted from task queries; active or opaque cut hooks decline.
 A separate internal probe-first mode postpones the board until a whole-source
 query pauses with a live Boolean decision. It reserves that decision's matching
 region for the retained probe engine before exposing the opposite region to its
-peer. The original builder solver and immutable native projection remain available
+peer. Source and caller-condition admission precedes the probe; task identity and
+mapping authority are allocated only when that pause creates the board.
+The original builder solver and immutable native projection remain available
 through the transfer. Probe work is a subset of each worker's cumulative work, not
 a refunded or additional charge. Without a live decision the same source query
 continues; fast completion creates no board.

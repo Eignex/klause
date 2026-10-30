@@ -245,11 +245,38 @@ duplicate savings can admit other useful pivots, so a proxy refusal establishes
 no absence of opportunities. Width and per-pivot budgets still apply. Temporary
 arrays own `24 * columns` primitive bytes inside the declared admission model;
 initialization, disposal and visits consume the containing allowance.
+The scan retains a protected-column set for every refused shape inside that
+model. BVE restricts this trial to the initially admitted columns, so an unrelated
+declined pivot cannot consume its resolution allowance. Later opportunities among
+protected columns wait for a fresh root view. This selection is a heuristic, not
+an exhaustive elimination pass.
 
 BVE receives half the allowance remaining after the private source copy. Its local cap
 retains complete earlier pivots when later analysis stops; cancellation of the
 containing call declines the generation. Baking, opening and canonical checks
 share the remaining containing allowance.
+Private baking adapts the root engine's construction and propagation meter into
+that allowance; those visits join preparation work rather than remaining on an
+unobserved temporary root state.
+Opening reserves another construction visit count for the fresh consumer before
+allocating its state. Reconstruction charges the larger of the source-entry model
+and a bound covering all composed sample copies and eliminated-clause replay.
+The latter uses the actual reconstruction descriptors; repeated elimination can
+retain more replay literals than one source view contains.
+Mapping composition separately charges its descriptor copies during preparation,
+including trials that produce no witness. The descriptors add their modeled
+primitive/reference storage before composition and copied-learning admission.
+
+Unused BVE allowance can copy globally learned clauses into the private model.
+Only this canonical worker's non-permanent clauses over retained Boolean columns
+qualify. Clauses mentioning an eliminated column need an unsupported resolution
+translation and are skipped. Global pins remove satisfied clauses and false
+literals. Each copied consequence owns its literal buffer and consumes the same
+work and modeled-memory grants; an exhausted local transfer grant retains the
+completed subset. The mapping composes through the enriched model's exact identity.
+These copies preserve consequences without sharing learned-store indexes or
+exchange cursors. Their work and time are preparation subsets; private baking
+and propagation include the added clauses.
 
 The private worker owns fresh watches, learning and search state. Canonical exchange
 cursors and pooled incumbent guidance stay with the retained canonical worker;

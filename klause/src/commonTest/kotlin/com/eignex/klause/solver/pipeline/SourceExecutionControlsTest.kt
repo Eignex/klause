@@ -35,6 +35,42 @@ class SourceExecutionControlsTest {
     }
 
     @Test
+    fun `incremental linear control should leave finite source solving available`() {
+        val source = SmtLib.parse("(declare-const b Bool) (assert b)").source
+        for (engine in listOf(FiniteEngine.FIXED, FiniteEngine.BACKTRACK, FiniteEngine.MIXED)) {
+            for (enabled in listOf(false, true)) {
+                for (applicationFactory in listOf(false, true)) {
+                    val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, engine))
+                    val options = ExecutionOptions.parse(listOf("open-linear-incremental=$enabled"))
+                    val request = SourceExecutionRequest(invocation, options,
+                        finiteRequest = if (applicationFactory) { shape ->
+                            SourceExecutionPolicy().finiteRequest(shape, engine, executionOptions = options)
+                        } else null)
+
+                    val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
+
+                    assertEquals(FiniteSolveVerdict.SAT,
+                        assertIs<FiniteSolveOutcome.Completed>(result.result.outcome).verdict)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `finite source execution should reject malformed incremental linear controls`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SmtLib.parse("(declare-const b Bool) (assert b)").source,
+            ExecutionOperation.SATISFY, FiniteEngine.MIXED,
+        ))
+
+        val failure = assertFailsWith<PipelineConfigException> {
+            SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("open-linear-incremental=invalid")))
+        }
+
+        assertTrue("open-linear-incremental" in assertNotNull(failure.message))
+    }
+
+    @Test
     fun `ordinary finite source execution should bind advisory completion to its companions`() {
         val source = LinearSourceProblem(listOf(
             LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),

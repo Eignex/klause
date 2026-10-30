@@ -499,6 +499,8 @@ is no separate stale binary graph or whole-graph rebuild.
 
 Opt-in failed-literal probing alternates a bounded rotating set of Boolean literals
 with Boolean coordinates from newly examined learned clauses of two to eight literals.
+Permanent source replacements supply the same bounded priorities; their clauses and
+ownership remain protected. A priority supplies no deduction without an actual probe conflict.
 The learned cursor advances without replaying an exhausted unchanged neighborhood;
 compaction invalidates its indices. Preparation and retained literal storage share the
 probe class allowance and memory observation. Funded probing precedes cheap root
@@ -506,8 +508,10 @@ simplification so proved facts can refresh binaries in the same safe-root opport
 the invocation token. A completed root conflict proves the complementary unit, which is attached and
 propagated through ordinary search. Completed root facts are published to shared
 components before traversal resumes. Successful and interrupted probes retract to the
-complete root; interruption supplies no deduction. Clause scans and probes enter the
-existing inprocessing and propagation work counters. Cursors survive suspension and
+complete root; interruption supplies no deduction. Speculative retractions preserve
+the saved search phases while retaining ordinary unassignment notifications for
+variable selectors. Clause scans and probes enter the existing inprocessing and
+propagation work counters. Cursors survive suspension and
 reset on reseeding; learned indices never survive a pass snapshot.
 
 Both root passes require an unconditional complete decision-level-zero root. Assumptions,

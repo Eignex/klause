@@ -23,8 +23,9 @@ internal object LabRuntime {
         }
         val report = context.outputDirectory.resolve("report")
         val measurement = p.getValue("measurement")
+        val recordsJfr = measurement in setOf("jfr", "compilation", "compilation+log")
         val options = runtime + buildList {
-            if (measurement in setOf("jfr", "compilation", "compilation+log")) {
+            if (recordsJfr) {
                 val compilation = if (measurement == "jfr") "" else ",jdk.Compilation#threshold=0ms"
                 add("-XX:StartFlightRecording=filename=$report/cli.jfr,settings=profile$compilation,dumponexit=true")
             }
@@ -72,7 +73,8 @@ internal object LabRuntime {
             "KLAUSE_CLI_PREFLIGHT_OPTS" to argumentFile("preflight.args", runtime),
             "LAB_WORKTREE" to requireNotNull(context.worktree).toString(),
         ) +
-            context.corpusDirectory?.let { mapOf("LAB_CORPUS" to it.toString()) }.orEmpty()
+            context.corpusDirectory?.let { mapOf("LAB_CORPUS" to it.toString()) }.orEmpty() +
+            (if (recordsJfr) mapOf("KLAUSE_LAB_PROFILE_DIR" to report.toString()) else emptyMap())
     }
 
     fun process(context: BenchContext, argv: List<String>, environment: Map<String, String>): Int {
