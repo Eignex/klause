@@ -705,16 +705,16 @@ internal class CpToLpRelaxation(
             }
         } finally {
             val templates = preparationTemplates
-            templateStats?.observeTemplatePreparation(start.elapsedNow().inWholeNanoseconds, work,
-                if (templates == null) mapOf("DECLINED" to 1L) else mapOf(
-                    "PREPARED" to 1L, "FACTORS_REUSED" to templates.reusedFactors.toLong(),
-                    "SOURCE_REBOUND" to if (templates.reboundSource) 1L else 0L,
-                    "INDEXES_REUSED" to if (templates.reusedIndexes) 1L else 0L,
-                    "BOUNDS_REUSED" to templates.reusedBounds.toLong(),
-                    "COMPONENTS_REUSED" to templates.reusedComponents.toLong(),
-                    "COMPONENTS_DIRTY" to (templates.components.size - templates.reusedComponents).toLong(),
-                    "RETAINED_UNITS_SUM" to templates.storageUnits,
-                ))
+            templateStats?.observeTemplatePreparation(
+                start.elapsedNow().inWholeNanoseconds, work, prepared = templates != null,
+                factorsReused = templates?.reusedFactors ?: 0,
+                sourceRebound = templates?.reboundSource ?: false,
+                indexesReused = templates?.reusedIndexes ?: false,
+                boundsReused = templates?.reusedBounds ?: 0,
+                componentsReused = templates?.reusedComponents ?: 0,
+                componentsDirty = templates?.let { it.components.size - it.reusedComponents } ?: 0,
+                retainedUnits = templates?.storageUnits ?: 0L,
+            )
         }
         if (cancellation()) throw LpAssemblyCancelled()
     }
