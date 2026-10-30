@@ -449,25 +449,31 @@ class CpSearchComponent(
         val premises = CpPublicationPremises(session, context, ::sourceIntId, sharedRootLevel)
         result.forEachInt { variable, value ->
             checkPublication()
+            val source = sourceIntId(variable)
+            if (context.intLowerBound(source) == value && context.intUpperBound(source) == value) return@forEachInt
             val premise = SearchAtomPremise.All(
                 listOf(premises.bound(variable, false), premises.bound(variable, true)),
             )
             checkCompleteFixpoint()
-            val publication = publish(SearchDecision.IntEqual(sourceIntId(variable), value), premise)
+            val publication = publish(SearchDecision.IntEqual(source, value), premise)
             if (publication !is ComponentResult.Consistent) return publication
         }
         result.forEachIntMin { variable, value ->
             checkPublication()
+            val source = sourceIntId(variable)
+            if (context.intLowerBound(source)?.let { it >= value } == true) return@forEachIntMin
             val premise = premises.bound(variable, false)
             checkCompleteFixpoint()
-            val publication = publish(SearchDecision.IntAtLeast(sourceIntId(variable), value), premise)
+            val publication = publish(SearchDecision.IntAtLeast(source, value), premise)
             if (publication !is ComponentResult.Consistent) return publication
         }
         result.forEachIntMax { variable, value ->
             checkPublication()
+            val source = sourceIntId(variable)
+            if (context.intUpperBound(source)?.let { it <= value } == true) return@forEachIntMax
             val premise = premises.bound(variable, true)
             checkCompleteFixpoint()
-            val publication = publish(SearchDecision.IntAtMost(sourceIntId(variable), value), premise)
+            val publication = publish(SearchDecision.IntAtMost(source, value), premise)
             if (publication !is ComponentResult.Consistent) return publication
         }
         return if (session.fixpointCancelled) ComponentResult.Indeterminate else ComponentResult.Consistent

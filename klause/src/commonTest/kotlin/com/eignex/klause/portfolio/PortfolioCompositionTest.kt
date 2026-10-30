@@ -14,11 +14,91 @@ import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.solver.ProblemClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class PortfolioCompositionTest {
+    @Test
+    fun `automatic integer learning should stay in single core CP pools`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
+            compactCardinalityEquality = true) { true }
+        val scenarios = listOf(
+            PortfolioScenario.sequential(Kind.COP, EngineMix.BACKTRACK) to 1,
+            PortfolioScenario.parallel(2, Kind.COP, EngineMix.BACKTRACK) to 0,
+            PortfolioScenario.sequential(Kind.COP, EngineMix.MIXED, arms = 12) to 0,
+        )
+
+        for ((scenario, expected) in scenarios) {
+            val arms = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+            assertEquals(expected, arms.count { it.recipe.build(1L, null).integerRowLearning })
+        }
+    }
+
+    @Test
+    fun `explicit integer learning should override the automatic execution scope`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
+            compactCardinalityEquality = true) { true }
+        for (enabled in listOf(false, true)) {
+            val scenario = PortfolioScenario.parallel(2, Kind.COP, EngineMix.BACKTRACK).copy(
+                btEdit = { it.copy(integerRowLearning = enabled) },
+            )
+
+            val arms = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+            assertTrue(arms.all { it.recipe.build(1L, null).integerRowLearning == enabled })
+        }
+    }
+
+    @Test
+    fun `model specific replacements should retain clausal learning`() {
+        for (packing in listOf(false, true)) {
+            val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+                binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
+                compactCardinalityEquality = true, binaryPackingObjective = packing) { true }
+
+            val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP), facts)
+                .filterIsInstance<BacktrackWorkerConfig>()
+
+            val replacement = arms.single { it.label == if (packing) "lp-default" else "selector-switch" }
+            assertFalse(replacement.recipe.build(1L, null).integerRowLearning)
+        }
+    }
+
+    @Test
+    fun `an explicit pool should retain its arithmetic settings`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
+            compactCardinalityEquality = true) { true }
+        val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK).copy(
+            btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") },
+        )
+
+        val arms = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+        assertTrue(arms.none { it.recipe.build(1L, null).integerRowLearning })
+    }
+
+    @Test
+    fun `an annotation template should retain its arithmetic setting`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
+            compactCardinalityEquality = true) { true }
+        for (enabled in listOf(false, true)) {
+            val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK).copy(
+                annotationArm = BacktrackParams(integerRowLearning = enabled),
+            )
+
+            val arms = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+
+            assertEquals(enabled, arms.single { it.label == "annotation" }.recipe.build(1L, null).integerRowLearning)
+        }
+    }
+
     @Test
     fun `default table satisfaction pools should schedule one support aware worker within the containing allowance`() {
         val budget = NodeBudget(limit = 100)

@@ -9,6 +9,10 @@ private const val INTEGER_LEARNING_STEPS = 16
 private const val INTEGER_LEARNING_LEVELS = 64
 
 internal class IntegerConflictLearner(private val state: PropagationState) {
+    private var previousSource: IntegerSourceRow? = null
+    private var previousUseLo = false
+    private var previousRow: IntegerConflictRow? = null
+
     fun learn(
         factorId: Int,
         currentLevel: Int,
@@ -40,11 +44,11 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         state.arithmeticLearningTrace?.record("integer.fallback-target", target.toLong(), trail.toLong())
         val source = sourceFactor(factorId) ?: return decline("seed-source")
         var row = when (source.linear.op) {
-            LinearOp.LE -> source.row(useLo = true)
-            LinearOp.GE -> source.row(useLo = false)
+            LinearOp.LE -> normalizedSource(source, useLo = true)
+            LinearOp.GE -> normalizedSource(source, useLo = false)
             LinearOp.EQ -> {
-                val lower = source.row(useLo = true) ?: return decline("seed-normalization")
-                if (lower.minimum(state) > lower.bound) lower else source.row(useLo = false)
+                val lower = normalizedSource(source, useLo = true) ?: return decline("seed-normalization")
+                if (lower.minimum(state) > lower.bound) lower else normalizedSource(source, useLo = false)
             }
             LinearOp.NE -> null
         } ?: return decline("seed-normalization")
@@ -72,6 +76,19 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(row, target, levels.size, levels, fallback)
         }
         return decline("step-limit-without-assertion")
+    }
+
+    private fun normalizedSource(source: IntegerSourceRow, useLo: Boolean): IntegerConflictRow? {
+        val previous = previousSource
+        if (previous != null && previous.linear === source.linear && previous.guard == source.guard &&
+            previousUseLo == useLo) {
+            return previousRow
+        }
+        val row = source.row(useLo)
+        previousSource = source
+        previousUseLo = useLo
+        previousRow = row
+        return row
     }
 
     private fun sourceFactor(
@@ -118,7 +135,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
             val useLo = marker[LAZY_PAYLOAD + 1] == 1
             if ((source.linear.op == LinearOp.LE && !useLo) || (source.linear.op == LinearOp.GE && useLo)) continue
-            val sourceRow = source.row(useLo) ?: continue
+            val sourceRow = normalizedSource(source, useLo) ?: continue
             if ((sourceRow.coefficient(variable) > 0L) == lower) continue
             state.arithmeticLearningTrace?.row("integer.endpoint-row", sourceRow, state, marker[2])
             val proposed = sourceRow.boundFor(state, variable, marker[2])

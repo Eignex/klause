@@ -6,6 +6,7 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpAutoConfig
@@ -15,6 +16,7 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.presolve.binaryChannelLiteral
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.INTEGER_LEARNING_TERMS
 import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
@@ -55,6 +57,8 @@ internal class ProblemFacts(
     val binaryPackingObjective: Boolean = false,
     val binaryEqualityObjective: Boolean = false,
     val extensionalSupports: Boolean = false,
+    val integerColumnsOnly: Boolean = false,
+    val compactCardinalityEquality: Boolean = false,
     val construction: WorkerConstructionCost = WorkerConstructionCost(0, 0),
     private val observer: ((String, WorkerEligibility) -> Unit)? = null,
     private val relaxation: (LpEmphasis) -> Boolean,
@@ -101,6 +105,11 @@ internal class ProblemFacts(
                     problem.numRealVars, problem.factors.size),
                 observer = observer,
                 binaryIntegers = binary,
+                integerColumnsOnly = problem.numIntVars > 0 && problem.numBoolVars == 0 && problem.numRealVars == 0,
+                compactCardinalityEquality = problem.factors.any { factor ->
+                    val form = factor.linearForm as? LinearForm.Conjunction
+                    form?.rows?.any { it.isCompactCardinalityEquality() } == true
+                },
                 binaryPackingObjective = (binary && problem.hasPackingObjective(objective)) ||
                     binarySource?.let {
                         it.problem.binaryIntegers && it.problem.hasPackingObjective(it.objective)
@@ -199,4 +208,22 @@ private fun Problem.hasBinaryEqualityObjective(objective: LinearObjective?): Boo
             row.isLongUnconditional && row.isIntegerOnly && row.relation == LinearOp.EQ
         }
     }
+}
+
+private fun LinearRow.isCompactCardinalityEquality(): Boolean {
+    if (size !in 3..INTEGER_LEARNING_TERMS || relation != LinearOp.EQ ||
+        !isLongUnconditional || !isIntegerOnly) return false
+    val first = coeff(0)
+    if (first == 0L || first == Long.MIN_VALUE) return false
+    val magnitude = if (first < 0L) -first else first
+    var negative = 0L
+    for (k in 0 until size) {
+        when (coeff(k)) {
+            magnitude -> Unit
+            -magnitude -> negative++
+            else -> return false
+        }
+    }
+    if (bound % magnitude != 0L) return false
+    return bound / magnitude in (1L - negative)..(size.toLong() - 1L - negative)
 }

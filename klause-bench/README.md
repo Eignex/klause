@@ -1370,11 +1370,32 @@ the investigation cost rather than becoming a solver regression.
 ## Prepared arithmetic learning
 
 `bench.profile.OrdinaryArithmeticLearningProfile` takes `suite=ID problem=NAME
-sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off trace=first-integer|initial
-attribution=false|true`.
-It runs clause and opt-in
+sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off trace=first-integer|initial|none
+samples=false|true attribution=false|true recipe=source|satOptimized|conflictDriven seed=3 worker-seed=3
+route=single|portfolio`.
+The source recipe uses its search hints or the conflict-driven preset; the explicit
+recipes use the existing SAT or conflict-driven preset. Preparation uses `seed`,
+and native traversal uses `worker-seed` (defaulting to the preparation seed), so a portfolio worker's
+position-derived seed can be captured without changing source preparation.
+The default `single` route runs clause and opt-in
 integer-row arms through ordinary finite preparation and backtrack traversal,
-without a decision replay. The existing bounded arithmetic trace records source
+without a decision replay. The `portfolio` route requires unannotated pure binary
+integer optimization. It retains the six curated CP slots, sharing, position-derived seeds and
+one containing node allowance; the trial preserves automatic learning and the
+control overrides it to false. Capture selects the first SAT or conflict-driven
+slot; `recipe` identifies that expected slot rather than replacing the pool. Its default target is `conflictDriven` at `seed + 1001`;
+`lp=auto` retains the ordinary portfolio LP ceiling. Capture observes only that
+slot's first native session and reports ignored later session attachments. Captured
+work and lifecycle counts cover that session; invocation CPU, elapsed time and
+thread allocation cover the whole portfolio. Instrumentation supplies no exact
+portfolio replay or performance qualification. `trace=none` leaves session, selector
+and branch observers detached; capture-only fields are null. `samples=true` records
+each whole invocation with the JDK profile settings, a 32 MiB recording cap, and
+the existing CPU/caller/allocation summaries in `<arm>-samples.txt`. Recording setup,
+dump and summary are outside the arm timer and inside the containing profile
+allowance. Samples are statistical; the cap can discard early recording chunks.
+The two arms share a JVM in clause/integer order, so these captures diagnose
+hotspots and do not establish a timing benefit. The existing bounded arithmetic trace records source
 conflicts, historical endpoint rows, mapped admission, retained consumers and
 retirement. Its live window admits 1,024 events and 65,536 words. Clauses above
 64 literals and endpoint markers above 32 words produce explicit omission events
@@ -1390,7 +1411,15 @@ The integer arm's `trace=first-integer` keeps the most recent conflict window un
 an integer object is admitted, then keeps its consumers, branch markers and
 retirement. Other post-admission details are omitted. Discarded-window/event/word
 counts and omitted observations are explicit; the live event and word caps stay
-fixed. `trace=initial` keeps the initial window instead. The clause arm keeps its
+fixed. Capture also keeps a session-wide integer decline census outside those
+windows: at most 63 reason names of at most 96 characters, plus an `other` bucket.
+Its counters continue after the payload window fills. Source, endpoint and terminal
+decline counts overlap; buckets count observations rather than failed conflicts.
+Classification truncation and
+counter saturation are explicit; this census counts only the attached session and
+supplies no omitted proof payload or invocation-wide distribution. The capture
+releases it with the session observation. `trace=none` collects no census.
+`trace=initial` keeps the initial window instead. The clause arm keeps its
 initial window. Deadlines, decisions and total work/lifecycle counts cover the
 entire invocation; discarding diagnostic data resets no solver allowance.
 
