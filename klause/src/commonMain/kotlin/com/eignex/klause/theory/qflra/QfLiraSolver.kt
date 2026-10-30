@@ -558,7 +558,7 @@ class ExactLiraSearchComponent private constructor(
                 if (prepared.booleans.any { it != variable && bools[it] == UNASSIGNED }) continue
                 eligible++
                 val comparison = prepared.form.comparison(true) { bools[it] == TRUE }
-                val affine = if (partialLinearAffineBounds) {
+                val affine = if (partialLinearAffineBounds && comparison.terms.size > 1) {
                     affineProbes++
                     system.affineImplication(comparison, operationStop)
                 } else null
