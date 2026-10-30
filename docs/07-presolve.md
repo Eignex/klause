@@ -306,10 +306,25 @@ including trials that produce no witness. The descriptors add their modeled
 primitive/reference storage before composition and copied-learning admission.
 
 Unused BVE allowance can copy globally learned clauses into the private model.
-Only this canonical worker's non-permanent clauses over retained Boolean columns
-qualify. Clauses mentioning an eliminated column need an unsupported resolution
-translation and are skipped. Global pins remove satisfied clauses and false
-literals. Each copied consequence owns its literal buffer and consumes the same
+Only this canonical worker's non-permanent clauses over Boolean source columns
+qualify. Global pins remove satisfied clauses and false literals. A clause that
+mentions an eliminated column can follow the actual BVE parent descriptors in
+elimination order. A pure pivot's satisfying value lifts every projected model,
+so substituting it preserves learned consequences. Other pivots use one shortest
+opposite-polarity source parent to derive a resolvent; each such consequence is
+entailed by the projected source. The transfer produces at most one clause per
+learned input and admits at most 64 literals per intermediate clause. A tautological
+or wider selected resolvent withholds that input, without excluding other useful
+translations. Every result contains only retained columns. An empty consequence
+declines the generation and grants no source refutation authority.
+
+Parent indexing, literal visits and normalization consume the transfer allowance.
+Final clause-input normalization reserves work from the resulting literal count
+before constructing its owned factor, including when resolution widens the input.
+Projection reserves 16 KiB of modeled scratch inside the remaining private byte
+grant; its temporary buffers are released after transfer. This reservation joins
+the conservative private peak model, including when a projection copies nothing.
+Each copied consequence owns its literal buffer and consumes the same
 work and modeled-memory grants; an exhausted local transfer grant retains the
 completed subset. The mapping composes through the enriched model's exact identity.
 These copies preserve consequences without sharing learned-store indexes or
@@ -765,6 +780,11 @@ exactly. A fresh positive channel retains the source coefficient when signed reu
 or a constant shift exceeds the objective's storage width. Mixed
 integer readers retain their columns and channels. Substituted values are
 reconstructed from their literals, preserving original costs and source coordinates.
+The rewrite-cost policy also projects binary costs within a mixed integer
+objective when existing signed channels carry them exactly. It retains nonbinary
+costs and any binary cost whose channel reuse would overflow, protecting their
+integer columns from substitution. This mixed view adds no Boolean channels and
+does not carry the pure binary-objective LP admission marker.
 Continuous models, approximate semantics and solution-set-sensitive invocations
 retain their objective form.
 

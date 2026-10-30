@@ -357,6 +357,56 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `integer endpoints should yield root bounds without existing atoms`() {
+        for (lower in listOf(false, true)) {
+            val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), if (lower) LinearOp.GE else LinearOp.LE,
+                    if (lower) 1 else 3),
+                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), if (lower) LinearOp.LE else LinearOp.GE, 0),
+            ))
+            val session = PropagationSession(source.bake())
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 4), null)
+
+            assertEquals(if (lower) 1L else 0L, session.intDomain(0).min)
+            assertEquals(if (lower) 2L else 1L, session.intDomain(0).max)
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `consistent endpoint probes should preserve the root domain`() {
+        for (domain in listOf(IntDomain(0, 2), IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 1L),
+            IntDomain(Long.MAX_VALUE - 1L, Long.MAX_VALUE))) {
+            val session = PropagationSession(Problem(0, 1, arrayOf(domain), emptyArray()).bake())
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2), null)
+
+            assertEquals(domain.min, session.intDomain(0).min)
+            assertEquals(domain.max, session.intDomain(0).max)
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `a locally capped endpoint probe should restore the complete root`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+        ))
+        val session = PropagationSession(source.bake())
+        val pass = RootProbingPass()
+
+        pass.run(session, BacktrackParams(rootProbeBatch = 4, rootProbeWork = 1), null)
+
+        assertEquals(0L, session.intDomain(0).min)
+        assertEquals(2L, session.intDomain(0).max)
+        assertEquals(0, session.decisionLevel)
+        pass.run(session, BacktrackParams(rootProbeBatch = 4), null)
+        assertEquals(1L, session.intDomain(0).min)
+    }
+
+    @Test
     fun `a learned bound neighborhood should reach a failed bound within one funded probe`() {
         val source = Problem(4, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),

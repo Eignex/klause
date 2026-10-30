@@ -67,7 +67,12 @@ When running the full gate locally:
 
 Read `klause-bench/README.md` before benchmarking. In short:
 
-- Experiments, A/B comparisons, reference runs, witness checks and profiling go through klause-lab (`deploy/lab`).
+- Experiments, A/B comparisons, reference runs, witness checks and profiling go through eignex-lab (`deploy/lab`).
+- Use the authenticated HTTP API at `https://lab.eignex.com`. SSH access, host discovery and lab administration
+  belong to agents explicitly working on eignex-lab operations; send concrete operational dependencies to that owner.
+- A normal A/B row runs all arms for one workload, seed and repetition on the same machine in one worker attempt.
+  Different rows, preparation and replacement attempts may use different compatible machines. Keep automatic
+  placement; do not pin the whole job or reject completed pairs merely because the job's node changed.
 - klause-bench provides what the lab calls: `select` names problems and resolves their files, `solve-one` solves one
   problem with klause-cli and writes its record, and the `bench.profile` mains run as `lab profile` jobs.
 - `solve-one` runs the installed CLI as a subprocess, so rebuild it with `:klause-cli:installJvmDist` first.

@@ -1419,14 +1419,14 @@ internal class CpToLpRelaxation(
                 // contribute nothing here — they are handled by the separators and the blocks above.
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
                     factor.lpHullEnabled(hullFlags, elementIndexes)
-                if (preparationTemplates?.emit(problem, factorId, this, linearProjection) == true) {
+                if (preparationTemplates?.emit(problem, factorId, this@Assembler, linearProjection) == true) {
                     templateRows += preparationTemplates?.factors?.get(factorId)?.rows?.size ?: 0
                     attributeRows(factorId)
                     continue
                 } else if (projections == null) {
-                    factor.emitLpRelaxation(this, linearProjection)
+                    factor.emitLpRelaxation(this@Assembler, linearProjection)
                 } else {
-                    projections.emitRelaxation(factorId, this, linearProjection)
+                    projections.emitRelaxation(factorId, this@Assembler, linearProjection)
                 }
                 attributeRows(factorId)
             }

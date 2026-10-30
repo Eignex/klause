@@ -126,6 +126,67 @@ class InprocessingTest {
     }
 
     @Test
+    fun `warmup should require work after the first complete root`() {
+        for (restart in listOf(false, true)) {
+            val pass = CountingPass()
+            val loop = Inprocessing(listOf(pass), cadence = 1)
+            val session = session()
+            val params = BacktrackParams(inprocessingInterval = 1L, inprocessingWarmupWork = 10L)
+            val opportunity = {
+                if (restart) loop.onRestart(session, params) else loop.onRoot(session, params)
+            }
+            session.chargeInprocessingWork(1000L)
+
+            opportunity()
+            assertEquals(0, pass.runs)
+            session.chargeInprocessingWork(9L)
+            opportunity()
+            assertEquals(0, pass.runs)
+            session.chargeInprocessingWork(1L)
+            opportunity()
+
+            assertEquals(1, pass.runs)
+        }
+    }
+
+    @Test
+    fun `warmup should exclude clause growth already present at its first root`() {
+        val pass = CountingPass()
+        val loop = Inprocessing(listOf(pass), cadence = 100)
+        val session = session()
+        val params = BacktrackParams(inprocessingGrowth = 1, inprocessingWarmupWork = 10L)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+        loop.onRoot(session, params)
+
+        session.chargeInprocessingWork(10L)
+        loop.onRoot(session, params)
+        assertEquals(0, pass.runs)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+        loop.onRoot(session, params)
+
+        assertEquals(1, pass.runs)
+    }
+
+    @Test
+    fun `scope reset should renew the warmup origin`() {
+        val pass = CountingPass()
+        val loop = Inprocessing(listOf(pass), cadence = 1)
+        val session = session()
+        val params = BacktrackParams(inprocessingInterval = 1L, inprocessingWarmupWork = 10L)
+        loop.onRoot(session, params)
+        session.chargeInprocessingWork(10L)
+        loop.onRoot(session, params)
+
+        loop.reset()
+        loop.onRoot(session, params)
+        assertEquals(1, pass.runs)
+        session.chargeInprocessingWork(10L)
+        loop.onRoot(session, params)
+
+        assertEquals(2, pass.runs)
+    }
+
+    @Test
     fun `pass attachments should not earn another growth opportunity`() {
         val pass = CountingPass(grow = true)
         val loop = Inprocessing(listOf(pass), cadence = 100)
@@ -221,7 +282,7 @@ class InprocessingTest {
 
             assertFalse(released)
             assertTrue(assertNotNull(retained.completeValues).getValue("protectedPrimitiveBytes") >= 12L)
-            loop.onRoot(session, BacktrackParams())
+            loop.onRoot(session, BacktrackParams(inprocessingWarmupWork = Long.MAX_VALUE))
             assertFalse(session.fixpointCancelled)
             assertEquals(true, session.boolValue(0))
             assertEquals(setOf(0), session.learnedClauseLiterals(2).toSet())

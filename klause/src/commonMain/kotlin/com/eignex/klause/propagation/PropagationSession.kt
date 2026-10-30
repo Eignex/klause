@@ -861,7 +861,12 @@ class PropagationSession private constructor(
             kind == AtomKind.GE -> if (threshold == Long.MIN_VALUE) return null else threshold - 1L
             else -> if (threshold == Long.MAX_VALUE) return null else threshold + 1L
         }
-        return probeFixpoint { pushIntBound(intVar, bound, atMost, reportImplied = false) }
+        return probeRootBound(intVar, bound, atMost)
+    }
+
+    internal fun probeRootBound(variable: Int, bound: Long, atMost: Boolean): PropagationResult? {
+        check(canSimplifyRoot)
+        return probeFixpoint { pushIntBound(variable, bound, atMost, reportImplied = false) }
     }
 
     /**

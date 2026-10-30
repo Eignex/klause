@@ -4,6 +4,19 @@ JVM problem catalog and single-case runner for
 [eignex-lab](https://github.com/Eignex/eignex-lab). Use the lab for experiments,
 revision comparisons, reference solvers, witness checks, schedules and profiling.
 
+Use the authenticated HTTP client at `https://lab.eignex.com`; see the lab's
+[run guide](https://github.com/Eignex/eignex-lab/blob/main/docs/runs.md).
+SSH access, host discovery and server administration belong to agents explicitly
+working on eignex-lab operations. Report operational dependencies to that owner.
+
+A normal A/B case row contains one workload, seed and repetition across all arms.
+The lab runs every arm of that row on the same machine in one worker attempt.
+Other rows, preparation and replacement attempts may use different compatible
+machines; keep automatic placement without pinning the whole job. Worker loss
+replaces the complete unfinished row rather than mixing arms from different
+machines or attempts. Accepted rows remain valid; retain failed and preparation
+costs and report repeated infrastructure losses separately.
+
 A standalone `cp` control sets both `param.bt-arm=LABEL` and `param.arms=1`.
 Named recipes repeat across the configured worker slots otherwise. Check the
 emitted `arm.*` entries to verify the actual worker count before comparing controls.
@@ -94,6 +107,15 @@ allowance. Reconstruction retains its source-entry charge and raises it when the
 actual replay descriptors and composed sample copies require more work.
 `MappingPreparationWork` includes descriptor ownership copies in preparation;
 their modeled storage also joins `ModeledPrivateBytes`.
+`WarmClausesTranslated` counts copied consequences transported through eliminated
+columns. Translation follows the captured BVE parents with one bounded resolvent
+per input and pivot, or a pure-value substitution. `WarmProjectionScratchBytes`
+records its conservative 16 KiB scratch reservation inside the existing byte grant;
+it joins `ModeledPrivateBytes` and is not additional live retained storage or RSS.
+Projection work remains inside `WarmClauseWork` and preparation. Tautological,
+wide or unsupported selected translations contribute no copied consequence.
+`WarmClauseNormalizationWork` records the final input-normalization reservation;
+it is a subset of transfer and preparation work, rather than another total to add.
 
 Run from the repository root with JDK 25 or newer:
 
@@ -314,6 +336,11 @@ Compressed corpus storage is decoded through the ordinary source-invocation path
 which charges decoding to the remaining source budget and preserves the packed input.
 JVM staged-file identities live in `report/jvm-profile-files.json`; the record binds
 that full manifest by digest instead of repeating thousands of class entries.
+Combined Linux LP preparation finishes Native linking before compiling the JVM library
+and harness. The ordering keeps the Native compiler ahead of retained JVM compiler
+state without changing compiler flags or preparation resource caps.
+`lp-lifecycle-reuse-v1` selects the original mixed-integer `egout` MPS at the same
+pinned HiGHS revision, separately from the frozen overflow and held-out cohorts.
 
 `bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
 work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,
@@ -982,8 +1009,8 @@ and cleanup separately through a finite `profile.runTimeoutSec` containing
 allowance. These bench-owned custom compilations have
 internal access to the engine and add no Maven artifacts. Ordinary CI compiles
 them and runs the shared deterministic regressions; it runs no profiling workload.
-When requested together, JVM profile staging precedes native compilation to avoid
-overlapping both compiler heaps in a bounded preparation worker.
+When requested together, Native profile linking precedes JVM library compilation
+and profile staging within the bounded preparation worker.
 Separate runtime jobs request only the selected target's build task. They retain
 their own CPU identity and resource receipts; different placements do not support
 an absolute cross-runtime speed comparison.
@@ -1248,9 +1275,10 @@ make fixed-work traces sensitive to measured segment costs.
 
 `source-rate-family` also prices accepted family gains against all observed sibling
 factory and segment costs, retaining failed and unproductive work until the next
-family gain. Family feedback uses the fractional rate score; silent complete
-workers retain coverage. Compare ordinary, worker-rate and family-rate controls on
-the same binary at fixed probes, coverage, admission and reseeding. Full traces
+family gain. Family feedback uses the fractional rate score for every paid
+post-incumbent segment, including silent complete-search segments. Complete workers
+retain the selected coverage scope and share. Compare ordinary, worker-rate and
+family-rate controls on the same binary at fixed probes, coverage, admission and reseeding. Full traces
 retain the phase, gains and inclusive costs needed to reconstruct both rate ledgers.
 
 `param.portfolio-probes=leader-half` redistributes the existing initial probe budget
