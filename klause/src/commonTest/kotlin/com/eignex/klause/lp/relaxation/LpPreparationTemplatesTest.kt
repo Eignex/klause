@@ -37,6 +37,19 @@ class LpPreparationTemplatesTest {
     private val objective = LinearObjective(intCoefficients = LongArray(6) { 1L })
 
     @Test
+    fun `equal integer and Boolean IDs should retain independent preparation components`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Clause(intArrayOf(0)),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+        ))
+        val captured = FactorProjectionProviders.Default.prepare(problem)
+
+        val templates = assertNotNull(captured.prepareLpTemplates(null, Cancellation.Never, reuseMetadata = true))
+
+        assertEquals(2, templates.components.size)
+    }
+
+    @Test
     fun `objective metadata refresh should retain row and bound indexes and match fresh authority`() {
         val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
         val revised = objective.copy(intCoefficients = longArrayOf(2, 1, 1, 1, 1, 1))

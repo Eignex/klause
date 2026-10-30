@@ -58,7 +58,10 @@ Retained-source assembly and fixed-layout installation adopt the same immutable 
 complete match against the current normalized column, including its origin, tag,
 integrality and both bound sides.
 
-Factor identity preserves a row definition; row rewrites replace it. Component
+Factor identity preserves a row definition; row rewrites replace it. Coalesced
+integer rows retain their source membership arrays without rebuilding a tagged
+list. Other factor memberships keep their deduplicated references; integer and
+Boolean coordinates remain distinct even when their numeric IDs coincide. Component
 snapshots retain their row definitions, exact endpoints, stated bound sides and
 objective coefficients. Unchanged row incidence retains the component partition.
 Bound or objective changes replace affected snapshots;
