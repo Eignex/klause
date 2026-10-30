@@ -151,12 +151,25 @@ private fun MutableIntObjectMap<SearchAtomPremise>.retain(literal: Int, premise:
 }
 
 private fun PropagationState.namedIntegerLeaf(premise: SearchAtomPremise, context: SearchContext): Boolean {
-    val leaves = (premise as? SearchAtomPremise.All)?.premises ?: return false
-    for (leaf in leaves) {
+    val pending = ArrayDeque<SearchAtomPremise>()
+    val expanded = HashSet<SearchAtomPremise.All>()
+    pending.addLast(premise)
+    var remaining = SHARED_PREMISE_VISIT_LIMIT
+    while (pending.isNotEmpty()) {
         work++
-        val asserted = leaf as? SearchAtomPremise.Asserted ?: return false
-        val literal = context.atomLiteral(asserted.decision) ?: return false
-        if (context.boolValue(Lit.variable(literal)) != Lit.isPositive(literal)) return false
+        if (runCancelled || remaining-- <= 0) return false
+        when (val current = pending.removeLast()) {
+            is SearchAtomPremise.Asserted -> {
+                val literal = context.atomLiteral(current.decision) ?: return false
+                if (context.boolValue(Lit.variable(literal)) != Lit.isPositive(literal)) return false
+            }
+            is SearchAtomPremise.All -> {
+                if (!expanded.add(current)) continue
+                if (current.premises.size > remaining - pending.size) return false
+                pending.addAll(current.premises)
+            }
+            SearchAtomPremise.Unavailable -> return false
+        }
     }
     return true
 }

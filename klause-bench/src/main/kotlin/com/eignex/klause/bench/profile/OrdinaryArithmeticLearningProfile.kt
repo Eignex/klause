@@ -3,6 +3,7 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Category
@@ -18,12 +19,17 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.json.ProblemJson
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.portfolio.BacktrackCatalog
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.pipeline.portfolioExecutor
 import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
@@ -48,7 +54,7 @@ internal object OrdinaryArithmeticLearningProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
             it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
-                "attribution", "recipe", "seed", "worker-seed")
+                "attribution", "recipe", "seed", "worker-seed", "route")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -60,10 +66,16 @@ internal object OrdinaryArithmeticLearningProfile {
         val lp = options["lp"] ?: "auto"
         require(lp in setOf("auto", "off"))
         val attribution = (options["attribution"] ?: "false").toBooleanStrict()
-        val recipe = options["recipe"] ?: "source"
+        val route = options["route"] ?: "single"
+        require(route in setOf("single", "portfolio"))
+        val recipe = options["recipe"] ?: if (route == "portfolio") "conflictDriven" else "source"
         require(recipe in setOf("source", "satOptimized", "conflictDriven"))
         val seed = (options["seed"] ?: "3").toLong()
-        val workerSeed = options["worker-seed"]?.toLong() ?: seed
+        val workerSeed = options["worker-seed"]?.toLong() ?: if (route == "portfolio") seed + 1001L else seed
+        val targetIndex = workerSeed - seed - 1000L
+        if (route == "portfolio") {
+            require(recipe != "source" && targetIndex in 0L..1L)
+        }
         val allocationBean = (ManagementFactory.getThreadMXBean() as? ThreadMXBean)
             ?.takeIf { it.isThreadAllocatedMemorySupported }?.apply { isThreadAllocatedMemoryEnabled = true }
         val cpuBean = ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean
@@ -128,6 +140,9 @@ internal object OrdinaryArithmeticLearningProfile {
                 out.resolve("$label-original.json").writeText(originalJson)
                 out.resolve("$label-prepared.json").writeText(preparedJson)
                 var native: PropagationSession? = null
+                var lastSession: PropagationSession? = null
+                var ignoredSessionAttachments = 0
+                var targetRecipe: String? = null
                 var capture: PreparedArithmeticLearningProfile.Capture? = null
                 var picks = 0
                 var attempts = 0
@@ -138,8 +153,11 @@ internal object OrdinaryArithmeticLearningProfile {
                     "conflictDriven" -> BacktrackPresets.conflictDriven(randomSeed = workerSeed)
                     else -> entry.searchParams ?: BacktrackPresets.conflictDriven(randomSeed = workerSeed)
                 }
-                val selector = base.variableSelector
-                fun attach(session: PropagationSession, origin: String) {
+                fun attach(session: PropagationSession, origin: String): Boolean {
+                    if (lastSession !== session) {
+                        lastSession = session
+                        if (native != null && native !== session) ignoredSessionAttachments++
+                    }
                     if (native == null) {
                         native = session
                         attachment = origin
@@ -150,7 +168,11 @@ internal object OrdinaryArithmeticLearningProfile {
                         integerRowsAtCapture = recorder.lifecycle()["learningIntegerAdmitted"]
                             ?.jsonPrimitive?.longOrNull ?: 0L
                     }
-                    check(native === session)
+                    if (native !== session) {
+                        check(route == "portfolio")
+                        return false
+                    }
+                    return true
                 }
                 fun observing(delegate: VariableSelector): VariableSelector = object : VariableSelector by delegate {
                     override fun fresh(): VariableSelector = observing(delegate.fresh())
@@ -159,7 +181,7 @@ internal object OrdinaryArithmeticLearningProfile {
                         delegate.onSessionCreated(session)
                     }
                     override fun pick(session: PropagationSession, rng: Random): VarRef? {
-                        attach(session, "selector-fallback")
+                        if (!attach(session, "selector-fallback")) return delegate.pick(session, rng)
                         val recorder = requireNotNull(capture)
                         picks++
                         val picked = delegate.pick(session, rng)
@@ -173,38 +195,65 @@ internal object OrdinaryArithmeticLearningProfile {
                         return picked
                     }
                 }
-                val params: BacktrackParams = base.copy(
-                    variableSelector = observing(selector), randomSeed = workerSeed, cancellation = stop,
-                    maxDecisions = nodes, pbLearning = false, integerRowLearning = learning,
+                fun observingParams(originalParams: BacktrackParams): BacktrackParams = originalParams.copy(
+                    variableSelector = observing(originalParams.variableSelector),
                     propagationAttribution = attribution,
                     branchObserver = object : SearchBranchAttemptObserver {
                         override fun onAttempt(decision: SearchDecision, context: SearchContext) {
-                            base.branchObserver?.onAttempt(decision, context)
+                            originalParams.branchObserver?.onAttempt(decision, context)
+                            if (lastSession !== native) return
                             attempts++
                             capture?.record("traversal.attempt", context.decisionLevel.toLong(),
                                 context.atomLiteral(decision)?.toLong() ?: -1L, attempts.toLong())
                         }
                     },
-                    lpConfig = if (lp == "auto") LpConfig.AUTO else null,
                 )
+                val params = observingParams(base.copy(
+                    randomSeed = workerSeed, cancellation = stop, maxDecisions = nodes,
+                    pbLearning = false, integerRowLearning = learning,
+                    lpConfig = if (lp == "auto") LpConfig.AUTO else null,
+                ))
                 var verdict = "preparation-terminal"
                 var witness: String? = null
                 var checked = false
                 var stats: String? = null
                 val model = prepared.problem as? BakedProblem
                 if (model != null && prepared.presolve?.infeasible != true && !stop()) {
-                    val solver = BacktrackSolver(model)
                     val objective = prepared.objective
-                    val sample = if (objective == null) {
-                        val result = solver.solve(params)
-                        verdict = result::class.simpleName ?: "unknown"
-                        stats = result.stats.toString()
-                        (result as? SolveResult.Sat)?.assignment
-                    } else {
-                        val result = solver.minimize(objective, params)
-                        verdict = result::class.simpleName ?: "unknown"
-                        stats = result.stats.toString()
-                        result.assignment
+                    val portfolio = if (route == "portfolio") {
+                        require(entry.searchParams == null && objective != null && model.numIntVars > 0 &&
+                            model.numBoolVars == 0 && model.numRealVars == 0)
+                        require((0 until model.numIntVars).all {
+                            model.intBounds.hasLower(it) && model.intBounds.hasUpper(it) &&
+                                model.intBounds.lower(it) >= 0L && model.intBounds.upper(it) <= 1L
+                        })
+                        val scenario = PortfolioScenario.sequential(Kind.COP, EngineMix.BACKTRACK, seed).copy(
+                            lpCeiling = if (lp == "auto") LpConfig.AGGRESSIVE else LpConfig.OFF,
+                            nodeBudget = NodeBudget(nodes),
+                            btEdit = { originalParams ->
+                                val edited = originalParams.copy(cancellation = stop, maxDecisions = nodes,
+                                    integerRowLearning = learning && originalParams.integerRowLearning)
+                                if (originalParams.randomSeed == workerSeed) observingParams(edited) else edited
+                            },
+                        )
+                        targetRecipe = BacktrackCatalog.ranked(Kind.COP)[targetIndex.toInt()].label
+                        check(targetRecipe == recipe) { "target worker is $targetRecipe, expected $recipe" }
+                        FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null)
+                    } else null
+                    val sample = try {
+                        if (objective == null) {
+                            val result = portfolio?.solve(stop) ?: BacktrackSolver(model).solve(params)
+                            verdict = result::class.simpleName ?: "unknown"
+                            stats = result.stats.toString()
+                            (result as? SolveResult.Sat)?.assignment
+                        } else {
+                            val result = portfolio?.minimize(stop) ?: BacktrackSolver(model).minimize(objective, params)
+                            verdict = result::class.simpleName ?: "unknown"
+                            stats = result.stats.toString()
+                            result.assignment
+                        }
+                    } finally {
+                        portfolio?.close()
                     }
                     sample?.let {
                         val point = prepared.reconstruct(it)
@@ -234,12 +283,15 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("sourceSha256", hash)
                     put("sourceMode", if (source64 == null) "catalog" else "frozen")
                     put("integerRowLearning", learning)
-                    put("pbLearning", false)
+                    put("pbLearning", if (route == "single") false else null)
                     put("propagationAttribution", attribution)
                     put("lp", lp)
                     put("seed", seed)
                     put("workerSeed", workerSeed)
                     put("recipe", recipe)
+                    put("route", route)
+                    put("targetRecipe", targetRecipe)
+                    put("ignoredSessionAttachments", ignoredSessionAttachments)
                     put("maxDecisions", nodes)
                     put("timeoutMs", timeout)
                     put("traceMode", traceMode)
