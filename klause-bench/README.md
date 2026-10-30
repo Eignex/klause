@@ -761,6 +761,10 @@ nonzero source residuals, and the scan has limited attempts. These instrumented
 20-million-work/64-MiB diagnostics establish neither production affordability nor
 later pruning. Keep the ordinary source comparison and independent invalid-point
 verdicts when qualifying a production policy.
+The generated-aggregate replay includes the ordinary opt-in producer's bounded
+source-pair indexing and discovery. Keep this cost separate from replaying supplied
+diagnostic proposals. `AggregatePair*` reports coverage, attempts and limiting
+stages; a partial generation establishes no general absence of useful cuts.
 
 [9277](https://lab.eignex.com/jobs/9277) exercises both sources at `0af8492830`
 with ownership and root cuts toggled independently. With root cuts off, node

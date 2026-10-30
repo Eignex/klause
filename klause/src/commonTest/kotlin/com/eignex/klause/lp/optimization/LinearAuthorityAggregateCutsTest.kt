@@ -41,6 +41,42 @@ class LinearAuthorityAggregateCutsTest {
         BigFraction.ZERO)
 
     @Test
+    fun `automatic source pairs should strengthen a checked bound without continuous endpoints`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right)),
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+
+        for ((aggregate, expected) in listOf(false to (BigFraction.ofLong(-3) *
+            BigFraction.ofLong(2).reciprocal()), true to BigFraction.MINUS_ONE)) {
+            LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = aggregate).use { authority ->
+                val result = authority.advance(source, Cancellation.Never, cuts = true)
+
+                assertEquals(SourceValue.Rational(expected),
+                    assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            }
+        }
+    }
+
+    @Test
+    fun `source pair preparation should retain its containing work and storage limits`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+
+        for (limits in listOf(LinearAuthorityAggregateLimits(work = 1),
+            LinearAuthorityAggregateLimits(allocation = 1))) {
+            val observations = mutableMapOf<String, Long>()
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count }, limits = limits)
+
+            assertTrue(cuts.isEmpty())
+            assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+            assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+        }
+    }
+
+    @Test
     fun `opposite bound projection should strengthen a checked sparse bound before mixed rounding`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope.copy(objective = SourceObjective("projection", ObjectiveSense.MINIMIZE)),
