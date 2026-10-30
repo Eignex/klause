@@ -250,11 +250,15 @@ sample. These advisory observations supply no certified bound or pruning authori
 The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
 
-The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
-`lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
+The `lp-default` optimization recipe enables the finite consumer; direct
+`BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
+`lp-directional-gains=true`. The execution setting can also disable it. LP bounding
+and branching must be enabled. Two recent samples
 in each direction permit a balanced gain score; otherwise reduced-cost/fractionality
 scoring and the configured selector keep their precedence. Directional scores compete
 with each other before fallback, so objective units are not mixed with reduced costs.
+Consumed choices record agreement with the current LP scorer, a changed variable,
+or a missing current LP candidate separately; a rejected proposal earns no consumption.
 
 Samples share one retained exact base model, active-row identity, objective mapping
 and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
