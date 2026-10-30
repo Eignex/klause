@@ -43,7 +43,7 @@ internal data class ExactContinuationLimits(
     val maxImportPivots: Int = 128,
     val maxPivots: Int = 10000,
     val startArbitraryPrecision: Boolean = false,
-    val preserveOverflowCheckpoint: Boolean = true,
+    val preserveOverflowCheckpoint: Boolean = false,
 ) {
     init {
         require(maxRows >= 0 && maxColumns >= 0 && maxCells >= 0 && maxBits >= 24)
