@@ -51,7 +51,8 @@ class BooleanProofPortfolioTest {
             btPool = listOf { BacktrackWorkerConfig.ofParams("fixed", params) })
         val workers = PortfolioBuilder.build(problem, scenario)
         try {
-            assertNotNull(BooleanProofPortfolio.forWorkers(workers) { error("unexpected decline: " + it) }).use { tasks ->
+            val admitted = BooleanProofPortfolio.forWorkers(workers) { error("unexpected decline: " + it) }
+            assertNotNull(admitted).use { tasks ->
                 val first = tasks.open(0, Cancellation.Never)
                 assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
 
