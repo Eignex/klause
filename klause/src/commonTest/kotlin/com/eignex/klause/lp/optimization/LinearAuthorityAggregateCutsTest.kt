@@ -50,15 +50,22 @@ class LinearAuthorityAggregateCutsTest {
                 "right" to SourcePremise(right), "bound" to SourcePremise(bound)),
             mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE, residual to BigFraction.ONE))
 
-        for ((aggregate, expected) in listOf(false to (BigFraction.ofLong(-3) *
-            BigFraction.ofLong(2).reciprocal()), true to BigFraction.MINUS_ONE)) {
+        for ((aggregate, selection, expected) in listOf(
+            Triple(false, false, BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal()),
+            Triple(true, false, BigFraction.MINUS_ONE), Triple(true, true, BigFraction.MINUS_ONE),
+        )) {
             LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = aggregate).use { authority ->
-                val result = authority.advance(source, Cancellation.Never, cuts = true)
+                val result = if (selection) authority.advanceWithPointCuts(source, Cancellation.Never)
+                    else authority.advance(source, Cancellation.Never, cuts = true)
 
                 assertEquals(SourceValue.Rational(expected),
                     assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
                 assertEquals(SourceEvidenceCheck.Checked,
                     SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+                if (selection) {
+                    val selected = authority.cutObservations()["numericalCutSelectionSelected"] ?: 0L
+                    assertTrue(selected > 0L)
+                }
             }
         }
     }

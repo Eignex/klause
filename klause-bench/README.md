@@ -765,6 +765,11 @@ The generated-aggregate replay includes the ordinary opt-in producer's bounded
 source-pair indexing and discovery. Keep this cost separate from replaying supplied
 diagnostic proposals. `AggregatePair*` reports coverage, attempts and limiting
 stages; a partial generation establishes no general absence of useful cuts.
+With both aggregate and point selection enabled, the initial CURRENT query omits
+generated aggregates. Discovery and fresh candidate checks are charged before
+point scoring; selected rows enter a subsequent masked query. A fallback can retain
+the individual-cut recipe after paying discovery costs, so retain both recipe
+totals and report actual selected/installed/retired rows separately.
 
 [9277](https://lab.eignex.com/jobs/9277) exercises both sources at `0af8492830`
 with ownership and root cuts toggled independently. With root cuts off, node
