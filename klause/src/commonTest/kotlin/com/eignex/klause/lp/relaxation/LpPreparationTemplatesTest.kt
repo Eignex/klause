@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -35,6 +36,19 @@ class LpPreparationTemplatesTest {
     ))
     private val selection = FactorProjectionProviders.Default.prepare(source)
     private val objective = LinearObjective(intCoefficients = LongArray(6) { 1L })
+
+    @Test
+    fun `repeated factor roles should retain one component reference`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
+            Element(0, 0, longArrayOf(0, 1), false, 0),
+        ))
+        val captured = FactorProjectionProviders.Default.prepare(problem)
+
+        val templates = assertNotNull(captured.prepareLpTemplates(null, Cancellation.Never, reuseMetadata = true))
+
+        assertEquals(listOf(Term.ofIntVar(0)), templates.components.single().references.toList())
+        assertEquals(setOf(0), templates.bounds.keys)
+    }
 
     @Test
     fun `equal integer and Boolean IDs should retain independent preparation components`() {
