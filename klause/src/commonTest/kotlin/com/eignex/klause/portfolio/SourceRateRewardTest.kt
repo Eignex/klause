@@ -13,6 +13,62 @@ import kotlin.test.assertTrue
 
 class SourceRateRewardTest {
     @Test
+    fun `gains after a first witness should pay the same segment startup`() {
+        for (priceFamilies in listOf(false, true)) {
+            val observed = mutableListOf<PortfolioProgress>()
+            var stop = false
+            val workers = listOf(
+                trackingWorker("finder", 0, ScriptedSearch({ true }, perSlice = 2) {})
+                    .also {
+                        it.constructionNanos = 30_000_000
+                        it.family = ArmFamily.LocalSearch
+                    },
+                trackingWorker("peer", 1, ScriptedSearch({ true }, start = 990.0) {})
+                    .also { it.constructionNanos = 10_000_000 },
+            )
+
+            val result = Portfolio(workers, fixedBandit(2, 1), baseSliceWork = 1, maxSliceWork = 1,
+                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(32),
+                onProgress = { event ->
+                    if (event is PortfolioEvent.Progressed && !event.progress.idleCredit) {
+                        observed += event.progress
+                        if (event.progress.arm == 1) stop = true
+                    }
+                }, rewardPolicy = SourceRateReward(priceFamilies)).use { it.minimize(Cancellation { stop }) }
+
+            val first = observed.single { it.arm == 0 }
+            val peer = observed.single { it.arm == 1 }
+            val firstRate = 1.0 / (first.nanos.toDouble() + first.constructionNanos)
+            val peerRate = 9.0 / (peer.nanos.toDouble() + peer.constructionNanos)
+            assertEquals(PortfolioPhase.FEASIBILITY, first.phase)
+            assertEquals(2L, first.acceptedIncumbents)
+            assertEquals(1.0, result.stats.portfolio.arms[0].meanReward)
+            assertEquals(peerRate / (peerRate + firstRate), result.stats.portfolio.arms[1].meanReward, 1e-12)
+        }
+    }
+
+    @Test
+    fun `published batches should price family gains without overflowing objective units`() {
+        for (scale in listOf(1e-200, 1.0, 1e308)) {
+            val reward = SourceRateReward(priceFamilies = true).fresh(
+                listOf(ArmFamily.LocalSearch, ArmFamily.Backtrack))
+            val first = PortfolioProgress(0, PortfolioPhase.FEASIBILITY, 1, 10, 0, true, false,
+                mapOf("FirstSolution" to 1.0), 0.5, acceptedIncumbents = 4, constructionNanos = 90)
+            reward.recordAcceptedGain(0, scale / 2)
+            reward.recordAcceptedGain(0, scale)
+            reward.recordAcceptedGain(0, scale)
+
+            assertEquals(1.0, reward.reward(first))
+            reward.recordAcceptedGain(1, scale)
+            val peer = first.copy(arm = 1, phase = PortfolioPhase.IMPROVEMENT, nanos = 100,
+                credit = mapOf("Improvement" to scale), acceptedIncumbents = 1, constructionNanos = 0)
+
+            assertEquals(2.0 / 7, reward.reward(peer), 1e-12)
+            assertEquals(2.0 / 7, assertNotNull(reward.familyReward), 1e-12)
+        }
+    }
+
+    @Test
     fun `family gain rates should pay unproductive sibling costs`() {
         for (scale in listOf(1e-200, 1.0, 1e200, 1e308)) {
             val gain = PortfolioProgress(2, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
@@ -75,7 +131,7 @@ class SourceRateRewardTest {
             val failed = observed.single { it.arm == 0 }
             val own = observed.filter { it.arm == 1 }
             val peer = observed.single { it.arm == 2 }
-            val ownCost = own.sumOf { it.nanos.toDouble() + it.constructionNanos }
+            val ownCost = own.last().nanos.toDouble() + own.last().constructionNanos
             val peerCost = peer.nanos.toDouble() + peer.constructionNanos + failed.nanos + failed.constructionNanos
             val ownRate = requireNotNull(own.last().credit["Improvement"]) / ownCost
             val peerRate = requireNotNull(peer.credit["Improvement"]) / peerCost
@@ -83,7 +139,7 @@ class SourceRateRewardTest {
             assertTrue(failed.failed || failed.refuted)
             assertEquals(0.0, result.stats.portfolio.arms[0].meanReward)
             assertEquals(2, own.size)
-            assertEquals((own.first().ordinaryReward + expected) / 2,
+            assertEquals((1.0 + expected) / 2,
                 result.stats.portfolio.arms[1].meanReward, 1e-12)
         }
     }
@@ -94,6 +150,7 @@ class SourceRateRewardTest {
             val configured = SourceRateReward(priceFamilies)
             configured.reward(PortfolioProgress(1, PortfolioPhase.IMPROVEMENT, 1, 1, 0, true, false,
                 mapOf("Improvement" to 1_000_000.0), 0.0))
+            configured.recordAcceptedGain(0, 1.0)
 
             repeat(2) {
                 val worker = trackingWorker("finder", 0, ScriptedSearch({ true }) {})
