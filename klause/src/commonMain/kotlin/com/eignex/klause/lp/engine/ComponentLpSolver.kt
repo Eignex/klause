@@ -769,11 +769,14 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     cancellation: Cancellation,
     engine: (LpModel, Cancellation) -> LpSolver,
     component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
+    projection: LpProjectionMeter? = null,
 ): T? {
     val n = model.n
     val m = model.m
     if (n == 0 || m < 2) return null
-    val rowIndex = model.rowIndex()
+    val rowIndex = model.rowIndex(projection)
+    projection?.reserve(5L * n + 4L * m + 4L * rowIndex.colIdx.size + 1L,
+        16L * n + 12L * m, matrix = true)
     // Union-find over columns sharing a row.
     val parent = IntArray(n) { it }
     fun find(x: Int): Int {
@@ -786,6 +789,7 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     }
     val inRow = BooleanArray(n)
     for (i in 0 until m) {
+        if (cancellation()) return null
         val from = rowIndex.rowPtr[i]
         val to = rowIndex.rowPtr[i + 1]
         if (from == to) return null // empty structural row → monolithic
@@ -808,6 +812,7 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     }
     if (blocks < 2) return null
 
+    projection?.reserve(n.toLong() + m, 128L * blocks + 8L * (n.toLong() + m), matrix = true)
     val blockCols = Array(blocks) { IntArrayList() }
     for (j in 0 until n) if (inRow[j]) blockCols[blockOf[find(j)]].add(j)
     val blockRows = Array(blocks) { IntArrayList() }
@@ -820,9 +825,17 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     // O(components x m), which on a model with many small components outweighs every restriction it
     // performs. Polled per component too - without it a long split never observes the deadline, since
     // the budget is only checked once a solver exists.
+    projection?.reserve(m.toLong(), 4L * m, matrix = true)
     val rowMapScratch = IntArray(model.m) { -1 }
     for (b in 0 until blocks) {
         if (cancellation()) return null
+        val entries = (0 until blockRows[b].size).sumOf {
+            val row = blockRows[b][it]
+            (rowIndex.rowPtr[row + 1] - rowIndex.rowPtr[row]).toLong()
+        }
+        val dimensions = blockCols[b].size.toLong() + blockRows[b].size
+        projection?.reserve(8L * entries + dimensions + 1L,
+            128L * (entries + dimensions) + 64L, matrix = true)
         parts.add(
             model.restrictTo(blockCols[b], blockRows[b], colMap = null, copyCosts = true, rowMapScratch),
         )
