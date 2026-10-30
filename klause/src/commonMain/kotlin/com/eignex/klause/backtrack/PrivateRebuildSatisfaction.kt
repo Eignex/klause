@@ -32,14 +32,27 @@ internal class PrivateRebuildSatisfaction(
     ))
     private var root: PropagationSession? = null
     private var rootMark = -1
+    private var rootPins = (solver.problem.rootDeductions as PropagationResult.Implied).boolKeys.size
     private var chargedPrivateWork = 0L
     private val canonical = ResumableSatisfaction(solver, sharedParams, ownsWorkDebt = false, atRoot = {
         val mark = it.explanationState.undoTop
-        if (mark == rootMark || !it.canSimplifyRoot || trialSpent() >= params.privateRebuildWork) false
+        val scanWork = solver.problem.numBoolVars.toLong()
+        if (mark == rootMark || !it.canSimplifyRoot || scanWork > params.privateRebuildWork - trialSpent()) false
         else {
             rootMark = mark
-            root = it
-            true
+            val start = TimeSource.Monotonic.markNow()
+            val pins = it.rootFixedVariableCount()
+            it.chargeInprocessingWork(scanWork)
+            chargedPrivateWork = saturatedWork(chargedPrivateWork, scanWork)
+            note("RootScanWork", scanWork)
+            note("RootScanNanos", start.elapsedNow().inWholeNanoseconds)
+            if (pins <= rootPins) false
+            else {
+                note("ProgressPins", (pins - rootPins).toLong())
+                rootPins = pins
+                root = it
+                true
+            }
         }
     })
     private var generation: PrivateRebuildGeneration? = null

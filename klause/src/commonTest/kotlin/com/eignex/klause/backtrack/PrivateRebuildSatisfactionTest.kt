@@ -1,5 +1,7 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -23,8 +25,8 @@ class PrivateRebuildSatisfactionTest {
     fun `private consumer should publish a checked canonical witness and release its generation`() {
         for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 2)),
-                Clause(intArrayOf(3, 4)), Clause(intArrayOf(5, 6)),
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
+                Clause(intArrayOf(4, 6)), Clause(intArrayOf(5, 7)),
             )).bake()
             var opens = 0
             var closes = 0
@@ -36,6 +38,7 @@ class PrivateRebuildSatisfactionTest {
 
             val result = BacktrackSolver(source).solve(BacktrackParams(
                 nativeSat = native, privateRebuildWork = 65_536L, clauseExchange = exchange,
+                variableSelector = InputOrder, valueSelector = IndomainMin,
             ))
 
             val accepted = assertIs<SolveResult.Sat>(result)
@@ -46,6 +49,8 @@ class PrivateRebuildSatisfactionTest {
             assertEquals(1L, stats["privateRebuildConsumers"])
             assertEquals(1L, stats["privateRebuildSourceAccepted"])
             assertEquals(1L, stats["privateRebuildRetired"])
+            assertTrue(stats.getValue("privateRebuildProgressPins") > 0L)
+            assertTrue(stats.getValue("privateRebuildWarmClausesRetained") > 0L)
             assertEquals(1, opens)
             assertEquals(1, closes)
         }
@@ -53,9 +58,13 @@ class PrivateRebuildSatisfactionTest {
 
     @Test
     fun `a refused generation should resume the retained worker without retrying preparation`() {
-        val source = Problem(3, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2, 4)))).bake()
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
+            Clause(intArrayOf(4, 6)), Clause(intArrayOf(5, 7)),
+        )).bake()
         val search = BacktrackSolver(source).resumableSolve(BacktrackParams(
             privateRebuildWork = 65_536L, learnedMemoryScratchBytes = 0L,
+            variableSelector = InputOrder, valueSelector = IndomainMin,
         ))
         var result: SolveResult? = null
 
@@ -70,6 +79,22 @@ class PrivateRebuildSatisfactionTest {
         assertEquals(1L, completed.stats.search.learning["privateRebuildAttempts"])
         assertEquals(1L, completed.stats.search.learning["privateRebuildDeclined"])
         assertNull(completed.stats.search.learning["privateRebuildConsumers"])
+    }
+
+    @Test
+    fun `an unchanged baked root should solve without preparing a private generation`() {
+        for (pinned in listOf(false, true)) {
+            val clauses = if (pinned) {
+                arrayOf(Clause(intArrayOf(0)), Clause(intArrayOf(2, 4)))
+            } else arrayOf(Clause(intArrayOf(0, 2, 4)))
+            val source = Problem(3, 0, emptyArray(), clauses).bake()
+
+            val result = BacktrackSolver(source).solve(BacktrackParams(privateRebuildWork = 65_536L))
+
+            assertIs<SolveResult.Sat>(result)
+            assertNull(result.stats.search.learning["privateRebuildAttempts"])
+            assertNull(result.stats.search.learning["privateRebuildConsumers"])
+        }
     }
 
     @Test
@@ -117,12 +142,14 @@ class PrivateRebuildSatisfactionTest {
 
     @Test
     fun `an expired opening token should not cancel a later private consumer`() {
-        val source = Problem(3, 0, emptyArray(), arrayOf(
-            Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 4)),
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
+            Clause(intArrayOf(4, 6)), Clause(intArrayOf(5, 7)),
         )).bake()
         var openingEnded = false
         val search = BacktrackSolver(source).resumableSolve(BacktrackParams(
             privateRebuildWork = 65_536L, cancellation = Cancellation { openingEnded },
+            variableSelector = InputOrder, valueSelector = IndomainMin,
         ))
         openingEnded = true
 
@@ -135,14 +162,16 @@ class PrivateRebuildSatisfactionTest {
     @Test
     fun `cancellation after private opening should release the generation without publishing a point`() {
         for (lifetime in listOf(false, true)) {
-            val source = Problem(3, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 4)),
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
+                Clause(intArrayOf(4, 6)), Clause(intArrayOf(5, 7)),
             )).bake()
             var live: ResumableSolve? = null
             val cancellation = Cancellation {
                 (live?.stats?.search?.learning?.get("privateRebuildConsumers") ?: 0L) > 0L
             }
             val params = BacktrackParams(privateRebuildWork = 65_536L,
+                variableSelector = InputOrder, valueSelector = IndomainMin,
                 cancellation = if (lifetime) Cancellation.Never.withLifetime(cancellation) else Cancellation.Never)
             val search = BacktrackSolver(source).resumableSolve(params)
             live = search
