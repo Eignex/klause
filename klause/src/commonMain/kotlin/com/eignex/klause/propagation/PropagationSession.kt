@@ -1325,9 +1325,7 @@ class PropagationSession private constructor(
                 }
             }
             val exported = literals ?: checkNotNull(native).literalsOf(i)
-            out.add(if (native != null && exported.isNotEmpty() &&
-                exported.all { Lit.variable(it) < problem.numBoolVars }
-            ) {
+            out.add(if (native != null && exported.isNotEmpty()) {
                 SharedClause(exported, EmptyLongArray, lbd, key)
             } else asSharedClause(exported, lbd, key))
         }
