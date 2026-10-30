@@ -17,8 +17,10 @@ internal object ComparisonProvenance {
     }
 
     val current: Identities by lazy {
-        capture(File(ComparisonProvenance::class.java.protectionDomain.codeSource.location.toURI()),
-            System.getProperty("java.class.path").split(File.pathSeparator).map(::File))
+        capture(
+            File(ComparisonProvenance::class.java.protectionDomain.codeSource.location.toURI()),
+            System.getProperty("java.class.path").split(File.pathSeparator).map(::File),
+        )
     }
 
     fun runtimeFingerprint(build: BuildProvenance): String = build.copy(
