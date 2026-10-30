@@ -1388,8 +1388,8 @@ internal fun LpEngine.rootLpRelaxationBound(
     globalCuts: List<Cut>,
     cancellation: Cancellation = Cancellation.Never,
 ): Double = try {
-    if (retainedRootEnabled && globalCuts.isEmpty() && lpGlobalCuts.isEmpty()) {
-        retainedRootLpRelaxationBound(relaxer, cancellation)
+    if (retainedRootEnabled) {
+        retainedRootLpRelaxationBound(relaxer, globalCuts, cancellation)
     } else {
         standaloneRootLpRelaxationBound(relaxer, globalCuts, cancellation)
     }
@@ -1401,16 +1401,19 @@ internal fun LpEngine.rootLpRelaxationBound(
 
 private fun LpEngine.retainedRootLpRelaxationBound(
     relaxer: CpToLpRelaxation,
+    globalCuts: List<Cut>,
     cancellation: Cancellation,
 ): Double {
     if (retainedRootRemainingWork() <= 0L || cancellation()) return Double.NaN
     val root = PropagationSession(problem, cancellation)
-    val relaxation = nodeRelaxation(relaxer, root) ?: run {
+    val relaxation = nodeRelaxation(relaxer, root)?.let {
+        cpAdapter.cutRelaxation(it, root, globalCuts)
+    } ?: run {
         if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootSourceLayoutDeclined" to 1L)
         cpAdapter.reset()
         if (retainedRootRemainingWork() <= 0L || cancellation()) return Double.NaN
         if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial + ("StandaloneRootFallback" to 1L)
-        return standaloneRootLpRelaxationBound(relaxer, emptyList(), cancellation)
+        return standaloneRootLpRelaxationBound(relaxer, globalCuts, cancellation)
     }
     if (relaxation.model.n == 0) return Double.NaN
     try {
