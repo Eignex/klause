@@ -252,7 +252,9 @@ private fun FiniteSolveRequest.withSourceControls(
         presolveBudget = presolveBudget, cores = cores,
         executionOptions = policy.options(
             engine,
-            executionOptions.withoutPresolve().without("node-limit", "dry-run-presolve").let {
+            executionOptions.withoutPresolve().without(
+                "node-limit", "dry-run-presolve", "open-linear-incremental",
+            ).let {
                 if (numericalCompanions) it.without("source-lp-work-limit", "source-lp-allocation-limit",
                     "source-lp-operations", "source-incumbent-completion") else it
             }.overriddenBy(options),

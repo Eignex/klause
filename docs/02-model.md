@@ -346,7 +346,8 @@ invocation arguments owned by [resources](06-sessions.md#resource-allowances) an
 [portfolios](12-portfolio.md).
 
 When preparation selects a finite route, `open-linear-incremental` stays at the
-source boundary and is omitted from finite engine settings.
+source boundary and is omitted from finite engine settings. This filtering covers
+both default requests and application-supplied finite requests.
 
 ---
 
