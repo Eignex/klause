@@ -10,6 +10,7 @@ import com.eignex.klause.bench.metric.NativeCliBuild
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
+import com.eignex.klause.bench.metric.runtimeOptions
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.Runners
@@ -69,8 +70,8 @@ internal object LpLibrarySuite : BenchSuite {
         val provenance = if (runtime == "native") {
             NativeCliBuild.capture(executable = executable, harness = harness, environment = environment)
         } else BuildProvenance(NativeCliBuild.treeIdentity(root.resolve("klause/build/lp-profile/jvm")),
-            NativeCliBuild.treeIdentity(javaHome), mapOf("javaOptions" to options.joinToString(" "),
-                "KLAUSE_DEBUG" to p.getValue("debug")),
+            NativeCliBuild.treeIdentity(javaHome), runtimeOptions(environment) +
+                ("javaOptions" to options.joinToString(" ")),
             System.getProperty("os.name"), System.getProperty("os.arch"), harness)
         val record = SolveMetric.solve(Runners.resolve(ref, true), settings, Budget(p.getValue("timeout-ms").toLong()),
             Instant.now().toString(), Reports.readGitSha(), installedBuild = { provenance },
