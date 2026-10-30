@@ -1114,7 +1114,11 @@ the investigation cost rather than becoming a solver regression.
 
 `bench.profile.OrdinaryArithmeticLearningProfile` takes `suite=ID problem=NAME
 sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off trace=first-integer|initial
-attribution=false|true`.
+attribution=false|true recipe=source|satOptimized seed=3 worker-seed=3`.
+The source recipe uses its search hints or the conflict-driven preset; the explicit
+SAT recipe uses the existing SAT preset. Preparation uses `seed`, and native traversal
+uses `worker-seed` (defaulting to the preparation seed), so a portfolio worker's
+position-derived seed can be captured without changing source preparation.
 It runs clause and opt-in
 integer-row arms through ordinary finite preparation and backtrack traversal,
 without a decision replay. The existing bounded arithmetic trace records source

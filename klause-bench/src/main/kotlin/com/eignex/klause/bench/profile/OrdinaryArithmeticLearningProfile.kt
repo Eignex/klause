@@ -48,7 +48,7 @@ internal object OrdinaryArithmeticLearningProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
             it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
-                "attribution")
+                "attribution", "recipe", "seed", "worker-seed")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -60,6 +60,10 @@ internal object OrdinaryArithmeticLearningProfile {
         val lp = options["lp"] ?: "auto"
         require(lp in setOf("auto", "off"))
         val attribution = (options["attribution"] ?: "false").toBooleanStrict()
+        val recipe = options["recipe"] ?: "source"
+        require(recipe in setOf("source", "satOptimized"))
+        val seed = (options["seed"] ?: "3").toLong()
+        val workerSeed = options["worker-seed"]?.toLong() ?: seed
         val allocationBean = (ManagementFactory.getThreadMXBean() as? ThreadMXBean)
             ?.takeIf { it.isThreadAllocatedMemorySupported }?.apply { isThreadAllocatedMemoryEnabled = true }
         val cpuBean = ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean
@@ -114,7 +118,7 @@ internal object OrdinaryArithmeticLearningProfile {
                 require(original.numIntVars <= 4096 && original.numBoolVars <= 4096)
                 val prepared = FinitePipeline.prepare(FinitePipelineRequest(
                     original, FiniteEngine.BACKTRACK, entry.objective,
-                    cancellation = stop, solveCancellation = stop, randomSeed = 3L,
+                    cancellation = stop, solveCancellation = stop, randomSeed = seed,
                 ))
                 val label = if (learning) "integer" else "clause"
                 val originalJson = codec.encodeToString(original)
@@ -129,7 +133,9 @@ internal object OrdinaryArithmeticLearningProfile {
                 var attempts = 0
                 var attachment: String? = null
                 var integerRowsAtCapture: Long? = null
-                val base = entry.searchParams ?: BacktrackPresets.conflictDriven(randomSeed = 3L)
+                val base = if (recipe == "satOptimized") {
+                    BacktrackPresets.satOptimized(randomSeed = workerSeed)
+                } else entry.searchParams ?: BacktrackPresets.conflictDriven(randomSeed = workerSeed)
                 val selector = base.variableSelector
                 fun attach(session: PropagationSession, origin: String) {
                     if (native == null) {
@@ -166,7 +172,7 @@ internal object OrdinaryArithmeticLearningProfile {
                     }
                 }
                 val params: BacktrackParams = base.copy(
-                    variableSelector = observing(selector), randomSeed = 3L, cancellation = stop,
+                    variableSelector = observing(selector), randomSeed = workerSeed, cancellation = stop,
                     maxDecisions = nodes, pbLearning = false, integerRowLearning = learning,
                     propagationAttribution = attribution,
                     branchObserver = object : SearchBranchAttemptObserver {
@@ -229,7 +235,9 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("pbLearning", false)
                     put("propagationAttribution", attribution)
                     put("lp", lp)
-                    put("seed", 3)
+                    put("seed", seed)
+                    put("workerSeed", workerSeed)
+                    put("recipe", recipe)
                     put("maxDecisions", nodes)
                     put("timeoutMs", timeout)
                     put("traceMode", traceMode)
