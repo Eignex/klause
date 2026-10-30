@@ -71,6 +71,7 @@ internal class PortfolioInvocation(
     onFault: ((ArmFault) -> Unit)? = null,
     private val optimizationIncumbents: PortfolioIncumbents<BigFraction>? = null,
     preparationStages: Map<String, Long> = emptyMap(),
+    private val livePreparationStages: (() -> Map<String, Long>)? = null,
     policy: (List<PortfolioWorker>) -> PortfolioInvocationPolicy = { PortfolioInvocationPolicy() },
 ) : PortfolioExecutor {
     init { require(factories.isNotEmpty()) { "portfolio invocation requires admitted arm factories" } }
@@ -142,9 +143,10 @@ internal class PortfolioInvocation(
         }
 
     private fun withPreparationStats(stats: SolveStats): SolveStats {
-        if (preparationStages.isEmpty()) return stats
+        val preparation = preparationStages + livePreparationStages?.invoke().orEmpty()
+        if (preparation.isEmpty()) return stats
         val stages = stats.smt.completeSearchStages.orEmpty().toMutableMap()
-        for ((key, value) in preparationStages) stages[key] = (stages[key] ?: 0L) + value
+        for ((key, value) in preparation) stages[key] = (stages[key] ?: 0L) + value
         return stats.copy(smt = stats.smt.copy(completeSearchStages = stages))
     }
 
@@ -178,7 +180,7 @@ internal class PortfolioInvocation(
     }
 
     private fun withPreparationStats(result: SolveResult): SolveResult {
-        if (preparationStages.isEmpty()) return result
+        if (preparationStages.isEmpty() && livePreparationStages == null) return result
         val stats = withPreparationStats(result.stats)
         return when (result) {
             is SolveResult.Sat -> result.copy(stats = stats)
@@ -188,7 +190,7 @@ internal class PortfolioInvocation(
     }
 
     private fun withPreparationStats(result: MinimizeResult): MinimizeResult {
-        if (preparationStages.isEmpty()) return result
+        if (preparationStages.isEmpty() && livePreparationStages == null) return result
         val stats = withPreparationStats(result.stats)
         return when (result) {
             is MinimizeResult.Optimal -> result.copy(stats = stats)

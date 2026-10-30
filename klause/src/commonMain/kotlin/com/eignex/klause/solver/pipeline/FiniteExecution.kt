@@ -1070,6 +1070,11 @@ private fun executePortfolio(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
+    val fundedCompanions = when (val admission = request.executionOptions.reader()[ExecutionOption.companionAdmission]) {
+        null, "ordinary" -> false
+        "funded" -> true
+        else -> pipelineConfigError("companion-admission expects ordinary|funded, got `$admission`")
+    }
     val probePolicy = when (val probes = request.executionOptions.reader()[ExecutionOption.portfolioProbes]) {
         null, "ordinary" -> InitialProbePolicy.ORDINARY
         "leader-half" -> InitialProbePolicy.LEADER_HALF
@@ -1114,7 +1119,7 @@ private fun executePortfolio(
             optimize = request.optimize,
             cores = request.cores,
             executionOptions = request.executionOptions.without("portfolio-proof-share", "portfolio-proof-workers",
-                "portfolio-lp-start", "portfolio-probes", "boolean-proof-tasks"),
+                "portfolio-lp-start", "portfolio-probes", "boolean-proof-tasks", "companion-admission"),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpCeiling = request.lpConfig,
@@ -1187,6 +1192,7 @@ private fun executePortfolio(
         includeRestartingProof = includeRestartingProof,
         probePolicy = probePolicy,
         booleanProofTasks = booleanProofTasks,
+        fundedCompanions = fundedCompanions,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {
