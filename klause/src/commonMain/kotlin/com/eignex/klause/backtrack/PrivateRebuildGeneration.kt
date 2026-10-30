@@ -23,6 +23,7 @@ internal class PrivateRebuildGeneration private constructor(
     val eliminated: Int,
     val reconstructionWork: Long,
     val passStopped: Boolean,
+    val admittedColumns: Int,
     val warmClauses: PrivateRebuildWarmClauses,
     val warmClauseNanos: Long,
 ) {
@@ -79,13 +80,10 @@ internal class PrivateRebuildGeneration private constructor(
                 source.numBoolVars, 0, emptyArray(), residual.toTypedArray(),
                 settings = source.settings, semantics = source.semantics,
             )
-            when (PrivateRebuildAdmission.permits(pinned, cancellation)) {
-                false -> {
-                    onDecline("GrowthProxy")
-                    return null
-                }
-                null -> return null
-                true -> Unit
+            val admission = PrivateRebuildAdmission.analyze(pinned, cancellation) ?: return null
+            if (admission.candidates == 0) {
+                onDecline("GrowthProxy")
+                return null
             }
             var mapping = SourceMapping(source, pinned, guarantees, lift = { sample ->
                 Sample(BooleanArray(fixed.size) { fixed[it] ?: sample.boolValue(it) }, longArrayOf())
@@ -103,7 +101,8 @@ internal class PrivateRebuildGeneration private constructor(
             }
             // A local pass boundary retains complete pivots; the containing call still controls
             // publication, opening and checks, and can decline the entire generation.
-            val delta = BoundedVariableElimination.eliminateSource(pinned, cancellation = passToken)
+            val delta = BoundedVariableElimination.eliminateSource(pinned,
+                objectiveBoolVars = admission.protectedColumns, cancellation = passToken)
             if (cancellation()) return null
             if (delta.infeasible) {
                 onDecline("Refutation")
@@ -128,7 +127,7 @@ internal class PrivateRebuildGeneration private constructor(
             if (cancellation()) return null
             mapping = mapping.then(SourceMapping(enriched, baked, TransformationGuarantees.IDENTITY))
             return PrivateRebuildGeneration(baked, mapping, bytes + warm.modeledBytes, delta.rebuild.steps.size,
-                entries * 4L, passStopped, warm, warmNanos)
+                entries * 4L, passStopped, admission.candidates, warm, warmNanos)
         }
     }
 }
