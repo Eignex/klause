@@ -123,6 +123,12 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         engine.propagator.reset()
     }
 
+    fun isSourceRoot(base: LpRelaxation): Boolean {
+        val state = engine.propagator.state ?: return false
+        return sourceRoot && native == null && currentModel === base.model && state.depth == 0 &&
+            base.model.exactState === state
+    }
+
     fun sourceRootRelaxation(base: LpRelaxation, cancellation: Cancellation): LpRelaxation? {
         reset()
         val exact = base.authoritativeWithTemplates(cancellation, onWork = engine::noteNodeOverhead) {

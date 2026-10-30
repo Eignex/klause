@@ -1158,6 +1158,10 @@ Keep physical RSS separate from modeled storage reservations. Source checking an
 all preparation, failed work and retirement belong to the containing comparison.
 
 `ROOT_ADMISSION_ROOT` distinguishes duty-cycle skips, declined relaxers and queries.
+`ROOT_LAYOUT_PREPARATION_ROOT` records active cold construction and exact-state
+installation across private worker pauses. Its work and time include completed and
+discarded chunks; waiting between slices is excluded. A ready layout grants no bound.
+These are subsets of containing LP work; nested template costs are not additional totals.
 `ROOT_QUERY_ROOT` records the requested component, sparse or standalone route and
 its work, cancellation, layout, numerical, certification or projection stop.
 A component request does not establish that a component owner was constructed;

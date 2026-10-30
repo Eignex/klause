@@ -242,6 +242,9 @@ interruption withholds an incomplete installation. A declined retained source la
 retires that attempt and uses the existing standalone numerical route within the
 same remaining work and storage limits.
 
+Private construction can pause under [root preparation](#root-preparation), without
+publishing partial numerical authority.
+
 An admitted sparse root advances the scoped owner's floating cursor in adaptive
 work quanta. Pauses publish no point or bound and charge only the new work. A
 pivoting pause can grow the next quantum under the existing adaptive ceiling;
@@ -481,14 +484,24 @@ Aggregation is disabled by default.
 
 Finite satisfaction and optimization share root hull pruning and cut harvesting;
 objective shaving and incumbent-relative fixings are optimization work. Root
-preparation runs once, under a common time and work allowance, before shared
-initialization publishes its bounds; a cancelled phase contributes only completed
-deductions. Interrupted root rounding retains its relaxation layout and basis for
-later slices. A completed rounding LP can retain its coordinates under the same
-bounded guidance allowance after charging the solve, avoiding another LP solve
+preparation runs once under its containing time and work allowance; a cancelled
+phase contributes only completed deductions. Interrupted root rounding retains its
+relaxation layout and basis for later slices. A completed rounding LP can retain its
+coordinates under the same bounded guidance allowance after charging the solve, avoiding another LP solve
 when pinning resumes. Every retry consumes the remaining root and LP allowances.
 Root rounding and pumping propose discrete assignments for mixed
 models, but a relaxation point supplies a target, never witness authority.
+
+Retained discrete root layouts prepare in private chunks before the first numerical
+consultation. Objective-column batches and factor batches charge materialized construction
+before yielding to the worker's slice. A paused builder retains only its source-root
+assembly buffers; no partial layout, point or certificate is available to consumers.
+Resumption keeps the same builder and cumulative root and LP funding. Containing
+cancellation or spent cumulative funding retires it. Completion prepares the source
+layout and its private exact state before the consultation-local numerical clock starts.
+The consultation adopts that state only while its source-root model, exact state and root scope remain current.
+Incumbent validation can retire pending construction, and engine closure releases its private buffers.
+Atomic projection and row emission retain the worker's ordinary overspend accounting.
 
 The internal root-only preparation policy can give source projection and numerical
 owner construction the remaining cumulative LP allowance while keeping each

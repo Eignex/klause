@@ -745,6 +745,8 @@ internal class CpToLpRelaxation(
      */
     private var structurallyPersistent: Boolean = false
 
+    val persistentLayoutCandidate: Boolean get() = structurallyPersistent && problem.numRealVars == 0
+
     init {
         projections?.requireSource(problem)
         if (!deferred) preparation().forEach { }
@@ -828,6 +830,18 @@ internal class CpToLpRelaxation(
             if (!complete) onDiscardedAssembly?.invoke(assembler.constructionSize)
         }
     }
+
+    fun prepareBuild(
+        domains: RelaxationDomains,
+        cancellation: Cancellation,
+        onWork: (Long) -> Unit,
+        onComplete: (LpRelaxation) -> Unit,
+    ): Iterator<Unit> = sequence {
+        val token = cancellation or preparationCancellation
+        prepareTemplates(token)
+        Assembler(domains, cancellation = token).preparation(emptyList(), onWork, onComplete)
+            .forEach { yield(Unit) }
+    }.iterator()
 
     private val timeIndexedViews by lazy {
         if (cumulativeTimeIndexed && !objectiveCone) schedulingViews(builtInFamilySource) else emptyList()
@@ -1293,14 +1307,61 @@ internal class CpToLpRelaxation(
         }
 
         fun assemble(extraCuts: List<Cut>): LpRelaxation {
+            var result: LpRelaxation? = null
+            preparation(extraCuts, {}, { result = it }).forEach { }
+            return checkNotNull(result)
+        }
+
+        fun preparation(
+            extraCuts: List<Cut>,
+            onWork: (Long) -> Unit,
+            onComplete: (LpRelaxation) -> Unit,
+        ): Iterator<Unit> = sequence {
+            var charged = 0L
+            fun charge() {
+                val size = constructionSize
+                if (size > charged) onWork(size - charged)
+                charged = size
+            }
+            try {
+                val result = assembleBody(extraCuts, ::charge)
+                charge()
+                onComplete(result)
+            } finally {
+                charge()
+            }
+        }.iterator()
+
+        private suspend fun SequenceScope<Unit>.assembleBody(
+            extraCuts: List<Cut>,
+            checkpoint: () -> Unit,
+        ): LpRelaxation {
             checkCancellation()
             // Materialize objective-only variables first so the relaxed objective is complete — including
             // LP-only continuous columns, else a real objective term with no constraint on it
             // never reaches the LP and the objective is not minimised over it.
             objective?.takeIf { emits(LpEmissionKind.OBJECTIVE) }?.let { obj ->
-                for (i in obj.intCoefficientValues.indices) if (obj.intCoefficientValues[i] != 0L) intColumn(i)
-                for (b in obj.boolWeightValues.indices) if (obj.boolWeightValues[b] != 0L) boolColumn(b)
-                for (r in obj.realCoefficientValues.indices) if (obj.realCoefficientValues[r] != 0.0) realColumn(r)
+                for (i in obj.intCoefficientValues.indices) {
+                    if (obj.intCoefficientValues[i] != 0L) intColumn(i)
+                    if ((i + 1) % CONSTRUCTION_BATCH_SIZE == 0) {
+                        checkpoint()
+                        yield(Unit)
+                    }
+                }
+                for (b in obj.boolWeightValues.indices) {
+                    if (obj.boolWeightValues[b] != 0L) boolColumn(b)
+                    if ((b + 1) % CONSTRUCTION_BATCH_SIZE == 0) {
+                        checkpoint()
+                        yield(Unit)
+                    }
+                }
+                for (r in obj.realCoefficientValues.indices) {
+                    if (obj.realCoefficientValues[r] != 0.0) realColumn(r)
+                    if ((r + 1) % CONSTRUCTION_BATCH_SIZE == 0) {
+                        checkpoint()
+                        yield(Unit)
+                    }
+                }
             }
             // Cone mode is the minimal linear+Boolean objective-cone probe: the column-heavy hull /
             // circuit / cut / cumulative features are all forced off (see [objectiveCone]). The
@@ -1318,6 +1379,10 @@ internal class CpToLpRelaxation(
                             if (factor.subcircuit) buildSubcircuitArcs(factor) else buildCircuitArcs(factor)
                         }
                         attributeRows(factorId)
+                        if ((factorId + 1) % CONSTRUCTION_BATCH_SIZE == 0) {
+                            checkpoint()
+                            yield(Unit)
+                        }
                     }
                 }
                 if (emits(LpEmissionKind.ENERGETIC)) {
@@ -1336,6 +1401,10 @@ internal class CpToLpRelaxation(
             for (factorId in if (emits(LpEmissionKind.FACTOR)) factorIndices() else emptyList()) {
                 val factor = problem.factors[factorId]
                 checkCancellation()
+                if (factorId > 0 && factorId % CONSTRUCTION_BATCH_SIZE == 0) {
+                    checkpoint()
+                    yield(Unit)
+                }
                 if (coneL != null && !coneL.contains(factorId)) continue
                 if (realResidual && !touchesReals(factor)) continue
                 currentFactorId = factorId
@@ -1408,6 +1477,9 @@ internal class CpToLpRelaxation(
             }
 
             attributeRows(-1)
+            checkpoint()
+            yield(Unit)
+            checkCancellation()
             val built = builder.build(Sense.MINIMIZE)
             val model = exactRows.project(built, cancellation) ?: throw LpAssemblyCancelled()
             val reqs = colReq.toTypedArray()

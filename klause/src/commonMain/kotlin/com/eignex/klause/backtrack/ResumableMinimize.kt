@@ -140,7 +140,7 @@ internal class ResumableMinimize(
 ) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
-        get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending &&
+        get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending && !rootLayoutPending &&
             pendingRealLeaf == null && pendingRealResult == null
     override val canContinuePreparation: Boolean get() = clausePrimal?.isDone == false
     private var initialCandidate = initialCandidate
@@ -266,6 +266,7 @@ internal class ResumableMinimize(
     private var pendingRealLeaf: LpSolveCursor<LeafRealResult>? = null
     private var pendingRealResult: LeafRealResult? = null
     private val rootLpDutyCycle = RootLpDutyCycle()
+    private var rootLayoutPending = false
 
     private fun completeLeaf(
         sample: Sample,
@@ -693,6 +694,8 @@ internal class ResumableMinimize(
         learnedMemory.reset()
         firstRun = true
         rootRoundingPending = false
+        rootLayoutPending = false
+        lpEngine.discardRootLayoutPreparation()
         lpEngine.rootRoundingWarmStart = null
         lpEngine.rootRoundingInterrupted = false
         treeBudgetExhausted = false
@@ -749,10 +752,12 @@ internal class ResumableMinimize(
                 if (primal.isDone) primal.close()
             }
             if (firstRun) {
-                firstRun = false
-                firstRunWork()?.let {
+                val initial = firstRunWork()
+                if (!rootLayoutPending) firstRun = false
+                initial?.let {
                     return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
                 }
+                if (rootLayoutPending) return StepEvent.Paused
             } else if (rootRoundingPending && !rootRoundingAttempted) {
                 rootPrimalWork(rootLpBudget())?.let {
                     return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
@@ -1035,7 +1040,7 @@ internal class ResumableMinimize(
      * the remaining root and LP work allowances.
      */
     private fun firstRunWork(): MinimizeResult.WithSample? {
-        if (!hasPreparation) sink.start()
+        if (!hasPreparation && !rootLayoutPending) sink.start()
         return firstRunWorkBody()
     }
 
@@ -1080,14 +1085,18 @@ internal class ResumableMinimize(
     }
 
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
+        rootLayoutPending = false
         if (initialCandidate == null && pausable && !rebindable && externalShared && restart === NoRestartSchedule) {
             initialCandidate = params.pooledIncumbents?.current()?.assignment
         }
         revalidateInitialCandidate()?.let {
+            lpEngine.discardRootLayoutPreparation()
             if (applyObjectiveBound() == SearchRunDisposition.Exhausted) rootIsExhausted = true
             return it
         }
         if (unboundedLeaf != null) return null
+        rootLayoutPending = !lpEngine.prepareRootLayout(runEndToken(), params.cancellation)
+        if (rootLayoutPending) return null
         val rootToken = rootLpBudget()
         val admissionStarted = if (lpEngine.lpRelaxer != null || lpEngine.retainedRootEnabled) {
             TimeSource.Monotonic.markNow()
