@@ -54,6 +54,11 @@ reuse their source-coordinate and coefficient buffers in presolve harvest and la
 LP assembly; guarded rows read the current pin on every emission. Each build maps
 those definitions into its own columns, bounds, premises and numerical owner.
 Templates retain neither a basis nor a checked claim.
+Exact bound columns materialize only when an import needs them. Each endpoint
+definition retains one completed normalized column; changing an open upper side
+replaces the cached column without linking prior versions. Preparation reserves
+pending construction work and retained storage inside its existing ceilings;
+actual construction charges the consuming import.
 Retained-source assembly and fixed-layout installation adopt the same immutable exact bound objects after a
 complete match against the current normalized column, including its origin, tag,
 integrality and both bound sides.

@@ -261,8 +261,9 @@ internal class LpRetainedSources(
                         val current = source.column(local)
                         val prepared = if (!fragment.colIsBool[local] && fragment.colRealId[local] < 0) {
                             relaxer.preparationTemplates?.bound(fragment.colVarId[local])
-                                ?.compatibleColumn(current)
+                                ?.compatibleColumn(current, cancellation)
                         } else null
+                        if (cancellation()) throw LpAssemblyCancelled()
                         if (prepared != null) boundTemplates++
                         prepared ?: current
                     } else {

@@ -30,6 +30,8 @@ import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.toLongExact
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 internal fun LpRelaxation.authoritativeWithTemplates(
     cancellation: Cancellation,
@@ -46,7 +48,10 @@ internal fun LpRelaxation.authoritativeWithTemplates(
             model.authoritativeModel { index ->
                 cancellation.charge(1L)
                 if (cancellation()) throw LpTemplateImportCancelled()
-                prepared(index)?.compatibleColumn(model, index)?.also { reused++ }
+                prepared(index)?.compatibleColumn(model, index, cancellation).also {
+                    if (cancellation()) throw LpTemplateImportCancelled()
+                    if (it != null) reused++
+                }
             }
         } catch (_: LpTemplateImportCancelled) {
             return null
@@ -60,12 +65,15 @@ internal fun LpRelaxation.authoritativeWithTemplates(
         cancellation.charge(1L)
         if (cancellation()) return null
         val current = original.column(index)
-        val prepared = prepared(index)?.compatibleColumn(current)
+        val prepared = prepared(index)?.compatibleColumn(current, cancellation)
+        if (cancellation()) return null
         if (prepared != null) reused++
         prepared ?: current
     }
+    val imported = if (reused == 0) original else original.withBoundColumns(columns)
+    if (cancellation()) return null
     onReuse(reused)
-    return if (reused == 0) original else original.withBoundColumns(columns)
+    return imported
 }
 
 private class LpTemplateImportCancelled : RuntimeException()
@@ -97,6 +105,7 @@ internal class LpSourceRowTemplate(private val row: LinearRow) {
     }
 }
 
+@OptIn(ExperimentalAtomicApi::class)
 internal data class LpIntegerBoundTemplate(
     val variable: Int,
     val lower: Long,
@@ -104,29 +113,51 @@ internal data class LpIntegerBoundTemplate(
     val statedLower: Boolean,
     val statedUpper: Boolean,
 ) {
-    val column = ExactLpColumn(
-        ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)),
-            ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(upper) - BigFraction.ofLong(lower)))),
-        origin = ExactLpNumber.of(lower), integral = true, tag = variable,
-    )
-    private val openColumn = column.copy(bounds = column.bounds.copy(upper = null))
+    private val completedColumn = AtomicReference<ExactLpColumn?>(null)
+    val column: ExactLpColumn get() = requireNotNull(column(false, Cancellation.Never))
 
-    fun compatibleColumn(current: ExactLpColumn): ExactLpColumn? = when (current) {
-        column -> column
-        openColumn -> openColumn
-        else -> null
+    private fun column(open: Boolean, cancellation: Cancellation): ExactLpColumn? {
+        val previous = completedColumn.load()
+        if (previous != null && (previous.bounds.upper == null) == open) return previous
+        cancellation.charge(COLUMN_WORK)
+        if (cancellation()) return null
+        val width = upper - lower
+        val current = ExactLpColumn(
+            ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)), if (open) null else ExactLpSide(
+                if (width >= 0L) ExactLpNumber.of(width)
+                else ExactLpNumber.of(BigFraction.ofLong(upper) - BigFraction.ofLong(lower)),
+            )),
+            origin = ExactLpNumber.of(lower), integral = true, tag = variable,
+        )
+        completedColumn.compareAndSet(previous, current)
+        return current
     }
 
-    fun compatibleColumn(model: LpModel, index: Int): ExactLpColumn? {
+    fun compatibleColumn(current: ExactLpColumn, cancellation: Cancellation = Cancellation.Never): ExactLpColumn? {
+        if (!current.integral || current.tag != variable || current.origin.legacyLong() != lower) return null
+        val lo = current.bounds.lower ?: return null
+        if (lo.strict || lo.premises != null || lo.number.legacyLong() != 0L) return null
+        val hi = current.bounds.upper
+        val width = upper - lower
+        if (hi != null && (hi.strict || hi.premises != null || hi.number.ieeeBits != null ||
+            (width >= 0L && hi.number.legacyLong() != width))
+        ) return null
+        return column(hi == null, cancellation)?.takeIf { it == current }
+    }
+
+    fun compatibleColumn(model: LpModel, index: Int, cancellation: Cancellation): ExactLpColumn? {
         val width = upper - lower
         if (model.doubleView != null || model.exactState != null || model.colContinuous[index] ||
             model.probeClampedLo[index] || model.tag[index] != variable || model.loShift[index] != lower || width < 0L
         ) return null
-        return if (!model.hasFiniteUpper(index) || model.probeClampedHi[index]) {
-            openColumn
-        } else {
-            column.takeIf { model.upper[index] == width }
-        }
+        val open = !model.hasFiniteUpper(index) || model.probeClampedHi[index]
+        if (!open && model.upper[index] != width) return null
+        return column(open, cancellation)
+    }
+
+    companion object {
+        const val STORAGE_UNITS = 24L
+        const val COLUMN_WORK = 23L
     }
 }
 
@@ -203,11 +234,16 @@ internal class LpPreparationTemplates private constructor(
                     it.source.numIntVars == problem.numIntVars && it.source.numRealVars == problem.numRealVars
             }
             var units = 0L
+            var pendingColumnWork = 0L
             try {
                 fun visit(count: Long = 1L): Boolean {
                     units += count
                     token.charge(count)
-                    return units <= MAX_UNITS && !token()
+                    return units + pendingColumnWork <= MAX_UNITS && !token()
+                }
+                fun reserveBound(): Boolean {
+                    pendingColumnWork += LpIntegerBoundTemplate.COLUMN_WORK
+                    return visit()
                 }
                 fun unchanged(): Boolean {
                     if (old == null || old.objectiveIndependent || old.factors.size != problem.numFactors ||
@@ -257,7 +293,7 @@ internal class LpPreparationTemplates private constructor(
                             if (!visit(old.bounds.size.toLong())) return null
                             changedBounds = LinkedHashMap(old.bounds)
                         }
-                        if (!visit(24L)) return null
+                        if (!reserveBound()) return null
                         changedBounds[variable] = LpIntegerBoundTemplate(variable, domain.min, domain.max, lower, upper)
                         reusedBounds--
                     }
@@ -307,7 +343,7 @@ internal class LpPreparationTemplates private constructor(
                             it.storageUnits, true)
                     }
                 }
-                if (units > MAX_UNITS || token()) return null
+                if (units + pendingColumnWork > MAX_UNITS || token()) return null
                 val oldFactors = HashMap<Factor, LpFactorTemplate>()
                 for (entry in old?.factors.orEmpty()) {
                     if (!visit()) return null
@@ -346,6 +382,8 @@ internal class LpPreparationTemplates private constructor(
                         if (!Term.isInt(reference)) continue
                         val variable = Term.intVar(reference)
                         if (variable in bounds) continue
+                        storage += LpIntegerBoundTemplate.STORAGE_UNITS
+                        if (storage > MAX_UNITS) return null
                         val domain = problem.rootDomainOf(variable)
                         val statedLower = problem.statesLowerBound(variable)
                         val statedUpper = problem.statesUpperBound(variable)
@@ -354,10 +392,9 @@ internal class LpPreparationTemplates private constructor(
                                 it.statedLower == statedLower && it.statedUpper == statedUpper
                         }
                         if (retainedBound != null) reusedBounds++
-                        if (retainedBound == null && !visit(24L)) return null
+                        if (retainedBound == null && !reserveBound()) return null
                         bounds[variable] = retainedBound ?: LpIntegerBoundTemplate(variable, domain.min, domain.max,
                             statedLower, statedUpper)
-                        storage += 24L
                     }
                 }
                 val unchangedIncidence = old != null && old.factors.size == factors.size && factors.indices.all {
