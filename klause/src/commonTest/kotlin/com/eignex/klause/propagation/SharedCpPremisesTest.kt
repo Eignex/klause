@@ -97,4 +97,36 @@ class SharedCpPremisesTest {
             for (premise in premises) assertNull(shared.explainAtoms(premise))
         }
     }
+
+    @Test
+    fun `unavailable proof branch should not replace an independent named premise`() {
+        val native = PropagationSession(Problem(2, 4, Array(4) { IntDomain(0, 10) }, arrayOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.LE, 0),
+        )), pbLearning = false)
+        val peer = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult = when (decision) {
+                SearchDecision.Bool(0) -> context.publish(SearchDecision.IntAtLeast(0, 3), SearchAtomPremise.Unavailable)
+                SearchDecision.Bool(2) -> context.publish(SearchDecision.IntAtLeast(2, 4),
+                    SearchAtomPremise.Asserted(decision))
+                else -> ComponentResult.Consistent
+            }
+        }
+        val shared = SearchSession(listOf(peer, CpSearchComponent(native)), atoms = SearchAtomRegistry(2))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(2)))
+        val publication = CpPublicationPremises(native, shared, { it }, rootLevel = 0)
+
+        val unavailable = publication.bound(1, upper = false)
+        val named = publication.bound(3, upper = false)
+        val unavailableAgain = publication.bound(1, upper = false)
+        val namedAgain = publication.bound(3, upper = false)
+
+        assertNull(shared.explainAtoms(unavailable))
+        assertContentEquals(intArrayOf(3), assertNotNull(shared.explainAtoms(named)).literals)
+        assertNull(shared.explainAtoms(unavailableAgain))
+        assertContentEquals(intArrayOf(3), assertNotNull(shared.explainAtoms(namedAgain)).literals)
+    }
+
 }
