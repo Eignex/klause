@@ -989,8 +989,8 @@ and cleanup separately through a finite `profile.runTimeoutSec` containing
 allowance. These bench-owned custom compilations have
 internal access to the engine and add no Maven artifacts. Ordinary CI compiles
 them and runs the shared deterministic regressions; it runs no profiling workload.
-When requested together, JVM profile staging precedes native compilation to avoid
-overlapping both compiler heaps in a bounded preparation worker.
+When requested together, Native profile linking precedes JVM library compilation
+and profile staging within the bounded preparation worker.
 Separate runtime jobs request only the selected target's build task. They retain
 their own CPU identity and resource receipts; different placements do not support
 an absolute cross-runtime speed comparison.
