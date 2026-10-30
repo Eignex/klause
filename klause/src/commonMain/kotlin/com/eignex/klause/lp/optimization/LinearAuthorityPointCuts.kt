@@ -119,7 +119,8 @@ internal class LinearAuthorityPointCuts(
             val objectiveNorm = sqrt(objectiveNormSquared)
             val candidates = ArrayList<Scored>()
             val forced = ArrayList<Scored>()
-            if (!meter.charge(installed.size.toLong(), 64L + installed.size * 64L)) return installed
+            if (!meter.charge(installed.size.toLong() + inactiveScans.size,
+                    128L + installed.size * 128L)) return installed
             val observedInactive = HashMap<Int, Int>()
             var support = 0
             for ((id, row) in rows.withIndex()) {
@@ -189,6 +190,7 @@ internal class LinearAuthorityPointCuts(
             for (cut in selected) onCut(rows[cut.id].family, "POINT_SELECTED", 1L)
             var retained = installed
             if (!meter.limited && !cancellation()) {
+                inactiveScans.keys.retainAll(installed)
                 inactiveScans.putAll(observedInactive)
                 misses = if (selected.isEmpty()) misses + 1 else 0
                 if (misses >= 4) {
