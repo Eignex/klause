@@ -49,8 +49,14 @@ class ComparisonProvenanceTest {
     @ParameterizedTest
     @ValueSource(strings = ["solver", "library", "launcher"])
     fun `runtime identity retains launchers and dependency bytes across solver revisions`(kind: String) {
-        val before = BuildProvenance(mapOf("bin/klause-cli" to "launcher", "lib/klause-jvm-SNAPSHOT.jar" to "solver",
-            "lib/dependency.jar" to "library"), mapOf("bin/java" to "java"), emptyMap(), "Linux", "amd64")
+        val before = BuildProvenance(
+            mapOf(
+            "bin/klause-cli" to "launcher",
+            "lib/klause-jvm-SNAPSHOT.jar" to "solver",
+            "lib/dependency.jar" to "library",
+        ),
+            mapOf("bin/java" to "java"), emptyMap(), "Linux", "amd64"
+        )
         val key = when (kind) {
             "solver" -> "lib/klause-jvm-SNAPSHOT.jar"
             "library" -> "lib/dependency.jar"
@@ -58,6 +64,9 @@ class ComparisonProvenanceTest {
         }
         val after = before.copy(distribution = before.distribution + (key to "other"))
 
-        assertEquals(kind == "solver", ComparisonProvenance.runtimeFingerprint(before) == ComparisonProvenance.runtimeFingerprint(after))
+        assertEquals(
+            kind == "solver",
+            ComparisonProvenance.runtimeFingerprint(before) == ComparisonProvenance.runtimeFingerprint(after),
+        )
     }
 }
