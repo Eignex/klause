@@ -56,32 +56,35 @@ class LpScopedSolverTest {
 
     @Test
     fun `component owners should share the containing basis storage limit`() {
-        val builder = LpBuilder()
-        repeat(2) {
-            val column = builder.addVar(0L, 5L, cost = 1L)
-            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
-        }
-        val limits = ArrayList<Long>()
-        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
-                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                limits += pricing.basisEntryLimit
-                return ProductionLpEngineFactory.newPersistentSolver(
-                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
-                )
+        for (rowOnly in listOf(false, true)) {
+            val builder = LpBuilder()
+            repeat(2) {
+                val column = builder.addVar(0L, 5L, cost = 1L)
+                builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
             }
-        }
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
-        LpScopedSolver(LpExactState(source), context = LpSolveContext(factory),
-            pricing = LpPricingOptions(basisEntryLimit = 64L), componentSplit = true).use { owner ->
-            assertTrue(owner.prepare())
-        }
+            if (rowOnly) builder.addRow(intArrayOf(), longArrayOf(), Relation.LE, 0L)
+            val limits = ArrayList<Long>()
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+                    iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    limits += pricing.basisEntryLimit
+                    return ProductionLpEngineFactory.newPersistentSolver(
+                        model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    )
+                }
+            }
+            val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+            LpScopedSolver(LpExactState(source), context = LpSolveContext(factory),
+                pricing = LpPricingOptions(basisEntryLimit = 64L), componentSplit = true).use { owner ->
+                assertTrue(owner.prepare())
+            }
 
-        assertEquals(2, limits.size)
-        assertTrue(limits.all { it > 0L })
-        assertTrue(limits.sum() <= 64L)
+            assertEquals(if (rowOnly) 3 else 2, limits.size)
+            assertTrue(limits.all { it > 0L })
+            assertTrue(limits.sum() <= 64L)
+        }
     }
 
     @Test

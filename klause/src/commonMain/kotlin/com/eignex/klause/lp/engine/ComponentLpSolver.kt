@@ -30,6 +30,7 @@ internal class ComponentLpSolver(
     ResumableLpSolver,
     TableauCutSolver {
     private val reusable = arrayOfNulls<FloatLpResult>(parts.size)
+    val rowOnlyRows: Int = parts.sumOf { if (it.cols.isEmpty()) it.rows.size else 0 }
     private class CheckedBound(val policy: LpCertificationPolicy, val bound: CertifiedLpBound)
     private val checkedBounds = arrayOfNulls<CheckedBound>(parts.size)
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
@@ -723,9 +724,9 @@ internal class ComponentLpSolver(
 
 /**
  * Decompose [model] into its column components and wrap them as a [ComponentLpSolver], or null when
- * decomposition does not apply: fewer than two row-coupled blocks, or an empty structural row (its
- * feasibility is not attached to any column, so it belongs to no block — the monolithic engine
- * handles it). [engine] builds each block's solver — the same monolithic selection [newLpSolver]
+ * decomposition does not apply: fewer than two row-coupled blocks. Empty structural rows form
+ * a separate logical-column child, retaining their feasibility and objective authority.
+ * [engine] builds each block's solver — the same monolithic selection [newLpSolver]
  * uses, so a block solves exactly as the whole model would.
  */
 internal fun componentLpSolverOrNull(
@@ -734,13 +735,22 @@ internal fun componentLpSolverOrNull(
     engine: (LpModel, Cancellation) -> LpSolver,
 ): ComponentLpSolverCapability? = componentLpSolverOrNull(model, cancellation, engine, ::ComponentLpSolver)
 
-@Suppress("TooGenericExceptionCaught") // Construction owns every child it created, including after native failures.
 internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     model: LpModel,
     cancellation: Cancellation,
     engine: (LpModel, Cancellation) -> LpSolver,
     component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
     projection: LpProjectionMeter? = null,
+): T? = componentLpSolverOrNull(model, cancellation, projection,
+    { part, token, _ -> engine(part, token) }, component)
+
+@Suppress("TooGenericExceptionCaught") // Construction owns every child it created, including after native failures.
+internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
+    model: LpModel,
+    cancellation: Cancellation,
+    projection: LpProjectionMeter?,
+    engine: (LpModel, Cancellation, Int) -> LpSolver,
+    component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
 ): T? {
     val n = model.n
     val m = model.m
@@ -759,11 +769,15 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
         return r
     }
     val inRow = BooleanArray(n)
+    var rowOnlyRows = 0
     for (i in 0 until m) {
         if (cancellation()) return null
         val from = rowIndex.rowPtr[i]
         val to = rowIndex.rowPtr[i + 1]
-        if (from == to) return null // empty structural row → monolithic
+        if (from == to) {
+            rowOnlyRows++
+            continue
+        }
         val root = find(rowIndex.colIdx[from])
         inRow[rowIndex.colIdx[from]] = true
         for (p in from + 1 until to) {
@@ -783,22 +797,45 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     }
     if (blocks < 2) return null
 
-    projection?.reserve(n.toLong() + m, 128L * blocks + 8L * (n.toLong() + m), matrix = true)
-    val blockCols = Array(blocks) { IntArrayList() }
+    val children = blocks + if (rowOnlyRows > 0) 1 else 0
+    projection?.reserve(n.toLong() + m, 128L * children + 8L * (n.toLong() + m), matrix = true)
+    val blockCols = Array(children) { IntArrayList() }
     for (j in 0 until n) if (inRow[j]) blockCols[blockOf[find(j)]].add(j)
-    val blockRows = Array(blocks) { IntArrayList() }
-    for (i in 0 until m) blockRows[blockOf[find(rowIndex.colIdx[rowIndex.rowPtr[i]])]].add(i)
+    val blockRows = Array(children) { IntArrayList() }
+    for (i in 0 until m) {
+        val from = rowIndex.rowPtr[i]
+        val block = if (from == rowIndex.rowPtr[i + 1]) blocks else blockOf[find(rowIndex.colIdx[from])]
+        blockRows[block].add(i)
+    }
     val isolated = IntArrayList()
     for (j in 0 until n) if (!inRow[j]) isolated.add(j)
 
-    val parts = ArrayList<LpNeighborhood>(blocks)
+    val parts = model.componentRestrictions(blockCols, blockRows, rowIndex, cancellation, projection) ?: return null
+    val solvers = ArrayList<LpSolver>(parts.size)
+    try {
+        for (part in parts) solvers += engine(part.model, cancellation, rowOnlyRows)
+        return component(model, parts, solvers, isolated.toIntArray())
+    } catch (primary: Throwable) {
+        closeComponentSolvers(solvers, primary)
+        throw primary
+    }
+}
+
+private fun LpModel.componentRestrictions(
+    blockCols: Array<IntArrayList>,
+    blockRows: Array<IntArrayList>,
+    rowIndex: LpRowIndex,
+    cancellation: Cancellation,
+    projection: LpProjectionMeter?,
+): List<LpNeighborhood>? {
+    val parts = ArrayList<LpNeighborhood>(blockCols.size)
     // One scratch buffer for the whole split: a fresh IntArray(m) per component makes the split alone
     // O(components x m), which on a model with many small components outweighs every restriction it
     // performs. Polled per component too - without it a long split never observes the deadline, since
     // the budget is only checked once a solver exists.
     projection?.reserve(m.toLong(), 4L * m, matrix = true)
-    val rowMapScratch = IntArray(model.m) { -1 }
-    for (b in 0 until blocks) {
+    val rowMapScratch = IntArray(m) { -1 }
+    for (b in blockCols.indices) {
         if (cancellation()) return null
         val entries = (0 until blockRows[b].size).sumOf {
             val row = blockRows[b][it]
@@ -808,17 +845,10 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
         projection?.reserve(8L * entries + dimensions + 1L,
             128L * (entries + dimensions) + 64L, matrix = true)
         parts.add(
-            model.restrictTo(blockCols[b], blockRows[b], colMap = null, copyCosts = true, rowMapScratch),
+            restrictTo(blockCols[b], blockRows[b], colMap = null, copyCosts = true, rowMapScratch),
         )
     }
-    val solvers = ArrayList<LpSolver>(parts.size)
-    try {
-        for (part in parts) solvers += engine(part.model, cancellation)
-        return component(model, parts, solvers, isolated.toIntArray())
-    } catch (primary: Throwable) {
-        closeComponentSolvers(solvers, primary)
-        throw primary
-    }
+    return parts
 }
 
 @Suppress("TooGenericExceptionCaught") // Release every child and preserve the original failure.

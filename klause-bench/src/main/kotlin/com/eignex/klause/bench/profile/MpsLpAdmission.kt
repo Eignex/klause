@@ -263,6 +263,8 @@ internal object MpsLpAdmission {
             put("nonzeros", rowIndices.size)
             put("emittedDenseProxy", rows.toLong() * (columns.toLong() + rows + 1))
             put("rowComponents", rowCounts.size)
+            put("rowCoupledComponents", rowCounts.keys.count { (columnCounts[it] ?: 0) > 0 })
+            put("rowOnlyRows", rowCounts.entries.sumOf { (root, count) -> if (root in columnCounts) 0 else count })
             put("largestComponentRows", rowCounts.values.maxOrNull() ?: 0)
             put("largestComponentColumns", rowCounts.keys.maxOfOrNull { columnCounts[it] ?: 0 } ?: 0)
             put("isolatedColumns", (0 until columns).count { pointers[it] == pointers[it + 1] })

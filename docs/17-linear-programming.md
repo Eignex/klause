@@ -230,7 +230,9 @@ never changes the dense exact-continuation cell or column caps.
 
 The explicit `lp-component-ownership=true` setting lets finite node bounding retain
 one numerical owner per independent row-coupled block. Each child keeps its basis
-and exact result authority. Bound, cost, row activation and premise changes
+and exact result authority. Empty structural rows form one logical-column child;
+its ordinary solve and exact checks retain feasibility, strict sides and logical
+objective costs. Bound, cost, row activation and premise changes
 invalidate only affected children; unchanged exact child states reuse optimal
 floating results and successful bounds under the same certification policy.
 Global trail revision numbers alone do not invalidate an unchanged child.
@@ -243,7 +245,8 @@ Scoped preparation reserves the graph scan, partition scratch and child restrict
 storage before constructing children. A declined or interrupted split retains its
 spent preparation work; child numerical preparation receives the remaining grant.
 Finite basis entry limits are divided among the immutable column blocks; local
-cut replacements retain those shares.
+cut replacements retain those shares. A logical-only child reserves its identity
+factor share first, within the same containing entry limit.
 
 Child bounds remain exact rationals until their sum, isolated-column contributions
 and the original objective constant, scale and sense are combined. Rounding applies
