@@ -234,8 +234,12 @@ retain their source emissions. Cut-bearing consultations keep propagation-derive
 preserving completed cut-owner results across later node adoption.
 Completed cold layout construction and template imports debit the containing LP allowance.
 An interrupted cold base charges its materialized columns, rows and coefficient entries before
-discarding them; that charge adds no retained authority. The containing worker token and
-remaining root work cap bound their preparation. The
+discarding them; that charge adds no retained authority.
+Retained source fragments charge each fresh emission before preparing the next region,
+including partial materialization on interruption. Exact-import refusal and abandoned
+publication keep those charges. Unchanged fragments add no assembly fee; restored cached
+fragments retain their source-mapping fee without another emission charge.
+The containing worker token and remaining root work cap bound their preparation. The
 root-local clock gates numerical queries and checking. A completed source layout can
 remain private for later node queries after that consultation expires; a containing-phase
 interruption withholds an incomplete installation. A declined retained source layout

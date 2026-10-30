@@ -878,16 +878,33 @@ internal class CpToLpRelaxation(
         region: LpEmissionRegion,
         domains: RelaxationDomains,
         cancellation: Cancellation = Cancellation.Never,
+    ): LpEmission = emitRegion(region, domains, cancellation, null)
+
+    fun emitRegion(
+        region: LpEmissionRegion,
+        domains: RelaxationDomains,
+        cancellation: Cancellation,
+        onWork: ((Long) -> Unit)?,
     ): LpEmission {
         if (preparationTemplates == null) prepareTemplates(cancellation or preparationCancellation)
         val tracked = LpEmissionDomains(domains)
-        val relaxation = Assembler(
+        val assembler = Assembler(
             tracked,
             cancellation = cancellation,
             region = region,
             columnDomains = RootDomains(problem),
-        ).assemble(emptyList())
-        return LpEmission(region, relaxation, tracked.dependencies())
+        )
+        var completed: LpRelaxation? = null
+        return try {
+            val relaxation = assembler.assemble(emptyList()).also { completed = it }
+            LpEmission(region, relaxation, tracked.dependencies())
+        } finally {
+            val model = completed?.model
+            val work = if (model == null) assembler.constructionSize else {
+                model.n.toLong() + model.m + (model.doubleView?.colVal?.size ?: model.csc.rowIdx.size)
+            }
+            onWork?.invoke(work)
+        }
     }
 
     /**
