@@ -134,6 +134,43 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `immutable source domain handoffs should avoid repeated endpoint preparation`() {
+        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never, reuseMetadata = true))
+        val view = source.withFactors(source.factors.copyOf())
+        var retainedWork = 0L
+
+        val retained = assertNotNull(selection.forEngineView(view).prepareLpTemplates(objective,
+            Cancellation.Never, reuseMetadata = true) { retainedWork = it })
+        val rebound = Problem(1, 6, Array(6) { IntDomain(0, 10) }, source.factors)
+        var reboundWork = 0L
+        selection.forEngineView(rebound).prepareLpTemplates(objective,
+            Cancellation.Never, reuseMetadata = true) { reboundWork = it }
+
+        assertSame(before.bounds, retained.bounds)
+        assertSame(before.components, retained.components)
+        assertTrue(retainedWork < reboundWork)
+    }
+
+    @Test
+    fun `raw views carrying shared finite domains should recheck changed endpoints`() {
+        val finite = source.bake(selection)
+        val view = finite.withFactors(finite.factors.copyOf())
+        val captured = FactorProjectionProviders.Default.prepare(view)
+        val before = assertNotNull(captured.prepareLpTemplates(objective, Cancellation.Never, reuseMetadata = true))
+        finite.rootIntDomainsInPlace[0] = IntDomain(1, 10)
+        val consumer = CpToLpRelaxation(view, objective, projections = captured, reuseTemplateMetadata = true)
+
+        val reused = assertNotNull(consumer.build(RootDomains(view)).model.authoritativeModel())
+        val after = assertNotNull(consumer.preparationTemplates)
+        val fresh = assertNotNull(CpToLpRelaxation(view, objective, projections = null)
+            .build(RootDomains(view)).model.authoritativeModel())
+
+        assertNotSame(before.bounds[0], after.bounds[0])
+        assertEquals(1L, after.bounds.getValue(0).lower)
+        assertTrue(reused.sameAuthority(fresh))
+    }
+
+    @Test
     fun `candidate import should adopt exact columns with unchanged normalized authority`() {
         val consumer = CpToLpRelaxation(source, objective, projections = selection, reuseTemplateMetadata = true)
         val relaxation = consumer.build(RootDomains(source))
