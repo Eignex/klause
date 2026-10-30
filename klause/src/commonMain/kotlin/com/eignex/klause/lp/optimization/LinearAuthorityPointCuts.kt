@@ -27,6 +27,10 @@ internal class LinearAuthorityPointCuts(
     private var misses = 0
     private var retired = false
 
+    fun releaseCandidates() {
+        family = null
+    }
+
     fun observe(name: String, amount: Long = 1L) {
         val key = "numericalCutSelection$name"
         counts[key] = (counts[key] ?: 0L) + amount
