@@ -132,7 +132,7 @@ class LpPrimalHeuristicsTest {
         }
 
         assertNull(proposal)
-        assertTrue(session.fixpointCancelled)
+        assertTrue(session.probeCancelled)
         assertEquals(4, polls)
         assertEquals(IntDomain(0, 101), session.intDomain(1))
     }
@@ -156,7 +156,7 @@ class LpPrimalHeuristicsTest {
         }
 
         assertNull(proposal)
-        assertTrue(session.fixpointCancelled)
+        assertTrue(session.probeCancelled)
         assertEquals(IntDomain(0, 255), session.intDomain(1))
     }
 

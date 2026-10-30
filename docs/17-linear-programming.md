@@ -218,6 +218,8 @@ objective identity. Retention copies at most one MiB within the remaining root
 and LP allowance. Rounding uses the stored coordinates without another numerical
 solve; its propagation and source-publication checks still run. A cancelled,
 incomplete or differently optimized point supplies no retained rounding guidance.
+Rounding pins use probe fixpoints without materializing implication lists;
+an interrupted pin restores the last complete propagation state and withholds its proposal.
 
 Preparation is capped at eight million modeled work units; root and node LP work
 stop at 150 million units or the containing invocation's smaller allowance.
