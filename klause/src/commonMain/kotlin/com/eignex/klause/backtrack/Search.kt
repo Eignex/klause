@@ -24,6 +24,7 @@ import com.eignex.klause.propagation.LeafColumns
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.VarKind
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.projectSeedCore
 import com.eignex.klause.solver.Sample
@@ -338,6 +339,13 @@ internal class CpSatisfactionTraversal(
     val initializationCancelled: Boolean get() = cp.session.fixpointCancelled
 
     fun propagationWork(): Long = cp.session.work
+
+    fun splitLiteral(): Int? {
+        check(rebindable && !closed)
+        val (kind, variable) = cp.session.decisionAt(currentAssumptions.numBools + 1) ?: return null
+        if (kind != VarKind.Bool || variable in currentAssumptions.bools) return null
+        return Lit.make(variable, cp.session.boolValue(variable) ?: return null)
+    }
 
     fun rebind(assumptions: Assumptions) {
         check(rebindable && !closed)

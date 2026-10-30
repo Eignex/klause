@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.BooleanSatisfactionRepair
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
@@ -36,13 +37,22 @@ internal class BooleanProofScheduler(
     splitVariables: List<Int>,
     parameters: List<BacktrackParams>,
     private val satisfactionQueries: Boolean,
+    private val solvers: List<BacktrackSolver>?,
 ) : AutoCloseable {
     constructor(
         problem: BakedProblem,
         context: BooleanProofContext,
         splitVariables: List<Int>,
         parameters: List<BacktrackParams>,
-    ) : this(problem, context, splitVariables, parameters, false)
+        satisfactionQueries: Boolean,
+    ) : this(problem, context, splitVariables, parameters, satisfactionQueries, null)
+
+    constructor(
+        problem: BakedProblem,
+        context: BooleanProofContext,
+        splitVariables: List<Int>,
+        parameters: List<BacktrackParams>,
+    ) : this(problem, context, splitVariables, parameters, false, null)
 
     private class Worker {
         var search: RepairSearch? = null
@@ -76,6 +86,7 @@ internal class BooleanProofScheduler(
 
     init {
         require(parameters.size in 1..64)
+        require(solvers == null || (solvers.size == parameters.size && solvers.all { it.problem === problem }))
         require(problem.numBoolVars in 1..4096 && problem.numIntVars == 0 && problem.numRealVars == 0)
         require(problem.factors.all { it is Clause } && !problem.hasSymmetryBreaking)
         require(splitVariables.all { it in 0 until problem.numBoolVars })
@@ -103,7 +114,7 @@ internal class BooleanProofScheduler(
             ?: return BooleanProofStep(null)
         try {
             if (slot.search == null) {
-                val solver = BacktrackSolver(problem)
+                val solver = solvers?.get(worker) ?: BacktrackSolver(problem)
                 val params = parameters[worker].copy(assumptions = Assumptions.None)
                 slot.search = if (satisfactionQueries) solver.openBooleanProof(params)
                     else solver.openRepair(objective, params)
@@ -185,6 +196,18 @@ internal class BooleanProofScheduler(
             if (cancellation()) TerminationReason.Cancelled else TerminationReason.BudgetExhausted,
             stats = stats, semantics = problem.semantics,
         )
+    }
+
+    internal fun adopt(worker: Int, search: BooleanSatisfactionRepair, literal: Int) {
+        check(!closed && satisfactionQueries)
+        require(worker in workers.indices && workers[worker].search == null && workers[worker].lease == null)
+        require(splitVariablesForValidation == setOf(Lit.variable(literal)))
+        require(search.matches(problem, parameters[worker].copy(assumptions = Assumptions.None)))
+        require(search.matchesCondition(Assumptions(bools = context.scope.condition.bools)))
+        require(search.splitLiteral() == literal)
+        val lease = checkNotNull(tasks.acquire(worker, if (Lit.isPositive(literal)) 1 else 0))
+        workers[worker].search = search
+        workers[worker].lease = lease
     }
 
     internal fun hasTask(worker: Int): Boolean = workers[worker].lease != null || pending > 0

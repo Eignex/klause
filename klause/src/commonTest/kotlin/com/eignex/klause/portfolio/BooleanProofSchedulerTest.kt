@@ -1,6 +1,8 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
@@ -32,6 +34,47 @@ class BooleanProofSchedulerTest {
     private val contradiction = Problem(5, 0, emptyArray(), Array(8) { mask ->
         Clause(IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
     }).bake()
+
+    @Test
+    fun `an adopted positive decision should reserve its cube before a peer starts`() {
+        val params = BacktrackParams(nativeSat = false, valueSelector = IndomainMax)
+        BacktrackSolver(contradiction).openBooleanProof(params).use { search ->
+            search.begin(Assumptions.None, params.maxDecisions, Double.POSITIVE_INFINITY, Cancellation.Never)
+            assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L).reason)
+            val literal = assertNotNull(search.splitLiteral())
+            assertTrue(Lit.isPositive(literal))
+            BooleanProofScheduler(contradiction, context, listOf(Lit.variable(literal)),
+                List(2) { params }, true).use { scheduler ->
+                scheduler.adopt(0, search, literal)
+                val peer = scheduler.runSlice(1, Cancellation.Never, Long.MAX_VALUE, 5000L)
+                assertEquals(0, peer.task)
+                assertFalse(scheduler.nativeCoverageComplete)
+                val adopted = scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+                assertEquals(1, adopted.task)
+                assertTrue(scheduler.nativeCoverageComplete)
+            }
+        }
+    }
+
+    @Test
+    fun `a foreign source probe should decline adoption without leasing coverage`() {
+        val foreign = Problem(5, 0, emptyArray(), contradiction.factors).bake()
+        val params = BacktrackParams(nativeSat = false)
+        BacktrackSolver(foreign).openBooleanProof(params).use { search ->
+            search.begin(Assumptions.None, params.maxDecisions, Double.POSITIVE_INFINITY, Cancellation.Never)
+            assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L).reason)
+            val literal = assertNotNull(search.splitLiteral())
+            BooleanProofScheduler(contradiction, context, listOf(Lit.variable(literal)),
+                List(2) { params }, true).use { scheduler ->
+                assertFailsWith<IllegalArgumentException> { scheduler.adopt(0, search, literal) }
+
+                assertEquals(2, scheduler.pending)
+                assertEquals(0, scheduler.completed)
+                assertEquals(0L, scheduler.work)
+            }
+        }
+    }
 
     @Test
     fun `retained workers should refute every disjoint task without independent proof authority`() {

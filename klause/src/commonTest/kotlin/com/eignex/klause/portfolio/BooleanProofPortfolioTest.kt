@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.bool.Clause
@@ -8,10 +9,13 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.lp.cut.CutSharing
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -27,6 +31,138 @@ class BooleanProofPortfolioTest {
     private val problem = Problem(5, 0, emptyArray(), Array(8) { mask ->
         Clause(IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
     }).bake()
+
+    @Test
+    fun `a source probe should split a live decision beyond caller and root pins`() {
+        val pinned = Problem(5, 0, emptyArray(), problem.factors + Clause(intArrayOf(Lit.make(1, true)))).bake()
+        val pins = mapOf(0 to true)
+        val scoped = context.copy(scope = context.scope.copy(condition = SourceCondition(bools = pins)))
+        val params = List(2) { BacktrackParams(nativeSat = false, variableSelector = InputOrder,
+            valueSelector = IndomainMin, assumptions = Assumptions(bools = pins)) }
+        BooleanProofPortfolio(pinned, scoped, listOf(1), params, probeFirst = true).use { tasks ->
+            val first = tasks.open(0, Cancellation.Never)
+            assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+            val root = first.stats.search.rootPropagationWork.sum
+            val probe = tasks.probeWork
+            assertEquals(2, Lit.variable(assertNotNull(tasks.partitionLiteral)))
+            assertEquals(2, tasks.size)
+            assertEquals(1, tasks.probeSegments)
+            assertTrue(probe > 0L)
+            assertEquals(probe, tasks.work)
+            assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
+            val second = tasks.open(1, Cancellation.Never)
+            val result = second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+            assertTrue(result is SolveResult.Unsat)
+            assertEquals(pins, assertNotNull(result.assumptionCore).bools)
+            assertEquals(root, first.stats.search.rootPropagationWork.sum)
+            assertEquals(2, tasks.completed)
+            assertEquals(first.work + second.work, tasks.work)
+            assertTrue(tasks.work >= probe)
+        }
+    }
+
+    @Test
+    fun `a completed normal source probe should avoid a task board and peer root`() {
+        val params = List(2) { BacktrackParams(nativeSat = false) }
+        BooleanProofPortfolio(problem, context, listOf(0), params, probeFirst = true).use { tasks ->
+            val first = tasks.open(0, Cancellation.Never)
+            val result = first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+            assertTrue(result is SolveResult.Unsat)
+            assertEquals(0, tasks.size)
+            assertNull(tasks.partitionLiteral)
+            assertEquals(first.work, tasks.probeWork)
+            assertEquals(first.work, tasks.work)
+            assertFalse(tasks.available(1))
+        }
+    }
+
+    @Test
+    fun `losing an adopted probe should return its cube and retain its charges`() {
+        val params = List(2) { BacktrackParams(nativeSat = false) }
+        BooleanProofPortfolio(problem, context, listOf(0), params, probeFirst = true).use { tasks ->
+            val first = tasks.open(0, Cancellation.Never)
+            assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+            assertEquals(2, tasks.size)
+            first.close()
+            val lostWork = first.work
+            val second = tasks.open(1, Cancellation.Never)
+            assertNull(second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
+            val result = second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+            assertTrue(result is SolveResult.Unsat)
+            assertEquals(2, tasks.completed)
+            assertTrue(lostWork > 0L)
+            assertEquals(lostWork + second.work, tasks.work)
+        }
+    }
+
+    @Test
+    fun `adopting a probe should preserve its exhausted containing quota`() {
+        val budget = NodeBudget(100L)
+        val params = List(2) { BacktrackParams(nativeSat = false, nodeBudget = budget) }
+        BooleanProofPortfolio(problem, context, listOf(0), params, probeFirst = true).use { tasks ->
+            val first = tasks.open(0, Cancellation.Never)
+            assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+            assertEquals(2, tasks.size)
+            while (!budget.exhausted()) budget.spend()
+            val spent = budget.spent
+            val result = first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+            assertTrue(result is SolveResult.Unknown)
+            assertEquals(TerminationReason.BudgetExhausted, result.reason)
+            assertEquals(spent, budget.spent)
+            assertEquals(0, tasks.completed)
+        }
+    }
+
+    @Test
+    fun `a source probe should retain its original session owner through adoption`() {
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false)
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+            btPool = listOf { BacktrackWorkerConfig.ofParams("fixed", params) })
+        val workers = PortfolioBuilder.build(problem, scenario)
+        try {
+            assertNotNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true)).use { tasks ->
+                val first = tasks.open(0, Cancellation.Never)
+                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+                assertEquals(2, tasks.size)
+
+                assertFailsWith<IllegalStateException> { workers[0].newResumableSolve() }
+                first.close()
+                assertNotNull(workers[0].newResumableSolve()).close()
+            }
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `a refuted adopted probe should preserve a feasible opposite guard`() {
+        val guarded = Problem(5, 0, emptyArray(), Array(8) { mask ->
+            Clause(intArrayOf(Lit.make(0, true)) +
+                IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
+        }).bake()
+        for (native in listOf(false, true)) {
+            val pool = SharedClausePool()
+            val params = List(2) { worker -> BacktrackParams(nativeSat = native,
+                variableSelector = InputOrder, valueSelector = IndomainMin,
+                clauseExchange = PoolClauseExchange(pool, origin = worker).conditioned()) }
+            BooleanProofPortfolio(guarded, context, listOf(0), params, probeFirst = true).use { tasks ->
+                val first = tasks.open(0, Cancellation.Never)
+                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+                assertEquals(Lit.make(0, false), tasks.partitionLiteral)
+                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
+                val second = tasks.open(1, Cancellation.Never)
+                val result = second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+                assertTrue(result is SolveResult.Sat)
+                assertTrue(result.assignment.boolValue(0))
+                assertEquals(1, tasks.completed)
+            }
+        }
+    }
 
     @Test
     fun `branched conditional refutations should preserve feasible sibling queries`() {

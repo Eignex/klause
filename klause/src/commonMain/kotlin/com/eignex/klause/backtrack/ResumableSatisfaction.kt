@@ -91,6 +91,8 @@ internal class ResumableSatisfaction(
         }
     }
 
+    internal fun splitLiteral(): Int? = traversal.splitLiteral()
+
     internal fun rebind(assumptions: Assumptions, cancellation: Cancellation) {
         check(rebindable && !closed)
         try {

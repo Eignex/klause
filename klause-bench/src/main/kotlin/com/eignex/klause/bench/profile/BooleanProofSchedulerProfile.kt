@@ -47,7 +47,9 @@ object BooleanProofSchedulerProfile {
         require(options.keys.containsAll(required) &&
             (options.keys - required).all { it in setOf("recipe", "native", "driver", "control", "warmups") })
         val driver = options["driver"] ?: "repair"
-        require(driver in setOf("repair", "satisfaction", "portfolio"))
+        require(driver in setOf("repair", "satisfaction", "portfolio", "portfolio-probe"))
+        val portfolioDriver = driver in setOf("portfolio", "portfolio-probe")
+        val probeFirst = driver == "portfolio-probe"
         val control = options["control"] ?: "paired"
         require(control in setOf("paired", "tasks", "replicas"))
         val warmups = options["warmups"]?.toInt() ?: 1
@@ -57,7 +59,7 @@ object BooleanProofSchedulerProfile {
         val limit = options.getValue("work").toLong().also { require(it in 10000L..2000000L) }
         val seed = options.getValue("seed").toLong()
         val splits = options.getValue("splits").toInt().also { require(it in 1..8) }
-        require(driver != "portfolio" || splits == 2)
+        require(!portfolioDriver || splits == (if (probeFirst) 1 else 2))
         val repeats = options.getValue("repeats").toInt().also { require(it in 1..6) }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val stop = Cancellation.after(120.seconds)
@@ -85,7 +87,7 @@ object BooleanProofSchedulerProfile {
                 // Each control pays its own source construction, bake, private setup, checking and retirement.
                 val problem = Dimacs.parse(bytes.decodeToString()).toProblem().bake(cancellation = stop)
                 val budget = NodeBudget(limit)
-                val parameters = if (driver == "portfolio") emptyList() else List(2) { worker ->
+                val parameters = if (portfolioDriver) emptyList() else List(2) { worker ->
                     val params = if (recipe == "input-order") BacktrackParams(
                         randomSeed = seed + worker, variableSelector = InputOrder, valueSelector = IndomainMin,
                     ) else BacktrackCatalog.byLabel(recipe).build(seed + worker, null)
@@ -95,8 +97,11 @@ object BooleanProofSchedulerProfile {
                 var totalTasks = 0
                 var schedulerWork = 0L
                 var admitted = false
+                var probeWork = 0L
+                var probeSegments = 0
+                var partitionLiteral: Int? = null
                 var decline: String? = null
-                val result = if (driver == "portfolio") {
+                val result = if (portfolioDriver) {
                     val recipeFactory = BacktrackRecipe(recipe) { workerSeed, event ->
                         val params = if (recipe == "input-order") BacktrackParams(
                             randomSeed = workerSeed, onEvent = event,
@@ -111,13 +116,16 @@ object BooleanProofSchedulerProfile {
                         sliceGrowth = 1.5, reseedStaleThreshold = 0,
                         diagnostics = PortfolioDiagnostics(limit, seed)).use { portfolio ->
                         val access = PortfolioAccess(portfolio)
-                        access.enable(mode == "tasks")
+                        access.enable(mode == "tasks", probeFirst)
                         portfolio.solve(stop).also {
                             completedTasks = access.completed
                             totalTasks = access.size
                             schedulerWork = access.work
                             admitted = access.size > 0
                             decline = access.decline
+                            probeWork = access.probeWork
+                            probeSegments = access.probeSegments
+                            partitionLiteral = access.partitionLiteral
                         }
                     }
                 } else if (mode == "tasks") {
@@ -153,13 +161,13 @@ object BooleanProofSchedulerProfile {
                     put("nativeSat", native)
                     put("taskRouteAdmitted", admitted)
                     put("taskRouteDecline", decline)
-                    put("sharing", driver == "portfolio")
+                    put("sharing", portfolioDriver)
                     put("presolve", false)
                     put("iteration", iteration)
                     put("warmup", iteration < 0)
                     put("sourceSha256", sha256(bytes))
                     put("seed", seed)
-                    put("workerSeeds", (if (driver == "portfolio") listOf(seed + 1000, seed + 1001)
+                    put("workerSeeds", (if (portfolioDriver) listOf(seed + 1000, seed + 1001)
                         else listOf(seed, seed + 1)).joinToString(","))
                     put("result", result::class.simpleName)
                     put("nativeCoverageComplete", result is SolveResult.Unsat)
@@ -167,6 +175,9 @@ object BooleanProofSchedulerProfile {
                     put("completedTasks", completedTasks)
                     put("totalTasks", totalTasks)
                     put("schedulerWork", schedulerWork)
+                    put("sourceProbeWork", probeWork)
+                    put("sourceProbeSegments", probeSegments)
+                    put("partitionLiteral", partitionLiteral)
                     put("decisions", result.stats.search.nodes.sum)
                     put("nodeBudgetSpent", budget.spent)
                     put("propagationWork", result.stats.search.propagationWork.sum)
@@ -186,9 +197,13 @@ object BooleanProofSchedulerProfile {
 
     private class PortfolioAccess(private val target: Portfolio) {
         private val type = target.javaClass
-        fun enable(value: Boolean) {
+        fun enable(value: Boolean, probe: Boolean) {
+            type.methods.single { it.name.startsWith("setDisjointBooleanProbe") }.invoke(target, probe)
             type.methods.single { it.name.startsWith("setDisjointBooleanProof") }.invoke(target, value)
         }
+        val probeWork: Long get() = read("getLastBooleanProofProbeWork") as Long
+        val probeSegments: Int get() = read("getLastBooleanProofProbeSegments") as Int
+        val partitionLiteral: Int? get() = read("getLastBooleanProofPartitionLiteral") as Int?
         val decline: String? get() = read("getLastBooleanProofDecline") as String?
         val completed: Int get() = read("getLastBooleanProofCompleted") as Int
         val size: Int get() = read("getLastBooleanProofTasks") as Int

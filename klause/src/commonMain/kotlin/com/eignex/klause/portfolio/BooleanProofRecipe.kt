@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.lp.bounding.LpPlan
@@ -10,10 +11,12 @@ import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.util.Cancellation
 
 internal class BooleanProofRecipe(
-    val problem: BakedProblem,
+    val solver: BacktrackSolver,
     val params: BacktrackParams,
     val reserve: (Cancellation, () -> ResumableSolve) -> ResumableSolve,
 ) {
+    val problem: BakedProblem get() = solver.problem
+
     fun deterministicClauseQuery(): Boolean = params.copy(
         randomSeed = null, nodeBudget = null, cancellation = Cancellation.Never, assumptions = Assumptions.None,
         onEvent = null, clauseExchange = null, cutExchange = null,

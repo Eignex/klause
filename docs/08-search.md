@@ -43,6 +43,13 @@ containing quota. Pooled task exchanges use a conditioned adapter: permanent
 scope clauses and direct global nogoods stay private, while the same session keeps
 its import filter across sibling queries. Source and mapping admission remain
 separate from that export promise.
+An optional probe-first coordinator advances the whole source under the ordinary
+scheduler grant before creating a partition. A paused query supplies its first live
+Boolean decision after caller pins; root-fixed and unread columns supply no pivot.
+The same engine transfers into the matching cube of a two-region partition, retaining
+its learning, root work, statistics and containing quota. Sibling reseeding can replay
+search, and that replay remains charged. A completed source probe needs neither a
+partition nor a peer root. Lost probes and task attempts retain charges.
 It runs through an explicit internal entry point; ordinary portfolio selection
 retains its existing policy.
 

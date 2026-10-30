@@ -82,7 +82,9 @@ query traversal and root publications while keeping cumulative work, learned sta
 and the containing decision allowance. Numeric restrictions, registered integer
 rows, symmetry reductions and extra components reject this path. Exchanges require
 an internal conditioned-export promise; unmarked exchanges reject it. Portfolio task
-lanes acquire the original session owner through the same guarded wrapper as ordinary
+lanes can first advance a whole-source query and transfer its retained engine into
+a matching task lease. The original source, caller pins, policy and containing quota
+must match; transfer retains cumulative work and learned state. Lanes acquire the original session owner through the same guarded wrapper as ordinary
 satisfaction, and release it on terminal completion, failure or explicit retirement.
 
 ALNS records retained repair observations as a best found point or an unknown
