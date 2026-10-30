@@ -117,8 +117,10 @@ from its compact archive. Names include `dimacs_mod/MANN_a9.clq` and
 For retained JFR captures, submit `lab/jfr-summary.json` through `lab run` with
 `bench.request.parameters` containing `source` (the job/artifact label), `sha256`
 and `gzip-base64` (at most 2 MiB). The SDK transports the payload in the frozen case
-file. Its `scripts/summarize-jfr.sh` verifies the capture and summarizes sampled
-stacks on the lab worker. Large captures must not be passed through profile arguments:
+file. The JDK recording reader verifies the capture hash and streams sampled stacks
+on the lab worker, limiting method aggregation to 32 frames per sample and 100,000
+distinct methods. Capture truncation and the analysis depth limit are reported
+separately. Large captures must not be passed through profile arguments:
 the generated shell command is subject to the operating system's argument-size limit.
 
 `solve-one suite=ID problem=NAME out=DIR` accepts these controls:
