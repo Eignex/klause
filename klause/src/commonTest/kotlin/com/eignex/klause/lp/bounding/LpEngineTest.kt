@@ -2,12 +2,14 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
@@ -26,22 +28,88 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpEngineTest {
+    @Test
+    fun `retained layouts accept noncompact exact source rows`() {
+        val coefficient = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, (0 until 2).map { block ->
+            ExactLinear.of(intArrayOf(Term.ofIntVar(2 * block), Term.ofIntVar(2 * block + 1)),
+                listOf(coefficient, coefficient + BigFraction.ONE), LinearOp.GE, coefficient)
+        })
+        val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
+        assertNotNull(CpToLpRelaxation(problem, objective).build(RootDomains(problem)).model.doubleView)
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)),
+            SolveStatsSink("exact-retained-layout")).use { engine ->
+
+            val relaxation = engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), PropagationSession(problem))
+
+            assertNotNull(assertNotNull(relaxation).model.exactState)
+        }
+    }
+
+    @Test
+    fun `cancelled template preparation charges the containing LP allowance`() {
+        val problem = boundedProblem().bake()
+        var work = 0L
+        val token = object : Cancellation {
+            private val meter = WorkMeter { work += it }
+            override fun isCancelled(): Boolean = work >= 3L
+            override fun workMeter(): WorkMeter = meter
+        }
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true), cancellation = token),
+            SolveStatsSink("cancelled-template-charge")).use { engine ->
+            val before = engine.totalSolveWork()
+            work = 0L
+
+            assertFailsWith<LpAssemblyCancelled> {
+                assertNotNull(engine.lpRelaxer).build(RootDomains(problem), cancellation = token)
+            }
+
+            assertTrue(work >= 3L)
+            assertEquals(work, engine.totalSolveWork() - before)
+        }
+    }
+
+    @Test
+    fun `retained root layouts adopt propagated source bounds`() {
+        val source = boundedProblem()
+        val problem = source.withFactors(source.factors +
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1))
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)),
+            SolveStatsSink("root-layout-propagation")).use { engine ->
+
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            assertEquals(4.0, bound)
+        }
+    }
+
     @Test
     fun `complete component node deductions honor the injected proof policy`() {
         for (accepted in listOf(false, true)) {

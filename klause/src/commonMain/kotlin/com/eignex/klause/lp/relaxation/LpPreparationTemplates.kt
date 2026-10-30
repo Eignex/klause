@@ -31,6 +31,7 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.MutableIntIntMap
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -251,6 +252,45 @@ internal class LpPreparationTemplates private constructor(
     companion object {
         private const val MAX_UNITS = 262_144L
 
+        @Suppress("CyclomaticComplexMethod") // The lower bound follows the selected cold preparation stages.
+        private fun coldPreparationFits(
+            selection: PreparedFactorProjections,
+            reuseMetadata: Boolean,
+            visit: (Long) -> Boolean,
+            remaining: () -> Long,
+        ): Boolean {
+            val problem = selection.problem
+            var minimum = (if (reuseMetadata) 1L else 2L) * problem.numFactors + 1L
+            if (!visit(18L) || minimum > remaining()) return false
+            val seen = MutableIntIntMap()
+            fun reference(value: Int): Boolean {
+                if (!visit(1L)) return false
+                // Ordinary preparation revisits support for incidence and component assembly.
+                minimum += if (reuseMetadata) 1L else 3L
+                if ((!reuseMetadata || Term.isInt(value)) && !seen.containsKey(value)) {
+                    if (!reuseMetadata) minimum++
+                    if (Term.isInt(value)) {
+                        minimum += 1L + LpIntegerBoundTemplate.COLUMN_WORK
+                    }
+                    if (!visit(8L)) return false
+                    seen.put(value, 0)
+                }
+                return minimum <= remaining()
+            }
+            for ((index, factor) in problem.factors.withIndex()) {
+                if (!visit(1L)) return false
+                minimum += factor.structuralKeyWeight.toLong()
+                if (minimum > remaining()) return false
+                if (selection.capabilities(index).relaxation == RelaxationCapability.SOUND &&
+                    (factor is Linear || factor is ExactLinear)
+                ) minimum += 1L + (factor as LinearRow).size
+                if (minimum > remaining()) return false
+                for (variable in factor.intVars) if (!reference(Term.ofIntVar(variable))) return false
+                for (variable in factor.boolVars) if (!reference(Term.ofLit(variable shl 1))) return false
+            }
+            return minimum <= remaining()
+        }
+
         fun prepare(
             selection: PreparedFactorProjections,
             namespace: Any,
@@ -282,6 +322,10 @@ internal class LpPreparationTemplates private constructor(
                     pendingColumnWork += LpIntegerBoundTemplate.COLUMN_WORK
                     return visit()
                 }
+                if (old == null && !coldPreparationFits(selection, reuseMetadata, ::visit) {
+                        MAX_UNITS - units - pendingColumnWork
+                    }
+                ) return null
                 fun unchanged(): Boolean {
                     if (old == null || old.objectiveIndependent || old.factors.size != problem.numFactors ||
                         old.objectiveConstant != (objective?.constant ?: 0L)

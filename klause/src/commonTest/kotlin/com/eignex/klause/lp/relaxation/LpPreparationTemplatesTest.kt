@@ -757,4 +757,34 @@ class LpPreparationTemplatesTest {
         assertNull(result)
         assertTrue(!payloadRead)
     }
+
+    @Test
+    fun `collectively oversized cold preparation should decline with bounded inspection`() {
+        val factors = source.factors.map { original ->
+            object : Factor by original {
+                override val structuralKeyWeight: Int = 100_000
+            }
+        }.toTypedArray<Factor>()
+        val captured = FactorProjectionProviders.Default.prepare(source.withFactors(factors))
+        var work = 0L
+
+        val result = captured.prepareLpTemplates(objective, Cancellation.Never) { work = it }
+
+        assertNull(result)
+        assertTrue(work in 1L..128L)
+    }
+
+    @Test
+    fun `selective cold admission should exclude ordinary component work`() {
+        val original = Clause(IntArray(6_000) { it shl 1 })
+        val factor = object : Factor by original {
+            override val structuralKeyWeight: Int = 240_000
+        }
+        val problem = Problem(6_000, 0, emptyArray(), arrayOf<Factor>(factor))
+        val captured = FactorProjectionProviders.Default.prepare(problem)
+
+        val templates = captured.prepareLpTemplates(null, Cancellation.Never, reuseMetadata = true)
+
+        assertNotNull(templates)
+    }
 }

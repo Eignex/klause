@@ -115,6 +115,11 @@ snapshots within the same containing allowance and storage cap.
 
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.
+Cold preparation first checks a necessary work lower bound within the same cap.
+The check follows the selected mode's row, bound and component stages and charges
+its own inspection; a refusal publishes no template. Persistent base assembly reads
+declared root domains, and live source bounds enter through the scoped adapter.
+Noncompact exact and IEEE layouts use retained source emission.
 An incomplete attempt publishes no snapshot. Compatible views share one atomic
 publication slot per source/finite scope, including temporary presolve bakes.
 Preparation and
