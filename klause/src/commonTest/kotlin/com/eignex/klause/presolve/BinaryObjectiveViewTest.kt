@@ -42,6 +42,97 @@ import kotlin.test.assertTrue
 
 class BinaryObjectiveViewTest {
     @Test
+    fun `mixed costs should reuse signed binary channels and retain nonbinary terms`() {
+        for (bound in listOf(0L, 1L)) {
+            val problem = Problem(1, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
+                listOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, bound))).bake()
+            val original = LinearObjective(longArrayOf(7), longArrayOf(-3, 5), constant = 11)
+
+            val view = checkNotNull(BinaryObjectiveView.create(problem, original, allowMixedObjective = true))
+
+            assertEquals(1, view.numBoolVars)
+            assertEquals(listOf(0L, 5L), view.objective.intCoefficients.toList())
+            assertNull(view.objective.binaryIntegerSource)
+            for (binary in 0L..1L) for (integer in listOf(0L, 2L, 4L)) {
+                val sample = Sample(booleanArrayOf(binary == bound), longArrayOf(binary, integer))
+                assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
+            }
+        }
+    }
+
+    @Test
+    fun `mixed binary costs without reusable channels should retain their representation`() {
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 4)), emptyList()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(3, 5))
+
+        val view = BinaryObjectiveView.create(problem, objective, allowMixedObjective = true)
+
+        assertNull(view)
+    }
+
+    @Test
+    fun `unrepresentable mixed binary reuse should retain the integer cost`() {
+        val objectives = listOf(
+            1L to LinearObjective(longArrayOf(Long.MAX_VALUE, 0), longArrayOf(1, 2, 3)),
+            0L to LinearObjective(intCoefficients = longArrayOf(1, 2, 3), constant = Long.MAX_VALUE),
+        )
+        for ((bound, original) in objectives) {
+            val problem = Problem(2, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 4)), listOf(
+                ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, bound),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+            )).bake()
+
+            val view = checkNotNull(BinaryObjectiveView.create(problem, original, allowMixedObjective = true))
+
+            assertEquals(2, view.numBoolVars)
+            assertEquals(listOf(1L, 0L, 3L), view.objective.intCoefficients.toList())
+            for (a in 0L..1L) for (b in 0L..1L) {
+                val sample = Sample(booleanArrayOf(a == bound, b == 1L), longArrayOf(a, b, 2))
+                assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
+            }
+        }
+    }
+
+    @Test
+    fun `rewrite cost should reconstruct a projected binary cost within a mixed objective`() {
+        for (order in listOf(AffinePivotOrder.MARKOWITZ, AffinePivotOrder.REWRITE_COST)) {
+            val source = Problem(1, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
+                listOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
+            val original = LinearObjective(intCoefficients = longArrayOf(3, 5), constant = 7)
+            val config = PresolveConfig.parse("off,+binary-columns").withAffinePivotOrder(order)
+
+            val prepared = PresolvePipeline.run(source, original, config, false)
+
+            val projected = order == AffinePivotOrder.REWRITE_COST
+            assertEquals(if (projected) 0L else 1L, prepared.problem.intDomainOrNull(0)?.max)
+            val sample = Sample(booleanArrayOf(true), longArrayOf(if (projected) 0L else 1L, 2))
+            val rebuilt = prepared.reconstruct(sample)
+            assertEquals(1L, rebuilt.ints[0])
+            assertEquals(2L, rebuilt.ints[1])
+            assertEquals(original.evaluateExact(rebuilt), checkNotNull(prepared.objective).evaluateExact(sample))
+        }
+    }
+
+    @Test
+    fun `an unprojected mixed binary cost should stay protected during column substitution`() {
+        val source = Problem(2, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 4)), listOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+            ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+        ))
+        val original = LinearObjective(longArrayOf(Long.MAX_VALUE, 0), longArrayOf(1, 2, 3))
+        val config = PresolveConfig.parse("off,+binary-columns").withAffinePivotOrder(AffinePivotOrder.REWRITE_COST)
+
+        val prepared = PresolvePipeline.run(source, original, config, false)
+        val point = Sample(booleanArrayOf(true, true), longArrayOf(1, 0, 2))
+        val rebuilt = prepared.reconstruct(point)
+
+        assertEquals(1L, prepared.problem.intDomainOrNull(0)?.max)
+        assertEquals(0L, prepared.problem.intDomainOrNull(1)?.max)
+        assertEquals(listOf(1L, 1L, 2L), rebuilt.ints.toList())
+        assertEquals(original.evaluateExact(rebuilt), checkNotNull(prepared.objective).evaluateExact(point))
+    }
+
+    @Test
     fun `objective symmetry should consume substituted signed Boolean costs`() {
         val source = Problem(
             0, 3, Array(3) { IntDomain(0, 1) },

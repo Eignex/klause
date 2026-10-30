@@ -20,6 +20,7 @@ enum class AffinePivotOrder {
     /** Markowitz ordering with the smallest incident unit-pivot rewrite payload tried first.
      *  Admits folds through word-sized reified linear consumers while retaining their Boolean outputs,
      *  and unit translations or sign reversals through native comparison clauses.
+     *  Reuses existing exact binary channels for cost terms within a mixed integer objective.
      *  Factor payload sizes estimate construction cost; they do not predict search savings. */
     REWRITE_COST,
 }
