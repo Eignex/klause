@@ -287,8 +287,21 @@ satisfaction only; the profile supplies neither independent UNSAT checking nor a
 production activation decision. Optional `control=tasks|replicas|paired` and `warmups=0|1`
 permit separate fresh-process controls with `repeats=1`; defaults are `paired` and `1`.
 The Linux `wholeProcessPeakRssBytes` reading is the cumulative process high-water
-mark, including startup and every preceding control. It cannot attribute peak memory
-to one arm of a paired process. Sampled heap is not a peak-memory bound.
+mark at control end, before record serialization and JVM/JFR exit. It includes
+startup and preceding controls but is not the final process-exit peak. It cannot
+attribute peak memory to one arm of a paired process. Sampled heap is not a peak-memory bound.
+
+For serial cold controls on Linux, submit the committed
+`scripts/profile-boolean-proof-cold.sh` through a lab profile's `script` field,
+with the same install build tasks and no main/classpath/jvmArgs. Pass the scheduler
+profile's source, work, driver, recipe and split arguments plus `seeds=1,3` and
+`cold-repeats=2`. Each control gets a fresh JVM, heap2560MiB, one processor, default
+GC and no JFR. Balanced order alternates within each seed block. Common corpus
+resolution has a separate preparation receipt; child `process.tsv` retains full
+wall/user/system time, final process maximum RSS in KiB and exit status. Failed
+children retain their output and later controls still run. Keep the lab's complete
+preparation and kernel resource receipts; these cold profile controls do not supply
+ordinary CLI or independent source-checking qualification.
 
 `lab/recipes/` contains the migrated lab recipes. `scripts/convert-lab-recipe.sh`
 translates legacy experiments or schedules from stdin without submitting them;

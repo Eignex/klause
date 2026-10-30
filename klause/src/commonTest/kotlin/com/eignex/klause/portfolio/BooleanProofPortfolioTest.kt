@@ -100,19 +100,24 @@ class BooleanProofPortfolioTest {
 
     @Test
     fun `adopting a probe should preserve its exhausted containing quota`() {
+        val quotaProblem = Problem(6, 0, emptyArray(), Array(16) { mask ->
+            Clause(IntArray(4) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
+        }).bake()
         val budget = NodeBudget(100L)
         val params = List(2) { BacktrackParams(nativeSat = false, nodeBudget = budget) }
-        BooleanProofPortfolio(problem, context, listOf(0), params, probeFirst = true).use { tasks ->
+        BooleanProofPortfolio(quotaProblem, context, listOf(0), params, probeFirst = true).use { tasks ->
             val first = tasks.open(0, Cancellation.Never)
             assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
             assertEquals(2, tasks.size)
+            val nodes = first.stats.search.nodes.sum
             while (!budget.exhausted()) budget.spend()
             val spent = budget.spent
             val result = first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
 
-            assertTrue(result is SolveResult.Unknown)
+            assertTrue(result is SolveResult.Unknown, "expected Unknown, got " + result?.let { it::class.simpleName })
             assertEquals(TerminationReason.BudgetExhausted, result.reason)
             assertEquals(spent, budget.spent)
+            assertEquals(nodes, first.stats.search.nodes.sum)
             assertEquals(0, tasks.completed)
         }
     }

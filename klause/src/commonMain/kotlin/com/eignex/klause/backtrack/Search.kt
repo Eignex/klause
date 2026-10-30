@@ -49,6 +49,8 @@ import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchDecisionBudget
+import com.eignex.klause.solver.search.SearchExecutionAccounting
+import com.eignex.klause.solver.search.SearchExecutionControlAdapter
 import com.eignex.klause.solver.search.SearchInvocationResources
 import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchModelContinuation
@@ -62,6 +64,7 @@ import com.eignex.klause.solver.search.SearchRunLifecycle
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.completedSearchSample
@@ -274,14 +277,16 @@ internal class CpSatisfactionTraversal(
                 .flatMap { it.enforcingFiniteFactors(problem) }.toSet())
             deferredRoot = deferredInitialization &&
                 (preparedSession != null || components.any { it is PreparingSearchComponent })
+            val sharedCancellation = if (deferredRoot) cancelledWhen({
+                if (run == null) propagationCancellation.deadline() else params.cancellation.deadline()
+            }, { params.cancellation.workScheduled() }) {
+                if (run == null) propagationCancellation() else params.cancellation()
+            } else params.cancellation
             val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
-                cancellation = if (deferredRoot) cancelledWhen({
-                    if (run == null) propagationCancellation.deadline() else params.cancellation.deadline()
-                }, { params.cancellation.workScheduled() }) {
-                    if (run == null) propagationCancellation() else params.cancellation()
-                } else params.cancellation,
+                cancellation = sharedCancellation,
                 learnedDb = params.sharedLearnedDb(),
                 atoms = if (params.integerRowLearning) SearchAtomRegistry(problem.numBoolVars) else null,
+                executionControls = SearchExecutionControlAdapter(sharedCancellation, traversal.executionAccounting),
             )
             learningSession = session
             if (params.clauseExchange != null || params.learnedMemoryBytes != null) {
@@ -553,12 +558,21 @@ private class CpSatisfactionTraversalPolicy(
         restart = restart,
     )
     override val booleanBranching = BooleanBranching.None
+    val executionAccounting: SearchExecutionAccounting = params.nodeBudget?.takeIf { rebindable }?.let { budget ->
+        object : SearchExecutionAccounting {
+            override fun canCommitDecision(): Boolean = !budget.exhausted()
+            override fun recordDecision(decision: SearchDecision): Boolean {
+                budget.spend()
+                return true
+            }
+            override val stopCause: SearchStopCause? get() =
+                if (budget.exhausted()) SearchStopCause.DecisionAllowance else null
+        }
+    } ?: SearchExecutionAccounting.Unlimited
     override val decisionBudget = SearchDecisionBudget {
         params.nodeBudget?.allowance?.let { budget ->
-            if (rebindable && budget.exhausted()) false else {
-                budget.spend()
-                !budget.exhausted()
-            }
+            if (!rebindable) budget.spend()
+            !budget.exhausted()
         } ?: true
     }
     override val observer: SearchRunObserver = brancher
