@@ -378,6 +378,9 @@ can share proof subgraphs, including nested inherited conjunctions. Validation
 admits at most 4,096 proof-reference visits and expands a repeated conjunction once.
 An unavailable, unnameable or inactive leaf withholds reuse. Proof-reference visits
 charge native work, and the publication memo ends with its callback.
+Fixpoint facts already implied by shared integer endpoints retain the shared
+premise without reconstructing a native proof. Endpoint strengthenings use the
+complete proof path; observers and cancellation checks still cover every deduction.
 
 Rows share the learned store and integer bounds propagation. A successful ordinary
 row assertion also retains its first-UIP clause in that native store. The two
