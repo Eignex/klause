@@ -15,6 +15,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,6 +40,21 @@ class NumericalFrontierSnapshotTest {
         SourceClaim.Bound(SourceValue.Rational(half)),
         SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(half, SourceDerivation.Premise("half")))),
     )
+
+    @Test
+    fun `an opened profile frontier should publish a checked source bound`() {
+        val invocation = NumericalFrontierSnapshot.open(context, TheoryParams(sourceLpOperations = 2),
+            frontier = true) as AutoCloseable
+
+        val bound = invocation.use {
+            val result = NumericalFrontierSnapshot.run(it, onIncumbent = { _, _ -> })
+            NumericalFrontierSnapshot.field(result, "bound") as SourceEvidence
+        }
+
+        val inspected = NumericalFrontierSnapshot(context, Cancellation.Never).bound(bound)
+        assertEquals("1", inspected.getValue("nativeValue").jsonPrimitive.content)
+        assertEquals("true", inspected.getValue("checked").jsonPrimitive.content)
+    }
 
     @Test
     fun `selection capture should expose empty journal limits`() {
