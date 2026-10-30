@@ -151,6 +151,19 @@ class LinearIncumbentCompletionTest {
     }
 
     @Test
+    fun `shared completion should reserve its retained exact scalar payload`() {
+        val shared = LinearIncumbentSharing()
+        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
+        val funding = SourceLpFunding(2_000_000L, 672L).also { it.grant(2_000_000L) }
+
+        LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
+            assertNotNull(producer.complete(source, seed, Cancellation.Never))
+            LinearIncumbentCompletion(SourceLpBudget(maxOperations = 0, funding = funding), originalCheck, shared)
+                { _, _ -> }.use { consumer -> assertNull(consumer.complete(source, seed, Cancellation.Never)) }
+        }
+    }
+
+    @Test
     fun `closing a producer should release its shared completions`() {
         val shared = LinearIncumbentSharing()
         var checks = 0

@@ -5,6 +5,7 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 
 internal class LinearIncumbentSharing {
     class Key(
@@ -50,18 +51,19 @@ internal class LinearIncumbentSharing {
         }
     }
 
-    private class Entry(val owner: Any, val key: Key, val point: Sample)
+    private class Entry(val owner: Any, val key: Key, val point: Sample, val bytes: Long)
     private val entries = ArrayList<Entry>()
 
     fun find(key: Key, budget: SourceLpBudget, token: Cancellation): Sample? {
         val previous = entries.firstOrNull { it.key.matches(key, token, budget) } ?: return null
-        return snapshot(previous.point, budget, token)
+        return snapshot(previous.point, previous.bytes, budget, token)
     }
 
     fun remember(owner: Any, key: Key, point: Sample, budget: SourceLpBudget, token: Cancellation): Boolean {
         if (!key.hasOriginalCheck || entries.size >= MAX_POINTS) return false
-        val retained = snapshot(point, budget, token) ?: return false
-        entries += Entry(owner, key, retained)
+        val bytes = retainedBytes(point, budget, token) ?: return false
+        val retained = snapshot(point, bytes, budget, token) ?: return false
+        entries += Entry(owner, key, retained, bytes)
         return true
     }
 
@@ -71,11 +73,27 @@ internal class LinearIncumbentSharing {
         return work
     }
 
-    private fun snapshot(point: Sample, budget: SourceLpBudget, token: Cancellation): Sample? {
+    private fun retainedBytes(point: Sample, budget: SourceLpBudget, token: Cancellation): Long? {
+        var bytes = 256L + 16L * (point.numBoolVars.toLong() + point.numIntVars + point.numRealVars)
+        for (value in point.exactInts.orEmpty()) {
+            if (token()) return null
+            val bits = value.magnitudeBitLength().toLong()
+            budget.observe(preparation = 1L + bits / 64L)
+            bytes += 64L + bits / 4L
+        }
+        for (value in point.exactReals.orEmpty()) {
+            if (token()) return null
+            val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
+            budget.observe(preparation = 1L + bits / 64L)
+            bytes += 64L + bits / 4L
+        }
+        return bytes.takeUnless { token() }
+    }
+
+    private fun snapshot(point: Sample, bytes: Long, budget: SourceLpBudget, token: Cancellation): Sample? {
         if (token()) return null
         val work = 1L + point.numBoolVars + point.numIntVars + point.numRealVars
-        val bytes = 256L + 16L * (point.numBoolVars.toLong() + point.numIntVars + point.numRealVars)
-        // Coordinate buffers and exact scalars are immutable; only the copied sample/list shells are additional.
+        // Consumers can retain immutable scalar payloads after the producing owner has closed.
         if (budget.funding?.let { it.availableWork <= work + 2L || it.remainingAllocation <= bytes } == true) {
             return null
         }
