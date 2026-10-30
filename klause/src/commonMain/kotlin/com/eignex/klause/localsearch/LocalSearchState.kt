@@ -283,6 +283,12 @@ class LocalSearchState private constructor(
         }
     }
 
+    private fun checkObjectiveProbeWork() {
+        if (scoringCountdown-- > 0) return
+        scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
+        checkProbeWork()
+    }
+
     // Break-count probe scratch. While breakProbeActive, updateViolation records each factor whose
     // degree changes during a probe's forward apply, snapshotting its pre-probe violated status on
     // first touch. The break count is then a scan of only the touched factors: a factor can flip
@@ -1465,7 +1471,10 @@ class LocalSearchState private constructor(
         val oldCost = cost
         val oldBestCost = bestCostSeen
         val oldTracking = activityTracking
-        val oldExactObjective = (objective as? FunctionalObjective)?.let(::committedValue)
+        val indexed = booleanDelta.takeIf { booleanDeltaOf === objective }
+        val oldExactObjective = if (indexed == null) {
+            (objective as? FunctionalObjective)?.let(::committedValue)
+        } else null
         val oldObjective = if (
             objective != null && objective !is LinearObjective && objective !is FunctionalObjective
         ) {
@@ -1511,6 +1520,9 @@ class LocalSearchState private constructor(
             val objectiveDelta = when {
                 feasibleObjective && cost > 0L -> Double.POSITIVE_INFINITY
                 objective is LinearObjective -> probeLinearObjectiveDelta(objective)
+                indexed != null -> indexed.difference(
+                    assignment, probeSlots, savedValuesScratch, ::checkObjectiveProbeWork,
+                )
                 objective is FunctionalObjective ->
                     (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble()
                 objective == null -> 0.0

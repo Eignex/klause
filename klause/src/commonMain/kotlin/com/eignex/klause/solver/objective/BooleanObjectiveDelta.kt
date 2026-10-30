@@ -5,7 +5,9 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.util.ExactIntegerSum
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.MutableIntLongMap
 
 internal class PreparedBooleanObjectiveDelta(val evaluator: BooleanObjectiveDelta?)
 
@@ -59,6 +61,32 @@ internal class BooleanObjectiveDelta private constructor(
         return if (minimize) delta else -delta
     }
 
+    fun difference(assignment: Assignment, slots: IntArrayList, saved: LongArray, poll: () -> Unit): Double {
+        val before = MutableIntLongMap()
+        val affected = IntHashSet()
+        for (i in 0 until slots.size) {
+            poll()
+            val variable = slots[i]
+            if (variable >= offsets.size - 1 || assignment.boolValue(variable) == (saved[i] != 0L)) continue
+            before.put(variable, saved[i])
+            for (reader in offsets[variable] until offsets[variable + 1]) {
+                poll()
+                affected.add(readers[reader])
+            }
+        }
+        val sum = ExactIntegerSum()
+        for (term in affected.toIntArray()) {
+            poll()
+            val old = value(term, poll) {
+                before.getOrDefault(it, if (assignment.boolValue(it)) 1L else 0L) != 0L
+            }
+            sum.addDelta(coefficients[term], old, value(term, poll, assignment::boolValue))
+        }
+        val delta = sum.toDouble()
+        if (delta == 0.0) return 0.0
+        return if (minimize) delta else -delta
+    }
+
     private inline fun value(term: Int, poll: () -> Unit, boolOf: (Int) -> Boolean): Long {
         val fold = folds[term] ?: return if (boolOf(terms[term])) 1L else 0L
         for (literal in fold.ins) {
@@ -84,11 +112,19 @@ internal class BooleanObjectiveDelta private constructor(
                 yield(PreparedBooleanObjectiveDelta(null))
                 return@sequence
             }
+            for ((index, definition) in definitions.withIndex()) {
+                val fold = definition.origin as? DefinitionalSweep.SweepNode.BoolFold
+                if (fold == null || fold.out !in 0 until numBooleans) {
+                    yield(PreparedBooleanObjectiveDelta(null))
+                    return@sequence
+                }
+                if ((index + 1) % 256 == 0) yield(null)
+            }
             val outputs = arrayOfNulls<DefinitionalSweep.SweepNode.BoolFold>(numBooleans)
             yield(null)
             for ((index, definition) in definitions.withIndex()) {
-                val fold = definition.origin as? DefinitionalSweep.SweepNode.BoolFold
-                if (fold == null || fold.out !in outputs.indices || outputs[fold.out] != null) {
+                val fold = definition.origin as DefinitionalSweep.SweepNode.BoolFold
+                if (outputs[fold.out] != null) {
                     yield(PreparedBooleanObjectiveDelta(null))
                     return@sequence
                 }
