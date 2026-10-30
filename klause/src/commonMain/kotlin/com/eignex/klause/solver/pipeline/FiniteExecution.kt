@@ -1070,6 +1070,14 @@ private fun executePortfolio(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
+    val leadingProbeBudget = when (val probes = request.executionOptions.reader()[ExecutionOption.portfolioProbes]) {
+        null, "ordinary" -> false
+        "leader-half" -> true
+        else -> pipelineConfigError("portfolio-probes expects ordinary|leader-half, got `$probes`")
+    }
+    if (leadingProbeBudget && (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
+        pipelineConfigError("portfolio-probes requires curated single-core mixed optimization")
+    }
     val deferLpProbes = when (val start = request.executionOptions.reader()[ExecutionOption.portfolioLpStart]) {
         null, "ordinary" -> false
         "after-probes" -> true
@@ -1099,7 +1107,7 @@ private fun executePortfolio(
             optimize = request.optimize,
             cores = request.cores,
             executionOptions = request.executionOptions.without("portfolio-proof-share", "portfolio-proof-workers",
-                "portfolio-lp-start"),
+                "portfolio-lp-start", "portfolio-probes"),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpCeiling = request.lpConfig,
@@ -1121,6 +1129,11 @@ private fun executePortfolio(
             plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
             plan.scenario.annotationArm != null)) {
         pipelineConfigError("portfolio-lp-start requires a curated recipe pool")
+    }
+    if (leadingProbeBudget && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
+            plan.scenario.annotationArm != null)) {
+        pipelineConfigError("portfolio-probes requires a curated recipe pool")
     }
     when (plan) {
         is PortfolioPlan.LocalSearchDryRun -> return localSearchDryRun(plan.pool)
@@ -1165,6 +1178,7 @@ private fun executePortfolio(
         improvementProofShare = proofShare ?: 0.5,
         deferLpProbes = deferLpProbes,
         includeRestartingProof = includeRestartingProof,
+        leadingProbeBudget = leadingProbeBudget,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

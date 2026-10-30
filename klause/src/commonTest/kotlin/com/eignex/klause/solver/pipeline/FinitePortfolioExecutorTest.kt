@@ -12,10 +12,12 @@ import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.ScriptedSearch
 import com.eignex.klause.portfolio.exactlyOneOver
 import com.eignex.klause.portfolio.fixedBandit
+import com.eignex.klause.portfolio.initialProbeFraction
 import com.eignex.klause.portfolio.trackingWorker
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
@@ -30,6 +32,52 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TestTimeSource
 
 class FinitePortfolioExecutorTest {
+    @Test
+    fun `the leading complete worker should receive half the initially eligible probe budget`() {
+        val model = ModelIdentity.of(Any())
+        val workers = List(6) { arm ->
+            trackingWorker("worker$arm", arm, ScriptedSearch({ false }) {}).also {
+                if (arm == 0) it.startAfterIncumbent = true
+                if (arm == 1) it.auxiliaryProof = true
+                if (arm == 2) it.bindEvidence(model, provesResults = false)
+                if (arm >= 4) it.family = ArmFamily.LocalSearch
+            }
+        }
+        val initial = listOf(2, 3, 4, 5)
+
+        val weights = leadingProbeWeights(workers)
+
+        assertEquals(0.5, initialProbeFraction(3, initial, weights), 1e-12)
+        assertEquals(0.5, initial.filter { it != 3 }.sumOf { initialProbeFraction(it, initial, weights) }, 1e-12)
+    }
+
+    @Test
+    fun `weighted probes should still attempt every initially eligible sibling`() {
+        val visits = mutableListOf<Int>()
+        val workers = List(3) { arm ->
+            trackingWorker("worker$arm", arm, ScriptedSearch({ false }) { visits += arm })
+        }
+
+        Portfolio(workers, fixedBandit(3, 0)).also {
+            it.initialProbeWeights = leadingProbeWeights(workers)
+        }.use { it.minimize(Cancellation { visits.size >= 3 }) }
+
+        assertEquals(listOf(0, 1, 2), visits)
+    }
+
+    @Test
+    fun `deferred LP admission should leave half the initial budget to the leading complete worker`() {
+        val workers = List(4) { arm ->
+            trackingWorker(if (arm == 1) "bt/lp-default" else "worker$arm", arm, ScriptedSearch({ false }) {})
+                .also { if (arm >= 2) it.family = ArmFamily.LocalSearch }
+        }
+        deferredLpProbes(workers)
+
+        val weights = leadingProbeWeights(workers)
+
+        assertEquals(0.5, initialProbeFraction(0, listOf(0, 2, 3), weights), 1e-12)
+    }
+
     @Test
     fun `LP probes should follow the other initial attempts even when one fails`() {
         for (failed in listOf(false, true)) {

@@ -81,17 +81,22 @@ internal fun FinitePipeline.portfolioExecutor(
     improvementProofShare: Double = 0.5,
     deferLpProbes: Boolean = false,
     includeRestartingProof: Boolean = false,
+    leadingProbeBudget: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
     }
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
-    if (deferLpProbes && (profile.problemClass != ProblemClass.FiniteCp || problem.numBoolVars != 0 ||
-            scenario.cores != 1 || scenario.kind != Kind.COP || scenario.engine != EngineMix.MIXED ||
-            scenario.explicitArms || scenario.arms != PortfolioScenario.DEFAULT_ARMS ||
-            scenario.btPool != null || scenario.lsPool != null || scenario.btEdit != null ||
-            scenario.annotationArm != null)) {
+    val curatedFiniteInteger = profile.problemClass == ProblemClass.FiniteCp && problem.numBoolVars == 0 &&
+        scenario.cores == 1 && scenario.kind == Kind.COP && scenario.engine == EngineMix.MIXED &&
+        !scenario.explicitArms && scenario.arms == PortfolioScenario.DEFAULT_ARMS &&
+        scenario.btPool == null && scenario.lsPool == null && scenario.btEdit == null && scenario.annotationArm == null
+    if (deferLpProbes && !curatedFiniteInteger) {
         pipelineConfigError("portfolio-lp-start requires a curated single-core mixed finite integer optimization")
+    }
+    if (leadingProbeBudget && (!curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
+            cancellation.deadline() == null)) {
+        pipelineConfigError("portfolio-probes requires curated elapsed single-core mixed finite integer optimization")
     }
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
@@ -193,13 +198,28 @@ internal fun FinitePipeline.portfolioExecutor(
         } else {
             emptySet()
         }
-        val probeWeights = if (companions == null) intArrayOf() else IntArray(workers.size) { arm ->
-            if (workers[arm].label == "numerical/finite-companion") 3 else 1
+        val deferred = if (deferLpProbes) deferredLpProbes(workers) else null
+        val probeWeights = when {
+            leadingProbeBudget -> leadingProbeWeights(workers)
+            companions == null -> intArrayOf()
+            else -> IntArray(workers.size) { arm ->
+                if (workers[arm].label == "numerical/finite-companion") 3 else 1
+            }
         }
         PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes,
             probeWeights = probeWeights,
-            onProgress = if (deferLpProbes) deferredLpProbes(workers) else null)
+            onProgress = deferred)
     }
+}
+
+internal fun leadingProbeWeights(workers: List<PortfolioWorker>): IntArray {
+    val initial = workers.indices.filter {
+        !workers[it].startAfterIncumbent && !workers[it].improvementOnly && !workers[it].auxiliaryProof
+    }
+    val leader = initial.firstOrNull {
+        workers[it].family == ArmFamily.Backtrack && workers[it].permitsSourceProofs
+    } ?: return intArrayOf()
+    return IntArray(workers.size) { if (it == leader) (initial.size - 1).coerceAtLeast(1) else 1 }
 }
 
 internal fun deferredLpProbes(workers: List<PortfolioWorker>): ((PortfolioEvent) -> Unit)? {

@@ -1037,6 +1037,14 @@ at fixed coverage, admission and reseeding, and retain the full containing-run l
 for source preparation, retirement and independent checking. Time-sensitive rewards
 make fixed-work traces sensitive to measured segment costs.
 
+`param.portfolio-probes=leader-half` redistributes the existing initial probe budget
+to give its leading complete worker half while retaining every sibling's probe.
+Compare it with `ordinary` at fixed rewards, coverage, admission and reseeding.
+Worker slots, seeds, total reservation and deadlines remain fixed. A containing
+deadline is required; work diagnostics and explicit recipes reject this control.
+Trace actual first-query, preparation and first-point costs instead of treating it
+as extra solver time.
+
 `param.portfolio-proof-workers=retained|complete` selects coverage of non-restarting
 workers or all complete retained sessions, including internal restarts. Both scopes
 use `param.portfolio-proof-share=0.5..1` within the same incumbent epoch; the default
