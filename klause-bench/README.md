@@ -591,11 +591,24 @@ incumbent protection. Retain delayed admission and unrefined cores as defaults;
 reason projection remains an opt-in source-specific control, and direct core search
 does not replace the primal pool.
 
-Source hashes, full witnesses, installed binaries and resource receipts accompany
-these runs. The lab has no WBO/WCNF source-check adapter: requested independent
-validation produces no verdict for these formats. All reported feasibility and
-optimality claims remain native and unchecked. Source-matched reference rows also
-lack independently checked proofs; their objective agreement adds no proof authority.
+These historical runs predate the lab's independent WBO/WCNF point checks. A fresh
+adapter run requests `sourceValidation=true` and complete assignments; qualification
+requires an actual `VALID` receipt bound to the original source, witness, exact
+objective, checker and policy. Unsupported or missing checks establish no validation.
+Point checks do not certify native lower bounds, optimality or infeasibility.
+Source-matched reference objectives also supply no independent proof authority.
+
+[9617](https://lab.eignex.com/jobs/9617) independently accepts the retained scheduling
+WBO witness at exact cost 19 and rejects an altered coordinate at claimed cost 19.
+[9636](https://lab.eignex.com/jobs/9636) compares ordinary and reason-refined mixed
+search, earlier admission with each refinement, and primal LS on that source at
+40 seconds, one processor and seeds 1 and 3. All ten original points are valid;
+native floors and completion flags remain independently unproved. The admission
+and refinement factorial does not establish the separate threshold-progress
+comparison. Retain threshold/query trajectories and checked incumbents alongside
+primal outcomes under equal containing allowances, including preparation,
+verification, recording, retirement and unsuccessful work. Production qualification
+also requires applicable-source hold-outs and matched physical execution controls.
 
 ## Clause sharing accounting
 
