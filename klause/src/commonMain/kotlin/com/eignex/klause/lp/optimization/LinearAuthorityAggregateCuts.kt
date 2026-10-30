@@ -131,7 +131,11 @@ internal object LinearAuthorityAggregateCuts {
                         val cut = derive(listOf(row.term.copy(weight = leftWeight),
                             other.term.copy(weight = rightWeight)), derivedStop, charge, attemptLimits,
                             allowMixed = true, continuousBounds = bounds) ?: continue
-                        if (point != null && !separates(cut, point, meter, observe)) continue
+                        if (point != null) {
+                            val separating = separates(cut, point, meter, observe)
+                            if (separating == null) eligibilityKnown = false
+                            if (separating != true) continue
+                        }
                         meter.reserve(1L, 128L + cut.inequality.supportSize * 64L)
                         candidates += cut
                     }
@@ -147,7 +151,7 @@ internal object LinearAuthorityAggregateCuts {
     private fun separates(
         cut: LinearAuthorityCut, point: Map<SourceCoordinate, Double>, meter: AggregateMeter,
         observe: (String, Long) -> Unit,
-    ): Boolean {
+    ): Boolean? {
         meter.reserve(1L, 128L + cut.inequality.supportSize * 64L)
         var activity = 0.0
         var normSquared = 0.0
@@ -155,7 +159,7 @@ internal object LinearAuthorityAggregateCuts {
             meter.reserve(4L)
             val coordinate = point[id] ?: run {
                 observe("AggregatePairPointUnavailable", 1L)
-                return false
+                return null
             }
             val coefficient = value.toDouble()
             activity += coefficient * coordinate
@@ -165,7 +169,7 @@ internal object LinearAuthorityAggregateCuts {
         val efficacy = (activity - cut.inequality.rhs.toDouble()) / sqrt(normSquared)
         if (!efficacy.isFinite()) {
             observe("AggregatePairPointUnavailable", 1L)
-            return false
+            return null
         }
         val eligible = efficacy >= CutPool.MIN_EFFICACY
         observe(if (eligible) "AggregatePairPointEligible" else "AggregatePairLowEfficacy", 1L)

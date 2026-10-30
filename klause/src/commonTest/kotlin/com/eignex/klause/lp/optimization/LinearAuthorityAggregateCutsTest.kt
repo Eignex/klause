@@ -115,14 +115,16 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
-    fun `point directed pair preparation should decline proposals with an unavailable point coordinate`() {
+    fun `an unavailable point coordinate should withhold complete proposal coverage`() {
         val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
             "left" to SourcePremise(left), "right" to SourcePremise(right)))
+        val observations = mutableMapOf<String, Long>()
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             point = mapOf(x to 0.75, real to 1.5))
 
-        assertTrue(cuts.isEmpty())
+        assertEquals(1L, observations["AggregatePairIncomplete"])
     }
 
     @Test
