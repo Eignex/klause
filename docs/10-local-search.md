@@ -335,6 +335,10 @@ when signed-word kernels are safe; wider intermediates use exact evaluation.
 materialized cones that agrees with the canonical objective at every feasible
 assignment. Source factors stay enforced, and hints grant no feasibility or proof
 authority.
+Native Element cones evaluate their selected constant or variable cell. An invalid
+index retains the stored result, matching the maintenance node's no-write behavior.
+Live-network scoring reads the canonical terms after the complete maintained probe,
+including output-domain clamping.
 
 Experimental channel views can leave admitted Boolean-value, Element-value or
 predicate outputs searched while retaining the other nodes in dependency order.
