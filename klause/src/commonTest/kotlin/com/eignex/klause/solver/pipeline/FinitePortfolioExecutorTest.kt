@@ -5,10 +5,14 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioEvent
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.portfolio.ScriptedSearch
 import com.eignex.klause.portfolio.exactlyOneOver
+import com.eignex.klause.portfolio.fixedBandit
+import com.eignex.klause.portfolio.trackingWorker
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
@@ -22,8 +26,71 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TestTimeSource
 
 class FinitePortfolioExecutorTest {
+    @Test
+    fun `LP probes should follow the other initial attempts even when one fails`() {
+        for (failed in listOf(false, true)) {
+            val visits = mutableListOf<Int>()
+            val workers = List(3) { arm ->
+                trackingWorker(if (arm == 0) "bt/lp-default" else "worker$arm", arm,
+                    ScriptedSearch({ false }) {
+                        visits += arm
+                        if (failed && arm == 1) error("initial attempt failed")
+                    }).also { if (arm == 2) it.family = ArmFamily.LocalSearch }
+            }
+            val observer = deferredLpProbes(workers)
+
+            Portfolio(workers, fixedBandit(3, 1), onProgress = observer).use {
+                it.minimize(Cancellation { visits.size >= 3 })
+            }
+
+            assertEquals(listOf(1, 2, 0), visits)
+        }
+    }
+
+    @Test
+    fun `an accepted incumbent should admit deferred LP before the remaining initial probes`() {
+        val visits = mutableListOf<Int>()
+        val workers = List(3) { arm ->
+            trackingWorker(if (arm == 0) "bt/lp-default" else "worker$arm", arm,
+                ScriptedSearch({ arm == 1 && it == 0 }) { visits += arm })
+                .also { if (arm == 2) it.family = ArmFamily.LocalSearch }
+        }
+        val observer = deferredLpProbes(workers)
+
+        Portfolio(workers, fixedBandit(3, 1), onProgress = observer).use {
+            it.minimize(Cancellation { visits.size >= 3 })
+        }
+
+        assertEquals(listOf(1, 0, 2), visits)
+    }
+
+    @Test
+    fun `admitted silent LP traversal should retain proof coverage`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(3)
+        val workers = List(3) { arm ->
+            trackingWorker(if (arm == 0) "bt/lp-default" else "worker$arm", arm,
+                ScriptedSearch({ arm == 1 && it == 0 }) {
+                    elapsed[arm] += 100L
+                    clock += 100.milliseconds
+                }).also {
+                    if (arm == 1) it.restartingSearch = true
+                    if (arm == 2) it.family = ArmFamily.LocalSearch
+                }
+        }
+        val observer = deferredLpProbes(workers)
+
+        Portfolio(workers, fixedBandit(3, 1), reseedStaleThreshold = 0, onProgress = observer).also {
+            it.runTimeSource = clock
+        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+
+        assertTrue(elapsed[0] >= (elapsed.sum() - 100L) / 2 - 100L)
+    }
+
     @Test
     fun `diagnostic finite invocations should reproduce the source schedule and rewards`() {
         val traces = List(2) {

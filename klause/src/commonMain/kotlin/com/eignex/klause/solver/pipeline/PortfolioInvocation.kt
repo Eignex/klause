@@ -8,10 +8,10 @@ import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioDiagnostics
 import com.eignex.klause.portfolio.PortfolioEvent
-import com.eignex.klause.portfolio.PortfolioRewardPolicy
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioIncumbents
+import com.eignex.klause.portfolio.PortfolioRewardPolicy
 import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.simplex.exact.BigFraction
@@ -48,6 +48,7 @@ internal class PortfolioInvocationPolicy(
     val reserveBeforeIncumbentOnly: Boolean = false,
     probes: Set<Int> = emptySet(),
     probeWeights: IntArray = intArrayOf(),
+    val onProgress: ((PortfolioEvent) -> Unit)? = null,
 ) {
     private val minimumShares = shares.copyOf()
     private val improvingProbes = probes.toSet()
@@ -101,7 +102,12 @@ internal class PortfolioInvocation(
             profile = selected.profile, minShares = selected.shares, onFault = onFault,
             diagnostics = controls.diagnostics,
             rewardPolicy = controls.rewardPolicy,
-            onProgress = controls.onProgress,
+            onProgress = selected.onProgress?.let { observer ->
+                { event: PortfolioEvent ->
+                    observer(event)
+                    controls.onProgress?.invoke(event)
+                }
+            } ?: controls.onProgress,
         ).also {
             it.invocationStarted = started
             it.exactLinearObjective = objective
