@@ -297,8 +297,9 @@ optima alone supply no global optimum or conflict authority.
 
 Completed exact integer components can retain node deductions separately from their
 numerical results. A query uses the parent's common dual-rounding scale and reuses
-compatible child deductions. The aggregate maps multipliers and reduced costs back
-to the current parent authority; each child alternative is combined with the other
+compatible child deductions. Parent scale inspection charges the shared checking
+meter without materializing parent multipliers. The aggregate maps multipliers and
+reduced costs back to the current parent authority; each child alternative is combined with the other
 children's strongest bounds for fixing. An alternative visits only its changed
 child's columns; its other reduced costs are already covered by the stronger
 primary deduction. Retained deduction payloads occupy at most eight

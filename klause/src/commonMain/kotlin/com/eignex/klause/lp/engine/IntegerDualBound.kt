@@ -91,14 +91,7 @@ internal class RoundedDuals(val scaleBits: Int, val scale: Long, val mult: LongA
 internal fun roundDuals(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): RoundedDuals? {
     val m = model.m
     if (y.size != m) return null
-    var maxY = 0.0
-    for (i in 0 until m) {
-        val yi = y[i]
-        if (!yi.isFinite()) return null
-        val a = abs(yi)
-        if (a > maxY) maxY = a
-    }
-    val k = chooseScale(maxY, scaleBits)
+    val k = dualRoundingScaleBits(y, scaleBits) ?: return null
     val scale = 1L shl k
     val scaleD = scale.toDouble()
     val mult = LongArray(m)
@@ -108,6 +101,23 @@ internal fun roundDuals(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT
         mult[i] = s.roundToLong()
     }
     return RoundedDuals(k, scale, mult)
+}
+
+internal fun dualRoundingScaleBits(
+    y: DoubleArray,
+    scaleBits: Int = DEFAULT_SCALE_BITS,
+    inspect: (() -> Unit)? = null,
+): Int? {
+    var maxY = 0.0
+    for (yi in y) {
+        inspect?.invoke()
+        if (!yi.isFinite()) return null
+        val a = abs(yi)
+        if (a > maxY) maxY = a
+    }
+    val k = chooseScale(maxY, scaleBits)
+    val scaled = maxY * (1L shl k).toDouble()
+    return k.takeIf { scaled.isFinite() && scaled < MAX_EXACT_INT }
 }
 
 /**
