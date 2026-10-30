@@ -127,18 +127,25 @@ internal class LpDirectionalHistory(
         if (!value.isFinite()) return Double.NaN
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return Double.NaN
-        val history = reliable(gains[variable]) ?: run {
-            if (!useClassPriors) return Double.NaN
+        val local = gains[variable] ?: return Double.NaN
+        val prior = if (reliable(local) == null) {
+            if (!useClassPriors || local.down.count + local.up.count == 0) return Double.NaN
             charge(1L)
             reliable(if (variable is VarRef.Bool) booleanPrior else integerPrior, prior = true)
-        } ?: return Double.NaN
-        val down = history.down.mean * fraction
-        val up = history.up.mean * (1.0 - fraction)
+                ?: return Double.NaN
+        } else null
+        val down = (if (prior == null) local.down.mean else estimate(local.down, prior.down)) * fraction
+        val up = (if (prior == null) local.up.mean else estimate(local.up, prior.up)) * (1.0 - fraction)
         val score = minOf(down, up) + maxOf(down, up) / 6.0
         return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
     }
 
     fun usesPrior(variable: VarRef): Boolean = !recent(gains[variable])
+
+    private fun estimate(local: Direction, prior: Direction): Double {
+        val weight = minOf(local.count, RELIABILITY).toDouble() / RELIABILITY
+        return local.mean * weight + prior.mean * (1.0 - weight)
+    }
 
     private fun recent(history: Gains?): Boolean = history != null &&
         history.down.count >= RELIABILITY && history.up.count >= RELIABILITY &&
