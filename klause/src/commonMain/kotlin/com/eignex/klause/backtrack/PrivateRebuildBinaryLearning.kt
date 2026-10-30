@@ -30,7 +30,7 @@ internal class PrivateRebuildBinaryLearning private constructor(
             val previous = LongArray(MAX_BINARIES)
             var count = 0
             var eligible = 0
-            for (index in 0 until session.learnedClauseCount) {
+            for (index in session.learnedClauseCount - 1 downTo 0) {
                 if (eligible == MAX_BINARIES) return null
                 if (!visit(5L)) return null
                 if (!session.isLearnedClause(index) || session.learnedClausePermanent(index) ||
