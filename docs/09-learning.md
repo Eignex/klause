@@ -337,8 +337,8 @@ gcd normalization. Each combination must remain conflicting. A retained row must
 propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have
-been a member of its historical domain; a later carve cannot remove that earlier membership, and a
-historical hole cannot supply a raw bound assertion. Literal counts do not establish
+been a member of its historical domain; a later carve cannot remove that earlier
+membership, and a historical hole cannot supply a raw bound assertion. Literal counts do not establish
 assertion. Foreign unavailable bound premises retain clause analysis. The producer
 admits at most 16 terms, 16 combinations, 64 native levels and 64 stored rows, with
 bounded duplicate lookup.
