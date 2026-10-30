@@ -587,7 +587,8 @@ internal class LpScopedSolver(
     ): Boolean = try {
         components.appendLocalRows(next, token, workLimit) { part, childToken, childWork ->
             newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
-                childWork, trackDegeneracy, context.engineFactory, componentPricing(part, next.model.n))
+                childWork, trackDegeneracy, context.engineFactory,
+                componentPricing(part, next.model.n, components.rowOnlyRows))
         }
     } catch (primary: Throwable) {
         solver = null
@@ -724,15 +725,15 @@ internal class LpScopedSolver(
             if (workBudget > 0L && projection.work >= workBudget) return null
             candidate = if (allowComponents && warm == null) {
                 componentLpSolverOrNull(
-                    working, token,
-                    { part, childToken ->
+                    working, token, projection,
+                    { part, childToken, rowOnlyRows ->
                         val remaining = if (workBudget > 0L) workBudget - projection.work else 0L
                         if (workBudget > 0L && remaining <= 0L) throw LpProjectionStop()
                         newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
-                            remaining, trackDegeneracy, context.engineFactory, componentPricing(part, working.n))
+                            remaining, trackDegeneracy, context.engineFactory,
+                            componentPricing(part, working.n, rowOnlyRows))
                     },
                     ::ComponentLpSolver,
-                    projection,
                 )
             } else null
             val remainingWork = if (workBudget > 0L) workBudget - projection.work else 0L
@@ -814,8 +815,8 @@ internal class LpScopedSolver(
         }
     }
 
-    private fun componentPricing(part: LpModel, columns: Int): LpPricingOptions {
-        return pricing.componentShare(part.n, columns)
+    private fun componentPricing(part: LpModel, columns: Int, rowOnlyRows: Int): LpPricingOptions {
+        return pricing.componentShare(part.n, columns, rowOnlyRows)
     }
 
     override fun close() {
