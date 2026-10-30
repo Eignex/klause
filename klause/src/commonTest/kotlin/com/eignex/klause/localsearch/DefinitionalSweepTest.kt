@@ -34,7 +34,9 @@ class DefinitionalSweepTest {
             BoolFoldDefinition(2, intArrayOf(Lit.make(1, true)), false),
         )))
 
-        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(LinearObjective(longArrayOf(0, 0, 7))))
+        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            LinearObjective(longArrayOf(0, 0, 7)), Cancellation.Never, captureBooleanCosts = true,
+        ))
 
         assertNull(objective.booleanCostSweep)
     }
@@ -46,7 +48,9 @@ class DefinitionalSweepTest {
             BoolFoldDefinition(2, intArrayOf(Lit.make(0, true), Lit.make(1, false)), true),
         )))
 
-        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(LinearObjective(longArrayOf(3, 0, 7))))
+        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            LinearObjective(longArrayOf(3, 0, 7)), Cancellation.Never, captureBooleanCosts = true,
+        ))
 
         assertNull(objective.booleanCostSweep)
     }
@@ -59,7 +63,9 @@ class DefinitionalSweepTest {
             BoolFoldDefinition(3, intArrayOf(Lit.make(1, true)), false),
         )))
 
-        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(LinearObjective(longArrayOf(0, 0, 7))))
+        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            LinearObjective(longArrayOf(0, 0, 7)), Cancellation.Never, captureBooleanCosts = true,
+        ))
 
         assertNull(objective.booleanCostSweep)
     }
