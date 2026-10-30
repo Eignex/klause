@@ -765,6 +765,9 @@ class LocalSearchState private constructor(
         if (feedsDefinitions(move)) return evaluateMove(move, scored).objectiveDelta
         return when (scored) {
             is LinearObjective -> linearObjectiveDelta(move, scored)
+            is FunctionalObjective -> scored.deltaIfApplied(assignment, move).also {
+                phaseTimer?.recordObjectiveScoring("generic")
+            }
             is IncrementalObjective -> scored.deltaIfApplied(assignment, move)
             else -> null
         }
@@ -1493,7 +1496,9 @@ class LocalSearchState private constructor(
                 feasibleObjective && cost > 0L -> Double.POSITIVE_INFINITY
                 objective is LinearObjective -> probeLinearObjectiveDelta(objective)
                 objective is FunctionalObjective ->
-                    (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble()
+                    (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble().also {
+                        phaseTimer?.recordObjectiveScoring("generic")
+                    }
                 objective == null -> 0.0
                 else -> objective.evaluate(assignment) - oldObjective
             }
