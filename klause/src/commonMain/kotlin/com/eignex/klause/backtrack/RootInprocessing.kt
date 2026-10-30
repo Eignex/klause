@@ -274,8 +274,12 @@ internal class RootProbingPass : InprocessingPass {
                 if (endpoint) session.probeRootBound(variable, bound, atMost) else session.probeRootLiteral(literal)
             }
             when (result) {
-                null -> if (!params.cancellation()) session.probeCancelled = priorCancelled
+                null -> {
+                    budget.note("Incomplete")
+                    if (!params.cancellation()) session.probeCancelled = priorCancelled
+                }
                 is PropagationResult.Unsat -> {
+                    budget.note("Refuted")
                     if (!budget.visit(3)) break
                     val before = session.work
                     val unit = complement(session, literal, if (endpoint) variable else -1, bound, atMost)
@@ -285,7 +289,7 @@ internal class RootProbingPass : InprocessingPass {
                     if (endpoint) budget.note("EndpointUnits")
                     if (nearby != null) neighborhood = null
                 }
-                else -> Unit
+                else -> budget.note("Consistent")
             }
         }
     }

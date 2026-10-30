@@ -48,4 +48,11 @@ class BacktrackParamsTest {
             assertFailsWith<IllegalArgumentException> { params.copy(lubyRestartBase = base) }
         }
     }
+
+    @Test
+    fun `negative inprocessing warmup should be rejected during construction`() {
+        for (work in listOf(-1L, Long.MIN_VALUE)) {
+            assertFailsWith<IllegalArgumentException> { BacktrackParams(inprocessingWarmupWork = work) }
+        }
+    }
 }
