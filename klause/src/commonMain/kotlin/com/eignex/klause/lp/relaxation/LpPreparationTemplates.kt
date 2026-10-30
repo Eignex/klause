@@ -1,7 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.ir.Factor
@@ -131,26 +130,19 @@ internal data class LpIntegerBoundTemplate(
     }
 }
 
-internal class LpFactorTemplate private constructor(
+internal class LpFactorTemplate(
     val factor: Factor,
-    private val integerVariables: IntArray?,
-    private val references: List<Int>?,
     val rows: List<LpSourceRowTemplate>?,
 ) {
-    constructor(factor: Factor, integerVariables: IntArray, rows: List<LpSourceRowTemplate>?) :
-        this(factor, integerVariables, null, rows)
-
-    constructor(factor: Factor, references: List<Int>, rows: List<LpSourceRowTemplate>?) :
-        this(factor, null, references, rows)
-
-    val supportSize: Int
-        get() = if (integerVariables != null) integerVariables.size else requireNotNull(references).size
+    private val integerVariables = factor.intVars
+    private val booleanVariables = factor.boolVars
+    val supportSize: Int get() = integerVariables.size + booleanVariables.size
     val storageUnits: Long = 4L + supportSize + (rows?.sumOf { it.storageUnits } ?: 0L)
 
-    fun reference(index: Int): Int = if (integerVariables != null) {
+    fun reference(index: Int): Int = if (index < integerVariables.size) {
         Term.ofIntVar(integerVariables[index])
     } else {
-        requireNotNull(references)[index]
+        Term.ofLit(booleanVariables[index - integerVariables.size] shl 1)
     }
 }
 
@@ -334,20 +326,6 @@ internal class LpPreparationTemplates private constructor(
                         retained
                     } else {
                         if (!visit(factor.structuralKeyWeight.toLong())) return null
-                        val integers = factor.intVars
-                        val booleans = factor.boolVars
-                        val coalescedIntegers = booleans.isEmpty() && (factor is Linear || factor is ExactLinear)
-                        val support = if (coalescedIntegers) null else ArrayList<Int>()
-                        if (support != null) {
-                            for (variable in integers) {
-                                if (!visit()) return null
-                                support.add(Term.ofIntVar(variable))
-                            }
-                            for (variable in booleans) {
-                                if (!visit()) return null
-                                support.add(Term.ofLit(variable shl 1))
-                            }
-                        }
                         val declared = if (selection.capabilities(factorId).relaxation != RelaxationCapability.SOUND ||
                             factor is LinearIndicator ||
                             factor is ReifiedPseudoBoolean
@@ -357,8 +335,7 @@ internal class LpPreparationTemplates private constructor(
                             if (!visit(1L + row.size)) return null
                             LpSourceRowTemplate(row)
                         }
-                        if (coalescedIntegers) LpFactorTemplate(factor, integers, rows)
-                        else LpFactorTemplate(factor, requireNotNull(support).distinct(), rows)
+                        LpFactorTemplate(factor, rows)
                     }
                     storage += entry.storageUnits
                     if (storage > MAX_UNITS) return null
