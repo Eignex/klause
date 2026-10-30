@@ -43,6 +43,29 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `ordinary component roots honor an empty cut selection from a nonempty pool`() {
+        val problem = boundedProblem()
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false), solveBudgetMillis = 30_000L),
+            SolveStatsSink("ordinary-root-cut-selection")).use { engine ->
+            val relaxer = assertNotNull(engine.lpRelaxer)
+            val base = relaxer.build(PropagationSession(problem))
+            val cut = engine.dualSimplex(base.model, Cancellation.Never).use { simplex ->
+                assertNotNull(simplex.solve())
+                simplex.gomoryCuts(8).first()
+            }
+            assertTrue(engine.cutPool.add(cut, base))
+            assertEquals(1, engine.lpGlobalCuts.size)
+            assertEquals(4.0, engine.rootLpRelaxationBound(relaxer, engine.lpGlobalCuts))
+
+            val bound = engine.rootLpRelaxationBound(relaxer, emptyList())
+
+            assertEquals(3.0, bound)
+        }
+    }
+
+    @Test
     fun `ordinary component roots retain global cuts for later node queries`() {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
             Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 3),

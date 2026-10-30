@@ -1406,9 +1406,7 @@ private fun LpEngine.retainedRootLpRelaxationBound(
 ): Double {
     if (retainedRootRemainingWork() <= 0L || cancellation()) return Double.NaN
     val root = PropagationSession(problem, cancellation)
-    val relaxation = nodeRelaxation(relaxer, root)?.let {
-        cpAdapter.cutRelaxation(it, root, globalCuts)
-    } ?: run {
+    val relaxation = nodeRelaxation(relaxer, root, globalCuts) ?: run {
         if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial + ("RootSourceLayoutDeclined" to 1L)
         cpAdapter.reset()
         if (retainedRootRemainingWork() <= 0L || cancellation()) return Double.NaN
