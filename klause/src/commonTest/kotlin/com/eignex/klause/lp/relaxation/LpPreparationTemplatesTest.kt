@@ -22,6 +22,7 @@ import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertNull
@@ -223,10 +224,46 @@ class LpPreparationTemplatesTest {
             override fun workMeter(): WorkMeter = meter
         }
 
-        val result = relaxation.authoritativeWithTemplates(token)
+        var published = false
+
+        val result = relaxation.authoritativeWithTemplates(token) { published = true }
 
         assertNull(result)
-        assertEquals(2L, work)
+        assertFalse(published)
+        assertTrue(work >= 2L)
+    }
+
+    @Test
+    fun `cancelled bound definition should permit a later complete import`() {
+        val consumer = CpToLpRelaxation(source, objective, projections = selection, reuseTemplateMetadata = true)
+        val relaxation = consumer.build(RootDomains(source))
+        var work = 0L
+        val meter = WorkMeter { work += it }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = work >= 2L
+            override fun workMeter(): WorkMeter = meter
+        }
+        assertNull(relaxation.authoritativeWithTemplates(token))
+
+        val recovered = assertNotNull(relaxation.authoritativeWithTemplates(Cancellation.Never))
+        val ordinary = assertNotNull(relaxation.model.authoritativeModel())
+
+        assertTrue(recovered.sameAuthority(ordinary))
+    }
+
+    @Test
+    fun `alternating probe upper sides should preserve current exact authority`() {
+        val consumer = CpToLpRelaxation(source, objective, projections = selection, reuseTemplateMetadata = true)
+        val relaxation = consumer.build(RootDomains(source))
+
+        for (clamped in listOf(false, true, false)) {
+            relaxation.model.probeClampedHi[0] = clamped
+
+            val imported = assertNotNull(relaxation.authoritativeWithTemplates(Cancellation.Never))
+            val ordinary = assertNotNull(relaxation.model.authoritativeModel())
+
+            assertTrue(imported.sameAuthority(ordinary))
+        }
     }
 
     @Test
@@ -564,6 +601,21 @@ class LpPreparationTemplatesTest {
         assertNull(stopped)
         assertTrue(work >= 3L)
         assertSame(before.components[0], after.components[0])
+    }
+
+    @Test
+    fun `bound heavy preparation should decline within its storage allowance`() {
+        val count = 12_000
+        val problem = Problem(0, count, Array(count) { IntDomain(0, 1) }, arrayOf<Factor>(
+            Linear(IntArray(count) { 1 }, IntArray(count) { it }, LinearOp.GE, 1),
+        ))
+        val captured = FactorProjectionProviders.Default.prepare(problem)
+        var work = 0L
+
+        val result = captured.prepareLpTemplates(null, Cancellation.Never) { work = it }
+
+        assertNull(result)
+        assertTrue(work < 262_144L)
     }
 
     @Test
