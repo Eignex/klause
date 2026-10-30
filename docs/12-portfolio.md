@@ -846,7 +846,10 @@ annotated, or execution is parallel or single-engine. See
 
 Single-core curated CP optimization over binary integer columns and complete
 unconditional integer linear rows uses its first `conflictDriven` recipe for bounded
-integer-row learning when the LP ceiling permits bounding.
+integer-row learning when the LP ceiling permits bounding and the model contains
+a mandatory equality of 3–16 terms that normalizes to unit coefficients. Signed
+terms represent complemented binary columns; the normalized cardinality must leave
+at least one term free.
 It spends the existing slot's allowance and keeps rows private to its prepared
 session. Caller edits follow this policy, so an explicit integer-row setting has
 authority. Named pools, annotation templates and model-specific replacement recipes

@@ -43,6 +43,48 @@ class ArmNeedsTest {
     }
 
     @Test
+    fun `compact signed and scaled cardinality equalities should offer arithmetic learning`() {
+        val rows = listOf(
+            Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1),
+            Linear(longArrayOf(2, 2, 2), intArrayOf(0, 1, 2), LinearOp.EQ, 2),
+            Linear(longArrayOf(-2, -2, -2), intArrayOf(0, 1, 2), LinearOp.EQ, -2),
+            Linear(longArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            Linear(LongArray(16) { 1L }, IntArray(16) { it }, LinearOp.EQ, 8),
+            ExactLinear.of(
+                IntArray(3) { Term.ofIntVar(it) }, List(3) { BigFraction.ofLong(2).reciprocal() },
+                LinearOp.EQ, BigFraction.ofLong(2).reciprocal(),
+            ),
+        )
+        for (row in rows) {
+            val model = Problem(0, 16, Array(16) { IntDomain(0, 1) }, listOf(row)).bake()
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE)
+
+            assertTrue(facts.compactCardinalityEquality)
+        }
+    }
+
+    @Test
+    fun `inequalities weighted equalities and forced cardinalities should decline arithmetic eligibility`() {
+        val rows = listOf(
+            Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1),
+            Linear(longArrayOf(1, 2, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1),
+            Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 3),
+            Linear(longArrayOf(2, 2, 2), intArrayOf(0, 1, 2), LinearOp.EQ, 1),
+            Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1),
+            Linear(LongArray(17) { 1L }, IntArray(17) { it }, LinearOp.EQ, 8),
+        )
+        for (row in rows) {
+            val model = Problem(0, 17, Array(17) { IntDomain(0, 1) }, listOf(row)).bake()
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE)
+
+            assertFalse(facts.compactCardinalityEquality)
+        }
+    }
+
+    @Test
     fun `curated eligibility should identify the missing objective without changing explicit recipes`() {
         val facts = ProblemFacts.assumed(Kind.CSP)
         val required = setOf(ArmNeed.Objective)
