@@ -6,12 +6,14 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.tools.CliProfile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Runs `klause-cli` as a subprocess on the model: the compiled `.fzn` for a MiniZinc instance, or the
@@ -62,22 +64,47 @@ internal object SolverInvocation {
         val exactObjective: String? = null,
         val stderr: String? = null,
         val stderrComplete: Boolean = false,
+        val stderrCapture: StderrCaptureStatus? = null,
     )
+
+    internal class Failure(val result: Result, message: String, cause: Throwable? = null) :
+        IllegalStateException(message, cause)
 
     /** Run klause-cli over [entry] under [budget]. [optimize] selects intermediate-solution mode (`-a`). */
     fun run(entry: ResolvedProblem, settings: Settings, budget: Budget, optimize: Boolean): Result {
-        val cmd = klauseCommand(entry, settings, budget, optimize)
-        // Hard wall-clock ceiling: a solve that ignores its `-t` deadline (e.g. an expensive move source
-        // that polls cancellation too rarely) must not hang the harness. Generous over the budget so it
-        // only ever kills a genuine runaway, never a solve that's merely flushing at the deadline.
-        return invoke(
-            cmd,
-            dialectFor(entry.ref.format),
-            hardTimeoutMs = budget.timeoutMillis * 2 + 20_000,
-            captureDirectory = settings.captureDirectory,
-            measureResources = settings.measureResources,
-        )
-            .copy(buildProvenance = InstalledBuild.current)
+        val file = if (entry.ref.format == Format.MINIZINC) MiniZincRunner().compileFzn(entry.ref)
+            else CorpusFetcher.resolve(entry.ref.source)
+        return withSourceInput(file, budget) { plain, remaining ->
+            val cmd = klauseCommand(entry, settings, remaining, optimize, plain)
+            invoke(
+                cmd,
+                dialectFor(entry.ref.format),
+                hardTimeoutMs = remaining.timeoutMillis * 2 + 20_000,
+                captureDirectory = settings.captureDirectory,
+                measureResources = settings.measureResources,
+            )
+        }.copy(buildProvenance = InstalledBuild.current)
+    }
+
+    internal fun withSourceInput(file: File, budget: Budget, solve: (File, Budget) -> Result): Result {
+        if (!CorpusFiles.isCompressed(file)) return solve(file, budget)
+        val start = System.nanoTime()
+        var preparationMs = 0L
+        val result = CorpusFiles.withPlainFile(file) { plain ->
+            preparationMs = (System.nanoTime() - start) / 1_000_000L
+            val remaining = budget.timeoutMillis - preparationMs
+            val result = if (remaining <= 0L) {
+                Result(null, null, null, proven = false, stats = mapOf("sourcePreparationBudgetExhausted" to "true"),
+                    rawOutput = "", command = "SOURCE_PREPARATION")
+            } else {
+                solve(plain, Budget(remaining))
+            }
+            result
+        }
+        return result.copy(stats = result.stats + mapOf(
+            "sourceDecodeMs" to preparationMs.toString(),
+            "sourceInvocationMs" to ((System.nanoTime() - start) / 1_000_000L).toString(),
+        ))
     }
 
     /** The provisioned klause-cli launcher. */
@@ -116,16 +143,11 @@ internal object SolverInvocation {
         }
 
     /** klause-cli on the model file (compiled `.fzn` for MiniZinc, else the original source). */
-    private fun klauseCommand(entry: ResolvedProblem, s: Settings, budget: Budget, optimize: Boolean): List<String> {
+    private fun klauseCommand(
+        entry: ResolvedProblem, s: Settings, budget: Budget, optimize: Boolean, file: File,
+    ): List<String> {
         val bin = klauseCliBin()
         check(bin.canExecute()) { "klause-cli not installed at $bin (run :klause-cli:installJvmDist)" }
-        val file = if (entry.ref.format == Format.MINIZINC) {
-            MiniZincRunner().compileFzn(entry.ref)
-        } else {
-            // A compressed `.zst` instance is passed as is: klause-cli decompresses it while reading, so
-            // the decompression counts toward the solve time as it would for any compressed input.
-            CorpusFetcher.resolve(entry.ref.source)
-        }
         return buildList {
             add(bin.absolutePath)
             // MPS instances (notably extension-less MIPLIB files) can't be auto-detected by suffix;
@@ -140,7 +162,8 @@ internal object SolverInvocation {
             add("-r")
             add(s.seed.toString())
             add("-s")
-            if (s.params.any { it.startsWith("portfolio-work=") }) add("-v")
+            if (s.params.any { it.startsWith("portfolio-work=") || it.startsWith("companion-integers=") ||
+                    it == "portfolio-progress=true" }) add("-v")
             if (s.exact) add("--exact")
             if (s.completeAssignment && entry.ref.format == Format.MINIZINC) add("--output-complete-assignment")
             if (optimize) {
@@ -194,29 +217,36 @@ internal object SolverInvocation {
         hardTimeoutMs: Long = Long.MAX_VALUE,
         captureDirectory: File? = null,
         measureResources: Boolean = false,
+        startProcess: (List<String>) -> Process = { ProcessBuilder(it).redirectErrorStream(false).start() },
+        stderrDrainWaitMs: Long = STDERR_DRAIN_WAIT_MS,
     ): Result {
         val startNanos = System.nanoTime()
         captureDirectory?.mkdirs()
         val measured = if (measureResources) {
             listOf(
-                "/usr/bin/time",
+                if (System.getProperty("os.name").startsWith("Mac")) "gtime" else "/usr/bin/time",
                 "--format=peakRssKiB=%M\nuserSeconds=%U\nsystemSeconds=%S\nwallSeconds=%e\nexit=%x",
                 "--output=${requireNotNull(captureDirectory).resolve("resources.txt")}",
             ) + cmd
         } else {
             cmd
         }
+        captureDirectory?.resolve("cli.stderr.json")?.let {
+            check(!it.exists() || it.delete()) { "Cannot remove stale stderr completion marker: $it" }
+        }
         captureDirectory?.resolve("cli-command.json")?.writeText(Reports.json.encodeToString(measured))
-        val process = ProcessBuilder(measured).redirectErrorStream(false).start()
-        val stdoutCapture = captureDirectory?.resolve("cli.stdout")?.bufferedWriter()
+        val process = startProcess(measured)
+        var outputFailure: Throwable? = null
+        val stdoutCapture = runCatching { captureDirectory?.resolve("cli.stdout")?.bufferedWriter() }
+            .onFailure { outputFailure = it }.getOrNull()
         // Watchdog: force-kill a runaway that blew past [hardTimeoutMs] so the read loop below (which
         // blocks until the child's stdout closes) can't hang forever on a child that never exits. A
         // killed child's stream closes, the loop returns, and the partial output is scored as usual.
-        val killed = AtomicBoolean(false)
-        Thread {
+        val killed = AtomicReference<String?>(null)
+        val watchdog = Thread {
             runCatching {
-                if (!process.waitFor(hardTimeoutMs, TimeUnit.MILLISECONDS)) {
-                    killed.set(true)
+                if (!process.waitFor(hardTimeoutMs, TimeUnit.MILLISECONDS) && process.isAlive) {
+                    killed.compareAndSet(null, "hard-timeout")
                     process.descendants().forEach { it.destroyForcibly() }
                     process.destroyForcibly()
                 }
@@ -225,22 +255,9 @@ internal object SolverInvocation {
             isDaemon = true
             start()
         }
-        val stderr = StringBuilder()
-        val stderrDrained = AtomicBoolean(false)
-        val drain = Thread {
-            captureDirectory?.resolve("cli.stderr")?.bufferedWriter().use { capture ->
-                process.errorStream.bufferedReader().forEachLine {
-                    stderr.appendLine(it)
-                    capture?.apply {
-                        appendLine(it)
-                        flush()
-                    }
-                }
-            }
-            stderrDrained.set(true)
-        }
-        drain.isDaemon = true
-        drain.start()
+        val stderr = StderrCapture(process.errorStream, captureDirectory?.let { directory ->
+            { directory.resolve("cli.stderr").outputStream() }
+        }).start()
 
         val raw = StringBuilder()
         val stats = LinkedHashMap<String, String>()
@@ -277,126 +294,139 @@ internal object SolverInvocation {
         }
         fun recordStat(kv: String) = kv.split('=', limit = 2)
             .takeIf { it.size == 2 }?.let { stats[it[0].trim()] = it[1].trim() }
-        process.inputStream.bufferedReader().forEachLine { rawLine ->
-            stdoutCapture?.apply {
-                appendLine(rawLine)
-                flush()
-            }
-            raw.appendLine(rawLine)
-            val line = rawLine.trim()
-            when (dialect) {
-                Dialect.MINIZINC -> when (line) {
-                    SOLUTION_SEPARATOR -> markIncumbent()
+        try {
+            process.inputStream.bufferedReader().forEachLine { rawLine ->
+                stdoutCapture?.apply {
+                    appendLine(rawLine)
+                    flush()
+                }
+                raw.appendLine(rawLine)
+                val line = rawLine.trim()
+                when (dialect) {
+                    Dialect.MINIZINC -> when (line) {
+                        SOLUTION_SEPARATOR -> markIncumbent()
 
-                    SEARCH_COMPLETE -> proven = true
+                        SEARCH_COMPLETE -> proven = true
 
-                    // MiniZinc prints it only once the search has completed: a proof of infeasibility.
-                    UNSATISFIABLE -> {
-                        unsat = true
-                        proven = true
+                        // MiniZinc prints it only once the search has completed: a proof of infeasibility.
+                        UNSATISFIABLE -> {
+                            unsat = true
+                            proven = true
+                        }
+
+                        UNKNOWN, ERROR -> Unit
+
+                        else -> when {
+                            line.startsWith(
+                                ARM_PREFIX,
+                            ) -> parseArm(line.removePrefix(ARM_PREFIX))?.let {
+                                val arrivedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
+                                attribution.add(it.copy(processElapsedMs = arrivedMs))
+                            }
+
+                            line.startsWith(STAT_PREFIX) -> recordStat(line.removePrefix(STAT_PREFIX).trim())
+
+                            line.startsWith("% klause-exact: _objective = ") ||
+                                line.startsWith("% klause-coordinate: _objective = ") ->
+                                recordObjective(line.substringAfter('=').trim().removeSuffix(";").trim())
+
+                            line.startsWith(OBJECTIVE_KEY) || line.startsWith(MODEL_OBJECTIVE_KEY) ->
+                                recordObjective(line.substringAfter('=').trim().removeSuffix(";").trim())
+                        }
                     }
 
-                    UNKNOWN, ERROR -> Unit
+                    Dialect.PB_COMPETITION -> when {
+                        line == XCSP_SATISFIABLE -> markFeasible()
 
-                    else -> when {
-                        line.startsWith(
-                            ARM_PREFIX,
-                        ) -> parseArm(line.removePrefix(ARM_PREFIX))?.let {
+                        line == XCSP_OPTIMUM -> {
+                            markFeasible()
+                            proven = true
+                        }
+
+                        line == XCSP_UNSATISFIABLE -> {
+                            unsat = true
+                            proven = true
+                        }
+
+                        line == XCSP_UNKNOWN -> Unit
+
+                        // `o <cost>`: one line per improving incumbent (model-oriented objective).
+                        line.startsWith(XCSP_OBJECTIVE_PREFIX) -> {
+                            if (recordObjective(line.removePrefix(XCSP_OBJECTIVE_PREFIX).trim())) markIncumbent()
+                        }
+
+                        line.startsWith(ARM_PREFIX) -> parseArm(line.removePrefix(ARM_PREFIX))?.let {
                             val arrivedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
                             attribution.add(it.copy(processElapsedMs = arrivedMs))
                         }
 
-                        line.startsWith(STAT_PREFIX) -> recordStat(line.removePrefix(STAT_PREFIX).trim())
-
-                        line.startsWith("% klause-exact: _objective = ") ||
-                            line.startsWith("% klause-coordinate: _objective = ") ->
-                            recordObjective(line.substringAfter('=').trim().removeSuffix(";").trim())
-
-                        line.startsWith(OBJECTIVE_KEY) || line.startsWith(MODEL_OBJECTIVE_KEY) ->
-                            recordObjective(line.substringAfter('=').trim().removeSuffix(";").trim())
-                    }
-                }
-
-                Dialect.PB_COMPETITION -> when {
-                    line == XCSP_SATISFIABLE -> markFeasible()
-
-                    line == XCSP_OPTIMUM -> {
-                        markFeasible()
-                        proven = true
+                        // `c <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
+                        line.startsWith(XCSP_COMMENT_PREFIX) ->
+                            recordStat(line.removePrefix(XCSP_COMMENT_PREFIX).trim())
                     }
 
-                    line == XCSP_UNSATISFIABLE -> {
-                        unsat = true
-                        proven = true
-                    }
+                    Dialect.SMT_LIB -> when {
+                        line == SMT_SAT -> {
+                            smtSat = true
+                            markFeasible()
+                        }
 
-                    line == XCSP_UNKNOWN -> Unit
+                        line == SMT_UNSAT -> {
+                            unsat = true
+                            proven = true
+                        }
 
-                    // `o <cost>`: one line per improving incumbent (model-oriented objective).
-                    line.startsWith(XCSP_OBJECTIVE_PREFIX) -> {
-                        if (recordObjective(line.removePrefix(XCSP_OBJECTIVE_PREFIX).trim())) markIncumbent()
-                    }
+                        line == SMT_UNKNOWN -> Unit
 
-                    line.startsWith(ARM_PREFIX) -> parseArm(line.removePrefix(ARM_PREFIX))?.let {
-                        val arrivedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
-                        attribution.add(it.copy(processElapsedMs = arrivedMs))
-                    }
-
-                    // `c <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
-                    line.startsWith(XCSP_COMMENT_PREFIX) -> recordStat(line.removePrefix(XCSP_COMMENT_PREFIX).trim())
-                }
-
-                Dialect.SMT_LIB -> when {
-                    line == SMT_SAT -> {
-                        smtSat = true
-                        markFeasible()
-                    }
-
-                    line == SMT_UNSAT -> {
-                        unsat = true
-                        proven = true
-                    }
-
-                    line == SMT_UNKNOWN -> Unit
-
-                    // `; <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
-                    line.startsWith(SMT_COMMENT_PREFIX) -> {
-                        val kv = line.removePrefix(SMT_COMMENT_PREFIX).trim()
-                        recordStat(kv)
-                        if (kv.substringBefore('=').trim() == "objective") {
-                            exactObjective = null
-                            objective = null
-                            if (recordObjective(kv.substringAfter('=', "").trim())) markIncumbent()
+                        // `; <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
+                        line.startsWith(SMT_COMMENT_PREFIX) -> {
+                            val kv = line.removePrefix(SMT_COMMENT_PREFIX).trim()
+                            recordStat(kv)
+                            if (kv.substringBefore('=').trim() == "objective") {
+                                exactObjective = null
+                                objective = null
+                                if (recordObjective(kv.substringAfter('=', "").trim())) markIncumbent()
+                            }
                         }
                     }
                 }
             }
+        } catch (failure: IOException) {
+            outputFailure = failure
+        } finally {
+            runCatching { stdoutCapture?.close() }.onFailure { outputFailure = it }
         }
-        stdoutCapture?.close()
-        if (!process.waitFor(GRACE_MILLIS, TimeUnit.MILLISECONDS)) {
-            killed.set(true)
+        if (outputFailure != null && process.isAlive) {
+            killed.compareAndSet(null, "output-capture-failure")
             process.descendants().forEach { it.destroyForcibly() }
             process.destroyForcibly()
-            process.waitFor()
+        }
+        if (!process.waitFor(GRACE_MILLIS, TimeUnit.MILLISECONDS)) {
+            killed.compareAndSet(null, "hard-timeout")
+            process.descendants().forEach { it.destroyForcibly() }
+            process.destroyForcibly()
+            process.waitFor(STDERR_DRAIN_WAIT_MS, TimeUnit.MILLISECONDS)
+        }
+        watchdog.interrupt()
+        var diagnostics = stderr.await(stderrDrainWaitMs, killed.get() != null)
+        captureDirectory?.let { directory ->
+            runCatching {
+                directory.resolve("cli.stderr.json").writeText(Reports.json.encodeToString(diagnostics.status))
+            }.onFailure {
+                diagnostics = diagnostics.copy(
+                    status = diagnostics.status.copy(metadataFailure = StderrCapture.describe(it)),
+                )
+            }
         }
         val elapsedMs = (System.nanoTime() - startNanos) / NANOS_PER_MILLI
-        // Force-killed children yield an undecided result with partial output; other nonzero exits
-        // without verdicts raise errors for the per-instance handler.
-        if (process.exitValue() != 0 && !anySolution && !unsat) {
-            // Join the stderr drain before classification so a refusal cannot race with its message.
-            drain.join(STDERR_DRAIN_WAIT_MS)
-            val refusal = unsupportedModelRefusal(stderr.toString())
-            check(killed.get() || refusal != null) {
-                "${cmd.first()} failed (exit ${process.exitValue()}): ${stderr.toString().take(STDERR_CAP)}"
-            }
-            // Unsupported models yield labelled undecided results.
-            if (refusal != null) stats["unsupported"] = refusal else stats["killed"] = "hard-timeout"
+        val exit = runCatching { process.exitValue() }.getOrNull()
+        if (exit != null && exit != 0 && !anySolution && !unsat && diagnostics.refusal != null) {
+            stats["unsupported"] = requireNotNull(diagnostics.refusal)
         }
-        if (killed.get()) stats["killed"] = "hard-timeout"
-        stats["exit"] = process.exitValue().toString()
-        drain.join(STDERR_DRAIN_WAIT_MS)
-        quarantines(stderr.toString())?.let { stats[QUARANTINED] = it }
-        val diagnostics = if (!drain.isAlive && stderrDrained.get()) stderr.toString() else null
+        killed.get()?.let { stats["killed"] = it }
+        outputFailure?.let { stats["outputCaptureFailure"] = StderrCapture.describe(it) }
+        stats["exit"] = exit?.toString() ?: "unavailable"
+        diagnostics.quarantines?.let { stats[QUARANTINED] = it }
         if (cmd.first().substringAfterLast('/') == "klause-cli") {
             System.getenv("KLAUSE_LAB_PROFILE_DIR")?.let { directory ->
                 val recording = File(directory, "cli.jfr")
@@ -404,7 +434,7 @@ internal object SolverInvocation {
                     .onFailure { System.err.println("CLI profile summary failed: ${it.message}") }
             }
         }
-        return Result(
+        val result = Result(
             feasible = when {
                 anySolution -> true
                 unsat -> false
@@ -424,34 +454,20 @@ internal object SolverInvocation {
             attribution = attribution,
             rawOutput = raw.toString(),
             command = cmd.joinToString(" "),
-            stderr = diagnostics?.take(STDERR_RECORD_CAP),
-            stderrComplete = diagnostics != null && diagnostics.length <= STDERR_RECORD_CAP,
+            stderr = diagnostics.text,
+            stderrComplete = diagnostics.complete,
+            stderrCapture = diagnostics.status,
         )
+        if ((outputFailure != null && killed.get() != "hard-timeout") || exit == null ||
+            (exit != 0 && !anySolution && !unsat && killed.get() == null && diagnostics.refusal == null)) {
+            throw Failure(
+                result, "${cmd.first()} failed (exit $exit): ${diagnostics.text.take(STDERR_CAP)}", outputFailure,
+            )
+        }
+        return result
     }
 
     internal fun parsePbObjective(text: String): Double? = ExactObjective.parse(text)?.approximate()
-
-    /**
-     * Decline reason from a nonzero exit with a `klause <format>: <reason>` line and no verdict,
-     * or null for other failures. Any stack trace classifies the run as a crash.
-     */
-    internal fun unsupportedModelRefusal(stderr: String): String? {
-        if (stderr.lineSequence().any { it.trimStart().startsWith("at ") || it.contains("Exception") }) return null
-        val line = stderr.lineSequence().firstOrNull { it.startsWith(REFUSAL_PREFIX) } ?: return null
-        return line.removePrefix(REFUSAL_PREFIX).trim().takeIf { it.isNotEmpty() }
-    }
-
-    /**
-     * The portfolio arms a klause run quarantined, joined into one stat value, or null when none was.
-     * The warning goes to stderr so it is never buried in a solution stream; this keeps it in the record,
-     * where nothing else says why an arm's `faults=` count rose.
-     */
-    internal fun quarantines(stderr: String): String? = stderr.lineSequence()
-        .filter { it.startsWith(QUARANTINE_PREFIX) }
-        .map { it.removePrefix(QUARANTINE_PREFIX).trim() }
-        .toList()
-        .ifEmpty { null }
-        ?.joinToString(" | ")
 
     /** Parse a `%%%klause-arm:` body. `label`, `objective` (the exact discrete `Long` channel), and
      *  `time` are required — a line missing or malformed on any of those is unusable and the whole
@@ -502,18 +518,11 @@ internal object SolverInvocation {
     private const val NANOS_PER_MILLI = 1_000_000L
     private const val GRACE_MILLIS = 30_000L
     private const val STDERR_CAP = 2000
-    private const val STDERR_RECORD_CAP = 16 * 1024
-
-    /** How a frontend prefixes a model it declines: `klause mps: ...`, `klause opb: ...`. */
-    private const val REFUSAL_PREFIX = "klause "
 
     /** How long the exit path waits for the stderr drain before reading what it collected. */
     private const val STDERR_DRAIN_WAIT_MS = 2_000L
 
-    /** How klause-cli announces a quarantined portfolio arm on stderr: `<label> quarantined: <reason>` follows. */
-    private const val QUARANTINE_PREFIX = "% WARNING: portfolio arm "
-
-    /** The stat key a record keeps the run's [quarantines] under. */
+    /** The stat key a record keeps quarantined portfolio arms under. */
     const val QUARANTINED = "quarantined"
 
     /** Ceiling on the dist's answer to `--version`, so a child that never answers cannot hang a run. */
