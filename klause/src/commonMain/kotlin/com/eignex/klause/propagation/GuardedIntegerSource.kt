@@ -1,13 +1,17 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedLinearPropagator
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.ElementPropagator
+import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Term
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.subExact
 
@@ -24,6 +28,24 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
     fun source(factorId: Int, trail: Int = state.undo.size, forBoundReason: Boolean = false): IntegerSourceRow? {
         if (factorId !in 0 until state.baseFactorCount) return decline("not-original", factorId)
         return when (val original = state.problem.factors[factorId]) {
+            is ExactLinear -> {
+                if (original.size > INTEGER_LEARNING_TERMS) return decline("term-limit", factorId)
+                if (original.variables.reals.isNotEmpty()) return decline("real-coordinates", factorId)
+                if (original.activator != LinearRow.ALWAYS || original.strict) {
+                    return decline("exact-activation-or-strictness", factorId)
+                }
+                val constants = original.constants as? IntegerConstants
+                    ?: return decline("wide-constants", factorId)
+                val source = state.factorAt(factorId) as? LinearPropagator
+                    ?: return decline("projection-kind", factorId)
+                if (source.boolVars.isNotEmpty() || source.op == LinearOp.NE || source.op != original.relation ||
+                    source.bound != constants.bound || source.vars.size != original.size ||
+                    source.vars.indices.any { source.vars[it] != Term.intVar(original.ref(it)) } ||
+                    !source.coeffs.contentEquals(constants.coeffs)) {
+                    return decline("projection-identity-or-operation", factorId)
+                }
+                IntegerSourceRow(source)
+            }
             is Linear -> {
                 if (original.vars.size > INTEGER_LEARNING_TERMS) return decline("term-limit", factorId)
                 if (original.realVars.isNotEmpty()) return decline("real-coordinates", factorId)
