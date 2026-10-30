@@ -508,7 +508,7 @@ class LpPreparationTemplatesTest {
             object : Factor by original {
                 override val structuralKeyWeight: Int = 100_000
             }
-        }.toTypedArray()
+        }.toTypedArray<Factor>()
         val captured = FactorProjectionProviders.Default.prepare(source.withFactors(factors))
         var work = 0L
 
