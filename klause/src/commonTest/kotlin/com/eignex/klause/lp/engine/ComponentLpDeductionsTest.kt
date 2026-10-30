@@ -66,7 +66,8 @@ class ComponentLpDeductionsTest {
             for (candidate in listOf(whole) + wholeAlternatives) for (column in 0 until model.n) {
                 val steps = candidate.fixSteps(column, 10L, 0L) ?: continue
                 assertTrue(candidates.any { assembled ->
-                    assembled.reducedCostSign(column) == candidate.reducedCostSign(column) &&
+                    (assembled.fixingColumns()?.contains(column) != false) &&
+                        assembled.reducedCostSign(column) == candidate.reducedCostSign(column) &&
                         assembled.fixSteps(column, 10L, 0L)?.let { it <= steps } == true
                 })
             }

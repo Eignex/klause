@@ -296,7 +296,9 @@ Completed exact integer components can retain node deductions separately from th
 numerical results. A query uses the parent's common dual-rounding scale and reuses
 compatible child deductions. The aggregate maps multipliers and reduced costs back
 to the current parent authority; each child alternative is combined with the other
-children's strongest bounds for fixing. Retained deductions occupy at most eight
+children's strongest bounds for fixing. An alternative visits only its changed
+child's columns; its other reduced costs are already covered by the stronger
+primary deduction. Retained deduction payloads occupy at most eight
 MiB inside the shared 16 MiB checking envelope, and assembly and checking work are
 charged even on a decline. Mixed columns, non-unit objective scaling and unsupported
 integer certificates use the whole-model deduction route. The independent safe

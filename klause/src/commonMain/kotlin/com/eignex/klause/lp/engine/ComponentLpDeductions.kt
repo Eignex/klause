@@ -79,7 +79,7 @@ internal class ComponentLpDeductionCache(size: Int) {
                 val beforeAllocation = meter.allocation
                 val beforeWork = meter.work
                 val alternatives = ArrayList<LpDeductionCertificate>(2)
-                val primary = try {
+                var primary = try {
                     nodeDualCertificate(
                         part.model, result.duals, cancellation, observer,
                         onAdditionalCertificate = if (withAlternatives) { { alternatives.add(it) } } else null,
@@ -88,6 +88,13 @@ internal class ComponentLpDeductionCache(size: Int) {
                 } finally {
                     childWork += meter.work - beforeWork
                 } ?: return null
+                for (candidate in alternatives.indices) {
+                    if (meter.less(primary.exactObjectiveBound(), alternatives[candidate].exactObjectiveBound())) {
+                        val previous = primary
+                        primary = alternatives[candidate]
+                        alternatives[candidate] = previous
+                    }
+                }
                 meter.reserve(128L + alternatives.size * 8L)
                 val deductions = ComponentLpDeductions(primary, alternatives)
                 val bytes = meter.allocation - beforeAllocation
@@ -171,6 +178,7 @@ private class CompositeDeduction(
     override fun belongsTo(model: LpModel, observer: LpCertificationObserver?): Boolean = model.exactState === authority
     override fun usesRationalArithmetic(): Boolean = true
     override fun integralObjectiveRows(): IntArray = IntArray(0)
+    override fun fixingColumns(): IntArray? = parts.getOrNull(alternativeIndex)?.cols
     override fun exactMultipliers(): List<BigFraction> = List(authority.model.m, ::exactMultiplier)
     override fun exactMultiplier(row: Int): BigFraction {
         val column = authority.model.n + row
