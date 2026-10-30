@@ -144,6 +144,7 @@ internal class ResumableMinimize(
             pendingRealLeaf == null && pendingRealResult == null
     override val canContinuePreparation: Boolean get() = clausePrimal?.isDone == false
     private var initialCandidate = initialCandidate
+    private var initialPoolVersion = 0L
     private var replaced = false
 
     // Unproved leaf coverage cannot become infeasibility or optimality, including under shared cutoffs.
@@ -1087,7 +1088,10 @@ internal class ResumableMinimize(
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
         rootLayoutPending = false
         if (initialCandidate == null && pausable && !rebindable && externalShared && restart === NoRestartSchedule) {
-            initialCandidate = params.pooledIncumbents?.current()?.assignment
+            params.pooledIncumbents?.current()?.takeIf { it.version > initialPoolVersion }?.let {
+                initialPoolVersion = it.version
+                initialCandidate = it.assignment
+            }
         }
         revalidateInitialCandidate()?.let {
             lpEngine.discardRootLayoutPreparation()
@@ -1095,7 +1099,8 @@ internal class ResumableMinimize(
             return it
         }
         if (unboundedLeaf != null) return null
-        rootLayoutPending = !lpEngine.prepareRootLayout(runEndToken(), params.cancellation)
+        rootLayoutPending = !lpEngine.prepareRootLayout(runEndToken(),
+            if (pausable) params.cancellation else Cancellation.Never)
         if (rootLayoutPending) return null
         val rootToken = rootLpBudget()
         val admissionStarted = if (lpEngine.lpRelaxer != null || lpEngine.retainedRootEnabled) {
