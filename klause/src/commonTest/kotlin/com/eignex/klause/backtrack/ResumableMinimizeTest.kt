@@ -206,7 +206,9 @@ class ResumableMinimizeTest {
                     val delegate = ProductionLpEngineFactory.newTableauSolver(
                         model, cancellation, iterationLimit, workLimit, trackDegeneracy, pricing,
                     )
-                    if (workLimit == 0L) return delegate
+                    if (workLimit == 0L) return object : TableauCutSolver by delegate {
+                        override fun solve(warm: Basis?): FloatLpResult? = null
+                    }
                     val first = primalSolves++ == 0
                     return object : TableauCutSolver by delegate {
                         override val lastTermination get() =
@@ -236,8 +238,10 @@ class ResumableMinimizeTest {
 
             if (allowance > charged) {
                 assertEquals(listOf(1L, 0L), offered.single().ints.toList())
+                assertEquals(2, primalSolves)
             } else {
                 assertTrue(offered.isEmpty())
+                assertEquals(1, primalSolves)
             }
         }
     }
