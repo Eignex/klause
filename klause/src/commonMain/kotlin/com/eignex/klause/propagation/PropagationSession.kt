@@ -125,6 +125,7 @@ class PropagationSession private constructor(
         retainedSharingSize = null
         retainedInprocessingMemory = null
         simplifiedRootSources = null
+        pendingRootSourceRetirement = null
     }
 
     /** Subscribe to per-variable unassign events fired by every backtrack/undo; see
@@ -175,6 +176,14 @@ class PropagationSession private constructor(
     private var scopedLearnedAssertion = false
     private var simplifiedRootSources: MutableSet<Int>? = null
     private var inprocessingRootPending = false
+    internal data class RootSourceRetirement(val factor: Int, val literals: IntArray)
+    internal var pendingRootSourceRetirement: RootSourceRetirement? = null
+        private set
+
+    internal fun retainRootSourceRetirement(factor: Int, literals: IntArray) {
+        check(factor in 0 until problem.numFactors && pendingRootSourceRetirement == null)
+        pendingRootSourceRetirement = RootSourceRetirement(factor, literals)
+    }
 
     internal fun resumeInprocessingRoot(): Boolean = withRequiredInprocessingCancellation {
         if (!inprocessingRootPending) return@withRequiredInprocessingCancellation false
@@ -261,6 +270,7 @@ class PropagationSession private constructor(
                 state.removeBoolWatch(factor, literal)
             }
         }
+        if (pendingRootSourceRetirement?.factor == factor) pendingRootSourceRetirement = null
     }
 
     private val impliedIntUndo: IntArray = preparedBuffers?.impliedIntUndo ?: (IntArray(problem.numIntVars) { -1 })
@@ -1170,9 +1180,16 @@ class PropagationSession private constructor(
             retainedSharingMemory?.invoke(sample)
             retainedInprocessingMemory?.invoke(sample)
             simplifiedRootSources?.let { sample.ownedReferences(it, it.size.toLong(), true) }
+            pendingRootSourceRetirement?.let { retirement ->
+                sample.ownedReferences(retirement, 1L, true)
+                val literals = retirement.literals
+                val original = (problem.factors[retirement.factor] as? Clause)?.literals
+                sample.owned(literals, literals.size.toLong() * Int.SIZE_BYTES, true, shared = literals === original)
+            }
             sample.record(mapOf(
                 "sharedLearningObserved" to if (sharedLearningMemory == null) 0L else 1L,
                 "rootRetiredSourceReferenceSlots" to (simplifiedRootSources?.size?.toLong() ?: 0L),
+                "rootPendingSourceReferenceSlots" to if (pendingRootSourceRetirement == null) 0L else 1L,
             ))
         }
     }

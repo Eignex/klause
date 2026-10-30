@@ -19,17 +19,10 @@ internal class RootSimplificationPass : InprocessingPass {
     override val spending = InprocessingSpending(InprocessingKind.Root)
     private var dropped = IntHashSet()
     private var revision = -1L
-    private var pendingSource: Pair<Int, IntArray>? = null
     private var pending: RootCandidate? = null
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
         sample.owned(dropped, dropped.allocatedBytes, protected)
-        pendingSource?.let { source ->
-            sample.step()
-            sample.ownedReferences(source, 1L, protected)
-            val literals = source.second
-            sample.owned(literals, literals.size.toLong() * Int.SIZE_BYTES, protected)
-        }
         pending?.let { candidate ->
             sample.step()
             sample.ownedReferences(candidate, 2L, protected)
@@ -45,7 +38,6 @@ internal class RootSimplificationPass : InprocessingPass {
         scanRoot = -1
         dropped = IntHashSet()
         revision = -1L
-        pendingSource = null
         pending = null
     }
 
@@ -72,11 +64,10 @@ internal class RootSimplificationPass : InprocessingPass {
         }
         revision = session.learnedClauseRevision
         if (count == 0) return
-        pendingSource?.let { (factor, literals) ->
+        session.pendingRootSourceRetirement?.let { (factor, literals) ->
             if (!budget.visit(literals.size + 1)) return
             session.retireRootSource(factor, literals)
             budget.note("RetirementWork", literals.size + 1L)
-            pendingSource = null
         }
         if (!dropped.isEmpty()) {
             if (budget.stopped()) return
@@ -148,7 +139,7 @@ internal class RootSimplificationPass : InprocessingPass {
                 val before = session.work
                 session.addRootDerivedClause(Clause(residual.toIntArray()), lbd, origin, source)
                 pending = null
-                if (source) pendingSource = factor to literals
+                if (source) session.retainRootSourceRetirement(factor, literals)
                 else dropped.add(index)
                 budget.note("AttachmentWork", session.work - before + residual.size * 2 + 1L)
                 budget.note("Shortened")
@@ -158,7 +149,6 @@ internal class RootSimplificationPass : InprocessingPass {
             if (source) {
                 if (!budget.visit(literals.size + 1)) break
                 session.retireRootSource(factor, literals)
-                pendingSource = null
                 budget.note("RetirementWork", literals.size + 1L)
             } else dropped.add(factor - session.problem.numFactors)
             pending = null
