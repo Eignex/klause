@@ -772,9 +772,16 @@ class LocalSearchState private constructor(
         if (feedsDefinitions(move)) return evaluateMove(move, scored).objectiveDelta
         return when (scored) {
             is LinearObjective -> linearObjectiveDelta(move, scored)
-            is FunctionalObjective -> if (booleanDeltaOf === scored) {
-                booleanDelta?.delta(assignment, move, ::checkScoringWork) ?: scored.deltaIfApplied(assignment, move)
-            } else scored.deltaIfApplied(assignment, move)
+            is FunctionalObjective -> {
+                val indexed = booleanDelta.takeIf { booleanDeltaOf === scored }
+                if (indexed != null) {
+                    indexed.delta(assignment, move, ::checkScoringWork).also {
+                        phaseTimer?.recordObjectiveScoring("indexed")
+                    }
+                } else scored.deltaIfApplied(assignment, move).also {
+                    phaseTimer?.recordObjectiveScoring("generic")
+                }
+            }
             is IncrementalObjective -> scored.deltaIfApplied(assignment, move)
             else -> null
         }
@@ -785,11 +792,15 @@ class LocalSearchState private constructor(
 
     internal fun prepareObjectiveDelta(objective: Objective): Sequence<Unit> = sequence {
         val functional = objective as? FunctionalObjective ?: return@sequence
-        if (scoringView(functional) is LinearObjective) return@sequence
+        if (scoringView(functional) is LinearObjective) {
+            phaseTimer?.recordObjectiveScoring("maintained")
+            return@sequence
+        }
         for (prepared in functional.prepareBooleanDelta(problem.numBoolVars)) {
             if (prepared != null) {
                 booleanDeltaOf = functional
                 booleanDelta = prepared.evaluator
+                phaseTimer?.recordObjectiveScoring(if (prepared.evaluator == null) "declined" else "prepared")
             }
             yield(Unit)
         }
@@ -1522,9 +1533,11 @@ class LocalSearchState private constructor(
                 objective is LinearObjective -> probeLinearObjectiveDelta(objective)
                 indexed != null -> indexed.difference(
                     assignment, probeSlots, savedValuesScratch, ::checkObjectiveProbeWork,
-                )
+                ).also { phaseTimer?.recordObjectiveScoring("indexed") }
                 objective is FunctionalObjective ->
-                    (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble()
+                    (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble().also {
+                        phaseTimer?.recordObjectiveScoring("generic")
+                    }
                 objective == null -> 0.0
                 else -> objective.evaluate(assignment) - oldObjective
             }

@@ -5,6 +5,7 @@ import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.LocalSearchPhaseTimer
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.bake
@@ -23,6 +24,52 @@ import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
 class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
+    @Test
+    fun `indexed primitive scores should report preparation and completed candidate calls`() {
+        val source = Dimacs.parseWcnf("7 1 2 0\n11 -1 2 0\n").toProblem()
+        val sweep = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = source.boolFolds))
+        val functional = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            intArrayOf(), longArrayOf(), 0L, minimize, intArrayOf(2, 3), longArrayOf(7L, 11L),
+        ))
+        val state = LocalSearchState(source.problem.bake(), Random(0))
+        val observations = LocalSearchPhaseTimer { 0L }
+        state.phaseTimer = observations
+        state.prepareObjectiveDelta(functional).forEach { }
+
+        state.objectiveDelta(functional, Move.BoolFlip(0))
+        state.objectiveDelta(functional, Move.BoolFlip(1))
+
+        val counts = observations.objectiveScoringSnapshot()
+        assertEquals(1L, counts.getValue("prepared"))
+        assertEquals(2L, counts.getValue("indexed"))
+        assertEquals(0L, counts.getValue("generic"))
+    }
+
+    @Test
+    fun `propagated indexed scores should report completed candidate calls`() {
+        val source = Dimacs.parseWcnf("h 1 3 0\nh -1 -3 0\n7 3 2 0\n11 -3 2 0\n").toProblem()
+        val sweep = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = source.boolFolds))
+        val functional = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            intArrayOf(), longArrayOf(), 0L, minimize, intArrayOf(3, 4), longArrayOf(7L, 11L),
+        ))
+        val state = LocalSearchState(source.problem.bake(), Random(0))
+        state.invariants = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = listOf(
+            BoolFoldDefinition(2, intArrayOf(Lit.make(0, false)), true),
+        ))).network(0, 5)
+        state.assignment.setBool(2, true)
+        state.assignment.setBool(4, true)
+        state.recompute()
+        val observations = LocalSearchPhaseTimer { 0L }
+        state.phaseTimer = observations
+        state.prepareObjectiveDelta(functional).forEach { }
+
+        state.objectiveDelta(functional, Move.BoolFlip(0))
+
+        val counts = observations.objectiveScoringSnapshot()
+        assertEquals(1L, counts.getValue("indexed"))
+        assertEquals(0L, counts.getValue("generic"))
+    }
+
     @Test
     fun `a maintained probe should restore its coordinates after scoring soft clauses`() {
         val source = Dimacs.parseWcnf("h 1 3 0\nh -1 -3 0\n7 3 2 0\n11 -3 2 0\n").toProblem()
