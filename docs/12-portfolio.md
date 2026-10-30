@@ -546,6 +546,16 @@ arms retire.
 
 ### Preparation revisits
 
+`portfolio-lp-start=after-probes` defers the curated LP workers' first probes in
+single-core mixed finite integer optimization without Boolean or real columns.
+The other initially eligible workers each receive one attempt, or an accepted
+incumbent admits the LP workers sooner. Failed attempts also advance this boundary.
+Every worker keeps its slot, seed, private state and source binding; admission then
+returns to the ordinary initial probes and complete-worker coverage. The existing
+containing deadline and probe accounting remain in force. This control does not
+remove a worker, change rewards or renew an allowance. Explicit recipes and arm
+counts reject it; `ordinary` is the default.
+
 Before the first incumbent, an optimization arm with pending private preparation, or
 a local-search arm that has not executed an instruction, receives preparation
 revisits after all initial siblings have been admitted. Unfinished arms rotate in arm

@@ -1070,6 +1070,14 @@ private fun executePortfolio(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
+    val deferLpProbes = when (val start = request.executionOptions.reader()[ExecutionOption.portfolioLpStart]) {
+        null, "ordinary" -> false
+        "after-probes" -> true
+        else -> pipelineConfigError("portfolio-lp-start expects ordinary|after-probes, got `$start`")
+    }
+    if (deferLpProbes && (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
+        pipelineConfigError("portfolio-lp-start requires curated single-core mixed optimization")
+    }
     val proofShare = request.executionOptions.reader()[ExecutionOption.portfolioProofShare]
     if (proofShare != null && (!proofShare.isFinite() || proofShare !in 0.5..1.0)) {
         pipelineConfigError("portfolio-proof-share must be finite and in [0.5, 1]")
@@ -1083,7 +1091,7 @@ private fun executePortfolio(
             engine = request.engine,
             optimize = request.optimize,
             cores = request.cores,
-            executionOptions = request.executionOptions.without("portfolio-proof-share"),
+            executionOptions = request.executionOptions.without("portfolio-proof-share", "portfolio-lp-start"),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpCeiling = request.lpConfig,
@@ -1100,6 +1108,11 @@ private fun executePortfolio(
             plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
             plan.scenario.annotationArm != null)) {
         pipelineConfigError("portfolio-proof-share requires a curated recipe pool")
+    }
+    if (deferLpProbes && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
+            plan.scenario.annotationArm != null)) {
+        pipelineConfigError("portfolio-lp-start requires a curated recipe pool")
     }
     when (plan) {
         is PortfolioPlan.LocalSearchDryRun -> return localSearchDryRun(plan.pool)
@@ -1142,6 +1155,7 @@ private fun executePortfolio(
         objectiveCoordinates = request.objectiveCoordinates,
         incumbentCompletionCheck = request.incumbentCompletionCheck(),
         improvementProofShare = proofShare ?: 0.5,
+        deferLpProbes = deferLpProbes,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

@@ -529,6 +529,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Opt-in retained proof coverage share in [0.5, 1] for curated single-core finite optimization. */
         val portfolioProofShare: ExecutionOption<Double> = ExecutionOption("portfolio-proof-share", ValueKind.DOUBLE)
 
+        /** Select ordinary LP probes or defer them until the other initial probes finish or find an incumbent. */
+        val portfolioLpStart: ExecutionOption<String> = ExecutionOption("portfolio-lp-start", ValueKind.STRING)
+
         /** The `reseed-stale-threshold` execution setting. */
         val reseedStaleThreshold: ExecutionOption<Int> = ExecutionOption("reseed-stale-threshold", ValueKind.INT)
 
@@ -576,7 +579,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, coreEarly, companionIntegers,
                 sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
                 coreRefinement, companionAfterIncumbent, companionActiveMillis, portfolioProgress,
-                phaseRetention, portfolioReward, portfolioProofShare, reseedStaleThreshold,
+                phaseRetention, portfolioReward, portfolioProofShare, portfolioLpStart, reseedStaleThreshold,
                 lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
             ).associateBy { it.id }
         }

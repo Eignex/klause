@@ -10,20 +10,21 @@ import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioDiagnostics
+import com.eignex.klause.portfolio.PortfolioEvent
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.PortfolioWorker
-import com.eignex.klause.portfolio.WorkerProofAuthority
 import com.eignex.klause.portfolio.SourceWorkerBinding
+import com.eignex.klause.portfolio.WorkerProofAuthority
 import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.portfolio.continuousMajority
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -78,11 +79,19 @@ internal fun FinitePipeline.portfolioExecutor(
     objectiveCoordinates: ObjectiveCoordinateView? = null,
     incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
     improvementProofShare: Double = 0.5,
+    deferLpProbes: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
     }
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
+    if (deferLpProbes && (profile.problemClass != ProblemClass.FiniteCp || problem.numBoolVars != 0 ||
+            scenario.cores != 1 || scenario.kind != Kind.COP || scenario.engine != EngineMix.MIXED ||
+            scenario.explicitArms || scenario.arms != PortfolioScenario.DEFAULT_ARMS ||
+            scenario.btPool != null || scenario.lsPool != null || scenario.btEdit != null ||
+            scenario.annotationArm != null)) {
+        pipelineConfigError("portfolio-lp-start requires a curated single-core mixed finite integer optimization")
+    }
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
     val companionEligibility = numericalCompanions?.let {
@@ -186,7 +195,34 @@ internal fun FinitePipeline.portfolioExecutor(
             if (workers[arm].label == "numerical/finite-companion") 3 else 1
         }
         PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes,
-            probeWeights = probeWeights)
+            probeWeights = probeWeights,
+            onProgress = if (deferLpProbes) deferredLpProbes(workers) else null)
+    }
+}
+
+internal fun deferredLpProbes(workers: List<PortfolioWorker>): ((PortfolioEvent) -> Unit)? {
+    val delayed = workers.indices.filter {
+        when (workers[it].label) {
+            "bt/lp-default", "bt/lp-aggressive", "bt/lp-conservative" -> !workers[it].startAfterIncumbent
+            else -> false
+        }
+    }
+    val pending = workers.indices.filter {
+        it !in delayed && !workers[it].startAfterIncumbent &&
+            !workers[it].improvementOnly && !workers[it].auxiliaryProof
+    }.toMutableSet()
+    if (delayed.isEmpty() || pending.isEmpty()) return null
+    delayed.forEach { workers[it].startAfterIncumbent = true }
+    var released = false
+    return observer@{ event ->
+        if (released) return@observer
+        val progress = (event as? PortfolioEvent.Progressed)?.progress ?: return@observer
+        if (progress.idleCredit) return@observer
+        pending.remove(progress.arm)
+        if (progress.acceptedIncumbent || pending.isEmpty()) {
+            delayed.forEach { workers[it].startAfterIncumbent = false }
+            released = true
+        }
     }
 }
 

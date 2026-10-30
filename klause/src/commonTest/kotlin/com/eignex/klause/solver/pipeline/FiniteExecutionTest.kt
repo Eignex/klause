@@ -16,6 +16,76 @@ import kotlin.test.assertNull
 
 class FiniteExecutionTest {
     @Test
+    fun `typed and parsed deferred LP controls should execute a curated finite integer optimization`() {
+        for (options in listOf(ExecutionOptions(ExecutionOption.portfolioLpStart("after-probes")),
+            ExecutionOptions.parse(listOf("portfolio-lp-start=after-probes")))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(true, result.completeSearchAdmitted)
+        }
+    }
+
+    @Test
+    fun `deferred LP controls should reject unknown policies and explicit recipe ownership`() {
+        for (settings in listOf(listOf("portfolio-lp-start=never"),
+            listOf("portfolio-lp-start=after-probes", "arms=2"),
+            listOf("portfolio-lp-start=after-probes", "bt-arm=satOptimized"))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions.parse(settings),
+            )
+
+            assertFailsWith<PipelineConfigException> {
+                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            }
+        }
+    }
+
+    @Test
+    fun `deferred LP controls should reject unsupported operations lanes and engines`() {
+        for ((optimize, cores, engine) in listOf(Triple(false, 1, FiniteEngine.MIXED),
+            Triple(true, 2, FiniteEngine.MIXED), Triple(true, 1, FiniteEngine.BACKTRACK))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, optimize, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize }, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, engine, cores = cores, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions(ExecutionOption.portfolioLpStart("after-probes")),
+            )
+
+            assertFailsWith<PipelineConfigException> {
+                FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+            }
+        }
+    }
+
+    @Test
+    fun `deferred LP controls should reject Boolean sources`() {
+        val shape = FiniteSolveShape(Problem(1, 0, emptyArray(), emptyArray()), true, false, null,
+            LinearObjective(longArrayOf(1)), 0, null)
+        val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+            shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+            executionOptions = ExecutionOptions(ExecutionOption.portfolioLpStart("after-probes")),
+        )
+
+        assertFailsWith<PipelineConfigException> {
+            FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+        }
+    }
+
+    @Test
     fun `typed and parsed proof shares should execute a curated finite optimization`() {
         for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProofShare(0.75)),
             ExecutionOptions.parse(listOf("portfolio-proof-share=0.75")))) {
