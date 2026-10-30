@@ -202,6 +202,7 @@ object BooleanProofSchedulerProfile {
                     put("sourceProbeSegments", probeSegments)
                     put("partitionLiteral", partitionLiteral)
                     put("decisions", result.stats.search.nodes.sum)
+                    put("restarts", result.stats.search.restarts.sum)
                     put("nodeBudgetSpent", budget.spent)
                     put("propagationWork", result.stats.search.propagationWork.sum)
                     put("rootPropagationWork", result.stats.search.rootPropagationWork.sum)
