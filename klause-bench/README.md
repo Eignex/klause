@@ -844,6 +844,10 @@ selection remain separate source-wide costs. The wrapper retains actual JDK file
 that shared identity prefix. Its assembly includes fragment import and installation;
 standalone import remains in the solve-and-certification interval. Route timings
 therefore compare modes within one route, not isolated stage names across routes.
+Per-stage thread allocation separates assembly from import, solve and retirement.
+Residual allocation includes view selection, result recording and snapshot publication;
+unavailable counters stay null. The wrapper exports sampled JFR allocation stacks
+after the numerical process, with distinct exit and resource receipts for that analysis.
 
 The unchanged-index controls [9363](https://lab.eignex.com/jobs/9363) and
 [9369](https://lab.eignex.com/jobs/9369), at `69cc7b2250`, compare all three modes

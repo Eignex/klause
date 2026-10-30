@@ -33,10 +33,20 @@ if command -v lscpu >/dev/null; then lscpu > "$OUT/cpu.txt"; fi
   'set -euo pipefail; find -H "$1" -type f -print0 | sort -z | xargs -0 sha256sum' _ "$JAVA_HOME" \
   > "$OUT/runtime-sha256.txt"
 find "$LAB_WORKTREE/klause/build/lp-profile/jvm" -type f -print0 | sort -z | xargs -0 sha256sum > "$OUT/jvm-sha256.txt"
-exec /usr/bin/time -v -o "$OUT/resources.txt" \
+profile_status=0
+/usr/bin/time -v -o "$OUT/resources.txt" \
   "${JAVA_HOME:+$JAVA_HOME/bin/}java" -Xmx512m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC \
   --enable-native-access=ALL-UNNAMED --add-modules=jdk.incubator.vector \
   "-XX:StartFlightRecording=filename=$OUT/profile.jfr,settings=profile,dumponexit=true" \
   -cp "$LAB_WORKTREE/klause/build/lp-profile/jvm/classes:$LAB_WORKTREE/klause/build/lp-profile/jvm/lib/*" \
   com.eignex.klause.bench.profile.LpTemplatePreparationProfile "$source_argument" "$source_hash" \
-  "${2:-3}" "${3:-32}" "${4:-standalone}"
+  "${2:-3}" "${3:-32}" "${4:-standalone}" || profile_status=$?
+printf '%s\n' "$profile_status" > "$OUT/numerical.exit"
+analysis_status=0
+JAVA_TOOL_OPTIONS='-Xmx512m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC' \
+  /usr/bin/time -v -o "$OUT/allocation-analysis-resources.txt" \
+  "$JAVA_HOME/bin/jfr" print --json --events jdk.ObjectAllocationSample "$OUT/profile.jfr" \
+  > "$OUT/allocations.json" || analysis_status=$?
+printf '%s\n' "$analysis_status" > "$OUT/allocation-analysis.exit"
+if [[ "$profile_status" -ne 0 ]]; then exit "$profile_status"; fi
+exit "$analysis_status"

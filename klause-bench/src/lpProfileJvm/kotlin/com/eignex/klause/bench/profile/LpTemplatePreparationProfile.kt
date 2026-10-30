@@ -18,6 +18,7 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -63,9 +64,15 @@ internal object LpTemplatePreparationProfile {
         val objective = requireNotNull(compiled.objective).toLinearObjective()
             .let { if (compiled.maximize) it.negated() else it }
         val stop = Cancellation.after(120.seconds)
-        val cpu = ManagementFactory.getThreadMXBean().takeIf {
+        val management = ManagementFactory.getThreadMXBean()
+        val cpu = management.takeIf {
             it.isCurrentThreadCpuTimeSupported && it.isThreadCpuTimeEnabled
         }
+        val allocations = (management as? ThreadMXBean)?.takeIf {
+            it.isThreadAllocatedMemorySupported && it.isThreadAllocatedMemoryEnabled
+        }
+        fun readAllocatedBytes(): Long? =
+            allocations?.getThreadAllocatedBytes(Thread.currentThread().threadId())?.takeIf { it >= 0L }
         val modes = listOf("disabled", "object", "index", "candidate")
         out.resolve("runs.jsonl").bufferedWriter().use { writer ->
             repeat(repeats + 1) { round ->
@@ -73,7 +80,7 @@ internal object LpTemplatePreparationProfile {
                     val signatures = HashMap<String, List<String>>()
                     for (offset in modes.indices) {
                         val mode = modes[(round + offset) % modes.size]
-                        val startBytes = profileAllocatedBytes()
+                        val startBytes = readAllocatedBytes()
                         val startCpu = cpu?.currentThreadCpuTime?.takeIf { it >= 0L }
                         val start = System.nanoTime()
                         val selected = FactorProjectionProviders.Default.prepare(source)
@@ -102,6 +109,8 @@ internal object LpTemplatePreparationProfile {
                         }
                         var assemblyNs = 0L
                         var solveNs = 0L
+                        var assemblyBytes: Long? = 0L
+                        var importSolveRetirementBytes: Long? = 0L
                         var retainedUnits = 0L
                         var coldNs = 0L
                         val results = ArrayList<String>()
@@ -111,6 +120,15 @@ internal object LpTemplatePreparationProfile {
                                 .let { it.withFactors(it.factors.copyOf()) }
                             val cost = if (step % 2 == 1) changedObjective else objective
                             val opening = System.nanoTime()
+                            val openingBytes = readAllocatedBytes()
+                            var assemblyEndBytes: Long? = null
+                            var assembled = false
+                            fun finishAssembly() {
+                                assemblyEndBytes = readAllocatedBytes()
+                                assemblyBytes = sumBytes(assemblyBytes, openingBytes, assemblyEndBytes)
+                                assemblyNs += System.nanoTime() - opening
+                                assembled = true
+                            }
                             val selectedView = if (change == "cold") {
                                 FactorProjectionProviders.Default.prepare(view)
                             } else selected.forEngineView(view)
@@ -137,7 +155,7 @@ internal object LpTemplatePreparationProfile {
                                             token = consumerToken, permanentRows = edit.permanentRows,
                                             objective = edit.objective, assertions = assertions))
                                         edit.commit()
-                                        assemblyNs += System.nanoTime() - opening
+                                        finishAssembly()
                                         val solving = System.nanoTime()
                                         requireNotNull(owner.solve(token = token)).also {
                                             solveNs += System.nanoTime() - solving
@@ -145,7 +163,7 @@ internal object LpTemplatePreparationProfile {
                                     }
                                 } else {
                                     val relaxation = consumer.build(RootDomains(view), cancellation = consumerToken)
-                                    assemblyNs += System.nanoTime() - opening
+                                    finishAssembly()
                                     val solving = System.nanoTime()
                                     val exact = requireNotNull(relaxation.authoritativeWithTemplates(token) {
                                         consumer.observeBoundTemplates(it)
@@ -156,10 +174,15 @@ internal object LpTemplatePreparationProfile {
                                 }
                             } catch (_: LpAssemblyCancelled) {
                                 check(change == "cancel" && step % 2 == 1)
-                                assemblyNs += System.nanoTime() - opening
+                                if (assembled) {
+                                    importSolveRetirementBytes = sumBytes(importSolveRetirementBytes,
+                                        assemblyEndBytes, readAllocatedBytes())
+                                } else finishAssembly()
                                 results.add("cancelled")
                                 return@consumers
                             }
+                            importSolveRetirementBytes = sumBytes(importSolveRetirementBytes,
+                                assemblyEndBytes, readAllocatedBytes())
                             retainedUnits = maxOf(retainedUnits, consumer.preparationTemplates?.storageUnits ?: 0L)
                             results.add("${result.verdict}:${result.lowerBound}:${result.witness?.objective}")
                             if (step == 0) coldNs = System.nanoTime() - start
@@ -168,7 +191,12 @@ internal object LpTemplatePreparationProfile {
                         val totalNs = System.nanoTime() - start
                         val endCpu = cpu?.currentThreadCpuTime?.takeIf { it >= 0L }
                         val threadCpuNs = if (startCpu != null && endCpu != null) endCpu - startCpu else null
-                        val allocatedBytes = profileAllocatedBytes()?.let { it - requireNotNull(startBytes) }
+                        val allocatedBytes = sumBytes(0L, startBytes, readAllocatedBytes())
+                        val measuredAssemblyBytes = assemblyBytes
+                        val measuredImportBytes = importSolveRetirementBytes
+                        val otherBytes = if (allocatedBytes != null && measuredAssemblyBytes != null &&
+                            measuredImportBytes != null
+                        ) allocatedBytes - measuredAssemblyBytes - measuredImportBytes else null
                         signatures[mode] = results
                         val preparation = phases["TEMPLATE_PREPARATION_NODE"]
                         val assembly = phases["TEMPLATE_ASSEMBLY_NODE"]
@@ -188,6 +216,9 @@ internal object LpTemplatePreparationProfile {
                             put("assemblyIncludingPreparationNs", assemblyNs)
                             put("solveAndCertificationNs", solveNs)
                             put("totalThreadBytes", allocatedBytes)
+                            put("assemblyThreadBytes", measuredAssemblyBytes)
+                            put("importSolveRetirementThreadBytes", measuredImportBytes)
+                            put("otherThreadBytes", otherBytes)
                             put("totalWork", work)
                             put("preparationNs", preparation?.nanos ?: 0L)
                             put("preparationWork", preparation?.work ?: 0L)
@@ -209,4 +240,7 @@ internal object LpTemplatePreparationProfile {
             }
         }
     }
+
+    private fun sumBytes(total: Long?, before: Long?, after: Long?): Long? =
+        if (total != null && before != null && after != null) total + after - before else null
 }
