@@ -34,15 +34,15 @@ import kotlin.test.assertTrue
 class LpEngineTest {
     @Test
     fun `ordinary node pruning consumes a checked partial component bound`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 5) }, listOf(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
-            Linear(intArrayOf(2), intArrayOf(1), LinearOp.GE, 1),
-            Linear(intArrayOf(2), intArrayOf(2), LinearOp.GE, 1),
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 5) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
         ))
         val sink = SolveStatsSink("partial-component-prune")
 
-        val pruned = LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1, 1), constant = 7L),
+        val pruned = LpEngine(problem, LinearObjective(intCoefficients = LongArray(6) { 1L }, constant = 7L),
             LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true, boundMaxPivots = 2,
                 probe = false, rootCutHarvest = false)), sink).use { engine ->
             engine.pruneNode(PropagationSession(problem), 8.0, -1, true)
