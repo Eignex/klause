@@ -152,27 +152,32 @@ internal data class LpIntegerBoundTemplate(
         return current
     }
 
-    fun compatibleColumn(current: ExactLpColumn, cancellation: Cancellation = Cancellation.Never): ExactLpColumn? {
+    fun compatibleColumn(
+        current: ExactLpColumn,
+        cancellation: Cancellation = Cancellation.Never,
+        onWork: (Long) -> Unit = {},
+    ): ExactLpColumn? {
         val previous = completedColumn.load()
         if (previous == current) return previous
-        if (!matchesColumn(current, cancellation) || cancellation()) return null
+        if (!matchesColumn(current, cancellation, onWork) || cancellation()) return null
         completedColumn.compareAndSet(previous, current)
         return current
     }
 
-    private fun matchesColumn(current: ExactLpColumn, cancellation: Cancellation): Boolean =
+    private fun matchesColumn(current: ExactLpColumn, cancellation: Cancellation, onWork: (Long) -> Unit): Boolean =
         current.integral && current.tag == variable && current.origin.legacyLong() == lower &&
-            matchesLower(current.bounds.lower) && matchesUpper(current.bounds.upper, cancellation)
+            matchesLower(current.bounds.lower) && matchesUpper(current.bounds.upper, cancellation, onWork)
 
     private fun matchesLower(side: ExactLpSide?): Boolean = side != null &&
         !side.strict && side.premises == null && side.number.legacyLong() == 0L
 
-    private fun matchesUpper(side: ExactLpSide?, cancellation: Cancellation): Boolean {
+    private fun matchesUpper(side: ExactLpSide?, cancellation: Cancellation, onWork: (Long) -> Unit): Boolean {
         if (side == null) return true
         if (side.strict || side.premises != null || side.number.ieeeBits != null) return false
         val width = upper - lower
         if (width >= 0L) return side.number.legacyLong() == width
         cancellation.charge(COLUMN_WORK)
+        onWork(COLUMN_WORK)
         if (cancellation()) return false
         return side.number.value == BigFraction.ofLong(upper) - BigFraction.ofLong(lower)
     }

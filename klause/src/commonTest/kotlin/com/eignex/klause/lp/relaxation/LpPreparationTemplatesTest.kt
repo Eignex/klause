@@ -329,6 +329,25 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `wide bound matching should debit its allowance before adoption`() {
+        val previous = LpIntegerBoundTemplate(0, Long.MIN_VALUE + 1L, Long.MAX_VALUE, true, true).column
+        val template = LpIntegerBoundTemplate(0, Long.MIN_VALUE + 1L, Long.MAX_VALUE, true, true)
+        var charged = 0L
+        var reported = 0L
+        val meter = WorkMeter { charged += it }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = reported > 0L
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        val imported = template.compatibleColumn(previous, token) { reported += it }
+
+        assertTrue(charged > 0L)
+        assertEquals(charged, reported)
+        assertNull(imported)
+    }
+
+    @Test
     fun `alternating probe upper sides should preserve current exact authority`() {
         val consumer = CpToLpRelaxation(source, objective, projections = selection, reuseTemplateMetadata = true)
         val relaxation = consumer.build(RootDomains(source))

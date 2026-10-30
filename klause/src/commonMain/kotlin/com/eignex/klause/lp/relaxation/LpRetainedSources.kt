@@ -231,6 +231,7 @@ internal class LpRetainedSources(
         var constant = state.model.objective.constant.value
         var emittedExtent = 0L
         var boundTemplates = 0
+        val onBoundWork = relaxer::observeTemplateWork
         for (index in update.changed) {
             if (cancellation()) throw LpAssemblyCancelled()
             check(epoch < Long.MAX_VALUE)
@@ -261,7 +262,7 @@ internal class LpRetainedSources(
                         val current = source.column(local)
                         val prepared = if (!fragment.colIsBool[local] && fragment.colRealId[local] < 0) {
                             relaxer.preparationTemplates?.bound(fragment.colVarId[local])
-                                ?.compatibleColumn(current, cancellation)
+                                ?.compatibleColumn(current, cancellation, onBoundWork)
                         } else null
                         checkCancellation(cancellation)
                         if (prepared != null) boundTemplates++
