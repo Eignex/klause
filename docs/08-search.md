@@ -330,7 +330,7 @@ The finite-domain fixpoint runs watched propagators until no domain changes or a
 conflict appears. [Explanation lifetime](09-learning.md#explanation-lifetime)
 defines the reasons retained for its deductions.
 
-An opt-in cost-aware worklist retains FIFO order when the oldest factor's measured
+A cost-aware worklist retains FIFO order when the oldest factor's measured
 mechanism-family work is at most the fifteen-visit inspection-and-shift budget. Otherwise it selects
 the least measured work within the oldest eight pending factors, retaining FIFO
 order for ties. Each family
@@ -342,7 +342,11 @@ fire. New wakes append, so every pending factor has a bounded number of earlier
 dispatches. Selection and queue shifts charge the containing propagation work.
 Family estimates survive retraction without retaining factor identities; queue
 replacement resets the bypass count. The fixed family array belongs to the state
-and participates in its retained memory observation. FIFO remains the default.
+and participates in its retained memory observation. The fixed finite optimization
+route enables it for integer models with mandatory cumulative tasks and constant
+durations, demands and capacities, excluding mixed placement models. Explicit
+execution options override that policy. Other routes and direct backtrack parameters
+retain FIFO unless requested.
 Exact dispatch, bypass, forced-opportunity and charged selection-work counters
 survive queue replacement and state retirement; selection work is a subset of the
 containing propagation work.
