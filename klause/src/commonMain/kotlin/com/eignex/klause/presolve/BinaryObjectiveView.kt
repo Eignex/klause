@@ -31,7 +31,6 @@ internal class BinaryObjectiveView(
                 objective.intCoefficientValues.none { it != 0L }
             ) return null
             val ranges = ColumnRanges.of(problem.rootIntDomainsInPlace)
-            val binaryCosts = BooleanArray(problem.numIntVars)
             var hasBinaryCost = false
             var hasNonbinaryCost = false
             for (v in objective.intCoefficientValues.indices) {
@@ -39,7 +38,6 @@ internal class BinaryObjectiveView(
                 if (objective.intCoefficientValues[v] == 0L) continue
                 if (v >= problem.numIntVars) return null
                 if (ranges.isClosed(v) && ranges.min(v) >= 0L && ranges.max(v) <= 1L) {
-                    binaryCosts[v] = true
                     hasBinaryCost = true
                 } else {
                     if (!allowMixedObjective) return null
@@ -65,7 +63,9 @@ internal class BinaryObjectiveView(
                 val coefficient = bigIntOf(objective.intCoefficientValues[v])
                 if (v % 256 == 0 && problem.cancellation()) return null
                 if (objective.intCoefficientValues[v] == 0L) continue
-                if (!binaryCosts[v]) continue
+                if (hasNonbinaryCost &&
+                    (!ranges.isClosed(v) || ranges.min(v) < 0L || ranges.max(v) > 1L)
+                ) continue
                 if (ranges.max(v) == 0L) {
                     retainedCosts[v] = 0L
                     changed = true
