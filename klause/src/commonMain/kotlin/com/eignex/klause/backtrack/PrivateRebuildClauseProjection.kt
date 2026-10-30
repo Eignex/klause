@@ -9,7 +9,8 @@ internal class PrivateRebuildClauseProjection private constructor(
     private val eliminated: BooleanArray,
     private val stages: List<Stage>,
 ) {
-    private class Stage(val variable: Int, val positive: IntArray?, val negative: IntArray?) {
+    private class Stage(val variable: Int, val positive: IntArray?, val negative: IntArray?,
+        val replacement: Int = Lit.NONE) {
         val pureValue: Boolean? get() = when {
             positive == null -> false
             negative == null -> true
@@ -38,6 +39,16 @@ internal class PrivateRebuildClauseProjection private constructor(
                 pivot = literal
             }
             if (pivot == Lit.NONE) continue
+            if (stage.replacement != Lit.NONE) {
+                if (!visit(current.size * 4L + 1L)) return Result.Stopped
+                val replaced = Clause(IntArray(current.size) { index ->
+                    if (Lit.variable(current[index]) != stage.variable) current[index]
+                    else if (Lit.isPositive(current[index])) stage.replacement else Lit.negate(stage.replacement)
+                })
+                if (replaced.tautological) return Result.Skipped
+                current = replaced.literals
+                continue
+            }
             val pure = stage.pureValue
             if (pure != null) {
                 if (Lit.evaluate(pivot, pure)) return Result.Skipped
@@ -80,17 +91,28 @@ internal class PrivateRebuildClauseProjection private constructor(
             val stages = ArrayList<Stage>(rebuild.steps.size)
             // Rebuild descriptors run backwards; clause projection follows the elimination order.
             for (step in rebuild.steps.asReversed()) {
-                if (step !is RebuildStep.SatisfyClauses || step.variable !in 0 until columns) return null
-                if (eliminated[step.variable] || !visit(3L)) return null
-                eliminated[step.variable] = true
+                val variable = when (step) {
+                    is RebuildStep.SatisfyClauses -> step.variable
+                    is RebuildStep.CopyLiteral -> step.variable
+                    else -> return null
+                }
+                if (variable !in 0 until columns || eliminated[variable] || !visit(3L)) return null
+                eliminated[variable] = true
+                if (step is RebuildStep.CopyLiteral) {
+                    if (Lit.variable(step.source) !in 0 until columns ||
+                        Lit.variable(step.source) == variable) return null
+                    stages.add(Stage(variable, null, null, step.source))
+                    continue
+                }
+                val clauses = (step as RebuildStep.SatisfyClauses).clauses
                 var positive: IntArray? = null
                 var negative: IntArray? = null
-                for (parent in step.clauses) {
+                for (parent in clauses) {
                     if (!visit(parent.size + 2L)) return null
                     var pivot = Lit.NONE
                     for (literal in parent) {
                         if (Lit.variable(literal) !in 0 until columns) return null
-                        if (Lit.variable(literal) != step.variable) continue
+                        if (Lit.variable(literal) != variable) continue
                         if (pivot != Lit.NONE) return null
                         pivot = literal
                     }
@@ -100,7 +122,7 @@ internal class PrivateRebuildClauseProjection private constructor(
                     } else if (parent.size < (negative?.size ?: Int.MAX_VALUE)) negative = parent
                 }
                 if (positive == null && negative == null) return null
-                stages.add(Stage(step.variable, positive, negative))
+                stages.add(Stage(variable, positive, negative))
             }
             return PrivateRebuildClauseProjection(eliminated, stages)
         }
