@@ -49,7 +49,7 @@ internal class PrivateRebuildGeneration private constructor(
                 entries += factor.literals.size
             }
             // This admission model covers simultaneous primitive buffers and reference slots,
-            // including the BVE database, source copies, reconstruction and a fresh native worker.
+            // including admission, the BVE database, source copies, reconstruction and a fresh native worker.
             // Object headers, the retained canonical worker and allocator overhead are separate.
             val bytes = entries * 512L
             if (bytes > byteLimit) {
@@ -76,6 +76,14 @@ internal class PrivateRebuildGeneration private constructor(
                 source.numBoolVars, 0, emptyArray(), residual.toTypedArray(),
                 settings = source.settings, semantics = source.semantics,
             )
+            when (PrivateRebuildAdmission.permits(pinned, cancellation)) {
+                false -> {
+                    onDecline("GrowthProxy")
+                    return null
+                }
+                null -> return null
+                true -> Unit
+            }
             var mapping = SourceMapping(source, pinned, guarantees, lift = { sample ->
                 Sample(BooleanArray(fixed.size) { fixed[it] ?: sample.boolValue(it) }, longArrayOf())
             })
