@@ -96,6 +96,8 @@ internal object LpLibrarySuite : BenchSuite {
             "callerRuntime" to runtime,
         ), comparisonControls = KlauseLabSuite.comparisonControls(case) + mapOf(
             "series" to "lp-public-library-v1-$runtime", "caller" to "baked-backtrack", "runtime" to runtime,
+            "libraryPreset" to "satOptimized", "maxInstructions" to "1000",
+            "sourceLowering" to "toExactSourceProblem",
             "runtimeFingerprint" to provenance.copy(distribution = emptyMap(), harness = emptyMap()).fingerprint,
             "heap-mib" to if (runtime == "native") "not-applicable-native" else p.getValue("heap-mib"),
             "gc" to if (runtime == "native") "compiled-default" else p.getValue("gc"),
