@@ -161,6 +161,7 @@ coordinate snapshots cross workers; producer certificates and failed or pending 
 stay private. Lookup and copied snapshots debit the consumer's existing funding, and
 each consumer retains its source witness and objective admission checks. Sharing grants
 no work, lifetime, bound or terminal authority.
+Consumers reserve the retained exact scalar payload under their own allocation ceiling.
 Completion statistics distinguish shared checked reuse from private recovery; both
 remain inside the consuming owner's completion time.
 

@@ -155,11 +155,30 @@ class LinearIncumbentCompletionTest {
         val shared = LinearIncumbentSharing()
         val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
         val funding = SourceLpFunding(2_000_000L, 672L).also { it.grant(2_000_000L) }
+        val budget = SourceLpBudget(maxOperations = 0, funding = funding)
 
         LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
             assertNotNull(producer.complete(source, seed, Cancellation.Never))
-            LinearIncumbentCompletion(SourceLpBudget(maxOperations = 0, funding = funding), originalCheck, shared)
-                { _, _ -> }.use { consumer -> assertNull(consumer.complete(source, seed, Cancellation.Never)) }
+            LinearIncumbentCompletion(budget, originalCheck, shared) { _, _ -> }.use { consumer ->
+                assertNull(consumer.complete(source, seed, Cancellation.Never))
+            }
+        }
+    }
+
+    @Test
+    fun `a shared success should not renew an unchanged private failed attempt`() {
+        val shared = LinearIncumbentSharing()
+        val originalCheck: (Sample, BigFraction, Cancellation) -> Boolean = { _, _, _ -> true }
+        val funding = SourceLpFunding(2_000_000L, 64L * 1024L * 1024L).also { it.grant(2_000_000L) }
+        val budget = SourceLpBudget(maxOperations = 0, funding = funding)
+
+        LinearIncumbentCompletion(budget, originalCheck, shared) { _, _ -> }.use { consumer ->
+            assertNull(consumer.complete(source, seed, Cancellation.Never))
+            LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
+                assertNotNull(producer.complete(source, seed, Cancellation.Never))
+
+                assertNull(consumer.complete(source, seed.copy(), Cancellation.Never))
+            }
         }
     }
 
