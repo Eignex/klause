@@ -1231,9 +1231,6 @@ internal class LocalSearchEngine(
         state.shaping.objective = objective
         state.shaping.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
         state.shaping.feasibilityGated = params.costShaping.feasibilityGated
-        timing.inPhase("preparation") {
-            prepareSteps(state.prepareObjectiveDelta(objective), params, checkpoint)
-        }
         if (params.objectiveGuidance == ObjectiveGuidance.Geometric) {
             timing.inPhase("preparation") {
                 prepareSteps(prepareObjectiveProposals(state, params.lsObjective), params, checkpoint)
