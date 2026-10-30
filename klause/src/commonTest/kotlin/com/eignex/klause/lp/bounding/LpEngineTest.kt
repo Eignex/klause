@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -45,12 +46,12 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpEngineTest {
@@ -68,19 +69,15 @@ class LpEngineTest {
                 engine.totalSolveWork() > before
             })
             val paid = engine.totalSolveWork()
-            val prepared = sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls
             val ready = engine.prepareRootLayout(Cancellation.Never, Cancellation.Never)
-            val imported = sink.snapshot().lp.phases["TEMPLATE_ASSEMBLY_NODE"]?.outcomes?.get("EXACT_BOUND_OBJECTS")
+            val imported = assertNotNull(engine.propagator.state)
             val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
 
             assertFalse(readyInFirstSlice)
             assertTrue(paid > before)
             assertTrue(ready)
-            assertNotNull(prepared)
-            assertEquals(prepared, sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls)
-            assertNotNull(imported)
-            assertEquals(imported,
-                sink.snapshot().lp.phases["TEMPLATE_ASSEMBLY_NODE"]?.outcomes?.get("EXACT_BOUND_OBJECTS"))
+            assertFalse(sink.snapshot().lp.phases.containsKey("TEMPLATE_PREPARATION_NODE"))
+            assertSame(imported, engine.propagator.state)
             assertEquals(3.0, bound)
         }
     }
@@ -259,26 +256,29 @@ class LpEngineTest {
     }
 
     @Test
-    fun `cancelled template preparation charges the containing LP allowance`() {
-        val problem = boundedProblem().bake(FactorProjectionProviders.Default)
+    fun `cancelled source assembly charges the containing LP allowance`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8),
+        ))
+        var armed = false
+        var cancelled = false
         var work = 0L
-        val token = object : Cancellation {
-            private val meter = WorkMeter { work += it }
-            override fun isCancelled(): Boolean = work >= 3L
-            override fun workMeter(): WorkMeter = meter
-        }
-        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true), cancellation = token),
-            SolveStatsSink("cancelled-template-charge"),
-            projections = assertNotNull(problem.factorProjections)).use { engine ->
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true), cancellation = Cancellation { cancelled }),
+            SolveStatsSink("cancelled-source-charge"), containingWork = {
+                if (armed) {
+                    work += it
+                    cancelled = true
+                }
+            }).use { engine ->
             val before = engine.totalSolveWork()
-            work = 0L
+            armed = true
 
             assertFailsWith<LpAssemblyCancelled> {
-                assertNotNull(engine.lpRelaxer).build(RootDomains(problem), cancellation = token)
+                engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), PropagationSession(problem))
             }
 
-            assertTrue(work >= 3L)
+            assertTrue(work > 0L)
             assertEquals(work, engine.totalSolveWork() - before)
         }
     }

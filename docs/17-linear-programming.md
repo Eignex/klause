@@ -132,9 +132,9 @@ Successful imports carry the known catalog index in the existing
 column-mapping scratch, avoiding a second lookup. Full definition checks and reused
 imports have separate observations, including checks in interrupted attempts.
 The catalog retains no additional cache or numerical result authority.
-An internal retained-only admission policy uses this catalog path and omits source
-template preparation from whole-model builds. Its complete layouts keep ordinary
-construction; actual later fragment imports supply the demand for reuse. This policy
+LP bounding engines select retained-only admission through this catalog path,
+omitting source template preparation from whole-model builds. Complete layouts keep
+ordinary construction; actual later fragment imports supply the demand for reuse. This policy
 is independent of whole-model selective metadata reuse.
 
 Template construction polls and charges the containing token, including failed
