@@ -68,6 +68,13 @@ cap from a completed bounded pass with no elimination; neither excludes other
 structural opportunities. `DeclinedGrowthProxy` records a completed cheap
 count/literal-volume admission refusal; tautology or duplicate savings can
 still make other eliminations useful.
+`AdmittedColumns` counts the initial pivot set for successful generations;
+the private BVE pass protects other columns rather than analyzing their pivots.
+`BveIndexedFactors` and `BveSourceFactors` compare the indexed neighborhood with
+the pinned source. A single admitted pivot indexes only its incident rows;
+multiple pivots use the full database. `ReusedSourceClauses` counts unchanged
+immutable inputs retained during pinning; later elimination can remove them.
+All scan and source-index transport work remains in preparation.
 Preparation, opening, trial, reconstruction, check and retirement timings have
 separate counters. The propagation ledger includes charged preparation,
 reconstruction and checks; do not add those work subsets again. `ModeledPrivateBytes` excludes the canonical
@@ -75,6 +82,18 @@ worker, headers and allocator overhead; it is not RSS or a simultaneous heap pea
 The canonical worker retains its warm state during the trial. A private refutation
 resumes it and supplies no independently checked source proof. This control alone
 does not qualify automatic production activation or complete source-cost benefit.
+`WarmClausesCopied` and `WarmClauseLiterals` count bounded copies of owned global
+learning over retained columns. `WarmClauseWork` and `WarmClauseNanos` are subsets
+of preparation, not additional totals. Copies spend unused local BVE allowance
+and the remaining modeled scratch grant; canonical learning and exchange state
+remain owned by canonical.
+`BakeConstructionEntries` and `BakePropagationWork` expose the private root bake;
+both debit the containing allowance and are preparation subsets.
+`OpeningConstructionWork` reserves the fresh consumer's setup visits in the same
+allowance. Reconstruction retains its source-entry charge and raises it when the
+actual replay descriptors and composed sample copies require more work.
+`MappingPreparationWork` includes descriptor ownership copies in preparation;
+their modeled storage also joins `ModeledPrivateBytes`.
 
 Run from the repository root with JDK 25 or newer:
 
@@ -225,6 +244,13 @@ Profile mains live in [bench/profile/](src/main/kotlin/com/eignex/klause/bench/p
 and run as lab profile jobs; consult the selected main for its arguments and
 retain its output through `$OUT`.
 
+Suite measurements `jfr`, `compilation` and `compilation+log` retain the CLI recording
+and write CPU, allocation and runtime-event summaries to `cases/N/out/solve.log`.
+Summary generation runs in the bench process after CLI exit, outside the subprocess
+`elapsedMs` and GNU time metrics and inside the containing case and job allowances.
+These instrumented captures support attribution; use separate uninstrumented controls
+for performance comparisons.
+
 Profile reflection reads the session's nullable retained propagation owner through
 `LivePropagationState`; live-only probes fail explicitly after release, and residual
 inspection declines a released session. Captures retain bounded diagnostic traces
@@ -257,6 +283,37 @@ receipts are absent, native verdicts remain unverified, and no default activatio
 throughput improvement follows.
 
 This repository owns catalog selection, runtime configuration and build/launch recipes.
+
+`lab/native-lp.json` selects original MPS inputs through the same planner and runs
+the Linux x86_64 Native CLI with one processor. Its solve records use the ordinary
+independent source-check protocol. Native executable and ELF dependency hashes
+identify that runtime; the executing JVM harness has a separate byte identity.
+`heap-mib` and JVM GC flags do not describe the Native process. Comparison controls
+record the Native compiled GC policy, the containing memory grant and the harness's
+512-MiB heap separately. `nativeAdapterElapsedNs` includes input verification,
+source decoding, identity capture, CLI execution and witness decoding. Keep that
+containing observation separate from CLI elapsed time and lab preparation/checking
+receipts. Only `none` and `resources` measurement modes are supported. Independent
+point checks do not certify Native optimality or infeasibility claims.
+
+`lab/library-lp-jvm.json` and `lab/library-lp-native.json` qualify the public baked
+`BacktrackSolver` library consumer separately from CLI source routing. The caller
+parses original MPS bytes with `toExactSourceProblem`, uses production LP dependencies
+and the `satOptimized` preset with 1000 instructions, and checks the returned point
+in original named coordinates before rendering it for the independent lab checker.
+It reports feasible points without upgrading solver statuses to source proofs.
+The subprocess includes parsing, exact lowering, baking, solving and source checking;
+the adapter also records source verification, runtime hashing and output decoding.
+Platform series, executable/library identities and runtime controls remain separate.
+Comparison fingerprints reuse `ComparisonProvenance` for the executing adapter and
+dependencies. JVM library callers also retain their compiled caller classes and an
+explicitly ordered classpath. Native caller source hashes identify the harness
+compiled into the separately hashed executable; its machine code remains part of
+that executable. Retained source and runtime identities accompany both series.
+Compressed corpus storage is decoded through the ordinary source-invocation path,
+which charges decoding to the remaining source budget and preserves the packed input.
+JVM staged-file identities live in `report/jvm-profile-files.json`; the record binds
+that full manifest by digest instead of repeating thousands of class entries.
 
 `bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
 work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,
@@ -387,7 +444,16 @@ logical trace, and distinguish emergency interruption from completed work.
 `bench.profile.RewriteStructureProfile` takes `suite=ID problem=NAME sha256=HEX
 presolve=CONFIG`. It captures each structure-control arm through production source
 and finite preparation, then reuses projected source hints, maintained definition
-networks and core/Table-hull LP assembly. Each arm has a 30-second containing
+networks and core/Table-hull LP assembly. Optional
+`orders=markowitz,rewrite_cost` compares those pivot policies with structure
+protection disabled instead of comparing blanket protection. At most two arms run.
+Optional `source64=BASE64` or `sourceGzip64=BASE64` supplies hash-checked source bytes
+through the existing trajectory input reader. The input receipt records source size,
+load time and cancellation before enforcing the capture's source bounds.
+Before/after model snapshots retain objective, domains, factor kinds, support and
+word-sized declared rows, charging the same consumer-diagnostic allowance without
+materializing structural keys.
+Each arm has a 30-second containing
 deadline, five million preparation work units and one million consumer-diagnostic
 units; the whole capture has 120 seconds. Sources, lowered coordinates and factors
 are capped before consumer preparation. The report retains actual maintained
@@ -398,6 +464,12 @@ small affine Table control. The Element source under that identity retains a
 legacy start-index placement rejected by the independent checker; use
 `suite=rewrite-structure-canonical-v1 problem=element-cone` for its separately
 identified standard-list-index control.
+
+`bench.profile.AffineObjectiveProfile` accepts `batch64=` with a base64 JSON list
+of `suite=ID`, `problem=NAME`, `sha256=HEX` argument lists. Each list can add
+`presolve=CONFIG` and `pivotOrder=markowitz|rewrite_cost` to retain complete MPS
+residuals under those controls. Residual captures diagnose representation changes;
+they do not execute search or validate a source outcome.
 
 ## Corpus and build identity
 
@@ -655,6 +727,19 @@ source visits and invalidations, interval visits, retained declines and deductio
 LP work and certification counters and whole-process measurements retain the cost
 of numerical repair and final completion. The automatic default remains disabled.
 
+[9534](https://lab.eignex.com/jobs/9534) attributes 36–43% of captured CPU samples
+to composed cancellation polls and 10–12% to callback invocation. These diagnostic
+samples motivate bounded polling in unmetered point-hint scans; attached meters
+retain every debit and immediate stop check.
+[9557](https://lab.eignex.com/jobs/9557) records four independently accepted Lin7
+SAT points with the combined route versus four ordinary UNKNOWNs at the same
+ten-second allowance. Both arms' Lin3 and Lin5 held-out points are independently
+accepted. The original LCTES control in [9569](https://lab.eignex.com/jobs/9569) and
+the finite sc control in [9574](https://lab.eignex.com/jobs/9574) remain UNKNOWN.
+These fixed-head observations retain all preparation, failed attempts and checking
+costs. Missing coordinator-owned execution frames withhold final physical
+qualification and automatic activation.
+
 `LinearRootOpeningProfile` accepts `inspect=partial-row-activation` for a pinned
 SMT source. It compares the existing cached partial interval producer with the
 same producer plus literal-to-row assertion scheduling. Both arms use seed 1,
@@ -816,6 +901,31 @@ Its receipts distinguish preparation, solve, witness checks and native proof fla
 These controls establish no throughput improvement or independent proof validation.
 
 ### Numerical lifecycle profiles
+
+`lp-lifecycle-v1` selects Afiro, Adlittle, Atwood0 and Avgas from the immutable
+HiGHS revision `73cac48c5340d775a477087198611862559be250`, under its MIT license.
+Selection retains original MPS bytes; the lab planner records each source SHA-256.
+Afiro and Adlittle share the source identities in the basis-corpus manifest.
+Avgas supplies a separate linear source. Atwood0 contains a quadratic objective
+and retains its unsupported-input outcome; it does not qualify LP admission.
+`lp-lifecycle-heldout-v1` freezes Avgas and Blending as original linear controls
+at the same revision, independently of the `lp-lifecycle-v1` membership.
+
+`scripts/lp-lifecycle-profile.sh mps-NAME 1 both checkpoint` compares complete
+tableau promotion on actual overflow with fixed-width replay under the same
+limits. `precision` compares early arbitrary precision with replay. Mode
+`checkpoint-feasibility` restricts the checkpoint query cohort to feasible
+completion while retaining the same edit controls and real workers. Runtime can
+be `jvm`, `native` or `both`; build `:klause:stageLpProfileJvm` and/or
+`:klause:linkLpProfileReleaseExecutableLinuxX64` accordingly. For a source outside
+the basis manifest, append its original SHA-256 and full HiGHS revision.
+`scripts/lp-lifecycle-qualification.sh jvm|native 3` runs the fixed Afiro,
+Adlittle, Avgas and Blending cohort sequentially from one build, retaining separate
+source directories and runtime-file hashes. Prepare only the selected platform's
+profile target; run platform jobs separately with one processor and outer parallelism one.
+The profile retains cold and unchanged requests, authority/bound/row/objective
+edits, retirement, failed work and conversion charges separately. Its worker
+observations require ordinary source-checked CLI controls for source claims.
 
 `scripts/lp-template-preparation-profile.sh <source> [repeats] [steps] [standalone|retained]` accepts
 `cover-2x3`, `cover-3x3`, `miplib3-p0033` and `miplib3-p0201`. The MIPLIB inputs
@@ -1093,12 +1203,27 @@ corresponding independent checker receipts.
 
 `finiteCompanionPreparationAttempts`, `finiteCompanionPreparationNs`,
 `finiteCompanionPreparationReady` and `finiteCompanionPreparationUnavailable`
-record the invocation's eager affine capture before worker factories. Retain
+record the invocation's ordinary eager affine capture before worker factories. Retain
 unavailable captures and captures followed by no worker query. This duration is
 inside containing solve time, separate from factory, query and retirement counters;
 it does not fund extra active time. Sampled JFR allocations cannot replace it when
 choosing a construction or useful-lifetime policy. Whole-job costs still retain
 exceptions that prevent a final invocation result.
+
+`param.companion-admission=funded` requires `param.companion-after-incumbent=true`
+and an elapsed deadline. It keeps the capability gate and explicit selections,
+declines a pair without room for both requested active lifetimes, and defers shared
+capture and private service construction until a funded first query. Capture pays
+the current query grant and cannot consume the reserved pair lifetime. Opening a
+later sibling requires room for that worker's requested lifetime. This control does
+not extend any active, work or allocation allowance; ordinary admission is default.
+`finiteCompanionAdmissionDeclined` and `finiteCompanionStartDeclines` distinguish
+initial funding from late opening refusals. Deferred preparation counters are
+inside the opening worker's segment, so do not add them to that segment again.
+Retain zero-query and unavailable captures. Compare ordinary-off, incumbent-gated
+eager construction, funded construction and a useful direct control with the same
+source, budget, reward, coverage and reseed settings before selecting production
+admission. A funded window alone does not establish useful handoff or net benefit.
 
 `param.portfolio-reward=ordinary|source|source-rate|source-rate-family` varies rewards
 independently of admission and coverage. `source` retains ordinary feasibility rewards, then rewards only
@@ -1107,6 +1232,10 @@ and source checks, including initialization, reseeding and retirement, when comp
 it with ordinary rewards. Counter changes alone do not establish a benefit.
 `source-rate` prices finite positive accepted gain per observed factory and segment
 time, retaining unproductive and feasibility setup costs until the next gain.
+Strict accepted improvements after the first witness within the same segment are
+priced in that segment; its complete startup remains charged. The first witness
+has no synthetic gain. Phase labels remain selection-time observations, so use the
+accepted objective sequence as well as ledger credits when auditing that boundary.
 Failed and refuted segments earn zero while retaining their costs in peer pricing.
 Initialization and checking are already inside segment time. Compare it separately
 at fixed coverage, admission and reseeding, and retain the full containing-run ledger
@@ -1375,6 +1504,10 @@ The CLI deadline includes frontend construction/preparation/search; compressed
 source decoding reduces its remaining allowance. MiniZinc compilation, preflight,
 artifact hashing and output reconstruction are outside that deadline and inside
 the containing case/job allowance. Independent checking is separate lab work.
+JFR measurements retain phase, caller and allocation summaries in `solve.log`.
+Summary analysis runs after CLI exit, outside its elapsed time and inside the
+containing case/job allowance. Sample shares and estimated allocations diagnose
+cost; instrumented timings do not qualify an ordinary production speedup.
 Retain complete active preparation/execution/checking charges, failures and
 retirement alongside CLI elapsed time; overlapping stage counters must not be
 summed as disjoint costs. Native proof flags do not certify source optimality or

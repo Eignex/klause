@@ -16,14 +16,49 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class ComparisonClauseTest {
+    @Test
+    fun `unrepresentable affine views should be declined without changing the clause`() {
+        for ((scale, offset, constant) in listOf(
+            Triple(2, 0, 1L),
+            Triple(1, 1, Long.MIN_VALUE),
+            Triple(1, -1, Long.MAX_VALUE),
+            Triple(-1, 0, Long.MIN_VALUE),
+        )) {
+            val clause = ComparisonClause(intArrayOf(0, 0), arrayOf(LinearOp.LE, LinearOp.GE),
+                longArrayOf(0, constant))
+            val before = clause.structuralKey()
+
+            assertFalse(clause.canSubstituteAffine(0, scale, offset, 1))
+            assertNull(clause.substituteAffine(0, scale, offset, 1))
+            assertEquals(before, clause.structuralKey())
+        }
+    }
+
+    @Test
+    fun `an affine view that reads no replaced input should retain the clause`() {
+        val clause = ComparisonClause(intArrayOf(0), arrayOf(LinearOp.NE), longArrayOf(0))
+
+        assertSame(clause, clause.substituteAffine(1, -1, 2, 0))
+    }
+
+    @Test
+    fun `cancelled comparison view analysis should decline its replacement`() {
+        val clause = ComparisonClause(intArrayOf(0), arrayOf(LinearOp.EQ), longArrayOf(0))
+
+        assertFalse(clause.canSubstituteAffine(0, 1, 1, Cancellation { true }))
+    }
 
     @Test
     fun `comparison repair should zero conditional products through admissible source choices`() {

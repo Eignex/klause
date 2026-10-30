@@ -518,6 +518,7 @@ final enum class com.eignex.klause.portfolio/PortfolioPhase : kotlin/Enum<com.ei
 
 final enum class com.eignex.klause.presolve/AffinePivotOrder : kotlin/Enum<com.eignex.klause.presolve/AffinePivotOrder> { // com.eignex.klause.presolve/AffinePivotOrder|null[0]
     enum entry MARKOWITZ // com.eignex.klause.presolve/AffinePivotOrder.MARKOWITZ|null[0]
+    enum entry REWRITE_COST // com.eignex.klause.presolve/AffinePivotOrder.REWRITE_COST|null[0]
     enum entry STABLE_ID // com.eignex.klause.presolve/AffinePivotOrder.STABLE_ID|null[0]
 
     final val entries // com.eignex.klause.presolve/AffinePivotOrder.entries|#static{}entries[0]
@@ -6949,9 +6950,11 @@ final class com.eignex.klause.factor.arithmetic/ComparisonClause : com.eignex.kl
     final val vars // com.eignex.klause.factor.arithmetic/ComparisonClause.vars|{}vars[0]
         final fun <get-vars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/ComparisonClause.vars.<get-vars>|<get-vars>(){}[0]
 
+    final fun canSubstituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): kotlin/Boolean // com.eignex.klause.factor.arithmetic/ComparisonClause.canSubstituteAffine|canSubstituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.arithmetic/ComparisonClause.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ComparisonClause.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ComparisonClause.structuralKey|structuralKey(){}[0]
+    final fun substituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): com.eignex.klause.ir/Factor? // com.eignex.klause.factor.arithmetic/ComparisonClause.substituteAffine|substituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/ContinuousProduct : com.eignex.klause.ir/Factor { // com.eignex.klause.factor.arithmetic/ContinuousProduct|null[0]

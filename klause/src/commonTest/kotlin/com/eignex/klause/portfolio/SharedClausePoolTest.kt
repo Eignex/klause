@@ -16,6 +16,39 @@ import kotlin.test.assertTrue
 class SharedClausePoolTest {
 
     @Test
+    fun `Boolean pools retain the same clauses with smaller private indexes`() {
+        val clauses = (0 until 8).map { boolClause(it * 4, 1) }
+        val generic = SharedClausePool()
+        val booleans = SharedClausePool(booleanOnly = true)
+        generic.publish(clauses, origin = 2)
+        booleans.publish(clauses, origin = 2)
+
+        val genericMemory = generic.memory()
+        val booleanMemory = booleans.memory()
+
+        assertEquals(generic.drainSince(0).clauses, booleans.drainSince(0).clauses)
+        assertContentEquals(generic.drainSince(0).origins, booleans.drainSince(0).origins)
+        assertEquals(genericMemory.getValue("poolPayloadBytes"), booleanMemory.getValue("poolPayloadBytes"))
+        assertEquals(genericMemory.getValue("poolPayloadOwnerCapacityBytes"),
+            booleanMemory.getValue("poolPayloadOwnerCapacityBytes") * 2L)
+        assertTrue(booleanMemory.getValue("poolPrivateIndexBytes") < genericMemory.getValue("poolPrivateIndexBytes"))
+        assertTrue(booleanMemory.getValue("poolOwnedBytes") < genericMemory.getValue("poolOwnedBytes"))
+    }
+
+    @Test
+    fun `Boolean pools decline atom payloads before retaining capacity`() {
+        val pool = SharedClausePool(booleanOnly = true)
+        val atoms = SharedClause(IntArray(0), longArrayOf(0, 0, 3, 0), 1)
+
+        val published = pool.publish(listOf(atoms))
+
+        assertEquals(0, published)
+        assertTrue(pool.drainSince(0).clauses.isEmpty())
+        assertEquals(0L, pool.memory().getValue("poolOwnedBytes"))
+        assertEquals(1L, pool.memory().getValue("poolDeclined"))
+    }
+
+    @Test
     fun `repeated glue export should suppress payload construction without losing later learning`() {
         for (native in listOf(false, true)) {
             val problem = Problem(8, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
@@ -292,6 +325,31 @@ class SharedClausePoolTest {
     }
 
     @Test
+    fun `closing after terminal learning records pool capacity without sampling the store`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(4, 0, emptyArray(), emptyList())
+            val pool = SharedClausePool(measureMemory = true)
+            val meter = SharingMeter()
+            val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
+            val session = PropagationSession(problem, nativeSat = native)
+            exchange.onSearchStart(session)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+
+            exchange.onSearchClose(session)
+
+            val stats = meter.snapshot().clauses
+            assertEquals(pool.memory().getValue("poolOwnedBytes"), stats.getValue("poolOwnedBytes"))
+            assertTrue(stats.getValue("poolPrivateIndexBytes") > 0L)
+            assertTrue(stats.getValue("peakSeenCapacityBytes") > 0L)
+            assertEquals(0L, stats.getValue("seenCapacityBytes"))
+            assertEquals(1L, stats.getValue("memorySampleStale"))
+            assertEquals(0L, stats.getValue("memorySampleComplete"))
+            assertEquals(0L, stats.getValue("memorySampleWork"))
+            assertTrue("ownedPrimitiveBytes" !in stats)
+        }
+    }
+
+    @Test
     fun `retiring a search should release its duplicate filter`() {
         val problem = Problem(4, 0, emptyArray(), emptyList())
         val pool = SharedClausePool(measureMemory = true)
@@ -311,7 +369,7 @@ class SharedClausePoolTest {
     fun `shared consumption should retain accounted reasons through native compaction`() {
         for (native in listOf(false, true)) {
             val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
-            val pool = SharedClausePool(measureMemory = true)
+            val pool = SharedClausePool(measureMemory = true, booleanOnly = true)
             val meter = SharingMeter()
             val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
             val session = PropagationSession(problem, nativeSat = native)
@@ -586,7 +644,7 @@ class SharedClausePoolTest {
     @Test
     fun `byte reclamation preserves imports across suspension and releases obsolete sessions`() {
         for (native in listOf(false, true)) {
-            val pool = SharedClausePool(cap = 100, softLimitBytes = 500L, measureMemory = true)
+            val pool = SharedClausePool(cap = 100, softLimitBytes = 500L, measureMemory = true, booleanOnly = true)
             val meter = SharingMeter()
             val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
             val problem = Problem(128, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))

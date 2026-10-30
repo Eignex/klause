@@ -211,7 +211,10 @@ internal class LpScopedSolver(
     fun compact(remap: LpLayoutRemap, token: Cancellation = cancellation): Boolean =
         edit(token, compaction = remap) { it.compact(remap, token) }
 
-    val continuationLimits get() = ExactContinuationLimits(startArbitraryPrecision = context.startArbitraryPrecision)
+    val continuationLimits get() = ExactContinuationLimits(
+        startArbitraryPrecision = context.startArbitraryPrecision,
+        preserveOverflowCheckpoint = context.preserveOverflowCheckpoint,
+    )
 
     val basisLifecycleWork: BasisOperationWork? get() = (solver as? PersistentLpSolver)?.basisLifecycleWork
 

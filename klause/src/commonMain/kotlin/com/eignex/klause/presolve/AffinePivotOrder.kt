@@ -16,4 +16,10 @@ enum class AffinePivotOrder {
      *  inverse and its application to linear programming", Management Science 3(3), 1957,
      *  https://doi.org/10.1287/mnsc.3.3.255. */
     MARKOWITZ,
+
+    /** Markowitz ordering with the smallest incident unit-pivot rewrite payload tried first.
+     *  Admits folds through word-sized reified linear consumers while retaining their Boolean outputs,
+     *  and unit translations or sign reversals through native comparison clauses.
+     *  Factor payload sizes estimate construction cost; they do not predict search savings. */
+    REWRITE_COST,
 }

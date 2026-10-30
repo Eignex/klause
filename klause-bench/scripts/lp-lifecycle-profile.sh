@@ -6,10 +6,13 @@ trace="${1:?usage: lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats] [bot
 repeats="${2:-3}"
 runtime="${3:-both}"
 mode="${4:-lifecycle}"
-[[ "$trace" == mps-afiro || "$trace" == mps-adlittle ]] || exit 2
+[[ "$trace" =~ ^mps-[a-z0-9_-]+$ ]] || exit 2
 [[ "$repeats" =~ ^[1-5]$ ]] || exit 2
 [[ "$runtime" == both || "$runtime" == jvm || "$runtime" == native ]] || exit 2
-[[ "$mode" == lifecycle || "$mode" == claims || "$mode" == precision || "$mode" == consumers ]] || exit 2
+case "$mode" in
+  lifecycle|claims|precision|checkpoint|checkpoint-feasibility|consumers) ;;
+  *) exit 2 ;;
+esac
 [[ "$(uname -s)/$(uname -m)" == Linux/x86_64 ]] || exit 2
 manifest="$LAB_WORKTREE/klause/src/jvmTest/resources/basis-corpus/manifest.json"
 fixture="$(sed -n "/\"id\": \"$trace\"/,/^    }/p" "$manifest")"
@@ -17,6 +20,12 @@ source_identity="$(printf '%s\n' "$fixture" | sed -n 's/^ *"source": "\([^"]*\)"
 expected="$(printf '%s\n' "$fixture" | sed -n 's/^ *"sourceSha256": "\([^"]*\)".*/\1/p')"
 source_path="${source_identity%@*}"
 source_revision="${source_identity##*@}"
+if [[ -n "${5:-}" || -n "${6:-}" ]]; then
+  expected="${5:?held-out source SHA-256 is required}"
+  source_revision="${6:?held-out source revision is required}"
+  source_path="HiGHS/check/instances/${trace#mps-}.mps"
+  source_identity="$source_path@$source_revision"
+fi
 [[ "$source_path" == "HiGHS/check/instances/${trace#mps-}.mps" ]] || exit 2
 [[ "$source_revision" =~ ^[a-f0-9]{40}$ && "$expected" =~ ^[a-f0-9]{64}$ ]] || exit 2
 mkdir -p "$OUT"
@@ -40,6 +49,9 @@ uname -a > "$OUT/platform.txt"
 if command -v lscpu >/dev/null; then lscpu > "$OUT/cpu.txt"; fi
 "${JAVA_HOME:+$JAVA_HOME/bin/}java" -version > "$OUT/java-version.txt" 2>&1
 if [[ "$runtime" != native ]]; then
+  java_binary="$(readlink -f "$(command -v "${JAVA_HOME:+$JAVA_HOME/bin/}java")")"
+  java_runtime="$(dirname "$(dirname "$java_binary")")"
+  find "$java_runtime" -type f -print0 | sort -z | xargs -0 sha256sum > "$OUT/jvm-runtime-sha256.txt"
   find "$LAB_WORKTREE/klause/build/lp-profile/jvm" -type f -print0 | sort -z | xargs -0 sha256sum > "$OUT/jvm-sha256.txt"
   /usr/bin/time -v -o "$OUT/jvm-resources.txt" \
   "${JAVA_HOME:+$JAVA_HOME/bin/}java" -Xmx1536m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC \
@@ -53,5 +65,10 @@ fi
 if [[ "$runtime" != jvm ]]; then
   native="$LAB_WORKTREE/klause/build/bin/linuxX64/lpProfileReleaseExecutable/klause-lp-profile.kexe"
   sha256sum "$native" > "$OUT/native-sha256.txt"
+  timeout 10 ldd "$native" > "$OUT/native-ldd.txt"
+  if grep -q 'not found' "$OUT/native-ldd.txt"; then exit 2; fi
+  awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^\//) print $i }' "$OUT/native-ldd.txt" |
+    sort -u | xargs -r sha256sum > "$OUT/native-runtime-sha256.txt"
+  [[ -s "$OUT/native-runtime-sha256.txt" ]] || exit 2
   /usr/bin/time -v -o "$OUT/native-resources.txt" "$native" "${args[@]}" > "$OUT/native.ndjson"
 fi

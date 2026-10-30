@@ -217,7 +217,7 @@ internal class RootProbingPass : InprocessingPass {
             budget.note("NeighborhoodCandidates")
             if (session.learnedClauseLiteralCount(index) !in 2..PROBE_NEIGHBORHOOD_LITERALS) continue
             val literals = session.rootClauseLiterals(session.problem.numFactors + index,
-                PROBE_NEIGHBORHOOD_LITERALS) ?: continue
+                PROBE_NEIGHBORHOOD_LITERALS, includePermanent = true, includeAtoms = true) ?: continue
             if (literals.size == 2 && literals[0] == Lit.negate(literals[1])) continue
             if (literals.any { budget.truth(it) == true }) continue
             neighborhood = literals
@@ -233,7 +233,7 @@ internal class RootProbingPass : InprocessingPass {
     }
 
     private fun probe(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
-        val variables = session.problem.numBoolVars
+        val variables = session.rootProbeVariableCount
         if (variables == 0) return
         preparationLeft = PROBE_NEIGHBORHOOD_CLAUSES
         var attempted = 0
@@ -250,13 +250,13 @@ internal class RootProbingPass : InprocessingPass {
             val variable = Lit.variable(literal)
             examined++
             budget.note("Candidates")
-            if (session.boolValue(variable) != null) continue
+            if (variable < session.problem.numBoolVars) {
+                if (session.boolValue(variable) != null) continue
+            } else if (!session.canProbeRootAtom(variable) || budget.truth(literal) != null) continue
             attempted++
             budget.note("Eligible")
             budget.probe()
-            val start = session.work
-            val token = Cancellation { session.work - start >= params.rootProbeWork }
-            val result = session.withCancellation(token) { session.probeBool(variable, Lit.isPositive(literal)) }
+            val result = probeLiteral(session, literal, params.rootProbeWork)
             when (result) {
                 null -> if (!params.cancellation()) session.probeCancelled = priorCancelled
                 is PropagationResult.Unsat -> {
@@ -267,8 +267,25 @@ internal class RootProbingPass : InprocessingPass {
                     budget.note("Units")
                     if (nearby != null) neighborhood = null
                 }
-                else -> session.popLast()
+                else -> Unit
             }
+        }
+    }
+
+    private fun probeLiteral(session: PropagationSession, literal: Int, limit: Long): PropagationResult? {
+        val start = session.work
+        val token = Cancellation { session.work - start >= limit }
+        val retracting = session.retractingListener
+        // Speculative retractions must not overwrite phases saved by ordinary search.
+        session.retractingListener = null
+        return try {
+            session.withCancellation(token) {
+                session.probeRootLiteral(literal)
+            }.also {
+                if (it != null && it !is PropagationResult.Unsat) session.popLast()
+            }
+        } finally {
+            session.retractingListener = retracting
         }
     }
 }

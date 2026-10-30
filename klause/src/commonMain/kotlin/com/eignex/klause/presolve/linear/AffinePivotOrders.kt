@@ -7,7 +7,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 
-/** Selects the next affine pivot without changing the candidate admissibility rules. */
+/** Selects the next affine pivot under the run's consumer admission. */
 internal object AffinePivotOrders {
 
     fun new(
@@ -24,6 +24,9 @@ internal object AffinePivotOrders {
 
         AffinePivotOrder.MARKOWITZ ->
             MarkowitzOrder(ws, eliminated, objectiveIntVars, capWide, pivotable, cancellation)
+
+        AffinePivotOrder.REWRITE_COST ->
+            MarkowitzOrder(ws, eliminated, objectiveIntVars, capWide, pivotable, cancellation, minimizeRewrite = true)
     }
 
     private class StableIdOrder(
@@ -68,6 +71,7 @@ internal object AffinePivotOrders {
         private val capWide: Boolean,
         private val pivotable: ((Linear, Int) -> Boolean)?,
         private val cancellation: Cancellation,
+        private val minimizeRewrite: Boolean = false,
     ) : AffineSingletons.PivotOrder {
         private val heap = PivotHeap()
         private var seeded = false
@@ -95,6 +99,7 @@ internal object AffinePivotOrders {
                     capWide,
                     pivotable,
                     cancellation,
+                    minimizeRewrite,
                 )
                 if (cand == null) {
                     rejected++
