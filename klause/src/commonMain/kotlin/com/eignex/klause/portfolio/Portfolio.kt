@@ -920,6 +920,8 @@ class Portfolio(
         private val activeSince = arrayOfNulls<TimeMark>(workers.size)
         private val armWork = DoubleArray(workers.size)
         private val siblingWork = LongArray(workers.size)
+        // The bounded early trial needs initial coverage once, across incumbent and proof-slice accounting resets.
+        private val initialCoreCoverage = LongArray(workers.size)
         private var proofStarted = false
         private var totalNanos = 0L
         private var chargedWork = 0L
@@ -1062,7 +1064,8 @@ class Portfolio(
             }
             val probe = if (dedicated) null else eligible.filter { !probed[it] && !busy[it] && !retired[it] }
                 .minByOrNull { if (workers[it].auxiliaryProof) 1 else 0 }
-            val revisit = if (dedicated || earlyCore != null || improving || eligible.any { !probed[it] && !retired[it] }) {
+            val unprobed = eligible.any { !probed[it] && !retired[it] }
+            val revisit = if (dedicated || earlyCore != null || improving || unprobed) {
                 null
             } else {
                 eligible.filter { preparationRevisits[it] && !busy[it] && !retired[it] }
@@ -1132,7 +1135,10 @@ class Portfolio(
                 for (arm in active) needed -= minOf(needed, siblingWork[arm])
                 needed == 0L
             } else complete.all { retired[it] || siblingWork[it] >= baseSliceWork }
-            return if (covered) eligible else eligible.filter { !workers[it].auxiliaryProof }
+            val earlyCovered = complete.all { retired[it] || initialCoreCoverage[it] >= baseSliceWork }
+            return if (covered) eligible else eligible.filter {
+                !workers[it].auxiliaryProof || (workers[it].earlyCoreTrial && earlyCovered)
+            }
         }
 
         // The free arm furthest below its owed share, else the policy's pick among free arms: a family first, so a
@@ -1273,6 +1279,7 @@ class Portfolio(
             val account = ledgerFor(arm)
             if (claim.closedProof) account.credit(arm, Signal.ProofClosure, 1.0)
             siblingWork[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - siblingWork[arm])
+            initialCoreCoverage[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - initialCoreCoverage[arm])
             val proofWork = workers[arm].auxiliaryProof && work > 0L
             if ((!proofStarted && claim.improved) || proofWork) siblingWork.fill(0L)
             if (proofWork) proofStarted = true
