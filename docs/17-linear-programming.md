@@ -255,6 +255,8 @@ revision is nonzero.
 Explicit query work and pivot allowances cover the collection, including failed
 children, for retained node queries and fresh root tableau queries. Reused results
 add no numerical work or factorization charges.
+Each consultation binds its current cancellation token, including unchanged
+children; identical exact authority retains their factors and completed evidence.
 Scoped preparation reserves the graph scan, partition scratch and child restriction
 storage before constructing children. A declined or interrupted split retains its
 spent preparation work; child numerical preparation receives the remaining grant.
