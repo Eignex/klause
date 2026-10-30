@@ -26,11 +26,11 @@ import kotlin.test.assertTrue
 class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
     @Test
     fun `maintained objective preparation should pause before admitting its linear view`() {
-        val source = Dimacs.parseWcnf((1..512).joinToString("\n") { "1 $it 0" }).toProblem()
+        val source = Dimacs.parseWcnf((1..512).joinToString("\n") { "$it $it 0" }).toProblem()
         val problem = source.problem
         val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = source.boolFolds))
         val functional = assertIs<FunctionalObjective>(sweep.functionalObjective(
-            intArrayOf(), longArrayOf(), 0L, minimize, IntArray(512) { 512 + it }, LongArray(512) { 1L },
+            intArrayOf(), longArrayOf(), 0L, minimize, IntArray(512) { 512 + it }, LongArray(512) { (it + 1L) },
         ))
         val state = LocalSearchState(problem.bake(), Random(0))
         state.invariants = sweep.network(0, 1024)
