@@ -130,10 +130,20 @@ internal class LpHints(
         return history.score(variable, value(variable))
     }
 
-    fun selected(variable: VarRef?, baseline: VarRef?) {
+    fun selected(variable: VarRef?, baseline: VarRef?, score: Double): VarRef? {
         directionalChoice = variable
         baselineChoice = baseline
         priorChoice = variable != null && history.usesPrior(variable)
+        if (priorChoice && baseline != null && variable != baseline) {
+            charge(1L)
+            val reference = history.referenceScore(baseline, value(baseline))
+            if (!(score > reference)) {
+                directionalChoice = null
+                priorChoice = false
+                observe("PRIOR_REJECTED")
+            }
+        }
+        return directionalChoice
     }
 
     private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {

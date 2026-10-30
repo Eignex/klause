@@ -48,8 +48,7 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
             best = VarRef.IntVar(i)
         }
     }
-    hints.selected(directional, best)
-    return directional ?: best
+    return hints.selected(directional, best, gainScore) ?: best
 }
 
 /** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below
