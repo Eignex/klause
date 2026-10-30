@@ -236,8 +236,17 @@ A trial requires global root pins beyond the baked root and the last attempted
 view. An unchanged baked root performs no BVE. The root-pin scan charges its full
 column visit count and records its time; an insufficient grant skips the scan.
 An unchanged root trail retains a completed miss. All attempts share one
-cumulative preparation, trial and checking allowance. BVE
-receives half the allowance remaining after the private source copy. Its local cap
+cumulative preparation, trial and checking allowance. A bounded admission scan
+uses saturated occurrence counts and parent literal volumes over the residual
+clauses. It admits a non-growing raw resolution shape: a single parent on one
+side satisfying `n * (w - 2) <= w`, or two parents on each side with total width
+at most eight. Tautology and
+duplicate savings can admit other useful pivots, so a proxy refusal establishes
+no absence of opportunities. Width and per-pivot budgets still apply. Temporary
+arrays own `24 * columns` primitive bytes inside the declared admission model;
+initialization, disposal and visits consume the containing allowance.
+
+BVE receives half the allowance remaining after the private source copy. Its local cap
 retains complete earlier pivots when later analysis stops; cancellation of the
 containing call declines the generation. Baking, opening and canonical checks
 share the remaining containing allowance.

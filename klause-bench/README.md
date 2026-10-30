@@ -65,7 +65,9 @@ the local BVE cap; later preparation and checks still obey the containing cap.
 `DeclinedUnsupported*` and `DeclinedMemory` identify integration refusals.
 `DeclinedPassStoppedEmpty` and `DeclinedPassCompleteEmpty` distinguish a local
 cap from a completed bounded pass with no elimination; neither excludes other
-structural opportunities.
+structural opportunities. `DeclinedGrowthProxy` records a completed cheap
+count/literal-volume admission refusal; tautology or duplicate savings can
+still make other eliminations useful.
 Preparation, opening, trial, reconstruction, check and retirement timings have
 separate counters. The propagation ledger includes charged preparation,
 reconstruction and checks; do not add those work subsets again. `ModeledPrivateBytes` excludes the canonical
