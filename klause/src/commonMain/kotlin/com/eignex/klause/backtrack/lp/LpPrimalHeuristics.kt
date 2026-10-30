@@ -74,7 +74,7 @@ internal fun LpEngine.lpRoundingProbe(
             } catch (_: CheckedLongOverflowException) {
                 return null
             } ?: return null
-            retainRootPrimalGuidance(relaxation, result, cancellation, objective)
+            retainRoundingPrimalGuidance(relaxation, result, objective)
             result.primal
         }
         val reals = if (toleranceReals && problem.numRealVars > 0) relaxation.floatReals(primal, problem) else null
