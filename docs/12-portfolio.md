@@ -270,8 +270,9 @@ the pool's key index deduplicates it directly under the publication lock. The
 generation cannot compact during that batch, so fresh keys need not enter the
 worker's retiring filter. Existing private keys still suppress earlier imports
 and exports. Entry pressure and byte limits keep the ordinary private admission
-and reclamation path. Every candidate visit and pool operation retains its
-publication work, scratch and cancellation bounds.
+and reclamation path. Capacity refusal happens before publication; exhausting
+publication funding ends the export without another allowance. Every candidate
+visit and pool operation retains its work, scratch and cancellation bounds.
 
 Glue export probes that same filter with the portable content key before copying
 native literals or constructing portable payloads. An empty filter skips duplicate
