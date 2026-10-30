@@ -260,6 +260,8 @@ class; otherwise reduced-cost/fractionality scoring and the configured selector 
 their precedence. Reliable variable history takes precedence over its class prior.
 Directional scores compete with each other before fallback, so objective units are
 not mixed with reduced costs.
+An invocation-local readiness check skips directional candidate lookups when no
+history can yield a score; its bookkeeping uses the same LP work allowance.
 Consumed choices distinguish variable history from class priors and record agreement
 with the current LP scorer, a changed variable, or a missing current LP candidate
 separately; a rejected proposal earns no consumption.
