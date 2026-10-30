@@ -155,7 +155,8 @@ internal class LinearAuthority(
         }
         var pending = pointRound?.takeIf {
             it.query.matches(source, cuts = true, cutMask = it.query.cutMask,
-                checkUnselectedCuts = checkUnselectedCuts(it.query.cutMask))
+                checkUnselectedCuts = checkUnselectedCuts(it.query.cutMask),
+                retainMaskedCuts = retainMaskedCuts(it.query.cutMask))
         }
         if (pending == null) {
             pointRound = null
@@ -183,7 +184,8 @@ internal class LinearAuthority(
             pointFamily = family
             if (family.cuts == null ||
                 !prepared.matches(source, cuts = true, cutMask = baselineMask,
-                    checkUnselectedCuts = checkUnselectedCuts(baselineMask))) {
+                    checkUnselectedCuts = checkUnselectedCuts(baselineMask),
+                    retainMaskedCuts = retainMaskedCuts(baselineMask))) {
                 policy.observe("PointUnavailable")
                 return base
             }
@@ -398,6 +400,9 @@ internal class LinearAuthority(
     private fun checkUnselectedCuts(mask: Set<Int>?): Boolean =
         mask == null || pointPolicy?.candidatesRetired(template?.cuts?.rows) != true
 
+    private fun retainMaskedCuts(mask: Set<Int>?): Boolean =
+        mask != null && pointPolicy?.managesCurrentRecipe(template?.cuts?.rows) == true
+
     private fun prepareQuery(
         source: SourceProofContext, cancellation: Cancellation, cuts: Boolean, cutMask: Set<Int>?,
     ): LinearAuthorityQuery? {
@@ -443,7 +448,8 @@ internal class LinearAuthority(
                 cutLifecycle.observe(family, "ProofVerificationWork", work)
             }
         }, cutMask = cutMask, onCut = cutLifecycle::observe,
-            checkUnselectedCuts = checkUnselectedCuts(cutMask))?.also {
+            checkUnselectedCuts = checkUnselectedCuts(cutMask),
+            retainMaskedCuts = retainMaskedCuts(cutMask))?.also {
             cutLifecycle.families = it.cutFamilies.values.toSet()
             activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong())
             activeMixedCutPeak = maxOf(activeMixedCutPeak, it.activeMixedCuts.toLong())
@@ -489,7 +495,7 @@ internal class LinearAuthority(
         cutMask: Set<Int>? = null,
     ): LinearAuthorityResult {
         val cached = if (retainLp || guidance) query?.takeIf {
-            it.matches(source, cuts, cutMask, checkUnselectedCuts(cutMask))
+            it.matches(source, cuts, cutMask, checkUnselectedCuts(cutMask), retainMaskedCuts(cutMask))
         } else null
         val prepared = cached ?: prepareQuery(source, cancellation, cuts, cutMask)?.also {
             if (retainLp || guidance) query = it

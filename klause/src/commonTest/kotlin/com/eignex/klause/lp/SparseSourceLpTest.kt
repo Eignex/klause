@@ -22,6 +22,57 @@ import kotlin.test.assertTrue
 
 class SparseSourceLpTest {
     @Test
+    fun `inactive source rows should map through compacted equalities`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ONE }, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+        )
+        val prepared = assertNotNull(SparseSourceLp.prepare(rows,
+            List(2) { ExactLpColumn(ExactLpBounds()) }, List(2) { BigFraction.ZERO }, BigFraction.ZERO, limits,
+            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
+        for ((inactive, expected) in listOf(setOf(2) to setOf(1), setOf(0, 1) to setOf(0),
+            setOf(0, 1, 2) to setOf(0, 1))) {
+            val mapped = prepared.emittedInactiveRows(inactive, Cancellation.Never) { _, _ -> true }
+
+            assertEquals(expected, mapped)
+        }
+    }
+
+    @Test
+    fun `partial equality deactivation should decline a compacted row mapping`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+        )
+        val prepared = assertNotNull(SparseSourceLp.prepare(rows,
+            listOf(ExactLpColumn(ExactLpBounds())), listOf(BigFraction.ZERO), BigFraction.ZERO, limits,
+            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
+        for (inactive in listOf(setOf(0), setOf(1))) {
+            val mapped = prepared.emittedInactiveRows(inactive, Cancellation.Never) { _, _ -> true }
+
+            assertNull(mapped)
+        }
+    }
+
+    @Test
+    fun `stopped row mapping should withhold a partial inactive mask`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+        )
+        val prepared = assertNotNull(SparseSourceLp.prepare(rows,
+            listOf(ExactLpColumn(ExactLpBounds())), listOf(BigFraction.ZERO), BigFraction.ZERO, limits,
+            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
+        var charges = 0
+
+        val mapped = prepared.emittedInactiveRows(setOf(0, 1), Cancellation.Never) { _, _ -> ++charges < 2 }
+
+        assertNull(mapped)
+        assertEquals(2, charges)
+    }
+
+    @Test
     fun `unconditional equality compaction should retain both sides of the source equality`() {
         val rows = listOf(
             ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.ONE), BigFraction.ONE),

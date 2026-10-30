@@ -34,6 +34,7 @@ internal class LinearAuthorityQuery private constructor(
     val checkedCuts: Set<Int>,
     val installedCuts: Set<Int>,
     val cutFamilies: Map<Int, CutFamily>,
+    val retainMaskedCuts: Boolean,
 ) {
     val context: SourceProofContext = source.withLinearAuthority()
     val closureRows: List<ExactRationalInequality> = rows.map {
@@ -43,8 +44,10 @@ internal class LinearAuthorityQuery private constructor(
     fun matches(
         other: SourceProofContext, cuts: Boolean = false, cutMask: Set<Int>? = null,
         checkUnselectedCuts: Boolean = true,
+        retainMaskedCuts: Boolean = false,
     ): Boolean = this.cuts == cuts && this.cutMask == cutMask &&
-        this.checkUnselectedCuts == checkUnselectedCuts && (source === other ||
+        this.checkUnselectedCuts == checkUnselectedCuts && this.retainMaskedCuts == retainMaskedCuts &&
+        (source === other ||
         (source.scope == other.scope &&
             source.coordinates == other.coordinates &&
             source.premises == other.premises &&
@@ -61,6 +64,7 @@ internal class LinearAuthorityQuery private constructor(
             consequences: List<SourceEvidence> = emptyList(),
             onCut: (CutFamily, String, Long) -> Unit = { _, _, _ -> },
             checkUnselectedCuts: Boolean = true,
+            retainMaskedCuts: Boolean = false,
         ): LinearAuthorityQuery? {
             val coordinates = template?.coordinates ?: source.numericCoordinates()
             val numeric = template?.numeric ?: source.numericContext()
@@ -114,7 +118,7 @@ internal class LinearAuthorityQuery private constructor(
                     cutMask != null && id !in cutMask -> "UNSELECTED"
                     else -> "INSTALLED"
                 }, 1L)
-                if (cutMask != null && id !in cutMask) continue
+                if (cutMask != null && id !in cutMask && !retainMaskedCuts) continue
                 if (id in accepted && (cutMask == null || id in cutMask)) {
                     cutFamilies[cited.size] = cut.family
                     activeCuts++
@@ -144,11 +148,12 @@ internal class LinearAuthorityQuery private constructor(
             val sign = if (source.scope.objective?.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
                 else BigFraction.MINUS_ONE
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
-            return LinearAuthorityQuery(source, coordinates, cited, rows, inactive, unconditional && inactive.isEmpty(),
+            return LinearAuthorityQuery(source, coordinates, cited, rows, inactive,
+                unconditional && (inactive.isEmpty() || retainMaskedCuts),
                 costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts,
                 cutMask?.toSet(), checkUnselectedCuts, accepted.toSet(),
                 accepted.filterTo(HashSet()) { cutMask == null || it in cutMask },
-                cutFamilies.toMap())
+                cutFamilies.toMap(), retainMaskedCuts)
         }
     }
 }

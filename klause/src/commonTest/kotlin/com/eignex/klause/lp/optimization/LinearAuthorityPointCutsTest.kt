@@ -363,6 +363,40 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `retiring an installed source row should suspend it without replacing the numerical owner`() {
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf("rounded" to SourcePremise(SourceInequality(
+            mapOf(x to BigFraction.ofLong(2), y to BigFraction.ofLong(2)), BigFraction.ofLong(3))),
+            "nonnegative x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "nonnegative y" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE),
+                BigFraction.ONE))
+        }
+        val root = SourceProofContext(mixedMaximum.scope, (triangle + x + y).toSet(), premises,
+            (triangle + x + y).associateWith { BigFraction.ONE })
+        val child = root.atScope(root.scope.copy(condition = SourceCondition(upper = mapOf(
+            x to BigFraction.ZERO, y to BigFraction.ZERO))))
+        val capture = LinearAuthorityCapture(128, 100_000L, 10_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithPointCuts(root, Cancellation.Never)
+            repeat(32) { authority.advanceWithPointCuts(child, Cancellation.Never) }
+
+            val result = authority.advanceWithPointCuts(child, Cancellation.Never)
+
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
+            assertTrue(capture.records.last().cuts.none { it.installed })
+            assertEquals(1L, authority.preparations)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(child.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
     fun `an empty aged mask should retain its checked relaxation without reinstalling cuts`() {
         val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)

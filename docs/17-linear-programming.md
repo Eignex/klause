@@ -348,6 +348,13 @@ Retired unselected candidates
 are omitted from proof replay as well as scoring. Masked-query reuse distinguishes
 whether unselected candidates are checked; installed cuts retain fresh source
 verification under the current scope.
+Managed current masks retain retired row definitions as inactive numerical rows.
+Their free logical columns impose no restriction and carry zero certificate
+multiplier. This preserves a compatible numerical owner across retirement.
+Suspension maps source row IDs through equality packing; both sides of a packed
+equality must have matching activity. An incompatible mask declines retained
+guidance, keeping failed mapping and ordinary fallback costs in the containing
+allowance.
 Preparation visits at most 65,536 modeled row/support operations with
 4,096-bit input, denominator and intermediate scalar limits. Cut definitions and source-row ownership
 stay in the retained template, ahead of changing invocation-bound rows. Every
@@ -1127,8 +1134,11 @@ Nonfinite projections supply no score. Each call visits at most 8,192 support
 entries with 65,536 modeled scoring work and 1 MiB modeled allocation, within the
 containing cumulative source allowance. A template retains at most 64 selected IDs.
 Changing its source layout clears those IDs; every query rechecks guards, pins and
-derivations. Unselected cut rows are omitted from masked queries, and changed row
-layouts invalidate numerical cursors through the ordinary compatibility checks.
+derivations. Unselected cut rows are omitted from masked queries unless they belong
+to an adopted current family, whose inactive definitions retain its numerical
+layout. Changed row layouts invalidate numerical cursors through the ordinary
+compatibility checks. Changed activity invalidates completed guidance before
+reusing the owner and its basis.
 Completed base bounds survive a paused or declined separation round. Checked base
 incumbents and terminals bypass extra separation. The ordinary default activates
 all accepted source cuts.

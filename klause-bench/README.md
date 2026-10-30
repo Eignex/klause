@@ -740,6 +740,12 @@ without subsequent checked support and actual frontier consumption.
 generation's retirement scan; `POINT_INSTALLED_RETIRED` attributes them by family.
 Retained tight rows still require current-source checks. Keep subsequent row-layout
 replacement, proof-mode changes and factor work in the containing cost comparison.
+Adopted current families suspend retired rows while retaining their numerical
+definitions. `InactiveRowMappingWork` and `InactiveRowMappingAllocation` record
+mapping through any packed source equalities; these costs also debit the containing
+preparation/funding totals. A partial equality deactivation declines retained
+guidance. Keep failed mapping and fallback costs. Owner reuse alone establishes no
+net source gain, and an inactive retained definition is not an installed cut.
 Point selection starts from the current checked recipe. `CurrentFallback` and
 `CurrentFallbackQueries` report retaining that recipe after an unproductive trial;
 `BaseQueries` counts base relaxation attempts. A point-selection arm can therefore
