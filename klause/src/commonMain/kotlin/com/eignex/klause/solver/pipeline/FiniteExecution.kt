@@ -1070,12 +1070,20 @@ private fun executePortfolio(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
+    val proofShare = request.executionOptions.reader()[ExecutionOption.portfolioProofShare]
+    if (proofShare != null && (!proofShare.isFinite() || proofShare !in 0.5..1.0)) {
+        pipelineConfigError("portfolio-proof-share must be finite and in [0.5, 1]")
+    }
+    if (proofShare != null && (!request.optimize || request.cores != 1 ||
+            request.engine !in setOf(FiniteEngine.MIXED, FiniteEngine.BACKTRACK))) {
+        pipelineConfigError("portfolio-proof-share requires curated single-core finite optimization")
+    }
     val plan = FinitePipeline.planPortfolio(
         PortfolioPlanRequest(
             engine = request.engine,
             optimize = request.optimize,
             cores = request.cores,
-            executionOptions = request.executionOptions,
+            executionOptions = request.executionOptions.without("portfolio-proof-share"),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpCeiling = request.lpConfig,
@@ -1088,6 +1096,11 @@ private fun executePortfolio(
             toleranceCheck = request.toleranceCheck,
         ),
     )
+    if (proofShare != null && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
+            plan.scenario.annotationArm != null)) {
+        pipelineConfigError("portfolio-proof-share requires a curated recipe pool")
+    }
     when (plan) {
         is PortfolioPlan.LocalSearchDryRun -> return localSearchDryRun(plan.pool)
 
@@ -1128,6 +1141,7 @@ private fun executePortfolio(
         },
         objectiveCoordinates = request.objectiveCoordinates,
         incumbentCompletionCheck = request.incumbentCompletionCheck(),
+        improvementProofShare = proofShare ?: 0.5,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {
