@@ -48,6 +48,76 @@ class BacktrackWorkerConfigTest {
     )
 
     @Test
+    fun `a binary integer pool should select one arithmetic worker across repeated recipes`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+        val count = BacktrackCatalog.ranked(Kind.COP, facts).size * 2
+
+        val arms = BacktrackWorkerConfig.diverse(Kind.COP, count, facts = facts)
+
+        assertEquals(listOf("conflictDriven"),
+            arms.filter { it.recipe.build(1L, null).integerRowLearning }.map { it.label })
+    }
+
+    @Test
+    fun `nonbinary mixed or nonlinear models should retain clausal recipes`() {
+        for ((binary, columns, linear) in listOf(Triple(false, true, true),
+            Triple(true, false, true), Triple(true, true, false))) {
+            val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+                binaryIntegers = binary, integerLinear = linear, integerColumnsOnly = columns) { true }
+
+            val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, facts = facts)
+
+            assertTrue(arms.none { it.recipe.build(1L, null).integerRowLearning },
+                "binary=$binary columns=$columns linear=$linear")
+        }
+    }
+
+    @Test
+    fun `satisfaction pools should retain clausal recipes`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+
+        val arms = BacktrackWorkerConfig.diverse(Kind.CSP, 12, facts = facts)
+
+        assertTrue(arms.none { it.recipe.build(1L, null).integerRowLearning })
+    }
+
+    @Test
+    fun `an LP off ceiling should retain clausal recipes`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+
+        val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, lpCeiling = LpConfig.OFF, facts = facts)
+
+        assertTrue(arms.none { it.recipe.build(1L, null).integerRowLearning })
+    }
+
+    @Test
+    fun `explicit arithmetic settings should override automatic diversity`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+        for (enabled in listOf(false, true)) {
+            val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, facts = facts,
+                edit = { it.copy(integerRowLearning = enabled) })
+
+            assertTrue(arms.all { it.recipe.build(1L, null).integerRowLearning == enabled })
+        }
+    }
+
+    @Test
+    fun `a scalar edit should preserve the arithmetic worker`() {
+        val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
+            binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
+
+        val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, facts = facts,
+            edit = { it.copy(maxDecisions = 20) })
+
+        assertEquals(listOf("conflictDriven"),
+            arms.filter { it.recipe.build(1L, null).integerRowLearning }.map { it.label })
+    }
+
+    @Test
     fun `an arm should earn cut uses only when it runs a cut separator`() {
         val cases = listOf(
             "lp-aggressive" to true,
