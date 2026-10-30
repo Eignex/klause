@@ -34,7 +34,15 @@ internal class BooleanProofScheduler(
     context: BooleanProofContext,
     splitVariables: List<Int>,
     parameters: List<BacktrackParams>,
+    private val satisfactionQueries: Boolean,
 ) : AutoCloseable {
+    constructor(
+        problem: BakedProblem,
+        context: BooleanProofContext,
+        splitVariables: List<Int>,
+        parameters: List<BacktrackParams>,
+    ) : this(problem, context, splitVariables, parameters, false)
+
     private class Worker {
         var search: RepairSearch? = null
         var lease: BooleanTaskLease? = null
@@ -93,9 +101,10 @@ internal class BooleanProofScheduler(
             ?: return BooleanProofStep(null)
         try {
             if (slot.search == null) {
-                slot.search = BacktrackSolver(problem).openRepair(objective, parameters[worker].copy(
-                    assumptions = Assumptions.None,
-                ))
+                val solver = BacktrackSolver(problem)
+                val params = parameters[worker].copy(assumptions = Assumptions.None)
+                slot.search = if (satisfactionQueries) solver.openBooleanProof(params)
+                    else solver.openRepair(objective, params)
             }
             val search = checkNotNull(slot.search)
             if (started[worker] !== lease) {

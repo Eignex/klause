@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
@@ -174,6 +175,7 @@ internal class CpSatisfactionTraversal(
     projectAssumptionCore: Boolean = false,
     preparedSession: PropagationSession? = null,
     preparedSeed: PropagationResult? = null,
+    private val rebindable: Boolean = false,
 ) : AutoCloseable {
     private val resources = SearchInvocationResources()
     private val lpResources = ArrayList<LpSearchResource>()
@@ -213,6 +215,7 @@ internal class CpSatisfactionTraversal(
         sink,
         slice,
         if (singleModel) params.leafColumns(cp.session) else null,
+        rebindable,
     )
     private val completion: BacktrackCompletion
     private var run: SearchRun? = null
@@ -224,6 +227,7 @@ internal class CpSatisfactionTraversal(
     private var deferredRoot = false
 
     // The verdict the root reached before any search, handed out by the first [next].
+    private var currentAssumptions = params.assumptions
     private var rootOutcome: SearchOutcome? = null
     val hasRootOutcome: Boolean get() = rootOutcome != null
     val preparationPending: Boolean get() = sharedSession != null && run == null && rootOutcome == null
@@ -231,6 +235,12 @@ internal class CpSatisfactionTraversal(
 
     init {
         try {
+            if (rebindable) {
+                require(problem.numIntVars == 0 && problem.numRealVars == 0 &&
+                    problem.factors.all { it is Clause } && !problem.hasSymmetryBreaking &&
+                    !params.integerRowLearning && params.componentFactory == null &&
+                    params.lpConfig == null && params.lpPlan == LpPlan())
+            }
             completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
             completion.lpResource?.let {
                 resources.own(it)
@@ -329,10 +339,39 @@ internal class CpSatisfactionTraversal(
 
     fun propagationWork(): Long = cp.session.work
 
+    fun rebind(assumptions: Assumptions) {
+        check(rebindable && !closed)
+        require(assumptions.numInts == 0 && assumptions.deductions.isEmpty &&
+            assumptions.boolKeys.all { it in 0 until problem.numBoolVars })
+        check(sharedSession == null) { "conditioned search requires completed root preparation" }
+        val session = checkNotNull(learningSession)
+        session.popTo(0)
+        val seeded = cp.session.reseedFrom(assumptions)
+        cp.rebase()
+        session.resetRootFacts()
+        currentAssumptions = assumptions
+        val exhausted = SearchOutcome.Exhausted(touchedAssumptionLevels =
+            IntArray(assumptions.numBools) { it + 1 })
+        rootOutcome = if (seeded is PropagationResult.Unsat || cp.session.isUnsatAtRoot) exhausted else {
+            when (session.initialize()) {
+                ComponentResult.Consistent -> {
+                    params.clauseExchange?.onSearchStart(cp.session)
+                    null
+                }
+                is ComponentResult.Conflict -> exhausted
+                ComponentResult.Indeterminate -> SearchOutcome.BudgetCapped
+            }
+        }
+        traversal.resetScope()
+        run?.reset()
+        if (run == null && rootOutcome == null) run = session.openRun(problem.numBoolVars, traversal)
+    }
+
     /**
      * Advance to the next outcome, or null when a pausable traversal reached its slice boundary with search still
-     * pending. Every outcome but [SearchOutcome.Found] is terminal and closes the traversal's LP resources; a model
+     * pending. Ordinary terminal outcomes close the traversal's LP resources; a model
      * releases their persistent solvers instead, since a lazy caller may abandon the traversal after it.
+     * Rebindable Boolean queries retain the prepared state until their owner closes it.
      */
     fun next(): SearchOutcome? {
         check(!closed) { "traversal is closed" }
@@ -379,7 +418,7 @@ internal class CpSatisfactionTraversal(
         }
         rootOutcome?.let { outcome ->
             rootOutcome = null
-            close()
+            finishQuery()
             return outcome
         }
         return when (val event = checkNotNull(run).next()) {
@@ -391,15 +430,15 @@ internal class CpSatisfactionTraversal(
             }
 
             SearchRunEvent.Exhausted -> {
-                close()
+                finishQuery()
                 // Learned decision levels describe traversal, not every premise of the exhausted tree.
                 SearchOutcome.Exhausted(touchedAssumptionLevels = IntArray(
-                    params.assumptions.numBools + params.assumptions.numInts,
+                    currentAssumptions.numBools + currentAssumptions.numInts,
                 ) { it + 1 })
             }
 
             SearchRunEvent.Indeterminate.Component -> {
-                close()
+                finishQuery()
                 if (params.cancellation()) SearchOutcome.BudgetCapped else SearchOutcome.Exhausted(indeterminate = true)
             }
 
@@ -407,17 +446,21 @@ internal class CpSatisfactionTraversal(
                 params.clauseExchange?.onSearchEnd(cp.session)
                 null
             } else {
-                close()
+                finishQuery()
                 SearchOutcome.BudgetCapped
             }
 
             SearchRunEvent.Indeterminate.Budget,
             SearchRunEvent.Indeterminate.Cancelled,
             -> {
-                close()
+                finishQuery()
                 SearchOutcome.BudgetCapped
             }
         }
+    }
+
+    private fun finishQuery() {
+        if (!rebindable) close()
     }
 
     /** Close the invocation resources; idempotent. */
@@ -479,6 +522,7 @@ private class CpSatisfactionTraversalPolicy(
     private val sink: SolveStatsSink?,
     private val slice: TraversalSlice?,
     leafColumns: LeafColumns?,
+    private val rebindable: Boolean,
 ) : SearchTraversalPolicy,
     SearchRunLifecycle {
     private val restart = RestartSchedule.from(params)
@@ -503,8 +547,10 @@ private class CpSatisfactionTraversalPolicy(
     override val booleanBranching = BooleanBranching.None
     override val decisionBudget = SearchDecisionBudget {
         params.nodeBudget?.allowance?.let { budget ->
-            budget.spend()
-            !budget.exhausted()
+            if (rebindable && budget.exhausted()) false else {
+                budget.spend()
+                !budget.exhausted()
+            }
         } ?: true
     }
     override val observer: SearchRunObserver = brancher
@@ -530,6 +576,11 @@ private class CpSatisfactionTraversalPolicy(
     init { session.retainedInprocessingMemory = inprocessing?.let { it::retainedMemory } }
 
     fun releaseRetainedState() { inprocessing?.reset() }
+
+    fun resetScope() {
+        inprocessing?.reset()
+        learnedMemory.reset()
+    }
 
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
 
