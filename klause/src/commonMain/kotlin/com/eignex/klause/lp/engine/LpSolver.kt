@@ -317,6 +317,15 @@ internal interface LpSolver : AutoCloseable {
  * component engine cannot accidentally hide the certification routes from its consumers.
  */
 internal interface ComponentLpSolverCapability : LpSolver {
+    fun nodeDeductions(
+        duals: DoubleArray,
+        observer: LpCertificationObserver? = null,
+        policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+        cancellation: Cancellation = Cancellation.Never,
+        withAlternatives: Boolean = false,
+        sharedMeter: MixedCertificateMeter? = null,
+    ): ComponentLpDeductions? = null
+
     fun exactBound(
         observer: LpCertificationObserver? = null,
         policy: LpCertificationPolicy = ProductionLpCertificationPolicy,

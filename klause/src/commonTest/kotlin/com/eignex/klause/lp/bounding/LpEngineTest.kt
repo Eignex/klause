@@ -43,6 +43,30 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `complete component node deductions honor the injected proof policy`() {
+        for (accepted in listOf(false, true)) {
+            val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+            ))
+            val sink = SolveStatsSink("complete-component-policy")
+            val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, success ->
+                accepted && success
+            })
+
+            val pruned = LpEngine(problem,
+                LinearObjective(intCoefficients = LongArray(4) { 1L }, constant = 7L),
+                LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                    probe = false, rootCutHarvest = false)), sink, context).use { engine ->
+                engine.pruneNode(PropagationSession(problem), 8.0, -1, true)
+            }
+
+            assertEquals(accepted, pruned)
+            assertEquals(1L, sink.snapshot().lp.phases["NODE_DEDUCTION_NODE"]?.outcomes?.get("COMPONENT_COMPLETE"))
+        }
+    }
+
+    @Test
     fun `ordinary component roots yield after their adaptive numerical query`() {
         val problem = Problem(0, 120, Array(120) { IntDomain(0, 1) }, (0 until 120).map { variable ->
             val next = (variable / 60) * 60 + (variable + 1) % 60

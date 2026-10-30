@@ -33,6 +33,7 @@ internal class ComponentLpSolver(
     val rowOnlyRows: Int = parts.sumOf { if (it.cols.isEmpty()) it.rows.size else 0 }
     private class CheckedBound(val policy: LpCertificationPolicy, val bound: CertifiedLpBound)
     private val checkedBounds = arrayOfNulls<CheckedBound>(parts.size)
+    private val deductions = ComponentLpDeductionCache(parts.size)
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
     private var activeChild: LpSolver? = null
     private var solveStarted = false
@@ -95,6 +96,7 @@ internal class ComponentLpSolver(
         clearEvidence()
         reusable.fill(null)
         checkedBounds.fill(null)
+        deductions.clear()
         closeComponentSolvers(solvers, failure)
         failure?.let { throw it }
     }
@@ -185,6 +187,7 @@ internal class ComponentLpSolver(
                 if (nextParts[index] !== parts[index]) {
                     reusable[index] = null
                     checkedBounds[index] = null
+                    deductions.invalidate(index)
                 }
                 if (!(solvers[index] as RetainedLpSolver).adopt(
                     checkNotNull(nextParts[index].model.exactState),
@@ -204,6 +207,7 @@ internal class ComponentLpSolver(
                 clearEvidence()
                 reusable.fill(null)
                 checkedBounds.fill(null)
+                deductions.clear()
                 closeComponentSolvers(solvers, primary)
             }
             throw primary
@@ -299,6 +303,7 @@ internal class ComponentLpSolver(
             for (index in parts.indices) if (changed[index]) {
                 reusable[index] = null
                 checkedBounds[index] = null
+                deductions.invalidate(index)
             }
             clearEvidence()
             published = true
@@ -391,6 +396,7 @@ internal class ComponentLpSolver(
         recessionDirection = null
         reusable.fill(null)
         checkedBounds.fill(null)
+        deductions.clear()
         throw primary
     }
 
@@ -543,6 +549,21 @@ internal class ComponentLpSolver(
             refactorizations = lastRefactorizations,
             exactState = model.exactState,
         )
+    }
+
+    override fun nodeDeductions(
+        duals: DoubleArray,
+        observer: LpCertificationObserver?,
+        policy: LpCertificationPolicy,
+        cancellation: Cancellation,
+        withAlternatives: Boolean,
+        sharedMeter: MixedCertificateMeter?,
+    ): ComponentLpDeductions? {
+        if (!currentAuthority() || recessionDirection != null) return null
+        val results = blockResults ?: return null
+        if (results.any { it?.optimal != true }) return null
+        return deductions.certify(model, parts, isolated, results, duals, observer, policy,
+            cancellation, withAlternatives, sharedMeter)
     }
 
     override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? {

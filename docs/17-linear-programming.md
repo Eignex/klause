@@ -292,6 +292,16 @@ to that aggregate. Bound support lifts every contributing row and side to the
 current parent state, including its current assertion witnesses. Floating child
 optima alone supply no global optimum or conflict authority.
 
+Completed exact integer components can retain node deductions separately from their
+numerical results. A query uses the parent's common dual-rounding scale and reuses
+compatible child deductions. The aggregate maps multipliers and reduced costs back
+to the current parent authority; each child alternative is combined with the other
+children's strongest bounds for fixing. Retained deductions occupy at most eight
+MiB inside the shared 16 MiB checking envelope, and assembly and checking work are
+charged even on a decline. Mixed columns, non-unit objective scaling and unsupported
+integer certificates use the whole-model deduction route. The independent safe
+objective check remains part of the node bound decision.
+
 At owner construction, blocks are ordered by row-and-column dimensions. After a work or
 pivot stop, completed blocks can contribute their checked dual bounds while
 unfinished blocks contribute freshly checked zero-dual box bounds. Missing
