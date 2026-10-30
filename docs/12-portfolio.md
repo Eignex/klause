@@ -586,7 +586,7 @@ implementation, and rotates ordinary-sized bounded
 slices across disjoint tasks, reusing each private session for sibling cubes.
 Construction, reseeding, failed attempts, checks and retirement retain their
 containing allowances and cumulative worker counters; it supplies no independent
-proof certificate or automatic admission policy. An internal portfolio coordinator
+proof certificate. An internal portfolio coordinator
 keeps source bindings, seed positions and channel origins on the original workers.
 Each lane holds its original session's exclusive owner, reports only its own work
 and emits source exhaustion after whole-board
@@ -613,12 +613,16 @@ through the transfer. Probe work is a subset of each worker's cumulative work, n
 a refunded or additional charge. Without a live decision the same source query
 continues; fast completion creates no board.
 
-The direct integration switches are internal and disabled by default. The source
-pipeline exposes `boolean-proof-tasks=true` for opt-in single-core satisfaction
-execution under the same admission guards; optimization and parallel requests
-reject this control. Result statistics distinguish actual partitions, native task
-closures, probe effort and declines. Combining schedules preserves their distinct
-observations.
+The source pipeline automatically admits single-core satisfaction portfolios with
+two identical native first-fail recipes and the ordinary work schedule under these
+source guards. Other shapes continue ordinary solving. Explicit
+`boolean-proof-tasks=false` disables admission; `true` also permits the bare
+non-native recipe and reports declines. Explicit enablement rejects optimization
+and parallel requests; omission leaves them on ordinary execution. Direct internal
+switches remain disabled by default. Result statistics distinguish actual partitions,
+native task closures, probe effort and explicit declines. An admitted fast probe
+retains its effort counters even when it creates no board. Combining schedules
+preserves their distinct observations.
 These counters do not establish independent checking or confer proof authority.
 
 ### Slice accounting and coverage

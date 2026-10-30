@@ -67,7 +67,7 @@ class BooleanProofPortfolioTest {
         val workers = PortfolioBuilder.build(problem, scenario)
         try {
             var identities = 0
-            val admitted = BooleanProofPortfolio.forWorkers(workers, probeFirst = true,
+            val admitted = BooleanProofPortfolio.forWorkers(workers, probeFirst = true, nativeOnly = true,
                 newIdentity = { "task-authority-${++identities}" })
             assertNotNull(admitted).use { tasks ->
                 assertEquals(0, identities)
@@ -84,6 +84,19 @@ class BooleanProofPortfolioTest {
                 assertEquals(first.work + second.work, tasks.work)
                 assertEquals(1, identities)
             }
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `automatic task admission should decline nonnative ordered workers`() {
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false)
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+            btPool = listOf { BacktrackWorkerConfig.ofParams("fixed", params) })
+        val workers = PortfolioBuilder.build(problem, scenario)
+        try {
+            assertNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true, nativeOnly = true))
         } finally {
             workers.forEach { it.close() }
         }
