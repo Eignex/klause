@@ -81,7 +81,7 @@ class LpEngineTest {
         }
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
             LpParams(lpPlan = LpPlan(bounding = true), cancellation = token),
-            SolveStatsSink("cancelled-template-charge")).use { engine ->
+            SolveStatsSink("cancelled-template-charge"), projections = problem.factorProjections).use { engine ->
             val before = engine.totalSolveWork()
             work = 0L
 
