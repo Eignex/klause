@@ -675,6 +675,19 @@ source visits and invalidations, interval visits, retained declines and deductio
 LP work and certification counters and whole-process measurements retain the cost
 of numerical repair and final completion. The automatic default remains disabled.
 
+[9534](https://lab.eignex.com/jobs/9534) attributes 36–43% of captured CPU samples
+to composed cancellation polls and 10–12% to callback invocation. These diagnostic
+samples motivate bounded polling in unmetered point-hint scans; attached meters
+retain every debit and immediate stop check.
+[9557](https://lab.eignex.com/jobs/9557) records four independently accepted Lin7
+SAT points with the combined route versus four ordinary UNKNOWNs at the same
+ten-second allowance. Both arms' Lin3 and Lin5 held-out points are independently
+accepted. The original LCTES control in [9569](https://lab.eignex.com/jobs/9569) and
+the finite sc control in [9574](https://lab.eignex.com/jobs/9574) remain UNKNOWN.
+These fixed-head observations retain all preparation, failed attempts and checking
+costs. Missing coordinator-owned execution frames withhold final physical
+qualification and automatic activation.
+
 `LinearRootOpeningProfile` accepts `inspect=partial-row-activation` for a pinned
 SMT source. It compares the existing cached partial interval producer with the
 same producer plus literal-to-row assertion scheduling. Both arms use seed 1,
