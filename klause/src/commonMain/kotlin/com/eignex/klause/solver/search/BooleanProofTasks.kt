@@ -75,6 +75,17 @@ class BooleanProofTasks(
         val index = owners.indices.firstOrNull {
             owners[it] == null && closures[it] == BooleanTaskCheck.Unresolved
         } ?: return null
+        return grant(worker, index)
+    }
+
+    internal fun acquire(worker: Int, index: Int): BooleanTaskLease? {
+        require(worker >= 0 && index in owners.indices)
+        require(owners.none { it?.worker == worker })
+        if (owners[index] != null || closures[index] != BooleanTaskCheck.Unresolved) return null
+        return grant(worker, index)
+    }
+
+    private fun grant(worker: Int, index: Int): BooleanTaskLease {
         check(nextAttempt < Long.MAX_VALUE)
         val cube = BooleanCube(variables.mapIndexed { bit, variable -> Lit.make(variable, index and (1 shl bit) != 0) })
         return BooleanTaskLease(identity, epoch, ++nextAttempt, index, worker, context, cube).also {

@@ -267,12 +267,17 @@ bake, private setup, source witness checking and retirement; process CPU, thread
 allocation, root/total propagation and native coverage remain separate observations.
 One warmup precedes measured repeats. Optional `recipe=LABEL native=true|false`
 selects a fresh catalog recipe and preserves the same propagation backend in both
-controls; defaults are `input-order` and `false`. Optional `driver=repair|satisfaction|portfolio`
+controls; defaults are `input-order` and `false`. Optional `driver=repair|satisfaction|portfolio|portfolio-probe`
 selects constant-objective repair or direct retained satisfaction for task workers;
 the default is `repair`. The `portfolio` driver uses builder-owned workers, runtime
 source bindings, ordinary scheduling and clause sharing in both controls, enabling
 the internal task switch only in the task control. It requires `splits=2` and records
-truthful admission declines and their reason. Its actual worker seeds are `seed+1000` and `seed+1001`;
+truthful admission declines and their reason. The `portfolio-probe` driver uses
+the same bound workers and requires `splits=1`; the first ordinary whole-source
+probe retains its engine and charges when a live decision creates a two-cube board.
+It records `sourceProbeWork`, `sourceProbeSegments` and `partitionLiteral`; probe
+work is included in `schedulerWork`. A completed probe records zero tasks, and no
+live decision keeps the same whole-source query running. Its actual worker seeds are `seed+1000` and `seed+1001`;
 the direct drivers use `seed` and `seed+1`. The switch remains disabled in ordinary
 production selection. The replica control uses ordinary satisfaction in every case. Qualify against the applicable
 strong catalog recipes before drawing any production-admission conclusion.

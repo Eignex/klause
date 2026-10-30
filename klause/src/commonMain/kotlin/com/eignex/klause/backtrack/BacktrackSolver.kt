@@ -240,7 +240,8 @@ class BacktrackSolver internal constructor(
         }
     }
 
-    internal fun openBooleanProof(params: BacktrackParams): RepairSearch = BooleanSatisfactionRepair(this, params)
+    internal fun openBooleanProof(params: BacktrackParams): BooleanSatisfactionRepair =
+        BooleanSatisfactionRepair(this, params)
 
     override fun describe(params: BacktrackParams): String {
         val lp = params.lpConfig?.let { "config" }

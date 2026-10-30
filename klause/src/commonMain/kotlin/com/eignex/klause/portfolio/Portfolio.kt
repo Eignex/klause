@@ -152,6 +152,13 @@ class Portfolio(
     internal var invocationStarted: TimeMark? = null
     internal var reserveBeforeIncumbentOnly: Boolean = false
     internal var disjointBooleanProof: Boolean = false
+    internal var disjointBooleanProbe: Boolean = false
+    internal var lastBooleanProofProbeWork: Long = 0L
+        private set
+    internal var lastBooleanProofProbeSegments: Int = 0
+        private set
+    internal var lastBooleanProofPartitionLiteral: Int? = null
+        private set
     internal var lastBooleanProofTasks: Int = 0
         private set
     internal var lastBooleanProofCompleted: Int = 0
@@ -234,12 +241,17 @@ class Portfolio(
         lastBooleanProofTasks = 0
         lastBooleanProofCompleted = 0
         lastBooleanProofWork = 0L
+        lastBooleanProofProbeWork = 0L
+        lastBooleanProofProbeSegments = 0
+        lastBooleanProofPartitionLiteral = null
         lastBooleanProofDecline = if (disjointBooleanProof) "unsupported-schedule" else "disabled"
         var proofTasks: BooleanProofPortfolio? = null
         if (disjointBooleanProof && lanes == 1 && baseSliceWork == 5000L &&
             maxSliceWork == 150000L && sliceGrowth == 1.5) {
             lastBooleanProofDecline = null
-            proofTasks = BooleanProofPortfolio.forWorkers(workers) { lastBooleanProofDecline = it }
+            proofTasks = BooleanProofPortfolio.forWorkers(workers, disjointBooleanProbe) {
+                lastBooleanProofDecline = it
+            }
             proofTasks?.let { run.restrictAvailability(it::available) }
         }
         val verdicts = ArrayList<SolveResult>()
@@ -359,6 +371,9 @@ class Portfolio(
         lastBooleanProofTasks = proofTasks?.size ?: 0
         lastBooleanProofCompleted = proofTasks?.completed ?: 0
         lastBooleanProofWork = proofTasks?.work ?: 0L
+        lastBooleanProofProbeWork = proofTasks?.probeWork ?: 0L
+        lastBooleanProofProbeSegments = proofTasks?.probeSegments ?: 0
+        lastBooleanProofPartitionLiteral = proofTasks?.partitionLiteral
         execution.exceptionOrNull()?.let { failure ->
             cleanup.exceptionOrNull()?.takeUnless { it === failure }?.let(failure::addSuppressed)
             throw failure

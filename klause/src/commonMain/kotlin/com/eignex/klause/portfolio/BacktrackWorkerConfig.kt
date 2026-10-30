@@ -170,7 +170,7 @@ internal class BacktrackWorkerConfig(
             objective = objective,
             withBound = withBound,
         ).bindEvidence(evidenceModel).also {
-            if (objective == null) it.booleanProofRecipe = BooleanProofRecipe(problem, params) { cancellation, open ->
+            if (objective == null) it.booleanProofRecipe = BooleanProofRecipe(solver, params) { cancellation, open ->
                 session.openOwnedSolve(params.withCancellation(cancellation)) { scoped ->
                     check(scoped.assumptions.numInts == 0 && scoped.assumptions.deductions.isEmpty &&
                         scoped.assumptions.bools == params.assumptions.bools) { "worker source condition changed" }

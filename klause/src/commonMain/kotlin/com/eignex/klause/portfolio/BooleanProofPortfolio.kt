@@ -1,47 +1,91 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.BooleanSatisfactionRepair
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.ResumableSolve
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanProofContext
+import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SchedulingCancellation
 import com.eignex.klause.util.workScheduled
 import kotlin.uuid.Uuid
 
+@Suppress("TooGenericExceptionCaught") // preserve primary failures while releasing retained worker state
 internal class BooleanProofPortfolio(
     private val problem: BakedProblem,
     private val context: BooleanProofContext,
     splitVariables: List<Int>,
     parameters: List<BacktrackParams>,
     private val reservations: List<(Cancellation, () -> ResumableSolve) -> ResumableSolve>? = null,
+    private val probeFirst: Boolean = false,
+    private val solvers: List<BacktrackSolver>? = null,
 ) : AutoCloseable {
     private val openingTokens = Array(parameters.size) { Cancellation.Never }
-    private val scheduler = BooleanProofScheduler(problem, context, splitVariables,
-        parameters.mapIndexed { worker, params ->
-            params.withCancellation(object : SchedulingCancellation {
-                override val workScheduled: Boolean get() = openingTokens[worker].workScheduled()
-                override fun isCancelled(): Boolean = openingTokens[worker]()
-                override fun deadline() = openingTokens[worker].deadline()
-                override fun workMeter() = openingTokens[worker].workMeter()
-            })
-        }, true)
+    private val parameters = parameters.mapIndexed { worker, params ->
+        params.withCancellation(object : SchedulingCancellation {
+            override val workScheduled: Boolean get() = openingTokens[worker].workScheduled()
+            override fun isCancelled(): Boolean = openingTokens[worker]()
+            override fun deadline() = openingTokens[worker].deadline()
+            override fun workMeter() = openingTokens[worker].workMeter()
+        })
+    }
+    private var scheduler: BooleanProofScheduler? = if (probeFirst) null else board(splitVariables)
+    private val probes = arrayOfNulls<BooleanSatisfactionRepair>(parameters.size)
+    private val retiredWork = LongArray(parameters.size)
+    private val retiredStats = Array(parameters.size) { SolveStats.EMPTY }
+    private var probeOwner: Int? = null
+    private var terminal = false
+    var probeWork: Long = 0L
+        private set
+    var probeSegments: Int = 0
+        private set
+    var partitionLiteral: Int? = null
+        private set
     private val handles = arrayOfNulls<Lane>(parameters.size)
     private var closed = false
-    val size: Int get() = scheduler.size
-    val completed: Int get() = scheduler.completed
-    val work: Long get() = scheduler.work
+    val size: Int get() = scheduler?.size ?: 0
+    val completed: Int get() = scheduler?.completed ?: 0
+    val work: Long get() = this.parameters.indices.sumOf(::workerWork)
 
-    fun available(worker: Int): Boolean = !closed && handles[worker]?.closed != true && scheduler.hasTask(worker)
+    init {
+        require(parameters.size in 1..64)
+        require(solvers == null || (solvers.size == parameters.size && solvers.all { it.problem === problem }))
+        require(reservations == null || reservations.size == parameters.size)
+        require(context.scope.objective == null && context.cutoff == null)
+        val condition = context.scope.condition
+        require(condition.lower.isEmpty() && condition.upper.isEmpty() && condition.integerRows.isEmpty())
+        require(condition.bools.keys.all { it in 0 until problem.numBoolVars })
+        require(parameters.all { it.assumptions.numInts == 0 && it.assumptions.deductions.isEmpty &&
+            it.assumptions.bools == condition.bools })
+    }
+
+    private fun board(splits: List<Int>) =
+        BooleanProofScheduler(problem, context, splits, parameters, true, solvers)
+
+    private fun workerWork(worker: Int): Long = retiredWork[worker] +
+        (scheduler?.workerWork(worker) ?: probes[worker]?.work ?: 0L)
+
+    private fun workerStats(worker: Int): SolveStats = retiredStats[worker].mergedWith(
+        scheduler?.workerStats(worker) ?: probes[worker]?.stats ?: SolveStats.EMPTY,
+    )
+
+    fun available(worker: Int): Boolean = !closed && !terminal && handles[worker]?.closed != true &&
+        (scheduler?.hasTask(worker) ?: (probeOwner == null || probeOwner == worker))
 
     fun open(worker: Int, cancellation: Cancellation): ResumableSolve {
         check(!closed && handles[worker] == null)
@@ -50,22 +94,34 @@ internal class BooleanProofPortfolio(
         return reservations?.get(worker)?.invoke(cancellation, open) ?: open()
     }
 
+    private fun retireProbe(worker: Int) {
+        val search = probes[worker] ?: return
+        probes[worker] = null
+        try {
+            search.close()
+        } finally {
+            retiredWork[worker] += search.work
+            retiredStats[worker] = retiredStats[worker].mergedWith(search.stats)
+        }
+    }
+
     private inner class Lane(private val worker: Int) : ResumableSolve {
         var closed = false
             private set
         private var done: SolveResult? = null
         override val isDone: Boolean get() = done != null
-        override val work: Long get() = scheduler.workerWork(worker)
-        override val stats: SolveStats get() = scheduler.workerStats(worker)
+        override val work: Long get() = workerWork(worker)
+        override val stats: SolveStats get() = workerStats(worker)
 
         override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
             done?.let { return it }
             check(!closed && !this@BooleanProofPortfolio.closed) { "search is closed" }
             if (global()) return finish(SolveResult.Unknown(TerminationReason.Cancelled, semantics = problem.semantics))
             if (sliceMillis <= 0L || sliceNodes == 0L || !available(worker)) return null
-            val step = scheduler.runSlice(worker, global, sliceMillis, if (sliceNodes < 0L) 5000L else sliceNodes)
+            val board = scheduler ?: return probe(global, sliceMillis, if (sliceNodes < 0L) 5000L else sliceNodes)
+            val step = board.runSlice(worker, global, sliceMillis, if (sliceNodes < 0L) 5000L else sliceNodes)
             step.sample?.let { return finish(SolveResult.Sat(it, semantics = problem.semantics)) }
-            if (scheduler.nativeCoverageComplete) return finish(SolveResult.Unsat(
+            if (board.nativeCoverageComplete) return finish(SolveResult.Unsat(
                 assumptionCore = Assumptions(bools = context.scope.condition.bools), semantics = problem.semantics,
             ))
             if (step.reason != null && step.reason != TerminationReason.SearchExhausted) return finish(
@@ -74,7 +130,68 @@ internal class BooleanProofPortfolio(
             return null
         }
 
+        private fun probe(global: Cancellation, millis: Long, work: Long): SolveResult? {
+            val before = workerWork(worker)
+            probeSegments++
+            return try {
+                probeStep(global, millis, work)
+            } finally {
+                probeWork += (workerWork(worker) - before).coerceAtLeast(0L)
+            }
+        }
+
+        private fun probeStep(global: Cancellation, millis: Long, work: Long): SolveResult? {
+            if (probeOwner == null) probeOwner = worker
+            val search = probes[worker] ?: try {
+                val params = parameters[worker].copy(assumptions = Assumptions.None)
+                (solvers?.get(worker) ?: BacktrackSolver(problem)).openBooleanProof(params).also {
+                    probes[worker] = it
+                    it.begin(Assumptions(bools = context.scope.condition.bools), params.maxDecisions,
+                        Double.POSITIVE_INFINITY, global)
+                }
+            } catch (failure: SearchInitializationCancelled) {
+                if (probes[worker] == null) {
+                    retiredWork[worker] += failure.work
+                    retiredStats[worker] = retiredStats[worker].mergedWith(failure.stats)
+                }
+                throw failure
+            }
+            val step = search.runSlice(global, millis, work)
+            step.sample?.let { sample ->
+                val verification = finiteWitnessVerifier(problem, null,
+                    Assumptions(bools = context.scope.condition.bools), global).verify(Candidate(sample, null))
+                if (verification is Verification.Accepted) return finish(
+                    SolveResult.Sat(sample, semantics = problem.semantics),
+                )
+                check(verification !is Verification.Rejected) { "source probe produced an invalid witness" }
+                return finish(SolveResult.Unknown(
+                    if (global()) TerminationReason.Cancelled else TerminationReason.BudgetExhausted,
+                    semantics = problem.semantics,
+                ))
+            }
+            if (step.reason != null) return finish(
+                if (step.reason == TerminationReason.SearchExhausted) SolveResult.Unsat(
+                    assumptionCore = Assumptions(bools = context.scope.condition.bools), semantics = problem.semantics,
+                ) else SolveResult.Unknown(step.reason, semantics = problem.semantics),
+            )
+            if (!global()) search.splitLiteral()?.let { literal ->
+                val replacement = board(listOf(Lit.variable(literal)))
+                try {
+                    replacement.adopt(worker, search, literal)
+                } catch (failure: Throwable) {
+                    runCatching { replacement.close() }.exceptionOrNull()?.let(failure::addSuppressed)
+                    throw failure
+                }
+                scheduler = replacement
+                partitionLiteral = literal
+                probes[worker] = null
+                probeOwner = null
+            }
+            return null
+        }
+
         private fun finish(result: SolveResult): SolveResult {
+            if (result is SolveResult.Sat || result is SolveResult.Unsat) terminal = true
             close()
             return when (result) {
                 is SolveResult.Sat -> result.copy(stats = stats)
@@ -86,19 +203,30 @@ internal class BooleanProofPortfolio(
         override fun close() {
             if (closed) return
             closed = true
-            if (!this@BooleanProofPortfolio.closed) scheduler.loseWorker(worker)
+            if (!this@BooleanProofPortfolio.closed) {
+                scheduler?.loseWorker(worker)
+                retireProbe(worker)
+                if (probeOwner == worker) probeOwner = null
+            }
         }
     }
 
     override fun close() {
         if (closed) return
         closed = true
-        scheduler.close()
+        val results = parameters.indices.map { worker -> runCatching { retireProbe(worker) } } +
+            runCatching { scheduler?.close() }
+        val failure = results.firstNotNullOfOrNull { it.exceptionOrNull() }
+        if (failure != null) {
+            results.mapNotNull { it.exceptionOrNull() }.filter { it !== failure }.forEach(failure::addSuppressed)
+            throw failure
+        }
     }
 
     companion object {
         fun forWorkers(
             workers: List<PortfolioWorker>,
+            probeFirst: Boolean = false,
             declined: (String) -> Unit = {},
         ): BooleanProofPortfolio? {
             fun decline(reason: String): BooleanProofPortfolio? {
@@ -134,15 +262,16 @@ internal class BooleanProofPortfolio(
                     recipe.params.assumptions.bools != condition.bools) return decline("worker-assumption-mismatch")
                 recipe.conditioned() ?: return decline("conditioned-sharing-unavailable")
             }
-            val splits = (0 until problem.numBoolVars).filter { it !in condition.bools }.take(2)
-            if (splits.size != 2) return decline("insufficient-free-booleans")
+            val count = if (probeFirst) 1 else 2
+            val splits = (0 until problem.numBoolVars).filter { it !in condition.bools }.take(count)
+            if (splits.size != count) return decline("insufficient-free-booleans")
             // Runtime bindings own source identity; fresh board ids prevent cross-invocation leases.
             val identity = Uuid.random().toString()
             val scope = invocation.scope?.copy(condition = condition) ?: SourceScope(
                 SourceRevision(identity, "klause-ir-clauses-v1"), condition,
             )
             return BooleanProofPortfolio(problem, BooleanProofContext(scope, identity + "/identity-bool-v1"),
-                splits, params, recipes.map { it.reserve })
+                splits, params, recipes.map { it.reserve }, probeFirst, recipes.map { it.solver })
         }
     }
 }

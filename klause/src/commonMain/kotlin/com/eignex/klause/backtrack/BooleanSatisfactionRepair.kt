@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConditionedClauseExchange
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.RepairSearchStep
@@ -28,6 +29,17 @@ internal class BooleanSatisfactionRepair(
             params.improvedSolutionSink == null && params.pooledIncumbents == null)
     }
 
+    private val problem = solver.problem
+    private var assumptions: Assumptions? = null
+
+    internal fun matches(problem: BakedProblem, params: BacktrackParams): Boolean =
+        !closed && started && this.problem === problem && this.params.copy(cancellation = Cancellation.Never) ==
+            params.copy(cancellation = Cancellation.Never)
+
+    internal fun matchesCondition(assumptions: Assumptions): Boolean = this.assumptions == assumptions
+
+    internal fun splitLiteral(): Int? = handle.splitLiteral()
+
     private val handle = ResumableSatisfaction(solver, params.copy(assumptions = Assumptions.None), rebindable = true)
     private var started = false
     private var closed = false
@@ -45,6 +57,7 @@ internal class BooleanSatisfactionRepair(
             require(cutoff == Double.POSITIVE_INFINITY) { "Boolean satisfaction has no objective cutoff" }
             require(decisionBudget == params.maxDecisions) { "Boolean satisfaction retains its decision policy" }
             handle.rebind(assumptions, cancellation)
+            this.assumptions = assumptions
             started = true
         } catch (failure: Throwable) {
             closeAfter(failure)
