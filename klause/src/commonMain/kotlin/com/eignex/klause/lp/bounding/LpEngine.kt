@@ -295,10 +295,12 @@ internal class LpEngine(
         if (!params.lpPlan.probe || !result.optimal ||
             result.primal.size.toLong() * Double.SIZE_BYTES > ROOT_PRIMAL_GUIDANCE_BYTES || lpWorkAllowanceSpent(1L)
         ) return
-        val remaining = if (retainedRootEnabled) retainedRootRemainingWork() else rootPrimalWorkBudget()
-        if ((retainedRootEnabled || remaining > 0L) && remaining <= 1L) return
+        val remaining = rootPrimalWorkBudget()
+        if (remaining > 0L && remaining <= 1L) return
+        if (retainedRootEnabled && SPARSE_LP_MAX_WORK - minOf(SPARSE_LP_MAX_WORK, totalSolveOps) <= 1L) return
         val started = TimeSource.Monotonic.markNow()
         // The auxiliary solver has closed; its completed output buffer belongs to this private worker.
+        // Pause bookkeeping preserves it while future pinning polls the next invocation's token.
         noteNodeOverhead(1L)
         rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation, result.basis, result.primal)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
