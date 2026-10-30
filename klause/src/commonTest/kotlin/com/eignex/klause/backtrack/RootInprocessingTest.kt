@@ -1,7 +1,10 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
@@ -249,6 +252,23 @@ class RootInprocessingTest {
 
             assertEquals(0L, phase.applyPhase(VarRef.Bool(1), sequenceOf(0L, 1L)).first())
         }
+    }
+
+    @Test
+    fun `root probes should preserve saved integer phases`() {
+        val source = Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+        ))
+        val session = PropagationSession(source.bake(), nativeSat = false)
+        val params = BacktrackParams(rootProbeBatch = 1, phaseSaving = true)
+        val phase = PhaseSaving(source.numBoolVars, source.numIntVars, params)
+        session.retractingListener = { phase.capture(it, session) }
+        session.pinInt(0, 0L)
+        session.popLast()
+
+        RootProbingPass().run(session, params, null)
+
+        assertEquals(0L, phase.applyPhase(VarRef.IntVar(0), sequenceOf(0L, 1L)).first())
     }
 
     @Test
