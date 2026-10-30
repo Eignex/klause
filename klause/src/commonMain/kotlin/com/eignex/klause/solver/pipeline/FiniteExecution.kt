@@ -1176,12 +1176,14 @@ private fun executePortfolio(
 
         is PortfolioPlan.Execute -> Unit
     }
-    val scenario = clausalDefaultScenario(
+    val baseScenario = clausalDefaultScenario(
         plan.scenario,
         ProblemProfile.of(request.problem, request.optimize),
         request.defaultArms,
         explicitArms = request.executionOptions.explicitArms,
     )
+    val scenario = weightedCoreDefaultScenario(baseScenario, request.problem, request.objective,
+        request.executionOptions, request.cancellation)
     val executor = FinitePipeline.portfolioExecutor(
         request.problem,
         scenario,
