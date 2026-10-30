@@ -35,4 +35,19 @@ internal object LpLifecycleSuite {
         category = Category.OPTIMIZATION
         for (name in heldoutNames) external(name, heldoutCollection, "$name.mps")
     }
+
+    private val reuseCollection = ExternalCollection(
+        id = "highs-lp-lifecycle-reuse-$REVISION",
+        url = "https://raw.githubusercontent.com/ERGO-Code/HiGHS/$REVISION/check/instances",
+        license = "MIT (HiGHS public MPS test inputs)",
+        reason = "Original mixed-integer MPS source for checked-result reuse applicability",
+        fetch = FetchMethod.Files(listOf("egout.mps"), "mps") { name, text ->
+            listOf(name.removeSuffix(".mps") to text)
+        },
+    )
+    val reuseSuite = suite("lp-lifecycle-reuse-v1", "Pinned original mixed-integer MPS reuse control") {
+        format = Format.MPS
+        category = Category.OPTIMIZATION
+        external("egout", reuseCollection, "egout.mps")
+    }
 }
