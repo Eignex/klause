@@ -829,7 +829,9 @@ internal class LpEngine(
         if (persistentRelaxer !== relaxer) {
             cpAdapter.reset()
             persistentRelaxation = null
-            val base = relaxer.build(RootDomains(problem), cancellation = cancellation)
+            val base = relaxer.build(RootDomains(problem), emptyList(), cancellation) {
+                noteNodeOverhead(it * LpNodeOverhead.BUILD)
+            }
             noteNodeOverhead(base.model.extent() * LpNodeOverhead.BUILD)
             if (base.persistentEligible && !base.model.hasContinuous) {
                 persistentRelaxation = base

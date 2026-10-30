@@ -232,8 +232,10 @@ source-root domain views without constructing a propagation session. They read n
 the compact immutable layout remains available for later node adoption, while other layouts
 retain their source emissions. Cut-bearing consultations keep propagation-derived root bounds,
 preserving completed cut-owner results across later node adoption.
-Completed cold layout construction and template imports debit the containing LP allowance, and
-the containing worker token and remaining root work cap bound their preparation. The
+Completed cold layout construction and template imports debit the containing LP allowance.
+An interrupted cold base charges its materialized columns, rows and coefficient entries before
+discarding them; that charge adds no retained authority. The containing worker token and
+remaining root work cap bound their preparation. The
 root-local clock gates numerical queries and checking. A completed source layout can
 remain private for later node queries after that consultation expires; a containing-phase
 interruption withholds an incomplete installation. A declined retained source layout

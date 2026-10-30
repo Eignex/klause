@@ -810,10 +810,23 @@ internal class CpToLpRelaxation(
         domains: RelaxationDomains,
         extraCuts: List<Cut> = emptyList(),
         cancellation: Cancellation = Cancellation.Never,
+    ): LpRelaxation = build(domains, extraCuts, cancellation, null)
+
+    fun build(
+        domains: RelaxationDomains,
+        extraCuts: List<Cut>,
+        cancellation: Cancellation,
+        onDiscardedAssembly: ((Long) -> Unit)?,
     ): LpRelaxation {
         val token = cancellation or preparationCancellation
         prepareTemplates(token)
-        return Assembler(domains, cancellation = token).assemble(extraCuts)
+        val assembler = Assembler(domains, cancellation = token)
+        var complete = false
+        return try {
+            assembler.assemble(extraCuts).also { complete = true }
+        } finally {
+            if (!complete) onDiscardedAssembly?.invoke(assembler.constructionSize)
+        }
     }
 
     private val timeIndexedViews by lazy {
@@ -894,6 +907,7 @@ internal class CpToLpRelaxation(
         private val columnDomains: RelaxationDomains = domains,
     ) : ExactRelaxationBuilder, SharedIndexChoices {
         private val builder = LpBuilder()
+        val constructionSize: Long get() = builder.constructionSize
         private val exactRows = ExactRelaxationRows()
         private var templateRows = 0
         private var templateBounds = 0
