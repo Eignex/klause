@@ -114,6 +114,17 @@ and `#` starts a comment. They bypass default suite family caps.
 from its compact archive. Names include `dimacs_mod/MANN_a9.clq` and
 `random/max_cut_60_500_9.asc`; model hashes identify the fetched bytes in lab records.
 
+`suite=maxsat-haplotyping` resolves the original MSE 2024
+`haplotyping-pedigrees_wt-ped2.B.recomb1-0.01-3` source through selected ZIP ranges.
+It requires a uniquely named member and a pinned SHA-256 of the decompressed source.
+HTTP ranges require matching coordinates, length and a stable strong ETag; a full
+response is rejected. Acquisition admits 32 MiB of requested range bytes, eight
+64 KiB cached blocks, a 16 MiB packed member and 64 MiB of original bytes. XZ
+decoding has a 64 MiB memory limit. Selection reads the central directory and the
+chosen local header; unrelated members stay packed at the source. Range transport
+does not retry internally. Retain failed acquisition and checking within the lab's
+containing allowance. These limits do not change solver grants or source semantics.
+
 For retained JFR captures, submit `lab/jfr-summary.json` through `lab run` with
 `bench.request.parameters` containing `source` (the job/artifact label), `sha256`
 and `gzip-base64` (at most 2 MiB). The SDK transports the payload in the frozen case
