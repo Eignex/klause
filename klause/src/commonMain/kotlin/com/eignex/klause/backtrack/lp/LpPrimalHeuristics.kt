@@ -54,7 +54,9 @@ internal fun LpEngine.lpRoundingProbe(
             outcome = "EMPTY_RELAXATION"
             return null
         }
-        val result = try {
+        val primal = retained?.primal?.also {
+            sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "REUSED", started.elapsedNow().inWholeNanoseconds)
+        } ?: try {
             solvePrimalRelaxation(
                 relaxation.model,
                 cancellation,
@@ -70,8 +72,7 @@ internal fun LpEngine.lpRoundingProbe(
             }
         } catch (_: CheckedLongOverflowException) {
             return null
-        } ?: return null
-        val primal = result.primal
+        }?.primal ?: return null
         val reals = if (toleranceReals && problem.numRealVars > 0) relaxation.floatReals(primal, problem) else null
         val seed = initial?.takeIf {
             it.numIntVars == problem.numIntVars && it.numBoolVars == problem.numBoolVars

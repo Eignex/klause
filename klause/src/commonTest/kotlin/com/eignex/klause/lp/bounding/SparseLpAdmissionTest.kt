@@ -26,6 +26,20 @@ import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
     @Test
+    fun `sparse trials preserve the ordinary root probe intent`() {
+        for (ceiling in listOf(1L, 1_000_000L)) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+                settings = ProblemSettings(lpCeilingTableauCells = ceiling))
+            val ordinary = LpAutoConfig.resolve(problem, LpConfig.AUTO)
+
+            val trial = LpAutoConfig.resolve(problem, LpConfig.parse("default,+sparse-trial"))
+
+            assertEquals(ordinary.probe, trial.probe)
+        }
+    }
+
+    @Test
     fun `sparse root consultations retain progress until a checked bound completes`() {
         val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
             List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
