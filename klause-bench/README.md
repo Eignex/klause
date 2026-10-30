@@ -1395,7 +1395,15 @@ The integer arm's `trace=first-integer` keeps the most recent conflict window un
 an integer object is admitted, then keeps its consumers, branch markers and
 retirement. Other post-admission details are omitted. Discarded-window/event/word
 counts and omitted observations are explicit; the live event and word caps stay
-fixed. `trace=initial` keeps the initial window instead. The clause arm keeps its
+fixed. Capture also keeps a session-wide integer decline census outside those
+windows: at most 63 reason names of at most 96 characters, plus an `other` bucket.
+Its counters continue after the payload window fills. Source, endpoint and terminal
+decline counts overlap; buckets count observations rather than failed conflicts.
+Classification truncation and
+counter saturation are explicit; this census counts only the attached session and
+supplies no omitted proof payload or invocation-wide distribution. The capture
+releases it with the session observation. `trace=none` collects no census.
+`trace=initial` keeps the initial window instead. The clause arm keeps its
 initial window. Deadlines, decisions and total work/lifecycle counts cover the
 entire invocation; discarding diagnostic data resets no solver allowance.
 

@@ -362,7 +362,7 @@ class PropagationState private constructor(
     internal var reasonPreflight = false
     internal var historicalTableReason: HistoricalTableReason? = null
     internal var arithmeticLearningTrace: ArithmeticLearningTrace? = null
-        get() = field?.takeIf { it.accepting }
+        get() = field?.takeIf { it.accepting || it.collectDeclines }
     internal var integerLearningTrailAtLevel: ((Int) -> Int?)? = null
 
     /** Factor whose [Propagator.propagate] is currently running. Read by the impl methods so
