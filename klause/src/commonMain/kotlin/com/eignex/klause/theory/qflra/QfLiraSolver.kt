@@ -1234,8 +1234,8 @@ class ExactLiraSearchComponent private constructor(
             val prepared = preparedRows[index]
             // Resolved source inputs stay fixed until the LP scope containing their assertion is popped.
             // A changed root fixing can simplify an already asserted source expression.
-            if (sourceAssertionLevels[index] >= 0 && (context.decisionLevel > 0 ||
-                    incrementalSourceRows && !refreshRoot)
+            if (sourceAssertionLevels[index] >= 0 &&
+                (context.decisionLevel > 0 || (incrementalSourceRows && !refreshRoot))
             ) continue
             val address = prepared.address
             val asserted = node.rowAssertions[address]
