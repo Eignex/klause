@@ -163,7 +163,9 @@ internal class PrivateRebuildSatisfaction(
             override fun workMeter(): WorkMeter = meter
         }
         val start = TimeSource.Monotonic.markNow()
-        val prepared = PrivateRebuildGeneration.prepare(session, params.learnedMemoryScratchBytes, token)
+        val prepared = PrivateRebuildGeneration.prepare(session, params.learnedMemoryScratchBytes, token) {
+            (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L) / 2L
+        }
         note("PreparationNanos", start.elapsedNow().inWholeNanoseconds)
         note("PreparationWork", session.work - preparationStart)
         if (prepared == null || token()) {
@@ -172,6 +174,7 @@ internal class PrivateRebuildSatisfaction(
             return
         }
         generation = prepared
+        if (prepared.passStopped) note("PassStopped")
         note("Eliminated", prepared.eliminated.toLong())
         note("ModeledPrivateBytes", prepared.modeledBytes)
         note("WarmClausesRetained", session.learnedClauseCount.toLong())

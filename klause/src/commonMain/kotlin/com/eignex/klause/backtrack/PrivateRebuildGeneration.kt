@@ -13,6 +13,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 
 internal class PrivateRebuildGeneration private constructor(
     val problem: BakedProblem,
@@ -20,6 +21,7 @@ internal class PrivateRebuildGeneration private constructor(
     val modeledBytes: Long,
     val eliminated: Int,
     val reconstructionWork: Long,
+    val passStopped: Boolean,
 ) {
     fun reconstruct(sample: Sample): Sample = mapping.reconstructFrom(problem, sample)
 
@@ -30,6 +32,7 @@ internal class PrivateRebuildGeneration private constructor(
             session: PropagationSession,
             byteLimit: Long,
             cancellation: Cancellation,
+            passWork: () -> Long = { Long.MAX_VALUE },
         ): PrivateRebuildGeneration? {
             if (!session.canSimplifyRoot || cancellation()) return null
             val source = session.problem as? BakedProblem ?: return null
@@ -68,7 +71,20 @@ internal class PrivateRebuildGeneration private constructor(
             var mapping = SourceMapping(source, pinned, guarantees, lift = { sample ->
                 Sample(BooleanArray(fixed.size) { fixed[it] ?: sample.boolValue(it) }, longArrayOf())
             })
-            val delta = BoundedVariableElimination.eliminateSource(pinned, cancellation = cancellation)
+            var spent = 0L
+            val allowance = passWork().coerceAtLeast(0L)
+            val meter = WorkMeter {
+                spent = saturatedWork(spent, it)
+                cancellation.charge(it)
+            }
+            val passToken = object : Cancellation {
+                override fun isCancelled(): Boolean = cancellation() || spent >= allowance
+                override fun deadline() = cancellation.deadline()
+                override fun workMeter(): WorkMeter = meter
+            }
+            // A local pass boundary retains complete pivots; the containing call still controls
+            // publication, opening and checks, and can decline the entire generation.
+            val delta = BoundedVariableElimination.eliminateSource(pinned, cancellation = passToken)
             if (cancellation() || delta.rebuild.steps.isEmpty()) return null
             cancellation.charge(entries)
             if (cancellation()) return null
@@ -77,7 +93,8 @@ internal class PrivateRebuildGeneration private constructor(
             val baked = reduced.bake(cancellation)
             if (cancellation()) return null
             mapping = mapping.then(SourceMapping(reduced, baked, TransformationGuarantees.IDENTITY))
-            return PrivateRebuildGeneration(baked, mapping, bytes, delta.rebuild.steps.size, entries * 4L)
+            return PrivateRebuildGeneration(baked, mapping, bytes, delta.rebuild.steps.size, entries * 4L,
+                spent >= allowance)
         }
     }
 }
