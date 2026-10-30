@@ -252,6 +252,11 @@ internal object AffineSingletons {
         var fillIn = 0L
         while (!cancellation()) {
             val cand = order.next() ?: break
+            if (domainBoundsOverflow(ranges, cand)) {
+                objVars.add(cand.x)
+                order.onRejected(cand.defIdx)
+                continue
+            }
             val replacement = objectiveRewrite?.let { checkNotNull(it.substitute(cand)) }
             val holed = domains != null && domains[cand.x].holeCount > 0L
             val partnerDomain = if (holed) holedPivotPartner(checkNotNull(domains), cand) else null
@@ -389,6 +394,7 @@ internal object AffineSingletons {
         val f = ws.factorAt(di)?.equivalentLinear() ?: return null
         if (f.op != LinearOp.EQ || f.vars.size != 2) return null
         val row = f.integerConstants ?: return null
+        if (row.bound == Long.MIN_VALUE || row.coeff(0) == Long.MIN_VALUE || row.coeff(1) == Long.MIN_VALUE) return null
         val fBound = row.bound
         for (xi in 0..1) {
             val x = f.vars[xi]
@@ -403,7 +409,8 @@ internal object AffineSingletons {
             if (x in objectiveIntVars || y in objectiveIntVars) continue
             if (!ws.isContained(di, x)) continue
             val domY = domains[y]
-            if (domY.max - domY.min > RESIDUE_DOMAIN_SPAN_CAP) continue
+            val span = domY.max - domY.min
+            if (span < 0L || span > RESIDUE_DOMAIN_SPAN_CAP) continue
             val restricted = restrictPartnerDomain(domY, domains[x], a, b, fBound) ?: continue
             return ResidueCandidate(
                 di,
@@ -427,22 +434,23 @@ internal object AffineSingletons {
     private fun holedPivotPartner(domains: Array<IntDomain>, c: AffineCandidate): IntDomain? {
         if (c.termVars.size != 1) return null
         val domY = domains[c.termVars[0]]
-        if (domY.max - domY.min > RESIDUE_DOMAIN_SPAN_CAP) return null
+        val span = domY.max - domY.min
+        if (span < 0L || span > RESIDUE_DOMAIN_SPAN_CAP) return null
         return restrictPartnerDomain(domY, domains[c.x], 1L, -c.termCoeffs[0], c.constTerm)
     }
 
     /** The partner domain restricted to the `y` values for which `x = (c − b·y)/a` is an integer
-     *  inside [domX], or `null` if no such `y` exists (leave the constraint for propagation to fail). */
+     *  inside [domX], or null when the projection is empty or needs wider arithmetic. */
     private fun restrictPartnerDomain(domY: IntDomain, domX: IntDomain, a: Long, b: Long, c: Long): IntDomain? {
         val valid = LongArrayList()
         for (y in domY.min..domY.max) {
             if (y !in domY) continue
-            // `c − b·y` can exceed 64 bits for a wide partner coefficient and a high-magnitude `y`; such a
-            // `y` admits no representable `x`, so drop it from the restricted partner domain.
+            // A wide numerator can still have a representable quotient, so an unrepresentable
+            // intermediate declines the entire projection rather than excluding this partner value.
             val num = try {
                 subExact(c, mulExact(b, y))
             } catch (_: CheckedLongOverflowException) {
-                continue
+                return null
             }
             if (num % a != 0L) continue
             val x = num / a
@@ -534,6 +542,7 @@ internal object AffineSingletons {
         if (f.op != LinearOp.EQ || f.vars.size < 2) return null
         val row = f.integerConstants ?: return null
         cancellation.charge(AFFINE_WORK_WEIGHT * f.vars.size)
+        if (row.bound == Long.MIN_VALUE) return null
         var preferred = 0
         if (minimizeRewrite) {
             var smallestWeight = Long.MAX_VALUE
@@ -564,7 +573,7 @@ internal object AffineSingletons {
             if ((position and CANCEL_POLL_MASK) == 0 && cancellation()) return null
             val x = f.vars[xi]
             val cx = row.coeff(xi)
-            if (eliminated[x] || x in objectiveIntVars) continue
+            if (eliminated[x] || x in objectiveIntVars || cx == Long.MIN_VALUE) continue
             // A column with an open side states no bound to carry over to the terms it folds into, so
             // eliminating it would drop the row a later bound proof reads and leave the column itself
             // unconstrained — trading a lane the model could have routed to for one reduction. A column
@@ -584,15 +593,18 @@ internal object AffineSingletons {
             val termVars = IntArray(f.vars.size - 1)
             val termCoeffs = LongArray(f.vars.size - 1)
             var w = 0
-            var partnerEliminated = false
+            var invalidPartner = false
             for (j in f.vars.indices) {
                 if (j == xi) continue
-                if (eliminated[f.vars[j]]) partnerEliminated = true
+                if (eliminated[f.vars[j]] || row.coeff(j) == Long.MIN_VALUE) {
+                    invalidPartner = true
+                    break
+                }
                 termVars[w] = f.vars[j]
                 termCoeffs[w] = -row.coeff(j) / cx
                 w++
             }
-            if (partnerEliminated) continue
+            if (invalidPartner) continue
             val constTerm = row.bound / cx
             // The alias case (n = 2, A = 1, B = 0, i.e. x = y) substitutes into ANY factor via
             // remap; otherwise x must occur only in foldable Linear factors. A contained non-unit
@@ -1238,6 +1250,14 @@ internal object AffineSingletons {
             w++
         }
         return Linear(newCoeffs, newVars, l.op, row.bound - cX * c.constTerm)
+    }
+
+    private fun domainBoundsOverflow(ranges: ColumnRanges, c: AffineCandidate): Boolean = try {
+        if (ranges.hasUpper(c.x)) subExact(ranges.max(c.x), c.constTerm)
+        if (ranges.hasLower(c.x)) subExact(ranges.min(c.x), c.constTerm)
+        false
+    } catch (_: CheckedLongOverflowException) {
+        true
     }
 
     /** Bounds on the term vars enforcing that `x = constTerm + Σ termCoeffs·termVars` stays within the

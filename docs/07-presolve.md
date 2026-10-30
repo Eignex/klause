@@ -506,6 +506,10 @@ Bound fusion combines matching sides into an equality or refutes crossing bounds
 These reductions preserve the solution set. Affine singleton elimination and
 singleton inequality projection require reconstruction; projection stays off for
 solution-set-sensitive queries.
+Unrepresentable affine constants, partner coefficients or carried-bound arithmetic
+retain the source definition. A residue projection whose numerator exceeds the
+signed word retains its equality, since division can still yield a representable
+source value. Partner spans must fit the bounded scan without subtraction overflow.
 Singleton projection meters occurrence construction, row specialization, candidate
 and rewrite scans through the invocation token in both lanes. It polls at bounded
 strides and before publishing each row with its reconstruction; an interrupted
