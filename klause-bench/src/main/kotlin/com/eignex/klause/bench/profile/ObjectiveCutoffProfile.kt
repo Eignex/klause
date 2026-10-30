@@ -4,7 +4,9 @@ import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.bench.metric.InstalledBuild
+import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.formats.json.ProblemJson
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.presolve.AffinePivotOrder
@@ -28,6 +30,7 @@ import java.io.File
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -75,6 +78,17 @@ internal object ObjectiveCutoffProfile {
         val preparationNs = System.nanoTime() - opened
         val problem = requireNotNull(prepared.problem as? BakedProblem)
         val objective = prepared.objective ?: originalObjective
+        val snapshot = ProblemJson().encodeToString(problem).encodeToByteArray()
+        require(snapshot.size <= 1_048_576)
+        out.resolve("prepared.json").writeBytes(snapshot)
+        out.resolve("preparation.json").writeText(buildJsonObject {
+            put("modelSha256", sha256(snapshot))
+            put("originalObjective", originalObjective.toString())
+            put("preparedObjective", objective.toString())
+            put("preparationNs", preparationNs)
+            put("preparationWork", budget.spent())
+            put("cutoffSpace", "prepared objective")
+        }.toString())
         val audit = BooleanBoundAudit(objective.boolWeights)
         val stop = containing or Cancellation.after(timeout.milliseconds) or Cancellation { audit.stopped }
         val base = BacktrackPresets.satOptimized(randomSeed = seed + 1000L, cancellation = stop)

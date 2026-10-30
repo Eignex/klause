@@ -1511,8 +1511,8 @@ cutoff=INTEGER presolve-work=INTEGER` and optional `seed=1 order=rewrite_cost
 presolve=default work=150000 slice-work=5000 timeout-ms=10000`. Hash-checked
 `source64` or `sourceGzip64` can supply the frozen XCSP3 source. It prepares the
 ordinary mixed finite model, then runs one retained `satOptimized` worker against
-a fixed external cutoff. This is a correctness replay, not a portfolio timing
-comparison. Set the preparation allowance to the trial's actual allowance.
+a fixed external cutoff in prepared-objective units. This is a correctness replay, not a portfolio timing
+comparison. The prepared model and objective identities are retained. Set the preparation allowance to the trial's actual allowance.
 
 The observer delegates the selector's decisions and notifications and compares the
 cached Boolean objective bound with a fresh sum after propagation, at selector
