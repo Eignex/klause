@@ -11,6 +11,7 @@ import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.forEachBinaryPartner
 import com.eignex.klause.solver.result.SearchStatsSink
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
@@ -229,6 +230,58 @@ class RootInprocessingTest {
             assertTrue(session.learnedLifecycle().getValue("learningClauseConsumed") > 0L)
             assertEquals(2L, stats.inprocessProbes)
             assertIs<PropagationResult.Unsat>(session.pinBool(0, !positive))
+        }
+    }
+
+    @Test
+    fun `completed root probes should preserve saved search phases`() {
+        for ((native, conflicting) in listOf(false to false, false to true, true to false, true to true)) {
+            val source = if (conflicting) problem(intArrayOf(1, 2), intArrayOf(1, 3))
+                else problem(intArrayOf(1, 2))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+            val params = BacktrackParams(rootProbeBatch = 1, phaseSaving = true)
+            val phase = PhaseSaving(source.numBoolVars, 0, params)
+            session.retractingListener = { phase.capture(it, session) }
+            session.pinBool(1, false)
+            session.popLast()
+
+            RootProbingPass().run(session, params, null)
+
+            assertEquals(0L, phase.applyPhase(VarRef.Bool(1), sequenceOf(0L, 1L)).first())
+        }
+    }
+
+    @Test
+    fun `interrupted root probes should preserve saved search phases`() {
+        for (native in listOf(false, true)) {
+            val source = problem(intArrayOf(1, 2))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+            val params = BacktrackParams(rootProbeBatch = 1, rootProbeWork = 1L, phaseSaving = true)
+            val phase = PhaseSaving(source.numBoolVars, 0, params)
+            session.retractingListener = { phase.capture(it, session) }
+            session.pinBool(0, false)
+            session.popLast()
+
+            RootProbingPass().run(session, params, null)
+
+            assertEquals(0L, phase.applyPhase(VarRef.Bool(0), sequenceOf(0L, 1L)).first())
+        }
+    }
+
+    @Test
+    fun `ordinary retractions after root probing should still save phases`() {
+        for (native in listOf(false, true)) {
+            val source = problem(intArrayOf(1, 2))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+            val params = BacktrackParams(rootProbeBatch = 1, phaseSaving = true)
+            val phase = PhaseSaving(source.numBoolVars, 0, params)
+            session.retractingListener = { phase.capture(it, session) }
+            RootProbingPass().run(session, params, null)
+
+            session.pinBool(1, true)
+            session.popLast()
+
+            assertEquals(1L, phase.applyPhase(VarRef.Bool(1), sequenceOf(0L, 1L)).first())
         }
     }
 
