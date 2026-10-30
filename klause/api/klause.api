@@ -371,6 +371,7 @@ public final class com/eignex/klause/backtrack/TieredVariableSelector : com/eign
 	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
+	public fun onSessionCreated (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
 	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
 	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
@@ -391,6 +392,7 @@ public final class com/eignex/klause/backtrack/selector/Chb : com/eignex/klause/
 	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
+	public fun onSessionCreated (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
 	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
 	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
@@ -409,6 +411,7 @@ public final class com/eignex/klause/backtrack/selector/DomainMaxRegret : com/ei
 	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
+	public fun onSessionCreated (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
 	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
 	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
@@ -493,6 +496,7 @@ public final class com/eignex/klause/backtrack/selector/InputOrder : com/eignex/
 	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
+	public fun onSessionCreated (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
 	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
 	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
@@ -511,6 +515,7 @@ public final class com/eignex/klause/backtrack/selector/LargestDomain : com/eign
 	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
+	public fun onSessionCreated (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
 	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
 	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
@@ -529,6 +534,7 @@ public final class com/eignex/klause/backtrack/selector/LargestUpperBound : com/
 	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
+	public fun onSessionCreated (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
 	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
 	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
@@ -547,6 +553,7 @@ public final class com/eignex/klause/backtrack/selector/LastConflict : com/eigne
 	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
+	public fun onSessionCreated (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
 	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
 	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
@@ -578,6 +585,7 @@ public final class com/eignex/klause/backtrack/selector/RandomVariable : com/eig
 	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
+	public fun onSessionCreated (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
 	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
 	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
@@ -597,6 +605,7 @@ public final class com/eignex/klause/backtrack/selector/RegressionVariableSelect
 	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
+	public fun onSessionCreated (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
 	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
 	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
@@ -620,6 +629,7 @@ public final class com/eignex/klause/backtrack/selector/SmallestDomain : com/eig
 	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
+	public fun onSessionCreated (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
 	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
 	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
@@ -638,6 +648,7 @@ public final class com/eignex/klause/backtrack/selector/SmallestLowerBound : com
 	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public fun onRestart ()V
+	public fun onSessionCreated (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
 	public fun onUnassign (Lcom/eignex/klause/solver/search/VarRef;)V
 	public fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
@@ -676,6 +687,7 @@ public abstract interface class com/eignex/klause/backtrack/selector/VariableSel
 	public synthetic fun fresh ()Lcom/eignex/klause/solver/search/VariableBranching;
 	public fun onConflict (Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/propagation/PropagationResult$Unsat;)V
 	public fun onPropagation (Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
+	public fun onSessionCreated (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSolution (Lcom/eignex/klause/solver/Sample;)V
 	public abstract fun pick (Lcom/eignex/klause/propagation/PropagationSession;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
 	public synthetic fun pick (Ljava/lang/Object;Lkotlin/random/Random;)Lcom/eignex/klause/solver/search/VarRef;
@@ -689,6 +701,7 @@ public final class com/eignex/klause/backtrack/selector/VariableSelector$Default
 	public static fun onConflict (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/solver/search/VarRef;Lcom/eignex/klause/solver/search/BranchingConflict;)V
 	public static fun onPropagation (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/propagation/PropagationResult$Implied;)V
 	public static fun onRestart (Lcom/eignex/klause/backtrack/selector/VariableSelector;)V
+	public static fun onSessionCreated (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/propagation/PropagationSession;)V
 	public static fun onSolution (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/solver/Sample;)V
 	public static fun onUnassign (Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/solver/search/VarRef;)V
 }
