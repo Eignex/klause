@@ -47,7 +47,9 @@ internal fun bindSourceExecutionControls(
     val resolvedPresolve = preparation.config.takeIf { presolveConfig != null || preparation.requested }
     val stop = cancellation or timeout or invocation.cancellation
     val companions = invocation.requestsFiniteNumericalCompanions
-    val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve").let {
+    val finiteOptions = options.withoutPresolve().without(
+        "node-limit", "dry-run-presolve", "open-linear-incremental",
+    ).let {
         if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
             "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
             "source-incumbent-completion") else it
