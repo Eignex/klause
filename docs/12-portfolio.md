@@ -515,6 +515,9 @@ native propagation and the native first-fail recipe with Luby256.
 An omitted native backend resolves to native propagation. Every worker must match
 the same full recipe after removing seed, allowance, invocation hooks and captured
 pins; mixed shapes decline. Private model generations and uncaptured conditions decline.
+A separate engine bake can retain the unbaked plan only with identical Boolean
+coordinates and the same factor objects in the same order. Another baked generation
+does not establish this relationship.
 A known pooled cut adapter is dormant under the required LP-off satisfaction
 recipe and is omitted from task queries; active or opaque cut hooks decline.
 A separate internal probe-first mode postpones the board until a whole-source

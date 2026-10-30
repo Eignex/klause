@@ -81,8 +81,8 @@ internal fun FinitePipeline.portfolioExecutor(
     improvementProofShare: Double = 0.5,
     deferLpProbes: Boolean = false,
     includeRestartingProof: Boolean = false,
-    booleanProofTasks: Boolean = false,
     leadingProbeBudget: Boolean = false,
+    booleanProofTasks: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"

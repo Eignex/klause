@@ -2,9 +2,9 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.presolve.PresolveConfig
@@ -38,13 +38,14 @@ class FiniteExecutionTest {
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
             val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.SAT, completed.verdict)
             val observations = completed.stats.portfolio.booleanProof
 
             assertEquals(if (enabled) 1 else 0, observations.size)
             if (enabled) {
+                assertNull(observations.single().decline)
                 assertEquals(1, observations.single().probeSegments)
                 assertEquals(0, observations.single().tasks)
-                assertNull(observations.single().decline)
                 assertTrue(observations.single().workerWork >= observations.single().probeWork)
             }
         }
@@ -62,6 +63,7 @@ class FiniteExecutionTest {
 
         val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
         val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        assertEquals(FiniteSolveVerdict.SAT, completed.verdict)
         val observation = completed.stats.portfolio.booleanProof.single()
 
         assertEquals("model-ineligible", observation.decline)

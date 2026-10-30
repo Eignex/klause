@@ -1183,8 +1183,8 @@ private fun executePortfolio(
         improvementProofShare = proofShare ?: 0.5,
         deferLpProbes = deferLpProbes,
         includeRestartingProof = includeRestartingProof,
-        booleanProofTasks = booleanProofTasks,
         leadingProbeBudget = leadingProbeBudget,
+        booleanProofTasks = booleanProofTasks,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {
