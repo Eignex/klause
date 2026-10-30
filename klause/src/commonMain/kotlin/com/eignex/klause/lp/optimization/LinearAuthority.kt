@@ -187,8 +187,8 @@ internal class LinearAuthority(
                 } else policy.observe("PointPreparationUnavailable")
             }
             val selected = cutLifecycle.containing("POINT_SELECTION") {
-                policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs, prepared.checkedCuts,
-                    observed.second, pointMask.intersect(prepared.checkedCuts), cancellation)
+                policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
+                    prepared.checkedCuts, observed.second, pointMask.intersect(prepared.checkedCuts), cancellation)
             }
             if (selected == pointMask || budget.funding?.exhausted == true || cancellation()) return base
             pointMask = selected
