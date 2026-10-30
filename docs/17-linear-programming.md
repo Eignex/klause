@@ -431,7 +431,9 @@ objective shaving and incumbent-relative fixings are optimization work. Root
 preparation runs once, under a common time and work allowance, before shared
 initialization publishes its bounds; a cancelled phase contributes only completed
 deductions. Interrupted root rounding retains its relaxation layout and basis for
-later slices, charging every retry to the remaining root and LP work allowances.
+later slices. A completed rounding LP can retain its coordinates under the same
+bounded guidance allowance after charging the solve, avoiding another LP solve
+when pinning resumes. Every retry consumes the remaining root and LP allowances.
 Root rounding and pumping propose discrete assignments for mixed
 models, but a relaxation point supplies a target, never witness authority.
 
