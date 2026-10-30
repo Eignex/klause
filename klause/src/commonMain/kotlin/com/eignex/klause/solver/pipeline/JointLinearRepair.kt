@@ -51,6 +51,8 @@ internal class JointLinearRepair(
     private val observeExternalIncumbents: Boolean = false,
     private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
+    private class CheckedCenter(val sample: Sample, val value: BigFraction?)
+
     private val sourceIntegers = sourceIntegers?.copyOf()
     private val stop = params.timeout or params.cancellation
     private val state = OpenTheorySolveState(params)
@@ -64,6 +66,7 @@ internal class JointLinearRepair(
             stages[key] = combine(key, stages[key] ?: 0L, count)
         } else null
     private var importedCenter: Sample? = null
+    private var preparedCenter: CheckedCenter? = null
     private val authority = LinearAuthority(budget, onLpShape = { shape ->
         if (shape.sparse) observe(shape.phase?.let { "jointRepairLpPhase_$it" } ?: "jointRepairLpNoPhase")
         if (!shape.admitted) observe("jointRepairLpDeclinedAttempts")
@@ -108,6 +111,31 @@ internal class JointLinearRepair(
         if (sample.exactReals == null && completion != null) completion.complete(source, sample, stop) else sample
     }
 
+    private fun checkedExternalCenter(cutoff: BigFraction? = null): CheckedCenter? {
+        val sample = externalIncumbent() ?: return null
+        if (completion != null) {
+            budget.observe(boundCertification = 1L + model.numBoolVars + model.numIntVars + model.numRealVars)
+            if (completion.checking(stop)()) return null
+        }
+        val value = objective?.evaluateExact(sample)
+        if (model.numRealVars != 0 && sample.exactReals?.size != model.numRealVars) {
+            observeExternal("MissingExactReals")
+            return null
+        }
+        if (cutoff != null && (value == null || value >= cutoff)) {
+            observeExternal("NotImproving")
+            return null
+        }
+        val checking = completion?.checking(stop) ?: stop
+        val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+            SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness), checking)
+        if (checked != SourceEvidenceCheck.Checked) {
+            observeExternal(if (checked is SourceEvidenceCheck.Rejected) "PointRejected" else "PointUnavailable")
+            return null
+        }
+        return CheckedCenter(sample, value)
+    }
+
     private fun queryObservations(): Map<String, Long> =
         query?.stats?.smt?.completeSearchStages.orEmpty().mapKeys { (key, _) ->
             when (key) {
@@ -144,35 +172,10 @@ internal class JointLinearRepair(
             completionExhausted = { exhausted },
             centerPreparationPending = { rootPreparationPending },
             proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
-                var pooledValue: BigFraction? = null
-                val pooled = externalIncumbent()?.takeIf { sample ->
-                    if (completion != null) {
-                        budget.observe(boundCertification =
-                            1L + model.numBoolVars + model.numIntVars + model.numRealVars)
-                        if (completion.checking(stop)()) return@takeIf false
-                    }
-                    val value = objective?.evaluateExact(sample)
-                    pooledValue = value
-                    when {
-                        model.numRealVars != 0 && sample.exactReals?.size != model.numRealVars -> {
-                            observeExternal("MissingExactReals")
-                            false
-                        }
-                        cutoff != null && (value == null || value >= cutoff) -> {
-                            observeExternal("NotImproving")
-                            false
-                        }
-                        else -> {
-                            val checking = completion?.checking(stop) ?: stop
-                            val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(
-                                SourceEvidence(source.scope, SourceClaim.Witness(sample),
-                                    SourceDerivation.SourceWitness), checking)
-                            if (checked != SourceEvidenceCheck.Checked) observeExternal(
-                                if (checked is SourceEvidenceCheck.Rejected) "PointRejected" else "PointUnavailable")
-                            checked == SourceEvidenceCheck.Checked
-                        }
-                    }
-                }
+                val checked = preparedCenter?.takeIf { round == 0L &&
+                    (cutoff == null || it.value?.let { value -> value < cutoff } == true)
+                } ?: checkedExternalCenter(cutoff)
+                val pooled = checked?.sample
                 val from = pooled?.let { sample ->
                     observe("jointRepairImportedCenters")
                     if (sample !== importedCenter) {
@@ -182,7 +185,7 @@ internal class JointLinearRepair(
                     List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } +
                         sample.exactReals.orEmpty()
                 } ?: centers
-                val limit = pooled?.let { pooledValue } ?: cutoff
+                val limit = checked?.value ?: cutoff
                 if (sourceInputPass && !adaptive && limit != null && limit != focusedCutoff) {
                     focusedCutoff = limit
                     focusedRemaining = sourceIntegers?.size ?: model.numIntVars
@@ -242,6 +245,15 @@ internal class JointLinearRepair(
         if (rootPoint == null) {
             funding.grant(20_000_000L)
             requestIncumbentPreparation()
+            if (!rootStarted && completion != null) {
+                preparedCenter = preparedCenter ?: checkedExternalCenter()
+                if (stop() || exhausted || cancellation()) return false
+                if (preparedCenter != null) {
+                    rootPoint = emptyMap()
+                    observe("jointRepairCheckedCenterPreparations")
+                    return true
+                }
+            }
             if (!rootStarted) {
                 if (!state.work.theoryCheck()) return false
                 rootStarted = true
@@ -271,6 +283,7 @@ internal class JointLinearRepair(
 
     private fun center(index: Int): BigFraction? {
         if (index >= model.numIntVars) return null
+        preparedCenter?.let { return BigFraction.of(it.sample.exactIntValue(index), BIG_ONE) }
         val coordinate = SourceCoordinate(SourceCoordinate.Kind.Integer, index)
         var value = rootPoint?.get(coordinate)?.takeIf { it.isFinite() }?.let { BigFraction.ofDouble(round(it)) }
             ?: BigFraction.ZERO
