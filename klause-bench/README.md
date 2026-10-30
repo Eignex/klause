@@ -816,7 +816,7 @@ These controls establish no throughput improvement or independent proof validati
 
 ### Numerical lifecycle profiles
 
-`scripts/lp-template-preparation-profile.sh <source> [repeats] [steps]` accepts
+`scripts/lp-template-preparation-profile.sh <source> [repeats] [steps] [standalone|retained]` accepts
 `cover-2x3`, `cover-3x3`, `miplib3-p0033` and `miplib3-p0201`. The MIPLIB inputs
 resolve through catalog `select files=true`, verify frozen source hashes and retain
 selection time/resource receipts; include `:klause-bench:installDist` in their build tasks.
@@ -835,6 +835,12 @@ Total time and allocation include final phase-snapshot publication; exact-bound
 adoption is reported separately from bound-template lookup. Main-thread CPU time
 is separate from elapsed time and excludes helper, compiler and collector threads;
 whole-process and enforced group resource receipts retain their broader costs.
+The retained route prepares the production source regions, installs their exact
+columns and rows into a private scoped owner, solves and closes that owner within
+the measured total. The wrapper retains actual JDK file hashes and the cost of
+that shared identity prefix. Its assembly includes fragment import and installation;
+standalone import remains in the solve-and-certification interval. Route timings
+therefore compare modes within one route, not isolated stage names across routes.
 
 The unchanged-index controls [9363](https://lab.eignex.com/jobs/9363) and
 [9369](https://lab.eignex.com/jobs/9369), at `69cc7b2250`, compare all three modes
