@@ -400,10 +400,14 @@ internal class LpPropagator(
         }
     } == true
 
-    fun solveFloat(warm: Basis? = null, token: Cancellation = cancellation): Pair<LpSolver, FloatLpResult?>? =
+    fun solveFloat(
+        warm: Basis? = null,
+        token: Cancellation = cancellation,
+        continuationWorkAllowance: (() -> Long?)? = null,
+    ): Pair<LpSolver, FloatLpResult?>? =
         solveOwned(token.takeIf { onPreparation != null }) { current ->
             val offered = queryWorkAllowance()
-            val continuation = continuationAllowance()
+            val continuation = (continuationWorkAllowance ?: continuationAllowance)()
             if (continuation != null && current.state.depth == 0) {
                 val profile = effort()
                 return@solveOwned current.advanceFloat(

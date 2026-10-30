@@ -577,7 +577,9 @@ internal class LpEngine(
     internal fun nodePreparationWorkBudget(): Long = if (sparseTrialActive) {
         nodeWorkBudget()
     } else if (separateNodePreparation) {
-        val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: nodeWorkBudget()
+        val containing = lpEffortGovernor.remainingWork()?.coerceAtLeast(1L) ?: if (retainedRootEnabled) {
+            retainedRootRemainingWork().coerceAtLeast(1L)
+        } else nodeWorkBudget()
         val offered = nodeWorkAllowance()?.coerceAtLeast(1L)
         when {
             offered == null -> containing
@@ -762,7 +764,7 @@ internal class LpEngine(
             noteSolveOps(metrics.workOps)
         } else null,
         continuationAllowance = {
-            if (retainedRootEnabled) retainedRootRemainingWork() else
+            if (sparseTrialActive) retainedRootRemainingWork() else
                 lpEffortGovernor.remainingWork()?.takeIf { rootQueryPolicy == LpRootQueryPolicy.CHECKPOINTED_WORK }
         },
     )
