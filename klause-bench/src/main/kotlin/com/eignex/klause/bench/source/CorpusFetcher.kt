@@ -353,5 +353,5 @@ internal object CorpusFetcher {
         require(rc == 0) { "command failed (exit $rc): ${cmd.joinToString(" ")}" }
     }
 
-    private fun log(msg: String) = println("[corpus] $msg")
+    private fun log(msg: String) = System.err.println("[corpus] $msg")
 }
