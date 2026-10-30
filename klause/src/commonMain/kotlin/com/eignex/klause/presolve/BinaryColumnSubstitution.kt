@@ -86,10 +86,14 @@ internal object BinaryColumnSubstitution {
         allowMixedObjective: Boolean = false,
     ): Substitution? {
         val view = objective?.let { BinaryObjectiveView.create(problem, it, allowMixedObjective) }
-        val protected = if (view == null) objectiveIntVars else buildSet {
-            for (v in view.objective.intCoefficientValues.indices) {
-                if (v % 256 == 0 && problem.cancellation()) return null
-                if (view.objective.intCoefficientValues[v] != 0L) add(v)
+        val protected = when {
+            view == null -> objectiveIntVars
+            !allowMixedObjective -> emptySet()
+            else -> buildSet {
+                for (v in view.objective.intCoefficientValues.indices) {
+                    if (v % 256 == 0 && problem.cancellation()) return null
+                    if (view.objective.intCoefficientValues[v] != 0L) add(v)
+                }
             }
         }
         return substituteColumns(problem, protected, bakeConfig, view)
