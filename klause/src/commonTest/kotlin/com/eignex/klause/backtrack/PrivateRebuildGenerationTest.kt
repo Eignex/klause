@@ -45,6 +45,27 @@ class PrivateRebuildGenerationTest {
     }
 
     @Test
+    fun `completed eliminations should remain consumable when the local pass allowance expires`() {
+        val source = Problem(6, 0, emptyArray(), listOf(
+            Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 3)),
+        ) + List(16) { Clause(intArrayOf(4, 6, 8)) } +
+            List(16) { Clause(intArrayOf(5, 6, 10)) } +
+            List(16) { Clause(intArrayOf(4, 7, 9)) } +
+            List(16) { Clause(intArrayOf(5, 7, 11)) }).bake()
+
+        val generation = assertNotNull(PrivateRebuildGeneration.prepare(
+            PropagationSession(source), 1_048_576L, Cancellation.Never, passWork = { 10_000L },
+        ))
+        val point = generation.reconstruct(Sample(BooleanArray(6) { it == 2 || it == 3 }, longArrayOf()))
+
+        assertTrue(generation.passStopped)
+        assertTrue(generation.eliminated > 0)
+        assertTrue(source.factors.all { factor ->
+            (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+        })
+    }
+
+    @Test
     fun `conditional roots should withhold a globally reusable generation`() {
         for (scoped in listOf(false, true)) {
             val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()

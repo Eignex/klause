@@ -233,7 +233,11 @@ workers retain their canonical traversal. Enumeration and optimization do not us
 this trial.
 
 An unchanged root trail retains a completed miss. New root deductions release it;
-all attempts share one cumulative preparation, trial and checking allowance.
+all attempts share one cumulative preparation, trial and checking allowance. BVE
+receives half the allowance remaining after the private source copy. Its local cap
+retains complete earlier pivots when later analysis stops; cancellation of the
+containing call declines the generation. Baking, opening and canonical checks
+share the remaining containing allowance.
 
 The private worker owns fresh watches, learning and search state. Canonical exchange
 cursors and pooled incumbent guidance stay with the retained canonical worker;

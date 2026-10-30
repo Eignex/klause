@@ -57,6 +57,8 @@ Use the same source, engine, presolve, seeds, processors, heap, containing allow
 and deadline in the zero/trial arms. `nativePrivateRebuildAttempts`, `Consumers`,
 `Eliminated`, `SourceAccepted`, `RefutationDeferred`, `Declined` and `Retired`
 separate preparation from consumption, canonical publication and fallback.
+`PassStopped` identifies usable generations that retain completed pivots after
+the local BVE cap; later preparation and checks still obey the containing cap.
 Preparation, opening, trial, reconstruction, check and retirement timings have
 separate counters. The propagation ledger includes charged preparation,
 reconstruction and checks; do not add those work subsets again. `ModeledPrivateBytes` excludes the canonical
