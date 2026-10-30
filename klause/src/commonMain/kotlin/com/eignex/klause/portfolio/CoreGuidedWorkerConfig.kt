@@ -20,20 +20,21 @@ internal class CoreGuidedWorkerConfig(
     private val maximumWork: Long? = null,
     private val maximumMillis: Long? = null,
     private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
+    private val stratify: Boolean = false,
     private val edit: ((BacktrackParams) -> BacktrackParams)? = null,
 ) : WorkerConfig {
-    override val label: String get() = "core-guided"
+    override val label: String get() = if (stratify) BacktrackArm.CoreGuidedStratified.label else "core-guided"
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, coreRefinement, edit)
+        CoreGuidedWorkerConfig(budget, maximumWork, maximumMillis, coreRefinement, stratify, edit)
 
     override fun withCoreRefinement(mode: CoreRefinementMode): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, mode, edit)
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, maximumMillis, mode, stratify, edit)
 
     internal fun withActiveTimeLimit(): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, coreRefinement, edit)
+        CoreGuidedWorkerConfig(nodeBudget, maximumWork, 2_000L, coreRefinement, stratify, edit)
 
     internal fun withWorkLimit(limit: Long): CoreGuidedWorkerConfig =
-        CoreGuidedWorkerConfig(nodeBudget, limit, null, coreRefinement, edit)
+        CoreGuidedWorkerConfig(nodeBudget, limit, null, coreRefinement, stratify, edit)
 
     override fun materialize(
         problem: BakedProblem,
@@ -69,7 +70,7 @@ internal class CoreGuidedWorkerConfig(
         worker = PortfolioWorker.of(
             workerLabel,
             armId,
-            CoreGuidedSolver(problem, maximumWork, maximumMillis, coreRefinement).session(),
+            CoreGuidedSolver(problem, maximumWork, maximumMillis, coreRefinement, stratify).session(),
             params,
             sourceObjective,
         ).bindEvidence(identity, provesResults = CoreGuidedSearch.scalarProofs(problem, sourceObjective)).also {

@@ -163,6 +163,14 @@ class EngineParamsTest {
     }
 
     @Test
+    fun `explicit stratified core search should resolve without changing the automatic pool`() {
+        val selected = pool("bt-arm=core-guided-stratified")
+
+        assertEquals(listOf("core-guided-stratified"), selected.pool!!.map { it().label })
+        assertNull(pool().pool)
+    }
+
+    @Test
     fun `early objective core admission should reject parallel portfolios`() {
         assertFailsWith<PipelineConfigException> { scenario(2, listOf("core-early=true")) }
     }

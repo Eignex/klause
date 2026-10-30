@@ -71,9 +71,10 @@ internal class BacktrackWorkerConfig(
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = recipe.build(seed + 1000L + index, workerEvent)
         params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
-        if (recipe.label == BacktrackArm.CoreGuided.label) {
+        if (recipe.label == BacktrackArm.CoreGuided.label || recipe.label == BacktrackArm.CoreGuidedStratified.label) {
             val coreParams = params
-            val core = CoreGuidedWorkerConfig(params.nodeBudget, coreRefinement = coreRefinement) { coreParams }
+            val core = CoreGuidedWorkerConfig(params.nodeBudget, coreRefinement = coreRefinement,
+                stratify = recipe.label == BacktrackArm.CoreGuidedStratified.label) { coreParams }
             return core.materialize(
                 problem, index, armId, seed, lsLambda, objective, lsObjective, definitionalSweep, onEvent, pools,
             )

@@ -874,6 +874,10 @@ auxiliary buffers and preparation cursors while keeping completed observations.
 
 Core refinement is disabled by default; `core-refinement=none|reasons|deletion`
 selects the private policy for curated and directly selected core workers.
+The explicit `core-guided-stratified` recipe restricts query pins to the highest
+remaining residual weight and lowers that threshold after a satisfying query.
+Its thresholds, completed cores and private query state retain the same containing
+allowances and source checks. Curated pools use the unstratified recipe.
 Seed-proof projection uses the
 [historical reasons](09-learning.md#explanation-lifetime) of the existing query,
 without another propagation session or solve; unsupported seed conflicts and tree
@@ -890,7 +894,7 @@ Its construction, trials and disposal share the core worker's work and active-ti
 allowances. It performs no additional search and does not promise a minimal core;
 tree refutations unavailable to propagation keep their original members.
 
-Selecting `core-guided` directly also accepts exact integer costs over columns whose
+Selecting `core-guided` or `core-guided-stratified` directly also accepts exact integer costs over columns whose
 source bounds are closed on both sides; curated pools still admit it only for Boolean
 objectives. A cost `c·x` starts at its cheapest root value and becomes the gaps between
 consecutive root values crossed away from it: each gap is a threshold `[x ≥ v]`, or

@@ -78,6 +78,15 @@ class BacktrackCatalogTest {
     }
 
     @Test
+    fun `stratified core search should require an explicit optimization recipe`() {
+        val recipe = BacktrackCatalog.byLabel("core-guided-stratified")
+
+        assertEquals("core-guided-stratified", recipe.label)
+        assertFalse(BacktrackCatalog.ranked(Kind.COP).any { it.label == recipe.label })
+        assertFalse(BacktrackCatalog.labels(Kind.CSP).contains(recipe.label))
+    }
+
+    @Test
     fun `byLabel should reject an unknown arm`() {
         assertFailsWith<IllegalStateException> { BacktrackCatalog.byLabel("no-such-arm") }
     }

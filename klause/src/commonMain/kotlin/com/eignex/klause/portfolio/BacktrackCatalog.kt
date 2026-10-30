@@ -178,7 +178,7 @@ object BacktrackCatalog {
         BacktrackArm.ConflictDriven -> conflictDriven()
         BacktrackArm.SupportAware -> supportAware()
         BacktrackArm.PropagationGuided -> propagationGuided()
-        BacktrackArm.CoreGuided -> BacktrackRecipe(BacktrackArm.CoreGuided.label) { seed, event ->
+        BacktrackArm.CoreGuided, BacktrackArm.CoreGuidedStratified -> BacktrackRecipe(arm.label) { seed, event ->
             BacktrackPresets.satOptimized(randomSeed = seed, inprocess = false, onEvent = event)
         }
         BacktrackArm.LpAggressive -> lpArm(LpEmphasis.AGGRESSIVE)
@@ -254,10 +254,12 @@ object BacktrackCatalog {
     private val catalog = ArmCatalog(BacktrackArm.entries, BacktrackArm::label, ::make)
 
     /** Every arm label across both kinds (COP is the superset), for validation and error messages. */
-    fun labels(): List<String> = catalog.labels(copOrder)
+    fun labels(): List<String> = labels(Kind.COP)
 
-    /** Every arm label for [kind], in credit order — for enumerating the pool by name. */
-    fun labels(kind: Kind): List<String> = catalog.labels(rankedArms(kind))
+    /** Every arm label for [kind], with explicit-only recipes after the credit-ordered pool. */
+    fun labels(kind: Kind): List<String> = catalog.labels(
+        rankedArms(kind) + if (kind == Kind.COP) listOf(BacktrackArm.CoreGuidedStratified) else emptyList(),
+    )
 
     /** A fresh recipe for the arm named [label] (CLI `bt-arm=` boundary). */
     fun byLabel(label: String): BacktrackRecipe = catalog.byLabel(label)
@@ -304,6 +306,7 @@ internal enum class BacktrackArm(val label: String, val needs: Set<ArmNeed> = em
     SupportAware("support-aware", setOf(ArmNeed.ExtensionalSupports)),
     PropagationGuided("propagation-guided", setOf(ArmNeed.ExtensionalSupports)),
     CoreGuided("core-guided", setOf(ArmNeed.BooleanObjective)),
+    CoreGuidedStratified("core-guided-stratified", setOf(ArmNeed.BooleanObjective)),
     LpAggressive("lp-aggressive", setOf(ArmNeed.Relaxation(LpEmphasis.AGGRESSIVE))),
     LpDefault("lp-default", setOf(ArmNeed.Relaxation(LpEmphasis.DEFAULT))),
     LpLbTree("lp-lbtree", setOf(ArmNeed.Objective, ArmNeed.Relaxation(LpEmphasis.DEFAULT))),
