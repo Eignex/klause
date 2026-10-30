@@ -133,8 +133,10 @@ class LinearAuthorityPointCutsTest {
                     real to BigFraction.MINUS_ONE, other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
                 "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
                 "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
-                "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE), BigFraction.ofLong(2))),
+                "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+                "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE),
+                    BigFraction.ofLong(2))),
             ), mapOf(x to BigFraction.ONE, other to BigFraction.MINUS_ONE))
         val budget = SourceLpBudget()
 
