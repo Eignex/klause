@@ -357,6 +357,28 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `integer endpoint progress should survive unrelated atom growth between slices`() {
+        for (unrelated in listOf(1, 8)) {
+            val source = Problem(0, 2 + unrelated,
+                Array(2 + unrelated) { if (it < 2) IntDomain(0, 2) else IntDomain(0, 16) }, arrayOf<Factor>(
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                    Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ))
+            val session = PropagationSession(source.bake())
+            session.boundGeLit(2, 1, true)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 1)
+
+            pass.run(session, params, null)
+            for (variable in 3 until 2 + unrelated) session.boundGeLit(variable, 1, true)
+            pass.run(session, params, null)
+
+            assertEquals(1L, session.intDomain(0).min)
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
     fun `integer endpoints should yield root bounds without existing atoms`() {
         for (lower in listOf(false, true)) {
             val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), arrayOf<Factor>(

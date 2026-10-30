@@ -176,7 +176,9 @@ private class RootCandidate(val factor: Int, val literals: IntArray) {
 
 internal class RootProbingPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true
-    private var cursor = 0L
+    private var literalCursor = 0L
+    private var endpointCursor = 0L
+    private var preferEndpoint = false
     private var learnedCursor = 0
     private var revision = -1L
     private var neighborhood: IntArray? = null
@@ -186,7 +188,9 @@ internal class RootProbingPass : InprocessingPass {
     override val spending = InprocessingSpending(InprocessingKind.Probe)
 
     override fun reset() {
-        cursor = 0L
+        literalCursor = 0L
+        endpointCursor = 0L
+        preferEndpoint = false
         learnedCursor = 0
         revision = -1L
         neighborhood = null
@@ -234,23 +238,45 @@ internal class RootProbingPass : InprocessingPass {
 
     private fun probe(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
         val variables = session.rootProbeVariableCount
-        val candidates = 2L * (variables.toLong() + session.problem.numIntVars)
+        val literalCandidates = 2L * variables
+        val endpointCandidates = 2L * session.problem.numIntVars
+        val candidates = literalCandidates + endpointCandidates
         if (candidates == 0L) return
         preparationLeft = PROBE_NEIGHBORHOOD_CLAUSES
         var attempted = 0
         var examined = 0
+        var literalsExamined = 0L
+        var endpointsExamined = 0L
         val priorCancelled = session.probeCancelled
         while (attempted < params.rootProbeBatch && examined < minOf(candidates, ROOT_LITERAL_LIMIT.toLong())) {
             if (!session.canSimplifyRoot || !budget.visit()) break
             val nearby = if (preferNeighborhood) neighborhoodLiteral(session, budget) else null
             if (budget.stopped()) break
-            val candidate = nearby?.toLong() ?: cursor
-            if (nearby == null) cursor = (cursor + 1L) % candidates
-            else neighborhoodPosition++
+            val endpoint = nearby == null && endpointsExamined < endpointCandidates &&
+                (preferEndpoint || literalsExamined >= literalCandidates)
+            val candidate = when {
+                nearby != null -> {
+                    neighborhoodPosition++
+                    nearby.toLong()
+                }
+                endpoint -> {
+                    val next = endpointCursor % endpointCandidates
+                    endpointCursor = (next + 1L) % endpointCandidates
+                    endpointsExamined++
+                    preferEndpoint = false
+                    next
+                }
+                else -> {
+                    val next = literalCursor % literalCandidates
+                    literalCursor = (next + 1L) % literalCandidates
+                    literalsExamined++
+                    preferEndpoint = true
+                    next
+                }
+            }
             preferNeighborhood = !preferNeighborhood
-            val endpoint = nearby == null && candidate >= 2L * variables
             val literal = if (endpoint) 0 else candidate.toInt()
-            val variable = if (endpoint) (candidate / 2L - variables).toInt() else Lit.variable(literal)
+            val variable = if (endpoint) (candidate / 2L).toInt() else Lit.variable(literal)
             val atMost = candidate % 2L == 0L
             examined++
             budget.note("Candidates")

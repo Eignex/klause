@@ -499,8 +499,10 @@ is no separate stale binary graph or whole-graph rebuild.
 
 Opt-in failed-literal probing alternates a bounded rotating set of source Boolean
 and existing integer-bound literals with coordinates from newly examined learned
-clauses of two to eight literals. The rotation also tests unfixed integer endpoints,
-including columns without existing atoms. Each slice snapshots its candidate space;
+clauses of two to eight literals. The global rotation alternates existing literals
+with unfixed integer endpoints, including columns without existing atoms. Separate
+cursors preserve endpoint progress when the atom registry grows. Each slice
+snapshots both candidate spaces and visits each global candidate at most once;
 scanning creates no atoms. A completed endpoint conflict names only the complementary
 unit it proves; registry and threshold-index growth enter the containing work and debt.
 Equality atoms decline. Bound probes use ordinary single-bound
