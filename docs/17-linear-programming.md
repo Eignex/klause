@@ -267,6 +267,9 @@ storage before constructing children. A declined or interrupted split retains it
 spent preparation work; child numerical preparation receives the remaining grant.
 Explicit component ownership funds cold preparation from the remaining shared LP
 and invocation allowances, separately from the adaptive numerical query quantum.
+Without a timed shared LP allowance, preparation uses the remaining bounded root
+work grant. Ordinary node queries keep their individual numerical limits; root-bound
+consultations explicitly retain a cumulative continuation grant.
 Preparation is charged before the query receives its remaining allowance.
 The first scoped query completes this charge before freezing a continuation grant;
 an interrupted preparation supplies neither a numerical query nor a prior query's charge.
