@@ -358,7 +358,11 @@ class DefinitionalSweep internal constructor(
     fun functionalObjective(objective: LinearObjective): IncrementalObjective? =
         functionalObjective(objective, Cancellation.Never)
 
-    internal fun functionalObjective(objective: LinearObjective, cancellation: Cancellation): IncrementalObjective? {
+    internal fun functionalObjective(
+        objective: LinearObjective,
+        cancellation: Cancellation,
+        captureBooleanCosts: Boolean = false,
+    ): IncrementalObjective? {
         if (cancellation()) return null
         for (coefficient in objective.realCoefficientValues) {
             cancellation.charge(1)
@@ -384,6 +388,7 @@ class DefinitionalSweep internal constructor(
             booleans.toIntArray(),
             LongArray(booleans.size) { objective.boolWeightValues[booleans[it]] },
             cancellation,
+            captureBooleanCosts,
         )
     }
 
@@ -408,6 +413,7 @@ class DefinitionalSweep internal constructor(
         boolTerms,
         boolTermCoeffs,
         Cancellation.Never,
+        false,
     )
 
     private fun functionalObjective(
@@ -418,6 +424,7 @@ class DefinitionalSweep internal constructor(
         boolTerms: IntArray,
         boolTermCoeffs: LongArray,
         cancellation: Cancellation,
+        captureBooleanCosts: Boolean,
     ): IncrementalObjective? {
         if (cancellation()) return null
         val intDefinitions = MutableIntObjectMap<SweepNode>()
@@ -528,7 +535,9 @@ class DefinitionalSweep internal constructor(
         val result = FunctionalObjective(
             terms, termCoeffs, constant, minimize, emptyList(), leaves.toIntArray(),
             boolTerms, boolTermCoeffs, emptyList(), boolLeaves.toIntArray(), cone,
-            booleanCostSweep = completeBooleanCostSweep(terms, boolTerms, boolTermCoeffs, cancellation),
+            booleanCostSweep = if (captureBooleanCosts) {
+                completeBooleanCostSweep(terms, boolTerms, boolTermCoeffs, cancellation)
+            } else null,
         )
         return if (cancellation()) null else result
     }
