@@ -9,6 +9,7 @@ import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.ExecutionStrategy
@@ -64,9 +65,13 @@ class LocalSearchWorkerBooleanCostsTest(
         val worker = LocalSearchWorkerConfig(recipe, reportPhaseTimes = true).materialize(
             problem, 0, 0, 3L, 1.0, canonical, gradient, supplied, null, null,
         )
+        val warm = Assignment(problem.numBoolVars, 0).apply {
+            setBool(source.boolFolds.first().out, true)
+        }.snapshot()
 
         val result = worker.use {
-            worker.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never, maxInstructions = 16L).last()
+            worker.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never,
+                warmStart = warm, maxInstructions = 16L).last()
         }
 
         val point = assertIs<MinimizeResult.WithSample>(result).sample
