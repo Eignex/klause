@@ -118,6 +118,12 @@ internal class LpHints(
         }
     }
 
+    fun hasDirectionalScores(): Boolean {
+        if (!collect || !directionalGains || !objectiveRecorded) return false
+        charge(1L)
+        return history.mayHaveScores
+    }
+
     fun directionalScore(variable: VarRef): Double {
         if (!collect || !directionalGains || !objectiveRecorded) return Double.NaN
         charge(1L)

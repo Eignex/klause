@@ -26,6 +26,7 @@ internal class LpDirectionalHistory(
     private val parents = HashMap<Int, Parent>()
     private var pending: Pending? = null
     private var stamp = 0L
+    private var reliableStamp = -1L
     private var depth = 0
     private var objective = Double.NaN
 
@@ -39,10 +40,14 @@ internal class LpDirectionalHistory(
     val retainedEntries: Int get() = gains.size + parents.size +
         (if (integerPrior != null) 1 else 0) + (if (booleanPrior != null) 1 else 0)
 
+    val mayHaveScores: Boolean get() = (reliableStamp >= 0L && stamp - reliableStamp <= maxAge) ||
+        recent(integerPrior) || recent(booleanPrior)
+
     fun clear(report: Boolean = true) {
         gains.clear()
         integerPrior = null
         booleanPrior = null
+        reliableStamp = -1L
         parents.clear()
         pending = null
         objective = Double.NaN
@@ -61,6 +66,7 @@ internal class LpDirectionalHistory(
         }
         val history = gains.getOrPut(child.parent.variable, ::Gains)
         update(if (child.up) history.up else history.down, normalized)
+        if (recent(history)) reliableStamp = stamp
         if (useClassPriors) {
             charge(1L)
             val prior = when (child.parent.variable) {
@@ -132,10 +138,11 @@ internal class LpDirectionalHistory(
         return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
     }
 
-    fun usesPrior(variable: VarRef): Boolean = gains[variable]?.let {
-        it.down.count < RELIABILITY || it.up.count < RELIABILITY ||
-            stamp - it.down.stamp > maxAge || stamp - it.up.stamp > maxAge
-    } ?: true
+    fun usesPrior(variable: VarRef): Boolean = !recent(gains[variable])
+
+    private fun recent(history: Gains?): Boolean = history != null &&
+        history.down.count >= RELIABILITY && history.up.count >= RELIABILITY &&
+        stamp - history.down.stamp <= maxAge && stamp - history.up.stamp <= maxAge
 
     private fun reliable(history: Gains?, prior: Boolean = false): Gains? {
         history ?: return null
