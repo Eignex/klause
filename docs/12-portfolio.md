@@ -551,7 +551,9 @@ recipe and is omitted from task queries; active or opaque cut hooks decline.
 A separate internal probe-first mode postpones the board until a whole-source
 query pauses with a live Boolean decision. It reserves that decision's matching
 region for the retained probe engine before exposing the opposite region to its
-peer. The original builder solver and immutable native projection remain available
+peer. Source and caller-condition admission precedes the probe; task identity and
+mapping authority are allocated only when that pause creates the board.
+The original builder solver and immutable native projection remain available
 through the transfer. Probe work is a subset of each worker's cumulative work, not
 a refunded or additional charge. Without a live decision the same source query
 continues; fast completion creates no board.
