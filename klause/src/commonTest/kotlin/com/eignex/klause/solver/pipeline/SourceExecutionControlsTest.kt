@@ -8,6 +8,8 @@ import com.eignex.klause.ir.LinearSourceTerm
 import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.solver.result.TerminationReason
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,6 +22,34 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SourceExecutionControlsTest {
+    @Test
+    fun `ordinary source cut controls should configure companions without changing the finite recipe`() {
+        val source = LinearSourceProblem(listOf(
+            LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
+            LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
+        ), emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))))
+        for ((options, expected) in listOf(
+            emptyList<String>() to listOf(true, false, false),
+            listOf("source-cuts=false", "source-point-cuts=true", "source-aggregate-cuts=true") to
+                listOf(false, true, true),
+        )) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
+            val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
+            val finite = assertNotNull(request.finiteRequest).invoke(invocation.finiteShape())
+
+            val scenario = buildPortfolioScenario(finite.executionOptions.reader(), finite.randomSeed,
+                finite.cores, Kind.COP, EngineMix.MIXED, finite.defaultArms)
+
+            assertTrue(invocation.requestsFiniteNumericalCompanions)
+            assertEquals(expected, listOf(request.theory.sourceCuts, request.theory.sourcePointCuts,
+                request.theory.sourceAggregateCuts))
+            assertFalse(scenario.explicitArms)
+            assertFalse(scenario.companionIntegers)
+            assertEquals(4_000L, scenario.companionActiveMillis)
+        }
+    }
+
     @Test
     fun `ordinary finite source execution should bind advisory completion to its companions`() {
         val source = LinearSourceProblem(listOf(

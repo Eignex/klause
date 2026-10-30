@@ -49,6 +49,7 @@ internal fun bindSourceExecutionControls(
     val companions = invocation.requestsFiniteNumericalCompanions
     val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve").let {
         if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
+            "source-cuts", "source-point-cuts", "source-aggregate-cuts",
             "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
             "source-incumbent-completion") else it
     }
@@ -85,6 +86,9 @@ internal fun bindSourceExecutionControls(
             sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
                 defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
             sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
+            sourceCuts = reader[ExecutionOption.sourceCuts] ?: defaults.sourceCuts,
+            sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
+            sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
             sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
                 ?: defaults.sourceIncumbentCompletion,
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
