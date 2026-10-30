@@ -74,14 +74,14 @@ internal object JfrCaptureSummary : BenchSuite {
     }
 
     internal class Samples {
-        private var samples = 0L
+        private var sampleCount = 0L
         private var truncated = 0L
         private var depthLimited = 0L
         private var emptyStacks = 0L
         private val methods = HashMap<String, Long>()
 
         fun record(frames: Sequence<String>, truncatedStack: Boolean) {
-            samples++
+            sampleCount++
             if (truncatedStack) truncated++
             val seen = HashSet<String>()
             for ((depth, method) in frames.take(STACK_DEPTH + 1).withIndex()) {
@@ -101,7 +101,7 @@ internal object JfrCaptureSummary : BenchSuite {
         fun summary(source: String, sha256: String): JsonObject = buildJsonObject {
             put("source", source)
             put("sha256", sha256)
-            put("samples", samples)
+            put("samples", sampleCount)
             put("stackDepth", STACK_DEPTH)
             put("truncatedStacks", truncated)
             put("depthLimitedStacks", depthLimited)
