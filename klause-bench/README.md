@@ -114,10 +114,12 @@ and `#` starts a comment. They bypass default suite family caps.
 from its compact archive. Names include `dimacs_mod/MANN_a9.clq` and
 `random/max_cut_60_500_9.asc`; model hashes identify the fetched bytes in lab records.
 
-For retained JFR captures, run `com.eignex.klause.bench.profile.JfrCaptureSummary`
-through `lab profile` with the source job/artifact label, its SHA-256 and gzip/Base64
-chunks as separate arguments. Its `scripts/summarize-jfr.sh` verifies the capture
-and summarizes sampled stacks on the lab worker.
+For retained JFR captures, submit `lab/jfr-summary.json` through `lab run` with
+`bench.request.parameters` containing `source` (the job/artifact label), `sha256`
+and `gzip-base64` (at most 2 MiB). The SDK transports the payload in the frozen case
+file. Its `scripts/summarize-jfr.sh` verifies the capture and summarizes sampled
+stacks on the lab worker. Large captures must not be passed through profile arguments:
+the generated shell command is subject to the operating system's argument-size limit.
 
 `solve-one suite=ID problem=NAME out=DIR` accepts these controls:
 
