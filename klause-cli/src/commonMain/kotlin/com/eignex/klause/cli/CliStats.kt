@@ -252,7 +252,7 @@ private fun appendRouteCertifierStats(
 internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> {
     val moves = stats.ls.moves.sum
     if (stats.run.backend != "ls" && moves == 0.0 && stats.ls.bestResidual == null &&
-        stats.ls.phaseNanos.isEmpty()
+        stats.ls.phaseNanos.isEmpty() && stats.ls.objectiveScoring.isEmpty()
     ) return emptyList()
 
     val out = ArrayList<Pair<String, String>>()
