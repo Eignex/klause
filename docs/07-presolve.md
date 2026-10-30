@@ -232,6 +232,11 @@ opens a consumer. Assumptions, external components, arithmetic and LP-enabled
 workers retain their canonical traversal. Enumeration and optimization do not use
 this trial.
 
+Pinning retains unchanged immutable source clauses by reference and copies only
+shortened rows. Column counts stay identical, preserving the clauses' plain-Boolean
+classification. Each new baked model owns its projection, watches and search state;
+the shared factor input carries no mutable search state.
+
 A trial requires global root pins beyond the baked root and the last attempted
 view. An unchanged baked root performs no BVE. The root-pin scan charges its full
 column visit count and records its time; an insufficient grant skips the scan.
@@ -251,7 +256,15 @@ declined pivot cannot consume its resolution allowance. Later opportunities amon
 protected columns wait for a fresh root view. This selection is a heuristic, not
 an exhaustive elimination pass.
 
-BVE receives half the allowance remaining after the private source copy. Its local cap
+When one column is admitted, the pass indexes its complete incident-clause
+neighborhood. Outside rows contain no pivot literal and remain unchanged; resolving
+the pivot commutes with those rows. The neighborhood keeps canonical column slots
+and transports every dropped local factor index back to its captured full source.
+An incomplete scan publishes no view. Multiple admitted columns retain the full
+database path. Neighborhood scanning and index transport debit preparation, while
+the kernel retains its local pass cap.
+
+BVE receives half the allowance remaining after source and neighborhood preparation. Its local cap
 retains complete earlier pivots when later analysis stops; cancellation of the
 containing call declines the generation. Baking, opening and canonical checks
 share the remaining containing allowance.
