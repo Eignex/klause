@@ -699,6 +699,8 @@ Native CP and shared first-UIP outcomes are reported separately. Non-asserting c
 identify chronological fallback, while zero does not establish explanation coverage.
 Native learned-constraint counts include integer rows; their terms do not count as
 Boolean learned literals.
+`learningIntegerSessions` counts native sessions with integer-row learning enabled,
+independently of constructed, admitted and consumed objects.
 Missing metrics stay absent, including root theory results that never enter traversal.
 `smtCompleteSearch*` stage observations overlap and cannot be summed as a work total.
 [SearchStats](../klause/src/commonMain/kotlin/com/eignex/klause/solver/result/SearchStats.kt)
