@@ -22,6 +22,8 @@ internal interface ReasonGraph {
     fun antecedentsOf(v: Int): IntArray?
 
     fun knownLeaf(v: Int): Boolean = false
+
+    fun deferredReason(v: Int): Boolean = false
 }
 
 /**
@@ -197,10 +199,6 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
             var i = redIdxStack[top]
             var failed = false
             var pushed = false
-            if (state.reasonPreflight && i == 0 && hasFailedSibling(v, ant, inClause, cache)) {
-                rejectPath(cache)
-                return false
-            }
             while (i < ant.size) {
                 val u = Lit.variable(ant[i])
                 i++
@@ -234,6 +232,13 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
                     }
 
                     else -> {
+                        if (state.reasonPreflight && redIdxStack[top] == 0 && i < ant.size) {
+                            state.checkFiniteWork()
+                            if (graph.deferredReason(u) && hasFailedSibling(v, ant, i, inClause, cache)) {
+                                rejectPath(cache)
+                                return false
+                            }
+                        }
                         val uAnt = graph.antecedentsOf(u)
                         if (uAnt == null) {
                             cache.put(u, 0)
@@ -269,13 +274,14 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
     private fun hasFailedSibling(
         v: Int,
         antecedents: IntArray,
+        start: Int,
         inClause: BooleanArray,
         cache: MutableIntIntMap,
     ): Boolean {
         val bools = state.problem.numBoolVars
-        for (lit in antecedents) {
+        for (i in start until antecedents.size) {
             state.checkFiniteWork()
-            val u = Lit.variable(lit)
+            val u = Lit.variable(antecedents[i])
             if (u == v) continue
             if (u >= bools && v >= bools && state.atoms.intVar[u - bools] == state.atoms.intVar[v - bools]) {
                 return true

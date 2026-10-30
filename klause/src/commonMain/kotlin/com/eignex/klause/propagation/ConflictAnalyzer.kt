@@ -570,6 +570,20 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         return atom < state.atoms.intVar.size && state.atoms.lvl[atom] >= 0 && state.atoms.ant[atom] == null
     }
 
+    override fun deferredReason(v: Int): Boolean {
+        val bools = state.problem.numBoolVars
+        val reason = if (v < bools) {
+            if (v < 0) return false
+            state.boolAntecedents[v]
+        } else {
+            val atom = v - bools
+            if (atom >= state.atoms.intVar.size || state.atoms.lvl[atom] < 0) return false
+            state.atoms.ant[atom]
+        }
+        if (!isLazyReason(reason)) return false
+        return !state.lazyReasonMemo.containsKey(requireNotNull(reason))
+    }
+
     /**
      * Unified level lookup that handles both bool vars (via [PropagationState.boolLevel])
      * and atom vars. Atom levels come from [PropagationState.atomLevelForConflict] — the

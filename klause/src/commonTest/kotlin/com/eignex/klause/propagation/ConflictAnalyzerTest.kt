@@ -30,7 +30,33 @@ class ConflictAnalyzerTest {
 
         assertTrue(analyzer.knownLeaf(decision))
         assertFalse(analyzer.knownLeaf(late))
+        assertFalse(analyzer.deferredReason(late))
         assertEquals(work, state.work)
+    }
+
+    @Test
+    fun `recorded lazy reasons should cease being deferred after memoization`() {
+        for (integer in listOf(false, true)) {
+            val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), arrayOf(Clause(intArrayOf(0))))
+            val state = PropagationState(problem, Assumptions.None)
+            state.undoLogging = true
+            state.currentLevel = 1
+            state.currentFactor = 0
+            val marker = state.lazyReason(intArrayOf())
+            val variable = if (integer) state.atomVarGe(0, 5) else 0
+            if (integer) check(state.tightenIntMin(0, 5, marker))
+            else check(state.pinBool(0, true, marker))
+            val recorded = if (integer) state.atoms.ant[variable - problem.numBoolVars]
+            else state.boolAntecedents[variable]
+            val analyzer = ConflictAnalyzer(state)
+            val work = state.work
+            assertTrue(analyzer.deferredReason(variable))
+
+            state.lazyReasonMemo[requireNotNull(recorded)] = intArrayOf()
+
+            assertFalse(analyzer.deferredReason(variable))
+            assertEquals(work, state.work)
+        }
     }
 
     @Test
