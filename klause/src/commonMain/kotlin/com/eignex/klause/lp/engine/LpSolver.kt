@@ -419,7 +419,10 @@ internal fun newLpSolver(
         componentLpSolverOrNull(
             model,
             cancellation,
-            { part, token -> factory.newGeneralSolver(part, token, workLimit, pricing) },
+            null,
+            { part, token, rowOnlyRows -> factory.newGeneralSolver(
+                part, token, workLimit, pricing.componentShare(part.n, model.n, rowOnlyRows),
+            ) },
             factory::newComponentSolver,
         )?.let { return it }
     }
@@ -453,9 +456,9 @@ internal fun newComponentTableauCutSolver(
     factory: LpEngineFactory = ProductionLpEngineFactory,
     pricing: LpPricingOptions = LpPricingOptions(),
 ): TableauCutSolver = componentLpSolverOrNull(
-    model, cancellation,
-    { part, token -> factory.newTableauSolver(
-        part, token, iterationLimit, workLimit, trackDegeneracy, pricing.componentShare(part.n, model.n),
+    model, cancellation, null,
+    { part, token, rowOnlyRows -> factory.newTableauSolver(
+        part, token, iterationLimit, workLimit, trackDegeneracy, pricing.componentShare(part.n, model.n, rowOnlyRows),
     ) },
     { parent, parts, children, isolated ->
         ComponentLpSolver(parent, parts, children, isolated).apply {
@@ -464,11 +467,16 @@ internal fun newComponentTableauCutSolver(
     },
 ) ?: newTableauCutSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy, factory, pricing)
 
-internal fun LpPricingOptions.componentShare(columns: Int, totalColumns: Int): LpPricingOptions {
+internal fun LpPricingOptions.componentShare(columns: Int, totalColumns: Int, rowOnlyRows: Int = 0): LpPricingOptions {
     val limit = basisEntryLimit
     if (limit == Long.MAX_VALUE) return this
+    // Row-only children retain identity factors and have no structural entering column that can create fill.
+    val logicalShare = minOf(limit, 4L * rowOnlyRows)
+    if (columns == 0) return copy(basisEntryLimit = logicalShare)
+    val structuralShare = limit - logicalShare
     // Column ownership keeps the allocation stable across component-local row additions.
-    val share = limit / totalColumns * columns + (limit % totalColumns) * columns / totalColumns
+    val share = structuralShare / totalColumns * columns +
+        (structuralShare % totalColumns) * columns / totalColumns
     return copy(basisEntryLimit = share)
 }
 
@@ -512,12 +520,13 @@ internal fun newRetainedLpSolver(
         componentLpSolverOrNull(
             model,
             cancellation,
-            { part, token ->
+            null,
+            { part, token, rowOnlyRows ->
                 newPersistentLpSolver(
                     part,
                     token,
                     factory = factory,
-                    pricing = pricing,
+                    pricing = pricing.componentShare(part.n, model.n, rowOnlyRows),
                     workLimit = workLimit,
                 )
             },

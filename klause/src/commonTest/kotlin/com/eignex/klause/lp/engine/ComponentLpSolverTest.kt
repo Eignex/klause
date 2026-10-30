@@ -93,6 +93,43 @@ class ComponentLpSolverTest {
     }
 
     @Test
+    fun `empty structural rows retain their logical objective in a separate child`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        builder.addRow(intArrayOf(), longArrayOf(), Relation.LE, 2L)
+        val legacy = builder.build(Sense.MINIMIZE)
+        legacy.cost[legacy.slackCol(2)] = 3L
+        val model = assertNotNull(LpExactState(assertNotNull(legacy.authoritativeModel())).ownerWorkingModel())
+
+        val result = solveAndCertify(model)
+
+        assertEquals(3, result.float?.blocks)
+        assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
+        assertEquals(BigFraction.ofLong(8L), result.lowerBound)
+    }
+
+    @Test
+    fun `an empty structural row can certify the component collection infeasible`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L)
+            builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.GE, 1L)
+        }
+        builder.addRow(intArrayOf(), longArrayOf(), Relation.GE, 1L)
+        val model = assertNotNull(
+            LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())).ownerWorkingModel(),
+        )
+
+        val result = solveAndCertify(model)
+
+        assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+        assertNull(result.witness)
+    }
+
+    @Test
     fun `component preparation reserves its grant before constructing children`() {
         val builder = LpBuilder()
         repeat(2) {
