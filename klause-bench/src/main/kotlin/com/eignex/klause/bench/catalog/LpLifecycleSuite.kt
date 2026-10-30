@@ -18,4 +18,21 @@ internal object LpLifecycleSuite {
         category = Category.OPTIMIZATION
         for (name in names) external(name, collection, "$name.mps")
     }
+
+    private val heldoutNames = listOf("avgas", "blending")
+    private val heldoutCollection = ExternalCollection(
+        id = "highs-lp-lifecycle-heldout-$REVISION",
+        url = "https://raw.githubusercontent.com/ERGO-Code/HiGHS/$REVISION/check/instances",
+        license = "MIT (HiGHS public MPS test inputs)",
+        reason = "Separate original linear MPS controls for exact-claim lifecycle qualification",
+        fetch = FetchMethod.Files(heldoutNames.map { "$it.mps" }, "mps") { name, text ->
+            listOf(name.removeSuffix(".mps") to text)
+        },
+    )
+
+    val heldoutSuite = suite("lp-lifecycle-heldout-v1", "Pinned original linear MPS held-out controls") {
+        format = Format.MPS
+        category = Category.OPTIMIZATION
+        for (name in heldoutNames) external(name, heldoutCollection, "$name.mps")
+    }
 }
