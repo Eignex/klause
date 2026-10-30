@@ -494,21 +494,100 @@ internal fun LpStats.hasActivity(): Boolean =
 internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     var sparseTrial: Map<String, Long> = emptyMap()
     private val phases = LinkedHashMap<String, LpPhaseStats>()
+    private var templatePreparationSeen = false
+    private var templateAssemblySeen = false
+    private var templateNanos = 0L
+    private var templateWork = 0L
+    private var templatePrepared = 0L
+    private var templateDeclined = 0L
+    private var templateFactorsReused = 0L
+    private var templateSourceRebound = 0L
+    private var templateIndexesReused = 0L
+    private var templateBoundsReused = 0L
+    private var templateComponentsReused = 0L
+    private var templateComponentsDirty = 0L
+    private var templateRetainedUnits = 0L
+    private var templateRows = 0L
+    private var templateBounds = 0L
+    private var templateExactBounds = 0L
     val cutLifecycle = LpCutStats { key, delta ->
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
 
-    fun observeTemplatePreparation(nanos: Long, work: Long, outcomes: Map<String, Long>) {
-        val key = "TEMPLATE_PREPARATION_${probeRoute.name}"
-        val delta = LpPhaseStats(calls = 1L, nanos = nanos, work = work, outcomes = outcomes)
-        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+    fun observeTemplatePreparation(
+        nanos: Long,
+        work: Long,
+        prepared: Boolean,
+        factorsReused: Int = 0,
+        sourceRebound: Boolean = false,
+        indexesReused: Boolean = false,
+        boundsReused: Int = 0,
+        componentsReused: Int = 0,
+        componentsDirty: Int = 0,
+        retainedUnits: Long = 0L,
+    ) {
+        if (!templatePreparationSeen) {
+            templatePreparationSeen = true
+            phases.getOrPut("TEMPLATE_PREPARATION_${probeRoute.name}") { LpPhaseStats() }
+        }
+        templateNanos += nanos
+        templateWork += work
+        if (!prepared) {
+            templateDeclined++
+            return
+        }
+        templatePrepared++
+        templateFactorsReused += factorsReused
+        if (sourceRebound) templateSourceRebound++
+        if (indexesReused) templateIndexesReused++
+        templateBoundsReused += boundsReused
+        templateComponentsReused += componentsReused
+        templateComponentsDirty += componentsDirty
+        templateRetainedUnits += retainedUnits
     }
 
     fun observeTemplateUse(rows: Int = 0, bounds: Int = 0, exactBounds: Int = 0) {
-        val key = "TEMPLATE_ASSEMBLY_${probeRoute.name}"
-        val delta = LpPhaseStats(outcomes = mapOf("ROWS" to rows.toLong(), "BOUNDS" to bounds.toLong(),
-            "EXACT_BOUND_OBJECTS" to exactBounds.toLong()))
-        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+        if (!templateAssemblySeen) {
+            templateAssemblySeen = true
+            phases.getOrPut("TEMPLATE_ASSEMBLY_${probeRoute.name}") { LpPhaseStats() }
+        }
+        templateRows += rows
+        templateBounds += bounds
+        templateExactBounds += exactBounds
+    }
+
+    private fun phaseSnapshot(): Map<String, LpPhaseStats> {
+        if (!templatePreparationSeen && !templateAssemblySeen) return phases.toMap()
+        return phases.toMutableMap().apply {
+            if (templatePreparationSeen) {
+                val outcomes = buildMap {
+                    if (templateDeclined != 0L) put("DECLINED", templateDeclined)
+                    if (templatePrepared != 0L) {
+                        put("PREPARED", templatePrepared)
+                        put("FACTORS_REUSED", templateFactorsReused)
+                        put("SOURCE_REBOUND", templateSourceRebound)
+                        put("INDEXES_REUSED", templateIndexesReused)
+                        put("BOUNDS_REUSED", templateBoundsReused)
+                        put("COMPONENTS_REUSED", templateComponentsReused)
+                        put("COMPONENTS_DIRTY", templateComponentsDirty)
+                        put("RETAINED_UNITS_SUM", templateRetainedUnits)
+                    }
+                }
+                val key = "TEMPLATE_PREPARATION_${probeRoute.name}"
+                put(key, getValue(key).mergedWith(LpPhaseStats(
+                    calls = templatePrepared + templateDeclined,
+                    nanos = templateNanos, work = templateWork, outcomes = outcomes,
+                )))
+            }
+            if (templateAssemblySeen) {
+                val key = "TEMPLATE_ASSEMBLY_${probeRoute.name}"
+                put(key, getValue(key).mergedWith(LpPhaseStats(outcomes = mapOf(
+                    "ROWS" to templateRows,
+                    "BOUNDS" to templateBounds,
+                    "EXACT_BOUND_OBJECTS" to templateExactBounds,
+                ))))
+            }
+        }
     }
 
     fun observeDirectionalBranch(outcome: String) {
@@ -948,7 +1027,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     }
 
     fun snapshot(): LpStats = LpStats(
-        phases = phases.toMap(),
+        phases = phaseSnapshot(),
         sparseTrial = sparseTrial,
         nodePasses = SumResult(nodePasses.toDouble()),
         standalonePasses = SumResult(standalonePasses.toDouble()),
