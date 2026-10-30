@@ -33,8 +33,6 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 
-internal enum class InitialProbePolicy { ORDINARY, LEADER_HALF, LP_TRANSFER }
-
 /** Materializes [scenario] over [problem] and schedules it on one lane per core, checking every result an arm
  *  claims against [problem] and reporting each arm quarantined for a refuted claim to [onFault]. */
 fun FinitePipeline.portfolioExecutor(
