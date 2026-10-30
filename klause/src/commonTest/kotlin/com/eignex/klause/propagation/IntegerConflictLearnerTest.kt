@@ -45,11 +45,11 @@ class IntegerConflictLearnerTest {
     @Test
     fun `a learned row should preserve the fallback backjump target`() {
         val native = PropagationSession(Problem(0, 3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 7)), arrayOf(
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 8)), arrayOf(
                 Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
                 Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
             )), pbLearning = false).apply { enableIntegerRowLearning() }
-        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 6))
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
 
         val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
 
