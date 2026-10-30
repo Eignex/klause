@@ -271,6 +271,7 @@ node queries. Selected global cuts enter through the retained cut adapter before
 root solve; the passed selection also governs an empty cut list.
 The fixed layout starts from source-root boxes and adopts the query's propagated
 bounds, without a second root fixpoint for that layout.
+Noncompact exact layouts use retained source emissions instead of the compact base adapter.
 When no numerical owner exists, preparation partitions the complete source and cut
 layout together. A declined live component append falls back to the ordinary owner.
 The original node-depth and cut policies remain in force. This root-bound operation

@@ -806,7 +806,7 @@ internal class LpEngine(
             cpAdapter.reset()
             persistentRelaxation = null
             val base = relaxer.build(RootDomains(problem), cancellation = params.cancellation)
-            if (base.persistentEligible && (!sparseTrialActive || !base.model.hasContinuous)) {
+            if (base.persistentEligible && !base.model.hasContinuous) {
                 persistentRelaxation = base
             }
             persistentRelaxer = relaxer
