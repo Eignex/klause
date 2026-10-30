@@ -49,7 +49,7 @@ internal class JointLinearRepair(
     private val onIncumbentImport: (() -> Unit)? = null,
     private val onIncumbentUse: (() -> Unit)? = null,
     private val observeExternalIncumbents: Boolean = false,
-    incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+    private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val sourceIntegers = sourceIntegers?.copyOf()
     private val stop = params.timeout or params.cancellation
@@ -336,6 +336,18 @@ internal class JointLinearRepair(
             val mark = TimeSource.Monotonic.markNow()
             observe("jointRepairPublicationChecks")
             val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence, verification)
+            var originalChecked = true
+            if (checked == SourceEvidenceCheck.Checked && incumbentCompletionCheck != null) {
+                val checking = publicationChecking(verification)
+                observe("jointRepairOriginalPublicationChecks")
+                val value = objective?.evaluateExact(sample)
+                originalChecked = value != null && incumbentCompletionCheck.invoke(sample, value, checking)
+                if (checking()) {
+                    originalChecked = false
+                    observe("jointRepairOriginalPublicationUnavailable")
+                } else observe(if (originalChecked) "jointRepairOriginalPublicationChecked"
+                    else "jointRepairOriginalPublicationRejected")
+            }
             stages["jointRepairPublicationNs"] = (stages["jointRepairPublicationNs"] ?: 0L) +
                 mark.elapsedNow().inWholeNanoseconds
             if (publicationLifetime == null && cancellation() && !stop()) {
@@ -344,7 +356,7 @@ internal class JointLinearRepair(
                     bound = snapshot.bound)
             }
             retire()
-            if (checked == SourceEvidenceCheck.Checked) {
+            if (checked == SourceEvidenceCheck.Checked && originalChecked) {
                 anchor = sample
                 observe("jointRepairCheckedIncumbents")
                 return JointRepairAttempt(ExactNeighborhoodResult.Witness(sample),
@@ -387,6 +399,17 @@ internal class JointLinearRepair(
         query = null
         pending = null
         active?.close()
+    }
+
+    private fun publicationChecking(cancellation: Cancellation): Cancellation = object : Cancellation {
+        private val meter = WorkMeter { units -> budget.observe(boundCertification = units) }
+        override fun isCancelled(): Boolean {
+            charge(1L)
+            // Atomic publication spends the containing funding after the query's slice grant ends.
+            return closed || cancellation() || funding.exhausted
+        }
+        override fun deadline() = cancellation.deadline()
+        override fun workMeter(): WorkMeter = meter
     }
 
     override fun close() {
