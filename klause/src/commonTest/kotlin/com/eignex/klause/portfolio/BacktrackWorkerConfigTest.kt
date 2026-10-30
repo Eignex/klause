@@ -53,7 +53,8 @@ class BacktrackWorkerConfigTest {
             binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
         val count = BacktrackCatalog.ranked(Kind.COP, facts).size * 2
 
-        val arms = BacktrackWorkerConfig.diverse(Kind.COP, count, facts = facts)
+        val arms = BacktrackWorkerConfig.diverse(Kind.COP, count, facts = facts,
+            automaticIntegerLearning = true)
 
         assertEquals(listOf("conflictDriven"),
             arms.filter { it.recipe.build(1L, null).integerRowLearning }.map { it.label })
@@ -66,7 +67,8 @@ class BacktrackWorkerConfigTest {
             val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
                 binaryIntegers = binary, integerLinear = linear, integerColumnsOnly = columns) { true }
 
-            val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, facts = facts)
+            val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, facts = facts,
+                automaticIntegerLearning = true)
 
             assertTrue(arms.none { it.recipe.build(1L, null).integerRowLearning },
                 "binary=$binary columns=$columns linear=$linear")
@@ -78,7 +80,8 @@ class BacktrackWorkerConfigTest {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.CSP).profile,
             binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
 
-        val arms = BacktrackWorkerConfig.diverse(Kind.CSP, 12, facts = facts)
+        val arms = BacktrackWorkerConfig.diverse(Kind.CSP, 12, facts = facts,
+            automaticIntegerLearning = true)
 
         assertTrue(arms.none { it.recipe.build(1L, null).integerRowLearning })
     }
@@ -88,7 +91,8 @@ class BacktrackWorkerConfigTest {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
             binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
 
-        val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, lpCeiling = LpConfig.OFF, facts = facts)
+        val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, lpCeiling = LpConfig.OFF, facts = facts,
+            automaticIntegerLearning = true)
 
         assertTrue(arms.none { it.recipe.build(1L, null).integerRowLearning })
     }
@@ -99,7 +103,7 @@ class BacktrackWorkerConfigTest {
             binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
         for (enabled in listOf(false, true)) {
             val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, facts = facts,
-                edit = { it.copy(integerRowLearning = enabled) })
+                automaticIntegerLearning = true, edit = { it.copy(integerRowLearning = enabled) })
 
             assertTrue(arms.all { it.recipe.build(1L, null).integerRowLearning == enabled })
         }
@@ -111,7 +115,7 @@ class BacktrackWorkerConfigTest {
             binaryIntegers = true, integerLinear = true, integerColumnsOnly = true) { true }
 
         val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, facts = facts,
-            edit = { it.copy(maxDecisions = 20) })
+            automaticIntegerLearning = true, edit = { it.copy(maxDecisions = 20) })
 
         assertEquals(listOf("conflictDriven"),
             arms.filter { it.recipe.build(1L, null).integerRowLearning }.map { it.label })
