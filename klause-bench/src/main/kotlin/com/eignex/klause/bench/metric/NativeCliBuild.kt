@@ -49,6 +49,12 @@ internal object NativeCliBuild {
         }
     }
 
+    fun treeIdentity(tree: File): Map<String, String> {
+        require(tree.isDirectory) { "Missing caller runtime: $tree" }
+        return tree.walkTopDown().filter(File::isFile).sortedBy { it.relativeTo(tree).path }
+            .associate { it.relativeTo(tree).invariantSeparatorsPath to hash(it) }
+    }
+
     private fun libraries(executable: File): List<File> {
         require(System.getProperty("os.name") == "Linux") { "Native CLI qualification requires Linux" }
         val process = ProcessBuilder("timeout", "10", "ldd", executable.canonicalPath).redirectErrorStream(true).start()
