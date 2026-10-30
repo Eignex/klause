@@ -100,7 +100,7 @@ internal fun LpEngine.lpRoundingProbe(
                         } else seed.intValue(variable).toDouble()
                     }
                 }
-                if (attempt.fixpointCancelled || cancellation()) {
+                if (attempt.fixpointCancelled || attempt.probeCancelled || cancellation()) {
                     rootRoundingInterrupted = true
                     outcome = "CANCELLED"
                     return null
@@ -151,7 +151,7 @@ internal fun LpEngine.pinToward(
     rounding: LpRounding = LpRounding.NEAREST,
     targetOf: (col: Int) -> Double?,
 ): Sample? {
-    if (session.fixpointCancelled) return null
+    if (session.fixpointCancelled || session.probeCancelled) return null
     val intOrder = (0 until problem.numIntVars).sortedBy { v ->
         targetOf(relaxation.intColOf[v])?.let { abs(it - round(it)) } ?: Double.MAX_VALUE
     }
@@ -172,11 +172,10 @@ internal fun LpEngine.pinToward(
             LpRounding.UP -> target > 0.0
             LpRounding.DOWN -> target >= 1.0
         }
-        val result = session.pinBool(b, first)
-        if (session.fixpointCancelled) return null
+        val result = session.probeBool(b, first) ?: return null
         if (result !is PropagationResult.Unsat) continue
-        if (session.pinBool(b, !first) is PropagationResult.Unsat) return null
-        if (session.fixpointCancelled) return null
+        val fallback = session.probeBool(b, !first) ?: return null
+        if (fallback is PropagationResult.Unsat) return null
     }
     return snapshotAssignment(session)
 }
@@ -184,8 +183,8 @@ internal fun LpEngine.pinToward(
 internal enum class LpRounding { NEAREST, UP, DOWN }
 
 /** Pin [v] to the rounded LP value (or [lo] when it has no LP column), falling back to the other side
- *  of the LP value on a conflict. False only when both candidates wipe out — a conflicting pin reverts
- *  the session to its pre-pin state, so the fallback resumes cleanly. */
+ *  of the LP value on a conflict. A conflicting pin reverts to its pre-pin state for the fallback;
+ *  interruption restores the last complete fixpoint and withholds the proposal. */
 private fun pinIntTowardLp(
     session: PropagationSession,
     v: Int,
@@ -194,21 +193,22 @@ private fun pinIntTowardLp(
     hi: Long,
     rounding: LpRounding,
 ): Boolean {
-    if (lp == null) return session.pinInt(v, lo) !is PropagationResult.Unsat
+    if (lp == null) return session.probeInt(v, lo)?.let { it !is PropagationResult.Unsat } ?: false
     val target = when (rounding) {
         LpRounding.NEAREST -> round(lp)
         LpRounding.UP -> ceil(lp)
         LpRounding.DOWN -> floor(lp)
     }
     val first = target.toLong().coerceIn(lo, hi)
-    if (session.pinInt(v, first) !is PropagationResult.Unsat) return true
+    val result = session.probeInt(v, first) ?: return false
+    if (result !is PropagationResult.Unsat) return true
     val second = when {
         lp >= first && first < hi -> first + 1L
         lp < first && first > lo -> first - 1L
         else -> first
     }
     if (second == first) return false
-    return session.pinInt(v, second) !is PropagationResult.Unsat
+    return session.probeInt(v, second)?.let { it !is PropagationResult.Unsat } ?: false
 }
 
 /**
@@ -266,6 +266,7 @@ internal fun LpEngine.lpFeasibilityPump(
                 val sample = pinToward(session, relaxation) { col ->
                     targetOfCol(relaxation, intTarget, boolTarget, col)
                 }
+                if (session.probeCancelled) return null
                 if (sample != null && !session.fixpointCancelled && !cancellation()) {
                     outcome = "PROPOSED"
                     accept(sample)?.let { return it }
@@ -273,7 +274,7 @@ internal fun LpEngine.lpFeasibilityPump(
             }
         } finally {
             primalPropagationWork += session.work
-            if (session.fixpointCancelled) outcome = "CANCELLED"
+            if (session.fixpointCancelled || session.probeCancelled) outcome = "CANCELLED"
             sink.lp.observePrimalPhase("PRIMAL_PUMP_ROUND", outcome, started.elapsedNow().inWholeNanoseconds)
         }
         val distance = distanceObjective(relaxation, intTarget, boolTarget) ?: return null // nothing to pump
