@@ -98,7 +98,8 @@ root; `-Dklause.*` properties are forwarded to the bench JVM.
 `list [suite]` lists suites or their problems. `select` emits JSON lines containing
 the `suite` and `problem` identities accepted by `solve-one`.
 `files=true` adds resolved model/data/include paths; `features=true` adds structural
-classification. Fetched suites download their corpus during resolution.
+classification. Fetched suites download their corpus during resolution, with progress
+on stderr so stdout retains selection JSON lines.
 
 | Selection filter | Purpose |
 |---|---|
