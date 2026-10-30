@@ -35,15 +35,15 @@ class LpEmissionTest {
         var work = 0L
         val relaxer = CpToLpRelaxation(problem, null, projections = projections, onTemplateWork = { work += it })
         val cache = LpEmissionCache(relaxer)
-        var pin: Boolean? = null
+        var live = problem.finiteIntDomain(0)
         val domains = object : RelaxationDomains {
-            override fun intDomain(varId: Int): IntDomain = problem.finiteIntDomain(varId)
-            override fun boolValue(varId: Int): Boolean? = pin
+            override fun intDomain(varId: Int): IntDomain = live
+            override fun boolValue(varId: Int): Boolean? = null
         }
 
         cache.refresh(domains, 0)
         cache.refresh(domains, 0)
-        pin = true
+        live = live.withMinAtLeast(2)
         cache.refresh(domains, 1)
 
         assertTrue(attemptWork > 0L)
