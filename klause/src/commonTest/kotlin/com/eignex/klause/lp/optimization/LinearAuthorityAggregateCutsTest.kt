@@ -385,6 +385,29 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `pair inspection should retain bounded inferences after a wide source row`() {
+        val wide = SourceInequality((2..6).associate {
+            SourceCoordinate(SourceCoordinate.Kind.Real, it) to BigFraction.ONE
+        }, BigFraction.ZERO)
+        val quarter = BigFraction.ofLong(4).reciprocal()
+        val point = mapOf(x to quarter * BigFraction.ofLong(3), y to quarter * BigFraction.ofLong(3),
+            real to quarter * BigFraction.ofLong(6))
+        val source = SourceProofContext(scope, point.keys + wide.coefficients.keys, mapOf(
+            "wide" to SourcePremise(wide), "left" to SourcePremise(left), "right" to SourcePremise(right)))
+
+        val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
+            LinearAuthorityAggregateTerm(0, "wide", wide), LinearAuthorityAggregateTerm(1, "left", left),
+            LinearAuthorityAggregateTerm(2, "right", right),
+        ), emptySet(), point, Cancellation.Never, limits = LinearAuthorityAggregateLimits(support = 4))
+
+        val cut = result.candidates.single()
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        assertFalse(result.complete)
+        assertNull(result.activeSourceRowsSatisfied)
+    }
+
+    @Test
     fun `pair inspection should distinguish source residuals from aggregate violations`() {
         val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
             LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),

@@ -374,6 +374,9 @@ scalars at 256 bits and proof references at 16 KiB. Each attempt has 65,536 work
 units and 1 MiB of modeled allocation, with failed attempts charged to the same
 containing observer and cancellation token. These candidates require source
 verification before admission.
+Pair inspection skips source rows wider than the support cap while retaining
+bounded inferences from other rows. It withholds complete coverage and source-point
+satisfaction when a skipped row has not been checked.
 An immutable template can append up to 64 explicit proposals before the shared
 checked-candidate pass. Existing candidate IDs are preserved; appending produces
 a new template identity. Full owner and coordinate indices must belong to that
