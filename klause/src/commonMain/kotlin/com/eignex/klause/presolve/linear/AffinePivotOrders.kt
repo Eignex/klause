@@ -7,7 +7,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 
-/** Selects the next affine pivot without changing the candidate admissibility rules. */
+/** Selects the next affine pivot under the run's consumer admission. */
 internal object AffinePivotOrders {
 
     fun new(

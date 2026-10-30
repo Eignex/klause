@@ -18,6 +18,7 @@ enum class AffinePivotOrder {
     MARKOWITZ,
 
     /** Markowitz ordering with the smallest incident unit-pivot rewrite payload tried first.
+     *  Admits folds through word-sized reified linear consumers while retaining their Boolean outputs.
      *  Factor payload sizes estimate construction cost; they do not predict search savings. */
     REWRITE_COST,
 }
