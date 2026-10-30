@@ -553,6 +553,7 @@ internal object AffineSingletons {
                 if (eliminated[variable] || variable in objectiveIntVars ||
                     (row.coeff(index) != 1L && row.coeff(index) != -1L)
                 ) continue
+                if (pivotable != null && !pivotable(f, index)) continue
                 val weight = ws.rewriteWeight(di, variable, cancellation)
                 if (cancellation()) return null
                 if (weight < smallestWeight) {

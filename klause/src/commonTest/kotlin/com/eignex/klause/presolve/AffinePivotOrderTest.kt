@@ -39,6 +39,27 @@ import kotlin.test.assertTrue
 
 class AffinePivotOrderTest {
     @Test
+    fun `an admitted pivot should remain available without scoring a protected objective payload`() {
+        var stopped = false
+        val table = Table(intArrayOf(0, 3), longArrayOf(0, 0, 1, 1, 2, 2))
+        val consumer = object : Factor by table {
+            override val structuralKeyWeight: Int get() {
+                stopped = true
+                return table.structuralKeyWeight
+            }
+        }
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 4) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 4), consumer,
+        ))
+
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
+            cancellation = Cancellation { stopped }, pivotOrder = AffinePivotOrder.REWRITE_COST,
+            objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0)))
+
+        assertFalse(delta.isEmpty)
+    }
+
+    @Test
     fun `rewrite cost should preserve propagated channel truth after eliminating its alias`() {
         val source = Problem(1, 3, arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(0, 2)), listOf(
             Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
