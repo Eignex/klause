@@ -39,14 +39,19 @@ class SourceExecutionControlsTest {
         val source = SmtLib.parse("(declare-const b Bool) (assert b)").source
         for (engine in listOf(FiniteEngine.FIXED, FiniteEngine.BACKTRACK, FiniteEngine.MIXED)) {
             for (enabled in listOf(false, true)) {
-                val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, engine))
-                val request = SourceExecutionRequest(invocation,
-                    ExecutionOptions.parse(listOf("open-linear-incremental=$enabled")))
+                for (applicationFactory in listOf(false, true)) {
+                    val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, engine))
+                    val options = ExecutionOptions.parse(listOf("open-linear-incremental=$enabled"))
+                    val request = SourceExecutionRequest(invocation, options,
+                        finiteRequest = if (applicationFactory) { shape ->
+                            SourceExecutionPolicy().finiteRequest(shape, engine, executionOptions = options)
+                        } else null)
 
-                val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
+                    val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
 
-                assertEquals(FiniteSolveVerdict.SAT,
-                    assertIs<FiniteSolveOutcome.Completed>(result.result.outcome).verdict)
+                    assertEquals(FiniteSolveVerdict.SAT,
+                        assertIs<FiniteSolveOutcome.Completed>(result.result.outcome).verdict)
+                }
             }
         }
     }
