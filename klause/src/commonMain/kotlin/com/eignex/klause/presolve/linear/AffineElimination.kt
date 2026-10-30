@@ -534,23 +534,31 @@ internal object AffineSingletons {
         if (f.op != LinearOp.EQ || f.vars.size < 2) return null
         val row = f.integerConstants ?: return null
         cancellation.charge(AFFINE_WORK_WEIGHT * f.vars.size)
-        var reverse = false
-        if (minimizeRewrite && f.vars.size == 2) {
-            val first = f.vars[0]
-            val second = f.vars[1]
-            val firstWeight = if (eliminated[first] || first in objectiveIntVars) {
-                Long.MAX_VALUE
-            } else ws.rewriteWeight(di, first, cancellation)
-            if (firstWeight > 0L) {
-                val secondWeight = if (eliminated[second] || second in objectiveIntVars) {
-                    Long.MAX_VALUE
-                } else ws.rewriteWeight(di, second, cancellation)
-                reverse = secondWeight < firstWeight
+        var preferred = 0
+        if (minimizeRewrite) {
+            var smallestWeight = Long.MAX_VALUE
+            for (index in f.vars.indices) {
+                cancellation.charge(AFFINE_WORK_WEIGHT)
+                if (cancellation()) return null
+                val variable = f.vars[index]
+                if (eliminated[variable] || variable in objectiveIntVars ||
+                    (row.coeff(index) != 1L && row.coeff(index) != -1L)
+                ) continue
+                val weight = ws.rewriteWeight(di, variable, cancellation)
+                if (cancellation()) return null
+                if (weight < smallestWeight) {
+                    smallestWeight = weight
+                    preferred = index
+                }
+                if (weight == 0L) break
             }
-            if (cancellation()) return null
         }
         for (position in f.vars.indices) {
-            val xi = if (reverse) 1 - position else position
+            val xi = when {
+                position == 0 -> preferred
+                position <= preferred -> position - 1
+                else -> position
+            }
             // A single wide row can carry thousands of pivot candidates each running an O(occurrences)
             // overflow check, so poll the deadline between them (and inside the check below).
             if ((position and CANCEL_POLL_MASK) == 0 && cancellation()) return null

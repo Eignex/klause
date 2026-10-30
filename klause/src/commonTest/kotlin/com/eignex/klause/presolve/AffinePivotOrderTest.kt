@@ -8,6 +8,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.presolve.linear.AffineSingletons
 import com.eignex.klause.propagation.Assumptions
@@ -35,6 +37,26 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class AffinePivotOrderTest {
+    @Test
+    fun `rewrite cost should avoid extra lp bound rows by eliminating a contained sum partner`() {
+        val source = Problem(0, 4,
+            arrayOf(IntDomain(0, 4), IntDomain(-4, 4), IntDomain(0, 4), IntDomain(0, 4)), listOf(
+                Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 3), LinearOp.LE, 4),
+            ))
+        val config = PresolveConfig.parse("off,+affine")
+        val byFirst = Presolver.runSource(source, config.withAffinePivotOrder(AffinePivotOrder.MARKOWITZ))
+        val byCost = Presolver.runSource(source, config.withAffinePivotOrder(AffinePivotOrder.REWRITE_COST))
+
+        val firstRows = CpToLpRelaxation(byFirst.problem, null).build(RootDomains(byFirst.problem)).model.m
+        val costRows = CpToLpRelaxation(byCost.problem, null).build(RootDomains(byCost.problem)).model.m
+        val lifted = assertNotNull(byCost.rebuild.asSampleLift())(Sample(BooleanArray(0), longArrayOf(1, 0, 3, 0)))
+
+        assertEquals(3, firstRows)
+        assertEquals(1, costRows)
+        assertEquals(-2L, lifted.ints[1])
+    }
+
     @Test
     fun `interrupted rewrite scoring should leave the source unchanged`() {
         var stopped = false

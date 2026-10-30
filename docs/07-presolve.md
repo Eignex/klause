@@ -88,12 +88,13 @@ default round cap; an explicit zero round cap still suppresses those schedules.
 ### Rewrite representation controls
 
 `AffinePivotOrder.REWRITE_COST` retains Markowitz ordering between definitions and
-chooses the smaller rewrite payload when either column of a two-column equality
-can be eliminated. It sums the current incident factors' `structuralKeyWeight`,
+tries the smallest rewrite payload among an equality's unit pivots first. It sums
+the current incident factors' `structuralKeyWeight`,
 excluding the definition, through the maintained occurrence index. Ties retain
 declaration order. Scoring charges and polls the phase allowance and never builds
 factor keys or speculative replacements. The ordinary admissibility, domain,
-objective and reconstruction checks apply to both directions. This opt-in estimate
+objective and reconstruction checks apply to the preferred pivot; a rejected pivot
+falls back to declaration order. This opt-in estimate
 describes construction size; active downstream search still determines total cost.
 
 `PresolveConfig.preserveStructure` is an opt-in performance control for affine and
