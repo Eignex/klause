@@ -11,13 +11,20 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
+import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpFloatTermination
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.lp.engine.PersistentLpSolver
+import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.propagation.PropagationSession
@@ -41,16 +48,32 @@ class LpEngineTest {
             Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
         ))
         val sink = SolveStatsSink("partial-component-prune")
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(if (model.m == 2) LpFloatAllowance(1L, 0) else allowance)
+                }
+            }
+        }
 
         val pruned = LpEngine(problem, LinearObjective(intCoefficients = LongArray(6) { 1L }, constant = 7L),
-            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true, boundMaxPivots = 2,
-                probe = false, rootCutHarvest = false)), sink).use { engine ->
-            engine.pruneNode(PropagationSession(problem), 8.0, -1, true)
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)), sink, LpSolveContext(factory)).use { engine ->
+            engine.pruneNode(PropagationSession(problem), 8.0, -1, true).also {
+                assertEquals(LpFloatTermination.WORK, engine.propagator.floatTermination)
+            }
         }
 
         assertTrue(pruned)
         assertEquals(1.0, sink.snapshot().lp.pruned.sum)
-        assertEquals(2L, sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes?.get("SOLVED"))
+        assertEquals(3L, sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes?.get("SOLVED"))
     }
 
     @Test
