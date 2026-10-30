@@ -45,7 +45,7 @@ class LpPreparationTemplatesTest {
         ))
         val captured = FactorProjectionProviders.Default.prepare(problem)
 
-        val templates = assertNotNull(captured.prepareLpTemplates(null, Cancellation.Never, reuseMetadata = true))
+        val templates = assertNotNull(captured.prepareLpTemplates(null, Cancellation.Never))
 
         assertEquals(listOf(Term.ofIntVar(0)), templates.components.single().references.toList())
         assertEquals(setOf(0), templates.bounds.keys)
@@ -59,9 +59,29 @@ class LpPreparationTemplatesTest {
         ))
         val captured = FactorProjectionProviders.Default.prepare(problem)
 
-        val templates = assertNotNull(captured.prepareLpTemplates(null, Cancellation.Never, reuseMetadata = true))
+        val templates = assertNotNull(captured.prepareLpTemplates(null, Cancellation.Never))
 
         assertEquals(2, templates.components.size)
+    }
+
+    @Test
+    fun `candidate preparation should reserve less storage than complete component snapshots`() {
+        val ordinary = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val captured = FactorProjectionProviders.Default.prepare(source)
+
+        val candidate = assertNotNull(captured.prepareLpTemplates(objective, Cancellation.Never,
+            reuseMetadata = true))
+
+        assertTrue(candidate.storageUnits < ordinary.storageUnits)
+    }
+
+    @Test
+    fun `ordinary preparation should restore component scopes after candidate preparation`() {
+        assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never, reuseMetadata = true))
+
+        val ordinary = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+
+        assertEquals(3, ordinary.components.size)
     }
 
     @Test
@@ -77,13 +97,11 @@ class LpPreparationTemplatesTest {
 
         assertSame(before.factors, after.factors)
         assertSame(before.bounds, after.bounds)
-        assertSame(before.components, after.components)
-        assertSame(before.components[1], after.components[1])
         assertTrue(reused.sameAuthority(fresh))
     }
 
     @Test
-    fun `bound metadata refresh should retain unrelated component scopes and match fresh authority`() {
+    fun `bound metadata refresh should retain unrelated definitions and match fresh authority`() {
         val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
         val view = Problem(1, 6, Array(6) { IntDomain(if (it == 0) 1 else 0, 10) }, source.factors)
         val consumer = CpToLpRelaxation(view, objective, projections = selection.forEngineView(view),
@@ -97,8 +115,6 @@ class LpPreparationTemplatesTest {
         assertSame(before.factors, after.factors)
         assertSame(before.bounds[1], after.bounds[1])
         assertNotSame(before.bounds[0], after.bounds[0])
-        assertNotSame(before.components[0], after.components[0])
-        assertSame(before.components[1], after.components[1])
         assertTrue(reused.sameAuthority(fresh))
     }
 
@@ -121,7 +137,6 @@ class LpPreparationTemplatesTest {
         assertTrue(work >= 12L)
         assertSame(before.factors, after.factors)
         assertSame(before.bounds, after.bounds)
-        assertSame(before.components, after.components)
     }
 
     @Test
@@ -136,7 +151,6 @@ class LpPreparationTemplatesTest {
         val fresh = assertNotNull(CpToLpRelaxation(source, revised, projections = null)
             .build(RootDomains(source)).model.authoritativeModel())
 
-        assertSame(before.components, after.components)
         assertSame(before.factors, after.factors)
         assertSame(before.bounds, after.bounds)
         assertEquals(7L, relaxation.objectiveConstant)
@@ -157,7 +171,7 @@ class LpPreparationTemplatesTest {
             .build(RootDomains(finite)).model.authoritativeModel())
 
         assertNotSame(before.bounds[0], after.bounds[0])
-        assertSame(before.components[1], after.components[1])
+        assertSame(before.bounds[1], after.bounds[1])
         assertTrue(reused.sameAuthority(fresh))
     }
 
@@ -175,7 +189,6 @@ class LpPreparationTemplatesTest {
             Cancellation.Never, reuseMetadata = true) { reboundWork = it }
 
         assertSame(before.bounds, retained.bounds)
-        assertSame(before.components, retained.components)
         assertTrue(retainedWork < reboundWork)
     }
 
@@ -557,7 +570,7 @@ class LpPreparationTemplatesTest {
 
         assertTrue(reused.sameAuthority(fresh))
         assertNotSame(before.factors[0], assertNotNull(changed.preparationTemplates).factors[0])
-        assertSame(before.components[1], assertNotNull(changed.preparationTemplates).components[1])
+        assertSame(before.factors[1], assertNotNull(changed.preparationTemplates).factors[1])
     }
 
     @Test

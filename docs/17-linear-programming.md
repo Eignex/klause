@@ -90,8 +90,11 @@ bound sides before retaining the row index. A selected view whose handoff checke
 ordered factor identities carries the same immutable layout token, so subsequent
 template preparations need no duplicate row scan. Other rewrites and explicit
 namespace remaps carry fresh tokens and validate their actual factor identities.
-Bound changes replace their exact
-objects and component metadata. Its source definitions carry no objective authority:
+Bound changes replace their exact objects and retain unrelated row and bound definitions.
+This mode retains no duplicate component partition or component-bound maps; numerical
+consumers assemble those definitions in their own layout. Template component observations
+therefore describe only the ordinary mode. Switching back to that mode constructs its
+partition before complete-index reuse. The selective mode's source definitions carry no objective authority:
 every assembly reads costs and the objective constant from its current objective,
 so changing that objective requires no source-template cost scan or replacement.
 Compact integer import can adopt exact bound columns during construction after

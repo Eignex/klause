@@ -310,37 +310,12 @@ internal class LpPreparationTemplates private constructor(
                         changedBounds[variable] = LpIntegerBoundTemplate(variable, domain.min, domain.max, lower, upper)
                         reusedBounds--
                     }
-                    var changedComponents: MutableList<LpTemplateComponent>? = null
-                    var reusedComponents = old.components.size
-                    if (changedBounds != null) for ((componentId, component) in old.components.withIndex()) {
-                        if (!visit()) return null
-                        var componentBounds: MutableMap<Int, LpIntegerBoundTemplate>? = null
-                        for ((variable, bound) in component.bounds) {
-                            if (!visit()) return null
-                            val current = changedBounds.getValue(variable)
-                            if (current === bound) continue
-                            if (componentBounds == null) {
-                                if (!visit(component.bounds.size.toLong())) return null
-                                componentBounds = LinkedHashMap(component.bounds)
-                            }
-                            componentBounds[variable] = current
-                        }
-                        if (componentBounds == null) continue
-                        if (changedComponents == null) {
-                            if (!visit(old.components.size.toLong())) return null
-                            changedComponents = old.components.toMutableList()
-                        }
-                        if (!visit()) return null
-                        changedComponents[componentId] = LpTemplateComponent(component.factors,
-                            componentBounds, component.references, component.costs)
-                        reusedComponents--
-                    }
                     if (!visit()) return null
                     return LpPreparationTemplates(
                         problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
                         0L, true, old.factors, changedBounds ?: old.bounds,
-                        changedComponents ?: old.components, old.source !== problem, old.factors.size, reusedBounds,
-                        reusedComponents, old.storageUnits, changedBounds == null && changedComponents == null)
+                        emptyList(), old.source !== problem, old.factors.size, reusedBounds,
+                        0, old.storageUnits, changedBounds == null)
                 }
                 if (reuseMetadata) {
                     val rebound = rebind()
@@ -410,7 +385,14 @@ internal class LpPreparationTemplates private constructor(
                             statedLower, statedUpper)
                     }
                 }
-                val unchangedIncidence = old != null && old.factors.size == factors.size && factors.indices.all {
+                if (reuseMetadata) {
+                    if (!visit()) return null
+                    return LpPreparationTemplates(problem, namespace, rowScope, problem.semantics,
+                        problem is BakedProblem, 0L, true, factors, bounds, emptyList(),
+                        old != null && old.source !== problem, reusedFactors, reusedBounds, 0, storage)
+                }
+                val unchangedIncidence = old != null && !old.objectiveIndependent &&
+                    old.factors.size == factors.size && factors.indices.all {
                     if (!visit()) return null
                     old.factors[it] === factors[it]
                 }
