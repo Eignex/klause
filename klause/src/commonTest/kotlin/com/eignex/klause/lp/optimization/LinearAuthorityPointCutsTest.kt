@@ -124,6 +124,40 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `point directed sides should strengthen a bound missed by uniform side choices`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val maximum = SourceProofContext(scope.copy(objective = SourceObjective("difference", ObjectiveSense.MAXIMIZE)),
+            setOf(x, real, other), mapOf(
+                "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    real to BigFraction.MINUS_ONE, other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+                "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+                "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE),
+                    BigFraction.ofLong(2))),
+            ), mapOf(x to BigFraction.ONE, other to BigFraction.MINUS_ONE))
+        val budget = SourceLpBudget()
+
+        LinearAuthority(budget, retainLp = true).use { authority ->
+            val current = authority.advance(maximum, Cancellation.Never, cuts = true)
+            val candidate = authority.advanceWithPointCuts(maximum, Cancellation.Never)
+
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
+                (assertNotNull(current.bound).claim as SourceClaim.Bound).value)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+                (assertNotNull(candidate.bound).claim as SourceClaim.Bound).value)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(maximum.withLinearAuthority())
+                .verify(assertNotNull(candidate.bound)))
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionPointPrepared"])
+            assertEquals(budget.measuredPreparationWork,
+                (authority.cutObservations()["numericalCutLifecycleRECIPE_CURRENT_PreparationWork"] ?: 0L) +
+                    (authority.cutObservations()["numericalCutLifecycleRECIPE_POINT_SELECTION_PreparationWork"] ?: 0L))
+        }
+    }
+
+    @Test
     fun `equally efficacious candidates should prefer sparse support`() {
         val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val rows = listOf(
