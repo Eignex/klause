@@ -142,6 +142,10 @@ internal object CorpusFetcher {
                 FetchMethod.Tar -> tar(collection, dir)
                 FetchMethod.TarballZst -> tarballZst(collection, dir)
                 FetchMethod.Zip -> zip(collection, dir)
+                is FetchMethod.ZipMember -> {
+                    CorpusZipSelection(downloads).fetch(URI(collection.url), method, dir)
+                    compress(dir)
+                }
                 is FetchMethod.Files -> files(collection, method, dir)
                 is FetchMethod.GbdFiles -> gbdFiles(collection, method, dir)
             }

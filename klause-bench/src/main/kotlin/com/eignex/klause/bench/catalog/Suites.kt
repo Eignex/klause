@@ -381,6 +381,18 @@ internal object Suites {
                     format = Format.WCNF,
                 )
             },
+            DynamicSuite(
+                "maxsat-haplotyping",
+                "Pinned MSE 2024 weighted haplotyping instance (fetched through ZIP ranges)",
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.maxsatHaplotyping,
+                    CorpusSelection.Layout.Flat("", "wcnf", familyOf = ::maxsatFamily),
+                    sel,
+                    Category.OPTIMIZATION,
+                    format = Format.WCNF,
+                )
+            },
         )
     }
 
@@ -1129,6 +1141,17 @@ internal object ExternalCollections {
         license = "MaxSAT Evaluation (academic benchmarks)",
         reason = "438KiB MaxSAT LIB weighted MaxCut family; fetched rather than vendored",
         fetch = FetchMethod.Zip,
+    )
+
+    val maxsatHaplotyping = ExternalCollection(
+        id = "mse24-weighted-haplotyping-pinned-v1",
+        url = maxsatExactWeighted.url,
+        license = maxsatExactWeighted.license,
+        reason = "one original weighted source selected from the MSE'24 ZIP without fetching unrelated instances",
+        fetch = FetchMethod.ZipMember(
+            "haplotyping-pedigrees_wt-ped2.B.recomb1-0.01-3.wcnf.xz",
+            "ecb87265f5a647882414411190438a41faf8a8c8cf442a8c92e0cb940c146e9f",
+        ),
     )
 
     val miplib2010 = ExternalCollection(
