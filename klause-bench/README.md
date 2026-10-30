@@ -703,6 +703,11 @@ counts source rows once; `MixedCandidates`, `MixedComplementaryAttempts` and
 `MixedComplementaryRetained` distinguish candidate work and retained alternatives.
 Bound-side alternatives and selected rows establish no useful bound or cost gain
 without subsequent checked support and actual frontier consumption.
+Point selection starts from the current checked recipe. `CurrentFallback` and
+`CurrentFallbackQueries` report retaining that recipe after an unproductive trial;
+`BaseQueries` counts base relaxation attempts. A point-selection arm can therefore
+contain both CURRENT and POINT_SELECTION recipe work; retain the ordinary source
+totals and both disjoint recipe costs.
 `numericalCutSelectionPointPrepared` counts one successful point-directed candidate
 preparation per immutable source template. It chooses each available continuous
 endpoint independently from the point. Its generation shares the original

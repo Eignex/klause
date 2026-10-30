@@ -81,6 +81,7 @@ internal class LinearAuthority(
     private var pointListener: ((LinearAuthorityQuery, List<BigFraction>) -> Unit)? = null
     private var pointPolicy: LinearAuthorityPointCuts? = null
     private var pointFamily: LinearAuthorityTemplate? = null
+    private var pointFallback: LinearAuthorityTemplate? = null
     private var directedFamily: LinearAuthorityTemplate? = null
     private var pointMask: Set<Int> = emptySet()
     private class PointRound(
@@ -130,6 +131,7 @@ internal class LinearAuthority(
         pointRound = null
         pointPolicy?.releaseCandidates()
         pointFamily = null
+        pointFallback = null
         directedFamily = null
         pointMask = emptySet()
         primalAttempt = null
@@ -139,8 +141,13 @@ internal class LinearAuthority(
     fun advanceWithPointCuts(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
         val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe)
             .also { pointPolicy = it }
+        if (pointFallback === template && template?.matches(source) == true) {
+            policy.observe("CurrentFallbackQueries")
+            return advance(source, cancellation, cuts = true)
+        }
         if (pointFamily !== template || template?.matches(source) != true || template?.cuts == null) {
             pointMask = emptySet()
+            pointFallback = null
             pointRound = null
             pointFamily = template
         }
@@ -152,8 +159,10 @@ internal class LinearAuthority(
             pointRound = null
             var point: Pair<LinearAuthorityQuery, List<BigFraction>>? = null
             pointListener = { query, values -> if (point == null) point = query to values }
+            val baselineMask = pointMask.takeIf { it.isNotEmpty() }
+            policy.observe("BaseQueries")
             val base = try {
-                advance(source, cancellation, cuts = true, cutMask = pointMask)
+                advance(source, cancellation, cuts = true, cutMask = baselineMask)
             } finally {
                 pointListener = null
             }
@@ -169,11 +178,13 @@ internal class LinearAuthority(
             }
             pointFamily = family
             if (family.cuts == null ||
-                !prepared.matches(source, cuts = true, cutMask = pointMask,
-                    checkUnselectedCuts = checkUnselectedCuts(pointMask))) {
+                !prepared.matches(source, cuts = true, cutMask = baselineMask,
+                    checkUnselectedCuts = checkUnselectedCuts(baselineMask))) {
                 policy.observe("PointUnavailable")
                 return base
             }
+            val baselineFamily = family
+            val baselineQuery = prepared
             if (!checkNotNull(family.cuts).pointDirected && directedFamily !== family && pointMask.isEmpty() &&
                 checkNotNull(family.cuts).rows.any { it.mixed }) {
                 directedFamily = family
@@ -193,7 +204,19 @@ internal class LinearAuthority(
                 policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
                     prepared.checkedCuts, observed.second, pointMask.intersect(prepared.checkedCuts), cancellation)
             }
-            if (selected == pointMask || budget.funding?.exhausted == true || cancellation()) return base
+            if (budget.funding?.exhausted == true || cancellation()) return base
+            if (baselineMask == null && selected.isEmpty()) {
+                template = baselineFamily
+                query = baselineQuery
+                pointFamily = baselineFamily
+                pointFallback = baselineFamily
+                directedFamily = null
+                policy.releaseCandidates()
+                policy.observe("CurrentFallback")
+                cutLifecycle.families = baselineQuery.cutFamilies.values.toSet()
+                return base.copy(paused = base.paused || budget.funding?.paused == true)
+            }
+            if (selected == pointMask) return base
             pointMask = selected
             pending = PointRound(prepared, base, selected)
             pointRound = pending

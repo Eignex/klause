@@ -1080,8 +1080,12 @@ Ordinary linear-source execution binds the same source-cut controls to its admit
 numerical companions. The containing source request owns these settings and removes
 them from finite worker recipe options; they change neither companion admission
 nor lifetime.
-The first relaxation uses its retained checked mask; a completed point can add
-one selection round at that node. The score combines normalized violation,
+A new template first runs the ordinary checked cut recipe; a completed point can
+add one selection round at that node. A trial that admits no candidate retains
+the ordinary template, checked query and numerical owner for later queries of that
+template. Successful selection retains its checked mask instead. The current
+baseline, candidate preparation and any replacement keep their separate containing
+costs. The score combines normalized violation,
 inverse square-root support and objective parallelism. The model-facing cut pool
 and source selector share the greedy parallelism filter. Floating scores guide
 selection; source inequalities and their derivations remain exact rationals.
