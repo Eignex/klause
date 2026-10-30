@@ -76,6 +76,84 @@ class ComponentLpSolverTest {
     }
 
     @Test
+    fun `an isolated improving direction withholds complete component points and tableaux`() {
+        val builder = LpBuilder()
+        repeat(2) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        builder.addRealVar(0.0, null, cost = -1.0)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val owner = assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel())))
+        owner.use {
+            assertNull(it.solve())
+
+            assertNull(it.exactWitness())
+            assertTrue(it.gomoryCuts(2).isEmpty())
+        }
+    }
+
+    @Test
+    fun `unfinished components require every minimizing bound side`() {
+        val builder = LpBuilder()
+        builder.addRealVar(0.0, null, cost = -1.0)
+        builder.addVar(0L, 5L, cost = 1L)
+        builder.addRealRow(intArrayOf(0), doubleArrayOf(1.0), Relation.GE, 1.0)
+        builder.addRealRow(intArrayOf(0), doubleArrayOf(1.0), Relation.GE, 2.0)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val owner = assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel())))
+        owner.use {
+            assertNull(it.resolveBounds(LpFloatAllowance(work = 0L, iterations = 1)))
+
+            val bound = it.exactBound()
+
+            assertNull(bound)
+        }
+    }
+
+    @Test
+    fun `completed children supply one exact aggregate without a full point`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val owner = assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel())))
+        owner.use {
+            val raw = it.resolveBounds(LpFloatAllowance(work = 0L, iterations = 2))
+            val bound = assertNotNull(it.exactBound())
+
+            assertNull(raw)
+            assertEquals(LpFloatTermination.PIVOTS, it.lastTermination)
+            assertEquals(BigFraction.ONE, bound.value)
+            assertSame(state, assertNotNull(bound.support).state)
+            assertNull(it.exactWitness())
+            assertTrue(it.gomoryCuts(3).isEmpty())
+        }
+    }
+
+    @Test
+    fun `partial component bounds honor certificate refusal`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val owner = assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel())))
+        owner.use {
+            assertNull(it.resolveBounds(LpFloatAllowance(work = 0L, iterations = 1)))
+
+            val bound = it.exactBound(policy = LpCertificationPolicy { _, _ -> false })
+
+            assertNull(bound)
+        }
+    }
+
+    @Test
     fun `tableau component queries should share their pivot allowance`() {
         val builder = LpBuilder()
         repeat(2) {

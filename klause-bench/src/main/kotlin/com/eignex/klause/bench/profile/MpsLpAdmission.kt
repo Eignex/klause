@@ -140,12 +140,12 @@ internal object MpsLpAdmission {
         return objective?.let { if (plan.maximize) it.negated() else it }
     }
 
-    private fun recipes(problem: BakedProblem, objective: LinearObjective?, mix: EngineMix): JsonObject {
+    internal fun recipes(problem: BakedProblem, objective: LinearObjective?, mix: EngineMix): JsonObject {
         val scenario = PortfolioScenario.sequential(Kind.COP, mix, seed = 3L)
         val factsType = Class.forName("com.eignex.klause.portfolio.ProblemFacts")
         val companion = factsType.getField("Companion").get(null)
         val facts = companion.javaClass.methods.single { it.name == "of" }.invoke(
-            companion, problem, ProblemProfile.of(problem, true), scenario.lpCeiling, objective,
+            companion, problem, ProblemProfile.of(problem, true), scenario.lpCeiling, objective, null,
         )
         val compositionType = Class.forName("com.eignex.klause.portfolio.PortfolioComposition")
         val composition = compositionType.getField("INSTANCE").get(null)
