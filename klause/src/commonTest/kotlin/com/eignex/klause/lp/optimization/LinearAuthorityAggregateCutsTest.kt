@@ -71,6 +71,29 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `repeated selected queries should reuse their completed pair generation`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val mixed = SourceInequality(left.coefficients + (residual to BigFraction.MINUS_ONE), left.rhs)
+        val bound = SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real, residual), mapOf("left" to SourcePremise(mixed),
+                "right" to SourcePremise(right), "bound" to SourcePremise(bound)),
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE, residual to BigFraction.ONE))
+        LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithPointCuts(source, Cancellation.Never)
+            val attempts = assertNotNull(authority.cutObservations()["numericalCutAggregatePairAttempts"])
+
+            val result = authority.advanceWithPointCuts(source, Cancellation.Never)
+
+            assertEquals(attempts, authority.cutObservations()["numericalCutAggregatePairAttempts"])
+            assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
     fun `source pair preparation should retain its containing work and storage limits`() {
         val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
             "left" to SourcePremise(left), "right" to SourcePremise(right)))

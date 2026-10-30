@@ -770,6 +770,9 @@ generated aggregates. Discovery and fresh candidate checks are charged before
 point scoring; selected rows enter a subsequent masked query. A fallback can retain
 the individual-cut recipe after paying discovery costs, so retain both recipe
 totals and report actual selected/installed/retired rows separately.
+Repeated `AggregatePairAttempts` or construction observations for one unchanged
+point-prepared template indicate reconstruction cost, rather than additional unique
+candidates. Retain these charges alongside template replacements and masked queries.
 
 [9277](https://lab.eignex.com/jobs/9277) exercises both sources at `0af8492830`
 with ownership and root cuts toggled independently. With root cuts off, node

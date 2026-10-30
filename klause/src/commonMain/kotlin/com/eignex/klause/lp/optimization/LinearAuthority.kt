@@ -262,31 +262,28 @@ internal class LinearAuthority(
     ): Pair<LinearAuthorityTemplate, LinearAuthorityQuery>? {
         if (values.size != prepared.coordinates.size || values.size > 8192) return null
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
-        var directed = family
-        if (checkNotNull(family.cuts).rows.any { it.mixed }) {
-            var work = 0L
-            if (budget.funding?.remainingAllocation?.let { 128L + values.size * 96L > it } == true) return null
-            cutCost(0L, 128L)
-            val point = HashMap<SourceCoordinate, Double>()
-            for (index in values.indices) {
-                val value = values[index]
-                val words = (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 63L) / 64L
-                val cost = 1L + words * words
-                if (funded() || cost > 65_536L - work ||
-                    budget.funding?.availableWork?.let { cost > it } == true) return null
-                cutCost(cost, 96L)
-                work += cost
-                point[prepared.coordinates[index]] = value.toDouble().takeIf(Double::isFinite) ?: return null
-            }
-            directed = family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
+        var work = 0L
+        if (budget.funding?.remainingAllocation?.let { 128L + values.size * 96L > it } == true) return null
+        cutCost(0L, 128L)
+        val point = HashMap<SourceCoordinate, Double>()
+        for (index in values.indices) {
+            val value = values[index]
+            val words = (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 63L) / 64L
+            val cost = 1L + words * words
+            if (funded() || cost > 65_536L - work ||
+                budget.funding?.availableWork?.let { cost > it } == true) return null
+            cutCost(cost, 96L)
+            work += cost
+            point[prepared.coordinates[index]] = value.toDouble().takeIf(Double::isFinite) ?: return null
         }
+        val directed = family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
         val refined = withAdditionalCuts(directed, funded) ?: return null
         if (funded()) return null
         val previous = template
         adoptTemplate(refined)
         query = null
         val checked = prepareQuery(source, funded, cuts = true, cutMask = emptySet())
-        if (checked == null || funded()) {
+        if (checked == null || funded() || template !== refined) {
             template = previous
             return null
         }

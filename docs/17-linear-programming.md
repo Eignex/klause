@@ -397,6 +397,8 @@ then constructs and checks aggregates alongside point-directed row alternatives.
 Only proposals selected against that point enter the replacement mask. An
 unproductive attempt retains the current recipe and its checked bound; selected
 aggregates follow the same bounded scoring, aging and retirement as other rows.
+Masked queries retain the completed point-prepared template, including when its
+individual family is empty. Candidate row IDs belong to that same checked template.
 Aggregation is disabled by default.
 
 ### Root preparation
