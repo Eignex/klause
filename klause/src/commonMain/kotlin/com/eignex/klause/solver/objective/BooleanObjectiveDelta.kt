@@ -24,9 +24,11 @@ internal class BooleanObjectiveDelta private constructor(
             for (i in offsets[variable] until offsets[variable + 1]) {
                 poll()
                 val term = readers[i]
-                sum.addDelta(coefficients[term], value(term, poll, assignment::boolValue), value(term, poll) {
+                val before = value(term, poll, assignment::boolValue)
+                val after = value(term, poll) {
                     assignment.boolValue(it) != (it == variable)
-                })
+                }
+                sum.addDelta(coefficients[term], before, after)
             }
         } else {
             val flipped = IntHashSet()
@@ -44,9 +46,11 @@ internal class BooleanObjectiveDelta private constructor(
                     poll()
                     val term = readers[i]
                     if (!visited.add(term)) continue
-                    sum.addDelta(coefficients[term], value(term, poll, assignment::boolValue), value(term, poll) {
+                    val before = value(term, poll, assignment::boolValue)
+                    val after = value(term, poll) {
                         assignment.boolValue(it) != (it in flipped)
-                    })
+                    }
+                    sum.addDelta(coefficients[term], before, after)
                 }
             }
         }
@@ -61,7 +65,9 @@ internal class BooleanObjectiveDelta private constructor(
             poll()
             if (boolOf(Lit.variable(literal)) != Lit.isPositive(literal)) {
                 if (fold.isAnd) return 0L
-            } else if (!fold.isAnd) return 1L
+            } else if (!fold.isAnd) {
+                return 1L
+            }
         }
         return if (fold.isAnd) 1L else 0L
     }
@@ -108,18 +114,20 @@ internal class BooleanObjectiveDelta private constructor(
                 if (fold == null) {
                     counts[variable]++
                     entries++
-                } else for (literal in fold.ins) {
-                    val input = Lit.variable(literal)
-                    if (input !in outputs.indices || outputs[input] != null) {
-                        yield(PreparedBooleanObjectiveDelta(null))
-                        return@sequence
+                } else {
+                    for (literal in fold.ins) {
+                        val input = Lit.variable(literal)
+                        if (input !in outputs.indices || outputs[input] != null) {
+                            yield(PreparedBooleanObjectiveDelta(null))
+                            return@sequence
+                        }
+                        if (seen[input] != term + 1) {
+                            seen[input] = term + 1
+                            counts[input]++
+                            entries++
+                        }
+                        if (++visits % 256 == 0) yield(null)
                     }
-                    if (seen[input] != term + 1) {
-                        seen[input] = term + 1
-                        counts[input]++
-                        entries++
-                    }
-                    if (++visits % 256 == 0) yield(null)
                 }
                 if (entries > 2_000_000) {
                     yield(PreparedBooleanObjectiveDelta(null))
@@ -142,19 +150,22 @@ internal class BooleanObjectiveDelta private constructor(
                 if (fold == null) {
                     val variable = terms[term]
                     readers[offsets[variable] + counts[variable]++] = term
-                } else for (literal in fold.ins) {
-                    val variable = Lit.variable(literal)
-                    if (seen[variable] != term + 1) {
-                        seen[variable] = term + 1
-                        readers[offsets[variable] + counts[variable]++] = term
+                } else {
+                    for (literal in fold.ins) {
+                        val variable = Lit.variable(literal)
+                        if (seen[variable] != term + 1) {
+                            seen[variable] = term + 1
+                            readers[offsets[variable] + counts[variable]++] = term
+                        }
+                        if (++visits % 256 == 0) yield(null)
                     }
-                    if (++visits % 256 == 0) yield(null)
                 }
                 if ((term + 1) % 256 == 0) yield(null)
             }
-            yield(PreparedBooleanObjectiveDelta(BooleanObjectiveDelta(
+            val evaluator = BooleanObjectiveDelta(
                 terms, coefficients, folds, offsets, readers, minimize,
-            )))
+            )
+            yield(PreparedBooleanObjectiveDelta(evaluator))
         }
     }
 }

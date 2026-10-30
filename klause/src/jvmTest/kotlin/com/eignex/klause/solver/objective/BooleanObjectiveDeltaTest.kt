@@ -24,10 +24,12 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
     @Test
     fun `parsed soft clauses should score their exchanged violation through local search`() {
         val source = Dimacs.parseWcnf("7 1 2 0\n11 -1 2 0\n").toProblem()
-        val sweep = DefinitionalSweep.infer(source.problem, boolFolds = source.boolFolds)
-        val functional = assertIs<FunctionalObjective>(sweep.functionalObjective(
-            intArrayOf(), longArrayOf(), 0L, minimize, intArrayOf(2, 3), longArrayOf(7L, 11L),
-        ))
+        val sweep = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = source.boolFolds))
+        val functional = assertIs<FunctionalObjective>(
+            sweep.functionalObjective(
+                intArrayOf(), longArrayOf(), 0L, minimize, intArrayOf(2, 3), longArrayOf(7L, 11L),
+            )
+        )
         val state = LocalSearchState(source.problem.bake(), Random(0))
         state.prepareObjectiveDelta(functional).forEach { }
 
@@ -43,9 +45,11 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
             val fold = DefinitionalSweep.SweepNode.BoolFold(128 + variable, intArrayOf(Lit.make(variable, true)), true)
             FunctionalObjective.Definition(fold.out, true, fold) { _, boolOf -> if (boolOf(variable)) 1L else 0L }
         }
-        val evaluator = assertNotNull(BooleanObjectiveDelta.preparation(
-            definitions, IntArray(128) { 128 + it }, LongArray(128) { 7L }, minimize, 256,
-        ).filterNotNull().last().evaluator)
+        val evaluator = assertNotNull(
+            BooleanObjectiveDelta.preparation(
+                definitions, IntArray(128) { 128 + it }, LongArray(128) { 7L }, minimize, 256,
+            ).filterNotNull().last().evaluator,
+        )
         val assignment = Assignment(256, 0)
         var polls = 0
 
@@ -60,18 +64,24 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
     @Test
     fun `compound parity should preserve cancellation between wide folded and bare costs`() {
         val fold = DefinitionalSweep.SweepNode.BoolFold(
-            3, intArrayOf(Lit.make(0, true), Lit.make(0, true), Lit.make(1, true)), false,
+            3,
+            intArrayOf(Lit.make(0, true), Lit.make(0, true), Lit.make(1, true)),
+            false,
         )
         val definition = FunctionalObjective.Definition(3, true, fold) { _, boolOf ->
             if (boolOf(0) || boolOf(1)) 1L else 0L
         }
-        val evaluator = assertNotNull(BooleanObjectiveDelta.preparation(
-            listOf(definition), intArrayOf(3, 0, 2), longArrayOf(Long.MAX_VALUE, Long.MIN_VALUE, 7L), minimize, 4,
-        ).filterNotNull().last().evaluator)
+        val evaluator = assertNotNull(
+            BooleanObjectiveDelta.preparation(
+                listOf(definition), intArrayOf(3, 0, 2), longArrayOf(Long.MAX_VALUE, Long.MIN_VALUE, 7L), minimize, 4,
+            ).filterNotNull().last().evaluator,
+        )
         val assignment = Assignment(4, 0)
-        val move = Move.Compound(listOf(
-            Move.BoolFlip(0), Move.BoolFlip(1), Move.BoolFlip(2), Move.BoolFlip(1),
-        ))
+        val move = Move.Compound(
+            listOf(
+                Move.BoolFlip(0), Move.BoolFlip(1), Move.BoolFlip(2), Move.BoolFlip(1),
+            )
+        )
 
         val delta = evaluator.delta(assignment, move) {}
 
@@ -87,9 +97,11 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
         val definition = FunctionalObjective.Definition(2, true, fold) { _, boolOf ->
             if (boolOf(0) && !boolOf(1)) 1L else 0L
         }
-        val evaluator = assertNotNull(BooleanObjectiveDelta.preparation(
-            listOf(definition), intArrayOf(2), longArrayOf(9L), minimize, 3,
-        ).filterNotNull().last().evaluator)
+        val evaluator = assertNotNull(
+            BooleanObjectiveDelta.preparation(
+                listOf(definition), intArrayOf(2), longArrayOf(9L), minimize, 3,
+            ).filterNotNull().last().evaluator,
+        )
         val assignment = Assignment(3, 0)
         assignment.setBool(2, true)
 
@@ -108,7 +120,11 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
         }
 
         val prepared = BooleanObjectiveDelta.preparation(
-            definitions, intArrayOf(2), longArrayOf(1L), minimize, 3,
+            definitions,
+            intArrayOf(2),
+            longArrayOf(1L),
+            minimize,
+            3,
         ).filterNotNull().last()
 
         assertNull(prepared.evaluator)
