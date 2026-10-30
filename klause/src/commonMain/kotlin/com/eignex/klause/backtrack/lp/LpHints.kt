@@ -33,6 +33,7 @@ internal class LpHints(
     private var freshRecord = false
     private var objectiveRecorded = false
     private var directionalChoice: VarRef? = null
+    private var baselineChoice: VarRef? = null
     private var scopeModel: ExactLpModel? = null
     private var scopeRows: LpScopedRows? = null
     private var scopeVariables = IntArray(0)
@@ -47,6 +48,7 @@ internal class LpHints(
         freshRecord = false
         objectiveRecorded = false
         directionalChoice = null
+        baselineChoice = null
         if (collect) history.beginNode(depth)
     }
 
@@ -88,8 +90,17 @@ internal class LpHints(
     fun branch(variable: VarRef) {
         if (directionalGains && scopeModel != null) {
             observe(if (directionalChoice == variable) "CONSUMED" else "FALLBACK")
+            if (directionalChoice == variable) {
+                val comparison = when (baselineChoice) {
+                    null -> "BASELINE_MISSING"
+                    variable -> "BASELINE_AGREED"
+                    else -> "BASELINE_CHANGED"
+                }
+                observe(comparison)
+            }
         }
         directionalChoice = null
+        baselineChoice = null
         if (collect && scopeModel != null) {
             charge(129L)
             history.branch(variable, value(variable))
@@ -109,8 +120,9 @@ internal class LpHints(
         return history.score(variable, value(variable))
     }
 
-    fun selected(variable: VarRef?) {
+    fun selected(variable: VarRef?, baseline: VarRef?) {
         directionalChoice = variable
+        baselineChoice = baseline
     }
 
     private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {
@@ -152,6 +164,7 @@ internal class LpHints(
         freshRecord = false
         objectiveRecorded = false
         directionalChoice = null
+        baselineChoice = null
     }
 
     override fun clear() {
