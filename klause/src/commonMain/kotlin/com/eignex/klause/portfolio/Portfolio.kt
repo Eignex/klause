@@ -821,7 +821,8 @@ class Portfolio(
      */
     @Suppress("TooGenericExceptionCaught")
     private inner class Schedule<H : AutoCloseable>(cancellation: Cancellation, val handles: Array<H?>) {
-        private val scopedReward = if (rewardPolicy is SourceRateReward) SourceRateReward() else rewardPolicy
+        private val scopedReward = if (rewardPolicy is SourceRateReward)
+            rewardPolicy.fresh(workers.map { it.family }) else rewardPolicy
         private var availability: ((Int) -> Boolean)? = null
 
         fun restrictAvailability(available: (Int) -> Boolean) { availability = available }
@@ -1326,7 +1327,8 @@ class Portfolio(
                 val family = policyFamily(arm)
                 val observableSearch = family.observable && work > 0L && !claim.preparing &&
                     failure !is SearchInitializationCancelled
-                families.record(family, progressed = reward > 0.0, plateau = improving || observableSearch)
+                families.record(family, progressed = reward > 0.0, plateau = improving || observableSearch,
+                    reward = (scopedReward as? SourceRateReward)?.familyReward ?: if (reward > 0.0) 1.0 else 0.0)
             }
             // Credit an arm earns while others run, from peers using what it shared, pays out now as one segment's
             // evidence: an arm the policy has stopped picking would otherwise hold it forever.

@@ -1070,8 +1070,8 @@ it does not fund extra active time. Sampled JFR allocations cannot replace it wh
 choosing a construction or useful-lifetime policy. Whole-job costs still retain
 exceptions that prevent a final invocation result.
 
-`param.portfolio-reward=ordinary|source|source-rate` varies rewards independently of admission
-and coverage. `source` retains ordinary feasibility rewards, then rewards only
+`param.portfolio-reward=ordinary|source|source-rate|source-rate-family` varies rewards
+independently of admission and coverage. `source` retains ordinary feasibility rewards, then rewards only
 accepted incumbent improvements and terminal closure. Retain phase/cost counters
 and source checks, including initialization, reseeding and retirement, when comparing
 it with ordinary rewards. Counter changes alone do not establish a benefit.
@@ -1082,6 +1082,13 @@ Initialization and checking are already inside segment time. Compare it separate
 at fixed coverage, admission and reseeding, and retain the full containing-run ledger
 for source preparation, retirement and independent checking. Time-sensitive rewards
 make fixed-work traces sensitive to measured segment costs.
+
+`source-rate-family` also prices accepted family gains against all observed sibling
+factory and segment costs, retaining failed and unproductive work until the next
+family gain. Family feedback uses the fractional rate score; silent complete
+workers retain coverage. Compare ordinary, worker-rate and family-rate controls on
+the same binary at fixed probes, coverage, admission and reseeding. Full traces
+retain the phase, gains and inclusive costs needed to reconstruct both rate ledgers.
 
 `param.portfolio-probes=leader-half` redistributes the existing initial probe budget
 to give its leading complete worker half while retaining every sibling's probe.

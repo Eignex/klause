@@ -725,7 +725,9 @@ internal fun buildPortfolioScenario(
         null, "ordinary" -> null
         "source" -> SourceProgressReward
         "source-rate" -> SourceRateReward()
-        else -> pipelineConfigError("portfolio-reward expects ordinary|source|source-rate, got `$reward`")
+        "source-rate-family" -> SourceRateReward(priceFamilies = true)
+        else -> pipelineConfigError(
+            "portfolio-reward expects ordinary|source|source-rate|source-rate-family, got `$reward`")
     }
     val reseedStaleThreshold = p[ExecutionOption.reseedStaleThreshold]
     val reportLsResiduals = p[ExecutionOption.lsResiduals] ?: false
