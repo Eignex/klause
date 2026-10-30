@@ -1051,7 +1051,8 @@ the investigation cost rather than becoming a solver regression.
 ## Prepared arithmetic learning
 
 `bench.profile.OrdinaryArithmeticLearningProfile` takes `suite=ID problem=NAME
-sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off trace=first-integer|initial`.
+sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off trace=first-integer|initial
+attribution=false|true`.
 It runs clause and opt-in
 integer-row arms through ordinary finite preparation and backtrack traversal,
 without a decision replay. The existing bounded arithmetic trace records source
@@ -1084,6 +1085,12 @@ asynchronous publication; it is inside the profile allowance and outside the arm
 timer. Each arm's deadline contains loading, preparation, solving,
 reconstruction, native point checking and retirement. Native propagation work is a
 subset of invocation cost; the arm timer excludes record serialization and output.
+Process CPU and invocation-thread allocated bytes cover that interval, including
+diagnostic recording; other threads' allocations are excluded. Unsupported counters
+remain null. Optional propagation attribution exposes mechanism work and reason costs.
+Completed optimization can release its native state before inspection. Such arms
+retain the solver's lifecycle snapshot and report `retirementInspection=solver-released`;
+stored-row counts are unavailable rather than zero, and no second retraction is attempted.
 Set the profile execution limit separately from `profile.runTimeoutSec`, which
 contains remote preparation, cache work, retries, capture and retirement. The
 instrumented capture supplies neither independent

@@ -26,7 +26,10 @@ import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
+import com.sun.management.OperatingSystemMXBean
+import com.sun.management.ThreadMXBean
 import java.io.File
+import java.lang.management.ManagementFactory
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.encodeToString
@@ -39,7 +42,8 @@ internal object OrdinaryArithmeticLearningProfile {
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
-            it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format")
+            it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
+                "attribution")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -50,6 +54,11 @@ internal object OrdinaryArithmeticLearningProfile {
         require(traceMode in setOf("initial", "first-integer"))
         val lp = options["lp"] ?: "auto"
         require(lp in setOf("auto", "off"))
+        val attribution = (options["attribution"] ?: "false").toBooleanStrict()
+        val allocationBean = (ManagementFactory.getThreadMXBean() as? ThreadMXBean)
+            ?.takeIf { it.isThreadAllocatedMemorySupported }?.apply { isThreadAllocatedMemoryEnabled = true }
+        val cpuBean = ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean
+        val thread = Thread.currentThread().threadId()
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         var stdoutBytes = 0L
         fun publish(record: String) {
@@ -91,6 +100,8 @@ internal object OrdinaryArithmeticLearningProfile {
         val codec = ProblemJson()
         out.resolve("ordinary-learning.jsonl").bufferedWriter().use { output ->
             for (learning in listOf(false, true)) {
+                val allocatedBefore = allocationBean?.getThreadAllocatedBytes(thread) ?: -1L
+                val cpuBefore = cpuBean?.processCpuTime ?: -1L
                 val opened = System.nanoTime()
                 val stop = Cancellation.after(timeout.milliseconds)
                 val entry = Runners.resolve(ref)
@@ -138,6 +149,7 @@ internal object OrdinaryArithmeticLearningProfile {
                 val params: BacktrackParams = base.copy(
                     variableSelector = observing(selector), randomSeed = 3L, cancellation = stop,
                     maxDecisions = nodes, pbLearning = false, integerRowLearning = learning,
+                    propagationAttribution = attribution,
                     lpConfig = if (lp == "auto") LpConfig.AUTO else null,
                 )
                 var verdict = "preparation-terminal"
@@ -165,12 +177,18 @@ internal object OrdinaryArithmeticLearningProfile {
                         witness = "bools=${point.bools.joinToString()};ints=${point.ints.joinToString()}"
                     }
                 }
-                val beforeRetirement = native?.learnedClauseCount
+                val liveAtInspection = native?.let { LivePropagationState.current(it) != null } == true
+                val beforeRetirement = if (liveAtInspection) native?.learnedClauseCount else null
                 val beforeLifecycle = capture?.lifecycle()
                 capture?.record("traversal.finished")
-                native?.popToLevel(0)
-                native?.forgetLearnedClauses { _, _ -> false }
-                capture?.record("traversal.retirement-checked")
+                if (liveAtInspection) {
+                    native?.popToLevel(0)
+                    native?.forgetLearnedClauses { _, _ -> false }
+                    capture?.record("traversal.retirement-checked")
+                }
+                val elapsed = System.nanoTime() - opened
+                val allocatedAfter = allocationBean?.getThreadAllocatedBytes(thread) ?: -1L
+                val cpuAfter = cpuBean?.processCpuTime ?: -1L
                 val record = buildJsonObject {
                     put("revision", Reports.readGitSha())
                     put("provenanceFingerprint", fingerprint)
@@ -182,6 +200,7 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("sourceMode", if (source64 == null) "catalog" else "frozen")
                     put("integerRowLearning", learning)
                     put("pbLearning", false)
+                    put("propagationAttribution", attribution)
                     put("lp", lp)
                     put("seed", 3)
                     put("maxDecisions", nodes)
@@ -197,9 +216,17 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("lifecycleBeforeRetirement", beforeLifecycle ?: JsonNull)
                     put("lifecycleAfterRetirement", capture?.lifecycle() ?: JsonNull)
                     put("storedBeforeRetirement", beforeRetirement)
-                    put("storedAfterRetirement", native?.learnedClauseCount)
+                    put("storedAfterRetirement", if (liveAtInspection) native?.learnedClauseCount else null)
+                    put("retirementInspection", when {
+                        liveAtInspection -> "manual-retraction"
+                        native != null -> "solver-released"
+                        else -> "unobserved"
+                    })
                     put("finiteWorkIncludingRetirement", capture?.work())
-                    put("armElapsedBeforeSerializationNs", System.nanoTime() - opened)
+                    put("armElapsedBeforeSerializationNs", elapsed)
+                    put("armProcessCpuNs", if (cpuBefore >= 0L && cpuAfter >= cpuBefore) cpuAfter - cpuBefore else null)
+                    put("armThreadAllocatedBytes", if (allocatedBefore >= 0L && allocatedAfter >= allocatedBefore)
+                        allocatedAfter - allocatedBefore else null)
                     put("cancelled", stop())
                     put("trace", capture?.export() ?: JsonNull)
                 }.toString()
