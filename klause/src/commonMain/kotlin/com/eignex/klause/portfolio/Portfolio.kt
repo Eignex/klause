@@ -479,9 +479,10 @@ class Portfolio(
             }
             claim.improved = true
             if (before != null) {
-                if (claim.hadIncumbent) {
+                if (claim.hadIncumbent || run.pricesAcceptedGains) {
                     val reward = incumbents.gain(before.objective, candidate.objective)
-                    run.ledgerFor(claim.arm).credit(claim.arm, Signal.Improvement, reward)
+                    run.recordAcceptedGain(claim.arm, reward)
+                    if (claim.hadIncumbent) run.ledgerFor(claim.arm).credit(claim.arm, Signal.Improvement, reward)
                 }
             } else if (!claim.foundFirst) {
                 claim.foundFirst = true
@@ -823,6 +824,11 @@ class Portfolio(
     private inner class Schedule<H : AutoCloseable>(cancellation: Cancellation, val handles: Array<H?>) {
         private val scopedReward = if (rewardPolicy is SourceRateReward)
             rewardPolicy.fresh(workers.map { it.family }) else rewardPolicy
+        val pricesAcceptedGains: Boolean get() = scopedReward is SourceRateReward
+
+        fun recordAcceptedGain(arm: Int, gain: Double) {
+            (scopedReward as? SourceRateReward)?.recordAcceptedGain(arm, gain)
+        }
         private var availability: ((Int) -> Boolean)? = null
 
         fun restrictAvailability(available: (Int) -> Boolean) { availability = available }
