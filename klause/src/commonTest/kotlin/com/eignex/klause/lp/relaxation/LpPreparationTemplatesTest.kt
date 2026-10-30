@@ -240,6 +240,20 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `consumer coefficient changes should not affect retained row templates`() {
+        val first = CpToLpRelaxation(source, objective, projections = selection, reuseTemplateMetadata = true)
+            .build(RootDomains(source))
+        first.model.csc.colVal[0] = 17L
+        val next = CpToLpRelaxation(source, objective, projections = selection, reuseTemplateMetadata = true)
+
+        val reused = assertNotNull(next.build(RootDomains(source)).model.authoritativeModel())
+        val fresh = assertNotNull(CpToLpRelaxation(source, objective, projections = null)
+            .build(RootDomains(source)).model.authoritativeModel())
+
+        assertTrue(reused.sameAuthority(fresh))
+    }
+
+    @Test
     fun `cancelled candidate import should withhold exact authority`() {
         val consumer = CpToLpRelaxation(source, objective, projections = selection, reuseTemplateMetadata = true)
         val relaxation = consumer.build(RootDomains(source))

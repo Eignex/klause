@@ -1,16 +1,18 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.lp.compactRelaxationSupported
 import com.eignex.klause.lp.emitExactLpRelaxation
 import com.eignex.klause.lp.emitLpRelaxation
 import com.eignex.klause.lp.engine.ExactLpBounds
@@ -29,7 +31,6 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.toLongExact
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -80,27 +81,37 @@ private class LpTemplateImportCancelled : RuntimeException()
 
 internal class LpSourceRowTemplate(private val row: LinearRow) {
     private val compactExact = row is ExactLinear && !row.strict && row.activator == LinearRow.ALWAYS &&
-        row.isIntegerOnly && row.compactRelaxationSupported()
+        row.isIntegerOnly && row.constants.let {
+            it is IntegerConstants && it.bound in -9_007_199_254_740_992L..9_007_199_254_740_992L &&
+                it.maxAbsCoeff <= 9_007_199_254_740_992L
+        }
     private val integers = if (compactExact ||
         (row !is ExactLinear && row.isLongUnconditional && row.isIntegerOnly)
     ) {
-        IntArray(row.size) { Term.intVar(row.ref(it)) }
+        when (row) {
+            is ExactLinear -> row.intVars
+            is Linear -> row.vars
+            else -> IntArray(row.size) { Term.intVar(row.ref(it)) }
+        }
     } else null
     private val coefficients = integers?.let {
         LongArray(row.size) {
-            if (compactExact) (row as ExactLinear).constants.exactCoeff(it).toLongExact() else row.coeff(it)
+            if (compactExact) (row.constants as IntegerConstants).coeff(it) else row.coeff(it)
         }
     }
     private val bound = when {
-        compactExact -> (row as ExactLinear).constants.exactBound.toLongExact()
+        compactExact -> (row.constants as IntegerConstants).bound
         integers != null -> row.bound
         else -> 0L
     }
     val storageUnits: Long = 2L + (integers?.size ?: 0) * 2L
 
     fun emit(builder: RelaxationBuilder, projection: LinearLpProjection) {
-        if (integers != null) builder.linearRow(row.relation, integers, requireNotNull(coefficients), bound)
-        else if (row is ExactLinear) row.emitExactLpRelaxation(builder)
+        if (integers != null) {
+            if (row.relation == LinearOp.NE) return
+            val columns = IntArray(integers.size) { builder.intColumn(integers[it]) }
+            builder.row(columns, requireNotNull(coefficients), row.relation, bound)
+        } else if (row is ExactLinear) row.emitExactLpRelaxation(builder)
         else row.emitLpRelaxation(builder, projection)
     }
 }

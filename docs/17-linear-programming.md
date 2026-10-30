@@ -49,10 +49,12 @@ retract with the search scope while definitions stay available to siblings. Thes
 definitions supply no witness authority: publication checks the original rows.
 
 Compatible discrete preparation views retain immutable source-row templates and exact
-integer endpoint metadata through their selected projections. Compact integer rows
-reuse their source-coordinate and coefficient buffers in presolve harvest and later
-LP assembly; guarded rows read the current pin on every emission. Each build maps
-those definitions into its own columns, bounds, premises and numerical owner.
+integer endpoint metadata through their selected projections. Compact rows retain
+canonical integer memberships and reusable coefficient buffers, reading primitive
+source constants at their declared width. Each build maps source coordinates into
+its own columns; the numerical builder copies coefficients into its private rows.
+Guarded rows read the current pin on every emission. Bounds, premises and numerical
+owners belong to the current build.
 Templates retain neither a basis nor a checked claim.
 Exact bound columns materialize only when an import needs them. Each endpoint
 definition retains one completed normalized column; changing an open upper side
