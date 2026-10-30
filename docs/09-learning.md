@@ -360,6 +360,10 @@ shared premise and mapped admission must decline.
 Every native conflict cascade repeats the mapped-target assertion and complete
 premise checks before admitting a typed result. An unavailable mapping retains its
 clausal fallback, including cascades reached through an LP consequence.
+Within one fixpoint publication, integer leaves that are flat conjunctions of
+active named assertions can share complete proof subgraphs. Inherited nested or
+unavailable leaves do not enter that memo. Proof-reference visits charge native
+work, and the publication memo ends with its callback.
 
 Rows share the learned store and integer bounds propagation. A successful ordinary
 row assertion also retains its first-UIP clause in that native store. The two

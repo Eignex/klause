@@ -92,6 +92,7 @@ private fun PropagationState.sharedPremise(
     for (literal in asserted) pending.addLast(NativePremiseFrame(literal))
     var remaining = SHARED_PREMISE_VISIT_LIMIT
     while (pending.isNotEmpty()) {
+        work++
         if (runCancelled) return SearchAtomPremise.Unavailable
         if (remaining-- <= 0) return SearchAtomPremise.Unavailable
         val frame = pending.removeLast()
@@ -134,6 +135,7 @@ private fun PropagationState.sharedPremise(
             val premise = sharedIntegerLeaf(atom, Lit.isPositive(literal), context, sourceIntId)
             if (premise === SearchAtomPremise.Unavailable) return premise
             proofs.put(literal, premise)
+            if (memo != null && namedIntegerLeaf(premise, context)) memo.retain(literal, premise)
             continue
         }
         if (!visiting.add(literal)) return SearchAtomPremise.Unavailable
@@ -146,6 +148,17 @@ private fun PropagationState.sharedPremise(
 
 private fun MutableIntObjectMap<SearchAtomPremise>.retain(literal: Int, premise: SearchAtomPremise) {
     if (size < SHARED_PREMISE_VISIT_LIMIT) put(literal, premise)
+}
+
+private fun PropagationState.namedIntegerLeaf(premise: SearchAtomPremise, context: SearchContext): Boolean {
+    val leaves = (premise as? SearchAtomPremise.All)?.premises ?: return false
+    for (leaf in leaves) {
+        work++
+        val asserted = leaf as? SearchAtomPremise.Asserted ?: return false
+        val literal = context.atomLiteral(asserted.decision) ?: return false
+        if (context.boolValue(Lit.variable(literal)) != Lit.isPositive(literal)) return false
+    }
+    return true
 }
 
 private fun PropagationState.sharedIntegerLeaf(
