@@ -100,27 +100,36 @@ class PrivateRebuildGenerationTest {
 
     @Test
     fun `cancellation during private baking should withhold the generation`() {
-        val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
-        var stopped = false
-        var constructions = 0
-        val meter = object : RootWorkMeter {
-            override fun charge(units: Long) = Unit
-            override fun propagation(units: Long) = Unit
-            override fun construction(entries: Long) {
-                constructions++
-                stopped = true
+        for (duringPropagation in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 2)),
+                Clause(intArrayOf(2, 4, 6)), Clause(intArrayOf(2, 4, 7)),
+                Clause(intArrayOf(3, 5, 6)), Clause(intArrayOf(3, 5, 7)),
+            )).bake()
+            var stopped = false
+            var constructions = 0
+            val meter = object : RootWorkMeter {
+                override fun charge(units: Long) = Unit
+                override fun propagation(units: Long) {
+                    if (duringPropagation && units > 0L) stopped = true
+                }
+                override fun construction(entries: Long) {
+                    constructions++
+                    if (!duringPropagation) stopped = true
+                }
             }
-        }
-        val token = object : Cancellation {
-            override fun isCancelled(): Boolean = stopped
-            override fun workMeter(): RootWorkMeter = meter
-        }
+            val token = object : Cancellation {
+                override fun isCancelled(): Boolean = stopped
+                override fun workMeter(): RootWorkMeter = meter
+            }
 
-        val generation = PrivateRebuildGeneration.prepare(PropagationSession(source), 1_048_576L, token)
+            val generation = PrivateRebuildGeneration.prepare(PropagationSession(source), 1_048_576L, token)
 
-        assertNull(generation)
-        assertEquals(1, constructions)
-        assertEquals(1, source.numFactors)
+            assertNull(generation)
+            assertTrue(stopped)
+            assertEquals(1, constructions)
+            assertEquals(6, source.numFactors)
+        }
     }
 
     @Test
