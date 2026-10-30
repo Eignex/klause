@@ -26,6 +26,7 @@ internal class PrivateRebuildGeneration private constructor(
     val admittedColumns: Int,
     val warmClauses: PrivateRebuildWarmClauses,
     val warmClauseNanos: Long,
+    val bakeWork: PrivateRebuildBakeWork,
 ) {
     fun reconstruct(sample: Sample): Sample = mapping.reconstructFrom(problem, sample)
 
@@ -123,11 +124,12 @@ internal class PrivateRebuildGeneration private constructor(
             val warmNanos = warmStart.elapsedNow().inWholeNanoseconds
             val enriched = if (warm.clauses.isEmpty()) reduced else reduced.withFactors(reduced.factors + warm.clauses)
             mapping = mapping.then(SourceMapping(reduced, enriched, TransformationGuarantees.IDENTITY))
-            val baked = enriched.bake(cancellation)
+            val bakeWork = PrivateRebuildBakeWork(cancellation)
+            val baked = enriched.bake(bakeWork)
             if (cancellation()) return null
             mapping = mapping.then(SourceMapping(enriched, baked, TransformationGuarantees.IDENTITY))
             return PrivateRebuildGeneration(baked, mapping, bytes + warm.modeledBytes, delta.rebuild.steps.size,
-                entries * 4L, passStopped, admission.candidates, warm, warmNanos)
+                entries * 4L, passStopped, admission.candidates, warm, warmNanos, bakeWork)
         }
     }
 }

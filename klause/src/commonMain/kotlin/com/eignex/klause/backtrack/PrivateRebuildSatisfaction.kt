@@ -197,6 +197,8 @@ internal class PrivateRebuildSatisfaction(
         note("WarmClauseLiterals", prepared.warmClauses.literals)
         note("WarmClauseWork", prepared.warmClauses.work)
         note("WarmClauseNanos", prepared.warmClauseNanos)
+        note("BakeConstructionEntries", prepared.bakeWork.constructionEntries)
+        note("BakePropagationWork", prepared.bakeWork.propagationWork)
         // The new model identity owns all imports and propagation indexes. A canonical exchange
         // cannot attach to it without a supported translation, so its cursor stays with canonical.
         val privateParams = sharedParams.copy(

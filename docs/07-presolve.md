@@ -255,6 +255,9 @@ BVE receives half the allowance remaining after the private source copy. Its loc
 retains complete earlier pivots when later analysis stops; cancellation of the
 containing call declines the generation. Baking, opening and canonical checks
 share the remaining containing allowance.
+Private baking adapts the root engine's construction and propagation meter into
+that allowance; those visits join preparation work rather than remaining on an
+unobserved temporary root state.
 
 Unused BVE allowance can copy globally learned clauses into the private model.
 Only this canonical worker's non-permanent clauses over retained Boolean columns
