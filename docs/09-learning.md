@@ -476,7 +476,10 @@ clauses against permanent root facts. An empty Boolean pin trail withholds the s
 without a pinned literal it cannot satisfy or shorten a Boolean clause. A shortened
 source clause enters as a permanent
 session-local replacement before its watches retire; immutable source text remains
-available for reasons. Satisfied source watches retire without changing variable IDs.
+available for reasons. The propagation session owns unfinished source-watch retirement
+after replacement admission. Pass reset or optional buffer release retains that record;
+a funded slice retires its watches before admitting another source replacement.
+Session close releases it. Satisfied source watches retire without changing variable IDs.
 Learned replacements retain their imported origin. Compaction protects live and
 historical reasons and removes obsolete watches; attaching a shortened binary installs
 both implication directions and evaluates facts already assigned at the root. There

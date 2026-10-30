@@ -331,6 +331,23 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `pass buffer resets should preserve unfinished source retirement`() {
+        for ((native, release) in listOf(false to false, false to true, true to false, true to true)) {
+            val session = PropagationSession(problem(intArrayOf(0, 2, 4), intArrayOf(1)).bake(), nativeSat = native)
+            val pass = RootSimplificationPass()
+            pass.run(session, BacktrackParams(inprocessingRootWork = 11L), null)
+            assertEquals(1, session.learnedClauseCount)
+
+            if (release) pass.releaseRetainedBuffers() else pass.reset()
+            pass.run(session, BacktrackParams(), null)
+            session.pinBool(1, false)
+
+            assertEquals(1, session.learnedClauseCount)
+            assertEquals(true, session.boolValue(2))
+        }
+    }
+
+    @Test
     fun `reset should release a root candidate retained across a tiny slice`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
