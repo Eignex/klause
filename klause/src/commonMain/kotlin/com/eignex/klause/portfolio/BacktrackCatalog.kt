@@ -132,7 +132,10 @@ object BacktrackCatalog {
      *  simplex bounding + objective propagation without the expensive cut machinery; `CONSERVATIVE` is
      *  the cheap combinatorial bounds only. Built only where [emphasis] has something to enable. */
     private fun lpArm(emphasis: LpEmphasis) = BacktrackRecipe("lp-${emphasis.name.lowercase()}") { seed, onEvent ->
-        BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(lpConfig = LpConfig(emphasis))
+        BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(
+            lpConfig = LpConfig(emphasis),
+            lpDirectionalGains = emphasis != LpEmphasis.CONSERVATIVE,
+        )
     }
 
     private fun lpTreeSearchArm() = BacktrackRecipe("lp-lbtree") { seed, onEvent ->

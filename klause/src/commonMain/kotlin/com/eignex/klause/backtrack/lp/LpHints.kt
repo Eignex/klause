@@ -29,10 +29,12 @@ internal class LpHints(
     private val charge: (Long) -> Unit = {},
 ) : LpHintSink {
     private val collect = numIntVars.toLong() + numBoolVars <= 8192L
-    private val history = LpDirectionalHistory(observe)
+    private val history = LpDirectionalHistory(observe, charge = charge, useClassPriors = directionalGains)
     private var freshRecord = false
     private var objectiveRecorded = false
     private var directionalChoice: VarRef? = null
+    private var baselineChoice: VarRef? = null
+    private var priorChoice = false
     private var scopeModel: ExactLpModel? = null
     private var scopeRows: LpScopedRows? = null
     private var scopeVariables = IntArray(0)
@@ -47,6 +49,8 @@ internal class LpHints(
         freshRecord = false
         objectiveRecorded = false
         directionalChoice = null
+        baselineChoice = null
+        priorChoice = false
         if (collect) history.beginNode(depth)
     }
 
@@ -88,8 +92,19 @@ internal class LpHints(
     fun branch(variable: VarRef) {
         if (directionalGains && scopeModel != null) {
             observe(if (directionalChoice == variable) "CONSUMED" else "FALLBACK")
+            if (directionalChoice == variable) {
+                observe(if (priorChoice) "PRIOR_CONSUMED" else "VARIABLE_CONSUMED")
+                val comparison = when (baselineChoice) {
+                    null -> "BASELINE_MISSING"
+                    variable -> "BASELINE_AGREED"
+                    else -> "BASELINE_CHANGED"
+                }
+                observe(comparison)
+            }
         }
         directionalChoice = null
+        baselineChoice = null
+        priorChoice = false
         if (collect && scopeModel != null) {
             charge(129L)
             history.branch(variable, value(variable))
@@ -103,14 +118,32 @@ internal class LpHints(
         }
     }
 
+    fun hasDirectionalScores(): Boolean {
+        if (!collect || !directionalGains || !objectiveRecorded) return false
+        charge(1L)
+        return history.mayHaveScores
+    }
+
     fun directionalScore(variable: VarRef): Double {
         if (!collect || !directionalGains || !objectiveRecorded) return Double.NaN
         charge(1L)
         return history.score(variable, value(variable))
     }
 
-    fun selected(variable: VarRef?) {
+    fun selected(variable: VarRef?, baseline: VarRef?, score: Double): VarRef? {
         directionalChoice = variable
+        baselineChoice = baseline
+        priorChoice = variable != null && history.usesPrior(variable)
+        if (priorChoice && baseline != null && variable != baseline) {
+            charge(1L)
+            val reference = history.referenceScore(baseline, value(baseline))
+            if (!(score > reference)) {
+                directionalChoice = null
+                priorChoice = false
+                observe("PRIOR_REJECTED")
+            }
+        }
+        return directionalChoice
     }
 
     private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {
@@ -152,6 +185,8 @@ internal class LpHints(
         freshRecord = false
         objectiveRecorded = false
         directionalChoice = null
+        baselineChoice = null
+        priorChoice = false
     }
 
     override fun clear() {
