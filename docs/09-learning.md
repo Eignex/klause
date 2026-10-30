@@ -307,7 +307,10 @@ kinds or unnameable atoms withhold a complete-incidence claim.
 
 ## Integer row learning
 
-`integerRowLearning` is opt-in and independent of pseudo-Boolean learning. Mandatory
+`integerRowLearning` controls typed integer learning independently of pseudo-Boolean
+learning. Direct backtrack parameters default it to false; the
+[portfolio policy](12-portfolio.md#model-specific-worker-recipes) selects it for one
+worker on binary integer linear models. Mandatory
 finite `Linear` inequalities and the explaining half of equalities provide integer
 rows. Mandatory `ExactLinear` rows provide the same source when every coordinate is
 integer and the complete compact projection preserves their word-sized constants,
@@ -696,6 +699,8 @@ Native CP and shared first-UIP outcomes are reported separately. Non-asserting c
 identify chronological fallback, while zero does not establish explanation coverage.
 Native learned-constraint counts include integer rows; their terms do not count as
 Boolean learned literals.
+`learningIntegerSessions` counts native sessions with integer-row learning enabled,
+independently of constructed, admitted and consumed objects.
 Missing metrics stay absent, including root theory results that never enter traversal.
 `smtCompleteSearch*` stage observations overlap and cannot be summed as a work total.
 [SearchStats](../klause/src/commonMain/kotlin/com/eignex/klause/solver/result/SearchStats.kt)

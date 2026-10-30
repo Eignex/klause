@@ -215,9 +215,17 @@ internal class BacktrackWorkerConfig(
         ): List<BacktrackWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
             val order = BacktrackCatalog.ranked(kind, facts)
+            val arithmeticIndex = if (kind == Kind.COP && facts.integerColumnsOnly && facts.binaryIntegers &&
+                facts.integerLinear && lpCeiling.resolved(LpTechnique.BOUNDING)) {
+                order.indexOfFirst { it.label == "conflictDriven" }
+            } else -1
             return List(count) {
+                val recipe = order[it % order.size]
+                val automatic = if (it == arithmeticIndex) {
+                    recipe.editing { params -> params.copy(integerRowLearning = true) }
+                } else recipe
                 BacktrackWorkerConfig(
-                    order[it % order.size].editing(edit).capLp(lpCeiling).spending(nodeBudget),
+                    automatic.editing(edit).capLp(lpCeiling).spending(nodeBudget),
                     zeroObjectivePricing,
                 )
             }

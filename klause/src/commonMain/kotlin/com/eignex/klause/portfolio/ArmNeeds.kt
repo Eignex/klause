@@ -55,6 +55,7 @@ internal class ProblemFacts(
     val binaryPackingObjective: Boolean = false,
     val binaryEqualityObjective: Boolean = false,
     val extensionalSupports: Boolean = false,
+    val integerColumnsOnly: Boolean = false,
     val construction: WorkerConstructionCost = WorkerConstructionCost(0, 0),
     private val observer: ((String, WorkerEligibility) -> Unit)? = null,
     private val relaxation: (LpEmphasis) -> Boolean,
@@ -101,6 +102,7 @@ internal class ProblemFacts(
                     problem.numRealVars, problem.factors.size),
                 observer = observer,
                 binaryIntegers = binary,
+                integerColumnsOnly = problem.numIntVars > 0 && problem.numBoolVars == 0 && problem.numRealVars == 0,
                 binaryPackingObjective = (binary && problem.hasPackingObjective(objective)) ||
                     binarySource?.let {
                         it.problem.binaryIntegers && it.problem.hasPackingObjective(it.objective)

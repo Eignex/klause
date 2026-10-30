@@ -19,6 +19,18 @@ import kotlin.test.assertTrue
 
 class PropagationSessionTest {
     @Test
+    fun `integer learning configuration should be reported before row admission`() {
+        for (enabled in listOf(false, true)) {
+            val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyList()))
+            if (enabled) session.enableIntegerRowLearning()
+
+            val counts = session.learnedLifecycle()
+
+            assertEquals(if (enabled) 1L else 0L, counts["learningIntegerSessions"] ?: 0L)
+        }
+    }
+
+    @Test
     fun `stopped duplicate lookup should decline export without consuming new learning`() {
         val session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()))
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
