@@ -1438,6 +1438,7 @@ abstract interface com.eignex.klause.backtrack.selector/VariableSelector : com.e
     abstract fun pick(com.eignex.klause.propagation/PropagationSession, kotlin.random/Random): com.eignex.klause.solver.search/VarRef? // com.eignex.klause.backtrack.selector/VariableSelector.pick|pick(com.eignex.klause.propagation.PropagationSession;kotlin.random.Random){}[0]
     open fun onConflict(com.eignex.klause.solver.search/VarRef, com.eignex.klause.propagation/PropagationResult.Unsat) // com.eignex.klause.backtrack.selector/VariableSelector.onConflict|onConflict(com.eignex.klause.solver.search.VarRef;com.eignex.klause.propagation.PropagationResult.Unsat){}[0]
     open fun onPropagation(com.eignex.klause.propagation/PropagationResult.Implied) // com.eignex.klause.backtrack.selector/VariableSelector.onPropagation|onPropagation(com.eignex.klause.propagation.PropagationResult.Implied){}[0]
+    open fun onSessionCreated(com.eignex.klause.propagation/PropagationSession) // com.eignex.klause.backtrack.selector/VariableSelector.onSessionCreated|onSessionCreated(com.eignex.klause.propagation.PropagationSession){}[0]
     open fun onSolution(com.eignex.klause.solver/Sample) // com.eignex.klause.backtrack.selector/VariableSelector.onSolution|onSolution(com.eignex.klause.solver.Sample){}[0]
 }
 
