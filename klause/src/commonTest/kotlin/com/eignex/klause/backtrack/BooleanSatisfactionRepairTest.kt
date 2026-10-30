@@ -44,12 +44,17 @@ class BooleanSatisfactionRepairTest {
                 val refuted = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
                 assertNull(refuted.sample)
                 assertEquals(TerminationReason.SearchExhausted, refuted.reason)
+                assertTrue(search.stats.search.restarts.sum > 0.0)
 
-                search.begin(Assumptions(bools = mapOf(0 to true)), Long.MAX_VALUE,
-                    Double.POSITIVE_INFINITY, Cancellation.Never)
-                val sibling = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+                for (value in listOf(false, true)) {
+                    search.begin(Assumptions(bools = mapOf(0 to true, 2 to value)), Long.MAX_VALUE,
+                        Double.POSITIVE_INFINITY, Cancellation.Never)
+                    val sibling = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
 
-                assertTrue(assertNotNull(sibling.sample).boolValue(0))
+                    val sample = assertNotNull(sibling.sample)
+                    assertTrue(sample.boolValue(0))
+                    assertEquals(value, sample.boolValue(2))
+                }
             }
         }
     }
