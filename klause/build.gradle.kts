@@ -56,7 +56,7 @@ kotlin {
             implementation("com.eignex:koblas:0.1.1-20261023.051622-264") {
                 version { strictly("0.1.1-20261023.051622-264") }
             }
-            implementation("com.eignex:kumulant:0.3.4-20261013.194059-67")
+            implementation("com.eignex:kumulant:0.3.4-20261031.061649-111")
             implementation("com.eignex:kpermute:1.3.0")
         }
         // BigInt is java.math.BigInteger on the JVM; native has no platform big integer to map onto.
@@ -111,8 +111,8 @@ kotlin.targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarge
 // so downstream Gradle consumers resolve the same binaries as this build.
 dependencies {
     constraints {
-        for ((module, build) in mapOf("jvm" to 67, "linuxx64" to 67, "linuxarm64" to 67, "macosarm64" to 66)) {
-            val pinned = "0.3.4-20261013.194059-$build"
+        for ((module, build) in mapOf("jvm" to 111, "linuxx64" to 111, "linuxarm64" to 111, "macosarm64" to 110)) {
+            val pinned = "0.3.4-20261031.061649-$build"
             add("commonMainImplementation", "com.eignex:kumulant-$module:$pinned") {
                 version { strictly(pinned) }
             }
