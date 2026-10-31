@@ -315,7 +315,8 @@ class ModelJsonTest {
             """{"float":{"min":0.0,"max":1.0,"bucket":3}}""" to "$.float.bucket: unknown field",
             """{"constraint":{"and":[{"ref":"a"},{"bogus":1}]}}""" to "$.constraint.and[1].bogus: unknown operator",
             """{"constraint":{"ge":[{"ref":"x"},1.5]}}""" to "$.constraint.ge[1]: expected an integer",
-            """{"constraint":{"ge":[{"mul":[2.5,{"ref":"x"}]},1]}}""" to "$.constraint.ge[0].mul[0]: expected an integer",
+            """{"constraint":{"ge":[{"mul":[2.5,{"ref":"x"}]},1]}}""" to
+                "$.constraint.ge[0].mul[0]: expected an integer",
             """{"constraint":{"ge":{"left":{"ref":"x"},"right":1}}}""" to "$.constraint.ge: expected an operand array",
             """{"constraint":{"notRef":{"name":"p"}}}""" to "$.constraint.notRef: expected STRING",
             """{"${'$'}type":"int","min":0,"max":1}""" to "$: expected exactly one operator",
