@@ -5,7 +5,6 @@ import com.eignex.klause.model.ModelJson
 import com.eignex.klause.model.SchemaEntry
 import com.eignex.skema.SchemaDef
 import com.eignex.skema.schemaJsonConfig
-import com.eignex.skema.serialization.decodeFromJsonElement
 import com.eignex.skema.serialization.toJsonSchema
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
@@ -26,7 +25,7 @@ object JsonSchema {
 
     /** Parse [text] into an immutable schema definition; errors name their JSON path, such as `$.entries.x.int`. */
     fun parse(text: String): SchemaDef<SchemaEntry> = try {
-        json.decodeFromJsonElement(serializer, json.parseToJsonElement(text), ModelJson.catalog)
+        json.decodeFromJsonElement(serializer, json.parseToJsonElement(text))
     } catch (e: SerializationException) {
         throw JsonFormatException(e.message ?: "malformed document", e)
     }

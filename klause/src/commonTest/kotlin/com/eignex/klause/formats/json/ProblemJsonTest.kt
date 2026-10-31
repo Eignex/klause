@@ -273,11 +273,11 @@ class ProblemJsonTest {
             """{"ints": [{"lower": 0, "upper": 9, "values": [[0, 1], [2, 3]]}]}""" to "$.ints[0]:",
             """{"bools": 1, "factors": [{"clause": {"literals": [0]}}], "implied": [2]}""" to "$.implied[0]:",
             """{"bools": 1, "factors": [{"clause": {"literals": [4]}}]}""" to "$:",
-            """{"bools": 1, "extra": 1}""" to "$.extra:",
+            """{"bools": 1, "extra": 1}""" to "unknown key 'extra'",
             factorDocument("""{"linear": {"vars": [0], "op": "LE", "bound": 2, "wideBound": "5"}}""") to
                 "$.factors[0].linear:",
             factorDocument("""{"divMod": {"dividend": 0, "quotient": 0, "remainder": 0, "constantDivisor": "x"}}""") to
-                "$.factors[0].divMod",
+                "expected a decimal integer string, got 'x'",
         )
 
         for ((text, path) in cases) {
