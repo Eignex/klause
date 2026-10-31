@@ -16,7 +16,6 @@ import com.eignex.klause.util.Bits
 import com.eignex.klause.util.LongArrayList
 import com.eignex.skema.schemaJsonConfig
 import com.eignex.skema.serialization.JsonNodeCatalog
-import com.eignex.skema.serialization.decodeFromJsonElement
 import com.eignex.skema.serialization.toJsonSchema
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
@@ -78,7 +77,7 @@ class ProblemJson(
     fun decodeFromJsonElement(element: JsonElement): Problem {
         requireKnownFactorKeys(element)
         val document = try {
-            json.decodeFromJsonElement(documentSerializer, element, catalog)
+            json.decodeFromJsonElement(documentSerializer, element)
         } catch (e: SerializationException) {
             throw JsonFormatException(e.message ?: "malformed problem document", e)
         }
