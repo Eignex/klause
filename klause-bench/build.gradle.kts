@@ -74,7 +74,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.21")
     testImplementation("org.junit.jupiter:junit-jupiter")
     // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
-    implementation("com.eignex:kumulant:0.3.4-20261031.084838-112")
+    implementation("com.eignex:kumulant:0.3.4-20261031.112208-113")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("org.tukaani:xz:1.12")
