@@ -32,7 +32,7 @@ eignexPublish {
 val fullTargets = providers.gradleProperty("targets.full").isPresent
 
 // Compact model JSON needs Skema's unreleased fixed-field nodes, root path decoding and integral tokens.
-val skemaPin = "0.3.1-20261031.095403-41"
+val skemaPin = "0.3.1-20261031.151831-42"
 
 kotlin {
     compilerOptions {
@@ -56,7 +56,7 @@ kotlin {
             implementation("com.eignex:koblas:0.1.1-20261023.051622-264") {
                 version { strictly("0.1.1-20261023.051622-264") }
             }
-            implementation("com.eignex:kumulant:0.3.4-20261031.120807-114")
+            implementation("com.eignex:kumulant:0.3.4-20261031.153009-115")
             implementation("com.eignex:kpermute:1.3.0")
         }
         // BigInt is java.math.BigInteger on the JVM; native has no platform big integer to map onto.
@@ -111,8 +111,8 @@ kotlin.targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarge
 // so downstream Gradle consumers resolve the same binaries as this build.
 dependencies {
     constraints {
-        for ((module, build) in mapOf("jvm" to 114, "linuxx64" to 114, "linuxarm64" to 114, "macosarm64" to 113)) {
-            val pinned = "0.3.4-20261031.120807-$build"
+        for ((module, build) in mapOf("jvm" to 115, "linuxx64" to 115, "linuxarm64" to 115, "macosarm64" to 114)) {
+            val pinned = "0.3.4-20261031.153009-$build"
             add("commonMainImplementation", "com.eignex:kumulant-$module:$pinned") {
                 version { strictly(pinned) }
             }
