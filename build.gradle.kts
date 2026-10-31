@@ -22,7 +22,7 @@ val koblasPins = mapOf(
 )
 
 val skemaPins = listOf("skema", "skema-jvm", "skema-linuxx64", "skema-linuxarm64", "skema-macosarm64")
-    .associateWith { "0.3.1-20261030.230110-39" }
+    .associateWith { "0.3.1-20261031.083244-40" }
 
 if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
     // Lab builds retain complete distributions; each fresh tree discards its incremental indexes.
