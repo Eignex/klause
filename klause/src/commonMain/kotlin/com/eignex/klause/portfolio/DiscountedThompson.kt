@@ -58,8 +58,12 @@ internal class DiscountedThompson(
     fun fade(retained: Double) {
         require(retained in 0.0..1.0) { "retained must be in [0, 1]" }
         if (retained == 1.0) return
+        // Snapshots carry the prior, and merging drops the copy the reset arm already holds.
         val evidence = inner.snapshot().map {
-            BernoulliSumResult((it.successes - PRIOR) * retained, (it.trials - 2 * PRIOR) * retained)
+            BernoulliSumResult(
+                PRIOR + (it.successes - PRIOR) * retained,
+                2 * PRIOR + (it.trials - 2 * PRIOR) * retained,
+            )
         }
         inner.reset()
         inner.merge(evidence)
