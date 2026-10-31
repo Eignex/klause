@@ -32,7 +32,7 @@ eignexPublish {
 val fullTargets = providers.gradleProperty("targets.full").isPresent
 
 // Compact model JSON needs Skema's unreleased fixed-field nodes, root path decoding and integral tokens.
-val skemaPin = "0.3.1-20261028.100806-19"
+val skemaPin = "0.3.1-20261030.230110-39"
 
 kotlin {
     compilerOptions {
