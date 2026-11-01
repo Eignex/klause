@@ -4,6 +4,16 @@ JVM problem catalog and single-case runner for
 [eignex-lab](https://github.com/Eignex/eignex-lab). Use the lab for experiments,
 revision comparisons, reference solvers, witness checks, schedules and profiling.
 
+Use the authenticated HTTP client at `https://lab.eignex.com`; see the lab's
+[run guide](https://github.com/Eignex/eignex-lab/blob/main/docs/runs.md).
+Report operational dependencies to the lab operations owner. SSH access, host
+discovery and server administration belong to that owner.
+
+Keep automatic placement. Each A/B workload, seed and repetition runs all arms
+on one machine in one worker attempt. Other rows, preparation and replacement
+attempts may use different compatible machines. Retain failed-attempt costs;
+worker loss replaces a complete unfinished row.
+
 A standalone `cp` control sets both `param.bt-arm=LABEL` and `param.arms=1`.
 Named recipes repeat across the configured worker slots otherwise. Check the
 emitted `arm.*` entries to verify the actual worker count before comparing controls.
@@ -763,15 +773,6 @@ endpoint independently from the point. Its generation shares the original
 and any resulting owner replacement retain their containing source/recipe costs.
 `PointPreparationUnavailable` does not establish complete ineligibility.
 
-[9554](https://lab.eignex.com/jobs/9554) captures original `pp08aCUTS` and `egout`
-source-pair applicability. A wide pp08 source row prevents pair discovery under
-the 128-coordinate cap; incomplete inspection establishes no absence of cuts.
-Egout yields 33 source-checked mixed aggregate proposals and a stronger checked
-root bound on replay, with extra discovery and solve cost. Its captured point has
-nonzero source residuals, and the scan has limited attempts. These instrumented
-20-million-work/64-MiB diagnostics establish neither production affordability nor
-later pruning. Keep the ordinary source comparison and independent invalid-point
-verdicts when qualifying a production policy.
 The generated-aggregate replay includes the ordinary opt-in producer's bounded
 source-pair indexing and discovery. Keep this cost separate from replaying supplied
 diagnostic proposals. `AggregatePair*` reports coverage, attempts and limiting
@@ -804,17 +805,6 @@ counts completed derivations before the point filter, rather than retained rows.
 Repeated `AggregatePairAttempts` or construction observations for one unchanged
 point-prepared template indicate reconstruction cost, rather than additional unique
 candidates. Retain these charges alongside template replacements and masked queries.
-
-[9277](https://lab.eignex.com/jobs/9277) exercises both sources at `0af8492830`
-with ownership and root cuts toggled independently. With root cuts off, node
-queries reuse 4 and 27 child results; with cuts on, 2 and 3 cuts become active.
-All eight source witnesses pass the independent MIPLIB solchecker with zero
-violations and objectives 4 and 6. Witness checking does not certify optimality.
-Preparation takes 6.4 seconds through a verified build cache; the preceding
-[9275](https://lab.eignex.com/jobs/9275) takes 333 seconds to prepare and retains
-the unpinned controls that often finish in LP-free arms. Earlier admission,
-worker-loss and deadline failures retain no numerical outcome. These small
-controls support lifecycle consumption, without a timing or default-activation claim.
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
