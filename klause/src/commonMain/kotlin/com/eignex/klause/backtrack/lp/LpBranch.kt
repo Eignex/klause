@@ -17,18 +17,10 @@ import com.eignex.klause.solver.search.VarRef
 internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?): VarRef? {
     hints ?: return null
     if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
-    val directionalAvailable = hints.hasDirectionalScores()
     var best: VarRef? = null
     var bestScore = LP_BRANCH_MIN_SCORE
-    var directional: VarRef? = null
-    var gainScore = LP_BRANCH_MIN_SCORE
     for (b in 0 until problem.numBoolVars) {
         if (session.boolValue(b) != null) continue
-        val gain = if (directionalAvailable) hints.directionalScore(VarRef.Bool(b)) else Double.NaN
-        if (gain > gainScore) {
-            gainScore = gain
-            directional = VarRef.Bool(b)
-        }
         val s = hints.branchScore(VarRef.Bool(b))
         if (!s.isNaN() && s > bestScore) {
             bestScore = s
@@ -37,18 +29,13 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
     }
     for (i in 0 until problem.numIntVars) {
         if (session.intDomain(i).isFixed) continue
-        val gain = if (directionalAvailable) hints.directionalScore(VarRef.IntVar(i)) else Double.NaN
-        if (gain > gainScore) {
-            gainScore = gain
-            directional = VarRef.IntVar(i)
-        }
         val s = hints.branchScore(VarRef.IntVar(i))
         if (!s.isNaN() && s > bestScore) {
             bestScore = s
             best = VarRef.IntVar(i)
         }
     }
-    return hints.selected(directional, best, gainScore) ?: best
+    return best
 }
 
 /** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below

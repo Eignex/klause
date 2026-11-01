@@ -168,8 +168,8 @@ class LpHintsTest {
     }
 
     @Test
-    fun `missing or cut changed current optima keep the existing score`() {
-        for (change in listOf("missing", "cut")) {
+    fun `missing changed or mismatched optima preserve the branch order`() {
+        for (change in listOf("missing", "cut", "split")) {
             val b = LpBuilder()
             b.addVar(0, 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(b.build(Sense.MINIMIZE).authoritativeModel()))
@@ -201,55 +201,61 @@ class LpHintsTest {
                     scoped = false,
                 ))
                 hints.finishNode(trail.state)
-            } else hints.finishNode()
+            } else if (change == "split") hints.recordObjective(relaxation, 10.0)
+            else hints.finishNode()
 
-            assertTrue(hints.directionalScore(VarRef.IntVar(0)).isNaN())
+            val alternatives = if (change == "split") {
+                listOf(SearchDecision.IntAtLeast(0, 4), SearchDecision.IntAtMost(0, 3))
+            } else listOf(SearchDecision.IntAtLeast(0, 3), SearchDecision.IntAtMost(0, 2))
+            assertEquals(alternatives, hints.orderAlternatives(VarRef.IntVar(0), alternatives))
             assertTrue(hints.branchScore(VarRef.IntVar(0)).isFinite())
         }
     }
 
     @Test
-    fun `baseline calibration applies only to partial directional proposals`() {
-        for ((samples, gain, accepted) in listOf(
-            Triple(1, 1.0, false), Triple(1, 8.0, false), Triple(1, 16.0, true), Triple(2, 1.0, true),
-        )) {
+    fun `directional ordering tries the lower predicted gain without changing either alternative`() {
+        for (boolean in listOf(false, true)) for (enabled in listOf(false, true)) for (upGain in listOf(0.0, 1.0, 3.0)) {
             val builder = LpBuilder()
-            repeat(3) { builder.addVar(0, 10, cost = if (it == 2) 100 else 1) }
+            builder.addVar(0, if (boolean) 1 else 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, 2),
-                BooleanArray(3), 0L, intArrayOf(0, 1, 2), IntArray(0))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(boolean), 0L, if (boolean) IntArray(0) else intArrayOf(0),
+                if (boolean) intArrayOf(0) else IntArray(0))
             val observations = ArrayList<String>()
-            val hints = LpHints(3, 0, directionalGains = true, observe = observations::add)
-            for (variable in 0..1) {
-                repeat(if (variable == 0) 2 else samples) {
-                    hints.beginNode(0, 100.0)
-                    hints.record(relaxation, DoubleArray(3) { 2.25 }, DoubleArray(0))
-                    hints.recordObjective(relaxation, 10.0)
-                    hints.branch(VarRef.IntVar(variable))
-                    for (up in if (variable == 0 || samples == 2) listOf(false, true) else listOf(false)) {
-                        hints.commit(if (up) SearchDecision.IntAtLeast(variable, 3)
-                            else SearchDecision.IntAtMost(variable, 2), 1)
-                        hints.beginNode(1, 100.0)
-                        hints.record(relaxation, DoubleArray(3) { 2.25 }, DoubleArray(0))
-                        val delta = if (variable == 0) {
-                            if (up) 24.0 else 8.0
-                        } else if (up) 3.0 else gain
-                        hints.recordObjective(relaxation, 10.0 + delta)
-                    }
+            val hints = LpHints(if (boolean) 0 else 1, if (boolean) 1 else 0,
+                directionalGains = enabled, observe = observations::add)
+            val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+            val lower = if (boolean) SearchDecision.Bool(1) else SearchDecision.IntAtMost(0, 2)
+            val upper = if (boolean) SearchDecision.Bool(0) else SearchDecision.IntAtLeast(0, 3)
+            val current = if (boolean) 0.25 else 2.25
+            repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(current), DoubleArray(0))
+                hints.recordObjective(relaxation, 10.0)
+                hints.branch(variable)
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) upper else lower, 1)
+                    hints.beginNode(1, 100.0)
+                    hints.recordObjective(relaxation, 10.0 + if (up) upGain else 1.0)
                 }
             }
             hints.beginNode(0, 100.0)
-            hints.record(relaxation, doubleArrayOf(0.0, 2.25, 2.25), DoubleArray(0))
+            hints.record(relaxation, doubleArrayOf(current), DoubleArray(0))
             hints.recordObjective(relaxation, 10.0)
             observations.clear()
-            val variable = VarRef.IntVar(1)
-            val baseline = VarRef.IntVar(2)
 
-            val selected = hints.selected(variable, baseline, hints.directionalScore(variable))
-            hints.branch(selected ?: baseline)
+            for (original in listOf(listOf(lower, upper), listOf(upper, lower))) {
+                val alternatives = hints.orderAlternatives(variable, original)
 
-            assertEquals(if (accepted) variable else null, selected, "samples=$samples gain=$gain")
-            assertEquals(if (accepted) 1 else 0, observations.count { it == "CONSUMED" })
+                val expected = when {
+                    !enabled || upGain == 1.0 -> original
+                    upGain < 1.0 -> listOf(upper, lower)
+                    else -> listOf(lower, upper)
+                }
+                assertEquals(expected, alternatives)
+            }
+            assertEquals(if (enabled && upGain != 1.0) 2 else 0, observations.count { it == "SIDE_CONSUMED" })
+            assertEquals(if (enabled && upGain != 1.0) 1 else 0, observations.count { it == "SIDE_BASELINE_CHANGED" })
         }
     }
 

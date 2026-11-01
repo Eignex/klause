@@ -5,6 +5,7 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
@@ -170,7 +171,7 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `a baseline class reference leaves an unobserved candidate ineligible`() {
+    fun `a class prior leaves an unobserved candidate without a side preference`() {
         val history = LpDirectionalHistory({})
         history.beginNode(0)
         history.record(10.0)
@@ -183,7 +184,7 @@ class LpDirectionalHistoryTest {
             }
         }
 
-        assertEquals(7.0 / 6.0, history.referenceScore(VarRef.Bool(1), 0.5), 1e-9)
+        assertNull(history.preferredUp(VarRef.Bool(1), 0.5))
         assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
     }
 
@@ -235,7 +236,6 @@ class LpDirectionalHistoryTest {
                 }
             }
 
-            assertEquals(1.5 * gain, history.referenceScore(VarRef.IntVar(0), 2.25), 1e-9)
             if (gain == 0.0) assertTrue(history.score(VarRef.IntVar(0), 2.25).isNaN())
             else assertEquals(1.5, history.score(VarRef.IntVar(0), 2.25), 1e-9)
             assertFalse(history.usesPrior(VarRef.IntVar(0)))
@@ -269,7 +269,7 @@ class LpDirectionalHistoryTest {
 
             assertTrue(history.score(sameClass, 0.5).isFinite())
             assertTrue(history.score(otherClass, 0.5).isNaN())
-            assertTrue(history.referenceScore(otherClass, 0.5).isNaN())
+            assertNull(history.preferredUp(otherClass, 0.5))
         }
     }
 
@@ -290,7 +290,7 @@ class LpDirectionalHistoryTest {
 
         repeat(9) { history.beginNode(0) }
 
-        assertTrue(history.referenceScore(VarRef.Bool(2), 0.5).isNaN())
+        assertNull(history.preferredUp(VarRef.Bool(2), 0.5))
         assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
         assertFalse(history.mayHaveScores)
     }
@@ -330,7 +330,7 @@ class LpDirectionalHistoryTest {
 
         history.clear()
 
-        assertTrue(history.referenceScore(VarRef.Bool(2), 0.5).isNaN())
+        assertNull(history.preferredUp(VarRef.Bool(2), 0.5))
         assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
         assertFalse(history.mayHaveScores)
     }

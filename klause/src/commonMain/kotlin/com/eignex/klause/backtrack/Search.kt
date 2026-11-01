@@ -734,7 +734,8 @@ internal class BacktrackBrancher(
             session.probeCancelled = false
             context.requestCancellationPoll()
         }
-        return alternatives
+        return if (preferImportedSolution && values is SolutionGuided) alternatives
+        else branching.orderAlternatives(variable, alternatives)
     }
 
     private fun isOpen(variable: VarRef): Boolean = when (variable) {
@@ -842,6 +843,8 @@ internal interface BacktrackBranching {
     fun pick(session: PropagationSession): VarRef? = null
 
     fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> = values
+
+    fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> = alternatives
 
     data object Selectors : BacktrackBranching
 }

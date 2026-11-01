@@ -253,24 +253,26 @@ subtraction, preserving small gains when the constant exceeds floating precision
 The `lp-default` and `lp-aggressive` optimization recipes enable the finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
-and branching must be enabled. Two recent samples in each direction permit a
-variable's balanced gain score. A variable with at least one recent sample can fill
+and branching must be enabled. Variable selection retains reduced-cost/fractionality
+scoring and the configured selector's precedence. After the selected variable's
+exhaustive split is constructed, the child with the smaller predicted minimized
+objective increase is tried first. Both complementary alternatives and the split
+threshold remain unchanged. Imported-solution guidance keeps precedence.
+Two recent samples in each direction permit a variable's directional estimates.
+A variable with at least one recent sample can fill
 missing confidence from a same-scope prior after two samples in each direction within
 its Boolean or integer coordinate class. Each direction weights its own mean by
 `min(count, 2) / 2` and the prior by the remaining weight. A fully observed direction
 uses only its own mean. Unobserved variables retain reduced-cost/fractionality scoring
 and the configured selector's precedence. Reliable variable history takes precedence
-over its class prior. A partially observed proposal can replace the current LP
-candidate only when its predicted gain exceeds that candidate's history or reliable
-class estimate. Missing reference estimates and ties retain the current candidate. A prior
-used for this comparison does not make an unobserved variable eligible to propose.
-Directional and reference scores use the same objective units; reduced costs remain
-part of the fallback scorer.
-An invocation-local readiness check skips directional candidate lookups when no
-history can yield a score; its bookkeeping uses the same LP work allowance.
-Consumed choices distinguish variable history from class priors and record agreement
-with the current LP scorer, a changed variable, or a missing current LP candidate
-separately; a rejected proposal earns no consumption.
+over its class prior. Estimated unit gains are multiplied by the current split's
+fractional movement before comparing the two directions. Missing estimates, ties,
+integral values and mismatched alternatives preserve the existing order.
+An invocation-local readiness check skips the selected-variable lookup when no
+history can supply estimates; its bookkeeping uses the same LP work allowance.
+Consumed preferences distinguish variable history from class priors and record
+agreement with or a change to the existing child order. They do not change the
+selected variable or supply pruning authority.
 
 Samples share one retained exact base model, active-row identity, objective mapping
 and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
