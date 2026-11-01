@@ -30,7 +30,7 @@ internal fun PropagationState.maintainGeneralCapWindow(
         val protected = BooleanArray(learned.size)
         collectLearnedReferences(protected) { budget.visit() }
         budget.visit(0L)
-        learned.capRanking.advance(cap, learned.permanentClauseCount + learned.nonClauseCount, budget,
+        learned.capRanking.advance(cap, learned.permanentClauseCount + learned.permanentArithmeticCount, budget,
             generalCapPolicy(protected, budget, canDrop, keep))
     } catch (_: ReclamationPreparation.Deferred) {
         learned.capPreparationDefers++
@@ -52,20 +52,25 @@ private fun PropagationState.generalCapPolicy(
     }
     override fun keep(index: Int): Boolean {
         val retained = retain(index)
-        val clause = learned.store[index] as ClausePropagator
-        return retained || protected[index] || clause.literals.size <= 1 || learned.stages[index] and 1 == 0
+        val prop = learned.store[index]
+        return retained || protected[index] || (prop is ClausePropagator && prop.literals.size <= 1) ||
+            learned.stages[index] and 1 == 0
     }
     override fun visited() { learned.capVisits++ }
     override fun retire(index: Int): Boolean {
-        val clause = learned.store[index] as ClausePropagator
-        if (!mayDrop(index) || protected[index] || clause.literals.size <= 1 || learned.stages[index] and 1 == 0) {
+        val prop = learned.store[index]
+        if (!mayDrop(index) || protected[index] || (prop is ClausePropagator && prop.literals.size <= 1) ||
+            learned.stages[index] and 1 == 0
+        ) {
             return false
         }
-        budget.visit(8L)
+        budget.visit(if (prop is LearnedIntegerPropagator) 16L else 8L)
         budget.visit(0L)
-        learned.retire(index)
-        factorAttribution?.retire(clause)
-        forgetDeferredClause(clause.literals)
+        val kind = learnedKind(index)
+        learned.retire(index, kind)
+        factorAttribution?.retire(prop)
+        if (prop is ClausePropagator) forgetDeferredClause(prop.literals)
+        if (prop is LearnedIntegerPropagator) checkNotNull(learned.integerRows).unlink(prop)
         learned.store[index] = RetiredLearnedPropagator
         refPayloadStore[baseFactorCount + index] = null
         return true

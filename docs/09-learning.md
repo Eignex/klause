@@ -299,15 +299,19 @@ capacity and report `learnedRetiredSlots` separately from active clause count.
 Window calls, charged work, visits and permanent, active and retained counts remain
 available in the released session's lifecycle totals.
 
-General CP uses the same handle-preserving clause ranking. Non-clause constraints
-contribute to its retained floor. Its funded protection snapshot covers current Boolean and integer
-reasons, saved integer bounds and pending first assertions. Retired factor payloads
-remain readable for explanations while propagation queues, binary minimization and
-active-clause readers skip those rows. The candidate cursor survives appended
-clauses and is rebuilt when full compaction renumbers the store. Ownership includes
-the candidate index and every retained payload; logical retirement reports no
-physical release. Lifecycle totals identify the packed-native or general backend
-and report completed ranking passes and boundary/preparation deferrals.
+General CP ranks learned clauses, pseudo-Boolean constraints and integer rows in
+the same candidate index. Permanent arithmetic constraints contribute to its floor.
+Its funded protection snapshot covers current Boolean and integer reasons, saved
+integer bounds and pending first assertions. Eligible retired factors become inert
+stable-ID slots; propagation queues and active readers skip them. Integer rows own
+their position in a dense reference cache, allowing retirement to unlink a row
+without scanning other rows. Cache capacity and position fields remain part of
+modeled ownership; removing the last row releases the cache backing array. Full
+compaction rebuilds cache positions and remaps integer-event subscriptions even
+when no integer rows remain. The candidate cursor survives admissions and is
+rebuilt when full compaction renumbers the store. Lifecycle totals identify the
+packed-native or general backend and report completed ranking passes and
+boundary/preparation deferrals.
 
 ## Pseudo-Boolean learning
 
@@ -460,7 +464,7 @@ poll cancellation; unfinished preparation publishes no tier changes or sweep eve
 Insufficient work or scratch safely defers the cap sweep. Completed selection keeps
 the same LBD priorities and tier lifetimes; a sweep event requires actual retirement.
 
-If complete candidate preparation cannot be funded, native and general clauses use
+If complete candidate preparation cannot be funded, native clauses and general learned constraints use
 the bounded handle-preserving window. The candidate index retains the best eligible
 LBD keys as a max-heap; each funded step can resume without a whole-store selection
 buffer. Permanent clauses, protected reasons, unfunded rows and policy survivors
@@ -468,11 +472,11 @@ reduce the heap quota. A pending eviction that gains protection also consumes th
 quota before the next heap step. Mid rows
 survive their demotion window, and classification clears survivor reuse flags.
 Current or historical reasons can retain additional rows above the soft cap. General
-clause retirement replaces its payload with an inert stable-ID slot and releases its
-watch-position payload and deferred/diagnostic aliases. Stale watches skip that slot;
+retirement replaces its payload with an inert stable-ID slot and releases its
+watch-position payload, integer-row cache entry and applicable deferred/diagnostic aliases. Stale watches skip that slot;
 their allocated capacity and policy columns remain owned until compaction. General
 reason snapshots and full physical compaction still require their complete funding;
-non-clause and shared stores retain the complete selection/remap path.
+shared stores retain the complete selection/remap path.
 
 Shared learning also accepts an optional modeled-byte soft limit checked at
 propagation boundaries independently of restarts. Units, glue clauses, live reason

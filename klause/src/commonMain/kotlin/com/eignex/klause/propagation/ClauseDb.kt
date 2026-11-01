@@ -83,7 +83,7 @@ internal fun PropagationState.addLearnedClause(
     if (clause.literals.size == 1) learned.units.add(newFid)
     learned.lbds.add(lbd)
     learned.permanent.add(if (permanent) 1 else 0)
-    work += learned.trackCapClause(learned.size - 1, permanent)
+    work += learned.trackCapObject(learned.size - 1, permanent)
     learned.tier.add(ClauseTier.UNSET.ordinal)
     learned.usedFlags.add(0)
     learned.origins.add(origin)
@@ -124,6 +124,7 @@ internal fun PropagationState.addLearnedPb(
     learned.store.add(prop)
     learned.nonClauseCount++
     work++
+    work += learned.trackCapObject(learned.size - 1, permanent, LearnedKind.Pb)
     learned.lbds.add(lbd)
     learned.permanent.add(if (permanent) 1 else 0)
     learned.tier.add(ClauseTier.UNSET.ordinal)
@@ -148,8 +149,10 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     learned.store.add(propagator)
     learned.nonClauseCount++
     work++
-    val rows = learned.integerRows ?: ArrayList<LearnedIntegerPropagator>().also { learned.integerRows = it }
-    rows.add(propagator)
+    work += learned.trackCapObject(learned.size - 1, false, LearnedKind.Integer)
+    val rows = learned.integerRows ?: LearnedIntegerRows().also { learned.integerRows = it; work++ }
+    work += rows.admissionWork
+    rows.admit(propagator)
     arithmeticLearningTrace?.stored(factor, "integer")
     learned.lbds.add(lbd)
     learned.permanent.add(0)
@@ -283,14 +286,18 @@ internal fun PropagationState.forgetLearnedClauses(
     }
 
     learned.units.clear()
-    learned.integerRows?.clear()
+    learned.integerRows?.let { rows -> work += rows.size.toLong() + 2L; rows.reset() }
     learned.resetCapIndex()
     var w = 0
     for (i in 0 until n) {
         work++
         if (remap[i] >= 0) {
             val propagator = learned.store[i]
-            if (propagator is LearnedIntegerPropagator) learned.integerRows?.add(propagator)
+            if (propagator is LearnedIntegerPropagator) {
+                val rows = checkNotNull(learned.integerRows)
+                work += rows.admissionWork
+                rows.admit(propagator)
+            }
             if (propagator is ClausePropagator && propagator.literals.size == 1) learned.units.add(baseFactorCount + w)
             learned.store[w] = learned.store[i]
             learned.stages[w] = learned.stages[i]
@@ -300,12 +307,12 @@ internal fun PropagationState.forgetLearnedClauses(
             learned.usedFlags[w] = learned.usedFlags[i]
             learned.origins[w] = learned.origins[i]
             if (learned.retiredOf(w)) learned.retiredCount++
-            else if (propagator is ClausePropagator) {
-                work += learned.trackCapClause(w, learned.permanent[w] == 1)
-            }
-            if (propagator !is ClausePropagator) {
-                learned.nonClauseCount++
-                work++
+            else {
+                work += learned.trackCapObject(w, learned.permanent[w] == 1, learnedKind(w))
+                if (propagator !is ClausePropagator) {
+                    learned.nonClauseCount++
+                    work++
+                }
             }
             w++
         }
@@ -331,7 +338,7 @@ internal fun PropagationState.forgetLearnedClauses(
     }
     while (refPayloadStore.size > rw) refPayloadStore.removeAt(refPayloadStore.size - 1)
     refPayloadStore = ArrayList(refPayloadStore)
-    learned.integerRows = learned.integerRows?.let { ArrayList(it) }
+    learned.integerRows?.let { rows -> work += rows.trimmingWork; rows.trim() }
 
     for (lit in watches.byLit.indices) {
         work++
@@ -404,7 +411,7 @@ internal fun PropagationState.forgetLearnedClauses(
     }
     learned.pendingAttach.truncateTo(pending)
     remapQueue(atoms.dirtyFactors, remap, refBase)
-    if (learned.integerRows != null) {
+    if (intEvents.overflow != null) {
         val overflow = intEvents.overflow
         work += (overflow?.primitiveCapacityBytes ?: 0L) + (overflow?.size?.toLong() ?: 0L) * (overflow?.size ?: 0)
         intEvents.remapLearned(remap, refBase)

@@ -79,7 +79,7 @@ internal fun PropagationState.prepareReclamation(
             budget.atomic(1L + (list?.backingData?.size ?: 0), (list?.backingData?.size?.toLong() ?: 0L) * 8L)
         }
     }
-    if (learned.integerRows != null) {
+    if (intEvents.overflow != null) {
         intEvents.overflow?.let { overflow ->
             budget.atomic(overflow.primitiveCapacityBytes + overflow.size.toLong() * overflow.size,
                 overflow.primitiveCapacityBytes * 2L + overflow.referenceCapacity.toLong() * Long.SIZE_BYTES * 2L)
@@ -119,7 +119,11 @@ internal fun PropagationState.ownLearned(sample: com.eignex.klause.util.SharingM
     when (prop) {
         is ClausePropagator -> ints(prop.literals)
         is PseudoBooleanPropagator -> { ints(prop.literals); ints(prop.byWeightDesc); longs(prop.weights) }
-        is LearnedIntegerPropagator -> { ints(prop.row.variables); longs(prop.row.coefficients) }
+        is LearnedIntegerPropagator -> {
+            sample.owned(prop, Int.SIZE_BYTES.toLong(), protected)
+            ints(prop.row.variables)
+            longs(prop.row.coefficients)
+        }
     }
     ints(refPayloadStore[baseFactorCount + index] as? IntArray)
 }

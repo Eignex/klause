@@ -184,7 +184,7 @@ private fun PropagationState.learnedSharingMemory(
     }
     sample.ownedReferences(learned.store, learned.size.toLong(), protectedRows)
     sample.ownedReferences(refPayloadStore, refPayloadStore.size.toLong(), baseFactorCount > 0 || protectedRows)
-    learned.integerRows?.let { sample.ownedReferences(it, it.size.toLong(), protectedInteger) }
+    learned.integerRows?.sharingMemory(sample, protectedInteger)
     var watchers = watches.pos.primitiveCapacityBytes
     var protectedWatchIndex = false
     sample.ownedReferences(watches.byLit, watches.byLit.size.toLong(), true)
@@ -253,7 +253,9 @@ private fun PropagationState.learnedSharingMemory(
         "learnedRetiredSlots" to learned.retiredCount.toLong(),
         "learnedPayloadBytes" to payload,
         "learnedMetadataCapacityBytes" to metadata,
-        "learnedReferenceSlots" to learned.size.toLong() * 2L + (learned.integerRows?.size ?: 0),
+        "learnedReferenceSlots" to learned.size.toLong() * 2L + (learned.integerRows?.capacity ?: 0),
+        "learnedIntegerRowCacheCapacityBytes" to (learned.integerRows?.capacity?.toLong() ?: 0L) * Long.SIZE_BYTES,
+        "learnedIntegerRowIndexBytes" to (learned.integerRows?.size?.toLong() ?: 0L) * Int.SIZE_BYTES,
         "sessionWatchCapacityBytes" to watchers,
         "sessionQueueCapacityBytes" to propQueue.allocatedBytes + atoms.dirtyFactors.allocatedBytes,
         "propagationScheduleCapacityBytes" to (propagationSchedule?.capacityBytes ?: 0L),

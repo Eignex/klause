@@ -39,28 +39,29 @@ class ClauseDbTest {
     }
 
     @Test
-    fun `arithmetic rows should reduce the clause ranking quota`() {
+    fun `arithmetic rows should compete with clauses for the ranked quota`() {
         for (integer in listOf(false, true)) {
             val session = PropagationSession(Problem(4, 1, arrayOf(IntDomain(0, 10)),
                 arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
             if (integer) {
                 val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
                     longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
-                session.addLearnedIntegerRow(row, 9)
-            } else session.addLearnedPb(longArrayOf(1, 1), intArrayOf(4, 6), 1, 9)
+                session.addLearnedIntegerRow(row, 10)
+            } else session.addLearnedPb(longArrayOf(1, 1), intArrayOf(4, 6), 1, 10)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 8)
 
             repeat(8) { session.maintainCapWindow(2, 64L, 128L, { false }) { false } }
 
             assertEquals(2, session.activeLearnedClauseCount)
-            assertTrue(!session.isLearnedClause(1))
+            assertEquals(NoPropagator, session.explanationState.factorAt(session.problem.numFactors))
+            assertTrue(session.isLearnedClause(1))
             assertTrue(session.isLearnedClause(2))
         }
     }
 
     @Test
-    fun `compaction should retain the arithmetic floor for pending clause ranking`() {
+    fun `compaction should rebuild arithmetic candidates for pending ranking`() {
         val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = false)
         session.addLearnedPb(longArrayOf(1, 1), intArrayOf(4, 6), 1, 9)
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
@@ -72,9 +73,90 @@ class ClauseDbTest {
         repeat(8) { session.maintainCapWindow(2, 64L, 128L, { false }) { false } }
 
         assertEquals(2, session.activeLearnedClauseCount)
-        assertTrue(!session.isLearnedClause(1))
+        assertTrue(session.isLearnedClause(1))
         assertTrue(session.isLearnedClause(2))
+        assertEquals(NoPropagator, session.explanationState.factorAt(0))
+        assertEquals(1L, session.learnedLifecycle()["learningPbRetired"])
+    }
+
+    @Test
+    fun `integer retirement should release the row cache before compaction`() {
+        val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
+        repeat(3) { session.addLearnedIntegerRow(row, 9) }
+        val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        repeat(16) {
+            val work = session.work
+            session.maintainCapWindow(0, 64L, 128L, { false }) { false }
+            assertTrue(session.work - work <= 64L)
+        }
+        val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(0, session.activeLearnedClauseCount)
+        assertEquals(3L, session.learnedLifecycle()["learningIntegerRetired"])
+        assertEquals(0L, after["learnedIntegerRowCacheCapacityBytes"])
+        assertEquals(0L, after["learnedIntegerRowIndexBytes"])
+        assertTrue(after.getValue("ownedPrimitiveBytes") < before.getValue("ownedPrimitiveBytes"))
+    }
+
+    @Test
+    fun `integer cache ownership should survive pending ranking and compaction`() {
+        val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
+        for (lbd in listOf(9, 8, 7)) session.addLearnedIntegerRow(row, lbd)
+        session.maintainCapWindow(1, 64L, 128L, { false }) { false }
+
+        session.forgetLearnedClauses { index, _ -> index != 0 }
+        session.addLearnedIntegerRow(row, 6)
+        repeat(16) { session.maintainCapWindow(1, 64L, 128L, { false }) { false } }
+
+        assertEquals(1, session.activeLearnedClauseCount)
+        assertEquals(6, session.learnedClauseLbd(2))
+        assertEquals(NoPropagator, session.explanationState.factorAt(session.problem.numFactors))
+        assertEquals(NoPropagator, session.explanationState.factorAt(session.problem.numFactors + 1))
+        assertEquals(row, assertNotNull(session.explanationState.learned.integerRows).single().row)
+        assertEquals(3L, session.learnedLifecycle()["learningIntegerRetired"])
+    }
+
+    @Test
+    fun `empty integer cache compaction should remove obsolete event subscriptions`() {
+        val session = PropagationSession(Problem(0, 2, arrayOf(IntDomain(0, 10), IntDomain(0, 10)), arrayOf(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10),
+            Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 10),
+        )), nativeSat = false)
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
+        repeat(3) { session.addLearnedIntegerRow(row, 9) }
+        repeat(16) { session.maintainCapWindow(0, 64L, 128L, { false }) { false } }
+        session.forgetLearnedClauses { _, _ -> true }
+        val fresh = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(1),
+            longArrayOf(1), intArrayOf(1), LinearOp.LE, 10), useLo = true))
+        session.addLearnedIntegerRow(fresh, 8)
+
+        val result = session.pinIntAtLeast(0, 1)
+
+        assertIs<PropagationResult.Implied>(result)
+        assertEquals(0L, session.intDomain(1).min)
+        assertEquals(fresh, assertNotNull(session.explanationState.learned.integerRows).single().row)
+        assertEquals(1, session.activeLearnedClauseCount)
+    }
+
+    @Test
+    fun `permanent arithmetic constraints should survive ranked retirement`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = false)
+        session.addLearnedPb(longArrayOf(1, 1), intArrayOf(4, 6), 1, 10, permanent = true)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+
+        repeat(8) { session.maintainCapWindow(0, 64L, 128L, { false }) { false } }
+
+        assertEquals(1, session.activeLearnedClauseCount)
         assertIs<PseudoBooleanPropagator>(session.explanationState.factorAt(0))
+        assertEquals(NoPropagator, session.explanationState.factorAt(1))
     }
 
     @Test
