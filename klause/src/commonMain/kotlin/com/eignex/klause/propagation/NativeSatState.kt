@@ -444,6 +444,7 @@ internal class NativeSatState(private val state: PropagationState) {
     fun forEachBinaryPartner(lit: Int, action: (Int) -> Unit) {
         val entries = watchEntries[lit]
         for (i in 0 until watchSizes[lit]) {
+            state.work++
             val h = entries[i].toInt()
             if (isRetired(h) || clauseLen(h) != 2) continue
             val first = litOf(h, 0)
