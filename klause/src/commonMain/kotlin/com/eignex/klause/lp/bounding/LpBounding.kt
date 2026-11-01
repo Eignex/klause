@@ -579,9 +579,6 @@ internal fun LpEngine.sparseSafePrune(
     // branch values toward the LP point and pick reduced-cost-impactful fractional variables. Purely
     // advisory — it never changes feasibility or the optimum.
     hints?.record(relaxation, result.primal, result.duals)
-    if (result.optimal && hints != null) {
-        hints.recordObjective(relaxation, result.objective)
-    }
     // The scoped owner carries appended-row bases itself; the hint is only for external fresh solves.
     var optimalBasis: Basis? = result.basis
     val rowMeter = if (problem.numRealVars > 0 &&
@@ -592,6 +589,7 @@ internal fun LpEngine.sparseSafePrune(
     val objectiveCeiling = if (canPrune) null else singleObjectiveCeiling(relaxation, cancellation)
     val canFix = canPrune || objectiveCeiling != null
     if (!canFix && !canPropagate) {
+        if (result.optimal) hints?.recordObjective(relaxation, result.objective)
         if (rowMeter != null && applyMixedRowBounds(relaxation, session, sink, learn, cancellation, rowMeter)) {
             return LpNodeOutcome(true, null)
         }
@@ -718,6 +716,10 @@ internal fun LpEngine.sparseSafePrune(
         if ((integralCutoff != null && full.ceilLong()?.let { it >= integralCutoff } == true) ||
             full >= rationalCutoff
         ) {
+            hints?.let {
+                noteNodeOverhead(words)
+                it.recordBound(boundRel, lower.toDouble())
+            }
             sink.lp.observePrune()
             observeCutUse(boundRel, cert, "BOUND_PRUNE")
             LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
@@ -737,6 +739,7 @@ internal fun LpEngine.sparseSafePrune(
             applyMixedRowBounds(boundRel, session, sink, learn, cancellation, rowMeter, relaxer) { optimalBasis = null }
         return LpNodeOutcome(prune, if (prune) null else optimalBasis)
     }
+    hints?.recordBound(boundRel, lower)
     val full = checkNotNull(BigFraction.ofDouble(lower)) + BigFraction.ofLong(boundRel.objectiveConstant)
     val sourceRange = sourceObjectiveRange(boundRel)
     val cutoff = if (canPrune) sourceObjectiveCutoff(boundRel, bound, sourceRange) else null

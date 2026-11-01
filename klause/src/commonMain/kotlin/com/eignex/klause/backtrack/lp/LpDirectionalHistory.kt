@@ -86,6 +86,7 @@ internal class LpDirectionalHistory(
     fun branch(variable: VarRef, value: Double) {
         parents.keys.removeAll { it >= depth }
         if (depth >= MAX_DEPTH || !objective.isFinite() || !value.isFinite()) return
+        if (variable is VarRef.Bool && (value < 0.0 || value > 1.0)) return
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return
         parents[depth] = Parent(objective, variable, value)
@@ -149,6 +150,7 @@ internal class LpDirectionalHistory(
 
     private fun score(variable: VarRef, value: Double, initializeUnobserved: Boolean): Double {
         if (!value.isFinite()) return Double.NaN
+        if (variable is VarRef.Bool && (value < 0.0 || value > 1.0)) return Double.NaN
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return Double.NaN
         val local = gains[variable]

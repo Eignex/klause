@@ -36,8 +36,9 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
         }
     }
     for (i in 0 until problem.numIntVars) {
-        if (session.intDomain(i).isFixed) continue
-        val gain = if (directionalAvailable) hints.directionalScore(VarRef.IntVar(i)) else Double.NaN
+        val domain = session.intDomain(i)
+        if (domain.isFixed) continue
+        val gain = if (directionalAvailable) hints.directionalScore(VarRef.IntVar(i), domain) else Double.NaN
         if (gain > gainScore) {
             gainScore = gain
             directional = VarRef.IntVar(i)
@@ -48,7 +49,8 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
             best = VarRef.IntVar(i)
         }
     }
-    return hints.selected(directional, best, gainScore) ?: best
+    val domain = (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) }
+    return hints.selected(directional, best, gainScore, domain) ?: best
 }
 
 /** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below

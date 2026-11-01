@@ -32,7 +32,7 @@ class LpParams(
 }
 
 internal enum class LpHintUnavailable {
-    NO_QUERY,
+    UNOBSERVED,
     ALLOWANCE,
     DEPTH,
     CADENCE,
@@ -40,7 +40,7 @@ internal enum class LpHintUnavailable {
     MODEL,
     SUSPENDED,
     NO_RESULT,
-    NON_OPTIMAL,
+    NO_BOUND,
     CANCELLED,
     EARLIER_BOUND,
     FEASIBILITY_ONLY,
@@ -55,13 +55,16 @@ internal enum class LpHintUnavailable {
 internal interface LpHintSink {
     fun clear()
 
-    /** Advisory floating optimum in minimized working units; supplies no certified bound. */
+    /** Advisory numeric projection of an accepted bound in minimized working units; adds no proof authority. */
+    fun recordBound(relaxation: LpRelaxation, bound: Double) {}
+
+    /** Advisory floating optimum when ordinary bounding needs no certificate. */
     fun recordObjective(relaxation: LpRelaxation, objective: Double) {}
 
     fun recordInfeasible() {}
 
     fun recordUnavailable(reason: LpHintUnavailable) {}
 
-    /** Record an LP solution's [primal] and [duals] against [relaxation]'s column→variable map. */
+    /** Record an advisory iterate's [primal] and [duals] against [relaxation]'s column→variable map. */
     fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray)
 }

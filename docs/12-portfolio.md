@@ -837,7 +837,7 @@ for three structures, skipped when LP is unavailable, the pool is explicit or
 annotated, or execution is parallel or single-engine. See
 [ordinary tableau admission](17-linear-programming.md).
 
-The `lp-default` and `lp-aggressive` optimization recipes consume scoped passive gains.
+The `lp-default` and `lp-aggressive` optimization recipes consume scoped passive checked-bound gains.
 Reliable variable estimates take precedence; partially observed proposals can replace
 the current LP candidate if their predicted gain exceeds its history or reliable
 class estimate. Unobserved variables keep current scoring. History spends

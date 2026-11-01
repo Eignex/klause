@@ -33,9 +33,40 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
+    fun `boolean gain history declines iterates outside the domain`() {
+        for (value in listOf(-0.5, 1.5)) {
+            val history = LpDirectionalHistory({}, useClassPriors = false)
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                history.commit(SearchDecision.Bool(1), 1)
+                history.beginNode(1)
+                history.record(11.0)
+                history.commit(SearchDecision.Bool(0), 1)
+                history.beginNode(1)
+                history.record(13.0)
+            }
+
+            assertTrue(history.score(variable, value).isNaN())
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, value)
+            for (literal in listOf(1, 0)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(100.0)
+            }
+
+            assertEquals(1.5, history.score(variable, 0.5), 1e-9)
+        }
+    }
+
+    @Test
     fun `missing children cannot borrow a later descendant objective`() {
         for (up in listOf(false, true)) {
-            for (reason in listOf("NO_QUERY", "CADENCE", "NON_OPTIMAL")) {
+            for (reason in listOf("UNOBSERVED", "CADENCE", "NO_BOUND")) {
                 val observations = ArrayList<String>()
                 val history = LpDirectionalHistory(observations::add)
                 history.beginNode(0)

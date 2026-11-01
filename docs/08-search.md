@@ -242,11 +242,18 @@ modes stop incomplete when their model continuation would require such a blocker
 
 ### Finite LP directional guidance
 
-Finite optimization records passive immediate parent/child floating LP optimum gains
-in minimized working objective units. Each gain is divided by the fractional movement
-to the actual lower or upper branch. A missing or interrupted optimum, infeasibility,
-negative or nonfinite gain, integral point or mismatched split supplies no numeric
-sample. These advisory observations supply no certified bound or pruning authority.
+Finite optimization records passive immediate parent/child progress of already accepted
+LP objective lower bounds in minimized working units. Each gain is divided by the
+fractional movement of the advisory LP iterate to the actual lower or upper branch.
+An unfinished iterate need not be feasible; its existing checked dual bound can still
+supply progress. Missing bounds, infeasibility, negative or nonfinite gains, integral
+coordinates and mismatched splits supply no numeric sample. Boolean coordinates must
+lie within `[0, 1]`; both integer split neighbours must belong to the current domain.
+These advisory observations supply no additional certified bound or pruning authority. The bound and fractional
+coordinates must come from the same working model; changed cut models decline.
+When ordinary bounding needs no certificate, an existing floating optimum remains
+the fallback estimate. Switching between checked bounds and floating optima clears
+history, so their gains and class priors never mix.
 The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
 
@@ -272,8 +279,8 @@ Consumed choices distinguish variable history from class priors and record agree
 with the current LP scorer, a changed variable, or a missing current LP candidate
 separately; a rejected proposal earns no consumption.
 Committed observation attempts retain their branch direction. Missing immediate-child
-optima distinguish LP admission gates, suspended or absent results and non-optimal
-points. Scope changes, depth changes and replaced alternatives report discarded
+bound estimates distinguish LP admission gates, suspended or absent results and
+unavailable bounds. Scope changes, depth changes and replaced alternatives report discarded
 attempts separately. These observations spend the existing allowance and do not
 request another solve or supply a gain sample.
 
