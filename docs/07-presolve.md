@@ -257,13 +257,13 @@ opens a consumer. Assumptions, external components, arithmetic and LP-enabled
 workers retain their canonical traversal. Enumeration and optimization do not use
 this trial.
 
-Pinning retains unchanged immutable source clauses by reference and copies only
-shortened rows. Column counts stay identical, preserving the clauses' plain-Boolean
+Source preparation retains unchanged immutable clauses by reference and copies
+shortened or complemented rows. Column counts stay identical, preserving the clauses' plain-Boolean
 classification. Each new baked model owns its projection, watches and search state;
 the shared factor input carries no mutable search state.
 
 A trial follows global root pins beyond the baked root and the last attempted
-view, or owned learned binary implications proving two unfixed variables equal.
+view, or owned learned binary implications proving two unfixed variables equal or complementary.
 An unchanged root performs no BVE. The root-pin scan charges its full
 column visit count and records its time; an insufficient grant skips the scan.
 An unchanged root trail retains a completed miss. All attempts share one
@@ -284,9 +284,13 @@ an exhaustive elimination pass.
 
 A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker
-qualifies. The capture binds its exact source object and owns its clauses. Adding
+qualifies. The capture binds its exact source object and owns its clauses; preparation
+rechecks that its columns remain unfixed. Adding
 them to the pinned source preserves the premises of the source implication-graph
-pass. Same-polarity equivalences retain Boolean slots and record `CopyLiteral`
+pass. A complemented pair flips one column in the private source view before
+the equal-valued graph pass. The source mapping reverses that flip when lifting a
+witness; canonical learned literals receive the same flip before private projection.
+Equivalent and complemented columns retain Boolean slots and record `CopyLiteral`
 reconstruction; transitive binary deletion alone opens no consumer. Literal
 remapping reserves normalization work before the graph pass receives half the
 remaining allowance. Discovery visits recent learning first, scanning at most 128 eligible binaries and

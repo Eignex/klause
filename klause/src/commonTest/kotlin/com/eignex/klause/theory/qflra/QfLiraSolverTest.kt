@@ -20,6 +20,8 @@ import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.LpRoute
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -501,7 +503,7 @@ class QfLiraSolverTest {
     }
 
     @Test
-    fun `existing source predicate should complete a deferred disjunction witness`() {
+    fun `existing source predicate consumes a deferred LP witness`() {
         val model = Problem(
             numBoolVars = 0,
             intBounds = openBounds(),
@@ -511,7 +513,9 @@ class QfLiraSolverTest {
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
             ),
         )
+        val stats = LpStatsSink()
         ExactLiraSearchComponent(model).use { component ->
+            component.observePrimaryLpWith(stats.certificationObserver(LpRoute.STANDALONE))
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0, maxAtoms = 2))
             assertIs<ComponentResult.Consistent>(session.initialize())
             val split = assertNotNull(
@@ -522,6 +526,7 @@ class QfLiraSolverTest {
                 ),
             )
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.positive)))
+            assertNull(stats.snapshot().phases["CLAIM_CONSUMPTION_STANDALONE"])
 
             val result = session.solve(0)
 
@@ -530,6 +535,8 @@ class QfLiraSolverTest {
                     .valueOf(component.assignmentKey),
             )
             assertEquals(BIG_ZERO, witness.intValue(0))
+            assertEquals(1L, stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
+                .outcomes["FEASIBLE_COMPLETION"])
         }
     }
 

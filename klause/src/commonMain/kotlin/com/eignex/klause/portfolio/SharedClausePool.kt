@@ -87,16 +87,19 @@ internal class SharedClausePool(
 
     /** Append the unseen clauses of [batch] (by key) as published by arm [origin], compacting on overflow.
      *  [isGlobal] marks a globally-published nogood for retention priority over filtered glue. A clause
-     *  already pooled keeps the arm that published it first. */
+     *  already pooled keeps the arm that published it first. With [stableGenerationOnly], a batch that
+     *  could require compaction returns -1 before publication. */
     fun publish(
         batch: List<SharedClause>,
         origin: Int = NO_ORIGIN,
         isGlobal: Boolean = false,
         maxWork: Long = reclamationWork,
         maxScratchEntries: Int = reclamationScratchEntries,
+        stableGenerationOnly: Boolean = false,
         cancelled: () -> Boolean = { false },
         charge: () -> Unit = {},
     ): Int = lock.withLock {
+        if (stableGenerationOnly && (softLimitBytes != null || batch.size > cap - store.size)) return@withLock -1
         val budget = Budget(maxWork, maxScratchEntries, cancelled, charge)
         var published = 0
         try {
@@ -533,7 +536,7 @@ internal class PoolClauseExchange(
         meter?.imported(SharingChannel.Clauses, imported, drained.cursor)
         meter?.duplicates(SharingChannel.Clauses, duplicates)
         countUses(session)
-        export(session)
+        export(session, retiring = false)
         observe(session)
     }
 
@@ -553,7 +556,7 @@ internal class PoolClauseExchange(
         retainSession(session)
         if (!session.cancelRequested) {
             countUses(session)
-            export(session)
+            export(session, retiring = false)
         }
         observe(session)
     }
@@ -562,7 +565,7 @@ internal class PoolClauseExchange(
         if (sessionIdentity != null && sessionIdentity !== session.sharingIdentity) return@metered
         if (!session.cancelRequested) {
             countUses(session)
-            export(session)
+            export(session, retiring = true)
         }
         if (pool.measureMemory) meter?.clauseMemorySample(
             ownedMemory() + SharingMemorySnapshot(SharingMemoryStatus.STALE, emptyMap(), 0L, 0).telemetry(),
@@ -599,8 +602,24 @@ internal class PoolClauseExchange(
 
     /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
      *  trail). The `seen` set guards against re-export within a session; the pool de-dups globally. */
-    private fun export(session: PropagationSession) {
+    private fun export(session: PropagationSession, retiring: Boolean) {
         val candidates = exportCandidates(session) ?: return
+        if (retiring && candidates.isNotEmpty() && pool.softLimitBytes == null &&
+            !seen.canAddWithoutGrowing(candidates.size)
+        ) {
+            val published = pool.publish(candidates, origin,
+                isGlobal = false,
+                maxWork = pool.reclamationWork,
+                maxScratchEntries = pool.reclamationScratchEntries,
+                stableGenerationOnly = true,
+                cancelled = { session.cancelRequested },
+                charge = { session.chargeSharingWork(1L) },
+            )
+            if (published >= 0) {
+                meter?.exported(SharingChannel.Clauses, published)
+                return
+            }
+        }
         val fresh = candidates.filter { admit(it.key, session) == true }
         val published = if (fresh.isEmpty()) 0 else pool.publish(
             fresh,

@@ -138,6 +138,8 @@ connected integer neighborhood without a root relaxation. The all-pinned
 rounded-root bootstrap is reserved for a center without that checked handoff.
 Continuous columns stay free, source
 cutoff checks remain exact, and later proposals retain their captured conditions.
+Imported points remain query incumbents and centers; only a point produced by the
+repair query enters companion discovery publication and original-source rechecking.
 If that first proposal pauses, it receives continuation after owed complete-worker
 coverage until the proposal finishes or the companion's existing allowance retires
 it. This trial grants no incumbent reward and does not renew work, allocation or
@@ -276,6 +278,16 @@ pool; resuming the same session retains both cursor and filter. Retirement recor
 the pool and filter capacity counters, then releases the filter without traversing
 the store. An uncancelled retirement also drains uses and exports
 remaining glue; a cancelled retirement skips those scans.
+A retirement batch that could allocate or grow the worker's private key table
+can use the pool's existing index instead. If it fits the remaining entry capacity
+and has no byte limit, the pool deduplicates it under the publication lock. The
+generation cannot compact during that batch, so fresh keys need not enter the
+worker's retiring filter. Existing private keys still suppress earlier imports
+and exports. Batches that fit the existing private backing, entry pressure and
+byte limits keep the ordinary private admission and reclamation path. Capacity
+refusal happens before publication; exhausting
+publication funding ends the export without another allowance. Every candidate
+visit and pool operation retains its work, scratch and cancellation bounds.
 
 Glue export probes that same filter with the portable content key before copying
 native literals or constructing portable payloads. An empty filter skips duplicate
