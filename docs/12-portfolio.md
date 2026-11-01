@@ -931,9 +931,11 @@ Each safe-root slice shares a 4,096-work grant: cheap simplification receives 25
 and up to two failed-literal probes share 3,072 work with an 8,192-work per-probe
 ceiling. Root scans examine at most 256 clauses per slice. Natural-root scheduling
 uses a 32-work interval, eight-clause growth and a 32-work cooldown, with no warmup.
-These allowances remain inside each worker's containing slice. Explicit backtrack
-edits apply after these defaults. Named pools and source annotations keep their
-selected parameters; native clausal proof admission retains its own policy.
+These allowances remain inside each worker's containing slice. The
+`root-maintenance=false` option retains stock root defaults without changing explicit
+root or probe settings. Backtrack edits apply after the automatic defaults. Named
+pools and source annotations keep their selected parameters; native clausal proof
+admission retains its own policy.
 
 Clausal complete-search recipes use clause learning, EMA restarts and a true-first
 saved phase; their balanced and stable variants differ in VSIDS decay (0.975, 0.99)
