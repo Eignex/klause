@@ -21,12 +21,13 @@ import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.util.Cancellation
-import java.io.File
-import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
 
 internal object ArithmeticLearningApplicabilityProfile {
     @JvmStatic
@@ -71,10 +72,16 @@ internal object ArithmeticLearningApplicabilityProfile {
                             put("status", "column-limit-declined")
                             return@buildJsonObject
                         }
-                        val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-                            original, FiniteEngine.BACKTRACK, entry.objective,
-                            cancellation = stop, solveCancellation = stop, randomSeed = 1L,
-                        ))
+                        val prepared = FinitePipeline.prepare(
+                            FinitePipelineRequest(
+                                original,
+                                FiniteEngine.BACKTRACK,
+                                entry.objective,
+                                cancellation = stop,
+                                solveCancellation = stop,
+                                randomSeed = 1L,
+                            )
+                        )
                         val model = prepared.problem as? BakedProblem
                         if (model == null || stop() || prepared.presolve?.infeasible == true) {
                             put("status", "preparation-incomplete-or-terminal")
@@ -88,10 +95,12 @@ internal object ArithmeticLearningApplicabilityProfile {
                         put("objective", prepared.objective != null)
                         put("annotatedSearch", entry.searchParams != null)
                         put("policy", policy(model, prepared.objective, entry.searchParams != null))
-                    } catch (error: RuntimeException) {
-                        put("status", "preparation-declined")
-                        put("error", error::class.simpleName)
-                        put("message", error.message?.take(512))
+                    } catch (error: IllegalArgumentException) {
+                        decline(error)
+                    } catch (error: IllegalStateException) {
+                        decline(error)
+                    } catch (error: UnsupportedOperationException) {
+                        decline(error)
                     } finally {
                         put("preparationNs", System.nanoTime() - started)
                         put("cancelled", stop())
@@ -104,11 +113,13 @@ internal object ArithmeticLearningApplicabilityProfile {
         }
     }
 
-    private fun policy(
-        model: BakedProblem,
-        objective: LinearObjective?,
-        annotated: Boolean,
-    ) = buildJsonObject {
+    private fun JsonObjectBuilder.decline(error: RuntimeException) {
+        put("status", "preparation-declined")
+        put("error", error::class.simpleName)
+        put("message", error.message?.take(512))
+    }
+
+    private fun policy(model: BakedProblem, objective: LinearObjective?, annotated: Boolean) = buildJsonObject {
         val factsType = Class.forName("com.eignex.klause.portfolio.ProblemFacts")
         val companion = factsType.getField("Companion").get(null)
         val facts = factsType.declaredClasses.single { it.simpleName == "Companion" }.methods.single {
@@ -124,14 +135,18 @@ internal object ArithmeticLearningApplicabilityProfile {
         val composition = Class.forName("com.eignex.klause.portfolio.PortfolioComposition")
         val arms = composition.getMethod("compose", PortfolioScenario::class.java, factsType).invoke(
             composition.getField("INSTANCE").get(null),
-            PortfolioScenario.sequential(Kind.COP, EngineMix.BACKTRACK, 1L), facts,
+            PortfolioScenario.sequential(Kind.COP, EngineMix.BACKTRACK, 1L),
+            facts,
         ) as List<*>
-        put("automaticSlots", buildJsonArray {
-            arms.forEachIndexed { index, arm ->
-                requireNotNull(arm)
-                val recipe = arm.javaClass.getMethod("getRecipe").invoke(arm) as BacktrackRecipe
-                if (recipe.build(1001L + index, null).integerRowLearning) add(JsonPrimitive(index))
+        put(
+            "automaticSlots",
+            buildJsonArray {
+                arms.forEachIndexed { index, arm ->
+                    requireNotNull(arm)
+                    val recipe = arm.javaClass.getMethod("getRecipe").invoke(arm) as BacktrackRecipe
+                    if (recipe.build(1001L + index, null).integerRowLearning) add(JsonPrimitive(index))
+                }
             }
-        })
+        )
     }
 }
