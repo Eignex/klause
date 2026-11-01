@@ -116,7 +116,9 @@ class QfLiraSolverLpTest {
             realUpper = doubleArrayOf(2.0, 2.0),
             factors = arrayOf(
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(3.0, 5.0), LinearOp.EQ, 1.0),
-                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+                ReifiedRealLinear(
+                    0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0,
+                ),
             ),
         )
         val stats = LpStatsSink()
