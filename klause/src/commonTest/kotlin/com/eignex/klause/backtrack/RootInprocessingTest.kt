@@ -91,7 +91,7 @@ class RootInprocessingTest {
 
     @Test
     fun `new root facts should extend the source neighborhood after an earlier slice`() {
-        for (native in listOf(false, true)) {
+        for ((native, prepared) in listOf(false to false, false to true, true to true)) {
             val source = Problem(6, 0, emptyArray(), Array<Factor>(130) { index ->
                 Clause(when (index) {
                     0 -> intArrayOf(10)
@@ -99,7 +99,9 @@ class RootInprocessingTest {
                     else -> intArrayOf(6, 8)
                 })
             }).bake()
-            val projection = PropagationProblem.preparation(source).asSequence().filterNotNull().last()
+            val projection = if (prepared) {
+                PropagationProblem.preparation(source).asSequence().filterNotNull().last()
+            } else PropagationProblem(source)
             val session = PropagationSession(projection, nativeSat = native)
             val pass = RootSimplificationPass()
             val params = BacktrackParams(rootSimplifyBatch = 4, inprocessingRootWork = 64L)
