@@ -27,7 +27,6 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpHintsTest {
@@ -51,7 +50,7 @@ class LpHintsTest {
 
     @Test
     fun `basis side advice puts the cheaper existing child first`() {
-        for (boolean in listOf(false, true)) for (alternate in listOf(false, true)) {
+        for (boolean in listOf(false, true)) for (id in 0..1) {
             for (upCheap in listOf(false, true)) for (upFirst in listOf(false, true)) {
                 val builder = LpBuilder()
                 repeat(2) { builder.addVar(0, 2) }
@@ -59,23 +58,16 @@ class LpHintsTest {
                     BooleanArray(2) { boolean }, 0L, if (boolean) IntArray(0) else intArrayOf(0, 1),
                     if (boolean) intArrayOf(0, 1) else IntArray(0))
                 val hints = LpHints(if (boolean) 0 else 2, if (boolean) 2 else 0, directionalGains = true)
-                val baseline = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
-                val runner = if (boolean) VarRef.Bool(1) else VarRef.IntVar(1)
-                val winner = if (alternate) runner else baseline
+                val variable = if (boolean) VarRef.Bool(id) else VarRef.IntVar(id)
                 val cost = if (upCheap) LpDirectionalCost(4.0, 1.0) else LpDirectionalCost(1.0, 4.0)
                 hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-                val choice = hints.basisPick(baseline, runner, IntDomain(0, 2), IntDomain(0, 2)) { _, _ ->
-                    if (alternate) listOf(LpDirectionalCost(0.1, 0.1), cost)
-                    else listOf(cost, LpDirectionalCost(0.1, 0.1))
-                }
-                hints.selected(choice?.first, baseline, choice?.second ?: Double.NaN, basis = true)
-                hints.branch(winner, if (boolean) null else IntDomain(0, 2))
-                val id = if (alternate) 1 else 0
+                hints.prepareSide(variable, IntDomain(0, 2)) { _, _ -> listOf(cost) }
+                hints.branch(variable, if (boolean) null else IntDomain(0, 2))
                 val lower = if (boolean) SearchDecision.Bool(2 * id + 1) else SearchDecision.IntAtMost(id, 0L)
                 val upper = if (boolean) SearchDecision.Bool(2 * id) else SearchDecision.IntAtLeast(id, 1L)
                 val existing = if (upFirst) listOf(upper, lower) else listOf(lower, upper)
 
-                val ordered = hints.orderAlternatives(winner, existing)
+                val ordered = hints.orderAlternatives(variable, existing)
 
                 assertEquals(if (upCheap) listOf(upper, lower) else listOf(lower, upper), ordered)
             }
@@ -84,7 +76,7 @@ class LpHintsTest {
 
     @Test
     fun `basis side advice expires with its node and point`() {
-        for (change in listOf("node", "reset", "clear", "record", "point", "empirical")) {
+        for (change in listOf("node", "reset", "clear", "record", "point", "selection")) {
             val builder = LpBuilder()
             repeat(2) { builder.addVar(0, 2) }
             val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
@@ -92,10 +84,7 @@ class LpHintsTest {
             val hints = LpHints(2, 0, directionalGains = true)
             val variable = VarRef.IntVar(0)
             hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-            hints.basisPick(variable, VarRef.IntVar(1), IntDomain(0, 2), IntDomain(0, 2)) { _, _ ->
-                listOf(LpDirectionalCost(4.0, 1.0), LpDirectionalCost(0.1, 0.1))
-            }
-            hints.selected(null, variable, Double.NaN, basis = true)
+            hints.prepareSide(variable, IntDomain(0, 2)) { _, _ -> listOf(LpDirectionalCost(4.0, 1.0)) }
             hints.branch(variable, IntDomain(0, 2))
             when (change) {
                 "node" -> hints.beginNode(1, 100.0)
@@ -103,7 +92,7 @@ class LpHintsTest {
                 "clear" -> hints.clear()
                 "record" -> hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
                 "point" -> hints.recordPoint(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-                else -> hints.selected(variable, variable, 1.0)
+                else -> hints.prepareSide(null, null) { _, _ -> null }
             }
             val existing = listOf(SearchDecision.IntAtMost(0, 0L), SearchDecision.IntAtLeast(0, 1L))
 
@@ -123,10 +112,7 @@ class LpHintsTest {
             val hints = LpHints(2, 0, directionalGains = true)
             val variable = VarRef.IntVar(if (change == "variable") 1 else 0)
             hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-            hints.basisPick(VarRef.IntVar(0), VarRef.IntVar(1), IntDomain(0, 2), IntDomain(0, 2)) { _, _ ->
-                listOf(LpDirectionalCost(4.0, 1.0), LpDirectionalCost(0.1, 0.1))
-            }
-            hints.selected(null, VarRef.IntVar(0), Double.NaN, basis = true)
+            hints.prepareSide(VarRef.IntVar(0), IntDomain(0, 2)) { _, _ -> listOf(LpDirectionalCost(4.0, 1.0)) }
             hints.branch(variable, if (change == "domain") IntDomain(0, 2).excludeValue(1) else IntDomain(0, 2))
             val split = if (change == "split") 1L else 0L
             val lower = SearchDecision.IntAtMost(variable.varId, split)
@@ -146,16 +132,13 @@ class LpHintsTest {
     @Test
     fun `tied basis child gains preserve the existing order`() {
         val builder = LpBuilder()
-        repeat(2) { builder.addVar(0, 2) }
-        val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
-            BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
-        val hints = LpHints(2, 0, directionalGains = true)
+        builder.addVar(0, 2)
+        val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0),
+            BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+        val hints = LpHints(1, 0, directionalGains = true)
         val variable = VarRef.IntVar(0)
-        hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-        hints.basisPick(variable, VarRef.IntVar(1), IntDomain(0, 2), IntDomain(0, 2)) { _, _ ->
-            listOf(LpDirectionalCost(2.0, 2.0), LpDirectionalCost(0.1, 0.1))
-        }
-        hints.selected(null, variable, Double.NaN, basis = true)
+        hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+        hints.prepareSide(variable, IntDomain(0, 2)) { _, _ -> listOf(LpDirectionalCost(2.0, 2.0)) }
         hints.branch(variable, IntDomain(0, 2))
         val existing = listOf(SearchDecision.IntAtLeast(0, 1L), SearchDecision.IntAtMost(0, 0L))
 
@@ -195,13 +178,14 @@ class LpHintsTest {
     }
 
     @Test
-    fun `basis comparison owns the refreshed point with a matching split`() {
+    fun `basis advice owns the refreshed point with a matching split`() {
         for (change in listOf("same-split", "moved-split", "next-node", "clear")) {
             val builder = LpBuilder()
             repeat(2) { builder.addVar(0, 2) }
             val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
                 BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
             val hints = LpHints(2, 0, directionalGains = true)
+            val variable = VarRef.IntVar(0)
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
             val point = doubleArrayOf(if (change == "moved-split") 1.1 else 0.1, 0.5)
@@ -209,13 +193,13 @@ class LpHintsTest {
             point.fill(0.0)
             if (change == "next-node") hints.beginNode(1, 100.0)
             if (change == "clear") hints.clear()
+            hints.prepareSide(variable, IntDomain(0, 2)) { _, _ -> listOf(LpDirectionalCost(4.0, 4.0)) }
+            hints.branch(variable, IntDomain(0, 2))
+            val existing = listOf(SearchDecision.IntAtLeast(0, 1L), SearchDecision.IntAtMost(0, 0L))
 
-            val selected = hints.basisPick(VarRef.IntVar(0), VarRef.IntVar(1),
-                IntDomain(0, 2), IntDomain(0, 2)) { _, _ ->
-                listOf(LpDirectionalCost(4.0, 4.0), LpDirectionalCost(4.0, 4.0))
-            }
+            val ordered = hints.orderAlternatives(variable, existing)
 
-            assertEquals(if (change == "same-split") VarRef.IntVar(1) else null, selected?.first, change)
+            assertEquals(if (change == "same-split") existing.reversed() else existing, ordered, change)
         }
     }
 
@@ -254,56 +238,57 @@ class LpHintsTest {
     }
 
     @Test
-    fun `basis comparison requires a strictly larger balanced directional gain`() {
-        for ((alternateCost, expected) in listOf(
-            LpDirectionalCost(4.0, 4.0) to VarRef.IntVar(1),
-            LpDirectionalCost(2.0, 6.0) to null,
-            LpDirectionalCost(1.0, 12.0) to null,
-            LpDirectionalCost(-1.0, 6.0) to null,
-            LpDirectionalCost(Double.NaN, 6.0) to null,
-            null to null,
+    fun `basis advice reads only its selected column and rejects unusable costs`() {
+        for ((cost, accepted) in listOf(
+            LpDirectionalCost(4.0, 1.0) to true,
+            LpDirectionalCost(3.0, 1.0) to false,
+            LpDirectionalCost(0.0, 0.0) to false,
+            LpDirectionalCost(-1.0, 6.0) to false,
+            LpDirectionalCost(Double.NaN, 6.0) to false,
+            null to false,
         )) {
             val builder = LpBuilder()
             repeat(2) { builder.addVar(0, 2) }
             val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
                 BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
             val hints = LpHints(2, 0, directionalGains = true)
-            hints.beginNode(0, 100.0)
-            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-
-            val selected = hints.basisPick(VarRef.IntVar(0), VarRef.IntVar(1), IntDomain(0, 2),
-                IntDomain(0, 2)) { model, columns ->
+            val variable = VarRef.IntVar(1)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.25), DoubleArray(0))
+            hints.prepareSide(variable, IntDomain(0, 2)) { model, columns ->
                 assertTrue(model === relaxation.model)
-                assertEquals(listOf(0, 1), columns.toList())
-                listOf(LpDirectionalCost(2.0, 6.0), alternateCost)
+                assertEquals(listOf(1), columns.toList())
+                listOf(cost)
             }
+            hints.branch(variable, IntDomain(0, 2))
+            val existing = listOf(SearchDecision.IntAtMost(1, 0L), SearchDecision.IntAtLeast(1, 1L))
 
-            assertEquals(expected, selected?.first)
+            val ordered = hints.orderAlternatives(variable, existing)
+
+            assertEquals(if (accepted) existing.reversed() else existing, ordered)
         }
     }
 
     @Test
-    fun `basis comparison ignores missing points and excluded split neighbours`() {
+    fun `basis advice ignores missing points and excluded split neighbours`() {
         for (decline in listOf("disabled", "next-node", "domain", "integral", "clear")) {
             val builder = LpBuilder()
-            repeat(2) { builder.addVar(0, 2) }
-            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
-                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
-            val hints = LpHints(2, 0, directionalGains = decline != "disabled")
+            builder.addVar(0, 2)
+            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0),
+                BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+            val hints = LpHints(1, 0, directionalGains = decline != "disabled")
             hints.beginNode(0, 100.0)
-            hints.record(relaxation, doubleArrayOf(if (decline == "integral") 0.0 else 0.5, 0.5),
-                DoubleArray(0))
+            hints.record(relaxation, doubleArrayOf(if (decline == "integral") 0.0 else 0.5), DoubleArray(0))
             if (decline == "next-node") hints.beginNode(1, 100.0)
             if (decline == "clear") hints.clear()
             var estimates = 0
 
-            val selected = hints.basisPick(VarRef.IntVar(0), VarRef.IntVar(1),
-                if (decline == "domain") IntDomain(1, 2) else IntDomain(0, 2), IntDomain(0, 2)) { _, _ ->
+            val available = hints.prepareSide(VarRef.IntVar(0),
+                if (decline == "domain") IntDomain(1, 2) else IntDomain(0, 2)) { _, _ ->
                 estimates++
-                listOf(LpDirectionalCost(1.0, 1.0), LpDirectionalCost(4.0, 4.0))
+                listOf(LpDirectionalCost(4.0, 1.0))
             }
 
-            assertNull(selected, decline)
+            assertTrue(!available, decline)
             assertEquals(0, estimates, decline)
         }
     }
@@ -512,47 +497,39 @@ class LpHintsTest {
     }
 
     @Test
-    fun `only reliable variable history can override the baseline`() {
+    fun `only reliable history supplies child priority`() {
         for ((samples, gain, accepted) in listOf(
             Triple(1, 1.0, false), Triple(1, 8.0, false), Triple(1, 16.0, false), Triple(2, 1.0, true),
         )) {
             val builder = LpBuilder()
-            repeat(3) { builder.addVar(0, 10, cost = if (it == 2) 100 else 1) }
+            builder.addVar(0, 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, 2),
-                BooleanArray(3), 0L, intArrayOf(0, 1, 2), IntArray(0))
-            val observations = ArrayList<String>()
-            val hints = LpHints(3, 0, directionalGains = true, observe = observations::add)
-            for (variable in 0..1) {
-                repeat(if (variable == 0) 2 else samples) {
-                    hints.beginNode(0, 100.0)
-                    hints.record(relaxation, DoubleArray(3) { 2.25 }, DoubleArray(0))
-                    hints.recordBound(relaxation, 10.0)
-                    hints.branch(VarRef.IntVar(variable))
-                    for (up in if (variable == 0 || samples == 2) listOf(false, true) else listOf(false)) {
-                        hints.commit(if (up) SearchDecision.IntAtLeast(variable, 3)
-                            else SearchDecision.IntAtMost(variable, 2), 1)
-                        hints.beginNode(1, 100.0)
-                        hints.record(relaxation, DoubleArray(3) { 2.25 }, DoubleArray(0))
-                        val delta = if (variable == 0) {
-                            if (up) 24.0 else 8.0
-                        } else if (up) 3.0 else gain
-                        hints.recordBound(relaxation, 10.0 + delta)
-                    }
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+            val hints = LpHints(1, 0, directionalGains = true)
+            val variable = VarRef.IntVar(0)
+            repeat(samples) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+                hints.branch(variable)
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
+                    hints.recordBound(relaxation, 10.0 + if (up) 3.0 else gain)
                 }
             }
             hints.beginNode(0, 100.0)
-            hints.record(relaxation, doubleArrayOf(0.0, 2.25, 2.25), DoubleArray(0))
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordBound(relaxation, 10.0)
-            observations.clear()
-            val variable = VarRef.IntVar(1)
-            val baseline = VarRef.IntVar(2)
+            hints.prepareSide(variable, IntDomain(0, 10)) { _, _ -> null }
+            hints.branch(variable, IntDomain(0, 10))
+            val existing = listOf(SearchDecision.IntAtLeast(0, 3L), SearchDecision.IntAtMost(0, 2L))
 
-            val selected = hints.selected(variable, baseline, hints.directionalScore(variable))
-            hints.branch(selected ?: baseline)
+            val ordered = hints.orderAlternatives(variable, existing)
 
-            assertEquals(if (accepted) variable else null, selected, "samples=$samples gain=$gain")
-            assertEquals(if (accepted) 1 else 0, observations.count { it == "CONSUMED" })
+            assertEquals(if (accepted) existing.reversed() else existing, ordered, "samples=$samples gain=$gain")
         }
     }
 

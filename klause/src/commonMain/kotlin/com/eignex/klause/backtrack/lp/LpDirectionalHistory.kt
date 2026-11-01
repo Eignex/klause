@@ -9,6 +9,10 @@ internal class LpDirectionalHistory(
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
 ) {
+    data class Prediction(val down: Double, val up: Double) {
+        val score: Double get() = minOf(down, up) + maxOf(down, up) / 6.0
+    }
+
     private class Direction {
         var count = 0
         var mean = 0.0
@@ -127,19 +131,20 @@ internal class LpDirectionalHistory(
         observe("${event}_${if (child.up) "UP" else "DOWN"}")
     }
 
-    fun score(variable: VarRef, value: Double): Double {
-        if (!value.isFinite()) return Double.NaN
-        if (variable is VarRef.Bool && (value < 0.0 || value > 1.0)) return Double.NaN
+    fun score(variable: VarRef, value: Double): Double = prediction(variable, value)?.score ?: Double.NaN
+
+    fun prediction(variable: VarRef, value: Double): Prediction? {
+        if (!value.isFinite()) return null
+        if (variable is VarRef.Bool && (value < 0.0 || value > 1.0)) return null
         val fraction = value - floor(value)
-        if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return Double.NaN
-        val samples = gains[variable] ?: return Double.NaN
+        if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return null
+        val samples = gains[variable] ?: return null
         expire(samples.down)
         expire(samples.up)
-        if (!recent(samples)) return Double.NaN
-        val down = samples.down.mean * fraction
-        val up = samples.up.mean * (1.0 - fraction)
-        val score = minOf(down, up) + maxOf(down, up) / 6.0
-        return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
+        if (!recent(samples)) return null
+        charge(3L)
+        val prediction = Prediction(samples.down.mean * fraction, samples.up.mean * (1.0 - fraction))
+        return prediction.takeIf { it.score.isFinite() && it.score > 0.0 }
     }
 
     private fun recent(history: Gains?): Boolean = history != null &&

@@ -270,29 +270,24 @@ subtraction, preserving small gains when the constant exceeds floating precision
 The `lp-default` and `lp-aggressive` optimization recipes enable the finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
-and branching must be enabled. Two recent samples in each direction permit a
-variable's balanced gain score, combining the smaller predicted child gain with
-one sixth of the larger. Each estimate uses only that variable's observed gains;
-missing directions and unreliable history permit a bounded comparison of the current
-LP scorer's winner and runner-up. A matching retained optimal basis supplies one-row
-objective cost estimates in both directions, multiplied by their fractional movements
-and combined with the same balanced score. Only a strictly larger finite score changes
-the winner. The chosen variable can also prefer the child with the smaller estimated
-objective increase. This preference is applied after value and incumbent guidance,
-only when both existing alternatives match the estimated Boolean or integer floor/ceil
-partition. It swaps those alternatives without adding, removing or replacing a decision;
-changed splits, pruned alternatives and tied directional gains retain their order.
-The preference expires at the next node, point replacement or history reset. Side
-consumption and changed order are recorded separately from variable selection.
-These estimates remain current-node advice, separate from observed gains.
-Unsupported engines, stale or unfinished bases, missing directions and insufficient
-allowance retain reduced-cost/fractionality scoring and the configured selector's
-precedence. Directional scores use the same objective units.
-An invocation-local readiness check skips directional candidate lookups when no
-history can yield a score; its bookkeeping uses the same LP work allowance.
-Consumed choices record agreement
-with the current LP scorer, a changed variable, or a missing current LP candidate
-separately.
+and branching must be enabled. The reduced-cost/fractionality scorer selects the
+variable; directional guidance only orders its two existing children.
+Two recent samples in each direction supply that variable's predicted child gains,
+using each direction's mean cost per unit of fractional movement. The balanced
+`min + max / 6` score admits finite positive predictions without comparing variables.
+Missing or unreliable history permits one bounded current-basis estimate for the
+selected structural column. A matching retained optimal basis supplies both objective
+costs, multiplied by the corresponding fractional movements. These estimates remain
+current-node advice, separate from observed gains and proof authority.
+
+The smaller predicted objective increase is tried first, after value and incumbent
+guidance, only when both existing alternatives match the estimated Boolean or integer
+floor/ceil partition. Guidance swaps those alternatives without adding, removing or
+replacing a decision. Tied gains, unsupported engines, stale or unfinished bases,
+insufficient allowance, pruned alternatives and changed partitions retain the existing
+heuristics. Preferences expire at the next node, point replacement or history reset.
+History and basis side consumption, changed order and unavailable advice are recorded
+separately. The readiness check and all analysis spend the existing LP work allowance.
 Committed observation attempts retain their branch direction. Missing immediate-child
 bound estimates distinguish LP admission gates, suspended or absent results and
 unavailable bounds. Scope changes, depth changes and replaced alternatives report discarded

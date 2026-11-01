@@ -24,8 +24,8 @@ import kotlin.test.assertTrue
 
 class ResumableMinimizeDirectionalTest {
     @Test
-    fun `finite search consumes both directional gains across cooperative slices`() {
-        val blocks = 4
+    fun `finite search consumes directional child advice across cooperative slices`() {
+        val blocks = 3
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
@@ -48,11 +48,11 @@ class ResumableMinimizeDirectionalTest {
             }) },
         )
 
-        val objective = LinearObjective(intCoefficients = LongArray(variables) { 1L })
+        val objective = LinearObjective(intCoefficients = LongArray(variables) { if (it % 3 == 0) 1L else 2L })
         ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
             var slices = 0
             while (slices++ < 128 && !search.isDone &&
-                (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("CONSUMED") ?: 0L) == 0L
+                (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("SIDE_CONSUMED") ?: 0L) == 0L
             ) {
                 search.runSlice(Cancellation.Never, 1000L, 32L) {}
             }
@@ -61,7 +61,7 @@ class ResumableMinimizeDirectionalTest {
             val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}"
             assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
-            assertTrue((observations["CONSUMED"] ?: 0L) > 0L, diagnostic)
+            assertTrue((observations["SIDE_CONSUMED"] ?: 0L) > 0L, diagnostic)
         }
     }
 

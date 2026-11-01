@@ -185,7 +185,8 @@ Unavailable callbacks identify admission gates and incomplete numerical outcomes
 they carry no optimum, bound or query authorization.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
 history lifetime. An optional numerical capability estimates directional objective
-costs from a retained optimal basis for at most two structural columns. Each basis-row
+costs from a retained optimal basis for at most two structural columns; finite child
+guidance requests only its selected column. Each basis-row
 solve scans oriented reduced costs, including logical columns, and converts its ratios
 to source-coordinate objective units. It neither pivots nor requests another LP solve
 or certificate. Analysis reserves its work before allocation, within the node's unspent

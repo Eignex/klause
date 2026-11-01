@@ -17,58 +17,26 @@ import com.eignex.klause.solver.search.VarRef
 internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?): VarRef? {
     hints ?: return null
     if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
-    val directionalAvailable = hints.hasDirectionalScores()
     var best: VarRef? = null
-    var runner: VarRef? = null
-    var runnerScore = LP_BRANCH_MIN_SCORE
     var bestScore = LP_BRANCH_MIN_SCORE
-    var directional: VarRef? = null
-    var gainScore = LP_BRANCH_MIN_SCORE
     for (b in 0 until problem.numBoolVars) {
         if (session.boolValue(b) != null) continue
-        val gain = if (directionalAvailable) hints.directionalScore(VarRef.Bool(b)) else Double.NaN
-        if (gain > gainScore) {
-            gainScore = gain
-            directional = VarRef.Bool(b)
-        }
-        val s = hints.branchScore(VarRef.Bool(b))
-        if (!s.isNaN() && s > bestScore) {
-            runner = best
-            runnerScore = bestScore
-            bestScore = s
+        val score = hints.branchScore(VarRef.Bool(b))
+        if (score > bestScore) {
+            bestScore = score
             best = VarRef.Bool(b)
-        } else if (s > runnerScore) {
-            runnerScore = s
-            runner = VarRef.Bool(b)
         }
     }
     for (i in 0 until problem.numIntVars) {
-        val domain = session.intDomain(i)
-        if (domain.isFixed) continue
-        val gain = if (directionalAvailable) hints.directionalScore(VarRef.IntVar(i), domain) else Double.NaN
-        if (gain > gainScore) {
-            gainScore = gain
-            directional = VarRef.IntVar(i)
-        }
-        val s = hints.branchScore(VarRef.IntVar(i))
-        if (!s.isNaN() && s > bestScore) {
-            runner = best
-            runnerScore = bestScore
-            bestScore = s
+        if (session.intDomain(i).isFixed) continue
+        val score = hints.branchScore(VarRef.IntVar(i))
+        if (score > bestScore) {
+            bestScore = score
             best = VarRef.IntVar(i)
-        } else if (s > runnerScore) {
-            runnerScore = s
-            runner = VarRef.IntVar(i)
         }
     }
-    if (directional != null) return hints.selected(directional, best, gainScore) ?: best
-    val basis = hints.basisPick(
-        best, runner,
-        (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
-        (runner as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
-        ::directionalCosts,
-    )
-    return hints.selected(basis?.first, best, basis?.second ?: Double.NaN, basis = true) ?: best
+    hints.prepareSide(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) }, ::directionalCosts)
+    return best
 }
 
 /** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below
