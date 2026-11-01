@@ -412,7 +412,9 @@ It consumes no random values; assignment and degree copies are charged to the
 caller. Inspection supplies neither source validation nor proof authority.
 
 Boolean-only clause models close native proposals under clause implications before
-ranking: forced literals propagate to a fixpoint, then a newly broken longer clause
+ranking. Pending falsifications of a longer clause share one queued visit; newly
+forced literals can enqueue it again. Forced literals and mandatory clause visits
+propagate to a fixpoint, then a newly broken longer clause
 gets a replacement supporter ranked by break score, objective delta and literal
 order. Conflicts reject the whole proposal. These closures are heuristic proposals,
 not deductions; every clause and pin is kept for full grading.
