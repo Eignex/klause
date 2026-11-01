@@ -93,6 +93,9 @@ can be expanded into per-variable terms, it preserves binary integer inputs left
 by binary substitution to keep that definition available to search. This bounded
 cost-view discovery charges the preparation allowance and retains no view. Other
 queries use `MARKOWITZ`. Explicit pivot policies retain their own consumer admission.
+Automatic mixed binary cost projection requires eliminating a projected cost
+column. If only unrelated columns can leave the integer lane, substitution retains
+the integer cost representation and still processes those unrelated columns.
 
 `AffinePivotOrder.STRUCTURED` keeps Markowitz ordering between definitions. It
 retains the first admitted declaration-order pivot for aliases and ordinary

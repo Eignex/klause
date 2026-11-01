@@ -119,6 +119,53 @@ class BinaryObjectiveViewTest {
     }
 
     @Test
+    fun `automatic mixed costs should retain integer coordinates when their readers prevent substitution`() {
+        for ((order, projected) in listOf(
+            AffinePivotOrder.AUTOMATIC to false,
+            AffinePivotOrder.STRUCTURED to true,
+            AffinePivotOrder.REWRITE_COST to true,
+        )) {
+            val source = Problem(1, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 4)), listOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            ))
+            val original = LinearObjective(intCoefficients = longArrayOf(3, 5), constant = 7)
+            val config = PresolveConfig.parse("off,+binary-columns").withAffinePivotOrder(order)
+
+            val prepared = PresolvePipeline.run(source, original, config, false)
+            val objective = prepared.objective ?: original
+            val point = Sample(booleanArrayOf(true), longArrayOf(1, 2))
+
+            assertEquals(if (projected) 0L else 3L, objective.intCoefficients[0])
+            assertEquals(if (projected) 3L else 0L, objective.boolWeights.getOrElse(0) { 0L })
+            assertEquals(1L, prepared.problem.intDomainOrNull(0)?.max)
+            assertEquals(original.evaluateExact(prepared.reconstruct(point)), objective.evaluateExact(point))
+        }
+    }
+
+    @Test
+    fun `unrelated binary elimination should retain an obstructed mixed integer cost`() {
+        val source = Problem(2, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 4), IntDomain(0, 1)), listOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            ReifiedLinear(1, intArrayOf(1), intArrayOf(2), LinearOp.EQ, 1),
+        ))
+        val original = LinearObjective(intCoefficients = longArrayOf(3, 5), constant = 7)
+
+        val prepared = PresolvePipeline.run(source, original, PresolveConfig.parse("off,+binary-columns"), false)
+        val objective = prepared.objective ?: original
+        val point = Sample(booleanArrayOf(true, true), longArrayOf(1, 2, 0))
+        val rebuilt = prepared.reconstruct(point)
+
+        assertEquals(3L, objective.intCoefficients[0])
+        assertTrue(objective.boolWeights.all { it == 0L })
+        assertEquals(1L, prepared.problem.intDomainOrNull(0)?.max)
+        assertEquals(0L, prepared.problem.intDomainOrNull(2)?.max)
+        assertEquals(listOf(1L, 2L, 1L), rebuilt.ints.toList())
+        assertEquals(original.evaluateExact(rebuilt), objective.evaluateExact(point))
+    }
+
+    @Test
     fun `an unprojected mixed binary cost should stay protected during column substitution`() {
         val source = Problem(2, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 4)), listOf(
             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),

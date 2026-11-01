@@ -18,6 +18,7 @@ internal class BinaryObjectiveView(
     val factors: List<Factor>,
     val objective: LinearObjective,
     val numBoolVars: Int,
+    val hasNonbinaryCost: Boolean,
 ) {
     companion object {
         fun create(
@@ -109,6 +110,7 @@ internal class BinaryObjectiveView(
                 factors,
                 if (hasNonbinaryCost) projected else projected.captureBinaryIntegerView(problem, objective),
                 weights.size,
+                hasNonbinaryCost,
             )
         }
     }
