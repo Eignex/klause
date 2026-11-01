@@ -166,7 +166,7 @@ internal class FiniteNumericalCompanions private constructor(
         return exactNeighborhoodWorker("ls/finite-joint-companion", arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
             pendingIncumbentTrial = { repair.incumbentTrialPending },
-            open = { repair.search(adaptive = false, seed = slot.seed) })
+            open = { repair.search(adaptive = limits.sourceIncumbentCompletion, seed = slot.seed) })
     }
 
     private fun sharedIncumbent(worker: PortfolioWorker, onVersion: (Long) -> Unit) =

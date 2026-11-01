@@ -143,7 +143,9 @@ repair query enters companion discovery publication and original-source rechecki
 If that first proposal pauses, it receives continuation after owed complete-worker
 coverage until the proposal finishes or the companion's existing allowance retires
 it. This trial grants no incumbent reward and does not renew work, allocation or
-active time. Later proposals use ordinary selection.
+active time. Completion-enabled companion repair uses adaptive connected neighborhood
+widths after the small first proposal, within the same integer selection, proposal
+and funding ceilings. Later proposals use ordinary worker selection.
 
 Each companion owns at most sixteen source/point attempts without eviction. Identity
 includes the full source restrictions, rows, coordinates, objective, interpretation
