@@ -44,6 +44,31 @@ import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
     @Test
+    fun `borrowed primal definitions should reach actual private numerical solves`() {
+        for (pump in listOf(false, true)) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, listOf(
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6),
+            )).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+            val sink = SolveStatsSink("shared-primal-numerical-use")
+            val selected = FactorProjectionProviders.Default.prepare(problem)
+            repeat(8) {
+                LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+                    projections = selected, reusePrimalTemplates = true).use { engine ->
+                    val sample = if (pump) engine.lpFeasibilityPump(objective, Cancellation.Never)
+                    else engine.lpRoundingProbe(objective, Cancellation.Never)
+                    assertEquals(6L, assertNotNull(sample).ints.sum())
+                }
+            }
+
+            val consumption = sink.snapshot().lp.phases.getValue("PRIMAL_LP_SOURCE_REUSE_ROOT")
+            assertTrue(consumption.calls > 0L)
+            assertEquals(consumption.calls, consumption.outcomes["NUMERICAL_CALLS"])
+            assertEquals(consumption.calls, consumption.outcomes["OPTIMAL_FLOAT_ITERATES"])
+        }
+    }
+
+    @Test
     fun `primal template preparation should stop its scan when the root grant is spent`() {
         val rows = Array(128) { Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1) }
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, rows.toList()).bake(FactorProjectionProviders.Default)
@@ -51,7 +76,7 @@ class LpPrimalHeuristicsTest {
         val sink = SolveStatsSink("spent-primal-template-scan")
         val factory = RecordingLpEngineFactory()
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, rootMaxWork = 1L)),
-            sink, LpSolveContext(factory)).use { engine ->
+            sink, LpSolveContext(factory), reusePrimalTemplates = true).use { engine ->
             val owners = factory.calls.size
 
             val result = engine.lpRoundingProbe(objective, Cancellation.Never)

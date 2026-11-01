@@ -144,6 +144,7 @@ internal class LpEngine(
     private val nodeWorkAllowance: () -> Long? = { null },
     private val containingWork: (Long) -> Unit = {},
     private val rootQueryPolicy: LpRootQueryPolicy = LpRootQueryPolicy.SHARED_WORK,
+    internal val reusePrimalTemplates: Boolean = false,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
@@ -251,6 +252,7 @@ internal class LpEngine(
                 } ?: nodeQueryWorkBudget() }
             } else nodeWorkAllowance,
             containingWork = { work -> if (rootProbe) chargeWork(work) },
+            reusePrimalTemplates = reusePrimalTemplates,
         ).also { it.structuralCutSupport = structuralCutSupport }
     }
 
@@ -347,6 +349,7 @@ internal class LpEngine(
             if (retainedRootEnabled) SPARSE_LP_MAX_FACTOR_WORK else Long.MAX_VALUE)
 
     internal val retainedRootEnabled: Boolean get() = sparseTrialActive || params.lpPlan.componentOwnership
+    internal val sourceTemplateReuseEnabled: Boolean get() = retainedRootEnabled
 
     private val auxiliarySources = LpAuxiliarySources()
     private var structuralCutSupport = params0.lpPlan.cuts || params0.lpPlan.circuit
@@ -422,6 +425,7 @@ internal class LpEngine(
                 projections = projections,
                 elementIndexes = elementIndexes,
                 templateStats = sink.lp,
+                reuseSourceTemplates = sourceTemplateReuseEnabled,
                 preparationCancellation = params.cancellation,
                 retainImportedDefinitions = true,
                 onTemplateWork = ::noteNodeOverhead,

@@ -71,6 +71,7 @@ internal fun LpEngine.lpRoundingProbe(
                     cancellation,
                     primal = false,
                     warm = retained?.basis,
+                    reusedDefinition = relaxation.reusedPrimalDefinition,
                 ) { iterate, termination ->
                     if (iterate?.optimal != true && termination == LpFloatTermination.CANCELLED) {
                         rootRoundingInterrupted = true
@@ -365,8 +366,10 @@ private fun LpEngine.solveRelaxation(
         val relaxation = buildPrimalRelaxation(obj, session, cancellation) ?: return null
         if (relaxation.model.n == 0) return null
         val result = try {
-            solvePrimalRelaxation(relaxation.model, cancellation, primal = true)
-                ?: solvePrimalRelaxation(relaxation.model, cancellation, primal = false)
+            solvePrimalRelaxation(relaxation.model, cancellation, primal = true,
+                reusedDefinition = relaxation.reusedPrimalDefinition)
+                ?: solvePrimalRelaxation(relaxation.model, cancellation, primal = false,
+                    reusedDefinition = relaxation.reusedPrimalDefinition)
         } catch (_: CheckedLongOverflowException) {
             return null
         } ?: return null
@@ -402,7 +405,9 @@ private fun LpEngine.buildPrimalRelaxation(
         if (token()) throw LpAssemblyCancelled()
         var definition = "COMPLETE"
         val relaxation = buildPrimalSource(problem, objective, SessionDomains(session), token,
-            onWork = { debit(it * LpNodeOverhead.BUILD) }, onDefinition = { definition = it })
+            onWork = { debit(it * LpNodeOverhead.BUILD) }, selection = projections,
+            reuseCompleteTemplates = reusePrimalTemplates,
+            reuseSourceTemplates = reusePrimalTemplates, onDefinition = { definition = it })
         outcome = definition
         relaxation
     } catch (_: LpAssemblyCancelled) {
@@ -418,6 +423,7 @@ private fun LpEngine.solvePrimalRelaxation(
     cancellation: Cancellation,
     primal: Boolean,
     warm: Basis? = null,
+    reusedDefinition: Boolean = false,
     observeResult: ((FloatLpResult?, LpFloatTermination?) -> Unit)? = null,
 ): FloatLpResult? {
     requireOpen()
@@ -426,8 +432,10 @@ private fun LpEngine.solvePrimalRelaxation(
     val simplex = newTableauCutSolver(model, cancellation,
         workLimit = rootPrimalWorkBudget(), factory = solveContext.engineFactory, pricing = pricingOptions)
     var outcome = "FAILED"
+    var optimalFloatIterate = false
     try {
         val result = if (primal) simplex.solvePrimal(warm) else simplex.solve(warm)
+        optimalFloatIterate = result?.optimal == true
         outcome = if (result?.optimal == true) "OPTIMAL" else {
             val reason = simplex.lastTermination?.name ?: "OTHER"
             if (result == null) "NO_POINT_$reason" else "NON_OPTIMAL_$reason"
@@ -443,6 +451,7 @@ private fun LpEngine.solvePrimalRelaxation(
             } finally {
                 val stage = if (primal) "PRIMAL_LP_PRIMAL" else "PRIMAL_LP_DUAL"
                 sink.lp.observePrimalPhase(stage, outcome, started.elapsedNow().inWholeNanoseconds)
+                if (reusedDefinition) sink.lp.observePrimalDefinitionConsumed(optimalFloatIterate)
             }
         }
     }

@@ -191,7 +191,8 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellati
     if (session.isUnsatAtRoot) return null
     val relaxation = try {
         CpToLpRelaxation(prob, LinearObjective(intCoefficients = coeffs), projections = selected,
-            templateStats = sink.lp).build(session, cancellation = token)
+            templateStats = sink.lp, reuseSourceTemplates = sourceTemplateReuseEnabled)
+            .build(session, cancellation = token)
     } catch (_: LpAssemblyCancelled) {
         return null
     }
@@ -228,7 +229,8 @@ private fun LpEngine.safeMax(prob: Problem, coeffs: LongArray, token: Cancellati
 private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Double? {
     val relaxation = try {
         CpToLpRelaxation(problem, LinearObjective(intCoefficients = coeffs), projections = projections,
-            templateStats = sink.lp).build(RootDomains(problem), cancellation = token)
+            templateStats = sink.lp, reuseSourceTemplates = sourceTemplateReuseEnabled)
+            .build(RootDomains(problem), cancellation = token)
     } catch (_: CheckedLongOverflowException) {
         return null
     } catch (_: LpAssemblyCancelled) {

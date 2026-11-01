@@ -90,6 +90,21 @@ class LpPrimalTemplatesTest {
     }
 
     @Test
+    fun `interleaved compatible uses should keep a useful current definition`() {
+        repeat(8) { buildPrimalSource(source, objective, RootDomains(source), Cancellation.Never, {}, selected) }
+        val original = assertNotNull(selected.borrowLpPrimal(objective, RootDomains(source), Cancellation.Never))
+        val changed = Problem(1, 3, arrayOf(IntDomain(8, 10), IntDomain(0, 10), IntDomain(0, 10)), source.factors)
+        val selection = selected.forEngineView(changed)
+        repeat(8) {
+            buildPrimalSource(changed, objective, RootDomains(changed), Cancellation.Never, {}, selection)
+            assertSame(original, selected.borrowLpPrimal(objective, RootDomains(source), Cancellation.Never))
+        }
+
+        assertSame(original, selected.borrowLpPrimal(objective, RootDomains(source), Cancellation.Never))
+        assertNull(selection.borrowLpPrimal(objective, RootDomains(changed), Cancellation.Never))
+    }
+
+    @Test
     fun `changed objective costs should preserve the cached model objective`() {
         repeat(8) { buildPrimalSource(source, objective, RootDomains(source), Cancellation.Never, {}, selected) }
         val original = assertNotNull(selected.borrowLpPrimal(objective, RootDomains(source), Cancellation.Never))
@@ -102,6 +117,19 @@ class LpPrimalTemplatesTest {
         assertEquals(7L, rebound.objectiveConstant)
         assertSame(original.model.csc, rebound.model.csc)
         assertNotSame(original.model.cost, rebound.model.cost)
+    }
+
+    @Test
+    fun `an unrepresentable objective rebind should withhold the cached definition`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(2, 10) }, source.factors)
+        val selection = FactorProjectionProviders.Default.prepare(problem)
+        repeat(8) { buildPrimalSource(problem, objective, RootDomains(problem), Cancellation.Never, {}, selection) }
+        val changed = LinearObjective(intCoefficients = longArrayOf(Long.MAX_VALUE, 1, 1))
+
+        val borrowed = selection.borrowLpPrimal(changed, RootDomains(problem), Cancellation.Never)
+
+        assertNull(borrowed)
+        assertNotNull(selection.borrowLpPrimal(objective, RootDomains(problem), Cancellation.Never))
     }
 
     @Test
@@ -245,7 +273,7 @@ class LpPrimalTemplatesTest {
         ))
         val selection = FactorProjectionProviders.Default.prepare(problem)
         var reused = 0
-        repeat(8) {
+        repeat(16) {
             buildPrimalSource(problem, objective, RootDomains(problem), Cancellation.Never, {}, selection,
                 onDefinition = { if (it == "REUSED") reused++ })
         }

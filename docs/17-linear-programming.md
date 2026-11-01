@@ -132,8 +132,9 @@ Successful imports carry the known catalog index in the existing
 column-mapping scratch, avoiding a second lookup. Full definition checks and reused
 imports have separate observations, including checks in interrupted attempts.
 The catalog retains no additional cache or numerical result authority.
-LP bounding engines select retained-only admission through this catalog path,
-omitting source template preparation from whole-model builds. Complete layouts keep
+Explicit retained-root engines select retained-only admission through this catalog path,
+omitting source template preparation from whole-model builds. Ordinary node and
+shaving construction keep private definitions. Complete layouts keep
 ordinary construction; actual later fragment imports supply the demand for reuse. This policy
 is independent of whole-model selective metadata reuse.
 
@@ -186,8 +187,9 @@ units; actual completed column, row and coefficient construction supplies the de
 Capture inspection cannot exceed that prior work. The completed definition and its
 replacement-demand counter share the source/finite publication slot and its existing
 262,144-unit ceiling with the other preparation routes. Explicit selective metadata
-and an admitted fragment route retain their selected publication. A changed complete
-definition needs repeated completed reconstruction before replacing its predecessor;
+and an admitted fragment route retain their selected publication. A compatible borrow clears pending replacement demand. A changed complete
+definition needs consecutive completed reconstruction without an intervening compatible
+use before replacing its predecessor;
 only the current definition remains retained.
 
 This route accepts built-in discrete linear and Boolean projections with no auxiliary,
@@ -196,12 +198,16 @@ dimensions, source sides and endpoints, live endpoints, Boolean pins and open-si
 Unary reified equalities additionally retain bounded source and live value snapshots,
 so interior-hole changes invalidate their definition. Objective changes require every
 current nonzero coordinate to exist in the retained layout; changed costs receive private
-arrays and checked shift arithmetic, while a constant changes only the envelope.
+arrays and checked shift arithmetic; an unrepresentable rebind falls back to ordinary
+construction. A constant changes only the envelope.
 The retained definition drops build-specific source maps and preparation metadata.
 Numerical bases, mutable restrictions, results and source acceptance remain private.
 Capture, guard checks, objective rebinding, refusal and publication charge the current
 primal allowance and poll before a layout becomes available. This reuse supplies no
-checked result or source-level proof authority.
+checked result or source-level proof authority. A separate root observation counts
+borrowed definitions that reach a private numerical call and its optimal floating
+iterates; it supplies no certificate or source-acceptance authority. Numerical costs
+remain in their ordinary solve phases.
 
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.

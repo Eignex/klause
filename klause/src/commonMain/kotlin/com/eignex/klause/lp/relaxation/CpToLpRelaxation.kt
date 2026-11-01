@@ -162,6 +162,7 @@ internal class LpRelaxation(
     val rowFactorIds: IntArray = EmptyIntArray,
     val realUpperRows: Map<Int, Int> = emptyMap(),
     val preparationTemplates: LpPreparationTemplates? = null,
+    val reusedPrimalDefinition: Boolean = false,
 ) {
     fun column(variable: CpIntId): LpColumnId? =
         intColOf[variable.index].takeIf { it >= 0 }?.let(::LpColumnId)
@@ -292,6 +293,7 @@ internal fun LpRelaxation.withModel(
     sources: CutSourceMap? = sourceMap?.withBounds(reboundModel),
     remap: LpLayoutRemap? = null,
     reboundObjectiveConstant: Long = objectiveConstant,
+    reusedPrimalDefinition: Boolean = false,
 ): LpRelaxation {
     require(remap == null || remap.retainedColumns.size == model.n) { "column removal requires source metadata" }
     val gates = remap?.let { gatedRows.indices.filter { index -> it.row(gatedRows[index]) >= 0 } }
@@ -327,6 +329,7 @@ internal fun LpRelaxation.withModel(
         realUpperRows = if (remap == null) realUpperRows else realUpperRows.mapNotNull { (row, variable) ->
             remap.row(row).takeIf { it >= 0 }?.let { it to variable }
         }.toMap(),
+        reusedPrimalDefinition = reusedPrimalDefinition,
     )
 }
 

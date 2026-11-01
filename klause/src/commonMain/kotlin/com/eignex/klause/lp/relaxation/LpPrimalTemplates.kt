@@ -21,6 +21,7 @@ import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntHashSet
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -38,7 +39,8 @@ internal class LpPrimalTemplates private constructor(
     private val liveValues: Array<LongArray>,
 ) : LpPreparationReuse {
     private class PaidUnits(val units: Long)
-    private val replacementDemand = AtomicReference(PaidUnits(0L))
+    private val noDemand = PaidUnits(0L)
+    private val replacementDemand = AtomicReference(noDemand)
     private val settings = problem.settings
     private val factors = problem.factors.copyOf()
     private val lower = LongArray(problem.numIntVars) { problem.rootDomainOf(it).min }
@@ -106,12 +108,23 @@ internal class LpPrimalTemplates private constructor(
         }
         val model = if (changed) {
             if (!visit(previous.n.toLong() * 2L + previous.numVars)) return null
-            previous.withRowObjective(columns, LongArray(previous.n) { cost(objective, it) })
+            try {
+                previous.withRowObjective(columns, LongArray(previous.n) { cost(objective, it) })
+            } catch (_: CheckedLongOverflowException) {
+                return null
+            }
         } else previous
         if (!visit()) return null
+        val demand = replacementDemand.load()
+        if (demand.units != 0L) {
+            if (!visit()) return null
+            replacementDemand.compareAndSet(demand, noDemand)
+        }
+        if (token()) return null
         val constant = objective?.constant ?: 0L
         return if (model === previous && constant == relaxation.objectiveConstant) relaxation else {
-            relaxation.withModel(model, sources = null, reboundObjectiveConstant = constant).takeUnless { token() }
+            relaxation.withModel(model, sources = null, reboundObjectiveConstant = constant,
+                reusedPrimalDefinition = true).takeUnless { token() }
         }
     }
 
@@ -155,6 +168,13 @@ internal class LpPrimalTemplates private constructor(
                 relaxation.circuitArcs.isNotEmpty() || relaxation.gatedRows.isNotEmpty() ||
                 relaxation.realUpperRows.isNotEmpty()
             ) return null
+            val holeVariables = IntHashSet()
+            for (factor in problem.factors) {
+                if (!visit() || !eligible(factor)) return null
+                if (factor is ReifiedLinear && factor.op == LinearOp.EQ && factor.intVars.size == 1) {
+                    holeVariables.add(factor.intVars[0])
+                }
+            }
             for (column in 0 until model.n) {
                 if (!visit() || relaxation.colVarId[column] < 0 || relaxation.colRealId[column] >= 0 ||
                     relaxation.colReq[column] != null || relaxation.colPresence[column] != null ||
@@ -168,13 +188,6 @@ internal class LpPrimalTemplates private constructor(
                 if (units > LpEmissionTemplates.MAX_UNITS ||
                     !visit(premise.vars.size.toLong() + premise.boolLits.size)
                 ) return null
-            }
-            val holeVariables = IntHashSet()
-            for (factor in problem.factors) {
-                if (!visit() || !eligible(factor)) return null
-                if (factor is ReifiedLinear && factor.op == LinearOp.EQ && factor.intVars.size == 1) {
-                    holeVariables.add(factor.intVars[0])
-                }
             }
             val holes = holeVariables.toIntArray()
             for (variable in holes) {
@@ -201,7 +214,7 @@ internal class LpPrimalTemplates private constructor(
                 live.add(snapshot(domains.intDomain(variable)) ?: return null)
             }
             if (!visit(1L + problem.numFactors + problem.numIntVars * 5L + problem.numBoolVars + model.n)) return null
-            val detached = relaxation.withModel(model, sources = null)
+            val detached = relaxation.withModel(model, sources = null, reusedPrimalDefinition = true)
             return LpPrimalTemplates(LpEmissionScope(selection.lpEmissionNamespace, problem), units,
                 detached, problem, domains, holes, roots.toTypedArray(), live.toTypedArray()).takeUnless { token() }
         }

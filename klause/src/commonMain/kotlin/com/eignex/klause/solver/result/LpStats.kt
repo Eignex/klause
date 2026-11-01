@@ -494,6 +494,8 @@ internal fun LpStats.hasActivity(): Boolean =
 internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     var sparseTrial: Map<String, Long> = emptyMap()
     private val phases = LinkedHashMap<String, LpPhaseStats>()
+    private var primalDefinitionCalls = 0L
+    private var primalDefinitionOptimalIterates = 0L
     private var templatePreparationSeen = false
     private var templateAssemblySeen = false
     private var templateNanos = 0L
@@ -573,9 +575,18 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         templateEmissionImportPublications += emissionImportPublications
     }
 
+    private fun appendPrimalDefinitionSnapshot(target: MutableMap<String, LpPhaseStats>) {
+        if (primalDefinitionCalls == 0L) return
+        target["PRIMAL_LP_SOURCE_REUSE_ROOT"] = LpPhaseStats(calls = primalDefinitionCalls, outcomes = mapOf(
+            "NUMERICAL_CALLS" to primalDefinitionCalls,
+            "OPTIMAL_FLOAT_ITERATES" to primalDefinitionOptimalIterates,
+        ))
+    }
+
     private fun phaseSnapshot(): Map<String, LpPhaseStats> {
-        if (!templatePreparationSeen && !templateAssemblySeen) return phases.toMap()
+        if (!templatePreparationSeen && !templateAssemblySeen && primalDefinitionCalls == 0L) return phases.toMap()
         return phases.toMutableMap().apply {
+            appendPrimalDefinitionSnapshot(this)
             if (templatePreparationSeen) {
                 val outcomes = buildMap {
                     if (templateDeclined != 0L) put("DECLINED", templateDeclined)
@@ -623,6 +634,11 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         val key = "DIRECTIONAL_BRANCH_NODE"
         val delta = LpPhaseStats(calls = 1L, outcomes = mapOf(outcome to 1L))
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+    }
+
+    fun observePrimalDefinitionConsumed(optimalFloatIterate: Boolean) {
+        primalDefinitionCalls++
+        if (optimalFloatIterate) primalDefinitionOptimalIterates++
     }
 
     fun observePrimalPhase(stage: String, outcome: String, nanos: Long, work: Long = 0L) {
