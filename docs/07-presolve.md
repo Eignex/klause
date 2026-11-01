@@ -87,6 +87,12 @@ default round cap; an explicit zero round cap still suppresses those schedules.
 
 ### Rewrite representation controls
 
+`AffinePivotOrder.STRUCTURED` keeps Markowitz ordering between definitions and
+declaration order among admitted pivots. It enables rewrites through supported
+structured consumers and reuses existing exact binary cost channels within mixed
+integer objectives. It performs no incident-payload scoring. `MARKOWITZ` remains
+the default policy.
+
 `AffinePivotOrder.REWRITE_COST` retains Markowitz ordering between definitions and
 tries the smallest rewrite payload among an equality's unit pivots first. It sums
 the current incident factors' `structuralKeyWeight`,
@@ -97,7 +103,7 @@ objective and reconstruction checks apply to the preferred pivot; a rejected piv
 falls back to the first admitted declaration-order pivot. An equality without an
 admitted pivot performs no payload scoring. This opt-in estimate
 describes construction size; active downstream search still determines total cost.
-The same policy can fold an asserted integer definition through word-sized
+Both structured policies can fold an asserted integer definition through word-sized
 `ReifiedLinear` consumers. The replacement retains the channel's Boolean output
 and comparison in both directions; conditional equalities never supply asserted
 pivots. Coefficient checks, the per-row absorption cap and carried domain bounds

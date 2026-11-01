@@ -22,7 +22,7 @@ internal object AffinePivotOrders {
         AffinePivotOrder.STABLE_ID ->
             StableIdOrder(ws, eliminated, objectiveIntVars, capWide, pivotable, cancellation)
 
-        AffinePivotOrder.MARKOWITZ ->
+        AffinePivotOrder.MARKOWITZ, AffinePivotOrder.STRUCTURED ->
             MarkowitzOrder(ws, eliminated, objectiveIntVars, capWide, pivotable, cancellation)
 
         AffinePivotOrder.REWRITE_COST ->

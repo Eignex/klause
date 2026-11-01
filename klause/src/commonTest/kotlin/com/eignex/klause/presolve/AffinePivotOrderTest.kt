@@ -83,24 +83,26 @@ class AffinePivotOrderTest {
         val hint = DefinitionHint.Comparison(0, longArrayOf(1),
             arrayOf(DefinitionHint.Operand.Variable(0)), 2, LinearOp.GE)
         val objective = LinearObjective(boolWeights = longArrayOf(7), intCoefficients = longArrayOf(0, 1, 1))
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, listOf(hint)),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.LOCAL_SEARCH, objective))
-        val shape = invocation.finiteShape()
-        val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-            shape.problem, FiniteEngine.LOCAL_SEARCH, shape.linearObjective,
-            PresolveConfig.parse("off,+affine").withAffinePivotOrder(AffinePivotOrder.REWRITE_COST),
-            explicitPresolveConfig = true, preparedPlan = shape.preparedPlan,
-        ))
-        val view = assertNotNull(invocation.heuristicHints(prepared.problem, prepared.objective,
-            prepared.sourceMapping, Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
-            assertNotNull(prepared.executionPlan).capabilities))
-        val assignment = Assignment(prepared.problem.numBoolVars, prepared.problem.numIntVars)
-        assignment.setInt(2, 1)
+        for (order in listOf(AffinePivotOrder.STRUCTURED, AffinePivotOrder.REWRITE_COST)) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, listOf(hint)),
+                ExecutionOperation.OPTIMIZE, FiniteEngine.LOCAL_SEARCH, objective))
+            val shape = invocation.finiteShape()
+            val prepared = FinitePipeline.prepare(FinitePipelineRequest(
+                shape.problem, FiniteEngine.LOCAL_SEARCH, shape.linearObjective,
+                PresolveConfig.parse("off,+affine").withAffinePivotOrder(order),
+                explicitPresolveConfig = true, preparedPlan = shape.preparedPlan,
+            ))
+            val view = assertNotNull(invocation.heuristicHints(prepared.problem, prepared.objective,
+                prepared.sourceMapping, Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
+                assertNotNull(prepared.executionPlan).capabilities))
+            val assignment = Assignment(prepared.problem.numBoolVars, prepared.problem.numIntVars)
+            assignment.setInt(2, 1)
 
-        assertNotNull(view.sweep).sweep(assignment, prepared.problem.finiteIntDomains())
+            assertNotNull(view.sweep).sweep(assignment, prepared.problem.finiteIntDomains())
 
-        assertFalse(assignment.boolValue(0))
-        assertEquals(8.0, assertNotNull(view.objective).deltaIfApplied(assignment, Move.IntSet(1, 1)))
+            assertFalse(assignment.boolValue(0))
+            assertEquals(8.0, assertNotNull(view.objective).deltaIfApplied(assignment, Move.IntSet(1, 1)))
+        }
     }
 
     @Test
@@ -176,13 +178,17 @@ class AffinePivotOrderTest {
             ))
         val config = PresolveConfig.parse("off,+affine")
         val byFirst = Presolver.runSource(source, config.withAffinePivotOrder(AffinePivotOrder.MARKOWITZ))
+        val byStructured = Presolver.runSource(source, config.withAffinePivotOrder(AffinePivotOrder.STRUCTURED))
         val byCost = Presolver.runSource(source, config.withAffinePivotOrder(AffinePivotOrder.REWRITE_COST))
 
         val firstRows = CpToLpRelaxation(byFirst.problem, null).build(RootDomains(byFirst.problem)).model.m
+        val structuredRows = CpToLpRelaxation(byStructured.problem, null)
+            .build(RootDomains(byStructured.problem)).model.m
         val costRows = CpToLpRelaxation(byCost.problem, null).build(RootDomains(byCost.problem)).model.m
         val lifted = assertNotNull(byCost.rebuild.asSampleLift())(Sample(BooleanArray(0), longArrayOf(1, 0, 3, 0)))
 
         assertEquals(3, firstRows)
+        assertEquals(firstRows, structuredRows)
         assertEquals(1, costRows)
         assertEquals(-2L, lifted.ints[1])
     }

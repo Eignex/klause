@@ -307,7 +307,7 @@ object PresolvePipeline {
             ) {
                 BinaryColumnSubstitution.substitute(
                     packed, context.objectiveIntVars, bakeConfig, context.linearObjective,
-                    allowMixedObjective = config.affinePivotOrder == AffinePivotOrder.REWRITE_COST,
+                    allowMixedObjective = config.affinePivotOrder.allowsStructuredRewrites,
                 ).also { result ->
                     presolveBudget?.activeInvocation?.fixedColumns = result?.columns ?: 0
                 }

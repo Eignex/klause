@@ -215,7 +215,7 @@ internal object AffineSingletons {
         // unchanged since the previous run reached its fixpoint), so the scan need only test the factors
         // those variables appear in — O(delta) instead of O(factors) on the common fruitless re-run.
         if (sharedIntOcc != null) {
-            val seed = SeedOcc(problem.factors, sharedIntOcc, pivotOrder == AffinePivotOrder.REWRITE_COST)
+            val seed = SeedOcc(problem.factors, sharedIntOcc, pivotOrder.allowsStructuredRewrites)
             val hasCandidate = if (incrementalTouchedVars != null) {
                 anyTouchedVarHeadsCandidate(
                     seed,
@@ -238,7 +238,7 @@ internal object AffineSingletons {
         // The session-maintained index matches the pristine input factor order, so the first candidate
         // search reads it instead of rebuilding an O(factors) index; each fold then patches only the
         // occurrence entries of the rewritten factors rather than re-indexing the whole set.
-        val ws = WorkingSet(problem.factors, eliminated.size, sharedIntOcc, pivotOrder == AffinePivotOrder.REWRITE_COST)
+        val ws = WorkingSet(problem.factors, eliminated.size, sharedIntOcc, pivotOrder.allowsStructuredRewrites)
         // Each elimination rewrites only the factors mentioning the pivot and appends bound rows, so the
         // per-elimination cost is O(occurrences of x) rather than O(factors). The candidate scan still
         // walks the live factors in order (the elimination order is selection-order-sensitive), but the

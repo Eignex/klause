@@ -23,4 +23,11 @@ enum class AffinePivotOrder {
      *  Reuses existing exact binary channels for cost terms within a mixed integer objective.
      *  Factor payload sizes estimate construction cost; they do not predict search savings. */
     REWRITE_COST,
+
+    /** Markowitz ordering with ordinary declaration-order pivots and supported structured consumers.
+     *  Reuses existing exact binary cost channels within mixed integer objectives. */
+    STRUCTURED;
+
+    internal val allowsStructuredRewrites: Boolean
+        get() = this == STRUCTURED || this == REWRITE_COST
 }
