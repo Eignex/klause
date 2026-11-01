@@ -29,7 +29,8 @@ internal class ClauseDbArithmeticRankingTest {
                 if (integer) boolFactors + Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10) else boolFactors)
             val session = PropagationSession(problem, nativeSat = false)
             val clause = Clause(intArrayOf(1, 3, 4))
-            repeat(cap) { session.addLearnedClause(clause, 9) }
+            repeat(cap - 4) { session.addLearnedClause(clause, 9, permanent = true) }
+            repeat(4) { session.addLearnedClause(clause, 9) }
             if (integer) {
                 val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
                     longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
