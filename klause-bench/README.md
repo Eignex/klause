@@ -23,8 +23,9 @@ emitted `arm.*` entries to verify the actual worker count before comparing contr
 
 `bench.profile.LocalSearchTrajectory` accepts hash-pinned XCSP3 sources and
 `format=mps` for exactly retained pure-integer minimization sources.
-`preparationEngine=mixed|ls` selects the preparation route; `seed`, `moves`,
-`sliceMillis` and `sliceWork` control the private walk. Retain the emitted models,
+`preparationEngine=mixed|ls` selects the preparation route and `seed` its seed.
+`walkSeed` selects the private walk's seed, defaulting to `seed`; `moves`,
+`sliceMillis` and `sliceWork` bound the walk. Retain the emitted models,
 coordinate maps, completed moves and unfinished work when comparing slices.
 Profile timings and working-model checks do not qualify original-source performance.
 

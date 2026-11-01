@@ -83,7 +83,7 @@ internal object LocalSearchTrajectory {
             "channel", "presolve", "center64", "timeoutMillis", "traceCoordinates",
             "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors", "selectorsFromWalk", "ownerConflicts",
             "ownerRecipes", "owners", "ownerSeed",
-            "format", "preparationEngine",
+            "format", "preparationEngine", "walkSeed",
         )
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional || it == "selectors"
@@ -131,6 +131,7 @@ internal object LocalSearchTrajectory {
             ViewSpec("false", false, ChannelView.Maintained), ViewSpec("true", true, ChannelView.Maintained),
         ) else listOf(ViewSpec("maintained", false, ChannelView.Maintained), ViewSpec(channel.name, false, channel))
         val seed = options.getValue("seed").toLong()
+        val walkSeed = options["walkSeed"]?.toLong() ?: seed
         val ownerSeed = options["ownerSeed"]?.toLong() ?: seed
         val moves = options.getValue("moves").toLong().also { require(it in 1..1_000_000) }
         val timeoutMillis = options["timeoutMillis"]?.toLong()?.also { require(it in 100..60000) } ?: 60000L
@@ -195,6 +196,8 @@ internal object LocalSearchTrajectory {
             put("architecture", System.getProperty("os.arch"))
             put("channel", channel?.name)
             put("preparationEngine", engine.name)
+            put("preparationSeed", seed)
+            put("walkSeed", walkSeed)
             put("presolve", if (skipPresolve) "off" else "default")
             put("objectiveTreatment", when {
                 objective == null -> "none"
@@ -428,10 +431,10 @@ internal object LocalSearchTrajectory {
                         seedImplicitOnRestart = recipe.seedImplicitOnRestart,
                     )
                     val trace = if (mode == "repair") RepairTrajectory.attach(solver,
-                        "${options.getValue("recipe")}; linear shaping 1; seeded tie stream $seed",
+                        "${options.getValue("recipe")}; linear shaping 1; seeded tie stream $walkSeed",
                         traceCoordinates) else null
                     val params = LocalSearchParams(
-                        randomSeed = seed, maxFlips = if (walk) moves else 1L, cancellation = walkStop,
+                        randomSeed = walkSeed, maxFlips = if (walk) moves else 1L, cancellation = walkStop,
                         costShaping = CostShaping.Linear(lambda = 1.0), lsObjective = gradient,
                         normalizeWeightsByClass = true, reportResiduals = true,
                         initialAssignment = workingInitial,
