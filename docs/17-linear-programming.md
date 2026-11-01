@@ -403,8 +403,10 @@ definitions with independently chosen nearer continuous endpoints. Exact premise
 still authorize every row. The replacement shares the original generation's work
 limit and retains the source-row template; unavailable preparation leaves its prior
 candidates intact. Each immutable template attempts this preparation once.
-Point scoring waits seven completed point queries between scans of one immutable
-candidate generation. An adopted current recipe or fully installed checked family
+Point scoring admits at most one additional checked cut at each usable point.
+An addition permits another scan at the next point; a scan without an addition
+waits seven completed point queries before reconsidering its immutable candidate
+generation. An adopted current recipe or fully installed checked family
 ages on each usable point without that discovery cooldown. Four completed scans
 without an addition retire that
 generation's unselected candidates from further scoring. Installed rows keep aging

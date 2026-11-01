@@ -180,6 +180,62 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `a point should admit only the strongest nonparallel candidate`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("y upper")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE), emptySet(), Cancellation.Never)
+
+        assertEquals(setOf(0), selected)
+    }
+
+    @Test
+    fun `an addition should let the next point admit a complementary cut`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("y upper")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        val installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE), emptySet(), Cancellation.Never)
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ZERO, BigFraction.ONE), installed, Cancellation.Never)
+
+        assertEquals(setOf(0, 1), selected)
+    }
+
+    @Test
+    fun `an unsuccessful point should restore discovery cooldown after an addition`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("y upper")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        val installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE), emptySet(), Cancellation.Never)
+        selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            List(2) { BigFraction.ZERO }, installed, Cancellation.Never)
+        val work = selection.observations["numericalCutSelectionWork"]
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ZERO, BigFraction.ONE), installed, Cancellation.Never)
+
+        assertEquals(installed, selected)
+        assertEquals(work, selection.observations["numericalCutSelectionWork"])
+    }
+
+    @Test
     fun `candidate cooldown should avoid repeated scoring work`() {
         val rows = listOf(LinearAuthorityCut(0,
             SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))

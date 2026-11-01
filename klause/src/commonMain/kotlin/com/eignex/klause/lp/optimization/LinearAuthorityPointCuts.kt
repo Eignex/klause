@@ -227,7 +227,8 @@ internal class LinearAuthorityPointCuts(
                 }
             }
             val selected = selectNonparallelCuts(candidates.sortedWith(compareByDescending<Scored> { it.score }
-                .thenBy { it.id }), maximumCuts - installed.size, 1.0 - CutPool.MIN_ORTHOGONALITY, forced) { a, b ->
+                .thenBy { it.id }), minOf(1, maximumCuts - installed.size),
+                1.0 - CutPool.MIN_ORTHOGONALITY, forced) { a, b ->
                 if (!meter.charge(a.values.size.toLong() + b.values.size)) Double.POSITIVE_INFINITY else {
                     var dot = 0.0
                     for ((coordinate, value) in a.values) dot += value * (b.values[coordinate] ?: 0.0)
@@ -262,7 +263,7 @@ internal class LinearAuthorityPointCuts(
                     for (id in expired) onCut(rows[id].family, "POINT_INSTALLED_RETIRED", 1L)
                     inactiveScans.keys.removeAll(expired)
                 }
-                cooldown = if (retainedLayout) 0 else 7
+                cooldown = if (retainedLayout || selected.isNotEmpty()) 0 else 7
             }
             return retained + selected.map { it.id }
         } finally {
