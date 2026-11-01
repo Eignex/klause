@@ -129,7 +129,11 @@ internal object LocalSearchTrajectory {
         }
         val variants = if (channel == null) listOf(
             ViewSpec("false", false, ChannelView.Maintained), ViewSpec("true", true, ChannelView.Maintained),
-        ) else listOf(ViewSpec("maintained", false, ChannelView.Maintained), ViewSpec(channel.name, false, channel))
+        ) else listOf(
+            ViewSpec("maintained", false, ChannelView.Maintained),
+            ViewSpec("channel-${channel.name}", false, channel),
+        )
+        require(variants.map { it.label.lowercase() }.distinct().size == variants.size)
         val seed = options.getValue("seed").toLong()
         val walkSeed = options["walkSeed"]?.toLong() ?: seed
         val ownerSeed = options["ownerSeed"]?.toLong() ?: seed
