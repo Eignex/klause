@@ -521,8 +521,10 @@ in base-slice durations. Splitting equal exposure across segments preserves its
 weight; zero-time observations add no evidence or fading. This prices objective
 yield without changing the selected complete-worker coverage scope or share;
 silence supplies no proof verdict.
-Before a strict gain, feasibility feedback, family priors and silent complete-worker coverage retain
-their ordinary rules. Shared source preparation, retirement and independent checks
+Before an incumbent, feasibility feedback uses the ordinary rules. After the
+first-witness segment settles, learned family evidence retains the configured
+`phase-retention` share. Classification priors and selected silent complete-worker
+coverage stay fixed. Shared source preparation, retirement and independent checks
 remain in containing-run accounting.
 
 ### Reproducible diagnostics

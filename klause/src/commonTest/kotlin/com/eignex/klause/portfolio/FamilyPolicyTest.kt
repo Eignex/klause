@@ -15,6 +15,36 @@ class FamilyPolicyTest {
         (0 until rounds).count { policy.choose(pair) == family }
 
     @Test
+    fun `discarded feasibility evidence should restore classification priors`() {
+        val profile = ProblemProfile(ProblemClass.Continuous, optimizing = true, wide = false, scheduling = false)
+        for (prior in listOf(FamilyPrior.UNIFORM, FamilyPrior.of(profile))) {
+            val untouched = FamilyPolicy(Random(3), prior)
+            val learned = FamilyPolicy(Random(3), prior)
+            repeat(8) { learned.record(ArmFamily.LocalSearch, progressed = true, plateau = true) }
+
+            learned.fade(0.0)
+
+            assertEquals(List(1_000) { untouched.choose(pair) }, List(1_000) { learned.choose(pair) })
+        }
+    }
+
+    @Test
+    fun `partial phase retention should weaken learned discovery bias`() {
+        val prior = FamilyPolicy(Random(3))
+        val full = FamilyPolicy(Random(3))
+        val retained = FamilyPolicy(Random(3))
+        for (policy in listOf(full, retained)) {
+            repeat(8) { policy.record(ArmFamily.LocalSearch, progressed = true, plateau = true) }
+        }
+
+        retained.fade(0.25)
+
+        val retainedChoices = choicesOf(retained, ArmFamily.LocalSearch)
+        assertTrue(retainedChoices > choicesOf(prior, ArmFamily.LocalSearch))
+        assertTrue(retainedChoices < choicesOf(full, ArmFamily.LocalSearch))
+    }
+
+    @Test
     fun `splitting the same paid exposure should preserve family choices`() {
         for (reward in listOf(0.0, 0.25, 1.0)) {
             val whole = FamilyPolicy(Random(3))
