@@ -1121,6 +1121,26 @@ class PropagationSession private constructor(
         if (learnedClauseCount != before) learnedClauseRevision++
     }
 
+    internal val activeLearnedClauseCount: Int
+        get() = retainedState?.let { it.nativeEngine?.activeCount ?: it.learned.activeCount } ?: 0
+
+    internal fun maintainCapWindow(
+        cap: Int,
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+        keep: (Int) -> Boolean,
+    ): Int {
+        if (retainedState == null || decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot ||
+            inprocessingRootPending
+        ) return 0
+        val retired = state.nativeEngine?.maintainCapWindow(cap, maxWork, maxScratchBytes,
+            { cancelRequested || cancelled() }, keep)
+            ?: state.maintainGeneralCapWindow(cap, maxWork, maxScratchBytes, { cancelRequested || cancelled() }, keep)
+        if (retired > 0) learnedClauseRevision++
+        return retired
+    }
+
     /** Unified truth of a bool or atom literal — null when undetermined. */
     fun litTruth(lit: Int): Boolean? = state.litTruth(lit)
 
@@ -1241,8 +1261,8 @@ class PropagationSession private constructor(
     }
 
     internal fun learnedLifecycle(): Map<String, Long> = retainedState?.let {
-        it.learned.lifecycle.snapshot() + (it.factorAttribution?.snapshot() ?: emptyMap()) +
-            (it.propagationSchedule?.snapshot() ?: emptyMap())
+        it.learned.lifecycle.snapshot() + (it.nativeEngine?.capWindowStatistics() ?: it.learned.capWindowStatistics()) +
+            (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap())
     } ?: retiredLifecycle
 
     internal fun configureAttribution(
@@ -1268,8 +1288,8 @@ class PropagationSession private constructor(
         }
     }
 
-    /** Current learned-constraint count, including PB constraints and integer rows. Used to invoke
-     *  [forgetLearnedClauses] based on `BacktrackParams.maxLearnedClauses`. */
+    /** Retained learned-constraint slot count, including PB constraints and integer rows.
+     * Retired slots remain addressable until a funded compaction remaps their generation. */
     val learnedClauseCount: Int get() = retainedState?.let { it.nativeEngine?.count ?: it.learnedClauses.size } ?: 0
 
     /** LBD of the learned clause at [learnedIndex]. */
@@ -1296,11 +1316,11 @@ class PropagationSession private constructor(
     internal fun learnedClauseLiterals(learnedIndex: Int): IntArray =
         state.nativeEngine?.literalsOf(learnedIndex) ?: learnedClauseAt(learnedIndex).literals
 
-    /** True iff the learned constraint at [learnedIndex] is a clause (not a pseudo-Boolean constraint) —
-     *  the clause-only passes (vivification, glue export) skip the rest. Native-lane entries are all
-     *  clauses. */
+    /** True iff [learnedIndex] names an active clause. Clause-only passes skip other constraint
+     * kinds and retired slots. */
     internal fun isLearnedClause(learnedIndex: Int): Boolean =
-        state.nativeEngine != null || state.learnedClauses[learnedIndex] is ClausePropagator
+        state.nativeEngine?.let { !it.retiredOf(learnedIndex) }
+            ?: (!state.learned.retiredOf(learnedIndex) && state.learnedClauses[learnedIndex] is ClausePropagator)
 
     /** Three-tier DB tier of learned clause [learnedIndex]. */
     internal fun learnedClauseTier(learnedIndex: Int): ClauseTier = state.learnedClauseTier(learnedIndex)

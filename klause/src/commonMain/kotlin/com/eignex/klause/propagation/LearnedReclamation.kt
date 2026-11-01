@@ -60,28 +60,12 @@ internal fun PropagationState.prepareReclamation(
     budget.atomic(baseFactorCount.toLong())
     budget.atomic(count.toLong() * 16L)
     val retained = BooleanArray(count)
-    fun protect(fid: Int) {
-        budget.visit()
-        val index = fid - baseFactorCount
-        if (index in retained.indices) retained[index] = true
-    }
-    boolReason.forEach(::protect)
-    intMinReason.forEach(::protect)
-    intMaxReason.forEach(::protect)
+    collectLearnedReferences(retained) { budget.visit() }
     budget.atomic(boolReason.size.toLong() + intMinReason.size + intMaxReason.size + undo.size * 3L)
-    for (i in 0 until undo.size) {
-        budget.visit()
-        if (undo.tag[i] == 1) { protect(undo.minReason[i]); protect(undo.maxReason[i]) }
-    }
-    for (i in 0 until learned.pendingAttach.size) {
-        budget.visit()
-        val fid = learned.pendingAttach[i]
-        if (learned.stages[fid - baseFactorCount] and 2 == 0) protect(fid)
-    }
     nativeEngine?.prepareReclamation(budget, retained, keep)?.let { return retained }
     for (i in 0 until count) {
         budget.visit()
-        retained[i] = retained[i] || learned.permanent[i] == 1 || keep(i, learned.lbds[i])
+        retained[i] = retained[i] || (!learned.retiredOf(i) && (learned.permanent[i] == 1 || keep(i, learned.lbds[i])))
     }
     if (factorAttribution != null) budget.atomic(count.toLong() * count)
     budget.atomic(propQueue.size.toLong() * 3L + atoms.dirtyFactors.size * 3L + learned.pendingAttach.size,
@@ -108,7 +92,7 @@ internal fun PropagationState.prepareReclamation(
         }
     }
     for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
-        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach)) {
+        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) {
         budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
     }
     arithmeticLearningTrace?.let { trace ->
