@@ -46,9 +46,12 @@ internal class NativeSatState(private val state: PropagationState) {
     private var learnedCount = 0
     private var permanentCount = 0
     private var retiredCount = 0
-    private val capCandidates = IntArrayList()
+    private val capCandidates = IntArrayList(1)
     private var capRead = 0
     private var capWrite = 0
+    private var capCalls = 0L
+    private var capWork = 0L
+    private var capVisits = 0L
 
     // Per-learned-clause policy columns, parallel to the learned index — the native mirror of
     // LearnedClauseDb's forgetting/three-tier metadata. `tier` holds a [ClauseTier] ordinal;
@@ -282,10 +285,11 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedLbd.add(lbd)
         learnedPermanent.add(if (permanent) 1 else 0)
         state.work++
+        if (i == 0) state.work++
         if (permanent) {
             permanentCount++
         } else {
-            if (capCandidates.size == capCandidates.backingData.size) state.work += capCandidates.size
+            if (capCandidates.size == capCandidates.backingData.size) state.work += capCandidates.size * 3L
             capCandidates.add(i)
         }
         learnedTier.add(ClauseTier.UNSET.ordinal)
@@ -388,6 +392,7 @@ internal class NativeSatState(private val state: PropagationState) {
         cancelled: () -> Boolean,
         keep: (Int) -> Boolean,
     ): Int {
+        capCalls++
         if (permanentCount < cap || maxScratchBytes < 64L || !initialized || pendingConflict || unitsPending ||
             recheckHead < rechecks.size || bcpHead != state.boolPinOrder.size || state.runCancelled
         ) return 0
@@ -400,10 +405,12 @@ internal class NativeSatState(private val state: PropagationState) {
             val price = 32L + length.toLong() * 4L
             if (price > maxWork - work) {
                 state.work += 16L
+                capWork += 16L
                 work += 16L
                 if (cancelled()) return retired
             } else {
                 state.work += price
+                capWork += price
                 work += price
                 if (cancelled()) return retired
                 var protected = length <= 1 || lifecycleStages[index] and 2 != 0
@@ -423,6 +430,7 @@ internal class NativeSatState(private val state: PropagationState) {
             }
             if (!retiredOf(index)) capCandidates[capWrite++] = index
             capRead++
+            capVisits++
         }
         if (capRead == capCandidates.size) {
             capCandidates.truncateTo(capWrite)
@@ -431,6 +439,16 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         return retired
     }
+
+    internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) emptyMap() else mapOf(
+        "learnedCapCalls" to capCalls,
+        "learnedCapWork" to capWork,
+        "learnedCapVisits" to capVisits,
+        "learnedCapPermanentClauses" to permanentCount.toLong(),
+        "learnedCapRetainedSlots" to learnedCount.toLong(),
+        "learnedCapRetiredSlots" to retiredCount.toLong(),
+        "learnedCapActiveClauses" to activeCount.toLong(),
+    )
 
     /** Literals of learned clause [i] as a fresh array, for glue export and introspection. */
     fun literalsOf(i: Int): IntArray = clauseLits(baseCount + i)
