@@ -169,9 +169,15 @@ explanations cite the selected bound witnesses and all contributing row premises
 every learned literal is false at the conflict and implied by the cited antecedents.
 One integer or disjunction leaf cannot refute its sibling branches.
 
-The model-facing bounding callback supplies pre-separation floating optima and
-checked infeasibility outcomes to finite search hints. Directional history accepts
-only compatible retained model and row scopes; it adds no certification request.
+The model-facing bounding callback supplies numeric projections of already accepted
+objective bounds and checked infeasibility outcomes to finite search hints. It reuses
+the bound obtained for ordinary pruning, including a dual bound from an unfinished
+iterate. Directional history accepts only compatible retained model and row scopes
+whose fractional coordinates came from that working model; it adds no certification request.
+When no certificate is needed, an existing floating optimum can supply the advisory
+estimate; the search keeps that estimate kind in its history scope.
+Unavailable callbacks identify admission gates and incomplete numerical outcomes;
+they carry no optimum, bound or query authorization.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
 history lifetime.
 

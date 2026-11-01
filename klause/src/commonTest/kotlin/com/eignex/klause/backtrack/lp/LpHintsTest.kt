@@ -19,6 +19,7 @@ import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
@@ -96,7 +97,7 @@ class LpHintsTest {
 
     @Test
     fun `cutoff row and objective changes reject pending directional gains`() {
-        for (change in listOf("cutoff", "cut", "scale", "objective", "constant", "mapping")) {
+        for (change in listOf("cutoff", "cut", "scale", "objective", "constant", "mapping", "kind")) {
             val b = LpBuilder()
             val x = b.addVar(0, 10, cost = 1)
             b.addRow(intArrayOf(x), longArrayOf(1), Relation.LE, 10L)
@@ -111,7 +112,7 @@ class LpHintsTest {
             hints.beginNode(0, 100.0)
             val parent = relaxation()
             hints.record(parent, doubleArrayOf(2.25), DoubleArray(parent.model.m))
-            hints.recordObjective(parent, 10.0)
+            hints.recordBound(parent, 10.0)
             hints.branch(VarRef.IntVar(0))
             hints.commit(SearchDecision.IntAtMost(0, 2), 1)
             assertTrue(trail.push())
@@ -134,9 +135,37 @@ class LpHintsTest {
             val child = relaxation()
             hints.record(child, doubleArrayOf(2.0), DoubleArray(child.model.m))
 
-            hints.recordObjective(child, 11.0)
+            if (change == "kind") hints.recordObjective(child, 11.0) else hints.recordBound(child, 11.0)
 
             assertEquals(0, observations.count { it == "DOWN" }, change)
+        }
+    }
+
+    @Test
+    fun `cutoff context changes reject gains when floating cutoffs are equal`() {
+        for (change in listOf("incumbent", "external", "unchanged")) {
+            val first = BigFraction.ofLong((1L shl 60) + 32L)
+            val second = BigFraction.ofLong((1L shl 60) + 33L)
+            assertEquals(first.toDouble(), second.toDouble())
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), 1L shl 60, intArrayOf(0), IntArray(0))
+            val observations = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, observe = observations::add)
+            hints.beginNode(0, first.toDouble(), 1L, first)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            hints.recordBound(relaxation, 1.0)
+            hints.branch(VarRef.IntVar(0))
+            hints.commit(SearchDecision.IntAtMost(0, 2), 1)
+
+            hints.beginNode(1, second.toDouble(), if (change == "incumbent") 2L else 1L,
+                if (change == "external") second else first)
+            hints.record(relaxation, doubleArrayOf(2.0), DoubleArray(0))
+            hints.recordBound(relaxation, 1.5)
+
+            assertEquals(if (change == "unchanged") 1 else 0, observations.count { it == "DOWN" }, change)
         }
     }
 
@@ -151,7 +180,7 @@ class LpHintsTest {
             booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
         hints.beginNode(0, 100.0)
         hints.record(relaxation(), doubleArrayOf(2.25), DoubleArray(0))
-        hints.recordObjective(relaxation(), 10.0)
+        hints.recordBound(relaxation(), 10.0)
         hints.branch(VarRef.IntVar(0))
         for (up in listOf(false, true)) {
             assertTrue(trail.push())
@@ -159,7 +188,7 @@ class LpHintsTest {
             hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
             hints.beginNode(1, 100.0)
             hints.record(relaxation(), doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
-            hints.recordObjective(relaxation(), if (up) 13.0 else 11.0)
+            hints.recordBound(relaxation(), if (up) 13.0 else 11.0)
             assertTrue(trail.pop(0))
         }
 
@@ -168,8 +197,8 @@ class LpHintsTest {
     }
 
     @Test
-    fun `missing or cut changed current optima keep the existing score`() {
-        for (change in listOf("missing", "cut")) {
+    fun `missing or mismatched current bounds keep the existing score`() {
+        for (change in listOf("missing", "cut", "point", "domain", "hole")) {
             val b = LpBuilder()
             b.addVar(0, 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(b.build(Sense.MINIMIZE).authoritativeModel()))
@@ -179,13 +208,13 @@ class LpHintsTest {
             repeat(2) {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
-                hints.recordObjective(relaxation, 10.0)
+                hints.recordBound(relaxation, 10.0)
                 hints.branch(VarRef.IntVar(0))
                 for (up in listOf(false, true)) {
                     hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
                     hints.beginNode(1, 100.0)
                     hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
-                    hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                    hints.recordBound(relaxation, if (up) 13.0 else 11.0)
                 }
             }
             assertTrue(hints.directionalScore(VarRef.IntVar(0)).isFinite())
@@ -193,8 +222,16 @@ class LpHintsTest {
             hints.beginNode(1, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
 
-            if (change == "cut") {
-                hints.recordObjective(relaxation, 10.0)
+            if (change == "domain" || change == "hole") {
+                hints.recordBound(relaxation, 10.0)
+                hints.finishNode()
+            } else if (change == "point") {
+                val other = LpRelaxation(b.build(Sense.MINIMIZE), intArrayOf(0),
+                    booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+                hints.recordBound(other, 10.0)
+                hints.finishNode()
+            } else if (change == "cut") {
+                hints.recordBound(relaxation, 10.0)
                 assertTrue(trail.append(
                     LpScopedRow(0L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(8L),
                         ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))),
@@ -203,8 +240,58 @@ class LpHintsTest {
                 hints.finishNode(trail.state)
             } else hints.finishNode()
 
-            assertTrue(hints.directionalScore(VarRef.IntVar(0)).isNaN())
+            val domain = when (change) {
+                "domain" -> IntDomain(0, 1)
+                "hole" -> IntDomain(0, 10).excludeValue(2)
+                else -> null
+            }
+            assertTrue(hints.directionalScore(VarRef.IntVar(0), domain).isNaN())
             assertTrue(hints.branchScore(VarRef.IntVar(0)).isFinite())
+        }
+    }
+
+    @Test
+    fun `only reliable variable history can override the baseline`() {
+        for ((samples, gain, accepted) in listOf(
+            Triple(1, 1.0, false), Triple(1, 8.0, false), Triple(1, 16.0, false), Triple(2, 1.0, true),
+        )) {
+            val builder = LpBuilder()
+            repeat(3) { builder.addVar(0, 10, cost = if (it == 2) 100 else 1) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, 2),
+                BooleanArray(3), 0L, intArrayOf(0, 1, 2), IntArray(0))
+            val observations = ArrayList<String>()
+            val hints = LpHints(3, 0, directionalGains = true, observe = observations::add)
+            for (variable in 0..1) {
+                repeat(if (variable == 0) 2 else samples) {
+                    hints.beginNode(0, 100.0)
+                    hints.record(relaxation, DoubleArray(3) { 2.25 }, DoubleArray(0))
+                    hints.recordBound(relaxation, 10.0)
+                    hints.branch(VarRef.IntVar(variable))
+                    for (up in if (variable == 0 || samples == 2) listOf(false, true) else listOf(false)) {
+                        hints.commit(if (up) SearchDecision.IntAtLeast(variable, 3)
+                            else SearchDecision.IntAtMost(variable, 2), 1)
+                        hints.beginNode(1, 100.0)
+                        hints.record(relaxation, DoubleArray(3) { 2.25 }, DoubleArray(0))
+                        val delta = if (variable == 0) {
+                            if (up) 24.0 else 8.0
+                        } else if (up) 3.0 else gain
+                        hints.recordBound(relaxation, 10.0 + delta)
+                    }
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.0, 2.25, 2.25), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            observations.clear()
+            val variable = VarRef.IntVar(1)
+            val baseline = VarRef.IntVar(2)
+
+            val selected = hints.selected(variable, baseline, hints.directionalScore(variable))
+            hints.branch(selected ?: baseline)
+
+            assertEquals(if (accepted) variable else null, selected, "samples=$samples gain=$gain")
+            assertEquals(if (accepted) 1 else 0, observations.count { it == "CONSUMED" })
         }
     }
 
@@ -221,18 +308,18 @@ class LpHintsTest {
             repeat(2) {
                 hints.beginNode(0, Double.POSITIVE_INFINITY)
                 hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
-                hints.recordObjective(relaxation, 10.0)
+                hints.recordBound(relaxation, 10.0)
                 hints.branch(variable)
                 for (up in listOf(false, true)) {
                     hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
                     hints.beginNode(1, Double.POSITIVE_INFINITY)
                     hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
-                    hints.recordObjective(relaxation, if (up) 13.0 else 11.0)
+                    hints.recordBound(relaxation, if (up) 13.0 else 11.0)
                 }
             }
             hints.beginNode(0, Double.POSITIVE_INFINITY)
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
-            hints.recordObjective(relaxation, 10.0)
+            hints.recordBound(relaxation, 10.0)
 
             assertEquals(1.5, hints.directionalScore(variable), 1e-9, "constant=$constant")
         }

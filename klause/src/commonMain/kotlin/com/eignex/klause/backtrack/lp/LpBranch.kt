@@ -17,13 +17,14 @@ import com.eignex.klause.solver.search.VarRef
 internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?): VarRef? {
     hints ?: return null
     if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
+    val directionalAvailable = hints.hasDirectionalScores()
     var best: VarRef? = null
     var bestScore = LP_BRANCH_MIN_SCORE
     var directional: VarRef? = null
     var gainScore = LP_BRANCH_MIN_SCORE
     for (b in 0 until problem.numBoolVars) {
         if (session.boolValue(b) != null) continue
-        val gain = hints.directionalScore(VarRef.Bool(b))
+        val gain = if (directionalAvailable) hints.directionalScore(VarRef.Bool(b)) else Double.NaN
         if (gain > gainScore) {
             gainScore = gain
             directional = VarRef.Bool(b)
@@ -35,8 +36,9 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
         }
     }
     for (i in 0 until problem.numIntVars) {
-        if (session.intDomain(i).isFixed) continue
-        val gain = hints.directionalScore(VarRef.IntVar(i))
+        val domain = session.intDomain(i)
+        if (domain.isFixed) continue
+        val gain = if (directionalAvailable) hints.directionalScore(VarRef.IntVar(i), domain) else Double.NaN
         if (gain > gainScore) {
             gainScore = gain
             directional = VarRef.IntVar(i)
@@ -47,8 +49,7 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
             best = VarRef.IntVar(i)
         }
     }
-    hints.selected(directional)
-    return directional ?: best
+    return hints.selected(directional, best, gainScore) ?: best
 }
 
 /** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below

@@ -1271,7 +1271,10 @@ internal class ResumableMinimize(
 
     /** LP guidance affects only branch order; the shared runner still owns every frame and retraction. */
     private inner class LpGuidedBranching : BacktrackBranching {
-        override fun onBranch(variable: VarRef) { lpHints?.branch(variable) }
+        override fun onBranch(variable: VarRef) {
+            val domain = (variable as? VarRef.IntVar)?.let { session.intDomain(it.varId) }
+            lpHints?.branch(variable, domain)
+        }
 
         override fun onCommit(decision: SearchDecision, depth: Int) { lpHints?.commit(decision, depth) }
 
@@ -1295,10 +1298,14 @@ internal class ResumableMinimize(
                 SearchRunDisposition.Continue -> Unit
             }
             val externalBound = externalCutoff()
-            val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
+            val incumbent = incumbents.current()
+            val localBound = incumbent?.objective?.pruningBound ?: Double.POSITIVE_INFINITY
+            val effectiveBound = if (externalBound < localBound) externalBound else localBound
+            val externalExact = if (lpHints != null || (rebindable && discreteObjective)) {
+                exactObjectiveBoundSupplier?.invoke()
+            } else null
             if (rebindable && discreteObjective) {
-                val externalExact = exactObjectiveBoundSupplier?.invoke()
-                val localExact = incumbents.current()?.objective?.exact
+                val localExact = incumbent?.objective?.exact
                 val exactBound = when {
                     externalExact == null -> localExact
                     localExact == null || externalExact < localExact -> externalExact
@@ -1310,7 +1317,7 @@ internal class ResumableMinimize(
             }
             // Persistent LP fixings may use only a cutoff that survives every later repair.
             val lpBound = if (rebindable) externalBound else effectiveBound
-            lpHints?.beginNode(context.decisionLevel, lpBound)
+            lpHints?.beginNode(context.decisionLevel, lpBound, incumbent?.version ?: 0L, externalExact)
             val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1, singleObj?.ascending ?: true)
             lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState)
             if (!pruned) {

@@ -31,6 +31,21 @@ class LpParams(
         LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing)
 }
 
+internal enum class LpHintUnavailable {
+    UNOBSERVED,
+    ALLOWANCE,
+    DEPTH,
+    CADENCE,
+    LADDER,
+    MODEL,
+    SUSPENDED,
+    NO_RESULT,
+    NO_BOUND,
+    CANCELLED,
+    EARLIER_BOUND,
+    FEASIBILITY_ONLY,
+}
+
 /**
  * The LP-solution sink [LpEngine] records each node's fractional primal and reduced costs into. The
  * search-layer branching-hint store (`LpHints`) implements it; presolve passes no sink. Keeping the engine
@@ -40,11 +55,16 @@ class LpParams(
 internal interface LpHintSink {
     fun clear()
 
-    /** Advisory floating optimum in minimized working units; supplies no certified bound. */
+    /** Advisory numeric projection of an accepted bound in minimized working units; adds no proof authority. */
+    fun recordBound(relaxation: LpRelaxation, bound: Double) {}
+
+    /** Advisory floating optimum when ordinary bounding needs no certificate. */
     fun recordObjective(relaxation: LpRelaxation, objective: Double) {}
 
     fun recordInfeasible() {}
 
-    /** Record an LP solution's [primal] and [duals] against [relaxation]'s column→variable map. */
+    fun recordUnavailable(reason: LpHintUnavailable) {}
+
+    /** Record an advisory iterate's [primal] and [duals] against [relaxation]'s column→variable map. */
     fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray)
 }
