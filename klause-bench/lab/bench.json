@@ -8,6 +8,13 @@
     ":klause-bench:installDist",
     ":klause-bench:prepareLabRuntime"
   ],
+  "planInputs": [
+    "klause-bench",
+    "build.gradle.kts",
+    "settings.gradle.kts",
+    "gradle.properties",
+    "gradle"
+  ],
   "jvmArgs": [
     "-Xmx512m",
     "--enable-native-access=ALL-UNNAMED",
