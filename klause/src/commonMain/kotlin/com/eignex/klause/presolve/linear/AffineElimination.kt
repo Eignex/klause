@@ -541,6 +541,7 @@ internal object AffineSingletons {
         pivotable: ((Linear, Int) -> Boolean)?,
         cancellation: Cancellation = Cancellation.Never,
         minimizeRewrite: Boolean = false,
+        rankStructuredOnly: Boolean = false,
     ): AffineCandidate? {
         val f = ws.factorAt(di)?.equivalentLinear() ?: return null
         if (f.op != LinearOp.EQ || f.vars.size < 2) return null
@@ -549,6 +550,11 @@ internal object AffineSingletons {
             cancellation.charge(AFFINE_WORK_WEIGHT)
             candidateInFactor(ws, di, eliminated, objectiveIntVars, capWide, pivotable, cancellation) ?: return null
         } else null
+        if (rankStructuredOnly && fallback != null) {
+            val rank = requiresStructuredConsumers(ws, fallback, cancellation)
+            if (cancellation()) return null
+            if (!rank) return fallback
+        }
         cancellation.charge(AFFINE_WORK_WEIGHT * f.vars.size)
         if (row.bound == Long.MIN_VALUE) return null
         var preferred = 0
@@ -647,6 +653,23 @@ internal object AffineSingletons {
             }
         }
         return null
+    }
+
+    private fun requiresStructuredConsumers(
+        ws: FactorOcc,
+        candidate: AffineCandidate,
+        cancellation: Cancellation,
+    ): Boolean {
+        if (candidate.isAlias) return false
+        for (k in 0 until ws.degreeOf(candidate.x)) {
+            cancellation.charge(AFFINE_WORK_WEIGHT)
+            if (cancellation()) return false
+            val id = ws.occurrenceAt(candidate.x, k)
+            if (id == candidate.defIdx) continue
+            val factor = ws.factorAt(id)
+            if (factor is ReifiedLinear || factor is ComparisonClause) return true
+        }
+        return false
     }
 
     /** Whether any variable in [touchedVars] heads a unit-pivot or residue candidate, testing only the

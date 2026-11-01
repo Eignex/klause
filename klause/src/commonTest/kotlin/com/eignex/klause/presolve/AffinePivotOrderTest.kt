@@ -194,6 +194,25 @@ class AffinePivotOrderTest {
     }
 
     @Test
+    fun `structured ordering should avoid the larger rewrite through native channels`() {
+        val source = Problem(2, 3,
+            arrayOf(IntDomain(0, 4), IntDomain(-4, 4), IntDomain(0, 4)), listOf(
+                Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.LE, 4),
+            ))
+
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
+            objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 1)),
+            pivotOrder = AffinePivotOrder.STRUCTURED)
+        val rebuilt = assertNotNull(delta.rebuild.asSampleLift())(
+            Sample(booleanArrayOf(true, true), longArrayOf(3, 0, 1)))
+
+        assertEquals(2L, rebuilt.ints[1])
+    }
+
+    @Test
     fun `interrupted rewrite scoring should leave the source unchanged`() {
         var stopped = false
         val table = Table(intArrayOf(0, 2), longArrayOf(1, 0, 2, 1, 3, 2))

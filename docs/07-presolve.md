@@ -87,11 +87,13 @@ default round cap; an explicit zero round cap still suppresses those schedules.
 
 ### Rewrite representation controls
 
-`AffinePivotOrder.STRUCTURED` keeps Markowitz ordering between definitions and
-declaration order among admitted pivots. It enables rewrites through supported
-structured consumers and reuses existing exact binary cost channels within mixed
-integer objectives. It performs no incident-payload scoring. `MARKOWITZ` remains
-the default policy.
+`AffinePivotOrder.STRUCTURED` keeps Markowitz ordering between definitions. It
+retains the first admitted declaration-order pivot for aliases and ordinary
+consumers. When that pivot needs the added native reified or comparison-clause
+support, it tries the smallest incident rewrite payload first. Consumer admission
+checks walk the maintained occurrence index and charge the phase allowance. It
+also reuses existing exact binary cost channels within mixed integer objectives.
+`MARKOWITZ` remains the default policy.
 
 `AffinePivotOrder.REWRITE_COST` retains Markowitz ordering between definitions and
 tries the smallest rewrite payload among an equality's unit pivots first. It sums
@@ -808,7 +810,7 @@ or a constant shift exceeds the objective's storage width. Mixed
 integer readers retain their columns and channels. Substituted values are
 reconstructed from their literals, preserving original costs and source coordinates.
 `STRUCTURED` and `REWRITE_COST` also project binary costs within a mixed integer
-objective when existing signed channels carry them exactly. It retains nonbinary
+objective when existing signed channels carry them exactly. Both retain nonbinary
 costs and any binary cost whose channel reuse would overflow, protecting their
 integer columns from substitution. This mixed view adds no Boolean channels and
 does not carry the pure binary-objective LP admission marker.
