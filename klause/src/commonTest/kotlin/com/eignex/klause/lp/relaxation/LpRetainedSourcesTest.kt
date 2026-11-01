@@ -127,14 +127,14 @@ class LpRetainedSourcesTest {
             assertTrue(owner.replaceRows(initial.retired, initial.columns, initial.rows, false,
                 objective = initial.objective))
             initial.commit()
-            val before = sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes
-            assertTrue(before.getValue("RETAINED_FULL_BOUND_CHECKS") > 0L)
             assertTrue(owner.push())
             live[0] = live[0].withMinAtLeast(2)
             val child = assertNotNull(sources.prepare(owner.state, domains))
             assertTrue(owner.replaceRows(child.retired, child.columns, child.rows, true,
                 objective = child.objective, assertions = assertNotNull(child.boundAssertions(100L))))
             child.commit()
+            val before = sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes
+            assertTrue(before.getValue("RETAINED_FULL_BOUND_CHECKS") > 0L)
             live[1] = live[1].withMinAtLeast(1)
 
             assertNotNull(sources.prepare(owner.state, domains))
