@@ -77,7 +77,7 @@ class PortfolioWorkAccountingTest {
 
             val result = Portfolio(
                 arms, fixedBandit(2, arm = 0), baseSliceWork = 7L, lsInstructionsPerWork = 1.5,
-            ).use { it.minimize() }
+            ).use { it.minimize(Cancellation { offers.isNotEmpty() }) }
 
             assertEquals(listOf(10L to 7L), offers)
             assertEquals(13L, result.stats.portfolio.arms[0].work)
@@ -117,7 +117,7 @@ class PortfolioWorkAccountingTest {
 
         val result = Portfolio(
             arms, fixedBandit(2, arm = 0), baseSliceWork = 7L, lsInstructionsPerWork = 1.5,
-        ).use { it.solve() }
+        ).use { it.solve(Cancellation { offers.isNotEmpty() }) }
 
         assertEquals(listOf(10L to 7L), offers)
         assertEquals(13L, result.stats.portfolio.arms[0].work)
