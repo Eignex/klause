@@ -173,6 +173,7 @@ object PortfolioBuilder {
                 )
                 worker.bindEvidence(ModelIdentity.of(problem, objective)).also {
                     it.earlyCoreTrial = config is CoreGuidedWorkerConfig && deferCore && scenario.earlyCoreAdmission
+                    it.retainInitialProofCoverage = config is CoreGuidedWorkerConfig && deferCore
                     it.improvementOnly = if (config is CoreGuidedWorkerConfig && deferCore) {
                         !scenario.earlyCoreAdmission
                     } else armId >= plan.firstSolutionCount

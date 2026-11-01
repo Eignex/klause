@@ -676,6 +676,13 @@ owns reconstruction, cumulative probing and refutation authority.
 
 #### Auxiliary incumbent evaluation
 
+Deferred core workers retain each complete sibling's initial charged coverage
+across incumbent improvements. Once an incumbent admits the ordinary core worker,
+its first base trial can follow the initial sibling probes without waiting for an
+improvement-free epoch. Further trials require fresh complete-family work. The
+existing containing work and auxiliary time allowances bound both preparation and
+search.
+
 An auxiliary arm keeps its preparation and receives a bounded search trial after an
 incumbent arrives, running before ordinary selection once every initial sibling has
 been admitted. The trial is capped at twelve maximum work allowances and four base

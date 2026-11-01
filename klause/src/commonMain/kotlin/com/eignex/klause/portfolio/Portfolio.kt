@@ -1159,7 +1159,8 @@ class Portfolio(
             } else complete.all { retired[it] || siblingWork[it] >= baseSliceWork }
             val earlyCovered = complete.all { retired[it] || initialCoreCoverage[it] >= baseSliceWork }
             return if (covered) eligible else eligible.filter {
-                !workers[it].auxiliaryProof || (workers[it].earlyCoreTrial && earlyCovered)
+                !workers[it].auxiliaryProof || (earlyCovered &&
+                    (workers[it].earlyCoreTrial || (!proofStarted && workers[it].retainInitialProofCoverage)))
             }
         }
 
