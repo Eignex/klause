@@ -80,6 +80,10 @@ Solver-control flags are common to every mode; `--help` lists every parameter.
 produce a configuration error before worker execution, including when an adaptive
 restart schedule takes precedence.
 
+`--param inprocessing-warmup-work=N` withholds optional inprocessing until that much
+non-inprocessing work follows the first eligible complete root. Zero disables the
+warmup; see [root scheduling](09-learning.md#restarts-phases-and-inprocessing).
+
 `--param learned-memory-bytes=N` enables the optional learned-store modeled-byte
 soft limit. `learned-memory-work` (65,536 visits) and `learned-memory-scratch-bytes`
 (1 MiB) bound each attempt. All accept nonnegative values; zero work or scratch
