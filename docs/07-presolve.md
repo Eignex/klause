@@ -298,7 +298,8 @@ an exhaustive elimination pass.
 
 A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker
-qualifies. The capture binds its exact source object and owns its clauses; preparation
+qualifies. Discovery charges retained slot visits and skips logically retired entries
+before reading their literals. The capture binds its exact source object and owns its clauses; preparation
 rechecks that its columns remain unfixed. Global consequences remain valid after
 their canonical learned entries are reclaimed. Adding
 them to the pinned source preserves the premises of the source implication-graph
@@ -878,6 +879,8 @@ indeterminate. [Portfolio admission](12-portfolio.md#witnesses-and-proof-scope) 
 finite integer point and checks the selected original-source relations. The point is
 the session's private root, so incompatible caller pins still refute it. Prepared
 custom providers keep their selected factories and required original checks.
+Pure Boolean clause points use native clause propagation when the selected
+factories permit it, without constructing the general watcher index.
 Cancellation or unavailable required checking returns indeterminate. Every exit
 reports the propagation work through the caller's accounting hook, and no scratch
 state survives a check.

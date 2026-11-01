@@ -13,15 +13,25 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.SharingMemoryObservation
 
 /** Reduce the learned-clause database at a restart without discarding permanent or glue clauses. */
-internal fun forgetIfOverCap(session: PropagationSession, params: BacktrackParams) {
+internal fun forgetIfOverCap(
+    session: PropagationSession,
+    params: BacktrackParams,
+    protectedPublication: Boolean = false,
+) {
+    if (protectedPublication) return
     val cap = params.maxLearnedClauses ?: return
     val learnedSize = session.learnedClauseCount
     if (learnedSize <= cap) return
-    if (params.tieredLearnedDb) {
-        forgetTiered(session, params, cap, learnedSize)
+    val startWork = session.work
+    val prepared = prepareCapReduction(session, params, learnedSize, params.tieredLearnedDb)
+    if (prepared == null) {
+        forgetWindow(session, params, cap, startWork)
         return
     }
-    val prepared = prepareCapReduction(session, params, learnedSize, tiered = false) ?: return
+    if (params.tieredLearnedDb) {
+        forgetTiered(session, params, cap, learnedSize, prepared)
+        return
+    }
     val glueThreshold = params.lbdGlueThreshold
     val remaining = (cap - (learnedSize - prepared.count)).coerceAtLeast(0)
     if (prepared.count <= remaining) return
@@ -33,8 +43,13 @@ internal fun forgetIfOverCap(session: PropagationSession, params: BacktrackParam
     if (dropped > 0) params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropped, dropped = dropped))
 }
 
-private fun forgetTiered(session: PropagationSession, params: BacktrackParams, cap: Int, learnedSize: Int) {
-    val prepared = prepareCapReduction(session, params, learnedSize, tiered = true) ?: return
+private fun forgetTiered(
+    session: PropagationSession,
+    params: BacktrackParams,
+    cap: Int,
+    learnedSize: Int,
+    prepared: CapReductionPreparation,
+) {
     val residual = (cap - (learnedSize - prepared.count)).coerceAtLeast(0)
     if (prepared.count > residual && !prepared.select(residual)) return
     if (!prepared.publishTiers()) return
@@ -44,6 +59,36 @@ private fun forgetTiered(session: PropagationSession, params: BacktrackParams, c
         if (retired > 0) {
             params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = session.learnedClauseCount, dropped = retired))
         }
+    }
+}
+
+private fun forgetWindow(session: PropagationSession, params: BacktrackParams, cap: Int, startWork: Long) {
+    val retired = session.maintainCapWindow(cap,
+        (params.learnedMemoryWork - (session.work - startWork)).coerceAtLeast(0L),
+        params.learnedMemoryScratchBytes, { params.cancellation() }) { index ->
+        val lbd = session.learnedClauseLbd(index)
+        if (!params.tieredLearnedDb) {
+            lbd <= params.lbdGlueThreshold
+        } else {
+            val used = session.learnedClauseUsedSinceReduction(index)
+            val tier = session.learnedClauseTier(index).takeUnless { it == ClauseTier.UNSET } ?: when {
+                lbd <= params.lbdGlueThreshold -> ClauseTier.CORE
+                lbd <= params.midLbdThreshold -> ClauseTier.MID
+                else -> ClauseTier.LOCAL
+            }
+            val next = when (tier) {
+                ClauseTier.CORE -> ClauseTier.CORE
+                ClauseTier.MID -> if (used) ClauseTier.MID else ClauseTier.LOCAL
+                ClauseTier.LOCAL -> if (used) ClauseTier.MID else ClauseTier.LOCAL
+                ClauseTier.UNSET -> error("tier was resolved")
+            }
+            session.setLearnedClauseTier(index, next)
+            session.clearLearnedClauseUsed(index)
+            tier != ClauseTier.LOCAL || used
+        }
+    }
+    if (retired > 0) {
+        params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = session.activeLearnedClauseCount, dropped = retired))
     }
 }
 

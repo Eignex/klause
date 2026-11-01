@@ -143,6 +143,75 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `learned compaction should preserve a completed source scan at an unchanged root`() {
+        for ((native, prepared) in listOf(false to false, true to false, false to true, true to true)) {
+            val source = problem(intArrayOf(1), intArrayOf(2, 4), intArrayOf(4, 6), intArrayOf(2, 6)).bake()
+            val projection = if (prepared) {
+                PropagationProblem.preparation(source).asSequence().filterNotNull().last()
+            } else PropagationProblem(source)
+            val session = PropagationSession(projection, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(2, 4, 6)), 3)
+            val pass = RootSimplificationPass()
+            pass.run(session, BacktrackParams(), null)
+            session.forgetLearnedClauses { _, _ -> false }
+            assertEquals(0, session.learnedClauseCount)
+            val work = session.work
+
+            pass.run(session, BacktrackParams(), null)
+
+            assertEquals(work, session.work)
+        }
+    }
+
+    @Test
+    fun `a changed root should refresh source binaries after learned compaction`() {
+        for ((native, prepared) in listOf(false to false, true to false, false to true, true to true)) {
+            val source = problem(intArrayOf(1), intArrayOf(2, 4, 6)).bake()
+            val projection = if (prepared) {
+                PropagationProblem.preparation(source).asSequence().filterNotNull().last()
+            } else PropagationProblem(source)
+            val session = PropagationSession(projection, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(2, 6)), 2)
+            val pass = RootSimplificationPass()
+            pass.run(session, BacktrackParams(), null)
+            session.forgetLearnedClauses { _, _ -> false }
+            assertEquals(0, session.learnedClauseCount)
+            session.addRootDerivedClause(Clause(intArrayOf(3)), 1, 0, false)
+
+            pass.run(session, BacktrackParams(), null)
+            val partners = ArrayList<Int>()
+            session.explanationState.forEachBinaryPartner(4) { partners.add(it) }
+
+            assertEquals(listOf(6), partners)
+        }
+    }
+
+    @Test
+    fun `a pending retirement should invalidate learned candidates after compaction`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
+            session.addLearnedClause(Clause(intArrayOf(0, 4, 6)), 3)
+            val pass = RootSimplificationPass()
+            val stats = SearchStatsSink()
+            repeat(64) {
+                if ((stats.snapshot().learning["inprocessRootCandidates"] ?: 0L) < 3L) {
+                    pass.run(session, BacktrackParams(inprocessingRootWork = 1L), stats)
+                }
+            }
+            assertEquals(3L, stats.snapshot().learning.getValue("inprocessRootCandidates"))
+            assertEquals(2, session.learnedClauseCount)
+
+            repeat(3) { pass.run(session, BacktrackParams(), null) }
+            val partners = ArrayList<Int>()
+            session.explanationState.forEachBinaryPartner(4) { partners.add(it) }
+
+            assertEquals(listOf(6), partners)
+            assertEquals(1, session.learnedClauseCount)
+        }
+    }
+
+    @Test
     fun `new root facts should extend the source neighborhood after an earlier slice`() {
         for ((native, prepared) in listOf(false to false, false to true, true to true)) {
             val source = Problem(6, 0, emptyArray(), Array<Factor>(130) { index ->

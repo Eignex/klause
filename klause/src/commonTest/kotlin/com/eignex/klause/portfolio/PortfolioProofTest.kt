@@ -122,6 +122,7 @@ class PortfolioProofTest {
                 trackingWorker("proof", 1, proof).also {
                     it.auxiliaryProof = true
                     it.improvementOnly = true
+                    it.retainInitialProofCoverage = true
                 },
             )
 
@@ -188,6 +189,36 @@ class PortfolioProofTest {
 
         assertEquals(8, completeVisits)
         assertEquals(0, proofVisits)
+    }
+
+    @Test
+    fun `first core trial should retain every complete siblings charged coverage`() {
+        for (initialWork in listOf(0L, 2_500L, 5_000L)) {
+            val visits = IntArray(2)
+            var proofVisits = 0
+            val complete = List(2) { arm ->
+                val base = ScriptedSearch({ true }) { visits[arm]++ }
+                object : ResumableSearch by base {
+                    override val work: Long get() = if (visits[arm] == 1) initialWork else base.work
+                }
+            }
+            val proof = ScriptedSearch({ false }) {
+                assertTrue(complete.all { it.work >= 5_000L })
+                proofVisits++
+            }
+            val workers = complete.mapIndexed { arm, search -> trackingWorker("complete$arm", arm, search) } +
+                trackingWorker("core", 2, proof).also {
+                    it.auxiliaryProof = true
+                    it.improvementOnly = true
+                    it.retainInitialProofCoverage = true
+                }
+
+            Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
+                it.minimize(Cancellation { proofVisits > 0 || visits.sum() >= 8 })
+            }
+
+            assertEquals(1, proofVisits)
+        }
     }
 
     @Test

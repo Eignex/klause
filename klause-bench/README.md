@@ -102,12 +102,14 @@ multiple pivots use the full database. `ReusedSourceClauses` counts unchanged
 immutable inputs retained during pinning; later elimination can remove them.
 All scan and source-index transport work remains in preparation.
 Preparation, opening, trial, reconstruction, check and retirement timings have
-separate counters. The propagation ledger includes charged preparation,
+separate counters. The private coordinator ledger includes charged preparation,
 reconstruction and checks; do not add those work subsets again. `ModeledPrivateBytes` excludes the canonical
 worker, headers and allocator overhead; it is not RSS or a simultaneous heap peak.
 The canonical worker retains its warm state during the trial. A private refutation
 resumes it and supplies no independently checked source proof. This control alone
 does not qualify automatic production activation or complete source-cost benefit.
+`WarmClausesRetained` counts canonical learned-store slots, including logically retired
+entries awaiting compaction; it is not an active-clause count.
 `WarmClausesCopied` and `WarmClauseLiterals` count bounded copies of owned global
 learning over retained columns. `WarmClauseWork` and `WarmClauseNanos` are subsets
 of preparation, not additional totals. Copies spend unused local BVE allowance
@@ -169,6 +171,17 @@ and `#` starts a comment. They bypass default suite family caps.
 `suite=maxsat-maxcut` selects the [MaxSAT LIB weighted MaxCut family](https://www.cs.toronto.edu/maxsat-lib/maxsat-instances/master-set/weighted/maxcut/)
 from its compact archive. Names include `dimacs_mod/MANN_a9.clq` and
 `random/max_cut_60_500_9.asc`; model hashes identify the fetched bytes in lab records.
+
+`suite=maxsat-haplotyping` resolves the original MSE 2024
+`haplotyping-pedigrees_wt-ped2.B.recomb1-0.01-3` source through selected ZIP ranges.
+It requires a uniquely named member and a pinned SHA-256 of the decompressed source.
+HTTP ranges require matching coordinates, length and a stable strong ETag; a full
+response is rejected. Acquisition admits 32 MiB of requested range bytes, eight
+64 KiB cached blocks, a 16 MiB packed member and 64 MiB of original bytes. XZ
+decoding has a 64 MiB memory limit. Selection reads the central directory and the
+chosen local header; unrelated members stay packed at the source. Range transport
+does not retry internally. Retain failed acquisition and checking within the lab's
+containing allowance. These limits do not change solver grants or source semantics.
 
 For retained JFR captures, submit `lab/jfr-summary.json` through `lab run` with
 `bench.request.parameters` containing `source` (the job/artifact label), `sha256`
