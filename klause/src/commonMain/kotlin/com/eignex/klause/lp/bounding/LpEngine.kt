@@ -369,7 +369,7 @@ internal class LpEngine(
         if (!params.lpPlan.probe) return PartialPrimalRead.DISABLED
         if (problem.numRealVars != 0) return PartialPrimalRead.CONTINUOUS_SOURCE
         val currentOwner = ownsRootPrimalModel(relaxation.model) ||
-            retainedOwnerRead && retainedRootPrimalStateMatches(relaxation)
+            (retainedOwnerRead && retainedRootPrimalStateMatches(relaxation))
         if (!currentOwner) return PartialPrimalRead.STALE_OWNER
         if (cancellation()) return PartialPrimalRead.CANCELLED
         val previous = rootRoundingWarmStart
