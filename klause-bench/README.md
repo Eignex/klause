@@ -893,6 +893,10 @@ Point selection starts from the current checked recipe. `CurrentFallback` and
 `BaseQueries` counts base relaxation attempts. A point-selection arm can therefore
 contain both CURRENT and POINT_SELECTION recipe work; retain the ordinary source
 totals and both disjoint recipe costs.
+Optional source-pair discovery waits for a completed nonterminal point and uses
+65,536 work and 1 MiB modeled allocation. Ordinary aggregate-only preparation keeps
+its 500,000-work and 8 MiB limits. Current checked incumbents and terminals bypass
+this discovery; no extra numerical query is needed in that case.
 `numericalCutSelectionAdoptedInstalled` counts already-installed cuts entering
 the bounded mask from an integer-only current recipe or an aggregate-only cut
 family. Adoption adds no LP query or root miss; later completed points supply aging

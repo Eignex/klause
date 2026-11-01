@@ -472,11 +472,12 @@ Rows wider than the support cap are skipped with incomplete coverage. The cached
 proposals under 500,000 preparation work and 8 MiB modeled allocation, with
 per-attempt limits shared with explicit aggregation. Stopped or limited
 preparation reports its decline and leaves only completed proposals available.
-Point selection obtains its initial point from the current individual-cut recipe.
-When that family is empty, the initial query includes the bounded aggregate family;
-up to 64 fully checked installed aggregate rows enter aging without replacing that
-query. Otherwise, selection constructs and checks aggregates alongside
-point-directed row alternatives.
+Point selection queries the current recipe before preparing optional aggregate
+pairs. A checked current incumbent or terminal bypasses discovery. A completed
+nonterminal point can prepare aggregates alongside point-directed row alternatives
+under 65,536 work and 1 MiB modeled allocation. Ordinary aggregate-only queries keep
+their 500,000-work and 8 MiB limits. An installed aggregate recipe with at most 64
+fully checked rows can enter aging without replacing its query.
 When both source endpoints are stated, aggregate rounding selects the endpoint
 nearest the point independently for each continuous coordinate. One-sided coordinates
 retain their stated side; unavailable finite distances retain the ordinary choice.

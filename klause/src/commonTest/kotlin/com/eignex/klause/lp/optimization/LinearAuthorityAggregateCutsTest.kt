@@ -69,6 +69,41 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `point selection should query the current recipe before preparing aggregate pairs`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right)),
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+        val capture = LinearAuthorityCapture(4, 10_000L, 1_000_000L, Cancellation.Never)
+
+        val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithPointCuts(source, Cancellation.Never)
+        }
+
+        assertTrue(capture.records.first().cuts.isEmpty())
+        assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
+            assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+    }
+
+    @Test
+    fun `a checked current optimum should bypass optional pair discovery`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("x", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
+                "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE))),
+            mapOf(x to BigFraction.MINUS_ONE))
+        LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            val result = authority.advanceWithPointCuts(source, Cancellation.Never)
+
+            assertEquals(null, authority.cutObservations()["numericalCutAggregatePairAttempts"])
+            assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.evidence)))
+        }
+    }
+
+    @Test
     fun `installed aggregate cuts should retain their checked numerical recipe across scoped queries`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
@@ -88,6 +123,7 @@ class LinearAuthorityAggregateCutsTest {
         val child = source.atScope(source.scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO))))
         val capture = LinearAuthorityCapture(4, 10_000L, 1_000_000L, Cancellation.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advance(source, Cancellation.Never, cuts = true)
             authority.capture = capture
             authority.advanceWithPointCuts(source, Cancellation.Never)
             val attempts = assertNotNull(authority.cutObservations()["numericalCutAggregatePairAttempts"])

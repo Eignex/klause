@@ -50,11 +50,13 @@ internal data class LinearAuthorityAggregateProbeResult(
 )
 
 internal object LinearAuthorityAggregateCuts {
+    val sourcePairLimits = LinearAuthorityAggregateLimits(work = 500_000L, allocation = 8_388_608L)
+    val pointSourcePairLimits = LinearAuthorityAggregateLimits()
+
     fun prepareSourcePairs(
         source: SourceProofContext, cancellation: Cancellation,
         observe: (String, Long) -> Unit = { _, _ -> }, maximumCandidates: Int = 64,
-        limits: LinearAuthorityAggregateLimits = LinearAuthorityAggregateLimits(
-            work = 500_000L, allocation = 8_388_608L),
+        limits: LinearAuthorityAggregateLimits = sourcePairLimits,
         point: Map<SourceCoordinate, Double>? = null,
     ): List<LinearAuthorityCut> {
         require(maximumCandidates in 0..64)

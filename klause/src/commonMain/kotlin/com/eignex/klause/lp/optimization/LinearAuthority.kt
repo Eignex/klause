@@ -460,8 +460,7 @@ internal class LinearAuthority(
         prepared: LinearAuthorityTemplate, cancellation: Cancellation,
         point: Map<SourceCoordinate, Double>? = null,
     ): LinearAuthorityTemplate? {
-        val generateAggregates = aggregateCuts &&
-            (!deferAggregatePreparation || prepared.cuts?.rows?.isEmpty() == true)
+        val generateAggregates = aggregateCuts && !deferAggregatePreparation
         if (!generateAggregates && additionalCuts.isEmpty()) return prepared
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
         val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairs(
@@ -474,7 +473,10 @@ internal class LinearAuthority(
                         cutEligibility[key] = (cutEligibility[key] ?: 0L) + count
                     }
                 }
-            }, maximumCandidates = 64 - additionalCuts.size, point = point) else emptyList()
+            }, maximumCandidates = 64 - additionalCuts.size,
+            limits = if (point == null) LinearAuthorityAggregateCuts.sourcePairLimits
+                else LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            point = point) else emptyList()
         if (funded()) return null
         val additional = if (generated.isEmpty()) additionalCuts else {
             cutCost(1L, 64L + (generated.size + additionalCuts.size) * 8L)
