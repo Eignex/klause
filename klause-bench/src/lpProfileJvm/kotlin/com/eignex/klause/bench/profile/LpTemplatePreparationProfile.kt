@@ -5,6 +5,7 @@ import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.lp.bounding.LpNodeOverhead
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.solveAndCertify
@@ -13,6 +14,7 @@ import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpRetainedSources
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.authoritativeWithTemplates
+import com.eignex.klause.lp.relaxation.buildPrimalSource
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
@@ -35,7 +37,7 @@ internal object LpTemplatePreparationProfile {
     fun main(args: Array<String>) {
         require(args.size in 4..5)
         val route = args.getOrElse(4) { "standalone" }.also {
-            require(it in listOf("standalone", "retained"))
+            require(it in listOf("standalone", "retained", "primal"))
         }
         val file = if (args[0].startsWith("selection=")) {
             val line = File(args[0].removePrefix("selection=")).readLines().single { it.isNotBlank() }
@@ -113,6 +115,8 @@ internal object LpTemplatePreparationProfile {
                         var importSolveRetirementBytes: Long? = 0L
                         var retainedUnits = 0L
                         var sourceCacheUnits = 0L
+                        var wholeModelsReused = 0L
+                        var wholeModelsPublished = 0L
                         var coldNs = 0L
                         val results = ArrayList<String>()
                         repeat(steps) consumers@ { step ->
@@ -133,13 +137,18 @@ internal object LpTemplatePreparationProfile {
                             val selectedView = if (change == "cold") {
                                 FactorProjectionProviders.Default.prepare(view)
                             } else selected.forEngineView(view)
+                            var consumerWork = 0L
                             val consumerToken = if (change == "cancel" && step % 2 == 1) {
+                                val consumerMeter = WorkMeter {
+                                    consumerWork += it
+                                    meter.charge(it)
+                                }
                                 object : Cancellation {
-                                    override fun isCancelled(): Boolean = true
-                                    override fun workMeter(): WorkMeter = meter
+                                    override fun isCancelled(): Boolean = route != "primal" || stop() || consumerWork >= 48L
+                                    override fun workMeter(): WorkMeter = consumerMeter
                                 }
                             } else token
-                            val consumer = CpToLpRelaxation(view, cost,
+                            val consumer = if (route == "primal") null else CpToLpRelaxation(view, cost,
                                 projections = selectedView, templateStats = sink,
                                 reuseSourceTemplates = mode != "disabled", reuseTemplateIndexes = mode != "object",
                                 reuseTemplateMetadata = mode == "candidate" && route == "standalone",
@@ -149,7 +158,7 @@ internal object LpTemplatePreparationProfile {
                                 if (route == "retained") {
                                     LpScopedSolver(LpExactState(LpRetainedSources.emptyModel()),
                                         cancellation = consumerToken).use { owner ->
-                                        val sources = LpRetainedSources(view, consumer)
+                                        val sources = LpRetainedSources(view, checkNotNull(consumer))
                                         val edit = sources.prepare(owner.state, RootDomains(view), consumerToken)
                                             ?: if (consumerToken()) throw LpAssemblyCancelled()
                                             else error("retained source import declined")
@@ -165,11 +174,21 @@ internal object LpTemplatePreparationProfile {
                                         }
                                     }
                                 } else {
-                                    val relaxation = consumer.build(RootDomains(view), cancellation = consumerToken)
+                                    val relaxation = if (route == "primal") {
+                                        buildPrimalSource(view, cost, RootDomains(view), consumerToken,
+                                            onWork = { consumerToken.charge(it * LpNodeOverhead.BUILD) },
+                                            selection = selectedView, reuseCompleteTemplates = mode == "candidate",
+                                            reuseSourceTemplates = mode != "disabled",
+                                            reuseTemplateIndexes = mode != "object", templateStats = sink,
+                                            onDefinition = {
+                                                if (it == "REUSED") wholeModelsReused++
+                                                if (it == "PUBLISHED") wholeModelsPublished++
+                                            })
+                                    } else checkNotNull(consumer).build(RootDomains(view), cancellation = consumerToken)
                                     finishAssembly()
                                     val solving = System.nanoTime()
                                     val exact = requireNotNull(relaxation.authoritativeWithTemplates(token) {
-                                        consumer.observeBoundTemplates(it)
+                                        consumer?.observeBoundTemplates(it)
                                     })
                                     solveAndCertify(exact, cancellation = token).also {
                                         solveNs += System.nanoTime() - solving
@@ -184,7 +203,7 @@ internal object LpTemplatePreparationProfile {
                                 results.add("cancelled")
                                 return@consumers
                             } finally {
-                                retainedUnits = maxOf(retainedUnits, consumer.preparationTemplates?.storageUnits ?: 0L)
+                                retainedUnits = maxOf(retainedUnits, consumer?.preparationTemplates?.storageUnits ?: 0L)
                                 sourceCacheUnits = maxOf(sourceCacheUnits, selectedView.lpPreparationReuseUnits)
                             }
                             importSolveRetirementBytes = sumBytes(importSolveRetirementBytes,
@@ -208,6 +227,9 @@ internal object LpTemplatePreparationProfile {
                         val record = buildJsonObject {
                             put("source", file.name)
                             put("route", route)
+                            put("cancelWorkLimit", if (route == "primal" && change == "cancel") 48L else null)
+                            put("wholeModelsReused", wholeModelsReused)
+                            put("wholeModelsPublished", wholeModelsPublished)
                             put("sourceSha256", hash)
                             put("parseNs", parseNs)
                             put("round", round)

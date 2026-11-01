@@ -10,10 +10,10 @@ import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
-import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.SessionDomains
+import com.eignex.klause.lp.relaxation.buildPrimalSource
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.propagation.PropagationResult
@@ -400,9 +400,11 @@ private fun LpEngine.buildPrimalRelaxation(
     }
     return try {
         if (token()) throw LpAssemblyCancelled()
-        CpToLpRelaxation(problem, objective, preparationCancellation = token)
-            .buildWithWork(SessionDomains(session), token) { debit(it * LpNodeOverhead.BUILD) }
-            .also { outcome = "COMPLETE" }
+        var definition = "COMPLETE"
+        val relaxation = buildPrimalSource(problem, objective, SessionDomains(session), token,
+            onWork = { debit(it * LpNodeOverhead.BUILD) }, onDefinition = { definition = it })
+        outcome = definition
+        relaxation
     } catch (_: LpAssemblyCancelled) {
         outcome = "CANCELLED"
         null

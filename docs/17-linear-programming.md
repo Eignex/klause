@@ -180,6 +180,29 @@ a checked result. Its publication and borrowing debit the current allowance and
 poll after the debit; cancellation withholds either operation. Separate observations
 count these normalized definitions independently of primitive fragment reuse.
 
+Ordinary primal construction can instead retain one completed compact model after
+repeated real builds earn its capture cost. Its initial observation occupies 16
+units; actual completed column, row and coefficient construction supplies the demand.
+Capture inspection cannot exceed that prior work. The completed definition and its
+replacement-demand counter share the source/finite publication slot and its existing
+262,144-unit ceiling with the other preparation routes. Explicit selective metadata
+and an admitted fragment route retain their selected publication. A changed complete
+definition needs repeated completed reconstruction before replacing its predecessor;
+only the current definition remains retained.
+
+This route accepts built-in discrete linear and Boolean projections with no auxiliary,
+continuous or exact-state columns. Borrows check ordered factors, namespace, semantics,
+dimensions, source sides and endpoints, live endpoints, Boolean pins and open-side policy.
+Unary reified equalities additionally retain bounded source and live value snapshots,
+so interior-hole changes invalidate their definition. Objective changes require every
+current nonzero coordinate to exist in the retained layout; changed costs receive private
+arrays and checked shift arithmetic, while a constant changes only the envelope.
+The retained definition drops build-specific source maps and preparation metadata.
+Numerical bases, mutable restrictions, results and source acceptance remain private.
+Capture, guard checks, objective rebinding, refusal and publication charge the current
+primal allowance and poll before a layout becomes available. This reuse supplies no
+checked result or source-level proof authority.
+
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.
 Cold preparation first checks a necessary work lower bound within the same cap.

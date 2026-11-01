@@ -860,7 +860,7 @@ Lifecycle repeats range from one to five and default to three. Available modes a
 `consumers`; the default is `lifecycle`. Sources outside the basis manifest require
 both their original SHA-256 and full HiGHS revision.
 
-`scripts/lp-template-preparation-profile.sh <source> [repeats] [steps] [standalone|retained]`
+`scripts/lp-template-preparation-profile.sh <source> [repeats] [steps] [standalone|retained|primal]`
 accepts `cover-2x3`, `cover-3x3`, `miplib3-p0033` and `miplib3-p0201`. Submit it
 through the lab with `:klause:stageLpProfileJvm`, a 180-second runtime cap and
 compatible Linux x86_64 placement. MIPLIB sources also require
@@ -869,7 +869,9 @@ with `profile.runTimeoutSec`.
 
 The output directory contains `runs.jsonl`, the selected source and its hashes,
 process resource receipts, `profile.jfr` and `allocations.json`. The optional route
-selects standalone assembly or retained source installation. See the lab
+selects standalone assembly, retained source installation or the funded ordinary
+primal construction factory. The primal route includes private numerical consumers
+and a 48-unit construction allowance for interrupted consumers. See the lab
 [run guide](https://github.com/Eignex/eignex-lab/blob/main/docs/runs.md) for
 submitting comparisons and collecting their records. Keep experiment results and
 analysis outside the repository.

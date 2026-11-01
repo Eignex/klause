@@ -28,6 +28,9 @@ import com.eignex.klause.lp.relaxation.LpEmissionTemplates
 import com.eignex.klause.lp.relaxation.LpObservedMetadata
 import com.eignex.klause.lp.relaxation.LpPreparationReuse
 import com.eignex.klause.lp.relaxation.LpPreparationTemplates
+import com.eignex.klause.lp.relaxation.LpPrimalDemand
+import com.eignex.klause.lp.relaxation.LpPrimalTemplates
+import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.FactorProjectionPreparation
@@ -82,6 +85,8 @@ class PreparedFactorProjections internal constructor(
             is LpObservedMetadata -> current.metadata.storageUnits + LpObservedMetadata.STORAGE_UNITS
             is LpEmissionDemand -> LpObservedMetadata.STORAGE_UNITS
             is LpEmissionTemplates -> current.storageUnits
+            is LpPrimalDemand -> LpPrimalTemplates.DEMAND_UNITS
+            is LpPrimalTemplates -> current.storageUnits
             null -> 0L
         }
 
@@ -92,7 +97,9 @@ class PreparedFactorProjections internal constructor(
     ): LpPreparationTemplates? {
         val cache = lpTemplateCache
         val previous = cache.load()
-        if (previous is LpEmissionTemplates) {
+        if (previous is LpEmissionTemplates ||
+            (!reuseMetadata && (previous is LpPrimalDemand || previous is LpPrimalTemplates))
+        ) {
             token.charge(1L)
             onWork(1L)
             return null
@@ -128,6 +135,7 @@ class PreparedFactorProjections internal constructor(
     ): LpEmission? {
         val cache = lpTemplateCache
         val previous = cache.load()
+        if (previous is LpPrimalDemand || previous is LpPrimalTemplates) return null
         val metadata = (previous as? LpObservedMetadata)?.metadata ?: previous as? LpPreparationTemplates
         if (metadata != null && (metadata.objectiveIndependent ||
                 metadata.storageUnits > LpEmissionTemplates.MAX_UNITS - LpObservedMetadata.STORAGE_UNITS)
@@ -163,6 +171,55 @@ class PreparedFactorProjections internal constructor(
             cache.compareAndSet(previous, if (metadata == null) next else LpObservedMetadata(metadata, next))
             null
         }
+    }
+
+    internal fun borrowLpPrimal(
+        objective: LinearObjective?,
+        domains: RelaxationDomains,
+        token: Cancellation,
+    ): LpRelaxation? {
+        token.charge(1L)
+        if (token()) return null
+        return (lpTemplateCache.load() as? LpPrimalTemplates)?.find(this, objective, domains, token)
+    }
+
+    internal fun rememberLpPrimal(
+        relaxation: LpRelaxation,
+        objective: LinearObjective?,
+        domains: RelaxationDomains,
+        paidUnits: Long,
+        token: Cancellation,
+    ): Boolean {
+        val cache = lpTemplateCache
+        val previous = cache.load()
+        if (previous is LpEmissionDemand || previous is LpEmissionTemplates || previous is LpObservedMetadata ||
+            (previous is LpPreparationTemplates && previous.objectiveIndependent)
+        ) return false
+        token.charge(1L)
+        if (token() || LpPrimalTemplates.minimumUnits(problem, relaxation) > LpEmissionTemplates.MAX_UNITS ||
+            problem.numRealVars != 0 || relaxation.model.n == 0 || relaxation.model.doubleView != null ||
+            relaxation.model.exactState != null || !builtInRelaxation
+        ) return false
+        val demand = (previous as? LpPrimalDemand)?.takeIf { it.scope.matches(lpTemplateNamespace, problem) }
+        val earned = (previous as? LpPrimalTemplates)?.replacementWork(paidUnits, token)
+            ?: demand?.paidUnits ?: 0L
+        if (token()) return false
+        if (earned >= LpPrimalTemplates.captureWork(problem, relaxation)) {
+            val prepared = LpPrimalTemplates.capture(this, relaxation, objective, domains, token,
+                earned)
+            if (prepared == null) {
+                if (demand != null && !token()) cache.compareAndSet(previous, LpPrimalDemand(demand.scope,
+                    (demand.paidUnits + paidUnits).coerceAtMost(LpEmissionTemplates.MAX_UNITS)))
+                return false
+            }
+            return !token() && cache.compareAndSet(previous, prepared)
+        }
+        if (previous is LpPrimalTemplates) return false
+        val scope = demand?.scope ?: LpEmissionScope(lpTemplateNamespace, problem)
+        val next = LpPrimalDemand(scope,
+            ((demand?.paidUnits ?: 0L) + paidUnits).coerceAtMost(LpEmissionTemplates.MAX_UNITS))
+        if (!token()) cache.compareAndSet(previous, next)
+        return false
     }
 
     private fun inheritLpTemplates(source: PreparedFactorProjections): PreparedFactorProjections = apply {
