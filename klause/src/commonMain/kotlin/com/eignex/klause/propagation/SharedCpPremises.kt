@@ -106,8 +106,11 @@ private fun PropagationState.sharedPremise(
         if (proofs?.containsKey(literal) == true) continue
         val children = frame.children
         if (children != null) {
-            val leaves = children.map { proofOf(it) ?: return SearchAtomPremise.Unavailable }
-            val premise = SearchAtomPremise.All(leaves)
+            val premise = if (children.size == 1) {
+                proofOf(children[0]) ?: return SearchAtomPremise.Unavailable
+            } else {
+                SearchAtomPremise.All(children.map { proofOf(it) ?: return SearchAtomPremise.Unavailable })
+            }
             remember(literal, premise, memo != null && children.all { memo.containsKey(it) })
             visiting?.remove(literal)
             continue
@@ -143,7 +146,11 @@ private fun PropagationState.sharedPremise(
         pending.addLast(NativePremiseFrame(literal, next))
         for (child in next) pending.addLast(NativePremiseFrame(child))
     }
-    return SearchAtomPremise.All(asserted.map { proofOf(it) ?: return SearchAtomPremise.Unavailable })
+    return if (asserted.size == 1) {
+        proofOf(asserted[0]) ?: SearchAtomPremise.Unavailable
+    } else {
+        SearchAtomPremise.All(asserted.map { proofOf(it) ?: return SearchAtomPremise.Unavailable })
+    }
 }
 
 private fun MutableIntObjectMap<SearchAtomPremise>.retain(literal: Int, premise: SearchAtomPremise): Boolean {
@@ -153,25 +160,36 @@ private fun MutableIntObjectMap<SearchAtomPremise>.retain(literal: Int, premise:
 }
 
 private fun PropagationState.namedIntegerLeaf(premise: SearchAtomPremise, context: SearchContext): Boolean {
-    val pending = ArrayDeque<SearchAtomPremise>()
-    val expanded = HashSet<SearchAtomPremise.All>()
-    pending.addLast(premise)
+    var pending: ArrayDeque<SearchAtomPremise>? = null
+    var expanded: HashSet<SearchAtomPremise.All>? = null
+    var current: SearchAtomPremise? = premise
     var remaining = SHARED_PREMISE_VISIT_LIMIT
-    while (pending.isNotEmpty()) {
+    while (current != null) {
         work++
         if (runCancelled || remaining-- <= 0) return false
-        when (val current = pending.removeLast()) {
+        when (val next = current) {
             is SearchAtomPremise.Asserted -> {
-                val literal = context.atomLiteral(current.decision) ?: return false
+                val literal = context.atomLiteral(next.decision) ?: return false
                 if (context.boolValue(Lit.variable(literal)) != Lit.isPositive(literal)) return false
             }
             is SearchAtomPremise.All -> {
-                if (!expanded.add(current)) continue
-                if (current.premises.size > remaining - pending.size) return false
-                pending.addAll(current.premises)
+                if (expanded?.add(next) != false) {
+                    val children = next.premises
+                    if (children.size > remaining - (pending?.size ?: 0)) return false
+                    if (children.size == 1) {
+                        current = children[0]
+                        continue
+                    }
+                    if (children.size > 1) {
+                        if (expanded == null) expanded = hashSetOf(next)
+                        val stack = pending ?: ArrayDeque<SearchAtomPremise>().also { pending = it }
+                        stack.addAll(children)
+                    }
+                }
             }
             SearchAtomPremise.Unavailable -> return false
         }
+        current = pending?.removeLastOrNull()
     }
     return true
 }
@@ -184,35 +202,36 @@ private fun PropagationState.sharedIntegerLeaf(
 ): SearchAtomPremise {
     val variable = sourceIntId(atoms.intVar[atom])
     val threshold = atoms.threshold[atom]
-    val decisions = when (atoms.kind[atom]) {
-        AtomKind.GE -> if (positive) {
-            listOf(SearchDecision.IntAtLeast(variable, threshold))
-        } else if (threshold > Long.MIN_VALUE) {
-            listOf(SearchDecision.IntAtMost(variable, threshold - 1L))
-        } else {
-            return SearchAtomPremise.Unavailable
+    return when (atoms.kind[atom]) {
+        AtomKind.GE -> {
+            val decision = if (positive) {
+                SearchDecision.IntAtLeast(variable, threshold)
+            } else if (threshold > Long.MIN_VALUE) {
+                SearchDecision.IntAtMost(variable, threshold - 1L)
+            } else {
+                return SearchAtomPremise.Unavailable
+            }
+            context.sharedIntegerPremise(decision)
         }
-
-        AtomKind.LE -> if (positive) {
-            listOf(SearchDecision.IntAtMost(variable, threshold))
-        } else if (threshold < Long.MAX_VALUE) {
-            listOf(SearchDecision.IntAtLeast(variable, threshold + 1L))
-        } else {
-            return SearchAtomPremise.Unavailable
+        AtomKind.LE -> {
+            val decision = if (positive) {
+                SearchDecision.IntAtMost(variable, threshold)
+            } else if (threshold < Long.MAX_VALUE) {
+                SearchDecision.IntAtLeast(variable, threshold + 1L)
+            } else {
+                return SearchAtomPremise.Unavailable
+            }
+            context.sharedIntegerPremise(decision)
         }
-
-        AtomKind.EQ -> if (positive) {
-            listOf(SearchDecision.IntAtLeast(variable, threshold), SearchDecision.IntAtMost(variable, threshold))
-        } else {
-            return SearchAtomPremise.Unavailable
+        AtomKind.EQ -> {
+            if (!positive) return SearchAtomPremise.Unavailable
+            val lower = context.sharedIntegerPremise(SearchDecision.IntAtLeast(variable, threshold))
+            if (lower === SearchAtomPremise.Unavailable) return lower
+            val upper = context.sharedIntegerPremise(SearchDecision.IntAtMost(variable, threshold))
+            if (upper === SearchAtomPremise.Unavailable) return upper
+            SearchAtomPremise.All(listOf(lower, upper))
         }
     }
-    val premises = decisions.map { decision ->
-        val premise = context.sharedIntegerPremise(decision)
-        if (premise === SearchAtomPremise.Unavailable) return premise
-        premise
-    }
-    return SearchAtomPremise.All(premises)
 }
 
 private fun SearchContext.sharedIntegerPremise(decision: SearchDecision): SearchAtomPremise {

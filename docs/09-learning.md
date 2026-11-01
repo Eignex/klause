@@ -380,6 +380,9 @@ An unavailable, unnameable or inactive leaf withholds reuse. Proof-reference vis
 charge native work, and the publication memo ends with its callback. Complete
 memoized nodes also supply the current traversal; separate temporary proof storage
 is allocated only for nodes that cannot enter that bounded memo.
+Single-premise conjunctions reuse their child. Inherited-proof validation walks
+unary chains directly and allocates branching scratch only for a conjunction with
+several premises; every visited reference retains its work and cancellation checks.
 Fixpoint facts already implied by shared integer endpoints retain the shared
 premise without reconstructing a native proof. Endpoint strengthenings use the
 complete proof path; observers and cancellation checks still cover every deduction.
