@@ -6,6 +6,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryObservation
 
 internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
+    selectedRetirements.sharingMemory(sample)
     val protected = protectedLearnedMemory(sample)
     nativeEngine?.sharingMemory(sample, protected) ?: learnedSharingMemory(sample, protected)
     factorAttribution?.sharingMemory(sample)
@@ -177,6 +178,7 @@ private fun PropagationState.learnedSharingMemory(
     val columns = listOf(learned.stages, learned.lbds, learned.permanent, learned.tier, learned.boolReasons,
         learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)
     val protectedRows = protected.size > 0
+    learned.capRanking.sharingMemory(sample, protectedRows)
     var metadata = 0L
     for (column in columns) {
         sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
@@ -253,6 +255,7 @@ private fun PropagationState.learnedSharingMemory(
         "learnedRetiredSlots" to learned.retiredCount.toLong(),
         "learnedPayloadBytes" to payload,
         "learnedMetadataCapacityBytes" to metadata,
+        "learnedCapIndexStateBytes" to learned.capRanking.modeledBytes,
         "learnedReferenceSlots" to learned.size.toLong() * 2L + (learned.integerRows?.capacity ?: 0),
         "learnedIntegerRowCacheCapacityBytes" to (learned.integerRows?.capacity?.toLong() ?: 0L) * Long.SIZE_BYTES,
         "learnedIntegerRowIndexBytes" to (learned.integerRows?.size?.toLong() ?: 0L) * Int.SIZE_BYTES,

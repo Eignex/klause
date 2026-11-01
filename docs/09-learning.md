@@ -317,6 +317,20 @@ rebuilt when full compaction renumbers the store. Lifecycle totals identify the
 packed-native or general backend and report completed ranking passes and
 boundary/preparation deferrals.
 
+Selected pure-Boolean retirement captures an opaque admission handle before a
+replacement is admitted. A separate compaction generation rejects stale selections;
+captured handles retain no clause payload and survive later factor-ID remapping.
+The caller authorizes a request only after replacement propagation and required
+root/peer publication finish. Authorized requests stay kernel-owned when optional
+pass buffers are released. A bounded round-robin continuation rechecks current
+reasons and pending attachments, so protected requests do not block later eligible
+ones. Terminal acknowledgement and request-owner release have separate funded steps;
+capture also checks its retained-metadata allowance. Reseeding or closing the scope
+invalidates outstanding handles. Selected retirement reports logical disabling,
+payload unlinking and full physical release separately. The cap index repairs
+externally retired heap and survivor entries through funded resumable steps before
+continuing its LBD ranking; its scalar continuation state remains modeled ownership.
+
 ## Pseudo-Boolean learning
 
 `pbLearning` auto-enables cutting-plane analysis for pure-Boolean models. Explicit

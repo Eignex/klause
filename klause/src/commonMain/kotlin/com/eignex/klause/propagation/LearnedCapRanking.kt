@@ -1,8 +1,10 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.SharingMemoryObservation
 
 internal interface LearnedCapPolicy {
+    fun alive(index: Int): Boolean
     fun lbd(index: Int): Int
     fun prepare(index: Int): Boolean
     fun keep(index: Int): Boolean
@@ -22,8 +24,14 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
     private var prepared = -1
     private var stage = Stage.Collect
     private var afterSift = Stage.Trim
+    private var retirementRevision = 0L
+    private var observedRetirementRevision = 0L
+    private var cleanupRevision = 0L
+    private var cleanupRead = 0
+    private var afterCleanup = Stage.Collect
     var passes = 0L
         private set
+    val modeledBytes: Long get() = 100L
 
     fun reset() {
         read = 0
@@ -35,11 +43,28 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         sift = 0
         stage = Stage.Collect
         afterSift = Stage.Trim
+        observedRetirementRevision = retirementRevision
+        cleanupRevision = retirementRevision
+        cleanupRead = 0
+        afterCleanup = Stage.Collect
+    }
+
+    fun invalidateRetiredHandles() { retirementRevision++ }
+
+    fun sharingMemory(sample: SharingMemoryObservation, protected: Boolean) {
+        sample.owned(this, 68L, protected)
+        sample.ownedReferences(this, 4L, protected)
     }
 
     fun advance(cap: Int, fixedFloor: Int, budget: ReclamationPreparation, policy: LearnedCapPolicy) {
         prepared = -1
         while (true) {
+            if ((stage == Stage.Collect || stage == Stage.Trim) && observedRetirementRevision != retirementRevision) {
+                afterCleanup = stage
+                cleanupRead = 0
+                cleanupRevision = retirementRevision
+                stage = Stage.Clean
+            }
             val limit = (cap.toLong() - fixedFloor - floor).coerceAtLeast(0L).toInt()
             when (stage) {
                 Stage.Collect -> {
@@ -59,7 +84,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
                 Stage.Retire -> {
                     budget.visit(if (pending == prepared) 0L else 8L)
                     budget.visit(0L)
-                    if (!policy.retire(pending)) {
+                    if (policy.alive(pending) && !policy.retire(pending)) {
                         candidates[write++] = pending
                         floor++
                     }
@@ -67,12 +92,20 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
                     stage = Stage.Trim
                 }
                 Stage.Trim -> trim(limit, budget)
+                Stage.Clean -> clean(budget, policy)
             }
         }
     }
 
     private fun collect(limit: Int, budget: ReclamationPreparation, policy: LearnedCapPolicy) {
         val index = candidates[read]
+        budget.visit(4L)
+        budget.visit(0L)
+        if (!policy.alive(index)) {
+            read++
+            policy.visited()
+            return
+        }
         val funded = policy.prepare(index)
         budget.visit(0L)
         prepared = if (funded) index else -1
@@ -89,6 +122,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
             candidates[heapSize] = index
             sift = heapSize++
             write++
+            afterSift = Stage.Trim
             stage = Stage.Up
         } else if (heapSize > 0 && better(index, candidates[0], policy)) {
             pending = candidates[0]
@@ -106,15 +140,16 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
 
     private fun siftUp(budget: ReclamationPreparation, policy: LearnedCapPolicy) {
         if (sift == 0) {
-            stage = Stage.Trim
+            stage = afterSift
             return
         }
         budget.visit(8L)
         budget.visit(0L)
         val parent = (sift - 1) / 2
-        if (!better(candidates[parent], candidates[sift], policy)) stage = Stage.Trim else {
+        if (!better(candidates[parent], candidates[sift], policy)) stage = afterSift else {
             swap(sift, parent)
             sift = parent
+            if (afterSift == Stage.Clean) cleanupRead = minOf(cleanupRead, parent)
         }
     }
 
@@ -150,6 +185,38 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         stage = if (heapSize > 0) Stage.Down else Stage.Retire
     }
 
+    private fun clean(budget: ReclamationPreparation, policy: LearnedCapPolicy) {
+        if (cleanupRevision != retirementRevision) {
+            cleanupRevision = retirementRevision
+            cleanupRead = 0
+        }
+        if (cleanupRead == write) {
+            observedRetirementRevision = retirementRevision
+            stage = afterCleanup
+            return
+        }
+        budget.visit(16L)
+        budget.visit(0L)
+        if (policy.alive(candidates[cleanupRead])) {
+            cleanupRead++
+            return
+        }
+        if (cleanupRead >= heapSize) {
+            write--
+            if (cleanupRead < write) candidates[cleanupRead] = candidates[write]
+            floor--
+            return
+        }
+        heapSize--
+        candidates[cleanupRead] = candidates[heapSize]
+        write--
+        if (write > heapSize) candidates[heapSize] = candidates[write]
+        if (cleanupRead >= heapSize) return
+        sift = cleanupRead
+        afterSift = Stage.Clean
+        stage = if (sift > 0 && better(candidates[(sift - 1) / 2], candidates[sift], policy)) Stage.Up else Stage.Down
+    }
+
     private fun better(left: Int, right: Int, policy: LearnedCapPolicy): Boolean {
         val a = policy.lbd(left)
         val b = policy.lbd(right)
@@ -162,5 +229,5 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         candidates[right] = value
     }
 
-    private enum class Stage { Collect, Up, Down, Retire, Trim }
+    private enum class Stage { Collect, Up, Down, Retire, Trim, Clean }
 }

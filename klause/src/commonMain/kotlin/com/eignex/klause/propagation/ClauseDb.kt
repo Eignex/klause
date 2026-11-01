@@ -290,6 +290,8 @@ internal fun PropagationState.forgetLearnedClauses(
         remap[i] = if (retained[i]) newCount++ else -1
     }
     if (newCount == n) return true
+    work += selectedRetirements.remapWork
+    selectedRetirements.remap(remap)
     arithmeticLearningTrace?.remap(baseFactorCount, remap)
     for (i in 0 until n) if (remap[i] < 0) {
         work++

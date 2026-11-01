@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -29,10 +30,13 @@ class ClauseDbArithmeticRankingTest(private val cap: Int, private val integer: B
 
     @Test
     fun `production caps should rank arithmetic rows with local clauses`() {
-        val session = PropagationSession(Problem(3, 1, arrayOf(IntDomain(0, 10)), arrayOf(
+        val boolFactors = arrayOf<Factor>(
             Clause(intArrayOf(1, 2)), Clause(intArrayOf(3, 4)),
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10),
-        )), nativeSat = false)
+        )
+        val problem = Problem(3, if (integer) 1 else 0,
+            if (integer) arrayOf(IntDomain(0, 10)) else emptyArray(),
+            if (integer) boolFactors + Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10) else boolFactors)
+        val session = PropagationSession(problem, nativeSat = false)
         val clause = Clause(intArrayOf(1, 3, 4))
         repeat(cap) { session.addLearnedClause(clause, 9) }
         if (integer) {

@@ -286,13 +286,13 @@ class ClauseDbTest {
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
         val before = session.work
 
-        val retired = session.maintainCapWindow(1, 128L, 128L, { session.work - before >= 32L }) {
+        val retired = session.maintainCapWindow(1, 128L, 128L, { session.work - before >= 36L }) {
             error("cancelled policy callback")
         }
 
         assertEquals(0, retired)
         assertTrue(session.isLearnedClause(1))
-        assertEquals(32L, session.work - before)
+        assertEquals(36L, session.work - before)
     }
 
     @Test

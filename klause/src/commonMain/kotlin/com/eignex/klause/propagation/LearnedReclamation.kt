@@ -60,6 +60,7 @@ internal fun PropagationState.prepareReclamation(
     budget.visit(scratchBytes = count.toLong() * 29L + baseFactorCount.toLong() * Long.SIZE_BYTES)
     budget.atomic(baseFactorCount.toLong())
     budget.atomic(count.toLong() * 16L)
+    if (selectedRetirements.hasRequests) budget.atomic(selectedRetirements.remapWork)
     val retained = BooleanArray(count)
     collectLearnedReferences(retained) { budget.visit() }
     budget.atomic(boolReason.size.toLong() + intMinReason.size + intMaxReason.size + undo.size * 3L)

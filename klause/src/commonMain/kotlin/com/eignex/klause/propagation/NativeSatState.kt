@@ -332,9 +332,11 @@ internal class NativeSatState(private val state: PropagationState) {
             if (lifecycleStages[index] and 1 == 0) sample.retain(protected, index)
         }
         val protectedRows = protected.size > 0
+        capRanking.sharingMemory(sample, protectedRows)
+        state.learned.capRanking.sharingMemory(sample, protectedRows)
         val columns = listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedBoolReasons,
             learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
-            capCandidates, state.learned.capCandidates)
+            capCandidates, state.learned.capCandidates, state.learned.boolReasons)
         var metadata = 0L
         for (column in columns) {
             sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
@@ -365,6 +367,7 @@ internal class NativeSatState(private val state: PropagationState) {
             "learnedPayloadBytes" to learnedLits.size.toLong() * Int.SIZE_BYTES,
             "learnedArenaCapacityBytes" to learnedLits.backingData.size.toLong() * Int.SIZE_BYTES,
             "learnedMetadataCapacityBytes" to metadata,
+            "learnedCapIndexStateBytes" to capRanking.modeledBytes + state.learned.capRanking.modeledBytes,
             "sessionWatchCapacityBytes" to watchBytes +
                 (watchSizes.size.toLong() + watchPos.size) * Int.SIZE_BYTES +
                 baseUnits.backingData.size.toLong() * Int.SIZE_BYTES,
@@ -430,6 +433,7 @@ internal class NativeSatState(private val state: PropagationState) {
         mayDrop: (Int) -> Boolean,
         retain: (Int) -> Boolean,
     ): LearnedCapPolicy = object : LearnedCapPolicy {
+        override fun alive(index: Int): Boolean = !retiredOf(index)
         private var prepared = -1
         private var protected = false
         override fun lbd(index: Int): Int = learnedLbd[index]
@@ -475,6 +479,26 @@ internal class NativeSatState(private val state: PropagationState) {
         val count = learnedBoolReasons[index] + delta
         check(count >= 0)
         learnedBoolReasons[index] = count
+    }
+
+    internal fun retireSelectedLearnedClause(index: Int, budget: ReclamationPreparation): LearnedRetirementResult {
+        if (!initialized || pendingConflict || bcpHead != state.boolPinOrder.size || state.runCancelled) {
+            return LearnedRetirementResult(LearnedRetirementStatus.Deferred)
+        }
+        if (index !in 0 until learnedCount) return LearnedRetirementResult(LearnedRetirementStatus.AlreadyGone,
+            payloadReleased = true, physicalReleased = true)
+        if (retiredOf(index)) return LearnedRetirementResult(LearnedRetirementStatus.AlreadyGone)
+        budget.visit(16L)
+        if (learnedPermanent[index] == 1 || literalCountOf(index) <= 1 || learnedBoolReasons[index] > 0 ||
+            lifecycleStages[index] and 2 != 0
+        ) return LearnedRetirementResult(LearnedRetirementStatus.ProtectedFloor)
+        budget.visit(16L)
+        budget.visit(0L)
+        lifecycleStages[index] = lifecycleStages[index] or RETIRED
+        state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
+        retiredCount++
+        capRanking.invalidateRetiredHandles()
+        return LearnedRetirementResult(LearnedRetirementStatus.Retired)
     }
 
     internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) emptyMap() else mapOf(
@@ -563,6 +587,8 @@ internal class NativeSatState(private val state: PropagationState) {
             remap[i] = if (retained[i]) survivors++ else -1
         }
         if (survivors == learnedCount) return
+        state.work += state.selectedRetirements.remapWork
+        state.selectedRetirements.remap(remap)
 
         for (i in 0 until learnedCount) if (remap[i] < 0) {
             state.work++

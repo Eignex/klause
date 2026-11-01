@@ -40,6 +40,7 @@ private fun PropagationState.generalCapPolicy(
     mayDrop: (Int) -> Boolean,
     retain: (Int) -> Boolean,
 ): LearnedCapPolicy = object : LearnedCapPolicy {
+    override fun alive(index: Int): Boolean = !learned.retiredOf(index)
     private var references: BooleanArray? = null
     private var prepared = -1
     private var protected = false
