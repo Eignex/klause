@@ -565,50 +565,10 @@ Boolean point checks and native bound authority are separate from the lab's
 independent source checks and independently validated proofs. Use ordinary lab
 adapter runs for source-matched admission and primal controls.
 
-[9178](https://lab.eignex.com/jobs/9178) and
-[9180](https://lab.eignex.com/jobs/9180) qualify the scheduling WBO at `d5a65676c0`,
-seed 3, with 250,000 work units, 200-unit slices and a 40-second containing
-allowance. Both retain the same source hash, 11,110 prepared Boolean columns,
-8,382 factors and a reconstructed objective-19 witness. Ordinary search spends
-204,186 final work units across 20 queries and 19 unit-weight cores; seed-reason
-projection spends 175 across two queries and one six-member weight-19 core.
-Retirement is included, and both closed trajectories release their query pins.
-Source preparation takes 18–20 seconds before these queries. These instrumented
-runs establish consumption and witness custody, without independently checked
-optimality or a throughput claim.
-
-[9179](https://lab.eignex.com/jobs/9179) runs the four-source set through eight
-CLI controls at the same revision, seed 3, one processor and 40 seconds per case.
-On the scheduling WBO, delayed reason projection consumes one weight-19 core and
-reports objective 19; delayed ordinary and earlier admission spend their auxiliary
-allowance on coarse cores. Direct ordinary and reason search also report 19, while
-LS and ALNS retain larger feasible objectives. On `mprime`, the mixed pool reports
-562 before core admission; both direct controls spend their allowance on bounds
-without a witness. On the MaxSAT tail, direct controls reach floor 5 without a
-witness, while every curated core receives zero segments. The candidate delayed
-case has no witness where its parent has one, so this elapsed run does not establish
-incumbent protection. Retain delayed admission and unrefined cores as defaults;
-reason projection remains an opt-in source-specific control, and direct core search
-does not replace the primal pool.
-
-These historical runs predate the lab's independent WBO/WCNF point checks. A fresh
-adapter run requests `sourceValidation=true` and complete assignments; qualification
+An adapter run requests `sourceValidation=true` and complete assignments; qualification
 requires an actual `VALID` receipt bound to the original source, witness, exact
 objective, checker and policy. Unsupported or missing checks establish no validation.
 Point checks do not certify native lower bounds, optimality or infeasibility.
-Source-matched reference objectives also supply no independent proof authority.
-
-[9617](https://lab.eignex.com/jobs/9617) independently accepts the retained scheduling
-WBO witness at exact cost 19 and rejects an altered coordinate at claimed cost 19.
-[9636](https://lab.eignex.com/jobs/9636) compares ordinary and reason-refined mixed
-search, earlier admission with each refinement, and primal LS on that source at
-40 seconds, one processor and seeds 1 and 3. All ten original points are valid;
-native floors and completion flags remain independently unproved. The admission
-and refinement factorial does not establish the separate threshold-progress
-comparison. Retain threshold/query trajectories and checked incumbents alongside
-primal outcomes under equal containing allowances, including preparation,
-verification, recording, retirement and unsuccessful work. Production qualification
-also requires applicable-source hold-outs and matched physical execution controls.
 
 ## Clause sharing accounting
 
