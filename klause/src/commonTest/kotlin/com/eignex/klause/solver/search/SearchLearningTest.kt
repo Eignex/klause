@@ -16,8 +16,10 @@ class SearchLearningTest {
             val learning = SearchLearning(SearchLearnedDbParams(maxClauses = cap, glueLbd = 0,
                 reclamationWork = grant))
             val host = SearchSession(emptyList())
-            repeat(cap + 3) { learning.learn(intArrayOf(0, (it + 1) * 2), host) }
+            host.push(SearchDecision.Bool(0))
+            repeat(3) { learning.learn(intArrayOf(0, (it + 1) * 2), host) }
             assertIs<ComponentResult.Consistent>(learning.propagate(host, IntArrayList()))
+            repeat(cap) { learning.learn(intArrayOf((it + 4) * 2), host) }
 
             repeat(40) {
                 var charged = 0L
@@ -86,6 +88,28 @@ class SearchLearningTest {
         assertEquals(1, session.learnedClauseCount)
         assertEquals(0L, session.learnedClauseStats().relearned)
         assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `cancellation after retirement should retain owners until resumed physical release`() {
+        val learning = SearchLearning(SearchLearnedDbParams(maxClauses = 0, glueLbd = 0,
+            reclamationWork = 512L))
+        val host = SearchSession(emptyList())
+        repeat(8) { learning.learn(intArrayOf(it * 4, it * 4 + 2), host) }
+        learning.propagate(host, IntArrayList())
+
+        learning.onRestart({ learning.size < 8 })
+        val partial = SharingMemoryObservation(100_000L, 1024, { false }, {})
+        val partialValues = requireNotNull(partial.snapshot { learning.retainedMemory(partial) }.completeValues)
+        repeat(128) { learning.onRestart() }
+        val complete = SharingMemoryObservation(100_000L, 1024, { false }, {})
+        val completeValues = requireNotNull(complete.snapshot { learning.retainedMemory(complete) }.completeValues)
+
+        assertEquals(1L, partialValues.getValue("sharedLearnedRetiredObjects"))
+        assertEquals(0L, completeValues.getValue("sharedLearnedRetiredObjects"))
+        assertEquals(0L, completeValues.getValue("sharedLearnedPayloadBytes"))
+        assertTrue(completeValues.getValue("sharedLearnedIndexCapacityBytes") <
+            partialValues.getValue("sharedLearnedIndexCapacityBytes"))
     }
 
     @Test

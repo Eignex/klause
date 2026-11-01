@@ -148,7 +148,7 @@ internal class SharedReclamationBudget(
         private set
 
     fun pay(amount: Long, scratchBytes: Long = 64L) {
-        if (cancelled()) throw Stopped(true)
+        poll()
         if (scratchBytes > scratchAllowance) {
             blockedScratch = true
             throw Stopped(false)
@@ -160,12 +160,14 @@ internal class SharedReclamationBudget(
         }
         var remaining = amount
         while (remaining-- > 0L) {
-            if (cancelled()) throw Stopped(true)
+            poll()
             charge()
             work++
         }
-        if (cancelled()) throw Stopped(true)
+        poll()
     }
+
+    private fun poll() { if (cancelled()) throw Stopped(true) }
 
     val canResume: Boolean get() = !blockedScratch && blockedWork <= allowance
     class Stopped(val cancelled: Boolean) : RuntimeException()
