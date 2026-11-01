@@ -30,6 +30,7 @@ import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.SearchDecision
@@ -44,21 +45,89 @@ import kotlin.test.assertTrue
 class LpEngineTest {
     @Test
     fun `linear bound should release branch costs when first read after a backtrack`() {
-        val problem = Problem(2, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-        val session = PropagationSession(problem)
-        session.pinBool(0, true)
-        session.pinBool(1, true)
-        session.popToLevel(1)
+        for (exact in listOf(false, true)) {
+            val problem = Problem(2, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val session = PropagationSession(problem)
+            session.pinBool(0, true)
+            session.pinBool(1, true)
+            session.popToLevel(1)
 
-        val rootPruned = LpEngine(problem,
-            LinearObjective(boolWeights = longArrayOf(5, 2), intCoefficients = longArrayOf(1)),
-            LpParams(), SolveStatsSink("late-linear-bound")).use { engine ->
-            assertTrue(engine.pruneNode(session, 4.0, -1, true))
-            session.popToLevel(0)
-            engine.pruneNode(session, 4.0, -1, true)
+            val rootPruned = LpEngine(problem,
+                LinearObjective(boolWeights = longArrayOf(5, 2), intCoefficients = longArrayOf(1)),
+                LpParams(), SolveStatsSink("late-linear-bound")).use { engine ->
+                fun dominated(): Boolean =
+                    if (exact) engine.linearBoundDominates(session, BigFraction.ofLong(4))
+                    else engine.pruneNode(session, 4.0, -1, true)
+
+                assertTrue(dominated())
+                session.popToLevel(0)
+                dominated()
+            }
+
+            assertFalse(rootPruned)
         }
+    }
 
-        assertFalse(rootPruned)
+    @Test
+    fun `exact linear bounds should distinguish cutoffs above double precision`() {
+        val endpoint = 9_007_199_254_740_992L
+        val problem = Problem(0, 1, arrayOf(IntDomain(endpoint, endpoint + 1)), emptyArray())
+        val session = PropagationSession(problem)
+        val lower = BigFraction.ofLong(endpoint)
+
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(), SolveStatsSink("exact-linear-cutoff")).use { engine ->
+            for ((offset, dominated) in listOf(
+                BigFraction.ZERO to true,
+                BigFraction.ONE to false,
+                BigFraction.ofLong(2).reciprocal() to false,
+            )) {
+                assertEquals(dominated, engine.linearBoundDominates(session, lower + offset))
+            }
+        }
+    }
+
+    @Test
+    fun `exact linear bounds should retain rational cancellation after product overflow`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(2, 2)), emptyArray())
+        val session = PropagationSession(problem)
+        val lower = BigFraction.ofLong(Long.MAX_VALUE)
+
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(Long.MAX_VALUE), constant = -Long.MAX_VALUE),
+            LpParams(), SolveStatsSink("exact-linear-overflow")).use { engine ->
+            for ((offset, dominated) in listOf(BigFraction.ZERO to true, BigFraction.ONE to false)) {
+                assertEquals(dominated, engine.linearBoundDominates(session, lower + offset))
+            }
+        }
+    }
+
+    @Test
+    fun `exact linear bounds should retain rational pruning after Boolean overflow`() {
+        val problem = Problem(2, 0, emptyArray(), emptyArray())
+        val session = PropagationSession(problem)
+
+        LpEngine(problem, LinearObjective(boolWeights = longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE)),
+            LpParams(), SolveStatsSink("exact-boolean-overflow")).use { engine ->
+            engine.linearBoundDominates(session, 1.0)
+            session.pinBool(0, true)
+            session.pinBool(1, true)
+
+            assertTrue(engine.linearBoundDominates(session, BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE))
+        }
+    }
+
+    @Test
+    fun `exact linear bounds should preserve the minimum long value`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 0)), emptyArray())
+        val session = PropagationSession(problem)
+        val lower = BigFraction.ofLong(Long.MIN_VALUE)
+
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1), constant = Long.MIN_VALUE),
+            LpParams(), SolveStatsSink("exact-linear-sentinel")).use { engine ->
+            for ((offset, dominated) in listOf(BigFraction.ZERO to true, BigFraction.ONE to false)) {
+                assertEquals(dominated, engine.linearBoundDominates(session, lower + offset))
+            }
+        }
     }
 
     @Test

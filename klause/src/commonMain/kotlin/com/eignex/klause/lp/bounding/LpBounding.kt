@@ -84,8 +84,12 @@ import kotlin.math.round
  * weight (or 0) that makes their contribution smallest; unpinned int vars take the
  * domain endpoint matching the coefficient's sign.
  */
-internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: PropagationSession): Long = try {
-    var total = addExact(obj.constant, boolLowerBoundPart(obj, session))
+internal fun LpEngine.linearLowerBound(
+    obj: LinearObjective,
+    session: PropagationSession,
+    useIncrementalBooleanBound: Boolean = true,
+): Long = try {
+    var total = addExact(obj.constant, boolLowerBoundPart(obj, session, useIncrementalBooleanBound))
     val sp = session.problem
     val ni = minOf(sp.numIntVars, obj.intCoefficientValues.size)
     for (i in 0 until ni) {
@@ -108,8 +112,14 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
  * directly. Throws [CheckedLongOverflowException] via [addExact] on the rescan path so the caller falls
  * back to no bound.
  */
-private fun LpEngine.boolLowerBoundPart(obj: LinearObjective, session: PropagationSession): Long {
-    if (session.installObjectiveBoolBound(obj.boolWeightValues)) return session.objectiveBoolLowerBound()
+private fun LpEngine.boolLowerBoundPart(
+    obj: LinearObjective,
+    session: PropagationSession,
+    useIncrementalBooleanBound: Boolean,
+): Long {
+    if (useIncrementalBooleanBound && session.installObjectiveBoolBound(obj.boolWeightValues)) {
+        return session.objectiveBoolLowerBound()
+    }
     var sum = 0L
     val nb = minOf(session.problem.numBoolVars, obj.boolWeightValues.size)
     for (b in 0 until nb) {
