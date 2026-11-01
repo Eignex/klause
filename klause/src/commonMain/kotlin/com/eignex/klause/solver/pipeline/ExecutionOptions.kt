@@ -493,6 +493,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Opt-in single-lane portfolio diagnostic work allowance. */
         val portfolioWork: ExecutionOption<Long> = ExecutionOption("portfolio-work", ValueKind.LONG)
 
+        /** Apply automatic bounded root defaults in eligible curated satisfaction pools. Defaults to true. */
+        val rootMaintenance: ExecutionOption<Boolean> = ExecutionOption("root-maintenance", ValueKind.BOOLEAN)
+
         /** Enable bounded sharing-memory observations independently of scheduling. */
         val sharingMemory: ExecutionOption<Boolean> = ExecutionOption("sharing-memory", ValueKind.BOOLEAN)
 
@@ -596,7 +599,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 scoring, acceptance, restart, strategy, localSearchArm, objectiveGuidance,
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
                 clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, coreEarly, companionIntegers,
-                sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+                rootMaintenance, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
                 coreRefinement, companionAfterIncumbent, companionActiveMillis, companionAdmission, portfolioProgress,
                 phaseRetention, portfolioReward, portfolioProofShare, portfolioProofWorkers, portfolioLpStart,
                 booleanProofTasks,

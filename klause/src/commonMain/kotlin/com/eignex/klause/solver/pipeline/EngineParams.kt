@@ -708,6 +708,7 @@ internal fun buildPortfolioScenario(
     val maxSliceWork = p[ExecutionOption.sliceMaxWork]
     val sliceGrowth = p[ExecutionOption.sliceGrowth]
     val diagnosticWorkLimit = p[ExecutionOption.portfolioWork]
+    val rootMaintenance = p[ExecutionOption.rootMaintenance] ?: true
     val sharingMemory = p[ExecutionOption.sharingMemory] ?: false
     val sharingMemoryBytes = p[ExecutionOption.sharingMemoryBytes]
     if (sharingMemoryBytes != null && sharingMemoryBytes < 0L) pipelineConfigError("sharing memory bytes must be nonnegative")
@@ -746,7 +747,7 @@ internal fun buildPortfolioScenario(
     if (sliceGrowth != null && (!sliceGrowth.isFinite() || sliceGrowth < 1.0)) {
         pipelineConfigError("slice-growth must be finite and >= 1")
     }
-    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, sharing-memory, sharing-memory-bytes, sharing-memory-work, sharing-memory-scratch, portfolio-progress, portfolio-reward, core-early, companion-integers, companion-after-incumbent, companion-active-ms, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
+    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, root-maintenance, sharing-memory, sharing-memory-bytes, sharing-memory-work, sharing-memory-scratch, portfolio-progress, portfolio-reward, core-early, companion-integers, companion-after-incumbent, companion-active-ms, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
     if (armsParam != null && (ls != null || bt != null)) {
         pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -799,6 +800,7 @@ internal fun buildPortfolioScenario(
         reportPortfolioProgress = portfolioProgress,
         rewardPolicy = rewardPolicy,
         explicitArms = armsParam != null || ls != null || bt != null,
+        rootMaintenance = rootMaintenance,
     )
     clauseShareLbd?.let { scenario = scenario.copy(clauseShareMaxLbd = it) }
     clauseShareLen?.let { scenario = scenario.copy(clauseShareMaxLen = it) }
