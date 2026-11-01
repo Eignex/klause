@@ -486,6 +486,10 @@ fill, and solving admitted residual components with the rational basis factors.
 Factorization and complete verification share the certificate budget; an unresolved
 component retains its proposed entries. A dimension-limited component can instead
 propose an admitted subset of dual coordinates for its open basic directions.
+When those directions exceed the existing dimension cap, repair targets the
+exact residuals whose signs require absent bound sides. Admissible one-sided
+residuals need not be zero. Every untouched direction remains subject to the
+complete dual check after the proposal changes its multipliers.
 Row-scaled floating elimination selects those coordinates within 16,384 projected
 cells and the containing certificate budget. Nonfinite or weak projected pivots
 decline; the selected exact submatrix must still factor and solve under the
@@ -499,7 +503,8 @@ independent continued-fraction entries under the same denominator and spending
 limits; approximation tolerances select proposals only. Every proposal must pass
 the complete exact reduced-cost and bound-side check. Diagnostics retain the
 missing side with its exact reduced cost, the refused common denominator, peeling
-counts and residual factor costs. Accepted bounds retain row multipliers for
+counts, the largest proposed restricted dimension and residual factor costs,
+including failed proposals. Accepted bounds retain row multipliers for
 source lifting and rechecking. Preparation, floating stops, certificate declines and completed checked
 bounds have separate outcomes and costs; factor fill and density describe the
 completed numerical solve. Sparse preparation alone does not authorize ordinary

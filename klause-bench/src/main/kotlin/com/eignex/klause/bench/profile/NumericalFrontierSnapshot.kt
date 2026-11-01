@@ -75,7 +75,7 @@ internal class NumericalFrontierSnapshot(
             field(metrics, "basisRepair")?.let {
                 put("basisRepair", scalars(it, listOf("peeledRows", "peeledColumns", "coreRows", "components",
                     "largestComponent", "solvedComponents", "factorWork", "factorAllocation", "openBasicColumns",
-                    "decline", "restrictedComponents", "restrictedColumns")))
+                    "decline", "restrictedComponents", "restrictedColumns", "largestRestrictedColumns")))
             }
         }
     }

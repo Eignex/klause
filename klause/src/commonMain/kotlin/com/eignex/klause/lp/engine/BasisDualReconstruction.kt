@@ -49,6 +49,7 @@ private class BasisDualRun(
     private var openBasicColumns = 0
     private var restrictedComponents = 0
     private var restrictedColumns = 0
+    private var largestRestrictedColumns = 0
     private var factorWork = 0L
     private var factorAllocation = 0L
     private var decline: String? = null
@@ -117,7 +118,7 @@ private class BasisDualRun(
     } finally {
         meter.basisRepair = ReconstructionBasisMetrics(peeledRows, peeledColumns, coreRows, components,
             largest, solved, factorWork, factorAllocation, openBasicColumns, decline,
-            restrictedComponents, restrictedColumns)
+            restrictedComponents, restrictedColumns, largestRestrictedColumns)
     }
 
     // Singleton elimination preserves the remaining equations without creating factor fill.
@@ -222,22 +223,38 @@ private class BasisDualRun(
                     val bounds = a.bounds[basis.basicVars[layout.structuralSlots[equation]]]
                     bounds.lower == null || bounds.upper == null
                 }
-                if (open.size > limits.dimension) {
+                val required = if (open.size <= limits.dimension) open else {
+                    meter.storage(64L + open.size * 8L)
+                    open.filter(::requiresMissingSide)
+                }
+                largestRestrictedColumns = maxOf(largestRestrictedColumns, required.size)
+                if (required.size > limits.dimension || (open.isNotEmpty() && required.isEmpty())) {
                     decline = "DIMENSION"
                     continue
                 }
-                val matched = selectOpenPivots(group, open)
+                val matched = selectOpenPivots(group, required)
                 if (matched == null) {
                     decline = "OPEN_RANK"
                     continue
                 }
-                if (open.isNotEmpty() && !solve(matched, open, local, restricted = true)) break
+                if (required.isNotEmpty() && !solve(matched, required, local, restricted = true)) break
                 restrictedComponents++
-                restrictedColumns += open.size
+                restrictedColumns += required.size
                 continue
             }
             if (!solve(group, selected, local)) break
         }
+    }
+
+    private fun requiresMissingSide(equation: Int): Boolean {
+        var reduced = rhs[equation]
+        for ((row, coefficient) in equations[equation]) {
+            meter.step()
+            if (activeRow[row]) reduced = subtract(reduced, coefficient, y[row])
+        }
+        val bounds = a.bounds[basis.basicVars[layout.structuralSlots[equation]]]
+        return (reduced.signum() > 0 && bounds.lower == null) ||
+            (reduced.signum() < 0 && bounds.upper == null)
     }
 
     private fun selectOpenPivots(group: List<Int>, selected: List<Int>): List<Int>? {

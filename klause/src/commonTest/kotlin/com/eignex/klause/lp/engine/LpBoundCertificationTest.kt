@@ -10,6 +10,68 @@ import kotlin.test.assertTrue
 
 class LpBoundCertificationTest {
     @Test
+    fun `large basis repair should retain admissible one sided residuals`() {
+        val size = 129
+        val zero = ExactLpNumber.of(0L)
+        for (upper in listOf(false, true)) {
+            val sign = if (upper) 1L else -1L
+            val bounds = if (upper) ExactLpBounds(upper = ExactLpSide(zero)) else
+                ExactLpBounds(ExactLpSide(zero))
+            val source = assertNotNull(LpExactState(ExactLpModel(
+                List(size) { column ->
+                    listOf(column to 2L, (column + 1) % size to 1L).sortedBy { it.first }
+                        .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
+                },
+                List(size) { zero },
+                List(size * 2) { ExactLpColumn(bounds) },
+                List(size) { ExactLpRow() },
+                ExactLpObjective(List(size) { ExactLpNumber.of(sign * if (it == 0) 3L else 2L) } +
+                    List(size) { zero }),
+            )).toWorkingModel())
+            val basis = Basis(IntArray(size) { it }, Array(size * 2) {
+                if (it < size) VarStatus.BASIC else if (upper) VarStatus.AT_UPPER else VarStatus.AT_LOWER
+            })
+
+            val result = certifyLpBoundOnly(source, DoubleArray(size) { sign * 0.99 },
+                ReconstructionLimits(maxAttempts = 1), basis = basis)
+
+            assertEquals(BigFraction.ZERO, assertNotNull(result.bound).value)
+        }
+    }
+
+    @Test
+    fun `partial basis repair should still check untouched open directions`() {
+        val size = 129
+        val zero = ExactLpNumber.of(0L)
+        val eighth = BigFraction.ofLong(8L).reciprocal()
+        val source = assertNotNull(LpExactState(ExactLpModel(
+            List(size) { column ->
+                listOf(column to if (column == 0) 2L else -2L,
+                    (column + 1) % size to if (column == size - 1) -1L else 1L)
+                    .sortedBy { it.first }
+                    .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
+            },
+            List(size) { zero },
+            List(size * 2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
+            List(size) { ExactLpRow() },
+            ExactLpObjective(List(size) { column ->
+                when (column) {
+                    0 -> ExactLpNumber.of(-1L)
+                    size - 1 -> ExactLpNumber.of(eighth)
+                    else -> zero
+                }
+            } + List(size) { zero }),
+        )).toWorkingModel())
+        val basis = Basis(IntArray(size) { it },
+            Array(size * 2) { if (it < size) VarStatus.BASIC else VarStatus.AT_LOWER })
+
+        val result = certifyLpBoundOnly(source, DoubleArray(size) { if (it == 0) -0.125 else 0.0 },
+            ReconstructionLimits(maxAttempts = 1), basis = basis)
+
+        assertNull(result.bound)
+    }
+
+    @Test
     fun `large basis repair should certify only admitted open directions`() {
         val size = 129
         val zero = ExactLpNumber.of(0L)

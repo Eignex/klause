@@ -69,6 +69,7 @@ internal data class ReconstructionBasisMetrics(
     val decline: String? = null,
     val restrictedComponents: Int = 0,
     val restrictedColumns: Int = 0,
+    val largestRestrictedColumns: Int = 0,
 )
 
 internal data class ReconstructionMetrics(
