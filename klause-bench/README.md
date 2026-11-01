@@ -1385,7 +1385,8 @@ It accepts:
 
 `suite=ID problem=NAME sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off
 trace=first-integer|initial|none samples=false|true models=true|false attribution=false|true
-recipe=source|satOptimized|conflictDriven seed=3 worker-seed=3 route=single|portfolio`.
+recipe=source|satOptimized|conflictDriven seed=3 worker-seed=3 route=single|portfolio
+learning-placement=automatic|observed`.
 
 `recipe=source` uses the source search hints or the conflict-driven preset.
 Preparation uses `seed`; traversal uses `worker-seed`, defaulting to `seed`.
@@ -1394,6 +1395,9 @@ requires unannotated pure binary integer optimization and retains the curated CP
 pool. Its trial preserves automatic learning; the control overrides it to false.
 Select the observed SAT or conflict-driven slot with `recipe` and `worker-seed`;
 the portfolio default is `conflictDriven` at `seed + 1001`.
+`learning-placement=observed` enables integer learning only on the observed slot
+in the portfolio trial. This explicit placement override is diagnostic;
+`automatic` preserves the production selector. Both controls disable integer learning.
 
 Inspect `ordinary-learning.jsonl`, source bytes, canonical original/prepared models
 and `provenance.json` under `OUT`. Capture covers the selected slot's first attached

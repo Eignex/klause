@@ -58,7 +58,7 @@ internal object OrdinaryArithmeticLearningProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
             it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
-                "attribution", "recipe", "seed", "worker-seed", "route", "samples", "models")
+                "attribution", "recipe", "seed", "worker-seed", "route", "samples", "models", "learning-placement")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -75,6 +75,9 @@ internal object OrdinaryArithmeticLearningProfile {
         val attribution = (options["attribution"] ?: "false").toBooleanStrict()
         val route = options["route"] ?: "single"
         require(route in setOf("single", "portfolio"))
+        val learningPlacement = options["learning-placement"] ?: "automatic"
+        require(learningPlacement in setOf("automatic", "observed"))
+        require(learningPlacement == "automatic" || route == "portfolio")
         val recipe = options["recipe"] ?: if (route == "portfolio") "conflictDriven" else "source"
         require(recipe in setOf("source", "satOptimized", "conflictDriven"))
         val seed = (options["seed"] ?: "3").toLong()
@@ -246,8 +249,11 @@ internal object OrdinaryArithmeticLearningProfile {
                             lpCeiling = if (lp == "auto") LpConfig.AGGRESSIVE else LpConfig.OFF,
                             nodeBudget = NodeBudget(nodes),
                             btEdit = { originalParams ->
+                                val selected = if (learningPlacement == "observed") {
+                                    originalParams.randomSeed == workerSeed
+                                } else originalParams.integerRowLearning
                                 val edited = originalParams.copy(cancellation = stop, maxDecisions = nodes,
-                                    integerRowLearning = learning && originalParams.integerRowLearning)
+                                    integerRowLearning = learning && selected)
                                 if (originalParams.randomSeed == workerSeed) observingParams(edited) else edited
                             },
                         )
@@ -320,6 +326,7 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("workerSeed", workerSeed)
                     put("recipe", recipe)
                     put("route", route)
+                    put("learningPlacement", learningPlacement)
                     put("targetRecipe", targetRecipe)
                     put("ignoredSessionAttachments", if (tracing) ignoredSessionAttachments else null)
                     put("maxDecisions", nodes)
