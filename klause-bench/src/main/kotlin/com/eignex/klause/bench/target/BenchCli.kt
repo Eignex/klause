@@ -263,10 +263,8 @@ object BenchCli {
      *  default per-family cap applies to it, only an explicit `per-family`. */
     private fun setProblems(names: List<String>, suites: Set<String>?): List<SelectedProblem> {
         val entries = ProblemSets.load(names).filter { suites == null || it.suite in suites }
-        val bySuite = entries.map { it.suite }.distinct().associateWith { id ->
-            Catalog.uncapped(
-                id,
-            ).problems.associateBy { it.name }
+        val bySuite = entries.groupBy { it.suite }.mapValues { (id, members) ->
+            Catalog.named(id, members.map { it.problem }).associateBy { it.name }
         }
         val missing = entries.filter { bySuite.getValue(it.suite)[it.problem] == null }
         require(missing.isEmpty()) {

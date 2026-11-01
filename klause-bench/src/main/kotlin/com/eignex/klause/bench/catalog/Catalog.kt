@@ -191,6 +191,8 @@ internal data class DynamicSuite(
     val defaultPerFamily: Int? = null,
     val sourceLayout: ArchiveSourceLayout? = null,
     val admit: ((ProblemRef) -> Boolean)? = null,
+    /** Exact identity lookup for fixed sets, without enumerating the rest of a large corpus. */
+    val namedProvider: ((List<String>) -> List<ProblemRef>)? = null,
     val provider: (CorpusSelection.Selection) -> List<ProblemRef>,
 )
 
@@ -226,6 +228,13 @@ internal object Catalog {
     }
 
     fun discovered(dynamic: DynamicSuite): List<ProblemRef> = dynamic.provider(CorpusSelection.Selection())
+
+    fun named(id: String, names: List<String>): List<ProblemRef> {
+        val dynamic = dynamicSuites.firstOrNull { it.id == id }
+        dynamic?.namedProvider?.let { return it(names) }
+        val wanted = names.toSet()
+        return uncapped(id).problems.filter { it.name in wanted }
+    }
 
     fun selected(dynamic: DynamicSuite, selection: CorpusSelection.Selection): Suite {
         val admit = dynamic.admit
