@@ -511,7 +511,7 @@ clauses under stable variable ids and share the native arena read-only; variable
 elimination runs once in [presolve](07-presolve.md) instead. Seeded searches skip
 inprocessing, since derivations under assumption pins would not hold globally.
 
-Opt-in root simplification examines bounded slices of source and learned Boolean
+Root simplification examines bounded slices of source and learned Boolean
 clauses against permanent root facts. An empty Boolean pin trail withholds the scan;
 without a pinned literal it cannot satisfy or shorten a Boolean clause. Clauses
 affected by a new Boolean root fact can be reached through a source-occurrence index
@@ -540,7 +540,7 @@ historical reasons and removes obsolete watches; attaching a shortened binary in
 both implication directions and evaluates facts already assigned at the root. There
 is no separate stale binary graph or whole-graph rebuild.
 
-Opt-in failed-literal probing alternates a bounded rotating set of source Boolean
+Failed-literal probing alternates a bounded rotating set of source Boolean
 and existing integer-bound literals with coordinates from newly examined learned
 clauses of two to eight literals. The global rotation alternates existing literals
 with unfixed integer endpoints, including columns without existing atoms. Separate

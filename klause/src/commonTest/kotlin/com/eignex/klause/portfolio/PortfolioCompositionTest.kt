@@ -483,6 +483,151 @@ class PortfolioCompositionTest {
     }
 
     @Test
+    fun `curated pseudo Boolean satisfaction should enable bounded root maintenance`() {
+        val budget = NodeBudget(limit = 100)
+        val facts = ProblemFacts.assumed(Kind.CSP, ProblemClass.PseudoBoolean)
+        for (cores in listOf(1, 2)) {
+            val scenario = PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK)
+                .copy(cores = cores, nodeBudget = budget)
+
+            val params = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+                .map { it.recipe.build(1L, null) }
+
+            assertTrue(params.isNotEmpty())
+            for (arm in params) {
+                assertTrue(arm.rootSimplification)
+                assertEquals(256, arm.rootSimplifyBatch)
+                assertEquals(2, arm.rootProbeBatch)
+                assertEquals(8192L, arm.rootProbeWork)
+                assertEquals(4096L, arm.inprocessingWork)
+                assertEquals(256L, arm.inprocessingRootWork)
+                assertEquals(3072L, arm.inprocessingProbeWork)
+                assertEquals(32L, arm.inprocessingInterval)
+                assertEquals(8, arm.inprocessingGrowth)
+                assertEquals(32L, arm.inprocessingCooldown)
+                assertEquals(0L, arm.inprocessingWarmupWork)
+                assertSame(budget, arm.nodeBudget)
+            }
+        }
+    }
+
+    @Test
+    fun `disabling automatic root maintenance should retain stock root parameters`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK)
+            .copy(rootMaintenance = false)
+        val facts = ProblemFacts.assumed(Kind.CSP, ProblemClass.PseudoBoolean)
+        val stock = BacktrackParams()
+
+        val params = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+            .map { it.recipe.build(1L, null) }
+
+        assertTrue(params.isNotEmpty())
+        for (arm in params) {
+            assertEquals(stock.rootSimplification, arm.rootSimplification)
+            assertEquals(stock.rootSimplifyBatch, arm.rootSimplifyBatch)
+            assertEquals(stock.rootProbeBatch, arm.rootProbeBatch)
+            assertEquals(stock.rootProbeWork, arm.rootProbeWork)
+            assertEquals(stock.inprocessingWork, arm.inprocessingWork)
+            assertEquals(stock.inprocessingRootWork, arm.inprocessingRootWork)
+            assertEquals(stock.inprocessingProbeWork, arm.inprocessingProbeWork)
+            assertEquals(stock.inprocessingInterval, arm.inprocessingInterval)
+            assertEquals(stock.inprocessingGrowth, arm.inprocessingGrowth)
+            assertEquals(stock.inprocessingCooldown, arm.inprocessingCooldown)
+            assertEquals(stock.inprocessingWarmupWork, arm.inprocessingWarmupWork)
+        }
+    }
+
+    @Test
+    fun `manual root settings should survive automatic policy opt out`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK).copy(
+            rootMaintenance = false,
+            btEdit = { it.copy(rootSimplification = true, rootProbeBatch = 7, inprocessingWork = 99L) },
+        )
+        val facts = ProblemFacts.assumed(Kind.CSP, ProblemClass.PseudoBoolean)
+
+        val params = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+            .map { it.recipe.build(1L, null) }
+
+        assertTrue(params.isNotEmpty())
+        assertTrue(params.all { it.rootSimplification && it.rootProbeBatch == 7 && it.inprocessingWork == 99L })
+    }
+
+    @Test
+    fun `other model classes should retain their root maintenance defaults`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK)
+        for (problemClass in ProblemClass.entries.filter { it != ProblemClass.PseudoBoolean }) {
+            val facts = ProblemFacts.assumed(Kind.CSP, problemClass)
+
+            val params = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+                .map { it.recipe.build(1L, null) }
+
+            assertTrue(params.all { !it.rootSimplification && it.rootProbeBatch == 0 })
+        }
+    }
+
+    @Test
+    fun `mixed and optimization pools should retain their root maintenance defaults`() {
+        val scenarios = listOf(
+            PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.MIXED),
+            PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK),
+        )
+        for (scenario in scenarios) {
+            val facts = ProblemFacts.assumed(scenario.kind, ProblemClass.PseudoBoolean)
+
+            val params = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+                .map { it.recipe.build(1L, null) }
+
+            assertTrue(params.all { !it.rootSimplification && it.rootProbeBatch == 0 })
+        }
+    }
+
+    @Test
+    fun `explicit edits should override automatic root maintenance`() {
+        val scenario = PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK).copy(
+            btEdit = { it.copy(rootSimplification = false, rootProbeBatch = 0, inprocessingWork = 17L) },
+        )
+        val facts = ProblemFacts.assumed(Kind.CSP, ProblemClass.PseudoBoolean)
+
+        val params = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+            .map { it.recipe.build(1L, null) }
+
+        assertTrue(params.isNotEmpty())
+        assertTrue(params.all { !it.rootSimplification && it.rootProbeBatch == 0 && it.inprocessingWork == 17L })
+    }
+
+    @Test
+    fun `explicit pools should preserve their root maintenance parameters`() {
+        val requested = BacktrackParams(rootProbeBatch = 5, inprocessingWork = 17L)
+        val scenario = PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK).copy(
+            btPool = listOf { BacktrackWorkerConfig.ofParams("custom", requested) },
+        )
+        val facts = ProblemFacts.assumed(Kind.CSP, ProblemClass.PseudoBoolean)
+
+        val params = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+            .map { it.recipe.build(1L, null) }
+
+        assertTrue(params.isNotEmpty())
+        assertTrue(params.all { !it.rootSimplification && it.rootProbeBatch == 5 && it.inprocessingWork == 17L })
+    }
+
+    @Test
+    fun `source annotations should preserve their root maintenance policy`() {
+        val requested = BacktrackParams(rootProbeBatch = 5, inprocessingWork = 17L)
+        val scenario = PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK)
+            .copy(annotationArm = requested)
+        val facts = ProblemFacts.assumed(Kind.CSP, ProblemClass.PseudoBoolean)
+
+        val params = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
+            .associate { it.label to it.recipe.build(1L, null) }
+
+        val annotation = params.getValue("annotation")
+        assertEquals(5, annotation.rootProbeBatch)
+        assertEquals(17L, annotation.inprocessingWork)
+        assertTrue(params.values.all { !it.rootSimplification })
+        assertTrue(params.filterKeys { it != "annotation" }.values.all { it.rootProbeBatch == 0 })
+    }
+
+    @Test
     fun `curated satisfaction root cuts should require an explicit override`() {
         for (requested in listOf(null, false, true)) {
             val edit = requested?.let { enabled ->
