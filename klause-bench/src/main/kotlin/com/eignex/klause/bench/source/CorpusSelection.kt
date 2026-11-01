@@ -143,10 +143,11 @@ internal object CorpusSelection {
         selection: Selection,
         category: Category,
         format: Format = Format.MINIZINC,
-        /** Resolve an instance's oracle from its resolved instance [File] (e.g. parse directives). */
-        expected: (File) -> Expected = { Expected.Unknown },
+        /** Resolve an instance's oracle from its resolved instance [File] (e.g. parse directives). Reading content
+         *  needs the collection's bytes; without it discovery may run on the collection's index listing alone. */
+        expected: ((File) -> Expected)? = null,
     ): List<ProblemRef> {
-        val root = CorpusFetcher.ensure(collection)
+        val root = if (expected == null) CorpusFetcher.listing(collection) else CorpusFetcher.ensure(collection)
         val discovered = layout.discover(root)
         // Reject empty discovery so a mismatched archive layout cannot look like a completed measurement.
         require(discovered.isNotEmpty()) {
@@ -160,7 +161,7 @@ internal object CorpusSelection {
                 format = format,
                 source = ProblemSource.External(collection, d.mznRelPath),
                 category = category,
-                expected = expected(File(root, d.mznRelPath)),
+                expected = expected?.invoke(File(root, d.mznRelPath)) ?: Expected.Unknown,
                 data = d.dznRelPath?.let { ProblemSource.External(collection, it) },
                 license = collection.license,
                 family = d.family,
