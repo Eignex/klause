@@ -384,6 +384,40 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `point separation should require a fourth original row when three leave a continuous residual`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val lastReal = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
+        val source = SourceProofContext(scope, setOf(x, y, z, real, otherReal, lastReal), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "middle" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(lastReal to BigFraction.ONE,
+                z to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "demand" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                otherReal to BigFraction.MINUS_ONE, lastReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-5))),
+        ))
+        val point = mapOf(x to 5.0 / 6, y to 5.0 / 6, z to 5.0 / 6,
+            real to 5.0 / 3, otherReal to 5.0 / 3, lastReal to 5.0 / 3)
+
+        for (rows in listOf(2, 3, 4)) {
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                maximumCandidates = 1,
+                limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = rows), point = point)
+
+            if (rows < 4) assertTrue(cuts.isEmpty()) else {
+                val cut = cuts.single()
+                assertEquals(SourceInequality(mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE,
+                    z to BigFraction.MINUS_ONE), BigFraction.ofLong(-3)), cut.inequality)
+                assertEquals(setOf(0, 1, 2, 3), cut.owners)
+                assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                    SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+            }
+        }
+    }
+
+    @Test
     fun `interrupting an extended derivation should withhold its partial proposal`() {
         val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(x, y, real, otherReal), linkedMapOf(
