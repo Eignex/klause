@@ -8,9 +8,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class ClauseDbRankingTest {
+internal class ClauseDbRankingTest {
     @Test
-    fun `general production caps should rank locals without a permanent floor`() {
+    @Suppress("FunctionNaming") // Native platform tests follow the common test naming convention.
+    internal fun `general production caps should rank locals without a permanent floor`() {
         for (cap in listOf(4_000, 20_000)) {
             val session = PropagationSession(Problem(3, 0, emptyArray(), arrayOf(
                 Clause(intArrayOf(1, 2)), Clause(intArrayOf(3, 4)),
