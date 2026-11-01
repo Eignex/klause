@@ -164,7 +164,9 @@ internal object ObjectivePortfolioReplay {
                 if (existing != null) {
                     capture = existing
                 } else if (captures.size < 8) {
-                    capture = PreparedArithmeticLearningProfile.Capture(session, maxWords = 2048, retainBoundaries = true)
+                    capture = PreparedArithmeticLearningProfile.Capture(
+                        session, maxWords = 2048, retainBoundaries = true,
+                    )
                         .also { recorder ->
                             captures.add(recorder)
                             recorder.boundary("session.created", params.randomSeed ?: -1L)
@@ -205,7 +207,8 @@ internal object ObjectivePortfolioReplay {
                         conflict.lbd.toLong(), conflict.guardLiterals.size.toLong())
                     val guards = conflict.guardLiterals
                     if (guards.size <= 16) {
-                        capture?.boundary("traversal.learned-guards", *guards.map(Int::toLong).toLongArray())
+                        capture?.boundaryWords("traversal.learned-guards",
+                            LongArray(guards.size) { guards[it].toLong() })
                     } else capture?.boundary("traversal.learned-guards-omitted", guards.size.toLong())
                 }
                 override fun onRestart(decisions: Long) { delegate?.onRestart(decisions) }

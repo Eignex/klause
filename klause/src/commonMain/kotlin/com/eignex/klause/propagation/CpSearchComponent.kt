@@ -616,7 +616,8 @@ class CpSearchComponent(
                 }
             }
             lastResult = result
-            trace?.boundary(if (result is PropagationResult.Implied) "analysis.native-implied" else "analysis.native-unsat",
+            trace?.boundary(
+                if (result is PropagationResult.Implied) "analysis.native-implied" else "analysis.native-unsat",
                 this@CpSearchComponent.session.decisionLevel.toLong(), session.decisionLevel.toLong(),
                 if (this@CpSearchComponent.session.fixpointCancelled) 1L else 0L)
             return when (result) {

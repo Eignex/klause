@@ -312,7 +312,9 @@ internal object PreparedArithmeticLearningProfile {
             })
         }
 
-        fun boundary(kind: String, vararg data: Long) {
+        fun boundary(kind: String, vararg data: Long) { boundaryWords(kind, data) }
+
+        fun boundaryWords(kind: String, data: LongArray) {
             trace.javaClass.getMethod("boundary", String::class.java, LongArray::class.java).invoke(trace, kind, data)
         }
 
