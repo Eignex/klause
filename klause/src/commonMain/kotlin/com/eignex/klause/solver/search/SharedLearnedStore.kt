@@ -59,9 +59,16 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
         signatures.size * 20L + watches.size * 24L + rows.ownedBytes + ranks.ownedBytes +
         signatures.ownedBytes + watches.ownedBytes + 72L
 
-    operator fun get(index: Int): Row = checkNotNull(rows[index.toLong()])
+    operator fun get(index: Int): Row {
+        charge(rows.readWork)
+        return checkNotNull(rows[index.toLong()])
+    }
     fun next(after: Long, ranked: Boolean = false): Row? = if (ranked) ranks.next(after, true) else rows.next(after)
-    fun explanationOf(index: Int): SearchExplanation = SearchExplanation(checkNotNull(get(index).literals).copyOf())
+    fun explanationOf(index: Int): SearchExplanation {
+        val literals = checkNotNull(get(index).literals)
+        charge(literals.size.toLong() + 16L)
+        return SearchExplanation(literals.copyOf())
+    }
 
     fun add(literals: IntArray, lbd: Int): Row? {
         if (literals.isEmpty()) return null
@@ -72,6 +79,7 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
         var bucket = signatures[hash.toLong()]
         var existing = bucket?.first
         while (existing != null) {
+            charge(1L)
             val stored = checkNotNull(existing.literals)
             if (!existing.retired && sameLiterals(stored, literals)) return null
             existing = existing.signatureNext
@@ -355,7 +363,11 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
         signatures.memory(sample) { bucket ->
             var retained = false
             var entry = bucket.first
-            while (entry != null) { sample.step(); retained = protected(entry) || retained; entry = entry.signatureNext }
+            while (entry != null) {
+                sample.step()
+                retained = protected(entry) || retained
+                entry = entry.signatureNext
+            }
             sample.owned(bucket, 4L, retained)
             sample.ownedReferences(bucket, 2L, retained)
             retained

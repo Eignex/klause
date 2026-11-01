@@ -120,7 +120,7 @@ internal class SearchLearning(
     }
 
     fun onRootReset() {
-        chargeOrdinary(reasons.readWork)
+        chargeOrdinary(reasons.readWork + 16L)
         reasons.forEach { _, row ->
             chargeOrdinary(16L)
             row.reasonCount--
@@ -155,6 +155,7 @@ internal class SearchLearning(
         unitsPending = false
         capActive = false
         memoryActive = false
+        chargeOrdinary(96L)
     }
 
     private fun protected(row: SharedLearnedStore.Row): Boolean =
@@ -274,11 +275,14 @@ internal class SearchLearning(
     fun propagate(host: ClauseWatchHost, boolTrail: IntArrayList): ComponentResult {
         while (firstAttach != null) {
             val row = checkNotNull(firstAttach)
-            if (row.stages and 8 == 0) {
-                row.stages = row.stages or 8
-                lifecycle.note(LearnedKind.Clause, LearnedStage.Asserted)
+            val result = deliver {
+                if (row.stages and 8 == 0) {
+                    chargeOrdinary(16L)
+                    row.stages = row.stages or 8
+                    lifecycle.note(LearnedKind.Clause, LearnedStage.Asserted)
+                }
+                if (row.attached) learned.recheck(row, host) else learned.attach(row, host)
             }
-            val result = deliver { if (row.attached) learned.recheck(row, host) else learned.attach(row, host) }
             if (result is ComponentResult.Indeterminate) return result
             chargeOrdinary(16L)
             firstAttach = row.attachNext
@@ -362,6 +366,7 @@ internal class SearchLearning(
     fun consumed(index: Int) {
         val row = learned[index]
         if (row.stages and 1 != 0) return
+        chargeOrdinary(16L)
         row.stages = row.stages or 1
         lifecycle.note(LearnedKind.Clause, LearnedStage.Consumed)
     }
