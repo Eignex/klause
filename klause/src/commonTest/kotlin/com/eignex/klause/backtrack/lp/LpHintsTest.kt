@@ -50,6 +50,121 @@ class LpHintsTest {
     }
 
     @Test
+    fun `basis side advice puts the cheaper existing child first`() {
+        for (boolean in listOf(false, true)) for (alternate in listOf(false, true)) {
+            for (upCheap in listOf(false, true)) for (upFirst in listOf(false, true)) {
+                val builder = LpBuilder()
+                repeat(2) { builder.addVar(0, 2) }
+                val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
+                    BooleanArray(2) { boolean }, 0L, if (boolean) IntArray(0) else intArrayOf(0, 1),
+                    if (boolean) intArrayOf(0, 1) else IntArray(0))
+                val hints = LpHints(if (boolean) 0 else 2, if (boolean) 2 else 0, directionalGains = true)
+                val baseline = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+                val runner = if (boolean) VarRef.Bool(1) else VarRef.IntVar(1)
+                val winner = if (alternate) runner else baseline
+                val cost = if (upCheap) LpDirectionalCost(4.0, 1.0) else LpDirectionalCost(1.0, 4.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+                val choice = hints.basisPick(baseline, runner, IntDomain(0, 2), IntDomain(0, 2)) { _, _ ->
+                    if (alternate) listOf(LpDirectionalCost(0.1, 0.1), cost)
+                    else listOf(cost, LpDirectionalCost(0.1, 0.1))
+                }
+                hints.selected(choice?.first, baseline, choice?.second ?: Double.NaN, basis = true)
+                hints.branch(winner, if (boolean) null else IntDomain(0, 2))
+                val id = if (alternate) 1 else 0
+                val lower = if (boolean) SearchDecision.Bool(2 * id + 1) else SearchDecision.IntAtMost(id, 0L)
+                val upper = if (boolean) SearchDecision.Bool(2 * id) else SearchDecision.IntAtLeast(id, 1L)
+                val existing = if (upFirst) listOf(upper, lower) else listOf(lower, upper)
+
+                val ordered = hints.orderAlternatives(winner, existing)
+
+                assertEquals(if (upCheap) listOf(upper, lower) else listOf(lower, upper), ordered)
+            }
+        }
+    }
+
+    @Test
+    fun `basis side advice expires with its node and point`() {
+        for (change in listOf("node", "reset", "clear", "record", "point", "empirical")) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 2) }
+            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val hints = LpHints(2, 0, directionalGains = true)
+            val variable = VarRef.IntVar(0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            hints.basisPick(variable, VarRef.IntVar(1), IntDomain(0, 2), IntDomain(0, 2)) { _, _ ->
+                listOf(LpDirectionalCost(4.0, 1.0), LpDirectionalCost(0.1, 0.1))
+            }
+            hints.selected(null, variable, Double.NaN, basis = true)
+            hints.branch(variable, IntDomain(0, 2))
+            when (change) {
+                "node" -> hints.beginNode(1, 100.0)
+                "reset" -> hints.resetHistory()
+                "clear" -> hints.clear()
+                "record" -> hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+                "point" -> hints.recordPoint(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+                else -> hints.selected(variable, variable, 1.0)
+            }
+            val existing = listOf(SearchDecision.IntAtMost(0, 0L), SearchDecision.IntAtLeast(0, 1L))
+
+            val ordered = hints.orderAlternatives(variable, existing)
+
+            assertEquals(existing, ordered, change)
+        }
+    }
+
+    @Test
+    fun `basis side advice preserves changed and pruned partitions`() {
+        for (change in listOf("variable", "split", "single", "empty", "domain")) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 2) }
+            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val hints = LpHints(2, 0, directionalGains = true)
+            val variable = VarRef.IntVar(if (change == "variable") 1 else 0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            hints.basisPick(VarRef.IntVar(0), VarRef.IntVar(1), IntDomain(0, 2), IntDomain(0, 2)) { _, _ ->
+                listOf(LpDirectionalCost(4.0, 1.0), LpDirectionalCost(0.1, 0.1))
+            }
+            hints.selected(null, VarRef.IntVar(0), Double.NaN, basis = true)
+            hints.branch(variable, if (change == "domain") IntDomain(0, 2).excludeValue(1) else IntDomain(0, 2))
+            val split = if (change == "split") 1L else 0L
+            val lower = SearchDecision.IntAtMost(variable.varId, split)
+            val upper = SearchDecision.IntAtLeast(variable.varId, split + 1L)
+            val existing = when (change) {
+                "empty" -> emptyList()
+                "single" -> listOf(lower)
+                else -> listOf(lower, upper)
+            }
+
+            val ordered = hints.orderAlternatives(variable, existing)
+
+            assertEquals(existing, ordered, change)
+        }
+    }
+
+    @Test
+    fun `tied basis child gains preserve the existing order`() {
+        val builder = LpBuilder()
+        repeat(2) { builder.addVar(0, 2) }
+        val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
+            BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+        val hints = LpHints(2, 0, directionalGains = true)
+        val variable = VarRef.IntVar(0)
+        hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+        hints.basisPick(variable, VarRef.IntVar(1), IntDomain(0, 2), IntDomain(0, 2)) { _, _ ->
+            listOf(LpDirectionalCost(2.0, 2.0), LpDirectionalCost(0.1, 0.1))
+        }
+        hints.selected(null, variable, Double.NaN, basis = true)
+        hints.branch(variable, IntDomain(0, 2))
+        val existing = listOf(SearchDecision.IntAtLeast(0, 1L), SearchDecision.IntAtMost(0, 0L))
+
+        val ordered = hints.orderAlternatives(variable, existing)
+
+        assertEquals(existing, ordered)
+    }
+
+    @Test
     fun `directional point refresh preserves fallback reduced cost priority`() {
         val builder = LpBuilder()
         val x = builder.addVar(0, 10, cost = 0)

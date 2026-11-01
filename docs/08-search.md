@@ -277,7 +277,14 @@ missing directions and unreliable history permit a bounded comparison of the cur
 LP scorer's winner and runner-up. A matching retained optimal basis supplies one-row
 objective cost estimates in both directions, multiplied by their fractional movements
 and combined with the same balanced score. Only a strictly larger finite score changes
-the winner. These estimates remain current-node advice, separate from observed gains.
+the winner. The chosen variable can also prefer the child with the smaller estimated
+objective increase. This preference is applied after value and incumbent guidance,
+only when both existing alternatives match the estimated Boolean or integer floor/ceil
+partition. It swaps those alternatives without adding, removing or replacing a decision;
+changed splits, pruned alternatives and tied directional gains retain their order.
+The preference expires at the next node, point replacement or history reset. Side
+consumption and changed order are recorded separately from variable selection.
+These estimates remain current-node advice, separate from observed gains.
 Unsupported engines, stale or unfinished bases, missing directions and insufficient
 allowance retain reduced-cost/fractionality scoring and the configured selector's
 precedence. Directional scores use the same objective units.
