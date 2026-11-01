@@ -263,8 +263,8 @@ reclamation attempts remain retryable.
 Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,
 queues and event indexes, with a conservative envelope for indivisible publication.
 Cancellation or an oversized envelope defers without mutation; accepted publication
-remaps the whole generation and trims retained primitive capacity. Shared search prepares
-a replacement generation and polls before swapping its stores and indexes. Protected
+remaps the whole generation and trims retained primitive capacity. Shared search retains
+stable handles and resumes separately funded owner removals. Protected
 state or an unfunded preparation permits continued search above the soft limit, with an
 explicit protected/deferred observation. Work debt supplies no hard pause-latency
 guarantee. Thresholds and default retention remain separate policy decisions.
@@ -460,19 +460,25 @@ If complete candidate preparation cannot be funded, the permanent-clause-floor
 case uses the bounded handle-preserving window. Permanent ownership already
 exhausts the cap, so every eligible local row is excess and no LBD ranking is needed.
 Mid rows survive their demotion window; each completed window clears survivor reuse
-flags. Other constraint kinds, shared stores and caps retain the complete selection
+flags. Other constraint kinds and caps retain the complete selection
 and remap preflight.
 
-Shared learning also accepts an optional modeled-byte soft limit checked at
-propagation boundaries independently of restarts. Units, glue clauses, live reason
-owners and pending first attachments form its protected floor; copied trail reasons
-and queued component publications remain privately protected. Reclamation prepares
-replacement stores, signatures, watches, stages, reason IDs and queues within a
-conservative work and scratch bound. Cancellation before publication discards the
-replacement; publication swaps the complete generation without callbacks. Rebuilding
-the indexes releases obsolete capacity as well as clause payload. Insufficient
-allowance defers reclamation, and a protected floor above the limit reports that
-condition while preserving the search state. Root reseeding releases obsolete copied
+Shared learning uses stable handles and bounded-height owned indexes for clauses,
+LBD ranking, watches, signatures and live reasons. Count-cap windows retire eligible
+clauses in descending LBD order, retaining older clauses on ties. A window fixes its
+admission boundary; appended clauses enter a later window. Epochs retain recent-use
+protection without a whole-store flag reset.
+The optional modeled-byte soft limit runs independently at propagation boundaries.
+Units, glue clauses, live reason owners and pending first attachments form its
+protected floor; copied trail reasons and queued component publications remain
+privately protected. Logical retirement disables propagation before separately funded
+watch, signature and index removal releases payload and metadata ownership. A partial
+release keeps its owner and cursor across calls. Each bounded mutation polls after
+its work debit and publishes without callbacks. Retired payload and unfinished
+metadata stay in ownership observations until released; partial observations supply
+no byte-limit authority. Unfinished maintenance bypasses completed-result caching.
+An insufficient atomic-operation grant explicitly defers while preserving the cursor.
+Root reseeding releases obsolete copied
 reasons; terminal release drops shared learning without rewriting lifetime counters.
 A cancelled automatic scan permits one propagation opportunity before another
 attempt, including when a suspended decision retracts and retries.
