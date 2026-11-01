@@ -2,6 +2,7 @@ package com.eignex.klause.bench.lab
 
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchContext
@@ -17,7 +18,37 @@ import java.util.HexFormat
 internal object LabInputs {
     const val RUNTIME = "klause-bench/build/lab-runtime/minizinc"
 
-    fun resolve(ref: ProblemRef, inputOnly: Boolean = false): List<BenchInput> = buildList {
+    fun resolve(ref: ProblemRef, inputOnly: Boolean = false): List<BenchInput> =
+        indexed(ref) ?: materialized(ref, inputOnly)
+
+    /**
+     * [ref]'s inputs from its collections' indexes, without their bytes, when the lab accepts declared hashes. The
+     * lab fetches each by content hash for the case that needs it, and [verify] checks it before the solve. MiniZinc
+     * models stay [materialized]: their include directories and dependency scan need real trees and content.
+     */
+    private fun indexed(ref: ProblemRef): List<BenchInput>? {
+        if (!CorpusFetcher.declaredInputs || ref.format == Format.MINIZINC) return null
+        return (listOf(ref.source to "model") + listOfNotNull(ref.data?.let { it to "data" })).map { (source, role) ->
+            declared(source, role) ?: return null
+        }.distinct()
+    }
+
+    private fun declared(source: ProblemSource, role: String): BenchInput? {
+        val collection = when (source) {
+            is ProblemSource.External -> source.collection
+            is ProblemSource.ExternalIndexed -> source.collection
+            else -> return null
+        }
+        val view = CorpusFetcher.indexed(collection) ?: return null
+        val file = CorpusFetcher.resolve(source) { view.root }
+        val entry = view.entry(file) ?: return null
+        val path = "${collection.id}/${entry.path}"
+        // The materialized path stages such names under the source tree; keep that behaviour for them.
+        if (path.any { it == ':' || it == '\\' || it.isISOControl() }) return null
+        return BenchInput(path, BenchInputRoot.CORPUS, role, entry.sha256)
+    }
+
+    private fun materialized(ref: ProblemRef, inputOnly: Boolean): List<BenchInput> = buildList {
         val model = CorpusFetcher.resolve(ref.source).toPath()
         add(input(model, "model"))
         ref.data?.let { add(input(CorpusFetcher.resolve(it).toPath(), "data")) }
@@ -80,7 +111,7 @@ internal object LabInputs {
                 }
 
                 else -> {
-                    include = false;
+                    include = false
                     index++
                 }
             }
@@ -114,7 +145,10 @@ internal object LabInputs {
             }
             require(staged.toRealPath().startsWith(source)) { "Input staging escapes source" }
             return BenchInput(
-                source.relativize(staged).toString().replace('\\', '/'), BenchInputRoot.SOURCE, role, sha256,
+                source.relativize(staged).toString().replace('\\', '/'),
+                BenchInputRoot.SOURCE,
+                role,
+                sha256,
             )
         }
         return BenchInput(
