@@ -845,6 +845,7 @@ class Portfolio(
             (scopedReward as? SourceRateReward)?.recordAcceptedGain(arm, gain)
         }
         private var availability: ((Int) -> Boolean)? = null
+        private val earlyCoreTrials = workers.indices.filter { workers[it].earlyCoreTrial }
 
         fun restrictAvailability(available: (Int) -> Boolean) { availability = available }
         private val started = runTimeSource.markNow()
@@ -941,6 +942,8 @@ class Portfolio(
         private val activeSince = arrayOfNulls<TimeMark>(workers.size)
         private val armWork = DoubleArray(workers.size)
         private val siblingWork = LongArray(workers.size)
+        // The bounded early trial needs initial coverage once, across incumbent and proof-slice accounting resets.
+        private val initialCoreCoverage = LongArray(workers.size)
         private var proofStarted = false
         private var totalNanos = 0L
         private var chargedWork = 0L
@@ -1067,8 +1070,8 @@ class Portfolio(
         /**
          * The next arm for lane [lane], or null when none is free. With a lane for every arm, each lane keeps its own
          * arm: there is nothing to share, so neither a probe nor the policy has a choice to make. Otherwise every arm
-         * first runs one base slice, in order, so the policy starts from evidence on each admitted arm; then the
-         * policy picks among arms neither busy nor retired. Improvement variants are admitted at the first
+         * first runs one base slice in order, with eligible early core trials preceding heuristic probes. The policy
+         * then picks among arms neither busy nor retired. Improvement variants are admitted at the first
          * incumbent, or when the initial pool retires.
          */
         private fun claim(lane: Int): Claim? = locked {
@@ -1078,19 +1081,26 @@ class Portfolio(
             if (remaining == 0) return@locked null
             val dedicated = diagnostics == null && lanes == workers.size && workers.none { it.startAfterIncumbent }
             val eligible = eligibleArms().let { arms -> availability?.let { arms.filter(it) } ?: arms }
+            val earlyCore = if (dedicated) null else earlyCoreTrials.firstOrNull {
+                it in eligible && !busy[it] && !retired[it]
+            }
             val probe = if (dedicated) null else eligible.filter { !probed[it] && !busy[it] && !retired[it] }
                 .minByOrNull { if (workers[it].auxiliaryProof) 1 else 0 }
-            val revisit = if (dedicated || improving || eligible.any { !probed[it] && !retired[it] }) {
+            val unprobed = eligible.any { !probed[it] && !retired[it] }
+            val revisit = if (dedicated || earlyCore != null || improving || unprobed) {
                 null
             } else {
                 eligible.filter { preparationRevisits[it] && !busy[it] && !retired[it] }
                     .minByOrNull { (it - nextPreparationArm + workers.size) % workers.size }
             }
-            val owed = if (dedicated || probe != null) null else owedArm(eligible) ?: owedCompleteArm(eligible)
+            val owed = if (dedicated || earlyCore != null || probe != null) null
+                else owedArm(eligible) ?: owedCompleteArm(eligible)
             val arm = when {
                 dedicated -> lane
 
-                probe != null -> probe.also { probed[it] = true }
+                earlyCore != null -> earlyCore
+
+                probe != null -> probe
 
                 owed != null -> owed
 
@@ -1099,13 +1109,15 @@ class Portfolio(
                 else -> policyPick(eligible)
             }
             if (arm < 0 || retired[arm] || busy[arm]) return@locked null
-            val revisiting = !dedicated && !improving && probe == null && preparationRevisits[arm]
+            val initialProbe = !dedicated && !probed[arm]
+            if (initialProbe) probed[arm] = true
+            val revisiting = !dedicated && !improving && earlyCore == null && probe == null && preparationRevisits[arm]
             if (revisiting) {
                 preparationRevisits[arm] = false
                 nextPreparationArm = (arm + 1) % workers.size
             }
             val auxiliary = improving && arm in incumbentProbeArms && !productive[arm]
-            val probing = probe != null || (auxiliary && !trialStarted[arm])
+            val probing = initialProbe || (auxiliary && !trialStarted[arm])
             val baseAllowance = probing || revisiting || workers[arm].auxiliaryProof
             val ordinaryAllowance = if (baseAllowance) baseSliceWork else sliceWork
             val allowance = if (diagnostics == null) ordinaryAllowance else
@@ -1145,7 +1157,10 @@ class Portfolio(
                 for (arm in active) needed -= minOf(needed, siblingWork[arm])
                 needed == 0L
             } else complete.all { retired[it] || siblingWork[it] >= baseSliceWork }
-            return if (covered) eligible else eligible.filter { !workers[it].auxiliaryProof }
+            val earlyCovered = complete.all { retired[it] || initialCoreCoverage[it] >= baseSliceWork }
+            return if (covered) eligible else eligible.filter {
+                !workers[it].auxiliaryProof || (workers[it].earlyCoreTrial && earlyCovered)
+            }
         }
 
         // The free arm furthest below its owed share, else the policy's pick among free arms: a family first, so a
@@ -1287,6 +1302,7 @@ class Portfolio(
             val account = ledgerFor(arm)
             if (claim.closedProof) account.credit(arm, Signal.ProofClosure, 1.0)
             siblingWork[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - siblingWork[arm])
+            initialCoreCoverage[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - initialCoreCoverage[arm])
             val proofWork = workers[arm].auxiliaryProof && work > 0L
             if ((!proofStarted && claim.improved) || proofWork) siblingWork.fill(0L)
             if (proofWork) proofStarted = true

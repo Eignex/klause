@@ -566,6 +566,14 @@ an installation. Without it, each process captures its own installed-build hashe
 `set=weighted-search-qualification-v1` fixes an easy WCNF control, the scheduling
 WBO and haplotyping MaxSAT tails, and the weighted `mprime` incumbent control.
 
+The scoped automatic weighted-core source policy is described in
+[portfolios](../docs/12-portfolio.md#boolean-objective-core-search). Compare the
+default run against `param.core-early=false` and `param.core-refinement=none` at
+the same source revision, seeds, resources and containing allowance. That control
+retains delayed, unrefined core search. Keep actual admission/refinement consumption,
+checked outcomes and full preparation/checking/disposal costs; configured policy
+alone does not qualify production benefit.
+
 `bench.profile.WeightedSearchProfile` qualifies one hash-pinned WCNF/WBO source
 through ordinary finite preparation and retained core search. Arguments are
 `suite=ID problem=NAME sha256=HEX format=wcnf|wbo policy=ordinary|stratified|reasons|deletion

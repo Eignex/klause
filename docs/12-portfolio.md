@@ -138,6 +138,8 @@ connected integer neighborhood without a root relaxation. The all-pinned
 rounded-root bootstrap is reserved for a center without that checked handoff.
 Continuous columns stay free, source
 cutoff checks remain exact, and later proposals retain their captured conditions.
+Imported points remain query incumbents and centers; only a point produced by the
+repair query enters companion discovery publication and original-source rechecking.
 If that first proposal pauses, it receives continuation after owed complete-worker
 coverage until the proposal finishes or the companion's existing allowance retires
 it. This trial grants no incumbent reward and does not renew work, allocation or
@@ -276,6 +278,16 @@ pool; resuming the same session retains both cursor and filter. Retirement recor
 the pool and filter capacity counters, then releases the filter without traversing
 the store. An uncancelled retirement also drains uses and exports
 remaining glue; a cancelled retirement skips those scans.
+A retirement batch that could allocate or grow the worker's private key table
+can use the pool's existing index instead. If it fits the remaining entry capacity
+and has no byte limit, the pool deduplicates it under the publication lock. The
+generation cannot compact during that batch, so fresh keys need not enter the
+worker's retiring filter. Existing private keys still suppress earlier imports
+and exports. Batches that fit the existing private backing, entry pressure and
+byte limits keep the ordinary private admission and reclamation path. Capacity
+refusal happens before publication; exhausting
+publication funding ends the export without another allowance. Every candidate
+visit and pool operation retains its work, scratch and cancellation bounds.
 
 Glue export probes that same filter with the portable content key before copying
 native literals or constructing portable payloads. An empty filter skips duplicate
@@ -935,8 +947,21 @@ An interrupted point check keeps its candidate for the next slice; each attempt
 retains its construction and propagation charges. Closing discards query pins,
 auxiliary buffers and preparation cursors while keeping completed observations.
 
-Core refinement is disabled by default; `core-refinement=none|reasons|deletion`
-selects the private policy for curated and directly selected core workers.
+Curated single-lane mixed source execution selects an early reason-refined core
+trial for nonuniform Boolean objectives over at most 16,384 Boolean columns and
+16,384 factors, with at most two million literal entries in clauses, cardinalities
+and pseudo-Boolean rows or their reifications. Pseudo-Boolean row constants must
+fit signed words. It excludes integer and real columns and requires the sum of the
+absolute objective coefficients and constant to fit the exact scalar range below
+`2^53`. Eligibility scanning is cancellable and charges the containing invocation.
+The trial retains ordinary complete-worker coverage, worker positions, seeds and
+its existing auxiliary allowance. Explicit core settings, arm counts, recipes,
+annotations, backtrack edits and work-driven diagnostics retain their selected
+policy. Unsupported or interrupted eligibility retains the ordinary delayed,
+unrefined core policy.
+
+`core-refinement=none|reasons|deletion` explicitly selects the private policy for
+curated and directly selected core workers.
 Seed-proof projection uses the
 [historical reasons](09-learning.md#explanation-lifetime) of the existing query,
 without another propagation session or solve; unsupported seed conflicts and tree
@@ -979,11 +1004,14 @@ ordinary complete workers stall, with the allowance described in
 [resources](06-sessions.md#resource-allowances); parallel pools admit it immediately, and `core-guided`
 selects it directly.
 
-`core-early=true` removes only the first-incumbent admission condition in a mixed
-optimization pool on one lane with automatic backtrack workers and an eligible
-Boolean objective. Worker order, seeds, initial complete-worker coverage and the
-bounded auxiliary allowance stay fixed. The control also preserves the containing
-work allowance in diagnostic schedules. It does not expand core eligibility.
+`core-early=true` admits the eligible bounded core trial after initial ordinary
+complete-worker coverage, before heuristic first probes, in a mixed optimization pool
+on one lane with automatic backtrack workers and a Boolean objective. The trial keeps
+its opportunity across retained preparation and query slices until it finishes or
+its cumulative allowance stops it, on either side of the first incumbent. Worker
+positions, seeds, complete-worker coverage and auxiliary limits stay fixed, including
+the containing work allowance in diagnostic schedules. The control does not expand
+core eligibility.
 
 ### Exact theory strategy execution
 
