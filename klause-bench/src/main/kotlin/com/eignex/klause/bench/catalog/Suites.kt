@@ -369,6 +369,18 @@ internal object Suites {
                     format = Format.WCNF,
                 )
             },
+            DynamicSuite(
+                "maxsat-maxcut",
+                "MaxSAT LIB weighted MaxCut instances (fetched; compact family archive)",
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.maxsatLibMaxcut,
+                    CorpusSelection.Layout.Flat("maxsat_instances/master_set/weighted/maxcut", "wcnf"),
+                    sel,
+                    Category.OPTIMIZATION,
+                    format = Format.WCNF,
+                )
+            },
         )
     }
 
@@ -1108,6 +1120,14 @@ internal object ExternalCollections {
         url = "https://www.cs.helsinki.fi/group/coreo/MSE2024-instances/mse24-exact-weighted.zip",
         license = "MaxSAT Evaluation (academic benchmarks)",
         reason = "4.4GB MSE'24 exact weighted track (flat `*.wcnf.xz`); fetched rather than vendored",
+        fetch = FetchMethod.Zip,
+    )
+
+    val maxsatLibMaxcut = ExternalCollection(
+        id = "maxsat-lib-weighted-maxcut",
+        url = "https://www.cs.toronto.edu/maxsat-lib/maxsat-instances/downloads/weighted/maxcut_wt.zip",
+        license = "MaxSAT Evaluation (academic benchmarks)",
+        reason = "438KiB MaxSAT LIB weighted MaxCut family; fetched rather than vendored",
         fetch = FetchMethod.Zip,
     )
 

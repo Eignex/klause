@@ -218,6 +218,16 @@ class SolveStatsTest {
     }
 
     @Test
+    fun `merge should add objective scoring observations across workers`() {
+        val left = SolveStats(ls = LocalSearchStats(objectiveScoring = mapOf("indexed" to 7L, "prepared" to 1L)))
+        val right = SolveStats(ls = LocalSearchStats(objectiveScoring = mapOf("indexed" to 11L, "plain" to 1L)))
+
+        val merged = left.mergedWith(right)
+
+        assertEquals(mapOf("indexed" to 18L, "prepared" to 1L, "plain" to 1L), merged.ls.objectiveScoring)
+    }
+
+    @Test
     fun `merge should add local search phase times by key`() {
         val left = SolveStats(ls = LocalSearchStats(phaseNanos = mapOf("seeding" to 7L, "selection" to 11L)))
         val right = SolveStats(ls = LocalSearchStats(phaseNanos = mapOf("preparation" to 3L, "selection" to 13L)))

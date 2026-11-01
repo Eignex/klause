@@ -4,6 +4,7 @@ import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.unhintedDefinitionSweep
 import com.eignex.klause.presolve.SourceMapping
@@ -96,7 +97,10 @@ internal fun PreparedSourceInvocation.heuristicHints(
         DefinitionalSweep.withSource(problem, allFolds, hints, stop)
     } else sweep
     if (stop()) return null
-    val functional = objective?.let { gradient?.functionalObjective(it, stop) }
+    val captureBooleanCosts = sweep == null && ExecutionStrategy.LOCAL_SEARCH in strategies &&
+        problem.semantics.effective.format == SourceFormat.WCNF &&
+        problem.numBoolVars <= 1_000_000 && problem.numIntVars == 0 && problem.numRealVars == 0
+    val functional = objective?.let { gradient?.functionalObjective(it, stop, captureBooleanCosts) }
     return if (stop()) null else PreparedSourceHints(sweep, functional)
 }
 
