@@ -1567,6 +1567,7 @@ class ExactLiraSearchComponent private constructor(
             val explanation = lp.explainConflict(result.conflictSupport, context)
             smtStats?.observeConflict(explanation)
             outcome = ComponentCheck.Infeasible(explanation)
+            LpClaim.CONTRADICTION.consumed(primaryLpObserver)
             return ComponentResult.Conflict(explanation)
         }
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
@@ -1583,7 +1584,7 @@ class ExactLiraSearchComponent private constructor(
             }
         }
         if (operationStop()) return ComponentResult.Indeterminate
-        captureCompleteWitness(candidate)
+        captureCompleteWitness(candidate, LpClaim.FEASIBLE_COMPLETION)
         // Source integer branching requires an independently checked continuous witness.
         return ComponentResult.Consistent
     }
@@ -1804,7 +1805,7 @@ class ExactLiraSearchComponent private constructor(
         return null
     }
 
-    private fun captureCompleteWitness(point: List<BigFraction>?) {
+    private fun captureCompleteWitness(point: List<BigFraction>?, claim: LpClaim? = null) {
         if (point == null || operationStop() || bools.any { it == UNASSIGNED } ||
             !node.selectsEveryDisjunction(model, disjunctionAtoms) ||
             node.nextDisequality(model, disjunctionAtoms, bools) != null
@@ -1812,6 +1813,7 @@ class ExactLiraSearchComponent private constructor(
         acceptWitness(point)?.let {
             assignment = it
             outcome = ComponentCheck.Feasible
+            claim?.consumed(primaryLpObserver)
         }
     }
 
