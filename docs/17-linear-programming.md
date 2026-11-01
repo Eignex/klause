@@ -404,8 +404,9 @@ still authorize every row. The replacement shares the original generation's work
 limit and retains the source-row template; unavailable preparation leaves its prior
 candidates intact. Each immutable template attempts this preparation once.
 Point scoring waits seven completed point queries between scans of one immutable
-candidate generation. An adopted current recipe ages on each usable point without
-that discovery cooldown. Four completed scans without an addition retire that
+candidate generation. An adopted current recipe or fully installed checked family
+ages on each usable point without that discovery cooldown. Four completed scans
+without an addition retire that
 generation's unselected candidates from further scoring. Installed rows keep aging
 after discovery retires and expire when they have been slack in four usable scoring
 scans without an intervening tight observation. Tightness uses the model-facing pool's tolerance.
@@ -421,7 +422,9 @@ Retired unselected candidates
 are omitted from proof replay as well as scoring. Masked-query reuse distinguishes
 whether unselected candidates are checked; installed cuts retain fresh source
 verification under the current scope.
-Managed current masks retain retired row definitions as inactive numerical rows.
+Managed current masks and fully installed selected families retain retired row
+definitions as inactive numerical rows. Selected-layout retention does not authorize
+reusing point-directed definitions as the ordinary current recipe.
 Their free logical columns impose no restriction and carry zero certificate
 multiplier. This preserves a compatible numerical owner across retirement.
 Suspension maps source row IDs through equality packing; both sides of a packed

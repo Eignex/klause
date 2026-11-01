@@ -401,7 +401,7 @@ internal class LinearAuthority(
         mask == null || pointPolicy?.candidatesRetired(template?.cuts?.rows) != true
 
     private fun retainMaskedCuts(mask: Set<Int>?): Boolean =
-        mask != null && pointPolicy?.managesCurrentRecipe(template?.cuts?.rows) == true
+        mask != null && pointPolicy?.retainsInstalledLayout(template?.cuts?.rows) == true
 
     private fun prepareQuery(
         source: SourceProofContext, cancellation: Cancellation, cuts: Boolean, cutMask: Set<Int>?,

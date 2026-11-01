@@ -27,6 +27,7 @@ internal class LinearAuthorityPointCuts(
     private var misses = 0
     private var retired = false
     private var managedCurrent = false
+    private var retainedLayout = false
     private val inactiveScans = HashMap<Int, Int>()
     var adoptedCurrent: Boolean = false
         private set
@@ -37,9 +38,13 @@ internal class LinearAuthorityPointCuts(
     fun managesCurrentRecipe(rows: List<LinearAuthorityCut>?): Boolean =
         rows != null && family === rows && managedCurrent
 
+    fun retainsInstalledLayout(rows: List<LinearAuthorityCut>?): Boolean =
+        rows != null && family === rows && retainedLayout
+
     fun releaseCandidates() {
         family = null
         managedCurrent = false
+        retainedLayout = false
         inactiveScans.clear()
     }
 
@@ -94,13 +99,15 @@ internal class LinearAuthorityPointCuts(
             misses = 0
             retired = false
             managedCurrent = false
+            retainedLayout = false
             inactiveScans.clear()
         }
         if (retired) {
             observe("RetiredQueries")
             if (installed.isEmpty()) return installed
         }
-        if (cooldown > 0) {
+        val complete = rows.size <= maximumCuts && installed.size == rows.size && checked.size == rows.size
+        if (cooldown > 0 && !complete) {
             cooldown--
             observe("CooldownQueries")
             return installed
@@ -148,6 +155,7 @@ internal class LinearAuthorityPointCuts(
                 }
                 adoptedCurrent = true
                 managedCurrent = true
+                retainedLayout = true
                 observe("AdoptedInstalled", rows.size.toLong())
                 return checked.toSet()
             }
@@ -229,8 +237,14 @@ internal class LinearAuthorityPointCuts(
             }
             observe("Selected", selected.size.toLong())
             for (cut in selected) onCut(rows[cut.id].family, "POINT_SELECTED", 1L)
+            val layoutCovered = complete && !retainedLayout && !meter.limited &&
+                meter.charge(rows.size * 2L) && rows.indices.all { it in checked && it in installed }
             var retained = installed
             if (!meter.limited && !cancellation()) {
+                if (layoutCovered) {
+                    retainedLayout = true
+                    observe("ManagedInstalled", rows.size.toLong())
+                }
                 inactiveScans.keys.retainAll(installed)
                 inactiveScans.putAll(observedInactive)
                 if (!retired) {
@@ -248,7 +262,7 @@ internal class LinearAuthorityPointCuts(
                     for (id in expired) onCut(rows[id].family, "POINT_INSTALLED_RETIRED", 1L)
                     inactiveScans.keys.removeAll(expired)
                 }
-                cooldown = if (managedCurrent) 0 else 7
+                cooldown = if (retainedLayout) 0 else 7
             }
             return retained + selected.map { it.id }
         } finally {

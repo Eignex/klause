@@ -888,6 +888,10 @@ mapping through any packed source equalities; these costs also debit the contain
 preparation/funding totals. A partial equality deactivation declines retained
 guidance. Keep failed mapping and fallback costs. Owner reuse alone establishes no
 net source gain, and an inactive retained definition is not an installed cut.
+When every checked candidate is installed, completed points age that family without
+the discovery cooldown and retain its numerical definitions for later suspension.
+`numericalCutSelectionManagedInstalled` counts rows entering this layout management.
+Ordinary-recipe compatibility remains separate from selected-layout ownership.
 Point selection starts from the current checked recipe. `CurrentFallback` and
 `CurrentFallbackQueries` report retaining that recipe after an unproductive trial;
 `BaseQueries` counts base relaxation attempts. A point-selection arm can therefore

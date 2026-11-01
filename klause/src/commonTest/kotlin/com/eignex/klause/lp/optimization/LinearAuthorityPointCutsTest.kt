@@ -334,17 +334,37 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `a fully selected family should age on consecutive usable points`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        var installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ofLong(2)), emptySet(), Cancellation.Never)
+        repeat(3) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), installed, Cancellation.Never)
+        }
+        assertEquals(setOf(0), installed)
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), installed, Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+    }
+
+    @Test
     fun `a tight observation should interrupt installed row aging`() {
         val rows = listOf(LinearAuthorityCut(0,
             SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
         val selection = LinearAuthorityPointCuts(SourceLpBudget())
-        repeat(24) {
-            selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
-                listOf(BigFraction.ZERO), setOf(0), Cancellation.Never)
+        var installed = setOf(0)
+        repeat(3) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), installed, Cancellation.Never)
         }
 
         val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
-            listOf(BigFraction.ONE), setOf(0), Cancellation.Never)
+            listOf(BigFraction.ONE), installed, Cancellation.Never)
 
         assertEquals(setOf(0), selected)
         assertEquals(null, selection.observations["numericalCutSelectionRetiredInstalled"])
