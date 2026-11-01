@@ -42,6 +42,38 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `range scaled guidance should improve the wider objective gap within one repair operation`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3),
+            longArrayOf(1000, 1, 1), null, null), factors = emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1000, 1000))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(500, 1, 1))
+        val guidance = LinearRepairGuidance()
+        LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true, repairGuidance = guidance).use {
+            it.run { _, _ -> }
+        }
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 1, maxFlips = 1),
+            external = { seed }, repairGuidance = guidance).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                val result = search.minimizeResult(TerminationReason.BudgetExhausted)
+                val sample = assertIs<MinimizeResult.WithSample>(result).sample
+
+                assertEquals(BigFraction.ofLong(1500), objective.evaluateExact(sample))
+                assertEquals(500L, sample.intValue(0))
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairRangeScaledGuidanceQueries"))
+                val witness = SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(witness))
+                assertNull(repair.stats.smt.completeSearchStages?.get("jointRepairRootQueries"))
+            }
+        }
+    }
+
+    @Test
     fun `shared root guidance should improve the useful disconnected integer on the first query`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
             factors = emptyArray())

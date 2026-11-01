@@ -150,12 +150,16 @@ and funding ceilings. Later proposals use ordinary worker selection.
 The numerical companion can retain one completed root relaxation point for checked
 handoff repair. A private snapshot belongs to the same captured source context and
 survives numerical search retirement until its invocation slot closes. It ranks
-integer neighborhood seeds by their distance from the checked center; continuous
-columns stay free. Retention, scalar conversion and ranking spend the producing or
-consuming companion's existing work and allocation. Missing, cancelled, foreign or
+integer neighborhood seeds by their distance from the checked center. Captured
+finite integer ranges scale each displacement by its range width; fixed columns
+have zero disagreement. Continuous columns stay free. Retention, scalar conversion
+and ranking spend the producing or consuming companion's existing work and
+allocation. Missing, cancelled, foreign or
 oversized guidance keeps ordinary neighborhood selection. No extra root query is
 opened to obtain guidance. `numericalRepairGuidancePublished` counts retained points;
 `jointRepairSharedGuidanceQueries` counts opened repair queries using that ranking.
+`jointRepairRangeScaledGuidanceQueries` identifies opened queries using finite range
+scaling. Open integer ranges retain ordinary selection.
 The point carries no witness, cutoff, completion-cache or proof authority.
 
 Each companion owns at most sixteen source/point attempts without eviction. Identity
