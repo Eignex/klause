@@ -46,7 +46,6 @@ internal class PrivateRebuildBinaryLearning private constructor(
                 val b = maxOf(literals[0], literals[1])
                 if (Lit.variable(a) !in 0 until source.numBoolVars ||
                     Lit.variable(b) !in 0 until source.numBoolVars || Lit.variable(a) == Lit.variable(b) ||
-                    Lit.isPositive(a) == Lit.isPositive(b) ||
                     session.boolValue(Lit.variable(a)) != null || session.boolValue(Lit.variable(b)) != null) continue
                 eligible++
                 val key = pair(a, b)
