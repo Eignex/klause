@@ -1413,6 +1413,14 @@ counters cover the whole portfolio; thread allocation excludes other threads.
 Unavailable counters remain null. The fixed clause/integer order shares one JVM,
 so use ordinary lab comparisons with source validation for performance claims.
 
+Run `bench.profile.ArithmeticLearningApplicabilityProfile` through the same lab
+profile build with `suite=ID max=64 timeout-ms=10000` to inspect up to 64 MPS
+sources in filename order. It prepares bounded inputs and reads the production
+selector's facts and configured integer-learning slots without starting search.
+`applicability.jsonl` retains source hashes, preparation declines and policy facts.
+This is an in-process finite preparation view; confirm CLI applicability with actual
+ordinary session counters before claiming source or performance qualification.
+
 Source bytes must match `sha256` after decompression and fit 1 MiB. Optional
 `source64=BASE64 format=FORMAT` accepts at most 96 KiB of encoded input. Canonical
 models admit 128 KiB each and live output admits 3 MiB. Set the execution timeout
