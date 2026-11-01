@@ -220,7 +220,7 @@ internal class BacktrackWorkerConfig(
                 facts.binaryIntegers && facts.integerLinear && facts.compactCardinalityEquality &&
                 facts.compactIntegerNeighborhood &&
                 lpCeiling.resolved(LpTechnique.BOUNDING)) {
-                order.indexOfFirst { it.label == "conflictDriven" }
+                order.indexOfFirst { it.label == "satOptimized" }
             } else -1
             return List(count) {
                 val recipe = order[it % order.size]

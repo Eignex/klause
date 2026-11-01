@@ -57,7 +57,7 @@ class BacktrackWorkerConfigTest {
         val arms = BacktrackWorkerConfig.diverse(Kind.COP, count, facts = facts,
             automaticIntegerLearning = true)
 
-        assertEquals(listOf("conflictDriven"),
+        assertEquals(listOf("satOptimized"),
             arms.filter { it.recipe.build(1L, null).integerRowLearning }.map { it.label })
     }
 
@@ -146,7 +146,7 @@ class BacktrackWorkerConfigTest {
         val arms = BacktrackWorkerConfig.diverse(Kind.COP, 12, facts = facts,
             automaticIntegerLearning = true, edit = { it.copy(maxDecisions = 20) })
 
-        assertEquals(listOf("conflictDriven"),
+        assertEquals(listOf("satOptimized"),
             arms.filter { it.recipe.build(1L, null).integerRowLearning }.map { it.label })
     }
 

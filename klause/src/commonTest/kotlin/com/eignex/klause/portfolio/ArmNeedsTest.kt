@@ -43,7 +43,7 @@ class ArmNeedsTest {
     }
 
     @Test
-    fun `compact signed and scaled cardinality equalities should offer arithmetic learning`() {
+    fun `compact signed and scaled cardinality equalities should be recognized`() {
         val rows = listOf(
             Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1),
             Linear(longArrayOf(2, 2, 2), intArrayOf(0, 1, 2), LinearOp.EQ, 2),
@@ -94,7 +94,7 @@ class ArmNeedsTest {
 
         val arms = BacktrackWorkerConfig.diverse(Kind.COP, 6, facts = facts, automaticIntegerLearning = true)
 
-        assertEquals(listOf("conflictDriven"),
+        assertEquals(listOf("satOptimized"),
             arms.filter { it.recipe.build(1L, null).integerRowLearning }.map { it.label })
     }
 

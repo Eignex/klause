@@ -860,7 +860,7 @@ annotated, or execution is parallel or single-engine. See
   and an unproductive trial retires it without claiming exhaustion.
 
 Single-core curated CP optimization over binary integer columns and complete
-unconditional integer linear rows uses its first `conflictDriven` recipe for bounded
+unconditional integer linear rows uses its first `satOptimized` recipe for bounded
 integer-row learning when the LP ceiling permits bounding and the model contains
 a mandatory equality of 3–16 terms that normalizes to unit coefficients. Signed
 terms represent complemented binary columns; the normalized cardinality must leave

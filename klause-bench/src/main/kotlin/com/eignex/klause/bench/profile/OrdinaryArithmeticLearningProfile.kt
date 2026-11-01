@@ -78,10 +78,11 @@ internal object OrdinaryArithmeticLearningProfile {
         val learningPlacement = options["learning-placement"] ?: "automatic"
         require(learningPlacement in setOf("automatic", "observed"))
         require(learningPlacement == "automatic" || route == "portfolio")
-        val recipe = options["recipe"] ?: if (route == "portfolio") "conflictDriven" else "source"
+        val recipe = options["recipe"] ?: if (route == "portfolio") "satOptimized" else "source"
         require(recipe in setOf("source", "satOptimized", "conflictDriven"))
         val seed = (options["seed"] ?: "3").toLong()
-        val workerSeed = options["worker-seed"]?.toLong() ?: if (route == "portfolio") seed + 1001L else seed
+        val workerOffset = if (recipe == "satOptimized") 1000L else 1001L
+        val workerSeed = options["worker-seed"]?.toLong() ?: if (route == "portfolio") seed + workerOffset else seed
         val targetIndex = workerSeed - seed - 1000L
         if (route == "portfolio") {
             require(recipe != "source" && targetIndex in 0L..1L)

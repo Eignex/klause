@@ -1389,12 +1389,13 @@ recipe=source|satOptimized|conflictDriven seed=3 worker-seed=3 route=single|port
 learning-placement=automatic|observed`.
 
 `recipe=source` uses the source search hints or the conflict-driven preset.
-Preparation uses `seed`; traversal uses `worker-seed`, defaulting to `seed`.
+Preparation uses `seed`. Single-worker traversal defaults `worker-seed` to `seed`;
+portfolio traversal derives its offset from the observed recipe.
 The `single` route runs clause and opt-in integer-row arms. The `portfolio` route
 requires unannotated pure binary integer optimization and retains the curated CP
 pool. Its trial preserves automatic learning; the control overrides it to false.
 Select the observed SAT or conflict-driven slot with `recipe` and `worker-seed`;
-the portfolio default is `conflictDriven` at `seed + 1001`.
+the portfolio default is `satOptimized` at `seed + 1000`.
 `learning-placement=observed` enables integer learning only on the observed slot
 in the portfolio trial. This explicit placement override is diagnostic;
 `automatic` preserves the production selector. Clause controls disable integer learning.
