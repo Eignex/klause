@@ -41,11 +41,13 @@ internal object ObjectiveCutoffProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all { it in setOf("suite", "problem", "sha256", "source64", "sourceGzip64",
             "cutoff", "seed", "order", "presolve", "presolve-work", "work", "slice-work", "timeout-ms",
-            "point64", "point-sha256", "point-only", "portfolio") })
+            "point64", "point-sha256", "point-only", "portfolio", "initial-bt-probe-ms") })
         require((options["point64"] == null) == (options["point-sha256"] == null))
         require(options["point-only"] == null || options["point64"] != null)
         val portfolio = (options["portfolio"] ?: "false").toBooleanStrict()
         require(!portfolio || options["cutoff"] == null)
+        require(portfolio || options["initial-bt-probe-ms"] == null)
+        val initialProbe = options["initial-bt-probe-ms"]?.toLong()?.also { require(it in 1L..1000L) }
         val cutoff = (options["cutoff"] ?: if (portfolio) "0" else error("cutoff is required")).toLong().also {
             require(it in -9_007_199_254_740_991..9_007_199_254_740_991)
         }
@@ -103,7 +105,7 @@ internal object ObjectiveCutoffProfile {
         }
         if (portfolio) {
             ObjectivePortfolioReplay.run(out, setup, prepared, originalObjective, objective, parsed.intVarNames,
-                seed, timeout, containing)
+                seed, timeout, containing, initialProbe)
             return
         }
         val audit = BooleanBoundAudit(objective.boolWeights)

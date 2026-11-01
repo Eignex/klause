@@ -43,6 +43,7 @@ internal object ObjectivePortfolioReplay {
         seed: Long,
         timeout: Long,
         containing: Cancellation,
+        initialProbeMillis: Long?,
     ) {
         val captures = ArrayList<PreparedArithmeticLearningProfile.Capture>()
         var omittedSessions = 0
@@ -92,6 +93,12 @@ internal object ObjectivePortfolioReplay {
             executor.use {
                 val portfolio = executor.javaClass.getDeclaredField("portfolio").apply { isAccessible = true }
                     .get(executor) as Portfolio
+                if (initialProbeMillis != null) {
+                    val probe = portfolio.javaClass.getDeclaredField("initialBacktrackProbeMillis")
+                        .apply { isAccessible = true }
+                    probe.set(portfolio, initialProbeMillis)
+                    check(probe.get(portfolio) == initialProbeMillis)
+                }
                 val observer: (Any) -> Unit = { observation -> publish(completion(portfolio, observation)) }
                 portfolio.javaClass.getDeclaredField("completionObserver").apply { isAccessible = true }
                     .set(portfolio, observer)
@@ -102,6 +109,7 @@ internal object ObjectivePortfolioReplay {
                     put("initialExternalCutoff", "none; uses actual pooled incumbents")
                     put("btEdit", "observer only; verify actual composition")
                     put("timeoutMs", timeout)
+                    put("initialBacktrackProbeMillis", initialProbeMillis)
                 })
                 val result = executor.minimize(stop) { offered ->
                     val native = offered.result as? MinimizeResult.WithSample

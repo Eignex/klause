@@ -183,6 +183,7 @@ class Portfolio(
     internal var includeRestartingProof: Boolean = false
 
     internal var completionObserver: ((OptimizationCompletionObservation) -> Unit)? = null
+    internal var initialBacktrackProbeMillis: Long? = null
 
     internal var evidenceVerification: PortfolioEvidence? = workers.firstNotNullOfOrNull { it.evidenceModel }?.let {
         val verifier = PortfolioEvidence(it, CandidateVerifier.trusting())
@@ -1503,7 +1504,13 @@ class Portfolio(
     private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, claim: Claim): Cancellation {
         if (diagnostics != null) return cancellation
         if (claim.whole) return cancellation
-        val slice = if (claim.probing && worker.acceptsInstructionBudget) probeSliceMillis else claim.sliceMillis
+        val backtrackProbe = initialBacktrackProbeMillis
+        val slice = when {
+            claim.probing && worker.family == ArmFamily.Backtrack && backtrackProbe != null ->
+                minOf(claim.sliceMillis, backtrackProbe)
+            claim.probing && worker.acceptsInstructionBudget -> probeSliceMillis
+            else -> claim.sliceMillis
+        }
         return until(slice) or cancellation.shorten(remainingShare(claim))
     }
 

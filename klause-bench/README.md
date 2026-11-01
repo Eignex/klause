@@ -1538,3 +1538,9 @@ and the latest 64 boundaries of at most 16 words. Output is at most four MiB wit
 128 KiB records and 128 points; omitted sessions and records are counted. Cutoff
 boundary payloads use `Double` bits. These native observations supply no independent
 proof check or timing comparison.
+
+Optional `initial-bt-probe-ms=1` caps each backtrack worker's initial elapsed query
+in portfolio mode, within `1..1000` milliseconds. Subsequent queries use ordinary
+grants; counted-arm probe controls and the containing deadline also apply. This
+is a diagnostic schedule perturbation. Inspect actual incumbent and lifecycle
+observations to establish which state the worker reached.
