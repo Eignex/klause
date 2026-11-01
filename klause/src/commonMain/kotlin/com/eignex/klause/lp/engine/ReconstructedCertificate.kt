@@ -1072,7 +1072,7 @@ private fun admitIntegerBoundInput(model: LpModel, duals: DoubleArray, meter: Re
     meter.poll()
     meter.step()
     val source = model.exactState?.model ?: throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
-    if (duals.size != model.m || !model.finiteExactInput() || model.hasContinuous) {
+    if (duals.size != model.m || !model.finiteExactInput()) {
         throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
     }
     val limits = meter.limits
@@ -1083,6 +1083,7 @@ private fun admitIntegerBoundInput(model: LpModel, duals: DoubleArray, meter: Re
     var entries = model.m.toLong()
     for (column in 0 until model.n) {
         meter.step()
+        if (!source.column(column).integral) throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
         entries += source.columnEntries(column).size
     }
     if (entries > limits.maxEntries) throw ReconstructionStop(ReconstructionDecline.DIMENSION)

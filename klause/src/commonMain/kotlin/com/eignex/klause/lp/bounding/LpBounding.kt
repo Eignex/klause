@@ -1622,7 +1622,7 @@ private fun LpEngine.checkRetainedRootBound(
     cancellation: Cancellation,
 ): BigFraction? {
     val observer = rootCertificationObserver()
-    val integer = if (model.exactState != null && !model.hasContinuous) {
+    val integer = if (model.exactState != null) {
         certifyLpIntegerBoundOnly(model, duals, limits, cancellation, observer, solveContext.certificationPolicy)
     } else null
     integer?.bound?.let { return it.value }

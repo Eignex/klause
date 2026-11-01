@@ -389,6 +389,7 @@ class LpBoundCertificationTest {
         var cancelled = false
         val token = Cancellation { cancelled }
         val policy = LpCertificationPolicy { _, success ->
+            assertTrue(success)
             cancelled = true
             success
         }
