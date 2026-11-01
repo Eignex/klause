@@ -443,6 +443,11 @@ continuous sides within the same row, work and scalar limits. Missing opposite
 sides retain their original premise; identical side choices produce one candidate.
 Both variants retain their exact bound derivations and require fresh checking
 before selection. Ordinary source separation keeps its preferred side policy.
+At the first available point, point selection can replace its unselected candidate
+definitions with independently chosen nearer continuous endpoints. Exact premises
+still authorize every row. The replacement shares the original generation's work
+limit and retains the source-row template; unavailable preparation leaves its prior
+candidates intact. Each immutable template attempts this preparation once.
 Preparation visits at most 65,536 modeled row/support operations with
 4,096-bit input, denominator and intermediate scalar limits. Cut definitions and source-row ownership
 stay in the retained template, ahead of changing invocation-bound rows. Every
@@ -565,8 +570,12 @@ or exact feasibility continuation. A retained basis supplies a dual proposal by
 reusing logical-column layout, peeling singleton equations and variables without
 fill, and solving admitted residual components with the rational basis factors.
 Factorization and complete verification share the certificate budget; an unresolved
-component retains its proposed entries. Basis-derived bounds require both rational
-and exact-basis policy acceptance; their observer work is charged once across the
+component retains its proposed entries. A dimension-limited component can instead
+match its open basic directions to an admitted subset of dual coordinates. Other
+proposed multipliers stay fixed; finite column boxes account for their residual
+reduced costs. This proposal retains the dimension, fill, scalar and cumulative
+spending limits and must pass the complete exact dual check. Basis-derived bounds
+require both rational and exact-basis policy acceptance; their observer work is charged once across the
 two mechanisms. A refused common denominator can propose
 independent continued-fraction entries under the same denominator and spending
 limits; approximation tolerances select proposals only. Every proposal must pass

@@ -21,6 +21,7 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.compareTo
 import com.eignex.klause.util.fitsLong
+import com.eignex.klause.util.magnitudeBitLength
 import com.eignex.klause.util.times
 import com.eignex.klause.util.toLongExact
 
@@ -80,6 +81,7 @@ internal class LinearAuthority(
     private var pointListener: ((LinearAuthorityQuery, List<BigFraction>) -> Unit)? = null
     private var pointPolicy: LinearAuthorityPointCuts? = null
     private var pointFamily: LinearAuthorityTemplate? = null
+    private var directedFamily: LinearAuthorityTemplate? = null
     private var pointMask: Set<Int> = emptySet()
     private class PointRound(
         val query: LinearAuthorityQuery, val base: LinearAuthorityResult, val mask: Set<Int>,
@@ -127,6 +129,7 @@ internal class LinearAuthority(
         pointListener = null
         pointRound = null
         pointFamily = null
+        directedFamily = null
         pointMask = emptySet()
         primalAttempt = null
         cutLifecycle.containing("RETIREMENT") { lp.close() }
@@ -157,17 +160,35 @@ internal class LinearAuthority(
                 policy.observe("PointUnavailable")
                 return base
             }
-            val prepared = observed.first
-            val family = template
+            var prepared = observed.first
+            var family = template ?: run {
+                policy.observe("PointUnavailable")
+                return base
+            }
             pointFamily = family
-            if (family?.cuts == null ||
+            if (family.cuts == null ||
                 !prepared.matches(source, cuts = true, cutMask = pointMask)) {
                 policy.observe("PointUnavailable")
                 return base
             }
+            if (!checkNotNull(family.cuts).pointDirected && directedFamily !== family && pointMask.isEmpty() &&
+                checkNotNull(family.cuts).rows.any { it.mixed }) {
+                directedFamily = family
+                cutLifecycle.families = checkNotNull(family.cuts).rows.mapTo(HashSet()) { it.family }
+                val refined = cutLifecycle.containing("POINT_SELECTION") {
+                    preparePointFamily(source, family, prepared, observed.second, cancellation)
+                }
+                if (refined != null) {
+                    family = refined.first
+                    prepared = refined.second
+                    directedFamily = family
+                    pointFamily = family
+                    policy.observe("PointPrepared")
+                } else policy.observe("PointPreparationUnavailable")
+            }
             val selected = cutLifecycle.containing("POINT_SELECTION") {
-                policy.select(family.cuts.rows, prepared.coordinates, prepared.costs, prepared.checkedCuts,
-                    observed.second, pointMask.intersect(prepared.checkedCuts), cancellation)
+                policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
+                    prepared.checkedCuts, observed.second, pointMask.intersect(prepared.checkedCuts), cancellation)
             }
             if (selected == pointMask || budget.funding?.exhausted == true || cancellation()) return base
             pointMask = selected
@@ -201,6 +222,53 @@ internal class LinearAuthority(
             cutBoundFamilies = if (strongest != null && strongest === pending.base.bound) {
                 pending.base.cutBoundFamilies
             } else result.cutBoundFamilies)
+    }
+
+    private fun preparePointFamily(
+        source: SourceProofContext, family: LinearAuthorityTemplate, prepared: LinearAuthorityQuery,
+        values: List<BigFraction>,
+        cancellation: Cancellation,
+    ): Pair<LinearAuthorityTemplate, LinearAuthorityQuery>? {
+        if (values.size != prepared.coordinates.size || values.size > 8192) return null
+        val funded = Cancellation { cancellation() || budget.funding?.paused == true }
+        var work = 0L
+        if (budget.funding?.remainingAllocation?.let { 128L + values.size * 96L > it } == true) return null
+        cutCost(0L, 128L)
+        val point = HashMap<SourceCoordinate, Double>()
+        for (index in values.indices) {
+            val value = values[index]
+            val words = (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 63L) / 64L
+            val cost = 1L + words * words
+            if (funded() || cost > 65_536L - work ||
+                budget.funding?.availableWork?.let { cost > it } == true) return null
+            cutCost(cost, 96L)
+            work += cost
+            point[prepared.coordinates[index]] = value.toDouble().takeIf(Double::isFinite) ?: return null
+        }
+        val refined = family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost)
+            ?.let { withAdditionalCuts(it, funded) } ?: return null
+        if (funded()) return null
+        val previous = template
+        adoptTemplate(refined)
+        query = null
+        val checked = prepareQuery(source, funded, cuts = true, cutMask = emptySet())
+        if (checked == null || funded()) {
+            template = previous
+            return null
+        }
+        query = checked
+        return refined to checked
+    }
+
+    private fun adoptTemplate(prepared: LinearAuthorityTemplate) {
+        template = prepared
+        for (cut in prepared.cuts?.rows.orEmpty()) cutLifecycle.observe(cut.family, "CONSTRUCTED")
+        retainedCutPeak = maxOf(retainedCutPeak, prepared.cuts?.rows?.size?.toLong() ?: 0L)
+        retainedMixedCutPeak = maxOf(retainedMixedCutPeak,
+            prepared.cuts?.rows?.count { cut -> cut.mixed }?.toLong() ?: 0L)
+        prepared.cuts?.observations?.forEach { (key, value) ->
+            cutEligibility["numericalCut$key"] = maxOf(cutEligibility["numericalCut$key"] ?: 0L, value)
+        }
     }
 
     fun check(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
@@ -320,16 +388,7 @@ internal class LinearAuthority(
                 ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts, cutMask != null) { work ->
                     cutPreparationWork += work
                     budget.observe(preparation = work)
-                }?.let { if (cuts) withAdditionalCuts(it, cancellation) else it }?.also {
-                    template = it
-                    for (cut in it.cuts?.rows.orEmpty()) cutLifecycle.observe(cut.family, "CONSTRUCTED")
-                    retainedCutPeak = maxOf(retainedCutPeak, it.cuts?.rows?.size?.toLong() ?: 0L)
-                    retainedMixedCutPeak = maxOf(retainedMixedCutPeak,
-                        it.cuts?.rows?.count { cut -> cut.mixed }?.toLong() ?: 0L)
-                    it.cuts?.observations?.forEach { (key, value) ->
-                        cutEligibility["numericalCut$key"] = maxOf(cutEligibility["numericalCut$key"] ?: 0L, value)
-                    }
-                } ?: return null
+                }?.let { if (cuts) withAdditionalCuts(it, cancellation) else it }?.also(::adoptTemplate) ?: return null
         } else null
         return LinearAuthorityQuery.prepare(source, prepared, cancellation, onCutWork = { work ->
             cutVerificationWork += work
