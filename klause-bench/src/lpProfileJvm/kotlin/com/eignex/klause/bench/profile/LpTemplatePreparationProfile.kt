@@ -107,7 +107,7 @@ internal object LpTemplatePreparationProfile {
                                     IntArray(source.numIntVars) { if (it == 0) 1 else if (it == 1) 0 else it })
                                 factors[0] = factors[0].remap(mapping)
                             })
-                            "finite" -> source.bake(selected)
+                            "finite" -> source.bake(selected, stop)
                             else -> source
                         }
                         val changedSelection = when (change) {
