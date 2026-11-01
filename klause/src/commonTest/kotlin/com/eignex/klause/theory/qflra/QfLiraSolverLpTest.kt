@@ -30,6 +30,8 @@ import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.search
+import com.eignex.klause.solver.result.LpRoute
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -63,6 +65,72 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
+    @Test
+    fun `complete LP witnesses consume a feasible completion claim`() {
+        val stats = LpStatsSink()
+        ExactLiraSearchComponent(halfIntegerSource()).use { component ->
+            component.observePrimaryLpWith(stats.certificationObserver(LpRoute.STANDALONE))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+
+            session.initialize()
+
+            assertIs<ComponentCheck.Feasible>(session.check())
+            assertEquals(1L, stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
+                .outcomes["FEASIBLE_COMPLETION"])
+        }
+    }
+
+    @Test
+    fun `LP refutations consume a contradiction claim`() {
+        val source = Problem(
+            0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 2.0),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(3.0, 5.0), LinearOp.LE, 1.0),
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, 3.0), LinearOp.GE, 3.0),
+            ),
+        )
+        val stats = LpStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observePrimaryLpWith(stats.certificationObserver(LpRoute.STANDALONE))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0))
+
+            session.initialize()
+
+            assertEquals(1L, stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
+                .outcomes["CONTRADICTION"])
+        }
+    }
+
+    @Test
+    fun `partial LP points do not consume complete source claims`() {
+        val source = Problem(
+            1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
+            numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(2.0, 2.0),
+            factors = arrayOf(
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(3.0, 5.0), LinearOp.EQ, 1.0),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ),
+        )
+        val stats = LpStatsSink()
+        ExactLiraSearchComponent(source).use { component ->
+            component.observePrimaryLpWith(stats.certificationObserver(LpRoute.STANDALONE))
+            val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
+
+            session.initialize()
+
+            assertTrue(stats.snapshot().phases.getValue("CLAIM_FEASIBLE_COMPLETION_STANDALONE")
+                .outcomes.getValue("SATISFIED") > 0L)
+            assertNull(stats.snapshot().phases["CLAIM_CONSUMPTION_STANDALONE"])
+        }
+    }
+
     @Test
     fun `LP cancellation should retain its parent meter and distinct session stop`() {
         var stopped = false
