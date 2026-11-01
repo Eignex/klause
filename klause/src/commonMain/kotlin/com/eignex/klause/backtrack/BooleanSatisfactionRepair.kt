@@ -44,7 +44,7 @@ internal class BooleanSatisfactionRepair(
     internal fun retainPartition(literal: Int): Boolean {
         check(!closed && started)
         if (!handle.retainPartition(literal)) return false
-        assumptions = Assumptions(bools = assumptions.bools +
+        assumptions = Assumptions(bools = checkNotNull(assumptions).bools +
             (Lit.variable(literal) to Lit.isPositive(literal)))
         return true
     }
