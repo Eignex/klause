@@ -66,7 +66,12 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             val event = reason(row, used) ?: return decline("no-qualified-endpoint")
             used.add(event.key)
             state.arithmeticLearningTrace?.row("integer.pivot-row", event.row, state, event.trail)
-            row = row.resolve(event.row, event.variable) ?: return decline("combination-shape-or-guard")
+            val combined = row.resolve(event.row, event.variable)
+            if (combined == null) {
+                state.arithmeticLearningTrace?.record("integer.endpoint-decline.combination-shape-or-guard")
+                return@repeat
+            }
+            row = combined
             if (row.minimum(state) <= row.bound) return decline("combination-lost-conflict")
             if (state.learned.integerRows?.any { it.row.subsumes(row) } == true) return decline("duplicate")
             val asserts = row.assertsAt(state, trail)
