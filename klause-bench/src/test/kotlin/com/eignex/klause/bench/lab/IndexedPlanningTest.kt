@@ -46,7 +46,7 @@ class IndexedPlanningTest {
     )
 
     @Test
-    fun `named archive selection should preserve provenance without fetching an indexed collection`() = withCache { cache ->
+    fun `named archive selection preserves indexed provenance without fetching bytes`() = withCache { cache ->
         val suite = Catalog.dynamicSuites.first { it.id == "smtlib-qflra" }
         val archive = requireNotNull(suite.sourceLayout)
         val materialized = File(cache, "materialized")
@@ -62,7 +62,10 @@ class IndexedPlanningTest {
         }
         val actual = withProperties(indexed, declared = true) { Catalog.named(suite.id, names) }
         assertEquals(expected, actual)
-        assertFalse(File(indexed, archive.collection.id).exists(), "exact lookup must use the index without fetching corpus bytes")
+        assertFalse(
+            File(indexed, archive.collection.id).exists(),
+            "exact lookup must use the index without fetching corpus bytes",
+        )
     }
 
     @Test

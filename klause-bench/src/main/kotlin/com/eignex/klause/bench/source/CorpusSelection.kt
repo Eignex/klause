@@ -178,13 +178,25 @@ internal object CorpusSelection {
 
     /** Resolve exact flat-corpus names with the same provenance as full discovery. Missing members
      * remain absent so the caller's existing missing-set-member check can report them. */
-    fun named(collection: ExternalCollection, layout: Layout.Flat, names: List<String>, category: Category, format: Format): List<ProblemRef> {
+    fun named(
+        collection: ExternalCollection,
+        layout: Layout.Flat,
+        names: List<String>,
+        category: Category,
+        format: Format,
+    ): List<ProblemRef> {
         val root = CorpusFetcher.listing(collection)
         return references(collection, root, layout.named(root, names), category, format, null)
     }
 
-    private fun references(collection: ExternalCollection, root: File, discovered: List<Discovered>, category: Category,
-                           format: Format, expected: ((File) -> Expected)?): List<ProblemRef> =
+    private fun references(
+        collection: ExternalCollection,
+        root: File,
+        discovered: List<Discovered>,
+        category: Category,
+        format: Format,
+        expected: ((File) -> Expected)?,
+    ): List<ProblemRef> =
         discovered.map { d ->
             ProblemRef(
                 name = d.name,
