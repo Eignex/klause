@@ -263,10 +263,12 @@ internal class LpHints(
     }
 
     private fun SearchDecision.matchesSide(advice: BasisSide, up: Boolean): Boolean = when (this) {
-        is SearchDecision.Bool -> (advice.variable as? VarRef.Bool)?.varId == (literal ushr 1) && (literal and 1 == 0) == up
+        is SearchDecision.Bool ->
+            (advice.variable as? VarRef.Bool)?.varId == (literal ushr 1) && (literal and 1 == 0) == up
         is SearchDecision.IntAtMost ->
             !up && (advice.variable as? VarRef.IntVar)?.varId == variable && upper == advice.split
-        is SearchDecision.IntAtLeast -> up && advice.variable == VarRef.IntVar(variable) && lower == advice.split + 1L
+        is SearchDecision.IntAtLeast ->
+            up && (advice.variable as? VarRef.IntVar)?.varId == variable && lower == advice.split + 1L
         else -> false
     }
 
