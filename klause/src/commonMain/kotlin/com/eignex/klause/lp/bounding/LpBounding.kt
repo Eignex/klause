@@ -659,7 +659,7 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
     if (cancellation()) return LpNodeOutcome(false, null)
-    if (boundRel.model !== relaxation.model) hints?.record(boundRel, boundRes.primal, boundRes.duals)
+    if (boundRel.model !== relaxation.model) hints?.recordPoint(boundRel, boundRes.primal, boundRes.duals)
     activateCutAttribution(boundRel)
     val additionalCertificates = ArrayList<LpDeductionCertificate>(2)
     val cert = if ((learn && canPropagate) || canFix) {

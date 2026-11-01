@@ -65,6 +65,10 @@ internal interface LpHintSink {
 
     fun recordUnavailable(reason: LpHintUnavailable) {}
 
+    /** Refresh the point paired with directional observations without retraining fallback hints. */
+    fun recordPoint(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) =
+        record(relaxation, primal, duals)
+
     /** Record an advisory iterate's [primal] and [duals] against [relaxation]'s column→variable map. */
     fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray)
 }

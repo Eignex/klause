@@ -257,7 +257,10 @@ lie within `[0, 1]`; both integer split neighbours must belong to the current do
 These advisory observations supply no additional certified bound or pruning authority.
 The bound and fractional coordinates must come from the same working model.
 A cut re-solve that returns an iterate refreshes the point before its accepted bound
-reaches the history.
+reaches the history. This bounded point snapshot is separate from the initial
+iterate's value-order hints and reduced-cost averages, which continue to supply the
+fallback scorer. Directional advice declines when the refreshed integer point
+would require a different floor split from that value ordering.
 When ordinary bounding needs no certificate, an existing floating optimum remains
 the fallback estimate. Switching between checked bounds and floating optima clears
 history, so the two estimate kinds never train the same gains.

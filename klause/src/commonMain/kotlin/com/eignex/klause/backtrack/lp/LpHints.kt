@@ -38,6 +38,7 @@ internal class LpHints(
     private val history = LpDirectionalHistory(observe, charge = charge)
     private var freshRecord = false
     private var pointRelaxation: LpRelaxation? = null
+    private var pointPrimal: DoubleArray? = null
     private var basisChoice = false
     private var boundRecorded = false
     private var unavailable = LpHintUnavailable.UNOBSERVED
@@ -63,6 +64,7 @@ internal class LpHints(
         this.externalExact = externalExact
         freshRecord = false
         pointRelaxation = null
+        pointPrimal = null
         basisChoice = false
         boundRecorded = false
         unavailable = LpHintUnavailable.UNOBSERVED
@@ -237,7 +239,8 @@ internal class LpHints(
     }
 
     private fun value(variable: VarRef, domain: IntDomain? = null): Double {
-        val value = if (!freshRecord) Double.NaN else when (variable) {
+        if (!freshRecord) return Double.NaN
+        val legacy = when (variable) {
             is VarRef.IntVar -> if (intStamp.getOrElse(variable.varId) { -1 } == solveStamp) {
                 intVal.getOrElse(variable.varId) { Double.NaN }
             } else Double.NaN
@@ -245,6 +248,14 @@ internal class LpHints(
                 boolVal.getOrElse(variable.varId) { Double.NaN }
             } else Double.NaN
         }
+        val snapshot = pointPrimal
+        val value = if (snapshot != null) {
+            charge(3L)
+            val column = pointRelaxation?.column(variable) ?: -1
+            val point = snapshot.getOrElse(column) { Double.NaN }
+            // Advice must describe the split supplied by the unchanged fallback value ordering.
+            if (variable is VarRef.IntVar && floor(point) != floor(legacy)) Double.NaN else point
+        } else legacy
         if (domain != null && value.isFinite()) {
             val lower = floor(value)
             charge(2L)
@@ -289,6 +300,7 @@ internal class LpHints(
         externalExact = null
         freshRecord = false
         pointRelaxation = null
+        pointPrimal = null
         basisChoice = false
         boundRecorded = false
         directionalChoice = null
@@ -309,6 +321,20 @@ internal class LpHints(
         recorded = false
     }
 
+    override fun recordPoint(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+        pointPrimal = null
+        pointRelaxation = null
+        freshRecord = false
+        boundRecorded = false
+        if (!collect || relaxation.colVarId.size > 8192) return
+        val size = minOf(primal.size, relaxation.colVarId.size)
+        charge(size.toLong() + 1L)
+        pointPrimal = primal.copyOf(size)
+        pointRelaxation = relaxation
+        freshRecord = true
+        unavailable = LpHintUnavailable.NO_BOUND
+    }
+
     /**
      * Record an advisory LP iterate: its fractional primal (per structural column,
      * `FloatLpResult.primal`) and, from the [duals], the decayed reduced-cost average of
@@ -320,6 +346,7 @@ internal class LpHints(
         recorded = true
         freshRecord = true
         pointRelaxation = relaxation
+        pointPrimal = null
         boundRecorded = false
         unavailable = LpHintUnavailable.NO_BOUND
         val model = relaxation.model

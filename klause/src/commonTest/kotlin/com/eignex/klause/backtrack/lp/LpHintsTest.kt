@@ -50,6 +50,95 @@ class LpHintsTest {
     }
 
     @Test
+    fun `directional point refresh preserves fallback reduced cost priority`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0, 10, cost = 0)
+        builder.addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.LE, 3.0)
+        val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(x), IntArray(0))
+        val hints = LpHints(1, 0, directionalGains = true)
+        hints.record(relaxation, doubleArrayOf(3.25), doubleArrayOf(-4.0))
+        val priority = hints.branchScore(VarRef.IntVar(0))
+
+        hints.recordPoint(relaxation, doubleArrayOf(3.5), doubleArrayOf(-20.0))
+
+        assertEquals(priority, hints.branchScore(VarRef.IntVar(0)))
+    }
+
+    @Test
+    fun `directional point refresh preserves fallback value order`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10)
+        val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        val hints = LpHints(1, 0, directionalGains = true)
+        hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+
+        hints.recordPoint(relaxation, doubleArrayOf(3.5), DoubleArray(0))
+
+        assertEquals(2L, hints.order(VarRef.IntVar(0), (0L..10L).asSequence()).first())
+    }
+
+    @Test
+    fun `basis comparison owns the refreshed point with a matching split`() {
+        for (change in listOf("same-split", "moved-split", "next-node", "clear")) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 2) }
+            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val hints = LpHints(2, 0, directionalGains = true)
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            val point = doubleArrayOf(if (change == "moved-split") 1.1 else 0.1, 0.5)
+            hints.recordPoint(relaxation, point, DoubleArray(0))
+            point.fill(0.0)
+            if (change == "next-node") hints.beginNode(1, 100.0)
+            if (change == "clear") hints.clear()
+
+            val selected = hints.basisPick(VarRef.IntVar(0), VarRef.IntVar(1),
+                IntDomain(0, 2), IntDomain(0, 2)) { _, _ ->
+                listOf(LpDirectionalCost(4.0, 4.0), LpDirectionalCost(4.0, 4.0))
+            }
+
+            assertEquals(if (change == "same-split") VarRef.IntVar(1) else null, selected?.first, change)
+        }
+    }
+
+    @Test
+    fun `directional gains use refreshed parent coordinates`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val hints = LpHints(1, 0, directionalGains = true)
+        val variable = VarRef.IntVar(0)
+        fun relaxation() = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
+        repeat(2) {
+            hints.beginNode(0, 100.0)
+            val parent = relaxation()
+            hints.record(parent, doubleArrayOf(2.25), DoubleArray(0))
+            hints.recordPoint(parent, doubleArrayOf(2.5), DoubleArray(0))
+            hints.recordBound(parent, 10.0)
+            hints.branch(variable)
+            for (up in listOf(false, true)) {
+                hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                hints.beginNode(1, 100.0)
+                val child = relaxation()
+                hints.record(child, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(0))
+                hints.recordBound(child, if (up) 13.0 else 11.0)
+            }
+        }
+        hints.beginNode(0, 100.0)
+        val current = relaxation()
+        hints.record(current, doubleArrayOf(2.25), DoubleArray(0))
+        hints.recordBound(current, 10.0)
+
+        val score = hints.directionalScore(variable)
+
+        assertEquals(1.25, score, 1e-9)
+    }
+
+    @Test
     fun `basis comparison requires a strictly larger balanced directional gain`() {
         for ((alternateCost, expected) in listOf(
             LpDirectionalCost(4.0, 4.0) to VarRef.IntVar(1),
