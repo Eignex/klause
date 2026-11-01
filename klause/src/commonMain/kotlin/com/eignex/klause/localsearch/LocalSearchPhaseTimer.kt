@@ -33,9 +33,11 @@ internal class LocalSearchPhaseTimer(
     }
 
     var inspectionVisits: (() -> Long)? = null
+    var repairVisits: (() -> Long)? = null
 
     fun objectiveScoringSnapshot(): Map<String, Long> = objectiveScoring.toMutableMap().apply {
         inspectionVisits?.let { put("inspection-visits", it()) }
+        repairVisits?.let { put("repair-visits", it()) }
     }
 
     fun enter(next: String): String {

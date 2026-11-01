@@ -43,6 +43,9 @@ class BooleanRepairClosureTest {
             BoolFoldDefinition(output, intArrayOf(Lit.make(0, false)), true),
         ))?.network(0, output + 1)
         state.recompute()
+        val control = LocalSearchRunControl(Cancellation.Never)
+        state.inspectionWork = control
+        state.repairWork = control.repairWork
         val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
         var polls = 0
 
@@ -52,6 +55,8 @@ class BooleanRepairClosureTest {
         assertTrue((0 until output).all { state.assignment.boolValue(it) })
         assertFalse(state.assignment.boolValue(output))
         assertEquals(0L, state.cost)
+        assertTrue(control.repairVisits in 1L..4_096L)
+        assertEquals(control.repairVisits, control.inspectionVisits)
     }
 
     @Test

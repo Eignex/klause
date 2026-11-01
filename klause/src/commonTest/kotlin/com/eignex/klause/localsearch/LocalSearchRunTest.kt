@@ -14,6 +14,38 @@ import kotlin.test.assertTrue
 
 class LocalSearchRunTest {
     @Test
+    fun `repair graph visits should use their own work price`() {
+        val control = LocalSearchRunControl(Cancellation.Never)
+        control.offer(Cancellation.Never, Long.MAX_VALUE, 1L, Long.MAX_VALUE, 1L)
+        control.repairWork.charge(127_999L)
+        assertFalse(control.shouldPause(0L))
+
+        control.repairWork.charge(1L)
+
+        assertTrue(control.shouldPause(0L))
+        assertEquals(1L, control.auxiliaryWork)
+        assertEquals(128_000L, control.repairVisits)
+        assertEquals(128_000L, control.inspectionVisits)
+    }
+
+    @Test
+    fun `fractional repair and scoring work should combine across slices`() {
+        val control = LocalSearchRunControl(Cancellation.Never)
+        control.offer(Cancellation.Never, Long.MAX_VALUE, 1L, Long.MAX_VALUE, 1L)
+        control.charge(3_999L)
+        control.repairWork.charge(31L)
+        assertFalse(control.shouldPause(0L))
+
+        control.offer(Cancellation.Never, Long.MAX_VALUE, 1L, Long.MAX_VALUE, 1L)
+        control.repairWork.charge(1L)
+
+        assertTrue(control.shouldPause(0L))
+        assertEquals(1L, control.work)
+        assertEquals(1L, control.auxiliaryWork)
+        assertEquals(4_031L, control.inspectionVisits)
+    }
+
+    @Test
     fun `scheduled slices should retain the configured native instruction price`() {
         val control = LocalSearchRunControl(Cancellation.Never)
         control.offer(Cancellation.Never, Long.MAX_VALUE, 10L, Long.MAX_VALUE, 7L, 1.5)
@@ -67,14 +99,16 @@ class LocalSearchRunTest {
 
     @Test
     fun `native instruction slices should retain their grant despite inspection work`() {
-        val control = LocalSearchRunControl(Cancellation.Never)
-        control.offer(Cancellation.Never, Long.MAX_VALUE, 2L, Long.MAX_VALUE)
+        for (repair in listOf(false, true)) {
+            val control = LocalSearchRunControl(Cancellation.Never)
+            control.offer(Cancellation.Never, Long.MAX_VALUE, 2L, Long.MAX_VALUE)
 
-        control.charge(20_000L)
+            if (repair) control.repairWork.charge(256_000L) else control.charge(20_000L)
 
-        assertFalse(control.shouldPause(1L))
-        assertTrue(control.shouldPause(2L))
-        assertEquals(2L, control.instructions)
+            assertFalse(control.shouldPause(1L))
+            assertTrue(control.shouldPause(2L))
+            assertEquals(2L, control.instructions)
+        }
     }
 
     @Test

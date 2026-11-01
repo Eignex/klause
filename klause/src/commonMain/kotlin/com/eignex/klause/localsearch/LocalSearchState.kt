@@ -162,6 +162,7 @@ class LocalSearchState private constructor(
     }
     internal var phaseTimer: LocalSearchPhaseTimer? = null
     internal var inspectionWork: WorkMeter? = null
+    internal var repairWork: WorkMeter? = null
 
     /** Per-invariant dynamic constraint weights and their class-normalised baseline. */
     val weights: FactorWeightBook = FactorWeightBook(problem)

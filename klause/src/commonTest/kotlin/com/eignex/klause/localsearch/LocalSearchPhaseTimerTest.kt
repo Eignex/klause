@@ -19,6 +19,7 @@ class LocalSearchPhaseTimerTest {
         var visits = 4L
         val timer = LocalSearchPhaseTimer { 0L }
         timer.inspectionVisits = { visits }
+        timer.repairVisits = { visits / 2L }
         val first = timer.objectiveScoringSnapshot()
 
         visits = 9L
@@ -26,6 +27,8 @@ class LocalSearchPhaseTimerTest {
 
         assertEquals(4L, first.getValue("inspection-visits"))
         assertEquals(9L, second.getValue("inspection-visits"))
+        assertEquals(2L, first.getValue("repair-visits"))
+        assertEquals(4L, second.getValue("repair-visits"))
     }
 
     @Test

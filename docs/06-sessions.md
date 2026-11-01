@@ -244,8 +244,8 @@ unchanged terminal failures do not restart recovery.
 
 Slice pricing is solver policy: LP work costs one node per 600 units and propagation
 one per 4000 visits. Resumable Boolean clause walks with definition repairs price
-factor, objective and implication inspections at the same visit rate, in addition
-to native instructions.
+factor and objective inspections at that visit rate, and integer implication and
+support-queue visits at one per 128000, in addition to native instructions.
 The portfolio passes both grants and its instruction price to retained counted
 handles, including session-ownership and objective-coordinate wrappers. Auxiliary
 inspection work joins the portfolio's containing work ledger even when an atomic

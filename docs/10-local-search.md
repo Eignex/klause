@@ -424,7 +424,8 @@ objective and implication inspections to
 their [slice allowance](06-sessions.md#decisions-moves-and-slices). A completed choice
 can pause the walk before its native instruction grant ends, retaining the assignment
 and paying any atomic overspend from later slices. Optional phase diagnostics include
-the cumulative inspection visits.
+the cumulative inspection visits and their Boolean repair-graph subset. Both
+operation kinds retain fractional charges across slices under their separate prices.
 
 ### Maintained literal channels
 

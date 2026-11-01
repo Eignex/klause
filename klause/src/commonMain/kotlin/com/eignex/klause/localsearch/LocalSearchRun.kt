@@ -18,6 +18,8 @@ internal fun interface LocalSearchCheckpoint : WorkMeter {
     override fun charge(units: Long) = Unit
 
     val inspectionVisits: Long get() = 0L
+    val repairVisits: Long get() = 0L
+    val repairWork: WorkMeter get() = this
 }
 
 internal class LocalSearchRunControl(private val lifetime: Cancellation) : LocalSearchCheckpoint {
@@ -29,23 +31,32 @@ internal class LocalSearchRunControl(private val lifetime: Cancellation) : Local
         private set
     var finished: Boolean = false
         private set
-    override var inspectionVisits: Long = 0L
+    private var scoringVisits = 0L
+    override var repairVisits: Long = 0L
         private set
+    override val inspectionVisits: Long get() = scoringVisits + minOf(repairVisits, Long.MAX_VALUE - scoringVisits)
+    override val repairWork = WorkMeter { units ->
+        if (units > 0L) repairVisits += minOf(units, Long.MAX_VALUE - repairVisits)
+    }
+    private val pricedInspections: Long get() = scoringVisits + minOf(
+        repairVisits / (BOOLEAN_REPAIR_VISITS_PER_WORK / PROPAGATION_WORK_PER_NODE),
+        Long.MAX_VALUE - scoringVisits,
+    )
     private var pricedInstructions = 0.0
     private var instructionsPerWork = LS_INSTRUCTIONS_PER_WORK
     private val slice = SliceBudget(
         nodeCount = { pricedInstructions.toLong() },
         lpWork = { 0L },
-        propagationWork = { inspectionVisits },
+        propagationWork = { pricedInspections },
     )
     var hasSliceAllowance: Boolean = true
         private set
     val cancellation: Cancellation = Cancellation { token() }
     val work: Long get() = slice.spent()
-    val auxiliaryWork: Long get() = inspectionVisits / PROPAGATION_WORK_PER_NODE
+    val auxiliaryWork: Long get() = pricedInspections / PROPAGATION_WORK_PER_NODE
 
     override fun charge(units: Long) {
-        if (units > 0L) inspectionVisits += minOf(units, Long.MAX_VALUE - inspectionVisits)
+        if (units > 0L) scoringVisits += minOf(units, Long.MAX_VALUE - scoringVisits)
     }
 
     override fun shouldPause(moves: Long): Boolean {
@@ -85,6 +96,8 @@ internal class LocalSearchRunControl(private val lifetime: Cancellation) : Local
         else ceil(nodes * LS_INSTRUCTIONS_PER_WORK).toLong()
     }
 }
+
+internal const val BOOLEAN_REPAIR_VISITS_PER_WORK = 128_000L
 
 internal abstract class LocalSearchRun<V>(
     protected val sink: SolveStatsSink,
