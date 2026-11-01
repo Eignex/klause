@@ -132,17 +132,42 @@ Successful imports carry the known catalog index in the existing
 column-mapping scratch, avoiding a second lookup. Full definition checks and reused
 imports have separate observations, including checks in interrupted attempts.
 The catalog retains no additional cache or numerical result authority.
-Retained-only updates share the completed column and handle collections until an
-emission introduces a new definition. The first addition copies those collections
-into the pending edit; successful publication transfers that private copy without
-another copy. An abandoned or stale edit cannot change the published collections.
-Row bindings, reference counts and scoped restrictions remain private to each update.
-Observations distinguish columns shared during a committed update from columns
-transferred on publication; these counts describe catalog copying, not numerical consumption.
 LP bounding engines select retained-only admission through this catalog path,
 omitting source template preparation from whole-model builds. Complete layouts keep
 ordinary construction; actual later fragment imports supply the demand for reuse. This policy
 is independent of whole-model selective metadata reuse.
+
+Retained-only preparation can share completed compact linear and reified-linear
+emissions through the selected source. A first preparation attempt records the
+modeled extent of definitions it actually constructs. A later attempt admits a
+fragment index only after that extent covers four times the index's storage.
+The index has 16 to 1,024 slots, selected from the factor count without scanning
+the source. Each source/finite publication slot retains either complete preparation
+metadata or this index, keeping their common 262,144-unit storage ceiling.
+Entries occupy 192 to 8,192 modeled units; a collision preserves an admitted
+coordinate, and a replacement retains no predecessor definition. Refused entries
+use ordinary emission.
+Ordinary complete metadata can carry a 16-unit demand observation within the same
+ceiling and yield its publication slot after repeated retained demand earns the
+fragment index. Explicit selective-metadata preparation keeps its selected route.
+
+A fragment borrow checks the source namespace, semantics, dimensions, raw/finite
+scope and identical factor at the same coordinate. It then checks declared integer
+endpoints and stated sides, current column costs, live endpoint dependencies and
+Boolean pins. An objective constant rebinds only the immutable envelope. These
+built-in emissions read live integer endpoints, so cached dependencies contain
+bounded endpoint snapshots rather than live domains. Unary reified equalities,
+whose binary hull also depends on interior holes, keep ordinary construction.
+Continuous, auxiliary, custom and noncompact emissions also keep that path.
+The shared fragment contains immutable normalized source arrays and row metadata;
+each consumer imports them into its private numerical layout and basis. Current
+Boolean restrictions remain scoped assertions in that owner.
+Completed regions can remain available when a later region or installation
+declines, without retaining a cancellation token, mutable owner or checked result.
+Index construction, inspection, endpoint capture and borrowing debit the current
+allowance before publication and poll again after the debit. Fragment publication
+and reuse observations establish definition reuse, not numerical consumption or
+certified deductions.
 
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.

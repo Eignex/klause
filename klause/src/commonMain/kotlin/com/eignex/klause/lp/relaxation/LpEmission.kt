@@ -14,10 +14,21 @@ internal class LpEmissionDependencies(
 ) {
     private val integers = integers.toMap()
     private val booleans = booleans.toMap()
+    val validationUnits: Long get() = integers.size.toLong() + booleans.size + 1L
 
     fun matches(domains: RelaxationDomains): Boolean = domains.honorsOpenSides == honorsOpenSides &&
         integers.all { (variable, domain) -> domains.intDomain(variable) === domain } &&
         booleans.all { (variable, value) -> domains.boolValue(variable) == value }
+
+    fun matchesEndpoints(domains: RelaxationDomains): Boolean = domains.honorsOpenSides == honorsOpenSides &&
+        integers.all { (variable, previous) ->
+            val current = domains.intDomain(variable)
+            current.min == previous.min && current.max == previous.max
+        } && booleans.all { (variable, value) -> domains.boolValue(variable) == value }
+
+    fun endpointSnapshot(): LpEmissionDependencies = LpEmissionDependencies(
+        integers.mapValues { (_, domain) -> IntDomain(domain.min, domain.max) }, booleans, honorsOpenSides,
+    )
 }
 
 internal class LpEmissionDomains(private val source: RelaxationDomains) : RelaxationDomains {
@@ -96,6 +107,7 @@ internal class LpEmissionCache(private val relaxer: CpToLpRelaxation) {
         }
         val changes = ArrayList<Change>()
         val changed = ArrayList<Int>()
+        val attempt = Any()
         var templatePreparationAttempted = false
         for (index in next.indices) {
             if (cancellation()) throw LpAssemblyCancelled()
@@ -105,7 +117,7 @@ internal class LpEmissionCache(private val relaxer: CpToLpRelaxation) {
                     relaxer.prepareEmissionTemplates(cancellation)
                     templatePreparationAttempted = true
                 }
-                val emitted = relaxer.emitRegion(relaxer.emissionRegions[index], domains, cancellation, onWork)
+                val emitted = relaxer.emitRegion(relaxer.emissionRegions[index], domains, cancellation, onWork, attempt)
                 emittedRegions++
                 if (targetDepth > 0 && saved.add(index)) changes.add(Change(targetDepth, index, previous))
                 next[index] = emitted

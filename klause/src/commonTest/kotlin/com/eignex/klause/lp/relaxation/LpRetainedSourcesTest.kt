@@ -681,44 +681,6 @@ class LpRetainedSourcesTest {
     }
 
     @Test
-    fun `discarded source additions should not alter later catalog publication`() {
-        for (imported in listOf(false, true)) {
-            val problem = Problem(0, 3, Array(3) { IntDomain(0, 6) }, arrayOf<Factor>(
-                ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true),
-            ))
-            var lower = 0L
-            val domains = object : RelaxationDomains {
-                override val honorsOpenSides: Boolean get() = lower == 0L
-                override fun intDomain(varId: Int): IntDomain = problem.finiteIntDomain(varId).let {
-                    if (varId == 1) it.withMinAtLeast(lower) else it
-                }
-                override fun boolValue(varId: Int): Boolean? = null
-            }
-            val sources = LpRetainedSources(problem, CpToLpRelaxation(problem,
-                LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L)),
-                linMaxTightFace = true, retainImportedDefinitions = imported))
-            LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
-                val root = assertNotNull(sources.prepare(owner.state, domains))
-                assertTrue(owner.replaceRows(root.retired, root.columns, root.rows, false, objective = root.objective))
-                root.commit()
-                assertTrue(owner.push())
-                lower = 2L
-                val discarded = assertNotNull(sources.prepare(owner.state, domains))
-                assertTrue(discarded.columns.isNotEmpty())
-
-                val installed = assertNotNull(sources.prepare(owner.state, domains))
-                assertEquals(discarded.columns.size, installed.columns.size)
-                assertTrue(owner.replaceRows(installed.retired, installed.columns, installed.rows, true,
-                    objective = installed.objective, assertions = assertNotNull(installed.boundAssertions(100L))))
-                installed.commit()
-
-                assertFailsWith<IllegalStateException> { discarded.commit() }
-                assertEquals(BigFraction.ofLong(2L), assertNotNull(owner.solve()).lowerBound)
-            }
-        }
-    }
-
-    @Test
     fun `cancelled and stale source publications should preserve the committed layout`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf<Factor>())
         val sources = LpRetainedSources(

@@ -21,7 +21,14 @@ import com.eignex.klause.lp.BuiltInRelaxationProjectionProvider
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.RelaxationProjection
+import com.eignex.klause.lp.relaxation.LpEmission
+import com.eignex.klause.lp.relaxation.LpEmissionDemand
+import com.eignex.klause.lp.relaxation.LpEmissionScope
+import com.eignex.klause.lp.relaxation.LpEmissionTemplates
+import com.eignex.klause.lp.relaxation.LpObservedMetadata
+import com.eignex.klause.lp.relaxation.LpPreparationReuse
 import com.eignex.klause.lp.relaxation.LpPreparationTemplates
+import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.FactorProjectionPreparation
 import com.eignex.klause.propagation.PropagationProjection
@@ -58,22 +65,103 @@ class PreparedFactorProjections internal constructor(
 ) {
     private var lpTemplateNamespace: Any = Any()
     private var lpTemplateRows: Any = Any()
-    private var lpSourceTemplateCache = AtomicReference<LpPreparationTemplates?>(null)
-    private var lpFiniteTemplateCache = AtomicReference<LpPreparationTemplates?>(null)
+    private var lpSourceTemplateCache = AtomicReference<LpPreparationReuse?>(null)
+    private var lpFiniteTemplateCache = AtomicReference<LpPreparationReuse?>(null)
+
+    private val lpTemplateCache: AtomicReference<LpPreparationReuse?>
+        get() = if (problem is BakedProblem) lpFiniteTemplateCache else lpSourceTemplateCache
+
+    internal val lpEmissionNamespace: Any get() = lpTemplateNamespace
+
+    internal val lpEmissionTemplateUnits: Long
+        get() = (lpTemplateCache.load() as? LpEmissionTemplates)?.storageUnits ?: 0L
+
+    internal val lpPreparationReuseUnits: Long
+        get() = when (val current = lpTemplateCache.load()) {
+            is LpPreparationTemplates -> current.storageUnits
+            is LpObservedMetadata -> current.metadata.storageUnits + LpObservedMetadata.STORAGE_UNITS
+            is LpEmissionDemand -> LpObservedMetadata.STORAGE_UNITS
+            is LpEmissionTemplates -> current.storageUnits
+            null -> 0L
+        }
 
     internal fun prepareLpTemplates(
         objective: LinearObjective?, token: Cancellation, reuseIndexes: Boolean = true,
         reuseMetadata: Boolean = false,
         onWork: (Long) -> Unit = {},
     ): LpPreparationTemplates? {
-        val cache = if (problem is BakedProblem) lpFiniteTemplateCache else lpSourceTemplateCache
+        val cache = lpTemplateCache
         val previous = cache.load()
+        if (previous is LpEmissionTemplates) {
+            token.charge(1L)
+            onWork(1L)
+            return null
+        }
+        val observed = previous as? LpObservedMetadata
         val next = LpPreparationTemplates.prepare(this, lpTemplateNamespace, lpTemplateRows, objective,
-            previous, token, onWork,
+            observed?.metadata ?: previous as? LpPreparationTemplates, token, onWork,
             reuseIndexes, reuseMetadata)
             ?: return null
-        cache.compareAndSet(previous, next)
+        val retained: LpPreparationReuse = if (observed != null &&
+            observed.demand.scope.matches(lpTemplateNamespace, problem) &&
+            next.storageUnits <= LpEmissionTemplates.MAX_UNITS - LpObservedMetadata.STORAGE_UNITS
+        ) LpObservedMetadata(next, observed.demand) else next
+        cache.compareAndSet(previous, retained)
         return next
+    }
+
+    internal fun borrowLpEmission(
+        factorId: Int,
+        objective: LinearObjective?,
+        domains: RelaxationDomains,
+        token: Cancellation,
+        onWork: (Long) -> Unit,
+    ): LpEmission? = (lpTemplateCache.load() as? LpEmissionTemplates)?.find(
+        this, factorId, objective, domains, token, onWork,
+    )
+
+    internal fun rememberLpEmission(
+        emission: LpEmission,
+        attempt: Any,
+        token: Cancellation,
+        onWork: (Long) -> Unit,
+    ): Boolean {
+        val cache = lpTemplateCache
+        val previous = cache.load()
+        val metadata = (previous as? LpObservedMetadata)?.metadata ?: previous as? LpPreparationTemplates
+        if (metadata != null && (metadata.objectiveIndependent ||
+                metadata.storageUnits > LpEmissionTemplates.MAX_UNITS - LpObservedMetadata.STORAGE_UNITS)
+        ) return false
+        var work = 0L
+        val units = try {
+            LpEmissionTemplates.extent(problem, emission) { count ->
+                work += count
+                token.charge(count)
+                !token()
+            }
+        } finally {
+            onWork(work)
+        }
+        if (units == null || token()) return false
+        if (previous is LpEmissionTemplates && previous.scope.matches(lpTemplateNamespace, problem)) {
+            return previous.offer(problem, emission, units, token, onWork)
+        }
+        val demand = ((previous as? LpObservedMetadata)?.demand ?: previous as? LpEmissionDemand)
+            ?.takeIf { it.scope.matches(lpTemplateNamespace, problem) }
+        val capacity = LpEmissionTemplates.capacity(problem)
+        return if (demand != null && demand.attempt !== attempt &&
+            demand.paidUnits >= LpEmissionTemplates.indexUnits(capacity) * 4L
+        ) {
+            val prepared = LpEmissionTemplates.create(demand.scope, capacity, token, onWork) ?: return false
+            cache.compareAndSet(previous, prepared) && prepared.offer(problem, emission, units, token, onWork)
+        } else {
+            val scope = demand?.scope ?: LpEmissionScope(lpTemplateNamespace, problem)
+            val paid = ((demand?.paidUnits ?: 0L) + units)
+                .coerceAtMost(LpEmissionTemplates.MAX_UNITS)
+            val next = LpEmissionDemand(scope, attempt, paid)
+            cache.compareAndSet(previous, if (metadata == null) next else LpObservedMetadata(metadata, next))
+            false
+        }
     }
 
     private fun inheritLpTemplates(source: PreparedFactorProjections): PreparedFactorProjections = apply {

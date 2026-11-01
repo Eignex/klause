@@ -90,6 +90,10 @@ import kotlin.time.TimeSource
 
 internal class LpAssemblyCancelled : RuntimeException()
 
+private fun Cancellation.checkLpAssembly() {
+    if (this()) throw LpAssemblyCancelled()
+}
+
 /**
  * An LP relaxation of a `Problem` at one search node, plus the metadata mapping each LP column
  * back to the CP variable it stands for. The mapping is what lets reduced-cost fixing turn
@@ -287,6 +291,7 @@ internal fun LpRelaxation.withModel(
     reboundModel: LpModel,
     sources: CutSourceMap? = sourceMap?.withBounds(reboundModel),
     remap: LpLayoutRemap? = null,
+    reboundObjectiveConstant: Long = objectiveConstant,
 ): LpRelaxation {
     require(remap == null || remap.retainedColumns.size == model.n) { "column removal requires source metadata" }
     val gates = remap?.let { gatedRows.indices.filter { index -> it.row(gatedRows[index]) >= 0 } }
@@ -294,7 +299,7 @@ internal fun LpRelaxation.withModel(
         model = reboundModel,
         colVarId = colVarId,
         colIsBool = colIsBool,
-        objectiveConstant = objectiveConstant,
+        objectiveConstant = reboundObjectiveConstant,
         intColOf = intColOf,
         boolColOf = boolColOf,
         circuitArcs = circuitArcs,
@@ -706,10 +711,6 @@ internal class CpToLpRelaxation(
         templateStats?.observeTemplateUse(retainedFullChecks = 1)
     }
 
-    internal fun observeRetainedCatalog(columns: Int, unchanged: Int) {
-        templateStats?.observeTemplateUse(catalogPublicationColumns = columns, catalogUpdateColumns = unchanged)
-    }
-
     internal fun observeTemplateWork(work: Long) {
         onTemplateWork(work)
     }
@@ -911,7 +912,22 @@ internal class CpToLpRelaxation(
         domains: RelaxationDomains,
         cancellation: Cancellation,
         onWork: ((Long) -> Unit)?,
+        attempt: Any? = null,
     ): LpEmission {
+        val share = attempt != null && retainImportedDefinitions && !reuseTemplateMetadata &&
+            reuseRetainedDefinitions &&
+            projections != null && region.kind == LpEmissionKind.FACTOR &&
+            LpEmissionTemplates.eligible(problem.factors[region.index])
+        if (share) {
+            val borrowed = projections?.borrowLpEmission(region.index, objective, domains, cancellation, onTemplateWork)
+            if (borrowed != null) {
+                val model = borrowed.relaxation.model
+                onWork?.invoke(model.n.toLong() + model.m + model.csc.rowIdx.size)
+                cancellation.checkLpAssembly()
+                templateStats?.observeTemplateUse(emissionFragments = 1)
+                return borrowed
+            }
+        }
         val tracked = LpEmissionDomains(domains)
         val assembler = Assembler(
             tracked,
@@ -920,7 +936,7 @@ internal class CpToLpRelaxation(
             columnDomains = RootDomains(problem),
         )
         var completed: LpRelaxation? = null
-        return try {
+        val emitted = try {
             val relaxation = assembler.assemble(emptyList()).also { completed = it }
             LpEmission(region, relaxation, tracked.dependencies())
         } finally {
@@ -930,6 +946,12 @@ internal class CpToLpRelaxation(
             }
             onWork?.invoke(work)
         }
+        cancellation.checkLpAssembly()
+        if (share && projections?.rememberLpEmission(emitted, requireNotNull(attempt), cancellation,
+                onTemplateWork) == true
+        ) templateStats?.observeTemplateUse(emissionPublications = 1)
+        cancellation.checkLpAssembly()
+        return emitted
     }
 
     /**

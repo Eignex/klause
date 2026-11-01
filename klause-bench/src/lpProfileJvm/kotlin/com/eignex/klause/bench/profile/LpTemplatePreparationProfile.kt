@@ -112,6 +112,7 @@ internal object LpTemplatePreparationProfile {
                         var assemblyBytes: Long? = 0L
                         var importSolveRetirementBytes: Long? = 0L
                         var retainedUnits = 0L
+                        var sourceCacheUnits = 0L
                         var coldNs = 0L
                         val results = ArrayList<String>()
                         repeat(steps) consumers@ { step ->
@@ -182,10 +183,12 @@ internal object LpTemplatePreparationProfile {
                                 } else finishAssembly()
                                 results.add("cancelled")
                                 return@consumers
+                            } finally {
+                                retainedUnits = maxOf(retainedUnits, consumer.preparationTemplates?.storageUnits ?: 0L)
+                                sourceCacheUnits = maxOf(sourceCacheUnits, selectedView.lpPreparationReuseUnits)
                             }
                             importSolveRetirementBytes = sumBytes(importSolveRetirementBytes,
                                 assemblyEndBytes, readAllocatedBytes())
-                            retainedUnits = maxOf(retainedUnits, consumer.preparationTemplates?.storageUnits ?: 0L)
                             results.add("${result.verdict}:${result.lowerBound}:${result.witness?.objective}")
                             if (step == 0) coldNs = System.nanoTime() - start
                         }
@@ -232,7 +235,12 @@ internal object LpTemplatePreparationProfile {
                             put("retainedBoundDefinitionsReused",
                                 assembly?.outcomes?.get("RETAINED_BOUND_REUSES") ?: 0L)
                             put("retainedFullBoundChecks", assembly?.outcomes?.get("RETAINED_FULL_BOUND_CHECKS") ?: 0L)
+                            put("emissionFragmentsReused", assembly?.outcomes?.get("EMISSION_FRAGMENTS_REUSED") ?: 0L)
+                            put("emissionFragmentsPublished",
+                                assembly?.outcomes?.get("EMISSION_FRAGMENTS_PUBLISHED") ?: 0L)
                             put("peakRetainedTemplateUnits", retainedUnits)
+                            put("peakSourceCacheUnits", sourceCacheUnits)
+                            put("sourceCacheScope", "selected source-or-finite publication slot")
                             put("nativeResults", results.joinToString(","))
                             put("independentProofCheck", false)
                         }

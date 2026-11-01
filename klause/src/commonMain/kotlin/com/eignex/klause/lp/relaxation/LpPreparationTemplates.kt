@@ -239,7 +239,7 @@ internal class LpPreparationTemplates private constructor(
     val reusedComponents: Int,
     val storageUnits: Long,
     val reusedIndexes: Boolean = false,
-) {
+) : LpPreparationReuse {
     fun bound(variable: Int): LpIntegerBoundTemplate? = bounds[variable]
 
     fun emit(problem: Problem, factorId: Int, builder: RelaxationBuilder, projection: LinearLpProjection): Boolean {
