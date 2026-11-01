@@ -494,7 +494,11 @@ inside the pass. Pin and occurrence walks admit at most 8,192 entries per slice
 even with an unlimited class grant. Projections without an available index retain
 the ordinary scan. An indexed candidate at the ordinary cursor advances both walks;
 unchanged prefixes are not examined twice. Retired and non-clause source entries
-do not defer the remaining literal window. A shortened
+do not defer the remaining literal window. Once available occurrence walks cover
+every root pin, the ordinary cursor skips the remaining source suffix and continues
+through learned clauses. Missing indexes retain the full source scan. Learned
+compaction invalidates learned candidates while preserving stable source candidates.
+A shortened
 source clause enters as a permanent session-local replacement before its watches
 retire; immutable source text remains available for reasons. The propagation session
 owns unfinished source-watch retirement
