@@ -43,14 +43,14 @@ import kotlin.time.Duration
 class CliStatsTest {
     @Test
     fun `Boolean proof output should retain native closures and probe subsets separately`() {
-        val proof = BooleanProofStats(2, 2, 1, 5000L, 22000L)
+        val proof = BooleanProofStats(2, 2, 1, 5000L, 22000L, retainedProbes = 1)
         val stats = SolveStats(portfolio = PortfolioStats(booleanProof = listOf(proof)))
 
         val pairs = portfolioStatPairs(stats).toMap().filterKeys { it.startsWith("booleanProof.") }
 
         assertEquals(mapOf("booleanProof.0.tasks" to "2", "booleanProof.0.nativeRefutations" to "2",
             "booleanProof.0.probeSegments" to "1", "booleanProof.0.probeWork" to "5000",
-            "booleanProof.0.workerWork" to "22000"), pairs)
+            "booleanProof.0.workerWork" to "22000", "booleanProof.0.retainedProbes" to "1"), pairs)
     }
 
     @Test

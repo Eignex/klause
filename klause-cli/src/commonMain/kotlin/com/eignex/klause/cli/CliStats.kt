@@ -381,6 +381,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         "booleanProof.$index.tasks" to "${proof.tasks}",
         "booleanProof.$index.nativeRefutations" to "${proof.nativeRefutations}",
         "booleanProof.$index.probeSegments" to "${proof.probeSegments}",
+        "booleanProof.$index.retainedProbes" to "${proof.retainedProbes}",
         "booleanProof.$index.probeWork" to "${proof.probeWork}",
         "booleanProof.$index.workerWork" to "${proof.workerWork}",
         proof.decline?.let { "booleanProof.$index.decline" to it },

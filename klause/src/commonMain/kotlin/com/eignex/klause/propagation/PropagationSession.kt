@@ -221,6 +221,12 @@ class PropagationSession private constructor(
     internal fun canProbeRootAtom(variable: Int): Boolean =
         state.atoms.kind[variable - problem.numBoolVars] != AtomKind.EQ
 
+    internal fun rootSourceClauseSize(factor: Int): Int {
+        if (simplifiedRootSources?.contains(factor) == true) return 0
+        return if (usesNativeSat) (problem.factors[factor] as? Clause)?.literals?.size ?: 0
+        else (projection.propagators[factor] as? ClausePropagator)?.literals?.size ?: 0
+    }
+
     internal fun rootClauseLiterals(
         factor: Int,
         limit: Int,

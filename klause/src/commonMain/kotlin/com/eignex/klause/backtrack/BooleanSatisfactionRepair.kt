@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
@@ -39,6 +40,14 @@ internal class BooleanSatisfactionRepair(
     internal fun matchesCondition(assumptions: Assumptions): Boolean = this.assumptions == assumptions
 
     internal fun splitLiteral(): Int? = handle.splitLiteral()
+
+    internal fun retainPartition(literal: Int): Boolean {
+        check(!closed && started)
+        if (!handle.retainPartition(literal)) return false
+        assumptions = Assumptions(bools = checkNotNull(assumptions).bools +
+            (Lit.variable(literal) to Lit.isPositive(literal)))
+        return true
+    }
 
     private val handle = ResumableSatisfaction(solver, params.copy(assumptions = Assumptions.None), rebindable = true)
     private var started = false

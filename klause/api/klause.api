@@ -14096,21 +14096,23 @@ public final class com/eignex/klause/solver/result/ArmSchedule {
 }
 
 public final class com/eignex/klause/solver/result/BooleanProofStats {
-	public fun <init> (IIIJJLjava/lang/String;)V
-	public synthetic fun <init> (IIIJJLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (IIIJJLjava/lang/String;I)V
+	public synthetic fun <init> (IIIJJLjava/lang/String;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()I
 	public final fun component2 ()I
 	public final fun component3 ()I
 	public final fun component4 ()J
 	public final fun component5 ()J
 	public final fun component6 ()Ljava/lang/String;
-	public final fun copy (IIIJJLjava/lang/String;)Lcom/eignex/klause/solver/result/BooleanProofStats;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/BooleanProofStats;IIIJJLjava/lang/String;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/BooleanProofStats;
+	public final fun component7 ()I
+	public final fun copy (IIIJJLjava/lang/String;I)Lcom/eignex/klause/solver/result/BooleanProofStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/BooleanProofStats;IIIJJLjava/lang/String;IILjava/lang/Object;)Lcom/eignex/klause/solver/result/BooleanProofStats;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDecline ()Ljava/lang/String;
 	public final fun getNativeRefutations ()I
 	public final fun getProbeSegments ()I
 	public final fun getProbeWork ()J
+	public final fun getRetainedProbes ()I
 	public final fun getTasks ()I
 	public final fun getWorkerWork ()J
 	public fun hashCode ()I

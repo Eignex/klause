@@ -7,9 +7,29 @@ import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class CorpusSelectionTest {
+
+    @Test
+    fun `named flat selection should match discovery and reject paths outside its layout`() {
+        val root = Files.createTempDirectory("named-corpus").toFile()
+        try {
+            for (path in listOf("set/a/one.smt2", "set/b/two.smt2.zst", "set/unrelated/other.smt2")) {
+                File(root, path).apply { parentFile.mkdirs() }.writeText("fixture")
+            }
+            val layout = Layout.Flat("set", "smt2")
+            val names = listOf("b/two", "a/one", "missing/three", "a/one")
+            val expected = layout.discover(root).associateBy { it.name }
+            assertEquals(listOf(expected.getValue("b/two"), expected.getValue("a/one")), layout.named(root, names))
+            for (name in listOf("../escape", "/absolute", "a//one", "a/./one", "a\\one", "a/one\n")) {
+                assertFailsWith<IllegalArgumentException> { layout.named(root, listOf(name)) }
+            }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 
     @Test
     fun `interleave should spread across families`() {

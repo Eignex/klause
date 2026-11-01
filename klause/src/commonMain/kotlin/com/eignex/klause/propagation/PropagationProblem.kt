@@ -53,8 +53,7 @@ class PropagationProblem private constructor(
         }
     }
 
-    /** Propagator occurrences indexed by Boolean variable. */
-    val boolOccurrences: Array<IntArray> by lazy {
+    private val boolOccurrenceIndex = lazy {
         preparedIndexes?.boolOccurrences ?: run {
             if (isNativeSatEligible) {
                 invert(problem.numBoolVars, { true }) { it.boolVars }
@@ -64,7 +63,13 @@ class PropagationProblem private constructor(
         }
     }
 
-    internal fun preparedBoolOccurrences(variable: Int): IntArray? = preparedIndexes?.boolOccurrences?.get(variable)
+    /** Propagator occurrences indexed by Boolean variable. */
+    val boolOccurrences: Array<IntArray> by boolOccurrenceIndex
+
+    internal fun readyBoolOccurrences(variable: Int): IntArray? {
+        val ready = preparedIndexes?.boolOccurrences ?: boolOccurrenceIndex.takeIf { it.isInitialized() }?.value
+        return ready?.get(variable)
+    }
 
     /** Propagator occurrences indexed by integer variable. */
     val intOccurrences: Array<IntArray> by lazy {

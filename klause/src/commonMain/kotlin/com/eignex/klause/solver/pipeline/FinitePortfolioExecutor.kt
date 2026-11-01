@@ -82,7 +82,7 @@ internal fun FinitePipeline.portfolioExecutor(
     deferLpProbes: Boolean = false,
     includeRestartingProof: Boolean = false,
     probePolicy: InitialProbePolicy = InitialProbePolicy.ORDINARY,
-    booleanProofTasks: Boolean = false,
+    booleanProofTasks: Boolean? = false,
     fundedCompanions: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
