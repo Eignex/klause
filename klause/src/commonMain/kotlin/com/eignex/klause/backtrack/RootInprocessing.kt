@@ -70,9 +70,7 @@ internal class RootSimplificationPass : InprocessingPass {
             dropped = IntHashSet()
             if ((pending?.factor ?: -1) >= session.problem.numFactors) pending = null
             if (deferredFactor >= session.problem.numFactors) deferredFactor = -1
-            cursor = 0
-            scanEnd = count
-            scanRoot = session.explanationState.undoTop
+            refreshClauseScan(session)
         }
         revision = session.learnedClauseRevision
         if (count == 0) return
@@ -90,8 +88,7 @@ internal class RootSimplificationPass : InprocessingPass {
             dropped = IntHashSet()
             revision = session.learnedClauseRevision
             if (session.learnedClauseCount < beforeCount) {
-                cursor = 0
-                scanEnd = session.rootClauseCount
+                refreshClauseScan(session)
             }
             return
         }
@@ -175,9 +172,16 @@ internal class RootSimplificationPass : InprocessingPass {
             revision = session.learnedClauseRevision
         }
         if (session.learnedClauseCount < beforeCompaction) {
-            cursor = 0
-            scanEnd = session.rootClauseCount
+            refreshClauseScan(session)
         }
+    }
+
+    private fun refreshClauseScan(session: PropagationSession) {
+        val root = session.explanationState.undoTop
+        // Learned remapping leaves source identities and unchanged root facts intact.
+        cursor = if (scanRoot == root) minOf(cursor, session.problem.numFactors) else 0
+        scanEnd = session.rootClauseCount
+        scanRoot = root
     }
 
     private fun nextFactor(session: PropagationSession, budget: InprocessingBudget): Int? {
