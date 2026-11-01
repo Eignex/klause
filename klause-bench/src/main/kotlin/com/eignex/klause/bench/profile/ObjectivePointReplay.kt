@@ -47,9 +47,17 @@ internal object ObjectivePointReplay {
                 output.appendLine(encoded)
                 output.flush()
             }
-            try {
+            val failure = try {
                 probe(options, source, names, prepared, originalObjective, objective, stop, ::publish)
-            } catch (failure: Exception) {
+                null
+            } catch (failure: IllegalArgumentException) {
+                failure
+            } catch (failure: IllegalStateException) {
+                failure
+            } catch (failure: ReflectiveOperationException) {
+                failure
+            }
+            if (failure != null) {
                 publish(buildJsonObject {
                     put("event", "declined")
                     put("reason", failure.message?.take(512))
@@ -182,7 +190,7 @@ internal object ObjectivePointReplay {
         val ints = LongArray(problem.numIntVars) { variable ->
             stop.charge(1)
             intPins[variable] ?: roots.intDomain(variable).let { domain ->
-                require(domain.isFixed || !intReads[variable] && coefficients.getOrElse(variable) { 0L } == 0L)
+                require(domain.isFixed || (!intReads[variable] && coefficients.getOrElse(variable) { 0L } == 0L))
                 domain.min
             }
         }
