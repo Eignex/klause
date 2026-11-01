@@ -263,11 +263,12 @@ shortened rows. Column counts stay identical, preserving the clauses' plain-Bool
 classification. Each new baked model owns its projection, watches and search state;
 the shared factor input carries no mutable search state.
 
-A trial requires global root pins beyond the baked root and the last attempted
-view. An unchanged baked root performs no BVE. The root-pin scan charges its full
+A trial follows global root pins beyond the baked root and the last attempted
+view, or owned learned binary implications proving two unfixed variables equal.
+An unchanged root performs no BVE. The root-pin scan charges its full
 column visit count and records its time; an insufficient grant skips the scan.
 An unchanged root trail retains a completed miss. All attempts share one
-cumulative preparation, trial and checking allowance. A bounded admission scan
+cumulative preparation, trial and checking allowance. Root-pin trials use a bounded admission scan that
 uses saturated occurrence counts and parent literal volumes over the residual
 clauses. It admits a non-growing raw resolution shape: a single parent on one
 side satisfying `n * (w - 2) <= w`, or two parents on each side with total width
@@ -281,6 +282,20 @@ model. BVE restricts this trial to the initially admitted columns, so an unrelat
 declined pivot cannot consume its resolution allowance. Later opportunities among
 protected columns wait for a fresh root view. This selection is a heuristic, not
 an exhaustive elimination pass.
+
+A learned binary can close a reciprocal source binary, or two owned binaries can
+supply the pair. Only non-permanent global learning from the canonical worker
+qualifies. The capture binds its exact source object and owns its clauses. Adding
+them to the pinned source preserves the premises of the source implication-graph
+pass. Same-polarity equivalences retain Boolean slots and record `CopyLiteral`
+reconstruction; transitive binary deletion alone opens no consumer. Literal
+remapping reserves normalization work before the graph pass receives half the
+remaining allowance. Discovery visits recent learning first, scanning at most 128 eligible binaries and
+32,768 work units per root observation, inside the cumulative trial allowance.
+Changed learned counts or compaction revisions permit another scan. A fixed history
+remembers at most 32 attempted relations; its storage and 16 KiB discovery scratch
+consume the existing byte grant. Exhausted scans establish no absence of other
+equivalences.
 
 When one column is admitted, the pass indexes its complete incident-clause
 neighborhood. Outside rows contain no pivot literal and remain unchanged; resolving
@@ -309,7 +324,7 @@ primitive/reference storage before composition and copied-learning admission.
 Unused BVE allowance can copy globally learned clauses into the private model.
 Only this canonical worker's non-permanent clauses over Boolean source columns
 qualify. Global pins remove satisfied clauses and false literals. A clause that
-mentions an eliminated column can follow the actual BVE parent descriptors in
+mentions an eliminated column can follow equivalent-literal substitutions and actual BVE parent descriptors in
 elimination order. A pure pivot's satisfying value lifts every projected model,
 so substituting it preserves learned consequences. Other pivots use one shortest
 opposite-polarity source parent to derive a resolvent; each such consequence is

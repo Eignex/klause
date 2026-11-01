@@ -65,10 +65,19 @@ diagnosis; these observations do not retire the rebuilding objective.
 ## Build and run
 
 `param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
-trial after new global root pins, with actual source BVE and a fresh consuming
+trial after new global root pins or an owned learned equivalence, with source reduction and a fresh consuming
 worker. Zero is the default. `ProgressPins` excludes baked-root facts;
 `RootScanWork` and `RootScanNanos` retain the eligibility cost. An unchanged
-baked root keeps its canonical traversal.
+baked root without a captured equivalence keeps its canonical traversal.
+`BinaryScanWork` and `BinaryScanNanos` retain bounded discovery costs;
+`BinaryRelations` counts captured reciprocal implications and `EquivalentColumns`
+counts actual source implication-graph merges. Discovery accepts only owned global
+binary learning and checks at most 128 binaries within 32,768 work per observation.
+`BinaryHistoryWork` and `BinaryHistoryBytes` retain the fixed history's initialization
+and primitive storage. At most 32 relations are attempted in one worker. Its history
+and the 16 KiB discovery scratch model spend the existing byte grant. These work
+counters are subsets of worker work, not additional totals to sum. Missing relations
+after a bounded scan do not establish an absence of opportunities.
 Use the same source, engine, presolve, seeds, processors, heap, containing allowance
 and deadline in the zero/trial arms. `nativePrivateRebuildAttempts`, `Consumers`,
 `Eliminated`, `SourceAccepted`, `RefutationDeferred`, `Declined` and `Retired`
@@ -84,7 +93,7 @@ still make other eliminations useful.
 `AdmittedColumns` counts the initial pivot set for successful generations;
 the private BVE pass protects other columns rather than analyzing their pivots.
 `BveIndexedFactors` and `BveSourceFactors` compare the indexed neighborhood with
-the pinned source. A single admitted pivot indexes only its incident rows;
+the pinned source; an equivalence-only trial reports zero BVE factors. A single admitted pivot indexes only its incident rows;
 multiple pivots use the full database. `ReusedSourceClauses` counts unchanged
 immutable inputs retained during pinning; later elimination can remove them.
 All scan and source-index transport work remains in preparation.
@@ -942,60 +951,19 @@ The profile retains cold and unchanged requests, authority/bound/row/objective
 edits, retirement, failed work and conversion charges separately. Its worker
 observations require ordinary source-checked CLI controls for source claims.
 
-`scripts/lp-template-preparation-profile.sh <source> [repeats] [steps] [standalone|retained]` accepts
-`cover-2x3`, `cover-3x3`, `miplib3-p0033` and `miplib3-p0201`. The MIPLIB inputs
-resolve through catalog `select files=true`, verify frozen source hashes and retain
-selection time/resource receipts; include `:klause-bench:installDist` in their build tasks.
-It compares disabled
-templates, object reuse, complete index reuse and the internal candidate mode on the
-existing MPS component fixtures. Submit as a lab profile script with build task
-`:klause:stageLpProfileJvm`, Linux x86_64 placement and a 180-second runtime cap.
-It includes repeated cold preparation, unchanged views, alternating bound, objective
-and row edits, and cancellation through actual relaxation assembly and native LP
-certification. Records
-retain source bytes/hash, total preparation/assembly/solve work, time, allocation,
-modeled retained units and negative results. One warmup precedes up to five measured
-rounds; mode order rotates. Equal native results across modes check consistency,
-without establishing independent source or optimality validation.
-Total time and allocation include final phase-snapshot publication; exact-bound
-adoption is reported separately from bound-template lookup. Main-thread CPU time
-is separate from elapsed time and excludes helper, compiler and collector threads;
-whole-process and enforced group resource receipts retain their broader costs.
-The retained route prepares the production source regions, installs their exact
-columns and rows into a private scoped owner with source-bound assertions and
-permanent row markers, solves and closes that owner within the measured total.
-Its candidate mode borrows compatible immutable bound definitions from columns that
-earlier fragments actually introduced, without a whole-source metadata preparation.
-It uses retained-only admission, which also leaves a preceding whole-model build on
-ordinary construction.
-`retainedBoundDefinitionsReused` counts those avoided constructions separately from
-`exactBoundsAdopted`, which counts introductions backed by prepared definitions.
-`retainedFullBoundChecks` counts complete catalog-definition checks; memoized imports
-still check their current normalized coordinates and sides.
-The standalone candidate uses selective metadata reuse. Pin the revision when
-comparing these mode records; a shared label does not establish equal algorithms.
-It isolates root installation; ordinary CLI preparation, propagation and route
-selection remain separate source-wide costs. The wrapper retains actual JDK file hashes and the cost of
-that shared identity prefix. Its assembly includes fragment import and installation;
-standalone import remains in the solve-and-certification interval. Route timings
-therefore compare modes within one route, not isolated stage names across routes.
-Per-stage thread allocation separates assembly from import, solve and retirement.
-Residual allocation includes view selection, result recording and snapshot publication;
-unavailable counters stay null. The wrapper exports sampled JFR allocation stacks
-after the numerical process, with distinct exit and resource receipts for that analysis.
+`scripts/lp-template-preparation-profile.sh <source> [repeats] [steps] [standalone|retained]`
+accepts `cover-2x3`, `cover-3x3`, `miplib3-p0033` and `miplib3-p0201`. Submit it
+through the lab with `:klause:stageLpProfileJvm`, a 180-second runtime cap and
+compatible Linux x86_64 placement. MIPLIB sources also require
+`:klause-bench:installDist` for catalog selection. Set a finite containing allowance
+with `profile.runTimeoutSec`.
 
-The unchanged-index controls [9363](https://lab.eignex.com/jobs/9363) and
-[9369](https://lab.eignex.com/jobs/9369), at `69cc7b2250`, compare all three modes
-through actual consuming LPs on the two frozen P3 MPS fixtures. Including cold
-setup, median preparation-plus-assembly falls from 4.73 to 4.10 ms over 32
-consumers and from 5.79 to 5.27 ms over 64; allocation falls by 202/353 KB.
-Charged template work falls from 5741/7454 to 1742/2036. Ordered coordinates add
-9/6 modeled retained units; the publication/storage cap stays unchanged.
-Alternating bounds, objectives and rows rejects complete-index reuse and retains
-selective rebuilding, including failed-validation cost. Objective churn increases
-assembly time by 7.1/2.7 percent in these controls. Disabled templates remain
-cheaper on these tiny sources, and whole-LP timings support no speedup claim.
-Native LP results agree across modes; their optimality is not independently checked.
+The output directory contains `runs.jsonl`, the selected source and its hashes,
+process resource receipts, `profile.jfr` and `allocations.json`. The optional route
+selects standalone assembly or retained source installation. See the lab
+[run guide](https://github.com/Eignex/eignex-lab/blob/main/docs/runs.md) for
+submitting comparisons and collecting their records. Keep experiment results and
+analysis outside the repository.
 
 `scripts/lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats] [both|jvm|native]` runs one
 hash-pinned source from the existing basis corpus on JVM and Linux Native through
@@ -1181,18 +1149,6 @@ root bound, prunes and fixings establish progress and consumption. An admitted
 trial or completed lab job alone establishes no useful deduction or source proof.
 Keep physical RSS separate from modeled storage reservations. Source checking and
 all preparation, failed work and retirement belong to the containing comparison.
-
-`ROOT_ADMISSION_ROOT` distinguishes duty-cycle skips, declined relaxers and queries.
-`ROOT_LAYOUT_PREPARATION_ROOT` records active cold construction and exact-state
-installation across private worker pauses. Its work and time include completed and
-discarded chunks; waiting between slices is excluded. A ready layout grants no bound.
-These are subsets of containing LP work; nested template costs are not additional totals.
-`ROOT_QUERY_ROOT` records the requested component, sparse or standalone route and
-its work, cancellation, layout, numerical, certification or projection stop.
-A component request does not establish that a component owner was constructed;
-use the component lifecycle counters for that. Query work is the delta of charged
-LP operations and overlaps assembly, numerical and certificate counters. Its time
-also includes nested stages; do not add those observations together.
 
 [9172](https://lab.eignex.com/jobs/9172) compares default and trial at
 `bde182ce9b`, seed 3, ten seconds and one Linux/amd64 processor, with matching

@@ -52,6 +52,7 @@ internal fun configureLabPaths() {
         System.setProperty("klause.bench.minizinc", Path.of(tree, LabInputs.RUNTIME, "bin/minizinc").toString())
     }
     System.getenv("LAB_CORPUS")?.let { System.setProperty("klause.bench.corpusCache", it) }
+    System.getenv("LAB_DECLARED_INPUTS")?.let { System.setProperty("klause.bench.declaredInputs", it) }
     System.setProperty("klause.bench.cache", "false")
 }
 

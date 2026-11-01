@@ -5,11 +5,11 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.koblas.DenseVector
-import com.eignex.kumulant.bandit.contextual.LinearRegressionSpec
 import com.eignex.kumulant.bandit.contextual.RegressionContextualBandit
 import com.eignex.kumulant.bandit.contextual.RegressionContextualSpec
 import com.eignex.kumulant.bandit.materialize
 import com.eignex.kumulant.core.Concurrency
+import com.eignex.kumulant.schema.spec.BayesianRegression
 import com.eignex.kumulant.stat.regression.glm.LinUcb
 import kotlin.math.ln
 import kotlin.math.min
@@ -243,7 +243,7 @@ class RegressionVariableSelector private constructor(
             scoreCap: Int = 64,
         ): RegressionVariableSelector {
             val newBandit = {
-                val regression = LinearRegressionSpec.Bayesian(FEATURE_SIZE, priorVariance)
+                val regression = BayesianRegression(FEATURE_SIZE, priorVariance)
                 val spec = RegressionContextualSpec(1, regression, LinUcb, exploration, regression)
                 spec.materialize(Random(seed), Concurrency.None)
             }

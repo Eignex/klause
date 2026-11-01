@@ -48,10 +48,10 @@ object ModelJson {
 }
 
 // `mul` is IntScale when its left operand is a number, as constant multiplication encodes, else IntMul.
-private fun resolveMul(candidates: List<JsonNode>, payload: JsonElement, path: String): JsonNode {
+private fun resolveMul(candidates: List<JsonNode>, payload: JsonElement): JsonNode {
     val left = (payload as? JsonArray)?.firstOrNull() as? JsonPrimitive
     val type = if (left != null && !left.isString && left.doubleOrNull != null) IntScale::class else IntMul::class
-    return candidates.singleOrNull { it.type == type } ?: throw SerializationException("$path: ambiguous operator")
+    return candidates.singleOrNull { it.type == type } ?: throw SerializationException("ambiguous operator 'mul'")
 }
 
 private fun <T> List<T>.nestedLeft(node: (List<T>) -> T): T =

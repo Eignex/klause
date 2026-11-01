@@ -23,6 +23,45 @@ import kotlin.test.assertTrue
 
 class PrivateRebuildSatisfactionTest {
     @Test
+    fun `an owned learned equivalence should publish a checked witness without root pins`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
+                Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
+            )).bake()
+            var opens = 0
+            var closes = 0
+            val exchange = object : ClauseExchange {
+                override fun onSearchStart(session: PropagationSession) {
+                    opens++
+                    session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
+                    session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
+                }
+                override fun onSearchClose(session: PropagationSession) { closes++ }
+                override fun onRestart(session: PropagationSession) = Unit
+            }
+
+            val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+                nativeSat = native, privateRebuildWork = 65_536L, clauseExchange = exchange,
+            )))
+
+            assertTrue(source.factors.all { factor ->
+                (factor as Clause).literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+            })
+            val stats = result.stats.search.learning
+            assertNull(stats["privateRebuildProgressPins"])
+            assertEquals(1L, stats["privateRebuildBinaryRelations"])
+            assertEquals(1L, stats["privateRebuildEquivalentColumns"])
+            assertEquals(0L, stats["privateRebuildBveIndexedFactors"])
+            assertEquals(1L, stats["privateRebuildConsumers"])
+            assertEquals(1L, stats["privateRebuildSourceAccepted"])
+            assertEquals(1L, stats["privateRebuildRetired"])
+            assertEquals(1, opens)
+            assertEquals(1, closes)
+        }
+    }
+
+    @Test
     fun `private consumer should publish a checked canonical witness and release its generation`() {
         for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(

@@ -9,7 +9,6 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
-import com.eignex.kumulant.stream.lock
 
 /**
  * An append-only, de-duplicated pool of portfolio-portable [SharedCut]s shared across the LP-bearing
@@ -22,7 +21,7 @@ import com.eignex.kumulant.stream.lock
  * a platform mutex under the parallel one). De-dup is by [SharedCut.key]; a bounded [cap] stops growth
  * (it never evicts, so per-arm cursors stay valid).
  */
-internal class SharedCutPool(private val lock: Mutex = Concurrency.None.lock(), private val cap: Int = DEFAULT_CAP) {
+internal class SharedCutPool(private val lock: Mutex = Mutex(concurrent = false), private val cap: Int = DEFAULT_CAP) {
     private val cuts = ArrayList<SharedCut>()
     private val keys = LongHashSet()
 

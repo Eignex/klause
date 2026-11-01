@@ -15,6 +15,54 @@ class FamilyPolicyTest {
         (0 until rounds).count { policy.choose(pair) == family }
 
     @Test
+    fun `splitting the same paid exposure should preserve family choices`() {
+        for (reward in listOf(0.0, 0.25, 1.0)) {
+            val whole = FamilyPolicy(Random(3))
+            val split = FamilyPolicy(Random(3))
+            for (policy in listOf(whole, split)) {
+                repeat(4) { policy.record(ArmFamily.Backtrack, progressed = true, plateau = true) }
+            }
+
+            whole.record(ArmFamily.LocalSearch, progressed = reward > 0.0, plateau = true,
+                reward = reward, weight = 2.0)
+            repeat(16) {
+                split.record(ArmFamily.LocalSearch, progressed = reward > 0.0, plateau = true,
+                    reward = reward, weight = 0.125)
+            }
+
+            assertEquals(List(1_000) { whole.choose(pair) }, List(1_000) { split.choose(pair) })
+        }
+    }
+
+    @Test
+    fun `zero paid exposure should supply no evidence or fading`() {
+        val unchanged = FamilyPolicy(Random(3))
+        val unpaid = FamilyPolicy(Random(3))
+        for (policy in listOf(unchanged, unpaid)) {
+            repeat(4) { policy.record(ArmFamily.Backtrack, progressed = true, plateau = true) }
+        }
+
+        repeat(100) {
+            unpaid.record(ArmFamily.LocalSearch, progressed = true, plateau = true, reward = 1.0, weight = 0.0)
+        }
+
+        assertEquals(List(1_000) { unchanged.choose(pair) }, List(1_000) { unpaid.choose(pair) })
+    }
+
+    @Test
+    fun `longer zero yield exposure should yield more discretionary family share`() {
+        val cheap = FamilyPolicy(Random(3))
+        val costly = FamilyPolicy(Random(3))
+
+        repeat(8) {
+            cheap.record(ArmFamily.Backtrack, progressed = false, plateau = true, reward = 0.0, weight = 0.01)
+            costly.record(ArmFamily.Backtrack, progressed = false, plateau = true, reward = 0.0, weight = 1.0)
+        }
+
+        assertTrue(choicesOf(costly, ArmFamily.LocalSearch) > choicesOf(cheap, ArmFamily.LocalSearch))
+    }
+
+    @Test
     fun `low fractional progress should not earn full family success`() {
         val policy = FamilyPolicy(Random(3))
 

@@ -24,7 +24,7 @@ import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.kumulant.stream.Mutex
 
 /**
  * Supplies finite recipes and shared immutable preparation to source portfolio construction.
@@ -301,9 +301,9 @@ object PortfolioBuilder {
 
     /**
      * The shared pools for [scenario], or null when sharing doesn't apply (an LS-only portfolio
-     * ignores both). Created once per build and handed to every arm. The lock is derived
-     * from the executor's concurrency: a no-op on one lane (`Concurrency.None`, zero overhead — the clause pool
-     * is just cross-segment memory there) and a platform mutex for several lanes' concurrent writers. The clause
+     * ignores both). Created once per build and handed to every arm. The lock follows the core
+     * count: a no-op on one lane (zero overhead; the clause pool is just cross-segment memory
+     * there) and a platform mutex for several lanes' concurrent writers. The clause
      * pool is present when multiple backtrack workers can exchange clauses; the cut pool only when
      * [PortfolioScenario.shareCuts] opts in.
      */
@@ -316,15 +316,15 @@ object PortfolioBuilder {
     ): SharedPools? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null
         val identity = ModelIdentity.of(problem, objective)
-        val concurrency = if (scenario.cores == 1) Concurrency.None else Concurrency.Strict
-        val cuts = if (scenario.shareCuts) SharedCutPool(concurrency.lock()) else null
+        val concurrent = scenario.cores != 1
+        val cuts = if (scenario.shareCuts) SharedCutPool(Mutex(concurrent)) else null
         val witnessVerifier = finiteWitnessVerifier(problem, objective, toleranceCheck = scenario.toleranceCheck)
         // The bound managers are the dual of the shared incumbent: harmless for a CSP pool (no arm
         // publishes), so they are always present and only an optimising arm feeds them.
         return SharedPools(
             if (clausePeers) {
                 SharedClausePool(
-                    concurrency.lock(),
+                    Mutex(concurrent),
                     measureMemory = scenario.sharingMemory,
                     memorySampleWork = scenario.sharingMemoryWork,
                     memorySampleScratchEntries = scenario.sharingMemoryScratch,
@@ -337,8 +337,8 @@ object PortfolioBuilder {
                 null
             },
             cuts,
-            SharedObjectiveBound(concurrency.lock(), identity),
-            SharedVarBounds(problem.numIntVars, concurrency.lock(), identity.forObjective(null)),
+            SharedObjectiveBound(Mutex(concurrent), identity),
+            SharedVarBounds(problem.numIntVars, Mutex(concurrent), identity.forObjective(null)),
             IncumbentExchange<Sample, Double>(
                 improves = { candidate, standing -> candidate < standing },
                 verifier = { candidate ->
@@ -357,18 +357,18 @@ object PortfolioBuilder {
                     }
                 },
             ),
-            ContributionTally(concurrency.lock()),
+            ContributionTally(Mutex(concurrent)),
             nativeProjection = PropagationProblem(problem).takeIf { it.isNativeSatEligible },
             localSearchProjection = LocalSearchPreparation(
                 problem,
                 LocalSearchModel.of(problem).domains,
-                concurrency.lock(),
+                Mutex(concurrent),
             ).takeIf { it.shareable },
             localSearchInvariants = InvariantNetworkPreparation(
                 definitionalSweep,
                 problem.numIntVars,
                 problem.numBoolVars,
-                concurrency.lock(),
+                Mutex(concurrent),
             ),
             identity = identity,
         )

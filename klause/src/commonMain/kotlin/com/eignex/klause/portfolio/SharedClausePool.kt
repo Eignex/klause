@@ -12,9 +12,7 @@ import com.eignex.klause.util.SharingMemorySnapshot
 import com.eignex.klause.util.SharingMemoryStatus
 import com.eignex.klause.util.mixLongKey
 import com.eignex.klause.util.openAddressingCapacity
-import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
-import com.eignex.kumulant.stream.lock
 
 /**
  * An append-only, de-duplicated pool of session-portable learned nogoods ([SharedClause]) shared
@@ -24,9 +22,8 @@ import com.eignex.kumulant.stream.lock
  *
  * Used by the [Portfolio] on any number of lanes: several lanes publish concurrently and need a real lock,
  * and across segments the pool is also the *persistent memory* that survives a backtrack arm's handle being
- * rebuilt. The [lock] comes from the executor's
- * [Concurrency] via [com.eignex.kumulant.stream.lock]: a no-op under `Concurrency.None` (the single
- * core pays nothing), a platform mutex under the parallel executor's concurrent writers.
+ * rebuilt. The [lock] is a [Mutex] sized to the executor: a no-op on a single core (which pays
+ * nothing), a platform mutex under the parallel executor's concurrent writers.
  *
  * De-dup is by [SharedClause.key]. A bounded [cap] stops growth: a publish that would overflow first
  * compacts the pool to half, keeping globally-published nogoods (soundness-motivated shares that
@@ -41,7 +38,7 @@ import com.eignex.kumulant.stream.lock
  * in modern SAT solvers", IJCAI 2009, https://www.ijcai.org/Proceedings/09/Papers/074.pdf.
  */
 internal class SharedClausePool(
-    private val lock: Mutex = Concurrency.None.lock(),
+    private val lock: Mutex = Mutex(concurrent = false),
     private val cap: Int = DEFAULT_CAP,
     internal val measureMemory: Boolean = false,
     internal val memorySampleWork: Long = SharingMemoryObservation.DEFAULT_WORK,

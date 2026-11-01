@@ -5,15 +5,14 @@ import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.util.Cancellation
-import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.kumulant.stream.Mutex
 
 internal class PolynomialInvocationScope(
     private val service: PolynomialTheoryService,
     private val params: PolynomialTheoryParams,
 ) {
     private val native = QuadraticNativeScope(params)
-    private val lock = Concurrency.Strict.lock()
+    private val lock = Mutex()
     private var decline: PolynomialTheoryResource? = null
     val resource: PolynomialTheoryResource? get() = lock.withLock { decline }
     val stats: PolynomialTheoryStats get() = native.polynomialStats

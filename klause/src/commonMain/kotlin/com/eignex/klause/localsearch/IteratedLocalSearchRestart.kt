@@ -3,11 +3,11 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.solver.Sample
 import com.eignex.koblas.DenseVector
 import com.eignex.kumulant.bandit.ContextualBandit
-import com.eignex.kumulant.bandit.contextual.LinearRegressionSpec
 import com.eignex.kumulant.bandit.contextual.RegressionContextualBandit
 import com.eignex.kumulant.bandit.contextual.RegressionContextualSpec
 import com.eignex.kumulant.bandit.materialize
 import com.eignex.kumulant.core.Concurrency
+import com.eignex.kumulant.schema.spec.BayesianRegression
 import com.eignex.kumulant.stat.regression.glm.MultivariateGaussian
 import kotlin.math.abs
 import kotlin.random.Random
@@ -336,7 +336,7 @@ class IteratedLocalSearchRestart(
             exploration: Double = 1.0,
             priorVariance: Double = 1.0,
         ): RegressionContextualBandit<*> {
-            val regression = LinearRegressionSpec.Bayesian(ACCEPT_FEATURES, priorVariance)
+            val regression = BayesianRegression(ACCEPT_FEATURES, priorVariance)
             val spec = RegressionContextualSpec(2, regression, MultivariateGaussian, exploration, regression)
             return spec.materialize(Random(seed), Concurrency.None)
         }
