@@ -226,14 +226,14 @@ class LpHintsTest {
                     hints.record(relaxation, DoubleArray(3) { 2.25 }, DoubleArray(0))
                     hints.recordObjective(relaxation, 10.0)
                     hints.branch(VarRef.IntVar(variable))
-                    for (up in listOf(false, true)) {
+                    for (up in if (variable == 0 || samples == 2) listOf(false, true) else listOf(false)) {
                         hints.commit(if (up) SearchDecision.IntAtLeast(variable, 3)
                             else SearchDecision.IntAtMost(variable, 2), 1)
                         hints.beginNode(1, 100.0)
                         hints.record(relaxation, DoubleArray(3) { 2.25 }, DoubleArray(0))
                         val delta = if (variable == 0) {
                             if (up) 24.0 else 8.0
-                        } else if (up) 24.0 else gain
+                        } else if (up) 3.0 else gain
                         hints.recordObjective(relaxation, 10.0 + delta)
                     }
                 }

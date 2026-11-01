@@ -188,7 +188,7 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `both observed directions blend local gains until their reliability threshold`() {
+    fun `each direction blends local observations until its reliability threshold`() {
         for (samples in listOf(1, 2)) {
             val history = LpDirectionalHistory({})
             history.beginNode(0)
@@ -209,44 +209,11 @@ class LpDirectionalHistoryTest {
                 history.commit(SearchDecision.IntAtMost(1, 2), 1)
                 history.beginNode(1)
                 history.record(11.0)
-                history.commit(SearchDecision.IntAtLeast(1, 3), 1)
-                history.beginNode(1)
-                history.record(13.0)
             }
 
             val score = history.score(VarRef.IntVar(1), 2.25)
 
-            assertEquals(if (samples == 1) 5.0 else 1.5, score, 1e-9)
-        }
-    }
-
-    @Test
-    fun `one sided local history keeps selection fallback despite a reliable class prior`() {
-        for (up in listOf(false, true)) {
-            val history = LpDirectionalHistory({})
-            history.beginNode(0)
-            history.record(10.0)
-            history.branch(VarRef.IntVar(0), 2.25)
-            repeat(2) {
-                history.commit(SearchDecision.IntAtMost(0, 2), 1)
-                history.beginNode(1)
-                history.record(11.0)
-                history.commit(SearchDecision.IntAtLeast(0, 3), 1)
-                history.beginNode(1)
-                history.record(13.0)
-            }
-            val variable = VarRef.IntVar(1)
-            history.beginNode(0)
-            history.record(10.0)
-            history.branch(variable, 2.25)
-            history.commit(if (up) SearchDecision.IntAtLeast(1, 3) else SearchDecision.IntAtMost(1, 2), 1)
-            history.beginNode(1)
-            history.record(if (up) 13.0 else 11.0)
-
-            val score = history.score(variable, 2.25)
-
-            assertTrue(score.isNaN())
-            assertTrue(history.referenceScore(variable, 2.25).isFinite())
+            assertEquals(if (samples == 1) 22.0 / 3.0 else 5.0, score, 1e-9)
         }
     }
 

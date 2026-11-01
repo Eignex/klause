@@ -137,7 +137,7 @@ internal class LpDirectionalHistory(
         val prior = if (reliable(local) == null) {
             if (!useClassPriors) return Double.NaN
             if (!initializeUnobserved &&
-                (local == null || local.down.count == 0 || local.up.count == 0)
+                (local == null || local.down.count + local.up.count == 0)
             ) return Double.NaN
             charge(1L)
             reliable(if (variable is VarRef.Bool) booleanPrior else integerPrior, prior = true)
