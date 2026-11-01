@@ -878,6 +878,8 @@ without subsequent checked support and actual frontier consumption.
 `numericalCutSelectionRetiredInstalled` counts installed rows expired after four
 usable slack observations; `POINT_INSTALLED_RETIRED` attributes them by family.
 Installed-row aging continues after candidate discovery retires.
+These scans omit objective projection and candidate comparison vectors; their
+activity work and modeled storage remain in the selection and containing totals.
 Retained tight rows still require current-source checks. Keep subsequent row-layout
 replacement, proof-mode changes and factor work in the containing cost comparison.
 Adopted current families suspend retired rows while retaining their numerical

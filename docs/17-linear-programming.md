@@ -414,6 +414,9 @@ replacement generation receives its own lifetime. Remaining installed cuts keep
 their ordinary source checks and scope retraction. Retirement only weakens the
 relaxation, retaining cut definitions and checked coverage. An empty selected mask
 stays distinct from the ordinary all-cut recipe and cannot reinstall expired rows.
+After discovery retires, installed-row scans omit objective projection and candidate
+comparison vectors. Their point projection, activity checks and age state still
+debit the scoring and containing source allowances.
 Retired unselected candidates
 are omitted from proof replay as well as scoring. Masked-query reuse distinguishes
 whether unselected candidates are checked; installed cuts retain fresh source

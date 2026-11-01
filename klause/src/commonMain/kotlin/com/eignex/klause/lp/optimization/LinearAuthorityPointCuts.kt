@@ -108,8 +108,9 @@ internal class LinearAuthorityPointCuts(
         val meter = Meter(cancellation)
         val visitedFamilies = HashSet<CutFamily>()
         try {
+            val pointEntryBytes = if (retired) 64L else 128L
             if (point.size != coordinates.size || point.size > maximumSupport ||
-                !meter.charge(point.size.toLong(), 128L + point.size * 128L)) {
+                !meter.charge(point.size.toLong(), 128L + point.size * pointEntryBytes)) {
                 observe("PointUnavailable")
                 return installed
             }
@@ -124,9 +125,11 @@ internal class LinearAuthorityPointCuts(
                     return installed
                 }
                 values[coordinates[id]] = value
-                val cost = meter.scalar(costs[id]) ?: 0.0
-                objective[coordinates[id]] = cost
-                objectiveNormSquared += cost * cost
+                if (!retired) {
+                    val cost = meter.scalar(costs[id]) ?: 0.0
+                    objective[coordinates[id]] = cost
+                    objectiveNormSquared += cost * cost
+                }
             }
             var aggregateOnly = adoptCurrent && rows.size <= maximumCuts
             if (aggregateOnly) {
@@ -162,7 +165,8 @@ internal class LinearAuthorityPointCuts(
                 }
                 if (id !in checked) continue
                 val size = row.inequality.supportSize
-                if (size > maximumSupport - support || !meter.charge(1L, 128L + size * 96L)) {
+                val rowAllocation = if (retired) 64L else 128L + size * 96L
+                if (size > maximumSupport - support || !meter.charge(1L, rowAllocation)) {
                     observe("ScanLimited")
                     meter.limited = true
                     break
@@ -170,7 +174,7 @@ internal class LinearAuthorityPointCuts(
                 support += size
                 visitedFamilies.add(row.family)
                 observe("Visited")
-                val projected = LinkedHashMap<SourceCoordinate, Double>()
+                val projected = if (retired) null else LinkedHashMap<SourceCoordinate, Double>()
                 var normSquared = 0.0
                 var activity = 0.0
                 var parallel = 0.0
@@ -182,10 +186,10 @@ internal class LinearAuthorityPointCuts(
                         usable = false
                         break
                     }
-                    projected[coordinate] = scalar
+                    projected?.set(coordinate, scalar)
                     normSquared += scalar * scalar
                     activity += scalar * value
-                    parallel += scalar * (objective[coordinate] ?: 0.0)
+                    if (!retired) parallel += scalar * (objective[coordinate] ?: 0.0)
                 }
                 val rhs = meter.scalar(row.inequality.rhs)
                 val norm = sqrt(normSquared)
@@ -201,17 +205,18 @@ internal class LinearAuthorityPointCuts(
                     observe("ScoreUnavailable")
                     continue
                 }
-                val scored = Scored(id, projected, norm, score)
                 onCut(row.family, when {
                     id in installed -> "POINT_RETAINED"
                     efficacy >= CutPool.MIN_EFFICACY -> "POINT_ELIGIBLE"
                     else -> "POINT_LOW_EFFICACY"
                 }, 1L)
                 if (id in installed) {
-                    forced += scored
+                    if (projected != null) forced += Scored(id, projected, norm, score)
                     observedInactive[id] = if (activity - checkNotNull(rhs) >= -CutPool.ACTIVE_TOLERANCE) 0
                         else minOf(4, (inactiveScans[id] ?: 0) + 1)
-                } else if (efficacy >= CutPool.MIN_EFFICACY) candidates += scored
+                } else if (efficacy >= CutPool.MIN_EFFICACY) {
+                    candidates += Scored(id, checkNotNull(projected), norm, score)
+                }
             }
             val selected = selectNonparallelCuts(candidates.sortedWith(compareByDescending<Scored> { it.score }
                 .thenBy { it.id }), maximumCuts - installed.size, 1.0 - CutPool.MIN_ORTHOGONALITY, forced) { a, b ->
