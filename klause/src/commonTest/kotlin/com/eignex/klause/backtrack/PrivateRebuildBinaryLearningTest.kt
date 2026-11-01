@@ -58,6 +58,25 @@ class PrivateRebuildBinaryLearningTest {
     }
 
     @Test
+    fun `recent binaries should close a source implication within a linear scan grant`() {
+        val learning = (2 until 82).map { Clause(intArrayOf(1, Lit.make(it, true))) }
+        val source = Problem(82, 0, emptyArray(), (listOf(
+            Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3, 4)), Clause(intArrayOf(0, 3, 5)),
+        ) + learning).toTypedArray()).bake()
+        val session = PropagationSession(source)
+        session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
+        for (clause in learning) session.addLearnedClause(clause, 2)
+        var spent = 0L
+
+        val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { work ->
+            if (work > 4096L - spent) false else { spent += work; true }
+        }
+
+        assertNotNull(captured)
+        assertTrue(spent <= 4096L)
+    }
+
+    @Test
     fun `foreign and scoped learning should withhold an equivalence`() {
         for (native in listOf(false, true)) for (permanent in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(

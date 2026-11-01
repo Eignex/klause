@@ -107,6 +107,14 @@ internal class FamilyPolicy(
         }
     }
 
+    fun fade(retention: Double) {
+        require(retention in 0.0..1.0) { "family retention must be in [0, 1]" }
+        for (i in successes.indices) {
+            successes[i] *= retention
+            failures[i] *= retention
+        }
+    }
+
     /**
      * Record one segment of [family]: whether it [progressed], and [plateau] once an incumbent exists, when a
      * segment without progress counts against an observable family. Before that, only an observable family's

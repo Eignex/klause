@@ -584,7 +584,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 privateRebuildWork,
                 rootProbeBatch, rootProbeWork, inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
                 inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth,
-                inprocessingCooldown, lpObjectiveCone, lpAutoOffReprobe,
+                inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,
                 lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
                 lpBranching, lpDirectionalGains,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning,

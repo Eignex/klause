@@ -291,6 +291,8 @@ reconstruction; transitive binary deletion alone opens no consumer. Literal
 remapping reserves normalization work before the graph pass receives half the
 remaining allowance. Discovery visits recent learning first, scanning at most 128 eligible binaries and
 32,768 work units per root observation, inside the cumulative trial allowance.
+Reciprocal matching uses a temporary fixed-capacity key table and one source walk
+for the retained learned keys. Table initialization and probes consume discovery work.
 Changed learned counts or compaction revisions permit another scan. A fixed history
 remembers at most 32 attempted relations; its storage and 16 KiB discovery scratch
 consume the existing byte grant. Exhausted scans establish no absence of other
