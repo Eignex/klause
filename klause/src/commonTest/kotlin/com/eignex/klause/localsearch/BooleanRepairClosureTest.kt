@@ -23,6 +23,71 @@ import kotlin.test.assertTrue
 
 class BooleanRepairClosureTest {
     @Test
+    fun `joint implications should complete within a linear clause visit allowance`() {
+        val count = 300
+        val output = count + 2
+        val factors = Array<Factor>(count + 3) { index ->
+            when {
+                index < count -> Clause(intArrayOf(Lit.make(0, false), Lit.make(index + 1, true)))
+                index == count -> Clause(IntArray(count + 1) {
+                    if (it < count) Lit.make(it + 1, false) else Lit.make(count + 1, true)
+                })
+                index == count + 1 -> Clause(intArrayOf(Lit.make(0, true), Lit.make(output, true)))
+                else -> Clause(intArrayOf(Lit.make(0, false), Lit.make(output, false)))
+            }
+        }
+        val problem = Problem(output + 1, 0, emptyArray(), factors)
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setBool(output, true)
+        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(output, intArrayOf(Lit.make(0, false)), true),
+        ))?.network(0, output + 1)
+        state.recompute()
+        val control = LocalSearchRunControl(Cancellation.Never)
+        state.inspectionWork = control
+        state.repairWork = control.repairWork
+        val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
+        var polls = 0
+
+        val move = closure.close(state, Move.BoolFlip(0), Cancellation { ++polls > 16 })
+        state.apply(assertNotNull(move))
+
+        assertTrue((0 until output).all { state.assignment.boolValue(it) })
+        assertFalse(state.assignment.boolValue(output))
+        assertEquals(0L, state.cost)
+        assertTrue(control.repairVisits in 1L..4_096L)
+        assertEquals(control.repairVisits, control.inspectionVisits)
+    }
+
+    @Test
+    fun `queued mandatory clauses should settle before replacement support choices`() {
+        val problem = Problem(6, 0, emptyArray(), arrayOf<Factor>(
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(3, true), Lit.make(4, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(2, false), Lit.make(3, false))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(5, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(5, false))),
+        ))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.assignment.setBool(5, true)
+        state.invariants = DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(5, intArrayOf(Lit.make(0, false)), true),
+        ))?.network(0, 6)
+        state.shaping.objective = LinearObjective(boolWeights = longArrayOf(0, 0, 0, 1, 2, 10))
+        state.recompute()
+        val closure = assertNotNull(BooleanRepairClosure.preparation(state).filterNotNull().first().closure)
+
+        state.apply(assertNotNull(closure.close(state, Move.BoolFlip(0), Cancellation.Never)))
+
+        assertTrue(state.assignment.boolValue(1))
+        assertTrue(state.assignment.boolValue(2))
+        assertFalse(state.assignment.boolValue(3))
+        assertTrue(state.assignment.boolValue(4))
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
     fun `closed pools should retain primitive lane order`() {
         val problem = Problem(
             4,

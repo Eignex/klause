@@ -15,6 +15,23 @@ import kotlin.test.assertNotNull
 
 class LocalSearchPhaseTimerTest {
     @Test
+    fun `inspection snapshots should retain their captured visit count`() {
+        var visits = 4L
+        val timer = LocalSearchPhaseTimer { 0L }
+        timer.inspectionVisits = { visits }
+        timer.repairVisits = { visits / 2L }
+        val first = timer.objectiveScoringSnapshot()
+
+        visits = 9L
+        val second = timer.objectiveScoringSnapshot()
+
+        assertEquals(4L, first.getValue("inspection-visits"))
+        assertEquals(9L, second.getValue("inspection-visits"))
+        assertEquals(2L, first.getValue("repair-visits"))
+        assertEquals(4L, second.getValue("repair-visits"))
+    }
+
+    @Test
     fun `generic functional scoring should report completed evaluator calls`() {
         val source = Dimacs.parseWcnf("7 1 2 0\n").toProblem()
         val sweep = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = source.boolFolds))
