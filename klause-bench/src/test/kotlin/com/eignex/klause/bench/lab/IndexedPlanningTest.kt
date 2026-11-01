@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.lab
 
 import com.eignex.klause.bench.catalog.Category
+import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.ExternalCollection
 import com.eignex.klause.bench.catalog.FetchMethod
 import com.eignex.klause.bench.catalog.Format
@@ -43,6 +44,29 @@ class IndexedPlanningTest {
         Category.SAT,
         format = Format.DIMACS,
     )
+
+    @Test
+    fun `named archive selection preserves indexed provenance without fetching bytes`() = withCache { cache ->
+        val suite = Catalog.dynamicSuites.first { it.id == "smtlib-qflra" }
+        val archive = requireNotNull(suite.sourceLayout)
+        val materialized = File(cache, "materialized")
+        val tree = File(materialized, archive.collection.id)
+        for (path in listOf("a/one.smt2", "b/two.smt2.zst", "unrelated/other.smt2")) {
+            File(tree, "${archive.layout.subDir}/$path").apply { parentFile.mkdirs() }.writeText("fixture")
+        }
+        val indexed = File(cache, "indexed")
+        CorpusIndexes(indexed).save(CorpusIndex.of(archive.collection.id, tree))
+        val names = listOf("b/two", "a/one", "missing/three")
+        val expected = withProperties(materialized, declared = false) {
+            Catalog.uncapped(suite.id).problems.associateBy { it.name }.let { all -> names.mapNotNull(all::get) }
+        }
+        val actual = withProperties(indexed, declared = true) { Catalog.named(suite.id, names) }
+        assertEquals(expected, actual)
+        assertFalse(
+            File(indexed, archive.collection.id).exists(),
+            "exact lookup must use the index without fetching corpus bytes",
+        )
+    }
 
     @Test
     fun `declared input planning selects and hashes from the index without corpus bytes`() = withCache { cache ->

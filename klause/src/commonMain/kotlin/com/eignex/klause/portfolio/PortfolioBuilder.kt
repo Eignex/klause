@@ -172,6 +172,7 @@ object PortfolioBuilder {
                     selectedSweep, onEvent, pools,
                 )
                 worker.bindEvidence(ModelIdentity.of(problem, objective)).also {
+                    it.earlyCoreTrial = config is CoreGuidedWorkerConfig && deferCore && scenario.earlyCoreAdmission
                     it.improvementOnly = if (config is CoreGuidedWorkerConfig && deferCore) {
                         !scenario.earlyCoreAdmission
                     } else armId >= plan.firstSolutionCount

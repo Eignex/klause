@@ -8,6 +8,20 @@ import kotlin.test.assertTrue
 class LongHashSetTest {
 
     @Test
+    fun `insertion capacity predicts whether fresh members allocate backing arrays`() {
+        for ((existing, additional) in listOf(0 to 0, 0 to 1, 1 to 1, 8 to 1)) {
+            val set = LongHashSet()
+            repeat(existing) { set.add(it.toLong()) }
+            val bytes = set.allocatedBytes
+
+            val fits = set.canAddWithoutGrowing(additional)
+            repeat(additional) { set.add((existing + it).toLong()) }
+
+            assertEquals(fits, bytes == set.allocatedBytes)
+        }
+    }
+
+    @Test
     fun `bounded lookup should stop a collision chain without changing retained keys`() {
         val keys = (0L..64L).groupBy { mixLongKey(it) and 15 }.values.first { it.size >= 3 }.take(3)
         val set = LongHashSet()

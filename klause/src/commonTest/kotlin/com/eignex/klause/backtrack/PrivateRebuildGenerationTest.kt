@@ -24,14 +24,14 @@ import kotlin.test.assertTrue
 class PrivateRebuildGenerationTest {
     @Test
     fun `learned equivalences should open a reconstructable private consumer without root pins`() {
-        for (native in listOf(false, true)) {
+        for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
-                Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
+                Clause(intArrayOf(1, replacement, 4)), Clause(intArrayOf(1, replacement, 5)),
+                Clause(intArrayOf(0, Lit.negate(replacement), 6)), Clause(intArrayOf(0, Lit.negate(replacement), 7)),
             )).bake()
             val session = PropagationSession(source, nativeSat = native)
-            session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
-            session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
+            session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
+            session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
             val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
 
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
@@ -49,6 +49,26 @@ class PrivateRebuildGenerationTest {
             assertNull(session.boolValue(0))
             assertEquals(4, source.numFactors)
         }
+    }
+
+    @Test
+    fun `new root pins should withhold an earlier learned equivalence capture`() {
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
+            Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
+            Clause(intArrayOf(0, 4, 6)), Clause(intArrayOf(0, 4, 7)),
+            Clause(intArrayOf(0, 5, 6)), Clause(intArrayOf(0, 5, 7)),
+        )).bake()
+        val session = PropagationSession(source)
+        session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
+        session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
+        val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
+        session.addLearnedClause(Clause(intArrayOf(0)), 1)
+
+        val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L,
+            Cancellation.Never, learnedBinary = captured)
+
+        assertNull(generation)
     }
 
     @Test

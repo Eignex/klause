@@ -485,10 +485,23 @@ inprocessing, since derivations under assumption pins would not hold globally.
 
 Opt-in root simplification examines bounded slices of source and learned Boolean
 clauses against permanent root facts. An empty Boolean pin trail withholds the scan;
-without a pinned literal it cannot satisfy or shorten a Boolean clause. A shortened
-source clause enters as a permanent
-session-local replacement before its watches retire; immutable source text remains
-available for reasons. The propagation session owns unfinished source-watch retirement
+without a pinned literal it cannot satisfy or shorten a Boolean clause. Clauses
+affected by a new Boolean root fact can be reached through a source-occurrence index
+prepared ahead of traversal or cached by ordinary propagation. This bounded
+neighborhood alternates with the ordinary clause scan,
+retains its pin and occurrence positions across slices, and builds no index
+inside the pass. Pin and occurrence walks admit at most 8,192 entries per slice
+even with an unlimited class grant. Projections without an available index retain
+the ordinary scan. An indexed candidate at the ordinary cursor advances both walks;
+unchanged prefixes are not examined twice. Retired and non-clause source entries
+do not defer the remaining literal window. Once available occurrence walks cover
+every root pin, the ordinary cursor skips the remaining source suffix and continues
+through learned clauses. Missing indexes retain the full source scan. Learned
+compaction invalidates learned candidates while preserving stable source candidates.
+A shortened
+source clause enters as a permanent session-local replacement before its watches
+retire; immutable source text remains available for reasons. The propagation session
+owns unfinished source-watch retirement
 after replacement admission. Pass reset or optional buffer release retains that record;
 a funded slice retires its watches before admitting another source replacement.
 Session close releases it. Satisfied source watches retire without changing variable IDs.

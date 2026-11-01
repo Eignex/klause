@@ -369,6 +369,18 @@ internal object Suites {
                     format = Format.WCNF,
                 )
             },
+            DynamicSuite(
+                "maxsat-maxcut",
+                "MaxSAT LIB weighted MaxCut instances (fetched; compact family archive)",
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.maxsatLibMaxcut,
+                    CorpusSelection.Layout.Flat("maxsat_instances/master_set/weighted/maxcut", "wcnf"),
+                    sel,
+                    Category.OPTIMIZATION,
+                    format = Format.WCNF,
+                )
+            },
         )
     }
 
@@ -1111,6 +1123,14 @@ internal object ExternalCollections {
         fetch = FetchMethod.Zip,
     )
 
+    val maxsatLibMaxcut = ExternalCollection(
+        id = "maxsat-lib-weighted-maxcut",
+        url = "https://www.cs.toronto.edu/maxsat-lib/maxsat-instances/downloads/weighted/maxcut_wt.zip",
+        license = "MaxSAT Evaluation (academic benchmarks)",
+        reason = "438KiB MaxSAT LIB weighted MaxCut family; fetched rather than vendored",
+        fetch = FetchMethod.Zip,
+    )
+
     val miplib2010 = ExternalCollection(
         id = "miplib2010",
         url = "https://miplib2010.zib.de/download/miplib2010-1.1.3-complete.tgz",
@@ -1214,7 +1234,13 @@ private fun archiveSuite(
     subDir: String,
 ): DynamicSuite {
     val layout = CorpusSelection.Layout.Flat(subDir, "smt2")
-    return DynamicSuite(id, description, defaultPerFamily = 1, sourceLayout = ArchiveSourceLayout(collection, layout)) {
+    return DynamicSuite(
+        id,
+        description,
+        defaultPerFamily = 1,
+        sourceLayout = ArchiveSourceLayout(collection, layout),
+        namedProvider = { names -> CorpusSelection.named(collection, layout, names, Category.CSP, Format.SMTLIB) },
+    ) {
         CorpusSelection.select(collection, layout, it, Category.CSP, format = Format.SMTLIB)
     }
 }

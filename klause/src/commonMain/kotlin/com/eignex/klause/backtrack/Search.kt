@@ -356,6 +356,14 @@ internal class CpSatisfactionTraversal(
         return Lit.make(variable, cp.session.boolValue(variable) ?: return null)
     }
 
+    fun retainPartition(literal: Int): Boolean {
+        check(rebindable && !closed && run != null && sharedSession == null && rootOutcome == null)
+        require(!traversal.retainedRoot && splitLiteral() == literal)
+        if (!checkNotNull(run).retainBooleanRoot(literal)) return false
+        traversal.retainedRoot = true
+        return true
+    }
+
     fun rebind(assumptions: Assumptions) {
         check(rebindable && !closed)
         require(assumptions.numInts == 0 && assumptions.deductions.isEmpty &&
@@ -450,7 +458,8 @@ internal class CpSatisfactionTraversal(
                 finishQuery()
                 // Learned decision levels describe traversal, not every premise of the exhausted tree.
                 SearchOutcome.Exhausted(touchedAssumptionLevels = IntArray(
-                    currentAssumptions.numBools + currentAssumptions.numInts,
+                    currentAssumptions.numBools + currentAssumptions.numInts +
+                        (if (traversal.retainedRoot) 1 else 0),
                 ) { it + 1 })
             }
 
@@ -543,6 +552,7 @@ private class CpSatisfactionTraversalPolicy(
 ) : SearchTraversalPolicy,
     SearchRunLifecycle {
     private val restart = RestartSchedule.from(params)
+    var retainedRoot = false
 
     private val session: PropagationSession get() = cp.session
     val brancher = BacktrackBrancher(
@@ -580,7 +590,8 @@ private class CpSatisfactionTraversalPolicy(
         } ?: true
     }
     override val observer: SearchRunObserver = brancher
-    override val modelContinuation = SearchModelContinuation.BlockAtRoot
+    override val modelContinuation = if (rebindable) SearchModelContinuation.Chronological
+        else SearchModelContinuation.BlockAtRoot
     override val modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll
     override val pauseBeforeDecision: () -> Boolean = slice?.beforeBranch ?: { false }
     override val nodePolicy: SearchNodePolicy = object : SearchNodePolicy {
@@ -604,6 +615,7 @@ private class CpSatisfactionTraversalPolicy(
     fun releaseRetainedState() { inprocessing?.reset() }
 
     fun resetScope() {
+        retainedRoot = false
         inprocessing?.reset()
         learnedMemory.reset()
     }

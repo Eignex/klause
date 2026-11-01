@@ -1112,11 +1112,13 @@ private fun executePortfolio(
     if (deferLpProbes && (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
         pipelineConfigError("portfolio-lp-start requires curated single-core mixed optimization")
     }
-    val booleanProofTasks = request.executionOptions.reader()[ExecutionOption.booleanProofTasks] ?: false
-    if (booleanProofTasks && (request.optimize || request.cores != 1 ||
-            request.engine !in setOf(FiniteEngine.MIXED, FiniteEngine.BACKTRACK))) {
+    val requestedBooleanTasks = request.executionOptions.reader()[ExecutionOption.booleanProofTasks]
+    val booleanTaskScope = !request.optimize && request.cores == 1 &&
+        (request.engine == FiniteEngine.MIXED || request.engine == FiniteEngine.BACKTRACK)
+    if (requestedBooleanTasks == true && !booleanTaskScope) {
         pipelineConfigError("boolean-proof-tasks requires single-core finite satisfaction")
     }
+    val booleanProofTasks = if (booleanTaskScope) requestedBooleanTasks else false
     val proofShare = request.executionOptions.reader()[ExecutionOption.portfolioProofShare]
     val proofWorkers = request.executionOptions.reader()[ExecutionOption.portfolioProofWorkers]
     val includeRestartingProof = when (proofWorkers) {
@@ -1176,12 +1178,19 @@ private fun executePortfolio(
 
         is PortfolioPlan.Execute -> Unit
     }
-    val scenario = clausalDefaultScenario(
+    val baseScenario = clausalDefaultScenario(
         plan.scenario,
         ProblemProfile.of(request.problem, request.optimize),
         request.defaultArms,
         explicitArms = request.executionOptions.explicitArms,
     )
+    val scenario = weightedCoreDefaultScenario(baseScenario, request.problem, request.objective,
+        request.executionOptions, request.cancellation)
+    if (scenario !== baseScenario) {
+        request.onPortfolioEvent?.invoke("portfolio", SearchEvent.WorkerAdmission("core-guided/weighted-default",
+            admitted = true, requirements = "bounded early trial with historical-reason refinement",
+            declines = emptyList(), selected = true))
+    }
     val executor = FinitePipeline.portfolioExecutor(
         request.problem,
         scenario,

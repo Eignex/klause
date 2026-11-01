@@ -76,6 +76,15 @@ internal class PrivateRebuildGeneration private constructor(
             cancellation.charge(source.numBoolVars.toLong())
             if (cancellation()) return null
             val fixed = Array(source.numBoolVars) { session.boolValue(it) }
+            val complemented = learnedBinary?.complementedVariable ?: -1
+            if (learnedBinary != null) {
+                cancellation.charge(2L)
+                if (cancellation()) return null
+                if (learnedBinary.clauses[0].literals.any { fixed[Lit.variable(it)] != null }) {
+                    onDecline("BinaryFixedColumn")
+                    return null
+                }
+            }
             val residual = ArrayList<Factor>(source.numFactors)
             var reused = 0
             for (factor in source.factors) {
@@ -84,9 +93,15 @@ internal class PrivateRebuildGeneration private constructor(
                 cancellation.charge(literals.size * 2L + 1L)
                 if (cancellation()) return null
                 var changed = false
+                var complementedRow = false
                 var satisfied = false
                 for (literal in literals) {
-                    val value = fixed[Lit.variable(literal)] ?: continue
+                    val variable = Lit.variable(literal)
+                    if (variable == complemented) {
+                        changed = true
+                        complementedRow = true
+                    }
+                    val value = fixed[variable] ?: continue
                     changed = true
                     if (Lit.evaluate(literal, value)) {
                         satisfied = true
@@ -98,15 +113,29 @@ internal class PrivateRebuildGeneration private constructor(
                     residual.add(factor)
                     reused++
                 } else {
+                    if (complementedRow) {
+                        cancellation.charge(literals.size * 5L + 1L)
+                        if (cancellation()) return null
+                    }
                     val remaining = literals.filter { fixed[Lit.variable(it)] == null }.toIntArray()
+                    if (complementedRow) for (index in remaining.indices) {
+                        if (Lit.variable(remaining[index]) == complemented) {
+                            remaining[index] = Lit.negate(remaining[index])
+                        }
+                    }
                     if (remaining.isEmpty()) return null
                     residual.add(Clause(remaining))
                 }
             }
             if (learnedBinary != null) {
-                cancellation.charge(learnedBinary.clauses.size * 3L)
+                cancellation.charge(if (complemented < 0) learnedBinary.clauses.size * 3L
+                    else learnedBinary.clauses.sumOf { it.literals.size * 5L + 2L })
                 if (cancellation()) return null
-                residual.addAll(learnedBinary.clauses)
+                if (complemented < 0) residual.addAll(learnedBinary.clauses)
+                else for (clause in learnedBinary.clauses) residual.add(Clause(IntArray(clause.literals.size) {
+                    val literal = clause.literals[it]
+                    if (Lit.variable(literal) == complemented) Lit.negate(literal) else literal
+                }))
             }
             val pinned = Problem(
                 source.numBoolVars, 0, emptyArray(), residual.toTypedArray(),
@@ -120,7 +149,11 @@ internal class PrivateRebuildGeneration private constructor(
                 return null
             }
             var mapping = SourceMapping(source, pinned, guarantees, lift = { sample ->
-                Sample(BooleanArray(fixed.size) { fixed[it] ?: sample.boolValue(it) }, longArrayOf())
+                Sample(BooleanArray(fixed.size) { variable ->
+                    fixed[variable] ?: sample.boolValue(variable).let { value ->
+                        if (variable == complemented) !value else value
+                    }
+                }, longArrayOf())
             })
             val neighborhood = admission?.let {
                 PrivateRebuildNeighborhood.prepare(pinned, it, cancellation) ?: return null
@@ -184,7 +217,7 @@ internal class PrivateRebuildGeneration private constructor(
             mapping = mapping.then(SourceMapping(pinned, reduced, guarantees, rebuild))
             val warmStart = TimeSource.Monotonic.markNow()
             val warm = PrivateRebuildWarmClauses.capture(session, rebuild, fixed, byteLimit - privateBytes,
-                (allowance - spent).coerceAtLeast(0L), cancellation) ?: return null
+                (allowance - spent).coerceAtLeast(0L), cancellation, complemented) ?: return null
             val warmNanos = warmStart.elapsedNow().inWholeNanoseconds
             val enriched = if (warm.clauses.isEmpty()) reduced else reduced.withFactors(reduced.factors + warm.clauses)
             mapping = mapping.then(SourceMapping(reduced, enriched, TransformationGuarantees.IDENTITY))

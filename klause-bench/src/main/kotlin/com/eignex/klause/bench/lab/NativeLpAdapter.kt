@@ -22,7 +22,7 @@ import kotlinx.serialization.json.put
 import java.nio.file.Files
 import java.time.Instant
 
-/** Plans original MPS sources and records Native CLI points through the ordinary lab checker protocol. */
+/** Plans original MPS and SMT-LIB sources through the ordinary Native CLI and lab checker protocol. */
 fun main(args: Array<String>) {
     val protocolOutput = System.out
     System.setOut(System.err)
@@ -31,10 +31,12 @@ fun main(args: Array<String>) {
 }
 
 internal object NativeLpSuite : BenchSuite {
-    override fun describe() = BenchDescriptor("klause-native-lp", "Original MPS Native CLI qualification")
+    override fun describe() = BenchDescriptor("klause-native-lp", "Original MPS and SMT-LIB Native CLI qualification")
 
     override fun plan(request: BenchRequest): List<BenchCase> = KlauseLabSuite.plan(request).map { case ->
-        require(case.attributes["format"] == Format.MPS.name) { "Native LP qualification requires original MPS" }
+        require(Format.valueOf(case.attributes.getValue("format")) in setOf(Format.MPS, Format.SMTLIB)) {
+            "Native LP qualification requires original MPS or SMT-LIB"
+        }
         require(case.parameters["input-only"] != "true") { "Native LP qualification executes the original source" }
         require(case.resources.cpus == 1) { "Native LP qualification uses one processor" }
         require(case.parameters["measurement"] in setOf("none", "resources")) {
@@ -96,7 +98,7 @@ internal object NativeLpSuite : BenchSuite {
 
     private fun record(case: BenchCase, context: BenchContext): SolveRecord {
         val p = case.parameters
-        val ref = ProblemRef(case.attributes.getValue("problem"), Format.MPS,
+        val ref = ProblemRef(case.attributes.getValue("problem"), Format.valueOf(case.attributes.getValue("format")),
             ProblemSource.Prepared(LabInputs.path(case.inputs.single { it.role == "model" }, context).toFile()),
             Category.valueOf(case.attributes.getValue("category")), Expected.Unknown)
         val report = context.outputDirectory.resolve("report")
@@ -126,7 +128,7 @@ internal object NativeLpSuite : BenchSuite {
                             file, remaining ->
                         val command = SolverInvocation.klauseCommand(current, options, remaining, optimize,
                             file, executable)
-                        SolverInvocation.invoke(command, SolverInvocation.Dialect.PB_COMPETITION,
+                        SolverInvocation.invoke(command, SolverInvocation.dialectFor(current.ref.format),
                             hardTimeoutMs = remaining.timeoutMillis * 2 + 20_000,
                             captureDirectory = options.captureDirectory, measureResources = options.measureResources,
                             startProcess = { argv -> ProcessBuilder(argv).apply {
