@@ -1519,3 +1519,11 @@ search, one million search work units, four million observer visits, 4,096 slice
 128 points and four MiB of replay output. Inputs and prepared snapshots are at most
 one MiB; source coordinates/factors are at most 4,096 and structural words 65,536.
 Use the lab's independent checking and comparison workflow for qualification.
+
+Optional `point64=BASE64 point-sha256=HEX` supplies a complete JSON object from
+named source integer variables to integer values, at most 64 KiB. This mode first
+completes source auxiliaries, transports direct coordinates only when model
+identities, reconstruction and exact costs match, and samples with every prepared
+coordinate pinned. It declines unsupported transports. `$OUT/point-replay.jsonl`
+records native results; it supplies no independent check. The point probe has a
+five-second/five-million-work cap and exits before search unless `point-only=false`.

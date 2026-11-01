@@ -40,7 +40,10 @@ internal object ObjectiveCutoffProfile {
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all { it in setOf("suite", "problem", "sha256", "source64", "sourceGzip64",
-            "cutoff", "seed", "order", "presolve", "presolve-work", "work", "slice-work", "timeout-ms") })
+            "cutoff", "seed", "order", "presolve", "presolve-work", "work", "slice-work", "timeout-ms",
+            "point64", "point-sha256", "point-only") })
+        require((options["point64"] == null) == (options["point-sha256"] == null))
+        require(options["point-only"] == null || options["point64"] != null)
         val cutoff = options.getValue("cutoff").toLong().also {
             require(it in -9_007_199_254_740_991..9_007_199_254_740_991)
         }
@@ -91,6 +94,11 @@ internal object ObjectiveCutoffProfile {
             put("preparationWork", budget.spent())
             put("cutoffSpace", "prepared objective")
         }.toString())
+        if (options["point64"] != null) {
+            ObjectivePointReplay.run(options, out, requireNotNull(plan.model), parsed.intVarNames, prepared,
+                originalObjective, objective, containing)
+            if ((options["point-only"] ?: "true").toBooleanStrict()) return
+        }
         val audit = BooleanBoundAudit(objective.boolWeights)
         val stop = containing or Cancellation.after(timeout.milliseconds) or Cancellation { audit.stopped }
         val base = BacktrackPresets.satOptimized(randomSeed = seed + 1000L, cancellation = stop)
