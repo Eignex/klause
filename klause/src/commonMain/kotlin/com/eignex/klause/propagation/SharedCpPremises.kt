@@ -113,7 +113,7 @@ private fun PropagationState.sharedPremise(
         if (proofs?.containsKey(literal) == true) continue
         if (children != null) {
             val leaves = children.map { proofOf(it) ?: return SearchAtomPremise.Unavailable }
-            val premise = SearchAtomPremise.All(leaves)
+            val premise = SearchAtomPremise.All.fromOwned(leaves)
             remember(literal, premise, memo != null && children.all { memo.containsKey(it) })
             visiting?.remove(literal)
             continue
@@ -153,7 +153,7 @@ private fun PropagationState.sharedPremise(
             pendingChildren.add(null)
         }
     }
-    return SearchAtomPremise.All(asserted.map { proofOf(it) ?: return SearchAtomPremise.Unavailable })
+    return SearchAtomPremise.All.fromOwned(asserted.map { proofOf(it) ?: return SearchAtomPremise.Unavailable })
 }
 
 private fun MutableIntObjectMap<SearchAtomPremise>.retain(literal: Int, premise: SearchAtomPremise): Boolean {

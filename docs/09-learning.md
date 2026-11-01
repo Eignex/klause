@@ -403,8 +403,10 @@ memoized nodes also supply the current traversal; separate temporary proof stora
 is allocated only for nodes that cannot enter that bounded memo.
 Native proof traversal keeps literal identifiers and child references in parallel
 stacks. Inherited-proof validation allocates its stack and seen set only when a
-conjunction branches. Conjunctions retain every child, and reference visits keep
-their work, cancellation and local-limit checks.
+conjunction branches. Public conjunction construction snapshots its input; native
+proof assembly transfers its fresh child lists into immutable conjunctions without
+a second copy. Conjunctions retain every child, and reference visits keep their
+work, cancellation and local-limit checks.
 Fixpoint facts already implied by shared integer endpoints retain the shared
 premise without reconstructing a native proof. Endpoint strengthenings use the
 complete proof path; observers and cancellation checks still cover every deduction.

@@ -15,6 +15,22 @@ import kotlin.test.assertTrue
 
 class SearchAtomRegistryTest {
     @Test
+    fun `conjunctions should retain antecedents after caller list mutation`() {
+        val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(2))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
+        val children = mutableListOf<SearchAtomPremise>(
+            SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+            SearchAtomPremise.Asserted(SearchDecision.Bool(2)),
+        )
+        val premise = SearchAtomPremise.All(children)
+
+        children.clear()
+
+        assertEquals(setOf(1, 3), assertNotNull(session.explainAtoms(premise)).literals.toSet())
+    }
+
+    @Test
     fun `integer bound names should share exact complements through rollback`() {
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(1))
         val upper = SearchDecision.IntAtMost(4, 7L)

@@ -101,8 +101,15 @@ sealed interface SearchAtomPremise {
     ) : SearchAtomPremise
 
     /** All premises of an independently justified intermediate deduction. Empty means a root axiom. */
-    class All(premises: List<SearchAtomPremise>) : SearchAtomPremise {
-        internal val premises = premises.toList()
+    class All private constructor(premises: List<SearchAtomPremise>, owned: Boolean) : SearchAtomPremise {
+        constructor(premises: List<SearchAtomPremise>) : this(premises, owned = false)
+
+        internal val premises = if (owned && premises.size > 1) premises else premises.toList()
+
+        internal companion object {
+            // The producer transfers a fresh list and must retain no mutable alias.
+            fun fromOwned(premises: List<SearchAtomPremise>): All = All(premises, owned = true)
+        }
     }
 
     /** A missing witness invalidates the entire explanation. */
