@@ -13,7 +13,6 @@ import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationPolicy
-import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
@@ -145,11 +144,9 @@ class SparseLpAdmissionTest {
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
             settings = ProblemSettings(lpCeilingTableauCells = 1L))
         var refusals = 0
-        val policy = LpCertificationPolicy { certifier, successful ->
-            if (certifier == LpCertifier.RATIONAL && successful) {
-                refusals++
-                false
-            } else successful
+        val policy = LpCertificationPolicy { _, successful ->
+            if (successful) refusals++
+            false
         }
 
         val bound = LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
