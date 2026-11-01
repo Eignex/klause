@@ -165,7 +165,7 @@ internal object AffineSingletons {
         if (problem.numIntVars == 0) return null
         // The entry scan alone can dominate optional preparation on very large models.
         if (problem.factors.size > maxFactors) return null
-        val policy = pivotOrder.forQuery(problem, objective != null)
+        val policy = pivotOrder.forQuery(problem, objective, cancellation)
         val objectiveRewrite = objective?.takeUnless { problem.semantics.isApproximate }
             ?.let { AffineObjective(it, cancellation) }
         if (objectiveRewrite?.interrupted == true) return null

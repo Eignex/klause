@@ -212,7 +212,7 @@ class AffinePivotOrderTest {
     }
 
     @Test
-    fun `automatic mixed costs should reconstruct a binary channel fold`() {
+    fun `structured mixed costs should reconstruct a binary channel fold`() {
         val source = Problem(1, 3,
             arrayOf(IntDomain(0, 1), IntDomain(0, 4), IntDomain(0, 4)), listOf(
                 Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
@@ -220,6 +220,7 @@ class AffinePivotOrderTest {
             ))
 
         val delta = AffineSingletons.eliminateAffineSingletons(source.bake(),
+            pivotOrder = AffinePivotOrder.STRUCTURED,
             objective = LinearObjective(boolWeights = longArrayOf(3), intCoefficients = longArrayOf(0, 1, 1)))
         val rebuilt = assertNotNull(delta.reconstruct)(Sample(booleanArrayOf(true), longArrayOf(0, 1, 2)))
 
@@ -227,8 +228,14 @@ class AffinePivotOrderTest {
     }
 
     @Test
-    fun `automatic ordering should retain native channels outside discrete optimization`() {
-        for (realCount in 0..1) {
+    fun `automatic ordering should retain native channels outside a discrete integer cost variable`() {
+        for ((realCount, objective) in listOf(
+            0 to null,
+            1 to LinearObjective(intCoefficients = longArrayOf(0, 0, 1)),
+            0 to LinearObjective(boolWeights = longArrayOf(1, 1, 1)),
+            0 to LinearObjective(intCoefficients = longArrayOf(0, 1, 1)),
+            0 to LinearObjective(boolWeights = longArrayOf(1, 0, 0), intCoefficients = longArrayOf(0, 0, 1)),
+        )) {
             val source = Problem(3, 3, Array(3) { IntDomain(0, 4) }, listOf(
                 Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
                 ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
@@ -238,7 +245,7 @@ class AffinePivotOrderTest {
                 realUpper = DoubleArray(realCount) { 1.0 })
 
             val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
-                objective = if (realCount == 0) null else LinearObjective(boolWeights = longArrayOf(1, 1, 1)))
+                objective = objective)
 
             assertTrue(delta.isEmpty)
         }
