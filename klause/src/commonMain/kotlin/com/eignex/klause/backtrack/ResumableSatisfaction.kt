@@ -100,13 +100,13 @@ internal class ResumableSatisfaction(
 
     internal fun splitLiteral(): Int? = traversal.splitLiteral()
 
-    internal fun retainPartition(literal: Int): Assumptions {
+    internal fun retainPartition(literal: Int): Boolean {
         check(rebindable && !closed && done == null)
         val restricted = Assumptions(bools = assumptions.bools +
             (Lit.variable(literal) to Lit.isPositive(literal)))
-        traversal.retainPartition(literal)
+        if (!traversal.retainPartition(literal)) return false
         assumptions = restricted
-        return restricted
+        return true
     }
 
     internal fun rebind(assumptions: Assumptions, cancellation: Cancellation) {
