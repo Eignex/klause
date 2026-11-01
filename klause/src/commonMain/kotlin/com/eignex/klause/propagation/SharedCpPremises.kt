@@ -4,6 +4,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
 
@@ -94,23 +95,25 @@ private fun PropagationState.sharedPremise(
         val local = proofs ?: MutableIntObjectMap<SearchAtomPremise>().also { proofs = it }
         local.put(literal, premise)
     }
-    val pending = ArrayDeque<NativePremiseFrame>()
-    for (literal in asserted) pending.addLast(NativePremiseFrame(literal))
+    val pendingLiterals = IntArrayList(4)
+    val pendingChildren = ArrayList<IntArray?>(4)
+    for (literal in asserted) {
+        pendingLiterals.add(literal)
+        pendingChildren.add(null)
+    }
     var remaining = SHARED_PREMISE_VISIT_LIMIT
-    while (pending.isNotEmpty()) {
+    while (!pendingLiterals.isEmpty()) {
         work++
         if (runCancelled) return SearchAtomPremise.Unavailable
         if (remaining-- <= 0) return SearchAtomPremise.Unavailable
-        val frame = pending.removeLast()
-        val literal = frame.literal
+        val index = pendingLiterals.size - 1
+        val literal = pendingLiterals[index]
+        pendingLiterals.truncateTo(index)
+        val children = pendingChildren.removeAt(index)
         if (proofs?.containsKey(literal) == true) continue
-        val children = frame.children
         if (children != null) {
-            val premise = if (children.size == 1) {
-                proofOf(children[0]) ?: return SearchAtomPremise.Unavailable
-            } else {
-                SearchAtomPremise.All(children.map { proofOf(it) ?: return SearchAtomPremise.Unavailable })
-            }
+            val leaves = children.map { proofOf(it) ?: return SearchAtomPremise.Unavailable }
+            val premise = SearchAtomPremise.All(leaves)
             remember(literal, premise, memo != null && children.all { memo.containsKey(it) })
             visiting?.remove(literal)
             continue
@@ -143,14 +146,14 @@ private fun PropagationState.sharedPremise(
         val active = visiting ?: IntHashSet().also { visiting = it }
         if (!active.add(literal)) return SearchAtomPremise.Unavailable
         val next = IntArray(antecedents.size) { antecedents[it] xor 1 }
-        pending.addLast(NativePremiseFrame(literal, next))
-        for (child in next) pending.addLast(NativePremiseFrame(child))
+        pendingLiterals.add(literal)
+        pendingChildren.add(next)
+        for (child in next) {
+            pendingLiterals.add(child)
+            pendingChildren.add(null)
+        }
     }
-    return if (asserted.size == 1) {
-        proofOf(asserted[0]) ?: SearchAtomPremise.Unavailable
-    } else {
-        SearchAtomPremise.All(asserted.map { proofOf(it) ?: return SearchAtomPremise.Unavailable })
-    }
+    return SearchAtomPremise.All(asserted.map { proofOf(it) ?: return SearchAtomPremise.Unavailable })
 }
 
 private fun MutableIntObjectMap<SearchAtomPremise>.retain(literal: Int, premise: SearchAtomPremise): Boolean {
@@ -202,36 +205,35 @@ private fun PropagationState.sharedIntegerLeaf(
 ): SearchAtomPremise {
     val variable = sourceIntId(atoms.intVar[atom])
     val threshold = atoms.threshold[atom]
-    return when (atoms.kind[atom]) {
-        AtomKind.GE -> {
-            val decision = if (positive) {
-                SearchDecision.IntAtLeast(variable, threshold)
-            } else if (threshold > Long.MIN_VALUE) {
-                SearchDecision.IntAtMost(variable, threshold - 1L)
-            } else {
-                return SearchAtomPremise.Unavailable
-            }
-            context.sharedIntegerPremise(decision)
+    val decisions = when (atoms.kind[atom]) {
+        AtomKind.GE -> if (positive) {
+            listOf(SearchDecision.IntAtLeast(variable, threshold))
+        } else if (threshold > Long.MIN_VALUE) {
+            listOf(SearchDecision.IntAtMost(variable, threshold - 1L))
+        } else {
+            return SearchAtomPremise.Unavailable
         }
-        AtomKind.LE -> {
-            val decision = if (positive) {
-                SearchDecision.IntAtMost(variable, threshold)
-            } else if (threshold < Long.MAX_VALUE) {
-                SearchDecision.IntAtLeast(variable, threshold + 1L)
-            } else {
-                return SearchAtomPremise.Unavailable
-            }
-            context.sharedIntegerPremise(decision)
+
+        AtomKind.LE -> if (positive) {
+            listOf(SearchDecision.IntAtMost(variable, threshold))
+        } else if (threshold < Long.MAX_VALUE) {
+            listOf(SearchDecision.IntAtLeast(variable, threshold + 1L))
+        } else {
+            return SearchAtomPremise.Unavailable
         }
-        AtomKind.EQ -> {
-            if (!positive) return SearchAtomPremise.Unavailable
-            val lower = context.sharedIntegerPremise(SearchDecision.IntAtLeast(variable, threshold))
-            if (lower === SearchAtomPremise.Unavailable) return lower
-            val upper = context.sharedIntegerPremise(SearchDecision.IntAtMost(variable, threshold))
-            if (upper === SearchAtomPremise.Unavailable) return upper
-            SearchAtomPremise.All(listOf(lower, upper))
+
+        AtomKind.EQ -> if (positive) {
+            listOf(SearchDecision.IntAtLeast(variable, threshold), SearchDecision.IntAtMost(variable, threshold))
+        } else {
+            return SearchAtomPremise.Unavailable
         }
     }
+    val premises = decisions.map { decision ->
+        val premise = context.sharedIntegerPremise(decision)
+        if (premise === SearchAtomPremise.Unavailable) return premise
+        premise
+    }
+    return SearchAtomPremise.All(premises)
 }
 
 private fun SearchContext.sharedIntegerPremise(decision: SearchDecision): SearchAtomPremise {
@@ -259,5 +261,3 @@ private fun SearchContext.sharedIntegerPremise(decision: SearchDecision): Search
         else -> SearchAtomPremise.Unavailable
     }
 }
-
-private class NativePremiseFrame(val literal: Int, val children: IntArray? = null)

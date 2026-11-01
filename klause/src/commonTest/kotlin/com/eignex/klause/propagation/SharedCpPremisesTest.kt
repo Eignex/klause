@@ -210,4 +210,32 @@ class SharedCpPremisesTest {
         assertNull(shared.explainAtoms(repeated))
     }
 
+
+    @Test
+    fun `native deductions should preserve distinct named bounds`() {
+        val native = PropagationSession(Problem(2, 3, Array(3) { IntDomain(0, 10) }, arrayOf(
+            Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+        )), pbLearning = false)
+        val peer = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult = when (decision) {
+                SearchDecision.Bool(0) -> context.publish(
+                    SearchDecision.IntAtLeast(0, 2), SearchAtomPremise.Asserted(decision),
+                )
+                SearchDecision.Bool(2) -> context.publish(
+                    SearchDecision.IntAtLeast(1, 3), SearchAtomPremise.Asserted(decision),
+                )
+                else -> ComponentResult.Consistent
+            }
+        }
+        val shared = SearchSession(listOf(peer, CpSearchComponent(native)), atoms = SearchAtomRegistry(2))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(2)))
+        val publication = CpPublicationPremises(native, shared, { it }, rootLevel = 0)
+
+        val premise = publication.bound(2, upper = false)
+
+        assertContentEquals(intArrayOf(1, 3), assertNotNull(shared.explainAtoms(premise)).literals.sortedArray())
+    }
+
 }
