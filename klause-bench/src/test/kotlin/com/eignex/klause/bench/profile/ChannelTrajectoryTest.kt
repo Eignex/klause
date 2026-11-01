@@ -45,8 +45,9 @@ class ChannelTrajectoryTest {
             arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
         val sweep = assertNotNull(DefinitionalSweep.fromSource(problem,
             listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true)))))
-        val left = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        val right = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        val model = LocalSearchModel.open(problem)
+        val left = LocalSearchState(model, Random(0))
+        val right = LocalSearchState(model, Random(0), projection = left.projection)
         left.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
         right.invariants = ChannelView.SearchedValues.sweep(sweep, Cancellation.Never)
             ?.network(problem.numIntVars, problem.numBoolVars)
@@ -66,8 +67,9 @@ class ChannelTrajectoryTest {
     fun `an inconsistent searched predicate is not silently extended into a paired state`() {
         val problem = Problem(1, 1, arrayOf(IntDomain(-1, 2)),
             arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.LE, 0)))
-        val left = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        val right = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        val model = LocalSearchModel.open(problem)
+        val left = LocalSearchState(model, Random(0))
+        val right = LocalSearchState(model, Random(0), projection = left.projection)
         val coordinates = VarRemap(intArrayOf(0), intArrayOf(0))
         val maintained = TrajectoryView("maintained", left, coordinates,
             synchronize = { left.assignment.setBool(0, left.assignment.intValue(0) <= 0L) })
