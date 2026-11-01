@@ -29,21 +29,22 @@ internal class ClauseDbArithmeticRankingTest {
                 if (integer) boolFactors + Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10) else boolFactors)
             val session = PropagationSession(problem, nativeSat = false)
             val clause = Clause(intArrayOf(1, 3, 4))
-            repeat(cap) { session.addLearnedClause(clause, 9) }
+            repeat(cap - 4) { session.addLearnedClause(clause, 9, permanent = true) }
+            repeat(4) { session.addLearnedClause(clause, 9) }
             if (integer) {
                 val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
                     longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
                 session.addLearnedIntegerRow(row, 10)
             } else session.addLearnedPb(longArrayOf(1, 1, 1), clause.literals, 1, 10)
             val params = BacktrackParams(maxLearnedClauses = cap, tieredLearnedDb = true)
-    
+
             repeat(64) {
                 if (session.activeLearnedClauseCount <= cap) return@repeat
                 val before = session.work
                 forgetIfOverCap(session, params)
                 assertTrue(session.work - before <= 65_536L)
             }
-    
+
             assertEquals(cap, session.activeLearnedClauseCount)
             assertTrue(session.isLearnedClause(cap - 1))
             assertEquals(NoPropagator, session.explanationState.factorAt(session.problem.numFactors + cap))
