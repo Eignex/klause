@@ -48,5 +48,13 @@ JAVA_TOOL_OPTIONS='-Xmx512m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC' \
   "$JAVA_HOME/bin/jfr" print --json --events jdk.ObjectAllocationSample "$OUT/profile.jfr" \
   > "$OUT/allocations.json" || analysis_status=$?
 printf '%s\n' "$analysis_status" > "$OUT/allocation-analysis.exit"
+activity_status=0
+JAVA_TOOL_OPTIONS='-Xmx512m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC' \
+  /usr/bin/time -v -o "$OUT/activity-analysis-resources.txt" \
+  "$JAVA_HOME/bin/jfr" print --json \
+  --events jdk.ExecutionSample,jdk.GarbageCollection,jdk.Compilation,jdk.ThreadPark "$OUT/profile.jfr" \
+  > "$OUT/activity.json" || activity_status=$?
+printf '%s\n' "$activity_status" > "$OUT/activity-analysis.exit"
 if [[ "$profile_status" -ne 0 ]]; then exit "$profile_status"; fi
-exit "$analysis_status"
+if [[ "$analysis_status" -ne 0 ]]; then exit "$analysis_status"; fi
+exit "$activity_status"
