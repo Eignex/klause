@@ -23,7 +23,7 @@ internal class RootSimplificationPass : InprocessingPass {
     private var deferredFactor = -1
     private var pinCursor = 0
     private var occurrenceCursor = 0
-    private var preferNeighborhood = true
+    private var preferNeighborhood = false
     private var neighborhoodLeft = 0
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
@@ -47,7 +47,7 @@ internal class RootSimplificationPass : InprocessingPass {
         deferredFactor = -1
         pinCursor = 0
         occurrenceCursor = 0
-        preferNeighborhood = true
+        preferNeighborhood = false
     }
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
@@ -108,6 +108,7 @@ internal class RootSimplificationPass : InprocessingPass {
             var candidate = pending
             if (candidate == null) {
                 val factor = nextFactor(session, budget) ?: break
+                if (factor < session.problem.numFactors && session.rootSourceClauseSize(factor) == 0) continue
                 budget.note("Candidates")
                 val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - literalsVisited)
                 if (literals == null) {
@@ -215,8 +216,16 @@ internal class RootSimplificationPass : InprocessingPass {
                 occurrenceCursor = 0
                 continue
             }
+            val factor = occurrences[occurrenceCursor++]
+            if (occurrenceCursor == occurrences.size) {
+                pinCursor++
+                occurrenceCursor = 0
+            }
+            if (factor < cursor && scanRoot == session.explanationState.undoTop) continue
+            if (factor != cursor && session.rootSourceClauseSize(factor) < 2) continue
             budget.note("NeighborhoodCandidates")
-            return occurrences[occurrenceCursor++]
+            if (factor == cursor) cursor++
+            return factor
         }
         return null
     }

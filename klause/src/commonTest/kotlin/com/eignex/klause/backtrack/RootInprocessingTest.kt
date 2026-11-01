@@ -117,6 +117,22 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `source priority should retain learned clause maintenance within one slice`() {
+        for (native in listOf(false, true)) {
+            val source = problem(intArrayOf(1), intArrayOf(4, 6), intArrayOf(0, 2, 4)).bake()
+            val projection = PropagationProblem.preparation(source).asSequence().filterNotNull().last()
+            val session = PropagationSession(projection, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2, 6)), 3)
+
+            RootSimplificationPass().run(session, BacktrackParams(), null)
+            val partners = ArrayList<Int>()
+            session.explanationState.forEachBinaryPartner(2) { partners.add(it) }
+
+            assertEquals(setOf(4, 6), partners.toSet())
+        }
+    }
+
+    @Test
     fun `a root without Boolean facts should not spend the simplification allowance`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
