@@ -471,6 +471,8 @@ opposite signs on a shared continuous coordinate. Each pair uses its first index
 pivot and positive exact weights to cancel that coordinate; singleton source bounds
 participate in the same recipe. At least one row has integer activity. Checked
 rounding uses the first source bound sides for remaining continuous coordinates.
+Each source row's coefficient snapshot is shared across its generation's pair
+attempts; each weighted combination owns a separate accumulator.
 Rows wider than the support cap are skipped with incomplete coverage. The cached family retains at most 64
 proposals under 500,000 preparation work and 8 MiB modeled allocation, with
 per-attempt limits shared with explicit aggregation. Stopped or limited

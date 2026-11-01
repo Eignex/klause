@@ -348,6 +348,31 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `a source row should support multiple differently weighted pairs`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val weightedLeft = SourceInequality(mapOf(x to BigFraction.ofLong(2), real to BigFraction.ofLong(3)),
+            BigFraction.ofLong(3))
+        val weightedRight = SourceInequality(mapOf(y to BigFraction.ofLong(4), real to BigFraction.ofLong(-2)),
+            BigFraction.ZERO)
+        val otherRight = SourceInequality(mapOf(z to BigFraction.ofLong(2), real to BigFraction.MINUS_ONE),
+            BigFraction.ZERO)
+        val source = SourceProofContext(scope, setOf(x, y, z, real), linkedMapOf(
+            "left" to SourcePremise(weightedLeft), "right" to SourcePremise(weightedRight),
+            "other" to SourcePremise(otherRight)))
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never)
+
+        assertEquals(setOf(
+            SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ofLong(3)), BigFraction.ONE),
+            SourceInequality(mapOf(x to BigFraction.ONE, z to BigFraction.ofLong(3)), BigFraction.ONE),
+        ), cuts.map { it.inequality }.toSet())
+        for (cut in cuts) {
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+    }
+
+    @Test
     fun `an unavailable point coordinate should withhold complete proposal coverage`() {
         val source = SourceProofContext(scope, setOf(x, y, real), mapOf(
             "left" to SourcePremise(left), "right" to SourcePremise(right)))

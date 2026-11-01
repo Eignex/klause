@@ -131,10 +131,11 @@ internal object LinearAuthorityAggregateCuts {
                         val rightWeight = meter.number(if (coefficient > BigFraction.ZERO) coefficient
                             else coefficient.negated())
                         val leftWeight = meter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
-                        meter.reserve(1L, 256L)
-                        val cut = derive(listOf(row.term.copy(weight = leftWeight),
+                        meter.reserve(1L, 320L)
+                        val cut = deriveWithCoefficients(listOf(row.term.copy(weight = leftWeight),
                             other.term.copy(weight = rightWeight)), derivedStop, charge, attemptLimits,
-                            allowMixed = true, continuousBounds = selectedBounds) ?: continue
+                            allowMixed = true, continuousBounds = selectedBounds,
+                            coefficientSnapshots = listOf(row.coefficients, other.coefficients)) ?: continue
                         if (point != null) {
                             val separating = separates(cut, point, meter, observe)
                             if (separating == null) eligibilityKnown = false
@@ -359,6 +360,16 @@ internal object LinearAuthorityAggregateCuts {
         limits: LinearAuthorityAggregateLimits = LinearAuthorityAggregateLimits(),
         allowMixed: Boolean = false,
         continuousBounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm> = emptyMap(),
+    ): LinearAuthorityCut? = deriveWithCoefficients(terms, cancellation, observe, limits, allowMixed,
+        continuousBounds, coefficientSnapshots = null)
+
+    private fun deriveWithCoefficients(
+        terms: List<LinearAuthorityAggregateTerm>, cancellation: Cancellation,
+        observe: (String, Long) -> Unit,
+        limits: LinearAuthorityAggregateLimits,
+        allowMixed: Boolean,
+        continuousBounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
+        coefficientSnapshots: List<Map<SourceCoordinate, BigFraction>>?,
     ): LinearAuthorityCut? {
         val meter = AggregateMeter(limits, cancellation, observe)
         observe("AggregateAttempts", 1L)
@@ -376,12 +387,12 @@ internal object LinearAuthorityAggregateCuts {
             val coefficients = linkedMapOf<SourceCoordinate, BigFraction>()
             var rhs = BigFraction.ZERO
             var strict = false
-            for (term in terms) {
+            for ((index, term) in terms.withIndex()) {
                 val weight = meter.number(term.weight)
                 if (weight <= BigFraction.ZERO) stopAggregate("NonpositiveWeight")
                 if (term.inequality.supportSize > limits.support) stopAggregate("SupportLimit")
-                val row = term.inequality.coefficients
-                meter.reserve(row.size.toLong(), row.size * 64L)
+                val row = coefficientSnapshots?.get(index) ?: term.inequality.coefficients
+                meter.reserve(row.size.toLong(), if (coefficientSnapshots == null) row.size * 64L else 0L)
                 for ((id, value) in row) {
                     if (id.kind == SourceCoordinate.Kind.Boolean) stopAggregate("BooleanActivity")
                     if (id !in coefficients && coefficients.size >= limits.support) {
