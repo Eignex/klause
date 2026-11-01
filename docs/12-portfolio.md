@@ -643,6 +643,12 @@ retained-level deductions or LP setup can overrun a slice. Local-search arms
 follow the
 [retained handle contract](11-neighborhoods.md#handles-and-exclusive-ownership).
 
+Retained Boolean clause walks with definition repairs price scoring inspections
+alongside their native instructions. The scheduler passes both allowances through
+objective-coordinate wrappers and charges auxiliary work to the containing ledger,
+including atomic overspend. Native instruction limits retain their own currency;
+[local search](10-local-search.md) owns the inspected operations.
+
 #### Private CP preparation
 
 General CP optimization handles keep one private construction cursor through
