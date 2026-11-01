@@ -348,6 +348,67 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `point separation should cancel a third source row within its configured row limit`() {
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(x, y, real, otherReal), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "demand" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                otherReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "other lower" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+        ))
+        val point = mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 1.5)
+
+        val unbounded = SourceProofContext(scope, source.coordinates,
+            source.premises.filterKeys { it != "lower" && it != "other lower" })
+        for (context in listOf(source, unbounded)) {
+            for (rows in listOf(2, 3, 4)) {
+                val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(context, Cancellation.Never,
+                    maximumCandidates = 1,
+                    limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = rows), point = point)
+
+                if (rows == 2) assertTrue(cuts.isEmpty()) else {
+                    val cut = cuts.single()
+                    assertEquals(SourceInequality(mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE),
+                        BigFraction.ofLong(-2)), cut.inequality)
+                    assertEquals(setOf(0, 1, 2), cut.owners)
+                    assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(
+                        SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `interrupting an extended derivation should withhold its partial proposal`() {
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(x, y, real, otherReal), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "demand" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                otherReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "other lower" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+        ))
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, _ -> if (name == "AggregateExtendedAttempts") stopped = true },
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            point = mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 1.5))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+    }
+
+    @Test
     fun `a source row should support multiple differently weighted pairs`() {
         val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val weightedLeft = SourceInequality(mapOf(x to BigFraction.ofLong(2), real to BigFraction.ofLong(3)),
