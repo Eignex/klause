@@ -377,27 +377,28 @@ class SharedClausePoolTest {
 
     @Test
     fun `retiring producers keep fresh learning available for later consumers`() {
-        for (native in listOf(false, true)) {
-            val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
+        for (native in listOf(false, true)) for (knownCount in listOf(1, 8)) {
+            val problem = Problem(12, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
             val pool = SharedClausePool(measureMemory = true)
-            pool.publish(listOf(boolClause(0, 1)), origin = 7)
+            pool.publish((0 until knownCount).map { boolClause(it, 1) }, origin = 7)
             val meter = SharingMeter()
             val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
             val session = PropagationSession(problem, nativeSat = native)
             assertEquals(native, session.usesNativeSat)
             exchange.onSearchStart(session)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
-            session.addLearnedClause(Clause(intArrayOf(4, 6)), 1)
+            session.addLearnedClause(Clause(intArrayOf(18, 20)), 1)
 
             exchange.onSearchClose(session)
             val consumer = PropagationSession(problem, nativeSat = native)
             assertEquals(native, consumer.usesNativeSat)
             PoolClauseExchange(pool, origin = 2).onSearchStart(consumer)
-            consumer.pinBool(2, false)
+            consumer.pinBool(9, false)
 
-            assertEquals(true, consumer.boolValue(3))
+            assertEquals(true, consumer.boolValue(10))
             assertEquals(1L, meter.snapshot().clauses.getValue("exportDuplicates"))
-            assertEquals(1L, meter.snapshot().clauses.getValue("peakSeenKeys"))
+            assertEquals(if (knownCount == 1) 2L else 8L, meter.snapshot().clauses.getValue("peakSeenKeys"))
+            assertEquals(144L, meter.snapshot().clauses.getValue("peakSeenCapacityBytes"))
         }
     }
 

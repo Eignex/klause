@@ -278,12 +278,14 @@ pool; resuming the same session retains both cursor and filter. Retirement recor
 the pool and filter capacity counters, then releases the filter without traversing
 the store. An uncancelled retirement also drains uses and exports
 remaining glue; a cancelled retirement skips those scans.
-If a retirement batch fits the remaining entry capacity and has no byte limit,
-the pool's key index deduplicates it directly under the publication lock. The
+A retirement batch that could allocate or grow the worker's private key table
+can use the pool's existing index instead. If it fits the remaining entry capacity
+and has no byte limit, the pool deduplicates it under the publication lock. The
 generation cannot compact during that batch, so fresh keys need not enter the
 worker's retiring filter. Existing private keys still suppress earlier imports
-and exports. Entry pressure and byte limits keep the ordinary private admission
-and reclamation path. Capacity refusal happens before publication; exhausting
+and exports. Batches that fit the existing private backing, entry pressure and
+byte limits keep the ordinary private admission and reclamation path. Capacity
+refusal happens before publication; exhausting
 publication funding ends the export without another allowance. Every candidate
 visit and pool operation retains its work, scratch and cancellation bounds.
 
