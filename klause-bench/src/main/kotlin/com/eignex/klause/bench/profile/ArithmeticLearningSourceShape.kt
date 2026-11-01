@@ -67,9 +67,11 @@ internal object ArithmeticLearningSourceShape {
         var pairs = 0
         var resolvable = 0
         var compact = 0
+        var wideCompact = 0
         var minimum: Int? = null
         var pairsComplete = true
         val examples = mutableListOf<Triple<UnitSource, UnitSource, Int>>()
+        val wideExamples = mutableListOf<Triple<UnitSource, UnitSource, Int>>()
         outer@ for (i in sources.indices) {
             val left = sources[i]
             for (j in 0 until i) {
@@ -106,6 +108,10 @@ internal object ArithmeticLearningSourceShape {
                 if (residual !in 1..RESULT_TERM_LIMIT) continue
                 compact++
                 if (examples.size < 8) examples.add(Triple(left, right, residual))
+                if (left.refs.size > RESULT_TERM_LIMIT || right.refs.size > RESULT_TERM_LIMIT) {
+                    wideCompact++
+                    if (wideExamples.size < 8) wideExamples.add(Triple(left, right, residual))
+                }
             }
         }
         put("scope", "conjunctive unconditional word integer unit-coefficient rows")
@@ -122,6 +128,7 @@ internal object ArithmeticLearningSourceShape {
         put("pairs", pairs)
         put("oppositeSignPairs", resolvable)
         put("compactCoefficientPairs", compact)
+        put("wideCompactCoefficientPairs", wideCompact)
         put("minimumResidualTerms", minimum)
         put("sourceWidths", buildJsonArray {
             widths.forEach { (factor, terms) -> add(buildJsonObject {
@@ -129,19 +136,22 @@ internal object ArithmeticLearningSourceShape {
                 put("terms", terms)
             }) }
         })
-        put("examples", buildJsonArray {
-            examples.forEach { (left, right, residual) -> add(buildJsonObject {
-                put("leftFactor", left.factor)
-                put("leftDirection", left.direction)
-                put("rightFactor", right.factor)
-                put("rightDirection", right.direction)
-                put("residualTerms", residual)
-                put("sourceTerms", buildJsonArray {
-                    add(JsonPrimitive(left.refs.size))
-                    add(JsonPrimitive(right.refs.size))
-                })
-            }) }
-        })
+        put("examples", exportPairs(examples))
+        put("wideExamples", exportPairs(wideExamples))
+    }
+
+    private fun exportPairs(pairs: List<Triple<UnitSource, UnitSource, Int>>) = buildJsonArray {
+        pairs.forEach { (left, right, residual) -> add(buildJsonObject {
+            put("leftFactor", left.factor)
+            put("leftDirection", left.direction)
+            put("rightFactor", right.factor)
+            put("rightDirection", right.direction)
+            put("residualTerms", residual)
+            put("sourceTerms", buildJsonArray {
+                add(JsonPrimitive(left.refs.size))
+                add(JsonPrimitive(right.refs.size))
+            })
+        }) }
     }
 
     private class UnitSource(val factor: Int, val direction: Int, val refs: IntArray, val signs: IntArray)
