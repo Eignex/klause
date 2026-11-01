@@ -109,43 +109,6 @@ class LpRetainedSourcesTest {
     }
 
     @Test
-    fun `completed source definition checks should survive live bound memo replacements`() {
-        val problem = Problem(1, 2, Array(2) { IntDomain(0, 10) }, arrayOf<Factor>(
-            ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 8),
-        ))
-        val live = Array(2) { problem.finiteIntDomain(it) }
-        val domains = object : RelaxationDomains {
-            override fun intDomain(varId: Int): IntDomain = live[varId]
-            override fun boolValue(varId: Int): Boolean? = null
-        }
-        val sink = LpStatsSink()
-        val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L, 0L)),
-            templateStats = sink, retainImportedDefinitions = true)
-        val sources = LpRetainedSources(problem, consumer)
-        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
-            val initial = assertNotNull(sources.prepare(owner.state, domains))
-            assertTrue(owner.replaceRows(initial.retired, initial.columns, initial.rows, false,
-                objective = initial.objective))
-            initial.commit()
-            assertTrue(owner.push())
-            live[0] = live[0].withMinAtLeast(2)
-            val child = assertNotNull(sources.prepare(owner.state, domains))
-            assertTrue(owner.replaceRows(child.retired, child.columns, child.rows, true,
-                objective = child.objective, assertions = assertNotNull(child.boundAssertions(100L))))
-            child.commit()
-            val before = sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes
-            assertTrue(before.getValue("RETAINED_FULL_BOUND_CHECKS") > 0L)
-            live[1] = live[1].withMinAtLeast(1)
-
-            assertNotNull(sources.prepare(owner.state, domains))
-
-            val after = sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes
-            assertEquals(before.getValue("RETAINED_FULL_BOUND_CHECKS"), after.getValue("RETAINED_FULL_BOUND_CHECKS"))
-            assertTrue(after.getValue("RETAINED_BOUND_REUSES") > before.getValue("RETAINED_BOUND_REUSES"))
-        }
-    }
-
-    @Test
     fun `retained candidate imports should reuse actual columns without preparing source metadata`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
@@ -714,6 +677,43 @@ class LpRetainedSourcesTest {
             pin = null
             assertEquals(1, owner.state.rows.activeCount)
             assertEquals(BigFraction.ZERO, assertNotNull(owner.solve()).lowerBound)
+        }
+    }
+
+    @Test
+    fun `discarded source additions should not alter later catalog publication`() {
+        for (imported in listOf(false, true)) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 6) }, arrayOf<Factor>(
+                ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true),
+            ))
+            var lower = 0L
+            val domains = object : RelaxationDomains {
+                override fun intDomain(varId: Int): IntDomain = problem.finiteIntDomain(varId).let {
+                    if (varId == 1) it.withMinAtLeast(lower) else it
+                }
+                override fun boolValue(varId: Int): Boolean? = null
+            }
+            val sources = LpRetainedSources(problem, CpToLpRelaxation(problem,
+                LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L)),
+                linMaxTightFace = true, retainImportedDefinitions = imported))
+            LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+                val root = assertNotNull(sources.prepare(owner.state, domains))
+                assertTrue(owner.replaceRows(root.retired, root.columns, root.rows, false, objective = root.objective))
+                root.commit()
+                assertTrue(owner.push())
+                lower = 2L
+                val discarded = assertNotNull(sources.prepare(owner.state, domains))
+                assertTrue(discarded.columns.isNotEmpty())
+
+                val installed = assertNotNull(sources.prepare(owner.state, domains))
+                assertEquals(discarded.columns.size, installed.columns.size)
+                assertTrue(owner.replaceRows(installed.retired, installed.columns, installed.rows, true,
+                    objective = installed.objective, assertions = assertNotNull(installed.boundAssertions(100L))))
+                installed.commit()
+
+                assertFailsWith<IllegalStateException> { discarded.commit() }
+                assertEquals(BigFraction.ofLong(2L), assertNotNull(owner.solve()).lowerBound)
+            }
         }
     }
 

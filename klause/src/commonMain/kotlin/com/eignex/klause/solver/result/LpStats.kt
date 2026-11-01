@@ -512,6 +512,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     private var templateExactBounds = 0L
     private var templateRetainedBounds = 0L
     private var templateRetainedFullChecks = 0L
+    private var templateCatalogPublicationColumns = 0L
+    private var templateCatalogUpdateColumns = 0L
     val cutLifecycle = LpCutStats { key, delta ->
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
@@ -551,6 +553,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     fun observeTemplateUse(
         rows: Int = 0, bounds: Int = 0, exactBounds: Int = 0, retainedBounds: Int = 0,
         retainedFullChecks: Int = 0,
+        catalogPublicationColumns: Int = 0, catalogUpdateColumns: Int = 0,
     ) {
         if (!templateAssemblySeen) {
             templateAssemblySeen = true
@@ -561,6 +564,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         templateExactBounds += exactBounds
         templateRetainedBounds += retainedBounds
         templateRetainedFullChecks += retainedFullChecks
+        templateCatalogPublicationColumns += catalogPublicationColumns
+        templateCatalogUpdateColumns += catalogUpdateColumns
     }
 
     private fun phaseSnapshot(): Map<String, LpPhaseStats> {
@@ -594,6 +599,12 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                     put("EXACT_BOUND_OBJECTS", templateExactBounds)
                     if (templateRetainedBounds != 0L) put("RETAINED_BOUND_REUSES", templateRetainedBounds)
                     if (templateRetainedFullChecks != 0L) put("RETAINED_FULL_BOUND_CHECKS", templateRetainedFullChecks)
+                    if (templateCatalogPublicationColumns != 0L) {
+                        put("CATALOG_PUBLICATION_COLUMNS_REUSED", templateCatalogPublicationColumns)
+                    }
+                    if (templateCatalogUpdateColumns != 0L) {
+                        put("CATALOG_UPDATE_COLUMNS_REUSED", templateCatalogUpdateColumns)
+                    }
                 })))
             }
         }

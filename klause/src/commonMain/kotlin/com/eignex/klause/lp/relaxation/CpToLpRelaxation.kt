@@ -706,6 +706,10 @@ internal class CpToLpRelaxation(
         templateStats?.observeTemplateUse(retainedFullChecks = 1)
     }
 
+    internal fun observeRetainedCatalog(columns: Int, unchanged: Int) {
+        templateStats?.observeTemplateUse(catalogPublicationColumns = columns, catalogUpdateColumns = unchanged)
+    }
+
     internal fun observeTemplateWork(work: Long) {
         onTemplateWork(work)
     }

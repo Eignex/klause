@@ -106,10 +106,8 @@ internal class LpRetainedSources(
         private var lastUpper = 0L
         private var lastOpenUpper = false
         private var lastBounds: ExactLpBounds? = null
-        private var compactDefinitionState = 0
-        val storageUnits: Long = 17L + (required?.size ?: 0) + (definition?.storageUnits ?: 0L)
-        val compactDefinitionChecked: Boolean get() = compactDefinitionState != 0
-        private val sourceBoundsMemoized: Boolean get() = lastBounds === source.bounds
+        val storageUnits: Long = 16L + (required?.size ?: 0) + (definition?.storageUnits ?: 0L)
+        val sourceBoundsMemoized: Boolean get() = lastBounds === source.bounds
 
         fun compactColumn(model: LpModel, index: Int): ExactLpColumn? {
             val origin = model.loShift[index]
@@ -134,19 +132,11 @@ internal class LpRetainedSources(
         }
 
         private fun matchesCompactColumn(model: LpModel, index: Int): Boolean {
-            if (!compactDefinitionChecked) {
-                val upper = source.bounds.upper
-                compactDefinitionState = if (source.integral && source.origin.legacyLong() != null &&
-                    source.bounds.lower.matchesCompactSide(0L) &&
-                    (upper == null || (!upper.strict && upper.premises == null &&
-                        upper.number.legacyLong()?.let { it >= 0L } == true))
-                ) 1 else -1
-            }
-            if (compactDefinitionState < 0 || source.tag != model.tag[index] ||
-                source.origin.exactLong() != model.loShift[index]
+            if (!source.integral || source.tag != model.tag[index] ||
+                source.origin.legacyLong() != model.loShift[index] || !source.bounds.lower.matchesCompactSide(0L)
             ) return false
             return if (!model.hasFiniteUpper(index) || model.probeClampedHi[index]) source.bounds.upper == null else {
-                model.upper[index] >= 0L && source.bounds.upper?.number?.exactLong() == model.upper[index]
+                model.upper[index] >= 0L && source.bounds.upper.matchesCompactSide(model.upper[index])
             }
         }
 
@@ -176,6 +166,27 @@ internal class LpRetainedSources(
             lastBounds = next
             return next
         }
+    }
+
+    private class ColumnCatalog(
+        private val previousColumns: List<Column>,
+        private val previousHandles: Map<ColumnKey, Int>,
+        private val reuse: Boolean,
+    ) {
+        private var additions = if (reuse) null else previousColumns.toMutableList()
+        private var handles = if (reuse) null else previousHandles.toMutableMap()
+        val columns: List<Column> get() = additions ?: previousColumns
+        val keys: Map<ColumnKey, Int> get() = handles ?: previousHandles
+
+        fun add(key: ColumnKey, column: Column) {
+            val target = additions ?: previousColumns.toMutableList().also { additions = it }
+            val index = handles ?: previousHandles.toMutableMap().also { handles = it }
+            index[key] = target.size
+            target.add(column)
+        }
+
+        fun completedColumns(): List<Column> = if (reuse) columns else columns.toList()
+        fun completedHandles(): Map<ColumnKey, Int> = if (reuse) keys else keys.toMap()
     }
 
     private class Binding(val emission: LpEmission, val columns: IntArray, val rows: LongArray) {
@@ -267,8 +278,7 @@ internal class LpRetainedSources(
                 generation++
             }
         }
-        val staged = columns.toMutableList()
-        val keys = handles.toMutableMap()
+        val catalog = ColumnCatalog(columns, handles, relaxer.reuseRetainedDefinitions)
         val definitions = realDefinitions.toMutableMap()
         val next = bindings.copyOf()
         val added = ArrayList<LpStructuralColumn>()
@@ -293,10 +303,10 @@ internal class LpRetainedSources(
             check(epoch < Long.MAX_VALUE)
             val emission = update.emissions[index]
             val fragment = emission.relaxation
-            val hints = if (relaxer.reuseRetainedDefinitions && keys.isNotEmpty() &&
+            val hints = if (relaxer.reuseRetainedDefinitions && catalog.keys.isNotEmpty() &&
                 fragment.model.exactState == null && fragment.model.doubleView == null
             ) IntArray(fragment.model.n) else null
-            val source = importFragment(fragment, staged, keys, hints, cancellation) ?: return null
+            val source = importFragment(fragment, catalog.columns, catalog.keys, hints, cancellation) ?: return null
             require(source.objective.scale.value == BigFraction.ONE && source.objective.externalConstant.value.isZero)
             val mapped = hints ?: IntArray(source.n)
             for (local in mapped.indices) {
@@ -305,12 +315,12 @@ internal class LpRetainedSources(
                 val old = if (known >= 0) known else {
                     val currentKey = columnKey(fragment, local, epoch)
                     key = currentKey
-                    keys[currentKey]
+                    catalog.keys[currentKey]
                 }
                 if (old != null) {
                     // Integer and mixed emitters can encode the same coordinate in Long and IEEE forms.
-                    check(staged[old].source.origin.value == source.column(local).origin.value)
-                    check(staged[old].cost.value == source.objective.cost(local).value)
+                    check(catalog.columns[old].source.origin.value == source.column(local).origin.value)
+                    check(catalog.columns[old].cost.value == source.objective.cost(local).value)
                     mapped[local] = old
                 } else {
                     val definition = fragment.colPresence[local]
@@ -330,9 +340,8 @@ internal class LpRetainedSources(
                         ))
                     }
                     val cost = source.objective.cost(local)
-                    mapped[local] = staged.size
-                    keys[requireNotNull(key)] = staged.size
-                    staged.add(Column(
+                    mapped[local] = catalog.columns.size
+                    catalog.add(requireNotNull(key), Column(
                         column, cost, fragment.colVarId[local], fragment.colIsBool[local],
                         fragment.colRealId[local], fragment.colRealSign[local], fragment.colReq[local]?.copyOf(),
                         fragment.colPresentUpper[local], definition,
@@ -346,7 +355,7 @@ internal class LpRetainedSources(
             val rhs = List(source.m) { source.rhs(it) }.toMutableList()
             for (local in mapped.indices) {
                 val global = mapped[local]
-                val delta = source.column(local).origin.value - staged[global].source.origin.value
+                val delta = source.column(local).origin.value - catalog.columns[global].source.origin.value
                 for (entry in source.entries(local)) {
                     rowTerms[entry.row].add(global to entry.number)
                     if (!delta.isZero) {
@@ -386,6 +395,7 @@ internal class LpRetainedSources(
         }
         checkCancellation(cancellation)
         relaxer.observeBoundTemplates(boundTemplates)
+        val staged = catalog.columns
         val uses = columnUses.copyOf(staged.size)
         var owned = ownedStorageUnits + staged.drop(columns.size).sumOf { it.storageUnits }
         var unused = unusedColumns + (columns.size until staged.size).count { staged[it].reclaimable() }
@@ -420,8 +430,11 @@ internal class LpRetainedSources(
         ) {
             check(generation == expectedGeneration) { "stale source edit" }
             update.commit()
-            columns = staged.toList()
-            handles = keys.toMap()
+            if (relaxer.reuseRetainedDefinitions) {
+                relaxer.observeRetainedCatalog(staged.size, if (staged === columns) columns.size else 0)
+            }
+            columns = catalog.completedColumns()
+            handles = catalog.completedHandles()
             columnUses = uses
             unusedColumns = unused
             ownedStorageUnits = owned
@@ -455,7 +468,7 @@ internal class LpRetainedSources(
                     val global = keys[ColumnKey.Source(CutSourceKind.INTEGER, fragment.colVarId[local])]
                         ?: return@authoritativeModel null
                     val column = staged[global]
-                    if (!column.compactDefinitionChecked) relaxer.observeRetainedBoundCheck()
+                    if (!column.sourceBoundsMemoized) relaxer.observeRetainedBoundCheck()
                     val definition = column.compactColumn(model, local) ?: return@authoritativeModel null
                     hints[local] = global + 1
                     reused++
