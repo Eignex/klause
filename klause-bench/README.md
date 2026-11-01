@@ -241,7 +241,11 @@ configuration; a problem-level case identity can be shared by several arms.
 
 Profile mains live in [bench/profile/](src/main/kotlin/com/eignex/klause/bench/profile/)
 and run as lab profile jobs; consult the selected main for its arguments and
-retain its output through `$OUT`.
+retain its output through `$OUT`. `ObjectiveCutoffProfile` accepts
+`cache-audit=false` to replace the Boolean cache scan with bounded native traces.
+`initial-uncut-work=N` runs the first retained query without a cutoff for at most
+N work units before enabling the requested fixed cutoff; it shares the containing
+search allowance and records the actual first-query work and cutoff state.
 
 Suite measurements `jfr`, `compilation` and `compilation+log` retain the CLI recording
 and write CPU, allocation and runtime-event summaries to `cases/N/out/solve.log`.

@@ -229,7 +229,7 @@ internal object ObjectivePortfolioReplay {
         }
     }
 
-    private fun observing(
+    internal fun observing(
         params: BacktrackParams,
         captures: MutableList<PreparedArithmeticLearningProfile.Capture>,
         omitted: () -> Unit,

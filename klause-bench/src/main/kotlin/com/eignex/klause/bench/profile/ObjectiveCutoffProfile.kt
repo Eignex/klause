@@ -41,7 +41,8 @@ internal object ObjectiveCutoffProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all { it in setOf("suite", "problem", "sha256", "source64", "sourceGzip64",
             "cutoff", "seed", "order", "presolve", "presolve-work", "work", "slice-work", "timeout-ms",
-            "point64", "point-sha256", "point-only", "portfolio", "initial-bt-probe-ms", "defer-bt-continuation") })
+            "point64", "point-sha256", "point-only", "portfolio", "initial-bt-probe-ms", "defer-bt-continuation",
+            "cache-audit", "initial-uncut-work") })
         require((options["point64"] == null) == (options["point-sha256"] == null))
         require(options["point-only"] == null || options["point64"] != null)
         val portfolio = (options["portfolio"] ?: "false").toBooleanStrict()
@@ -56,6 +57,11 @@ internal object ObjectiveCutoffProfile {
         val seed = (options["seed"] ?: "1").toLong()
         val timeout = (options["timeout-ms"] ?: "10000").toLong().also { require(it in 1..30_000L) }
         val maximumWork = (options["work"] ?: "150000").toLong().also { require(it in 1..1_000_000L) }
+        val cacheAudit = (options["cache-audit"] ?: "true").toBooleanStrict()
+        val initialUncutWork = (options["initial-uncut-work"] ?: "0").toLong().also {
+            require(it in 0..maximumWork)
+        }
+        require(!portfolio || (options["cache-audit"] == null && initialUncutWork == 0L))
         val sliceWork = (options["slice-work"] ?: "5000").toLong().also { require(it in 1..maximumWork) }
         val preparationWork = options.getValue("presolve-work").toLong().also { require(it in 1..1_000_000_000L) }
         val order = AffinePivotOrder.valueOf((options["order"] ?: "rewrite_cost").uppercase())
@@ -110,11 +116,18 @@ internal object ObjectiveCutoffProfile {
                 ObjectivePortfolioReplay.Controls(seed, timeout, initialProbe, deferContinuation), containing)
             return
         }
-        val audit = BooleanBoundAudit(objective.boolWeights)
-        val stop = containing or Cancellation.after(timeout.milliseconds) or Cancellation { audit.stopped }
+        val audit = if (cacheAudit) BooleanBoundAudit(objective.boolWeights) else null
+        val captures = mutableListOf<PreparedArithmeticLearningProfile.Capture>()
+        var cutoffActive = initialUncutWork == 0L
+        val stop = containing or Cancellation.after(timeout.milliseconds) or Cancellation { audit?.stopped == true }
         val base = BacktrackPresets.satOptimized(randomSeed = seed + 1000L, cancellation = stop)
-        val params = base.copy(variableSelector = audit.observing(base.variableSelector),
-            objectiveBoundSupplier = { cutoff.toDouble() }, solveBudgetMillis = timeout)
+        val observed = if (audit == null) ObjectivePortfolioReplay.observing(base, captures) {
+            error("fixed-cutoff native capture allowance exhausted")
+        } else base.copy(variableSelector = audit.observing(base.variableSelector))
+        val params = observed.copy(
+            objectiveBoundSupplier = { if (cutoffActive) cutoff.toDouble() else Double.POSITIVE_INFINITY },
+            solveBudgetMillis = timeout,
+        )
         var slices = 0
         var points = 0
         var outputBytes = 0L
@@ -132,7 +145,8 @@ internal object ObjectiveCutoffProfile {
             BacktrackSolver(problem).resumable(objective, params).use { search ->
                 while (terminal == null && !stop() && search.work < maximumWork && slices < 4096) {
                     slices++
-                    terminal = search.runSlice(stop, timeout, minOf(sliceWork, maximumWork - search.work)) { result ->
+                    val grant = if (cutoffActive) sliceWork else initialUncutWork
+                    terminal = search.runSlice(stop, timeout, minOf(grant, maximumWork - search.work)) { result ->
                         if (points < 128) {
                             val source = prepared.reconstruct(result.sample)
                             publish(buildJsonObject {
@@ -148,15 +162,17 @@ internal object ObjectiveCutoffProfile {
                         }
                         points++
                     }
-                    audit.observe()
+                    audit?.observe()
                     publish(buildJsonObject {
                         put("event", "slice")
                         put("slice", slices)
                         put("work", search.work)
                         put("nodes", search.stats.search.nodes.sum)
                         put("propagationWork", search.stats.search.propagationWork.sum)
-                        put("audit", audit.report())
+                        put("finiteCutoffActive", cutoffActive)
+                        put("audit", audit?.report() ?: JsonNull)
                     })
+                    cutoffActive = true
                 }
                 publish(buildJsonObject {
                     put("event", "terminal")
@@ -167,6 +183,8 @@ internal object ObjectiveCutoffProfile {
                         else -> null
                     })
                     put("cutoff", cutoff)
+                    put("initialUncutWork", initialUncutWork)
+                    put("cacheAuditEnabled", cacheAudit)
                     put("preparationNs", preparationNs)
                     put("preparationWork", budget.spent())
                     put("searchNs", System.nanoTime() - searchStarted)
@@ -175,9 +193,17 @@ internal object ObjectiveCutoffProfile {
                     put("points", points)
                     put("pointsOmitted", (points - 128).coerceAtLeast(0))
                     put("cancelled", stop())
-                    put("audit", audit.report())
+                    put("audit", audit?.report() ?: JsonNull)
                     put("independentlyCheckedProof", false)
                 })
+            }
+            for ((index, capture) in captures.withIndex()) {
+                publish(buildJsonObject {
+                    put("event", "native-trace")
+                    put("session", index)
+                    put("capture", capture.export())
+                })
+                capture.release()
             }
         }
     }
