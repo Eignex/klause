@@ -571,7 +571,10 @@ every root pin, the ordinary cursor skips the remaining source suffix and contin
 through learned clauses. Missing indexes retain the full source scan. Learned
 compaction invalidates learned candidates while preserving stable source candidates
 and source scan progress at an unchanged root. A changed root restarts the source
-scan after learned compaction.
+scan after learned compaction. Logical retirement preserves both root passes'
+learned cursor positions; cached learned candidates are checked for liveness before
+their payload is used. The separate physical mapping generation invalidates indices
+after compaction or slot reuse.
 A shortened
 source clause enters as a permanent session-local replacement before its watches
 retire; immutable source text remains available for reasons. The propagation session
@@ -579,7 +582,17 @@ owns unfinished source-watch retirement
 after replacement admission. Pass reset or optional buffer release retains that record;
 a funded slice retires its watches before admitting another source replacement.
 Session close releases it. Satisfied source watches retire without changing variable IDs.
-Learned replacements retain their imported origin. Compaction protects live and
+Learned selections capture a stable retirement handle before replacement admission;
+an unfunded capture retains the candidate and admits no replacement. The root pass
+stages one inactive selection at a time. Replacement propagation and required peer
+publication complete before a funded root slice authorizes retirement. A satisfied
+clause uses the same publication boundary for its premises. Authorized requests stay
+kernel-owned through optional buffer release. Abandoned inactive captures retain a
+small cancellation owner until cancellation is funded or their scope is released.
+Caller metadata and kernel requests share a finite retained allowance bounded by
+the configured memory scratch envelope and any learned-memory soft limit. Existing
+candidate literal buffers remain part of the pass memory observation.
+Learned replacements retain their imported origin. Physical compaction protects live and
 historical reasons and removes obsolete watches; attaching a shortened binary installs
 both implication directions and evaluates facts already assigned at the root. There
 is no separate stale binary graph or whole-graph rebuild.
@@ -609,7 +622,7 @@ complete root; interruption supplies no deduction. Speculative retractions prese
 the saved search phases while retaining ordinary unassignment notifications for
 variable selectors. Clause scans and probes enter the existing inprocessing and
 propagation work counters. Cursors survive suspension and
-reset on reseeding; learned indices never survive a pass snapshot.
+reset on reseeding; learned snapshots retain their physical mapping generation.
 
 Both root passes require an unconditional complete decision-level-zero root. Assumptions,
 seed restrictions, permanent objective cutoffs, model blockers and externally implied
@@ -650,8 +663,9 @@ Root scan positions and residual candidates, probe cursors, vivification replace
 batches and subsumption preparation survive suspension. The subsumption occurrence
 window retains at most 1,024 clauses
 and 8,192 literals, advances round-robin, and declines a clause exceeding its remaining
-literal space. Compaction invalidates snapshots by a session-local revision, without
-changing source variable IDs. Replacement attachment precedes retirement; active and
+literal space. Compaction invalidates root indices through their mapping generation
+and other pass snapshots through the learned revision, without changing source
+variable IDs. Replacement attachment precedes retirement; active and
 historical reasons retain their ordinary protection.
 The retained-memory observation counts each primitive buffer once by identity,
 including residual capacity, occurrence postings and replacement metadata, and models
@@ -673,6 +687,13 @@ publication finish ahead of optional admission. Class rotation
 prevents a cheap pass from always taking the entire offered slice. Work and growth
 triggers, cooldown and warmup are disabled by default; the additional work ceilings are
 unlimited unless configured. Existing general off and SAT preset controls remain.
+Funded root continuation resumes retained candidates, source-watch retirement and
+selected requests before optional trigger gates. It receives one root-class grant
+inside the containing grant and starts no new optional scan. Protected requests
+yield ordinary search after a complete protected cycle; deferred work leaves that
+cycle incomplete. Ownership changes reopen protection checks, while memory
+observation alone supplies no new opportunity. Capture, authorization, cancellation,
+acknowledgement and retirement retain their charged work and class latency.
 Per-class attempted, eligible, shortened, unit, stopped and work counters diagnose
 applicability. Probe outcomes distinguish a consistent fixpoint, a completed
 refutation and an interrupted attempt; these counters add no second work charge.

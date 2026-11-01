@@ -44,6 +44,15 @@ internal interface InprocessingPass {
     fun releaseRetainedBuffers() = reset()
 
     fun rootPublished() = Unit
+
+    fun hasContinuation(session: PropagationSession): Boolean = false
+
+    fun continueAtRoot(
+        session: PropagationSession,
+        params: BacktrackParams,
+        stats: SearchStatsSink?,
+        containingWork: Long,
+    ) = Unit
 }
 
 /**
@@ -181,23 +190,32 @@ internal class Inprocessing(
                 lastCount = session.learnedClauseCount
             }
         }
-        if ((work - initialWork).coerceAtLeast(0L) < params.inprocessingWarmupWork) {
+        val warming = (work - initialWork).coerceAtLeast(0L) < params.inprocessingWarmupWork
+        if (warming) {
             stats?.noteInprocessing("inprocessWarmupRoots", 1L)
-            return false
         }
-        val restartDue = restart && --restartsUntilRun <= 0
+        val restartDue = !warming && restart && --restartsUntilRun <= 0
         if (restartDue) restartsUntilRun = cadence
         val elapsed = (work - lastWork).coerceAtLeast(0L)
         val intervalDue = params.inprocessingInterval > 0L && elapsed >= params.inprocessingInterval
         val growthDue = params.inprocessingGrowth > 0 &&
             session.learnedClauseCount.toLong() - lastCount >= params.inprocessingGrowth
-        if ((!restartDue && !intervalDue && !growthDue) || elapsed < params.inprocessingCooldown) return false
-        lastWork = work
-        lastCount = session.learnedClauseCount
+        val ordinaryDue = !warming && (restartDue || intervalDue || growthDue) &&
+            elapsed >= params.inprocessingCooldown
+        if (!ordinaryDue && passes.none { it.hasContinuation(session) }) return false
+        if (ordinaryDue) {
+            lastWork = work
+            lastCount = session.learnedClauseCount
+        }
         val repaid = repayDebt(params.inprocessingWork)
         val offered = params.inprocessingWork - repaid
         if (offered == 0L || params.cancellation() || session.cancelRequested) return false
-        stats?.noteInprocessing(if (restartDue) "inprocessRestartTriggers" else "inprocessWorkTriggers", 1L)
+        val trigger = when {
+            !ordinaryDue -> "inprocessRetirementContinuationTriggers"
+            restartDue -> "inprocessRestartTriggers"
+            else -> "inprocessWorkTriggers"
+        }
+        stats?.noteInprocessing(trigger, 1L)
         val start = session.work
         val duration = TimeSource.Monotonic.markNow()
         val rootMark = session.explanationState.undoTop
@@ -213,7 +231,10 @@ internal class Inprocessing(
                         if (containingWork == 0L) return@withInprocessingCancellation
                         val pass = passes[nextPass]
                         nextPass = (nextPass + 1) % passes.size
-                        pass.run(session, params, stats, containingWork)
+                        if (ordinaryDue) pass.run(session, params, stats, containingWork)
+                        else if (pass.hasContinuation(session)) {
+                            pass.continueAtRoot(session, params, stats, containingWork)
+                        }
                         if (session.fixpointCancelled) pendingRoot = pass
                     }
                 }

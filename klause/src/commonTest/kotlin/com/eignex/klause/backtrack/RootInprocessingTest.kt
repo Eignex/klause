@@ -188,7 +188,7 @@ class RootInprocessingTest {
     }
 
     @Test
-    fun `a pending retirement should invalidate learned candidates after compaction`() {
+    fun `physical compaction should invalidate a pending learned candidate`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
             assertEquals(native, session.usesNativeSat)
@@ -196,20 +196,23 @@ class RootInprocessingTest {
             session.addLearnedClause(Clause(intArrayOf(0, 4, 6)), 3)
             val pass = RootSimplificationPass()
             val stats = SearchStatsSink()
+            val loop = Inprocessing(listOf(pass), cadence = 1, stats = stats)
             repeat(64) {
-                if ((stats.snapshot().learning["inprocessRootCandidates"] ?: 0L) < 3L) {
-                    pass.run(session, BacktrackParams(inprocessingRootWork = 1L), stats)
+                if ((stats.snapshot().learning["inprocessRootCandidates"] ?: 0L) < 2L) {
+                    loop.onRestart(session, BacktrackParams(inprocessingRootWork = 1L))
                 }
             }
-            assertEquals(3L, stats.snapshot().learning.getValue("inprocessRootCandidates"))
+            assertEquals(2L, stats.snapshot().learning.getValue("inprocessRootCandidates"))
             assertEquals(2, session.learnedClauseCount)
+            session.forgetLearnedClauses { index, _ -> index == 1 }
+            assertEquals(1, session.learnedClauseCount)
 
-            repeat(3) { pass.run(session, BacktrackParams(), null) }
+            repeat(8) { loop.onRestart(session, BacktrackParams()) }
             val partners = ArrayList<Int>()
             session.explanationState.forEachBinaryPartner(4) { partners.add(it) }
 
             assertEquals(listOf(6), partners)
-            assertEquals(1, session.learnedClauseCount)
+            assertEquals(1, session.activeLearnedClauseCount)
         }
     }
 
@@ -364,7 +367,9 @@ class RootInprocessingTest {
             assertEquals(native, session.usesNativeSat)
             session.importClause(SharedClause(intArrayOf(0, 2, 4), longArrayOf(), 3), origin = 7)
 
-            RootSimplificationPass().run(session, BacktrackParams(), null)
+            val loop = Inprocessing(listOf(RootSimplificationPass()), cadence = 1)
+            repeat(8) { loop.onRestart(session, BacktrackParams()) }
+            session.forgetLearnedClauses { _, _ -> true }
             session.pinBool(1, false)
             var credited = 0L
             session.drainImportUses { origin, uses -> if (origin == 7) credited += uses }
@@ -379,7 +384,7 @@ class RootInprocessingTest {
     @Test
     fun `a retained active reason should not starve later root candidates`() {
         for ((native, work) in listOf(false to Long.MAX_VALUE, true to Long.MAX_VALUE,
-            false to 10L, true to 10L, false to 1L, true to 1L)) {
+            false to 256L, true to 256L)) {
             val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
@@ -387,12 +392,34 @@ class RootInprocessingTest {
             val pass = RootSimplificationPass()
             val params = BacktrackParams(rootSimplifyBatch = 2, inprocessingRootWork = work)
             val stats = SearchStatsSink()
+            val loop = Inprocessing(listOf(pass), cadence = 1, stats = stats)
 
-            repeat(100) { pass.run(session, params, stats) }
+            repeat(100) { loop.onRestart(session, params) }
 
             assertTrue((0 until session.learnedClauseCount).any {
                 session.learnedClauseLiterals(it).toSet() == setOf(4, 6)
             }, "native=$native work=$work learning=${stats.snapshot().learning}")
+        }
+    }
+
+    @Test
+    fun `an unfundable learned selection should yield without replacement admission`() {
+        for (native in listOf(false, true)) for (grant in listOf(1L, 10L)) {
+            val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            session.addLearnedClause(Clause(intArrayOf(0, 4, 6)), 3)
+            val loop = Inprocessing(listOf(RootSimplificationPass()), cadence = 1)
+            val params = BacktrackParams(inprocessingRootWork = grant)
+
+            repeat(64) { loop.onRestart(session, params) }
+            val partners = ArrayList<Int>()
+            session.explanationState.forEachBinaryPartner(4) { partners.add(it) }
+
+            assertTrue(partners.isEmpty())
+            assertEquals(2, session.learnedClauseCount)
+            assertFalse(session.hasLearnedRetirementContinuation)
+            assertEquals(0, session.decisionLevel)
         }
     }
 
@@ -404,7 +431,8 @@ class RootInprocessingTest {
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             val reason = assertNotNull(session.boolReasonClause(1)).toList()
 
-            RootSimplificationPass().run(session, BacktrackParams(), null)
+            val loop = Inprocessing(listOf(RootSimplificationPass()), cadence = 1)
+            repeat(4) { loop.onRestart(session, BacktrackParams()) }
             session.forgetLearnedClauses { _, _ -> false }
 
             assertEquals(reason, assertNotNull(session.boolReasonClause(1)).toList())
@@ -796,4 +824,55 @@ class RootInprocessingTest {
         assertFalse(session.fixpointCancelled)
         assertEquals(0L, assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes"))
     }
+
+    @Test
+    fun `logical retirement should preserve probe progress toward a useful learned suffix`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(
+                problem(intArrayOf(6, 0), intArrayOf(6, 1)).bake(), nativeSat = native,
+            )
+            assertEquals(native, session.usesNativeSat)
+            session.addLearnedClause(Clause(intArrayOf(2, 4)), 2)
+            session.addLearnedClause(Clause(intArrayOf(6, 2)), 2)
+            session.addLearnedClause(Clause(intArrayOf(0, 2, 4)), 3)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 1)
+            repeat(4) { pass.run(session, params, null) }
+            assertNull(session.boolValue(3))
+            val count = session.learnedClauseCount
+            val retired = session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { it != 2 }
+            assertEquals(1, retired)
+            assertEquals(count, session.learnedClauseCount)
+
+            pass.run(session, params, null)
+
+            assertEquals(true, session.boolValue(3))
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `physical compaction should invalidate probe positions before a useful learned survivor`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(
+                problem(intArrayOf(6, 0), intArrayOf(6, 1)).bake(), nativeSat = native,
+            )
+            assertEquals(native, session.usesNativeSat)
+            session.addLearnedClause(Clause(intArrayOf(2, 4)), 2)
+            session.addLearnedClause(Clause(intArrayOf(6, 2)), 2)
+            session.addLearnedClause(Clause(intArrayOf(0, 2, 4)), 3)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 1)
+            repeat(4) { pass.run(session, params, null) }
+            assertNull(session.boolValue(3))
+            session.forgetLearnedClauses { index, _ -> index != 0 }
+            assertEquals(2, session.learnedClauseCount)
+
+            pass.run(session, params, null)
+
+            assertEquals(true, session.boolValue(3))
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
 }
