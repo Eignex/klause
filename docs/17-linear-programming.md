@@ -486,10 +486,11 @@ fill, and solving admitted residual components with the rational basis factors.
 Factorization and complete verification share the certificate budget; an unresolved
 component retains its proposed entries. A dimension-limited component can instead
 propose an admitted subset of dual coordinates for its open basic directions.
-When those directions exceed the existing dimension cap, repair targets the
-exact residuals whose signs require absent bound sides. Admissible one-sided
-residuals need not be zero. Every untouched direction remains subject to the
-complete dual check after the proposal changes its multipliers.
+Repair targets the exact residuals whose signs require absent bound sides,
+even when the full open set fits the dimension cap. Admissible one-sided
+residuals need not be zero. With no such basic residual, an admitted full open
+subsystem remains available for other column residues. Every untouched direction
+remains subject to the complete dual check after the proposal changes its multipliers.
 Row-scaled floating elimination selects those coordinates within 16,384 projected
 cells and the containing certificate budget. Nonfinite or weak projected pivots
 decline; the selected exact submatrix must still factor and solve under the

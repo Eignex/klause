@@ -223,10 +223,7 @@ private class BasisDualRun(
                     val bounds = a.bounds[basis.basicVars[layout.structuralSlots[equation]]]
                     bounds.lower == null || bounds.upper == null
                 }
-                val required = if (open.size <= limits.dimension) open else {
-                    meter.storage(64L + open.size * 8L)
-                    open.filterTo(ArrayList<Int>(open.size), ::requiresMissingSide)
-                }
+                val required = repairDirections(open, limits.dimension)
                 largestRestrictedColumns = maxOf(largestRestrictedColumns, required.size)
                 if (required.size > limits.dimension || (open.isNotEmpty() && required.isEmpty())) {
                     decline = "DIMENSION"
@@ -244,6 +241,14 @@ private class BasisDualRun(
             }
             if (!solve(group, selected, local)) break
         }
+    }
+
+    private fun repairDirections(open: List<Int>, dimension: Int): List<Int> {
+        if (open.isEmpty()) return open
+        meter.storage(64L + open.size * 8L)
+        val required = open.filterTo(ArrayList<Int>(open.size), ::requiresMissingSide)
+        // An admitted full subsystem can also repair residues on nonbasic columns.
+        return if (required.isEmpty() && open.size <= dimension) open else required
     }
 
     private fun requiresMissingSide(equation: Int): Boolean {

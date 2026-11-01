@@ -13,17 +13,20 @@ class LpBoundCertificationTest {
     fun `large basis repair should retain admissible one sided residuals`() {
         val size = 129
         val zero = ExactLpNumber.of(0L)
-        for (upper in listOf(false, true)) {
+        for ((upper, openColumns) in listOf(false to 98, false to size, true to 98, true to size)) {
             val sign = if (upper) 1L else -1L
             val bounds = if (upper) ExactLpBounds(upper = ExactLpSide(zero)) else
                 ExactLpBounds(ExactLpSide(zero))
+            val boxed = ExactLpBounds(ExactLpSide(ExactLpNumber.of(if (upper) -1L else 0L)),
+                ExactLpSide(ExactLpNumber.of(if (upper) 0L else 1L)))
             val source = assertNotNull(LpExactState(ExactLpModel(
                 List(size) { column ->
                     listOf(column to 2L, (column + 1) % size to 1L).sortedBy { it.first }
                         .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
                 },
                 List(size) { zero },
-                List(size * 2) { ExactLpColumn(bounds) },
+                List(size) { ExactLpColumn(if (it < openColumns) bounds else boxed) } +
+                    List(size) { ExactLpColumn(bounds) },
                 List(size) { ExactLpRow() },
                 ExactLpObjective(List(size) { ExactLpNumber.of(sign * if (it == 0) 3L else 2L) } +
                     List(size) { zero }),
