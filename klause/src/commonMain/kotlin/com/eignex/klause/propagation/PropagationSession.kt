@@ -1122,14 +1122,16 @@ class PropagationSession private constructor(
         maxWork: Long,
         maxScratchBytes: Long,
         cancelled: () -> Boolean,
+        canDrop: (Int) -> Boolean = { true },
         keep: (Int) -> Boolean,
     ): Int {
         if (retainedState == null || decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot ||
             inprocessingRootPending
         ) return 0
         val retired = state.nativeEngine?.maintainCapWindow(cap, maxWork, maxScratchBytes,
-            { cancelRequested || cancelled() }, keep)
-            ?: state.maintainGeneralCapWindow(cap, maxWork, maxScratchBytes, { cancelRequested || cancelled() }, keep)
+            { cancelRequested || cancelled() }, canDrop, keep)
+            ?: state.maintainGeneralCapWindow(cap, maxWork, maxScratchBytes,
+                { cancelRequested || cancelled() }, canDrop, keep)
         if (retired > 0) learnedClauseRevision++
         return retired
     }

@@ -65,7 +65,11 @@ private fun forgetTiered(
 private fun forgetWindow(session: PropagationSession, params: BacktrackParams, cap: Int, startWork: Long) {
     val retired = session.maintainCapWindow(cap,
         (params.learnedMemoryWork - (session.work - startWork)).coerceAtLeast(0L),
-        params.learnedMemoryScratchBytes, { params.cancellation() }) { index ->
+        params.learnedMemoryScratchBytes, { params.cancellation() }, { index ->
+            !session.learnedClausePermanent(index) && session.learnedClauseLbd(index) > params.lbdGlueThreshold &&
+                (!params.tieredLearnedDb || (session.learnedClauseTier(index) == ClauseTier.LOCAL &&
+                    !session.learnedClauseUsedSinceReduction(index)))
+        }) { index ->
         val lbd = session.learnedClauseLbd(index)
         if (!params.tieredLearnedDb) {
             lbd <= params.lbdGlueThreshold

@@ -24,15 +24,14 @@ internal class LearnedClauseDb(
     val stages = IntArrayList()
     val pendingAttach = IntArrayList()
     internal val capCandidates = IntArrayList(1)
-    internal var capRead = 0
-    internal var capWrite = 0
+    internal val capRanking = LearnedCapRanking(capCandidates)
     internal var permanentClauseCount = 0
+    internal var nonClauseCount = 0
     internal var retiredCount = 0
     internal var capCalls = 0L
     internal var capWork = 0L
     internal var capVisits = 0L
     internal var capBoundaryDefers = 0L
-    internal var capFloorDefers = 0L
     internal var capPreparationDefers = 0L
     private var capAllocationCharged = false
     val units = IntArrayList()
@@ -96,10 +95,10 @@ internal class LearnedClauseDb(
 
     internal fun resetCapIndex() {
         permanentClauseCount = 0
+        nonClauseCount = 0
         retiredCount = 0
         capCandidates.clear()
-        capRead = 0
-        capWrite = 0
+        capRanking.reset()
     }
 
     internal fun retire(index: Int) {
@@ -115,9 +114,11 @@ internal class LearnedClauseDb(
         "learnedCapWork" to capWork,
         "learnedCapVisits" to capVisits,
         "learnedCapBoundaryDefers" to capBoundaryDefers,
-        "learnedCapFloorDefers" to capFloorDefers,
+        "learnedCapFloorDefers" to 0L,
         "learnedCapPreparationDefers" to capPreparationDefers,
+        "learnedCapRankedPasses" to capRanking.passes,
         "learnedCapPermanentClauses" to permanentClauseCount.toLong(),
+        "learnedCapNonClauseFloor" to nonClauseCount.toLong(),
         "learnedCapRetainedSlots" to size.toLong(),
         "learnedCapRetiredSlots" to retiredCount.toLong(),
         "learnedCapActiveClauses" to activeCount.toLong(),

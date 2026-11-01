@@ -26,6 +26,7 @@ internal class ReclamationPreparation(
     var atomicUnits = 0L
         private set
     private var scratch = 0L
+    val remainingWork: Long get() = maxWork - work
 
     fun visit(units: Long = 1L, scratchBytes: Long = 0L) {
         if (cancelled() || units > maxWork - work || scratchBytes > maxScratchBytes - scratch) throw Deferred()

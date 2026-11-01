@@ -120,6 +120,8 @@ internal fun PropagationState.addLearnedPb(
     val newFid = totalFactorCount
     learned.stages.add(0)
     learned.store.add(prop)
+    learned.nonClauseCount++
+    work++
     learned.lbds.add(lbd)
     learned.permanent.add(if (permanent) 1 else 0)
     learned.tier.add(ClauseTier.UNSET.ordinal)
@@ -142,6 +144,8 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     val factor = totalFactorCount
     learned.stages.add(0)
     learned.store.add(propagator)
+    learned.nonClauseCount++
+    work++
     val rows = learned.integerRows ?: ArrayList<LearnedIntegerPropagator>().also { learned.integerRows = it }
     rows.add(propagator)
     arithmeticLearningTrace?.stored(factor, "integer")
@@ -296,6 +300,10 @@ internal fun PropagationState.forgetLearnedClauses(
             if (learned.retiredOf(w)) learned.retiredCount++
             else if (propagator is ClausePropagator) {
                 work += learned.trackCapClause(w, learned.permanent[w] == 1)
+            }
+            if (propagator !is ClausePropagator) {
+                learned.nonClauseCount++
+                work++
             }
             w++
         }

@@ -284,26 +284,28 @@ variable. Learned clauses live in a growable side buffer with a wrapping
 replacement-scan cursor per clause, and reductions compact them in place. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
 
-When permanent native clauses already fill a restart cap, a bounded window over
-non-permanent learned clauses can retire unused local rows without renumbering
-handles. Each row funds its policy update and live-reason scan before publication;
-units, pending rechecks and current root reasons survive. An unfinished window
-retains its read and write cursors across later restarts and appended clauses.
+When complete cap selection cannot be funded, a bounded window over non-permanent
+learned clauses retains the lowest LBD and stable-handle keys after permanent and
+tier-protected ownership. Its max-heap shares the candidate index with retained
+survivors. Funded heap steps, cursors and pending retirement survive later restarts
+and appended clauses; compaction resets them before handles change. Policy updates
+and live-reason scans are charged before publication. A later use protects a pending
+eviction; units, pending rechecks and current root reasons survive.
 Retired rows stop propagation and export, while their slots and arena bytes remain
 owned until a funded full compaction reclaims them. Ownership reports include that
 capacity and report `learnedRetiredSlots` separately from active clause count.
 Window calls, charged work, visits and permanent, active and retained counts remain
 available in the released session's lifecycle totals.
 
-General CP uses the same handle-preserving clause retirement above a permanent
-clause floor. Its funded protection snapshot covers current Boolean and integer
+General CP uses the same handle-preserving clause ranking. Non-clause constraints
+contribute to its retained floor. Its funded protection snapshot covers current Boolean and integer
 reasons, saved integer bounds and pending first assertions. Retired factor payloads
 remain readable for explanations while propagation queues, binary minimization and
 active-clause readers skip those rows. The candidate cursor survives appended
 clauses and is rebuilt when full compaction renumbers the store. Ownership includes
 the candidate index and every retained payload; logical retirement reports no
 physical release. Lifecycle totals identify the packed-native or general backend
-and distinguish boundary, floor and preparation deferrals.
+and report completed ranking passes and boundary/preparation deferrals.
 
 ## Pseudo-Boolean learning
 
@@ -456,12 +458,14 @@ poll cancellation; unfinished preparation publishes no tier changes or sweep eve
 Insufficient work or scratch safely defers the cap sweep. Completed selection keeps
 the same LBD priorities and tier lifetimes; a sweep event requires actual retirement.
 
-If complete candidate preparation cannot be funded, the permanent-clause-floor
-case uses the bounded handle-preserving window. Permanent ownership already
-exhausts the cap, so every eligible local row is excess and no LBD ranking is needed.
-Mid rows survive their demotion window; each completed window clears survivor reuse
-flags. Other constraint kinds, shared stores and caps retain the complete selection
-and remap preflight.
+If complete candidate preparation cannot be funded, native and general clauses use
+the bounded handle-preserving window. The candidate index retains the best eligible
+LBD keys as a max-heap; each funded step can resume without a whole-store selection
+buffer. Permanent clauses and policy survivors reduce the heap quota. Mid rows
+survive their demotion window, and classification clears survivor reuse flags.
+Current or historical reasons can retain additional rows above the soft cap. General
+reason snapshots and full physical compaction still require their complete funding;
+non-clause and shared stores retain the complete selection/remap path.
 
 Shared learning also accepts an optional modeled-byte soft limit checked at
 propagation boundaries independently of restarts. Units, glue clauses, live reason

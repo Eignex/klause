@@ -23,6 +23,44 @@ import kotlin.test.assertTrue
 class ClauseDbTest {
 
     @Test
+    fun `arithmetic rows should reduce the clause ranking quota`() {
+        for (integer in listOf(false, true)) {
+            val session = PropagationSession(Problem(4, 1, arrayOf(IntDomain(0, 10)), emptyArray()), nativeSat = false)
+            if (integer) {
+                val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+                    longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
+                session.addLearnedIntegerRow(row, 9)
+            } else session.addLearnedPb(longArrayOf(1, 1), intArrayOf(4, 6), 1, 9)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 8)
+
+            repeat(8) { session.maintainCapWindow(2, 64L, 128L, { false }) { false } }
+
+            assertEquals(2, session.activeLearnedClauseCount)
+            assertTrue(!session.isLearnedClause(1))
+            assertTrue(session.isLearnedClause(2))
+        }
+    }
+
+    @Test
+    fun `compaction should retain the arithmetic floor for pending clause ranking`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = false)
+        session.addLearnedPb(longArrayOf(1, 1), intArrayOf(4, 6), 1, 9)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 8)
+        session.maintainCapWindow(2, 64L, 128L, { false }) { false }
+
+        session.forgetLearnedClauses { index, _ -> index != 1 }
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 7)
+        repeat(8) { session.maintainCapWindow(2, 64L, 128L, { false }) { false } }
+
+        assertEquals(2, session.activeLearnedClauseCount)
+        assertTrue(!session.isLearnedClause(1))
+        assertTrue(session.isLearnedClause(2))
+        assertIs<PseudoBooleanPropagator>(session.explanationState.factorAt(0))
+    }
+
+    @Test
     fun `general window retirement should disable propagation while retaining factor payload`() {
         val session = PropagationSession(Problem(4, 0, emptyArray(), arrayOf(Clause(intArrayOf(4, 6)))),
             nativeSat = false)

@@ -47,8 +47,7 @@ internal class NativeSatState(private val state: PropagationState) {
     private var permanentCount = 0
     private var retiredCount = 0
     private val capCandidates = IntArrayList(1)
-    private var capRead = 0
-    private var capWrite = 0
+    private val capRanking = LearnedCapRanking(capCandidates)
     private var capCalls = 0L
     private var capWork = 0L
     private var capVisits = 0L
@@ -390,54 +389,72 @@ internal class NativeSatState(private val state: PropagationState) {
         maxWork: Long,
         maxScratchBytes: Long,
         cancelled: () -> Boolean,
+        canDrop: (Int) -> Boolean,
         keep: (Int) -> Boolean,
     ): Int {
         capCalls++
-        if (permanentCount < cap || maxScratchBytes < 64L || !initialized || pendingConflict || unitsPending ||
+        if (maxScratchBytes < 64L || !initialized || pendingConflict || unitsPending ||
             recheckHead < rechecks.size || bcpHead != state.boolPinOrder.size || state.runCancelled
         ) return 0
-        var work = 0L
-        var retired = 0
-        while (capRead < capCandidates.size && maxWork - work >= 32L) {
-            if (cancelled()) return retired
-            val index = capCandidates[capRead]
-            val length = literalCountOf(index)
-            val price = 32L + length.toLong() * 4L
-            if (price > maxWork - work) {
-                state.work += 16L
-                capWork += 16L
-                work += 16L
-                if (cancelled()) return retired
-            } else {
-                state.work += price
-                capWork += price
-                work += price
-                if (cancelled()) return retired
-                var protected = length <= 1 || lifecycleStages[index] and 2 != 0
-                // Native antecedents are copied literals, and Boolean undo saves no prior handle.
-                // Every remaining live clause handle belongs to a reason for one of its literals.
-                for (offset in 0 until length) {
-                    if (cancelled()) return retired
-                    if (state.boolReason[variableOf(index, offset)] == baseCount + index) protected = true
-                }
-                if (cancelled()) return retired
-                if (!keep(index) && !protected) {
-                    lifecycleStages[index] = lifecycleStages[index] or RETIRED
-                    state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
-                    retiredCount++
-                    retired++
-                }
+        val before = retiredCount
+        val budget = ReclamationPreparation(maxWork, maxScratchBytes, cancelled) {
+            state.work += it
+            capWork += it
+        }
+        try {
+            budget.visit(0L, 64L)
+            capRanking.advance(cap, permanentCount, budget, capPolicy(budget, canDrop, keep))
+        } catch (_: ReclamationPreparation.Deferred) {
+            // Heap steps and pending retirement keep their handles across roots.
+        }
+        return retiredCount - before
+    }
+
+    private fun capPolicy(
+        budget: ReclamationPreparation,
+        mayDrop: (Int) -> Boolean,
+        retain: (Int) -> Boolean,
+    ): LearnedCapPolicy = object : LearnedCapPolicy {
+        private var prepared = -1
+        private var protected = false
+        override fun lbd(index: Int): Int = learnedLbd[index]
+        override fun keep(index: Int): Boolean = retain(index)
+        override fun visited() { capVisits++ }
+        override fun prepare(index: Int): Boolean {
+            val price = 32L + literalCountOf(index).toLong() * 4L
+            if (budget.remainingWork < 32L) budget.visit(32L)
+            if (price > budget.remainingWork) {
+                budget.visit(16L)
+                return false
             }
-            if (!retiredOf(index)) capCandidates[capWrite++] = index
-            capRead++
-            capVisits++
+            protected = capProtected(index, budget, 32L)
+            prepared = index
+            return true
         }
-        if (capRead == capCandidates.size) {
-            capCandidates.truncateTo(capWrite)
-            capRead = 0
-            capWrite = 0
+        override fun retire(index: Int): Boolean {
+            if (!mayDrop(index)) return false
+            val pinned = if (index == prepared) protected else capProtected(index, budget, 0L)
+            if (pinned) return false
+            budget.visit(0L)
+            lifecycleStages[index] = lifecycleStages[index] or RETIRED
+            state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
+            retiredCount++
+            return true
         }
-        return retired
+    }
+
+    private fun capProtected(index: Int, budget: ReclamationPreparation, work: Long): Boolean {
+        val length = literalCountOf(index)
+        budget.visit(work + length.toLong() * 4L)
+        budget.visit(0L)
+        var protected = length <= 1 || lifecycleStages[index] and 2 != 0
+        // Native antecedents are copied literals; Boolean undo saves no prior clause handle.
+        for (offset in 0 until length) {
+            budget.visit(0L)
+            if (state.boolReason[variableOf(index, offset)] == baseCount + index) protected = true
+        }
+        budget.visit(0L)
+        return protected
     }
 
     internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) emptyMap() else mapOf(
@@ -445,6 +462,7 @@ internal class NativeSatState(private val state: PropagationState) {
         "learnedCapCalls" to capCalls,
         "learnedCapWork" to capWork,
         "learnedCapVisits" to capVisits,
+        "learnedCapRankedPasses" to capRanking.passes,
         "learnedCapPermanentClauses" to permanentCount.toLong(),
         "learnedCapRetainedSlots" to learnedCount.toLong(),
         "learnedCapRetiredSlots" to retiredCount.toLong(),
@@ -559,8 +577,7 @@ internal class NativeSatState(private val state: PropagationState) {
         permanentCount = 0
         retiredCount = 0
         capCandidates.clear()
-        capRead = 0
-        capWrite = 0
+        capRanking.reset()
         for (i in 0 until learnedCount) {
             state.work++
             val target = remap[i]

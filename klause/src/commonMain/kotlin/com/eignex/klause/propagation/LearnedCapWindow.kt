@@ -11,6 +11,7 @@ internal fun PropagationState.maintainGeneralCapWindow(
     maxWork: Long,
     maxScratchBytes: Long,
     cancelled: () -> Boolean,
+    canDrop: (Int) -> Boolean,
     keep: (Int) -> Boolean,
 ): Int {
     learned.capCalls++
@@ -18,42 +19,47 @@ internal fun PropagationState.maintainGeneralCapWindow(
         learned.capBoundaryDefers++
         return 0
     }
-    if (learned.permanentClauseCount < cap) {
-        learned.capFloorDefers++
-        return 0
-    }
     val budget = ReclamationPreparation(maxWork, maxScratchBytes, cancelled) {
         work += it
         learned.capWork += it
     }
-    var retired = 0
+    val retiredBefore = learned.retiredCount
     try {
         budget.visit(0L, 64L)
         budget.visit(learned.size.toLong(), learned.size.toLong())
         val protected = BooleanArray(learned.size)
         collectLearnedReferences(protected) { budget.visit() }
         budget.visit(0L)
-        while (learned.capRead < learned.capCandidates.size) {
-            budget.visit(32L)
-            budget.visit(0L)
-            val index = learned.capCandidates[learned.capRead]
-            val clause = learned.store[index] as ClausePropagator
-            val pinned = protected[index] || clause.literals.size <= 1 || learned.stages[index] and 1 == 0
-            if (!keep(index) && !pinned) {
-                learned.retire(index)
-                factorAttribution?.retire(clause)
-                retired++
-            }
-            if (!learned.retiredOf(index)) learned.capCandidates[learned.capWrite++] = index
-            learned.capRead++
-            learned.capVisits++
-        }
-        learned.capCandidates.truncateTo(learned.capWrite)
-        learned.capRead = 0
-        learned.capWrite = 0
+        learned.capRanking.advance(cap, learned.permanentClauseCount + learned.nonClauseCount, budget,
+            generalCapPolicy(protected, budget, canDrop, keep))
     } catch (_: ReclamationPreparation.Deferred) {
         learned.capPreparationDefers++
         // Completed row transactions retain their handles; the next root rebuilds reason protection.
     }
-    return retired
+    return learned.retiredCount - retiredBefore
+}
+
+private fun PropagationState.generalCapPolicy(
+    protected: BooleanArray,
+    budget: ReclamationPreparation,
+    mayDrop: (Int) -> Boolean,
+    retain: (Int) -> Boolean,
+): LearnedCapPolicy = object : LearnedCapPolicy {
+    override fun lbd(index: Int): Int = learned.lbds[index]
+    override fun prepare(index: Int): Boolean {
+        budget.visit(32L)
+        return true
+    }
+    override fun keep(index: Int): Boolean = retain(index)
+    override fun visited() { learned.capVisits++ }
+    override fun retire(index: Int): Boolean {
+        val clause = learned.store[index] as ClausePropagator
+        if (!mayDrop(index) || protected[index] || clause.literals.size <= 1 || learned.stages[index] and 1 == 0) {
+            return false
+        }
+        budget.visit(0L)
+        learned.retire(index)
+        factorAttribution?.retire(clause)
+        return true
+    }
 }
