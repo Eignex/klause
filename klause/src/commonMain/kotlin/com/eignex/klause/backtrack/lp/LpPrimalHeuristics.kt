@@ -23,6 +23,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.WorkMeter
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -384,14 +385,22 @@ private fun LpEngine.buildPrimalRelaxation(
     val allowance = rootPrimalWorkBudget()
     var work = 0L
     var outcome = "FAILED"
-    val token = cancellation or Cancellation { allowance > 0L && work >= allowance }
     fun debit(units: Long) {
         work += units
         noteNodeOverhead(units)
     }
+    val meter = WorkMeter {
+        cancellation.charge(it)
+        debit(it)
+    }
+    val token = object : Cancellation {
+        override fun isCancelled(): Boolean = cancellation() || allowance > 0L && work >= allowance
+        override fun deadline() = cancellation.deadline()
+        override fun workMeter(): WorkMeter = meter
+    }
     return try {
         if (token()) throw LpAssemblyCancelled()
-        CpToLpRelaxation(problem, objective, preparationCancellation = token, onTemplateWork = ::debit)
+        CpToLpRelaxation(problem, objective, preparationCancellation = token)
             .buildWithWork(SessionDomains(session), token) { debit(it * LpNodeOverhead.BUILD) }
             .also { outcome = "COMPLETE" }
     } catch (_: LpAssemblyCancelled) {

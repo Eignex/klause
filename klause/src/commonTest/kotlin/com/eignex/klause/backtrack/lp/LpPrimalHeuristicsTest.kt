@@ -25,6 +25,7 @@ import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
@@ -41,6 +42,27 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
+    @Test
+    fun `primal template preparation should stop its scan when the root grant is spent`() {
+        val rows = Array(128) { Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1) }
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, rows.toList()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val sink = SolveStatsSink("spent-primal-template-scan")
+        val factory = RecordingLpEngineFactory()
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, rootMaxWork = 1L)),
+            sink, LpSolveContext(factory)).use { engine ->
+            val owners = factory.calls.size
+
+            val result = engine.lpRoundingProbe(objective, Cancellation.Never)
+
+            assertNull(result)
+            assertEquals(owners, factory.calls.size)
+            val phase = sink.snapshot().lp.phases.getValue("PRIMAL_LP_ASSEMBLY_ROOT")
+            assertEquals(1L, phase.outcomes["CANCELLED"])
+            assertTrue(phase.work in 1L until problem.numFactors.toLong())
+        }
+    }
+
     @Test
     fun `primal assembly should stop before a numerical owner after its containing debit cancels`() {
         for (pump in listOf(false, true)) {
