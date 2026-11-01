@@ -61,14 +61,18 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
             runner = VarRef.IntVar(i)
         }
     }
-    if (directional != null) return hints.selected(directional, best, gainScore) ?: best
+    if (directional != null) {
+        hints.selected(directional, best, gainScore)
+        return best
+    }
     val basis = hints.basisPick(
         best, runner,
         (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
         (runner as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
         ::directionalCosts,
     )
-    return hints.selected(basis?.first, best, basis?.second ?: Double.NaN, basis = true) ?: best
+    hints.selected(basis?.first, best, basis?.second ?: Double.NaN, basis = true)
+    return best
 }
 
 /** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below
