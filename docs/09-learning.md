@@ -289,6 +289,8 @@ diagnostic invocation; an incomplete trace cannot establish exhaustive applicabi
 
 Native forgetting runs at restart boundaries only with a configured cap. Permanent
 and glue clauses (default LBD at most 2) survive; remaining space favors lower LBD.
+A count-based preparation estimate must fit 65,536 work units before selection;
+a larger estimate preserves the store and its policy state at that restart.
 The SAT preset enables capped tiered retention:
 
 | Tier | Initial classification | Lifetime |

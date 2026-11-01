@@ -16,6 +16,9 @@ internal fun forgetIfOverCap(session: PropagationSession, params: BacktrackParam
     val cap = params.maxLearnedClauses ?: return
     val learnedSize = session.learnedClauseCount
     if (learnedSize <= cap) return
+    val levels = Int.SIZE_BITS - learnedSize.countLeadingZeroBits()
+    val reductionWork = learnedSize.toLong() * (levels * 4L + 16L)
+    if (reductionWork > 65_536L) return
     if (params.tieredLearnedDb) {
         forgetTiered(session, params, cap, learnedSize)
         return
