@@ -24,18 +24,18 @@ import kotlin.test.assertTrue
 class PrivateRebuildSatisfactionTest {
     @Test
     fun `an owned learned equivalence should publish a checked witness without root pins`() {
-        for (native in listOf(false, true)) {
+        for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
-                Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
+                Clause(intArrayOf(1, replacement, 4)), Clause(intArrayOf(1, replacement, 5)),
+                Clause(intArrayOf(0, Lit.negate(replacement), 6)), Clause(intArrayOf(0, Lit.negate(replacement), 7)),
             )).bake()
             var opens = 0
             var closes = 0
             val exchange = object : ClauseExchange {
                 override fun onSearchStart(session: PropagationSession) {
                     opens++
-                    session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
-                    session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
+                    session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
+                    session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
                 }
                 override fun onSearchClose(session: PropagationSession) { closes++ }
                 override fun onRestart(session: PropagationSession) = Unit

@@ -263,7 +263,7 @@ classification. Each new baked model owns its projection, watches and search sta
 the shared factor input carries no mutable search state.
 
 A trial follows global root pins beyond the baked root and the last attempted
-view, or owned learned binary implications proving two unfixed variables equal.
+view, or owned learned binary implications proving two unfixed variables equal or complementary.
 An unchanged root performs no BVE. The root-pin scan charges its full
 column visit count and records its time; an insufficient grant skips the scan.
 An unchanged root trail retains a completed miss. All attempts share one
@@ -286,7 +286,7 @@ A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker
 qualifies. The capture binds its exact source object and owns its clauses. Adding
 them to the pinned source preserves the premises of the source implication-graph
-pass. Same-polarity equivalences retain Boolean slots and record `CopyLiteral`
+pass. Equivalent and complemented columns retain Boolean slots and record `CopyLiteral`
 reconstruction; transitive binary deletion alone opens no consumer. Literal
 remapping reserves normalization work before the graph pass receives half the
 remaining allowance. Discovery visits recent learning first, scanning at most 128 eligible binaries and

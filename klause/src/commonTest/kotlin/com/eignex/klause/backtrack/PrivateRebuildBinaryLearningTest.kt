@@ -16,14 +16,14 @@ import kotlin.test.assertTrue
 class PrivateRebuildBinaryLearningTest {
     @Test
     fun `owned reciprocal implications should capture a source bound equivalence without root pins`() {
-        for (native in listOf(false, true)) {
+        for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
-                Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
+                Clause(intArrayOf(1, replacement, 4)), Clause(intArrayOf(1, replacement, 5)),
+                Clause(intArrayOf(0, Lit.negate(replacement), 6)), Clause(intArrayOf(0, Lit.negate(replacement), 7)),
             )).bake()
             val session = PropagationSession(source, nativeSat = native)
-            session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
-            session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
+            session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
+            session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
 
             val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
 
@@ -46,15 +46,18 @@ class PrivateRebuildBinaryLearningTest {
 
     @Test
     fun `an owned binary should close a reciprocal source implication`() {
-        val source = Problem(3, 0, emptyArray(), arrayOf(
-            Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3, 4)), Clause(intArrayOf(0, 3, 5)),
-        )).bake()
-        val session = PropagationSession(source)
-        session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
+        for (replacement in listOf(2, 3)) {
+            val source = Problem(3, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(1, replacement)), Clause(intArrayOf(0, Lit.negate(replacement), 4)),
+                Clause(intArrayOf(0, Lit.negate(replacement), 5)),
+            )).bake()
+            val session = PropagationSession(source)
+            session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
 
-        val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true }
+            val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true }
 
-        assertNotNull(captured)
+            assertNotNull(captured)
+        }
     }
 
     @Test
