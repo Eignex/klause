@@ -106,8 +106,10 @@ internal class LpRetainedSources(
         private var lastUpper = 0L
         private var lastOpenUpper = false
         private var lastBounds: ExactLpBounds? = null
-        val storageUnits: Long = 16L + (required?.size ?: 0) + (definition?.storageUnits ?: 0L)
-        val sourceBoundsMemoized: Boolean get() = lastBounds === source.bounds
+        private var compactDefinitionState = 0
+        val storageUnits: Long = 17L + (required?.size ?: 0) + (definition?.storageUnits ?: 0L)
+        val compactDefinitionChecked: Boolean get() = compactDefinitionState != 0
+        private val sourceBoundsMemoized: Boolean get() = lastBounds === source.bounds
 
         fun compactColumn(model: LpModel, index: Int): ExactLpColumn? {
             val origin = model.loShift[index]
@@ -132,11 +134,19 @@ internal class LpRetainedSources(
         }
 
         private fun matchesCompactColumn(model: LpModel, index: Int): Boolean {
-            if (!source.integral || source.tag != model.tag[index] ||
-                source.origin.legacyLong() != model.loShift[index] || !source.bounds.lower.matchesCompactSide(0L)
+            if (!compactDefinitionChecked) {
+                val upper = source.bounds.upper
+                compactDefinitionState = if (source.integral && source.origin.legacyLong() != null &&
+                    source.bounds.lower.matchesCompactSide(0L) &&
+                    (upper == null || (!upper.strict && upper.premises == null &&
+                        upper.number.legacyLong()?.let { it >= 0L } == true))
+                ) 1 else -1
+            }
+            if (compactDefinitionState < 0 || source.tag != model.tag[index] ||
+                source.origin.exactLong() != model.loShift[index]
             ) return false
             return if (!model.hasFiniteUpper(index) || model.probeClampedHi[index]) source.bounds.upper == null else {
-                model.upper[index] >= 0L && source.bounds.upper.matchesCompactSide(model.upper[index])
+                model.upper[index] >= 0L && source.bounds.upper?.number?.exactLong() == model.upper[index]
             }
         }
 
@@ -445,7 +455,7 @@ internal class LpRetainedSources(
                     val global = keys[ColumnKey.Source(CutSourceKind.INTEGER, fragment.colVarId[local])]
                         ?: return@authoritativeModel null
                     val column = staged[global]
-                    if (!column.sourceBoundsMemoized) relaxer.observeRetainedBoundCheck()
+                    if (!column.compactDefinitionChecked) relaxer.observeRetainedBoundCheck()
                     val definition = column.compactColumn(model, local) ?: return@authoritativeModel null
                     hints[local] = global + 1
                     reused++

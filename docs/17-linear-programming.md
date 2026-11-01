@@ -128,10 +128,15 @@ the identical immutable source-bound pair and its primitive endpoints. Subsequen
 imports check their current tag, origin and open or finite width against those
 endpoints. A changed live-bound request replaces the memo; earlier bound snapshots
 remain immutable. Imports preserve a memo of a different live restriction.
+A private scalar records whether each immutable source definition has integral,
+non-strict, unpremised compact sides. Replacing the live-bound memo does not
+invalidate that eligibility. The scalar is included in owned storage accounting.
+Each import still checks its current source tag,
+origin and open or finite width; unsupported definitions keep ordinary construction.
 Successful imports carry the known catalog index in the existing
 column-mapping scratch, avoiding a second lookup. Full definition checks and reused
 imports have separate observations, including checks in interrupted attempts.
-The catalog retains no additional cache or numerical result authority.
+The catalog retains no additional bound definition or numerical result authority.
 LP bounding engines select retained-only admission through this catalog path,
 omitting source template preparation from whole-model builds. Complete layouts keep
 ordinary construction; actual later fragment imports supply the demand for reuse. This policy

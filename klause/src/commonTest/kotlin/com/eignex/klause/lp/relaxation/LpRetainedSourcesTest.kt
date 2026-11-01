@@ -109,6 +109,43 @@ class LpRetainedSourcesTest {
     }
 
     @Test
+    fun `completed source definition checks should survive live bound memo replacements`() {
+        val problem = Problem(1, 2, Array(2) { IntDomain(0, 10) }, arrayOf<Factor>(
+            ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 8),
+        ))
+        val live = Array(2) { problem.finiteIntDomain(it) }
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = live[varId]
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val sink = LpStatsSink()
+        val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L, 0L)),
+            templateStats = sink, retainImportedDefinitions = true)
+        val sources = LpRetainedSources(problem, consumer)
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val initial = assertNotNull(sources.prepare(owner.state, domains))
+            assertTrue(owner.replaceRows(initial.retired, initial.columns, initial.rows, false,
+                objective = initial.objective))
+            initial.commit()
+            val before = sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes
+            assertTrue(before.getValue("RETAINED_FULL_BOUND_CHECKS") > 0L)
+            assertTrue(owner.push())
+            live[0] = live[0].withMinAtLeast(2)
+            val child = assertNotNull(sources.prepare(owner.state, domains))
+            assertTrue(owner.replaceRows(child.retired, child.columns, child.rows, true,
+                objective = child.objective, assertions = assertNotNull(child.boundAssertions(100L))))
+            child.commit()
+            live[1] = live[1].withMinAtLeast(1)
+
+            assertNotNull(sources.prepare(owner.state, domains))
+
+            val after = sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes
+            assertEquals(before.getValue("RETAINED_FULL_BOUND_CHECKS"), after.getValue("RETAINED_FULL_BOUND_CHECKS"))
+            assertTrue(after.getValue("RETAINED_BOUND_REUSES") > before.getValue("RETAINED_BOUND_REUSES"))
+        }
+    }
+
+    @Test
     fun `retained candidate imports should reuse actual columns without preparing source metadata`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
