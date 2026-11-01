@@ -200,7 +200,7 @@ internal class RootSimplificationPass : InprocessingPass {
         while (pinCursor < pins.size && neighborhoodLeft > 0) {
             val variable = pins[pinCursor]
             val occurrences = if (variable < session.problem.numBoolVars) {
-                session.projection.preparedBoolOccurrences(variable)
+                session.projection.readyBoolOccurrences(variable)
             } else null
             if (variable < session.problem.numBoolVars && occurrences == null) {
                 pinCursor = pins.size
