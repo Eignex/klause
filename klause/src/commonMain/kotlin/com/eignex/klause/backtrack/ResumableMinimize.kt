@@ -238,7 +238,7 @@ internal class ResumableMinimize(
         }
         if (::cp.isInitialized) session.explanationState.arithmeticLearningTrace?.observeCutoff(
             bound.toBits(), session.decisionLevel,
-            if (::searchSession.isInitialized) searchSession.decisionLevel else -1,
+            if (::searchSession.isInitialized) searchSession.decisionLevel else -1, bestObj.toBits(),
         )
         return bound
     }

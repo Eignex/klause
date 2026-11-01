@@ -1544,3 +1544,12 @@ in portfolio mode, within `1..1000` milliseconds. Subsequent queries use ordinar
 grants; counted-arm probe controls and the containing deadline also apply. This
 is a diagnostic schedule perturbation. Inspect actual incumbent and lifecycle
 observations to establish which state the worker reached.
+
+With an initial query cap, `defer-bt-continuation=true` can hold the retained
+`satOptimized` worker after its first point-free feasibility query until another
+arm publishes an incumbent. It uses the existing incumbent eligibility gate and
+records deferral and release. A worker that already reported a point declines the
+perturbation. Native captures include the first finite cutoff observed after trace
+attachment and the worker's local incumbent at that read; missing observations
+remain unavailable. This mode changes diagnostic scheduling and supplies no proof
+authority or additional allowance.

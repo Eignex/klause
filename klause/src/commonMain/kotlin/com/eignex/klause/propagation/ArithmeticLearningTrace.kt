@@ -16,6 +16,8 @@ internal class ArithmeticLearningTrace(
         private set
     var observedCutoffBits: Long? = null
         private set
+    var firstFiniteRead: Event? = null
+        private set
 
     var truncated = false
         private set
@@ -56,8 +58,12 @@ internal class ArithmeticLearningTrace(
         boundaries.add(Event(kind, data.copyOf()))
     }
 
-    fun observeCutoff(bits: Long, nativeLevel: Int, sharedLevel: Int) {
+    fun observeCutoff(bits: Long, nativeLevel: Int, sharedLevel: Int, localBestBits: Long) {
         if (!retainBoundaries) return
+        if (firstFiniteRead == null && Double.fromBits(bits).isFinite()) {
+            firstFiniteRead = Event("minimize.first-finite-cutoff",
+                longArrayOf(bits, localBestBits, nativeLevel.toLong(), sharedLevel.toLong()))
+        }
         if (observedCutoffBits == bits) return
         observedCutoffBits = bits
         boundary("minimize.cutoff-read", bits, nativeLevel.toLong(), sharedLevel.toLong())

@@ -6,7 +6,9 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.Portfolio
+import com.eignex.klause.portfolio.PortfolioEvent
 import com.eignex.klause.portfolio.PortfolioExecutor
+import com.eignex.klause.portfolio.PortfolioPhase
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.BakedProblem
@@ -33,6 +35,13 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal object ObjectivePortfolioReplay {
+    data class Controls(
+        val seed: Long,
+        val timeoutMillis: Long,
+        val initialProbeMillis: Long?,
+        val deferContinuation: Boolean,
+    )
+
     fun run(
         out: File,
         invocation: PreparedSourceInvocation,
@@ -40,11 +49,12 @@ internal object ObjectivePortfolioReplay {
         originalObjective: LinearObjective,
         objective: LinearObjective,
         names: Map<String, Int>,
-        seed: Long,
-        timeout: Long,
+        controls: Controls,
         containing: Cancellation,
-        initialProbeMillis: Long?,
     ) {
+        val seed = controls.seed
+        val timeout = controls.timeoutMillis
+        val initialProbeMillis = controls.initialProbeMillis
         val captures = ArrayList<PreparedArithmeticLearningProfile.Capture>()
         var omittedSessions = 0
         var bytes = 0L
@@ -67,6 +77,7 @@ internal object ObjectivePortfolioReplay {
                 output.appendLine(encoded)
                 output.flush()
             }
+            val deferral = DeferredContinuation(controls.deferContinuation, ::publish)
             val hints = LocalSearchTrajectory.heuristicHints(invocation, prepared, containing)
             val sweep = hints?.let { get(it, "Sweep") as DefinitionalSweep? }
             val functional = hints?.let { get(it, "Objective") as IncrementalObjective? }
@@ -78,6 +89,7 @@ internal object ObjectivePortfolioReplay {
             requireNotNull(plan)
             val stop = containing or Cancellation.after(timeout.milliseconds)
             val events: (String, SearchEvent) -> Unit = { worker, event ->
+                deferral.observe(worker, event)
                 publish(buildJsonObject {
                     put("event", "engine-event")
                     put("worker", worker)
@@ -99,6 +111,7 @@ internal object ObjectivePortfolioReplay {
                     probe.set(portfolio, initialProbeMillis)
                     check(probe.get(portfolio) == initialProbeMillis)
                 }
+                deferral.attach(portfolio)
                 val observer: (Any) -> Unit = { observation -> publish(completion(portfolio, observation)) }
                 portfolio.javaClass.getDeclaredField("completionObserver").apply { isAccessible = true }
                     .set(portfolio, observer)
@@ -110,8 +123,10 @@ internal object ObjectivePortfolioReplay {
                     put("btEdit", "observer only; verify actual composition")
                     put("timeoutMs", timeout)
                     put("initialBacktrackProbeMillis", initialProbeMillis)
+                    put("deferBacktrackContinuation", controls.deferContinuation)
                 })
                 val result = executor.minimize(stop) { offered ->
+                    deferral.incumbent(offered.workerLabel)
                     val native = offered.result as? MinimizeResult.WithSample
                     if (native != null && points++ < 128) {
                         val source = prepared.reconstruct(native.sample)
@@ -159,6 +174,61 @@ internal object ObjectivePortfolioReplay {
         }
     }
 
+    private class DeferredContinuation(
+        private val enabled: Boolean,
+        private val publish: (JsonObject) -> Unit,
+    ) {
+        private var portfolio: Portfolio? = null
+        private var arm = -1
+        private var attempted = false
+        private var deferred = false
+        private var nativeIncumbents = 0
+
+        fun attach(portfolio: Portfolio) {
+            this.portfolio = portfolio
+            arm = portfolio.workers.indexOfFirst { it.label == "bt/satOptimized" }
+            require(!enabled || arm >= 0)
+        }
+
+        fun observe(worker: String, event: SearchEvent) {
+            if (!enabled) return
+            if (worker == "bt/satOptimized" && event is SearchEvent.Incumbent) nativeIncumbents++
+            val progress = ((event as? SearchEvent.PortfolioDiagnostic)?.event as? PortfolioEvent.Progressed)?.progress
+                ?: return
+            if (progress.arm != arm || progress.idleCredit || attempted) return
+            attempted = true
+            deferred = !progress.failed && !progress.refuted && nativeIncumbents == 0 &&
+                progress.acceptedIncumbents == 0L && progress.phase == PortfolioPhase.FEASIBILITY
+            if (deferred) eligibility(true)
+            publish(buildJsonObject {
+                put("event", if (deferred) "continuation-deferred" else "continuation-not-deferred")
+                put("arm", arm)
+                put("nativeIncumbents", nativeIncumbents)
+                put("acceptedIncumbents", progress.acceptedIncumbents)
+                put("preparing", progress.preparing)
+                put("initializationNanos", progress.initializationNanos)
+            })
+        }
+
+        fun incumbent(worker: String) {
+            if (!deferred) return
+            eligibility(false)
+            deferred = false
+            publish(buildJsonObject {
+                put("event", "continuation-released")
+                put("incumbentWorker", worker)
+                put("releasedByOtherArm", worker != "bt/satOptimized")
+            })
+        }
+
+        private fun eligibility(value: Boolean) {
+            val worker = checkNotNull(portfolio).workers[arm]
+            val flag = worker.javaClass.getDeclaredField("startAfterIncumbent").apply { isAccessible = true }
+            flag.setBoolean(worker, value)
+            check(flag.getBoolean(worker) == value)
+        }
+    }
+
     private fun observing(
         params: BacktrackParams,
         captures: MutableList<PreparedArithmeticLearningProfile.Capture>,
@@ -173,7 +243,7 @@ internal object ObjectivePortfolioReplay {
                     capture = existing
                 } else if (captures.size < 8) {
                     capture = PreparedArithmeticLearningProfile.Capture(
-                        session, maxWords = 2048, retainBoundaries = true,
+                        session, maxWords = 2048, retainBoundaries = true, seed = params.randomSeed,
                     )
                         .also { recorder ->
                             captures.add(recorder)

@@ -163,6 +163,18 @@ class ArithmeticLearningTraceTest {
     }
 
     @Test
+    fun `first finite cutoff observation should retain its local incumbent state`() {
+        val trace = ArithmeticLearningTrace().apply { retainBoundaries = true }
+        trace.observeCutoff(Double.POSITIVE_INFINITY.toBits(), 0, 0, Double.POSITIVE_INFINITY.toBits())
+
+        trace.observeCutoff(5000.0.toBits(), 2, 3, Double.POSITIVE_INFINITY.toBits())
+        trace.observeCutoff(4000.0.toBits(), 4, 5, 3900.0.toBits())
+
+        val first = checkNotNull(trace.firstFiniteRead)
+        assertContentEquals(longArrayOf(5000.0.toBits(), Double.POSITIVE_INFINITY.toBits(), 2, 3), first.data)
+    }
+
+    @Test
     fun `terminal boundaries should survive detailed capture exhaustion within a fixed window`() {
         val trace = ArithmeticLearningTrace(maxEvents = 1, maxWords = 1).apply { retainBoundaries = true }
         val state = PropagationState(Problem(0, 0, emptyArray(), emptyArray()), Assumptions.None)

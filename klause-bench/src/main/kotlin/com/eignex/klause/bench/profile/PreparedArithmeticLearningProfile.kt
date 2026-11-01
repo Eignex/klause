@@ -31,6 +31,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -245,6 +246,7 @@ internal object PreparedArithmeticLearningProfile {
         private val maxWords: Int = 8192,
         captureFirstInteger: Boolean = false,
         retainBoundaries: Boolean = false,
+        private val seed: Long? = null,
     ) {
         private val field = LivePropagationState.require(native).javaClass.getDeclaredField("arithmeticLearningTrace")
             .apply { isAccessible = true }
@@ -287,6 +289,18 @@ internal object PreparedArithmeticLearningProfile {
                 put(name, trace.javaClass.getMethod(getter).invoke(trace) as Long)
             }
             put("words", trace.javaClass.getMethod("getWords").invoke(trace) as Int)
+            put("seed", seed)
+            val first = trace.javaClass.getMethod("getFirstFiniteRead").invoke(trace)
+            put("firstFiniteCutoff", if (first == null) JsonNull else buildJsonObject {
+                val data = first.javaClass.getMethod("getData").invoke(first) as LongArray
+                val local = Double.fromBits(data[1])
+                put("cutoff", Double.fromBits(data[0]))
+                put("localIncumbent", local.takeIf { it.isFinite() })
+                put("noLocalIncumbent", local == Double.POSITIVE_INFINITY)
+                put("nativeLevel", data[2])
+                put("sharedLevel", data[3])
+                put("afterTraceAttachment", true)
+            })
             put("boundaryLimit", 64)
             put("boundaryWordLimit", 16)
             put("discardedBoundaries", trace.javaClass.getMethod("getDiscardedBoundaries").invoke(trace) as Long)
