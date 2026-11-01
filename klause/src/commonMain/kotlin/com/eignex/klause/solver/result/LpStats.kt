@@ -496,6 +496,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     private val phases = LinkedHashMap<String, LpPhaseStats>()
     private var primalDefinitionCalls = 0L
     private var primalDefinitionOptimalIterates = 0L
+    private var pumpPreparationCalls = 0L
+    private var pumpPreparationOptimalIterates = 0L
     private var templatePreparationSeen = false
     private var templateAssemblySeen = false
     private var templateNanos = 0L
@@ -576,15 +578,24 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     }
 
     private fun appendPrimalDefinitionSnapshot(target: MutableMap<String, LpPhaseStats>) {
-        if (primalDefinitionCalls == 0L) return
-        target["PRIMAL_LP_SOURCE_REUSE_ROOT"] = LpPhaseStats(calls = primalDefinitionCalls, outcomes = mapOf(
-            "NUMERICAL_CALLS" to primalDefinitionCalls,
-            "OPTIMAL_FLOAT_ITERATES" to primalDefinitionOptimalIterates,
-        ))
+        if (primalDefinitionCalls != 0L) {
+            target["PRIMAL_LP_SOURCE_REUSE_ROOT"] = LpPhaseStats(calls = primalDefinitionCalls, outcomes = mapOf(
+                "NUMERICAL_CALLS" to primalDefinitionCalls,
+                "OPTIMAL_FLOAT_ITERATES" to primalDefinitionOptimalIterates,
+            ))
+        }
+        if (pumpPreparationCalls != 0L) {
+            target["PRIMAL_LP_PUMP_REUSE_ROOT"] = LpPhaseStats(calls = pumpPreparationCalls, outcomes = mapOf(
+                "NUMERICAL_CALLS" to pumpPreparationCalls,
+                "OPTIMAL_FLOAT_ITERATES" to pumpPreparationOptimalIterates,
+            ))
+        }
     }
 
     private fun phaseSnapshot(): Map<String, LpPhaseStats> {
-        if (!templatePreparationSeen && !templateAssemblySeen && primalDefinitionCalls == 0L) return phases.toMap()
+        if (!templatePreparationSeen && !templateAssemblySeen &&
+            primalDefinitionCalls == 0L && pumpPreparationCalls == 0L
+        ) return phases.toMap()
         return phases.toMutableMap().apply {
             appendPrimalDefinitionSnapshot(this)
             if (templatePreparationSeen) {
@@ -639,6 +650,11 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     fun observePrimalDefinitionConsumed(optimalFloatIterate: Boolean) {
         primalDefinitionCalls++
         if (optimalFloatIterate) primalDefinitionOptimalIterates++
+    }
+
+    fun observePumpPreparationConsumed(optimalFloatIterate: Boolean) {
+        pumpPreparationCalls++
+        if (optimalFloatIterate) pumpPreparationOptimalIterates++
     }
 
     fun observePrimalPhase(stage: String, outcome: String, nanos: Long, work: Long = 0L) {

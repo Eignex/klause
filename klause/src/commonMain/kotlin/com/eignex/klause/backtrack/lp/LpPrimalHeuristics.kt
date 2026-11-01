@@ -2,7 +2,6 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.snapshotAssignment
 import com.eignex.klause.lp.bounding.LpEngine
-import com.eignex.klause.lp.bounding.LpNodeOverhead
 import com.eignex.klause.lp.bounding.RootRoundingWarmStart
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -23,7 +22,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.WorkMeter
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -251,6 +249,8 @@ internal fun LpEngine.lpFeasibilityPump(
     val seen = HashSet<String>()
     val rng = Random(params.randomSeed ?: 0L)
     var restarts = 0
+    var preparation: LpPumpPreparation? = null
+    var preparationAttempted = false
     repeat(PUMP_ROUNDS) { step ->
         if (cancellation()) return null
         val (relaxation, primal) = solved
@@ -291,7 +291,15 @@ internal fun LpEngine.lpFeasibilityPump(
             sink.lp.observePrimalPhase("PRIMAL_PUMP_ROUND", outcome, started.elapsedNow().inWholeNanoseconds)
         }
         val distance = distanceObjective(relaxation, intTarget, boolTarget) ?: return null // nothing to pump
-        solved = solveRelaxation(distance, cancellation) ?: return null
+        solved = try {
+            if (reusePumpPreparation && !preparationAttempted) {
+                preparationAttempted = true
+                preparation = LpPumpPreparation.create(this, relaxation, cancellation)
+            }
+            solveRelaxation(distance, cancellation, preparation)
+        } catch (_: LpAssemblyCancelled) {
+            null
+        } ?: return null
     }
     return null
 }
@@ -359,23 +367,29 @@ private fun LpEngine.perturbRounding(
 private fun LpEngine.solveRelaxation(
     obj: LinearObjective,
     cancellation: Cancellation,
+    preparation: LpPumpPreparation? = null,
 ): Pair<LpRelaxation, DoubleArray>? {
-    val session = PropagationSession(problem, cancellation)
+    var session: PropagationSession? = null
     try {
-        if (session.isUnsatAtRoot) return null
-        val relaxation = buildPrimalRelaxation(obj, session, cancellation) ?: return null
+        val rebound = preparation?.rebind(obj, cancellation)
+        val relaxation = rebound ?: run {
+            val root = PropagationSession(problem, cancellation)
+            session = root
+            if (root.isUnsatAtRoot) return null
+            buildPrimalRelaxation(obj, root, cancellation) ?: return null
+        }
         if (relaxation.model.n == 0) return null
         val result = try {
             solvePrimalRelaxation(relaxation.model, cancellation, primal = true,
-                reusedDefinition = relaxation.reusedPrimalDefinition)
+                reusedDefinition = relaxation.reusedPrimalDefinition, reusedPumpPreparation = rebound != null)
                 ?: solvePrimalRelaxation(relaxation.model, cancellation, primal = false,
-                    reusedDefinition = relaxation.reusedPrimalDefinition)
+                    reusedDefinition = relaxation.reusedPrimalDefinition, reusedPumpPreparation = rebound != null)
         } catch (_: CheckedLongOverflowException) {
             return null
         } ?: return null
         return relaxation to result.primal
     } finally {
-        primalPropagationWork += session.work
+        session?.let { primalPropagationWork += it.work }
     }
 }
 
@@ -385,27 +399,14 @@ private fun LpEngine.buildPrimalRelaxation(
     cancellation: Cancellation,
 ): LpRelaxation? {
     val started = TimeSource.Monotonic.markNow()
-    val allowance = rootPrimalWorkBudget()
-    var work = 0L
+    val accounting = LpPrimalAssembly(this, cancellation)
+    val token = accounting.token
     var outcome = "FAILED"
-    fun debit(units: Long) {
-        work += units
-        noteNodeOverhead(units)
-    }
-    val meter = WorkMeter {
-        cancellation.charge(it)
-        debit(it)
-    }
-    val token = object : Cancellation {
-        override fun isCancelled(): Boolean = cancellation() || (allowance > 0L && work >= allowance)
-        override fun deadline() = cancellation.deadline()
-        override fun workMeter(): WorkMeter = meter
-    }
     return try {
         if (token()) throw LpAssemblyCancelled()
         var definition = "COMPLETE"
         val relaxation = buildPrimalSource(problem, objective, SessionDomains(session), token,
-            onWork = { debit(it * LpNodeOverhead.BUILD) }, selection = projections,
+            onWork = accounting::chargeConstruction, selection = projections,
             reuseCompleteTemplates = reusePrimalTemplates,
             reuseSourceTemplates = reusePrimalTemplates, onDefinition = { definition = it })
         outcome = definition
@@ -414,7 +415,8 @@ private fun LpEngine.buildPrimalRelaxation(
         outcome = "CANCELLED"
         null
     } finally {
-        sink.lp.observePrimalPhase("PRIMAL_LP_ASSEMBLY", outcome, started.elapsedNow().inWholeNanoseconds, work)
+        sink.lp.observePrimalPhase("PRIMAL_LP_ASSEMBLY", outcome,
+            started.elapsedNow().inWholeNanoseconds, accounting.work)
     }
 }
 
@@ -424,6 +426,7 @@ private fun LpEngine.solvePrimalRelaxation(
     primal: Boolean,
     warm: Basis? = null,
     reusedDefinition: Boolean = false,
+    reusedPumpPreparation: Boolean = false,
     observeResult: ((FloatLpResult?, LpFloatTermination?) -> Unit)? = null,
 ): FloatLpResult? {
     requireOpen()
@@ -452,6 +455,7 @@ private fun LpEngine.solvePrimalRelaxation(
                 val stage = if (primal) "PRIMAL_LP_PRIMAL" else "PRIMAL_LP_DUAL"
                 sink.lp.observePrimalPhase(stage, outcome, started.elapsedNow().inWholeNanoseconds)
                 if (reusedDefinition) sink.lp.observePrimalDefinitionConsumed(optimalFloatIterate)
+                if (reusedPumpPreparation) sink.lp.observePumpPreparationConsumed(optimalFloatIterate)
             }
         }
     }

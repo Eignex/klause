@@ -44,6 +44,74 @@ import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
     @Test
+    fun `objective only pump iterations should reuse their completed root preparation`() {
+        for (reuse in listOf(false, true)) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, listOf(
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6),
+            )).bake(FactorProjectionProviders.Default)
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+            val sink = SolveStatsSink("private-pump-preparation")
+            var first: List<Long>? = null
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+                reusePumpPreparation = reuse).use { engine ->
+                val sample = engine.lpFeasibilityPump(objective, Cancellation.Never) { proposal ->
+                    if (first == null) first = proposal.ints.toList()
+                    proposal.takeIf { it.ints.toList() != first }
+                }
+
+                val accepted = assertNotNull(sample)
+                assertTrue(accepted.ints.sum() >= 6L)
+                assertNotEquals(first, accepted.ints.toList())
+                val phases = sink.snapshot().lp.phases
+                val assembly = phases.getValue("PRIMAL_LP_ASSEMBLY_ROOT")
+                if (reuse) {
+                    assertEquals(1L, assembly.outcomes["COMPLETE"])
+                    val used = phases.getValue("PRIMAL_LP_PUMP_REUSE_ROOT")
+                    assertTrue(used.calls > 0L)
+                    assertEquals(used.calls, used.outcomes["OPTIMAL_FLOAT_ITERATES"])
+                } else {
+                    assertTrue(assertNotNull(assembly.outcomes["COMPLETE"]) > 1L)
+                    assertNull(phases["PRIMAL_LP_PUMP_REUSE_ROOT"])
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a cancelled private pump rebind should not open a fallback numerical owner`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6),
+        )).bake(FactorProjectionProviders.Default)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val sink = SolveStatsSink("cancelled-private-pump")
+        val factory = RecordingLpEngineFactory()
+        var armed = false
+        var stopped = false
+        var work = 0L
+        var owners = 0
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+            LpSolveContext(factory), reusePumpPreparation = true, containingWork = {
+                if (armed) {
+                    work += it
+                    if (work >= 2L) stopped = true
+                }
+            }).use { engine ->
+            val sample = engine.lpFeasibilityPump(objective, Cancellation { stopped }) {
+                armed = true
+                owners = factory.calls.size
+                null
+            }
+
+            assertNull(sample)
+            assertEquals(owners, factory.calls.size)
+            val preparation = sink.snapshot().lp.phases.getValue("PRIMAL_LP_PUMP_PREPARATION_ROOT")
+            assertEquals(1L, preparation.outcomes["ADMITTED"])
+            assertEquals(1L, preparation.outcomes["CANCELLED"])
+            assertNull(sink.snapshot().lp.phases["PRIMAL_LP_PUMP_REUSE_ROOT"])
+        }
+    }
+
+    @Test
     fun `borrowed primal definitions should reach actual private numerical solves`() {
         for (pump in listOf(false, true)) {
             val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, listOf(

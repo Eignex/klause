@@ -144,7 +144,8 @@ internal class LpEngine(
     private val nodeWorkAllowance: () -> Long? = { null },
     private val containingWork: (Long) -> Unit = {},
     private val rootQueryPolicy: LpRootQueryPolicy = LpRootQueryPolicy.SHARED_WORK,
-    internal val reusePrimalTemplates: Boolean = true,
+    internal val reusePrimalTemplates: Boolean = false,
+    internal val reusePumpPreparation: Boolean = false,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
@@ -253,6 +254,7 @@ internal class LpEngine(
             } else nodeWorkAllowance,
             containingWork = { work -> if (rootProbe) chargeWork(work) },
             reusePrimalTemplates = reusePrimalTemplates,
+            reusePumpPreparation = reusePumpPreparation,
         ).also { it.structuralCutSupport = structuralCutSupport }
     }
 

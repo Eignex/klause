@@ -209,6 +209,20 @@ borrowed definitions that reach a private numerical call and its optimal floatin
 iterates; it supplies no certificate or source-acceptance authority. Numerical costs
 remain in their ordinary solve phases.
 
+A private feasibility-pump scope can reuse its completed root layout for subsequent
+objectives. Its problem and selected built-in propagation and relaxation mechanisms
+stay fixed; proposal pinning runs in separate sessions. Admission compares bounded
+objective-binding work with the completed layout's construction extent. A cheaper
+binding retains only the current immutable model view, with no predecessor chain or
+shared numerical basis. Nonzero objective coordinates must already exist in that
+layout; new costs and checked affine shifts receive private arrays. Build-specific
+source maps are detached. Exact-state, IEEE, continuous and unsupported selections
+keep ordinary construction. Cancellation withholds a view before publication or a
+numerical owner opens; an unrepresentable objective uses the funded ordinary path.
+Admission and rebinding spend the current containing and LP allowance. Their costs
+and actual numerical consumption have separate observations from shared-source reuse;
+optimal floating iterates provide no certificate or source-acceptance authority.
+
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.
 Cold preparation first checks a necessary work lower bound within the same cap.
