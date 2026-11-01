@@ -1,6 +1,7 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -41,6 +42,41 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BinaryObjectiveViewTest {
+    @Test
+    fun `mixed channels should retain a better source point across cutoff slices`() {
+        for (sliceWork in listOf(-1L, 1L, 4L)) {
+            val source = Problem(2, 6, arrayOf(
+                IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 2), IntDomain(0, 0),
+                IntDomain(0, 1), IntDomain(0, 1),
+            ), listOf(
+                Linear(longArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 1),
+                Linear(longArrayOf(1, 1, -1), intArrayOf(2, 1, 3), LinearOp.EQ, 2),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.GE, 1),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(4), LinearOp.EQ, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(5), LinearOp.EQ, 1),
+            ))
+            val original = LinearObjective(intCoefficients = longArrayOf(0, 0, 1, 0, 100, 100), constant = 6)
+            val config = PresolveConfig.parse("off,+binary-columns,+affine")
+                .withAffinePivotOrder(AffinePivotOrder.REWRITE_COST)
+            val prepared = PresolvePipeline.run(source, original, config, false)
+            val params = BacktrackPresets.satOptimized(randomSeed = 1001L).copy(objectiveBoundSupplier = { 150.0 })
+
+            val terminal = BacktrackSolver(prepared.problem.bake()).resumable(prepared.objective ?: original, params)
+                .use { search ->
+                    var result: MinimizeResult? = null
+                    var slices = 0
+                    while (result == null && slices++ < 256) {
+                        result = search.runSlice(Cancellation.Never, 60_000, sliceWork) { }
+                    }
+                    result
+                }
+
+            val rebuilt = prepared.reconstruct(assertIs<MinimizeResult.WithSample>(terminal).sample)
+            assertEquals(listOf(3L, 0L, 2L, 0L, 1L, 0L), rebuilt.ints.toList())
+        }
+    }
+
     @Test
     fun `mixed costs should reuse signed binary channels and retain nonbinary terms`() {
         for (bound in listOf(0L, 1L)) {

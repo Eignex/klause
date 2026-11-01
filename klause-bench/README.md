@@ -1506,24 +1506,16 @@ independent proof checking.
 
 ## External objective cutoff replay
 
-`bench.profile.ObjectiveCutoffProfile` takes `suite=ID problem=NAME sha256=HEX
-cutoff=INTEGER presolve-work=INTEGER` and optional `seed=1 order=rewrite_cost
-presolve=default work=150000 slice-work=5000 timeout-ms=10000`. Hash-checked
-`source64` or `sourceGzip64` can supply the frozen XCSP3 source. It prepares the
-ordinary mixed finite model, then runs one retained `satOptimized` worker against
-a fixed external cutoff in prepared-objective units. This is a correctness replay,
-not a portfolio timing comparison. The prepared model and objective identities are
-retained. Set the preparation allowance to the trial's actual allowance.
+Run `bench.profile.ObjectiveCutoffProfile` through eignex-lab with
+`suite=ID problem=NAME sha256=HEX cutoff=INTEGER presolve-work=INTEGER`.
+Optional controls are `seed=1 order=rewrite_cost presolve=default work=150000
+slice-work=5000 timeout-ms=10000`; `source64` or `sourceGzip64` supplies a
+hash-checked XCSP3 source. The cutoff uses prepared-objective units.
 
-The observer delegates the selector's decisions and notifications and compares the
-cached Boolean objective bound with a fresh sum after propagation, at selector
-queries and at slice boundaries. It supports nonnegative Boolean costs whose sum
-fits `Long`; an uninstalled cache contributes zero, so only an overshoot is a
-failure. A matching cache does not validate integer bounds, conflict learning,
-presolve equivalence or proof completeness. The observer stops at four million
-Boolean visits; the run also stops at its work grant, 4,096 slices, search deadline
-and 120-second containing deadline. Source input is at most one MiB, with at most
-4,096 coordinates/factors and 65,536 structural words. At most 128 reconstructed
-named source points are retained, under a four-MiB output ceiling. Native terminals and reconstructed costs carry
-no independent proof or source-check claim. Cold lab preparation is separately
-charged, and the observer overhead prevents using these timings as a speedup.
+The profile writes the prepared model, objective identities, reconstructed points
+and bounded Boolean-cache observations to `$OUT`. It supports nonnegative Boolean
+costs whose sum fits `Long`. Limits are 120 seconds overall, at most 30 seconds of
+search, one million search work units, four million observer visits, 4,096 slices,
+128 points and four MiB of replay output. Inputs and prepared snapshots are at most
+one MiB; source coordinates/factors are at most 4,096 and structural words 65,536.
+Use the lab's independent checking and comparison workflow for qualification.
