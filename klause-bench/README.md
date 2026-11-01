@@ -875,8 +875,9 @@ counts source rows once; `MixedCandidates`, `MixedComplementaryAttempts` and
 `MixedComplementaryRetained` distinguish candidate work and retained alternatives.
 Bound-side alternatives and selected rows establish no useful bound or cost gain
 without subsequent checked support and actual frontier consumption.
-`numericalCutSelectionRetiredInstalled` counts installed rows expired at the
-generation's retirement scan; `POINT_INSTALLED_RETIRED` attributes them by family.
+`numericalCutSelectionRetiredInstalled` counts installed rows expired after four
+usable slack observations; `POINT_INSTALLED_RETIRED` attributes them by family.
+Installed-row aging continues after candidate discovery retires.
 Retained tight rows still require current-source checks. Keep subsequent row-layout
 replacement, proof-mode changes and factor work in the containing cost comparison.
 Adopted current families suspend retired rows while retaining their numerical

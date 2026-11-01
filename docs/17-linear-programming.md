@@ -406,9 +406,9 @@ candidates intact. Each immutable template attempts this preparation once.
 Point scoring waits seven completed point queries between scans of one immutable
 candidate generation. An adopted current recipe ages on each usable point without
 that discovery cooldown. Four completed scans without an addition retire that
-generation's unselected candidates from further scoring. At that scan, installed
-rows also retire when they have been slack in four usable scoring scans without
-an intervening tight observation. Tightness uses the model-facing pool's tolerance.
+generation's unselected candidates from further scoring. Installed rows keep aging
+after discovery retires and expire when they have been slack in four usable scoring
+scans without an intervening tight observation. Tightness uses the model-facing pool's tolerance.
 Full pools remain eligible for aging; incomplete scans do not advance it. A
 replacement generation receives its own lifetime. Remaining installed cuts keep
 their ordinary source checks and scope retraction. Retirement only weakens the

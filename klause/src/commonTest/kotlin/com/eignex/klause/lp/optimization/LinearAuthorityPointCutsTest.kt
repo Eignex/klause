@@ -286,6 +286,54 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `installed rows should keep aging after candidate retirement`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumCuts = 1)
+        var installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ONE), emptySet(), Cancellation.Never, adoptCurrent = true)
+        repeat(4) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ONE), installed, Cancellation.Never)
+        }
+        assertTrue(selection.candidatesRetired(rows))
+        repeat(3) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), installed, Cancellation.Never)
+        }
+        assertEquals(setOf(0), installed)
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), installed, Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+        assertEquals(1L, selection.observations["numericalCutSelectionRetiredFamilies"])
+    }
+
+    @Test
+    fun `continued aging should not reinstall retired candidates`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("x-upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("y-upper")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        var installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            List(2) { BigFraction.ONE }, emptySet(), Cancellation.Never, adoptCurrent = true)
+        repeat(4) {
+            installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+                listOf(BigFraction.ZERO, BigFraction.ONE), installed, Cancellation.Never)
+        }
+        assertEquals(setOf(1), installed)
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE), installed, Cancellation.Never)
+
+        assertEquals(setOf(1), selected)
+    }
+
+    @Test
     fun `a tight observation should interrupt installed row aging`() {
         val rows = listOf(LinearAuthorityCut(0,
             SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
