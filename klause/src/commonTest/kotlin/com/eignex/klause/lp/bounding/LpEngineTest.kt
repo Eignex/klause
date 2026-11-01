@@ -43,6 +43,25 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `linear bound should release branch costs when first read after a backtrack`() {
+        val problem = Problem(2, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val session = PropagationSession(problem)
+        session.pinBool(0, true)
+        session.pinBool(1, true)
+        session.popToLevel(1)
+
+        val rootPruned = LpEngine(problem,
+            LinearObjective(boolWeights = longArrayOf(5, 2), intCoefficients = longArrayOf(1)),
+            LpParams(), SolveStatsSink("late-linear-bound")).use { engine ->
+            assertTrue(engine.pruneNode(session, 4.0, -1, true))
+            session.popToLevel(0)
+            engine.pruneNode(session, 4.0, -1, true)
+        }
+
+        assertFalse(rootPruned)
+    }
+
+    @Test
     fun `complete component node deductions honor the injected proof policy`() {
         for (accepted in listOf(false, true)) {
             val problem = Problem(0, 4, Array(4) { IntDomain(0, 5) }, listOf(
