@@ -124,6 +124,33 @@ class PortfolioProgressTest {
     }
 
     @Test
+    fun `deferred queries should require an accepted global improvement`() {
+        for ((improves, rejected, perSlice) in listOf(
+            Triple(false, false, 1), Triple(true, false, 1), Triple(true, true, 1), Triple(true, false, 2),
+        )) {
+            var accepted = 0
+            var queries = 0
+            val secondProbe = improves && perSlice == 1
+            val workers = listOf(
+                trackingWorker("finder", 0,
+                    ScriptedSearch({ it == 0 || (secondProbe && it == 1) }, perSlice = perSlice) { }),
+                trackingWorker("local", 1, ScriptedSearch({ true }, start = 2_000.0) { }),
+                trackingWorker("deferred", 2, ScriptedSearch({ false }) {
+                    assertTrue(accepted >= 2)
+                    queries++
+                }).also { it.startAfterAcceptedImprovement = true },
+            )
+            Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(24),
+                witnessCheck = WitnessCheck { _, value ->
+                    if (rejected && value == 998.0) "rejected improvement" else null
+                }).use { it.minimize(Cancellation.Never) { accepted++ } }
+
+            assertEquals(improves && !rejected, queries > 0)
+        }
+    }
+
+    @Test
     fun `a deferred worker should first query after incumbent availability`() {
         val events = mutableListOf<PortfolioEvent>()
         val workers = listOf(

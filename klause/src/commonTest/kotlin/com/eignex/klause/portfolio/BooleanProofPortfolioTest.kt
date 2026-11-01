@@ -164,6 +164,22 @@ class BooleanProofPortfolioTest {
     }
 
     @Test
+    fun `a worker awaiting improvement should decline Boolean proof tasks`() {
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+            btPool = listOf { BacktrackCatalog.byLabel("first-fail") })
+        val workers = PortfolioBuilder.build(problem, scenario)
+        workers[0].startAfterAcceptedImprovement = true
+        try {
+            var decline: String? = null
+            assertNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true) { decline = it })
+
+            assertEquals("workers-not-two-canonical-complete", decline)
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
     fun `mixed supported recipes should decline a shared task board`() {
         val ordered = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false)
         val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK, btPool = listOf(
