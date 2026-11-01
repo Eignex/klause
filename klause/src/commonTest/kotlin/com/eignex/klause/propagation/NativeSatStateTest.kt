@@ -24,6 +24,122 @@ class NativeSatStateTest {
     private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
 
     @Test
+    fun `retired native clauses should stop propagating without renumbering survivors`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+
+        session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+        session.pinBool(0, false)
+
+        assertNull(session.boolValue(1))
+        assertEquals(2, session.learnedClauseCount)
+        assertEquals(1, session.activeLearnedClauseCount)
+    }
+
+    @Test
+    fun `native cap retirement should protect a live root reason`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(0, false))), 1, permanent = true)
+
+        val retired = session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+
+        assertEquals(0, retired)
+        assertTrue(session.isLearnedClause(0))
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `native cap windows should resume bounded progress while clauses are appended`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
+        repeat(3) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        var retired = 0
+
+        repeat(4) { attempt ->
+            val before = session.work
+            retired += session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+            assertTrue(session.work - before <= 40L)
+            if (attempt == 0) session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        }
+
+        assertEquals(4, retired)
+        assertEquals(1, session.activeLearnedClauseCount)
+    }
+
+    @Test
+    fun `native cap cancellation at the debit should preserve clause policy`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        val before = session.work
+
+        val retired = session.maintainNativeCapWindow(1, 40L, 64L, { session.work - before >= 40L }) {
+            error("cancelled policy callback")
+        }
+
+        assertEquals(0, retired)
+        assertTrue(session.isLearnedClause(1))
+        assertEquals(40L, session.work - before)
+    }
+
+    @Test
+    fun `unfunded native windows should preserve learned clauses`() {
+        for ((work, scratch) in listOf(0L to 64L, 39L to 64L, 40L to 0L)) {
+            val session = session(4, or(2, true, 3, true))
+            session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+
+            session.maintainNativeCapWindow(1, work, scratch, { false }) { false }
+
+            assertTrue(session.isLearnedClause(1))
+            assertEquals(2, session.activeLearnedClauseCount)
+        }
+    }
+
+    @Test
+    fun `native windows should defer pending first reassertions`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
+        session.pinBool(0, false)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.popToLevel(0)
+
+        val retired = session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+
+        assertEquals(0, retired)
+        assertTrue(session.isLearnedClause(1))
+    }
+
+    @Test
+    fun `retired clauses should stay absent from glue export`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+
+        val exported = session.exportGlueClauses(9, 2, skipPermanent = true)
+
+        assertTrue(exported.isEmpty())
+    }
+
+    @Test
+    fun `compacting retired slots should preserve exact retirement counts`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+        session.forgetLearnedClauses { _, _ -> true }
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+
+        session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+
+        assertEquals(2L, session.learnedLifecycle()["learningClauseRetired"])
+        assertEquals(1, session.activeLearnedClauseCount)
+    }
+
+    @Test
     fun `a root learned reason should remain in the conflict core after compaction`() {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(0, true, 1, true)), 2)
