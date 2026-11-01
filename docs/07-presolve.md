@@ -96,6 +96,8 @@ queries use `MARKOWITZ`. Explicit pivot policies retain their own consumer admis
 Automatic mixed binary cost projection requires eliminating a projected cost
 column. If only unrelated columns can leave the integer lane, substitution retains
 the integer cost representation and still processes those unrelated columns.
+An empty mixed admission scan returns unchanged: additional objective protection
+cannot create an eligible column.
 
 `AffinePivotOrder.STRUCTURED` keeps Markowitz ordering between definitions. It
 retains the first admitted declaration-order pivot for aliases and ordinary

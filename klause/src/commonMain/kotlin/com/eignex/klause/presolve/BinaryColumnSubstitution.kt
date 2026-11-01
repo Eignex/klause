@@ -128,8 +128,8 @@ internal object BinaryColumnSubstitution {
             return substituteColumns(problem, protected, bakeConfig, null)
         }
         fun viewOnly(): Substitution? {
-            if (requiredMixedObjective != null) return unprojected()
-            if (view == null) return null
+            // Additional objective protection cannot create an eligible integer column.
+            if (view == null || requiredMixedObjective != null) return null
             val rebuilt = PresolveShared.rebuildProblem(
                 problem, view.factors, bakeConfig = bakeConfig, numBoolVars = numBools, seedDeductions = seeds,
             )
