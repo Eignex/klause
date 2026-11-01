@@ -237,7 +237,7 @@ internal class LinearAuthorityPointCuts(
                     }
                     inactiveScans.clear()
                 } else {
-                    cooldown = 7
+                    cooldown = if (managedCurrent) 0 else 7
                 }
             }
             return retained + selected.map { it.id }

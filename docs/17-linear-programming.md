@@ -404,7 +404,8 @@ still authorize every row. The replacement shares the original generation's work
 limit and retains the source-row template; unavailable preparation leaves its prior
 candidates intact. Each immutable template attempts this preparation once.
 Point scoring waits seven completed point queries between scans of one immutable
-candidate generation. Four completed scans without an addition retire that
+candidate generation. An adopted current recipe ages on each usable point without
+that discovery cooldown. Four completed scans without an addition retire that
 generation's unselected candidates from further scoring. At that scan, installed
 rows also retire when they have been slack in four usable scoring scans without
 an intervening tight observation. Tightness uses the model-facing pool's tolerance.
@@ -564,8 +565,7 @@ subsystem remains available for other column residues. A repair adds open basic
 directions whose residuals require missing sides after an earlier subsystem solve,
 retaining prior equations in the expanded proposal. Every expansion adds a direction
 and shares the original dimension, work, allocation and scalar limits. Every untouched
-direction
-remains subject to the complete dual check after the proposal changes its multipliers.
+direction remains subject to the complete dual check after the proposal changes its multipliers.
 Row-scaled floating elimination selects those coordinates within 16,384 projected
 cells and the containing certificate budget. Nonfinite or weak projected pivots
 decline; the selected exact submatrix must still factor and solve under the

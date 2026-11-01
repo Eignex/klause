@@ -267,6 +267,25 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `adopted installed rows should age on consecutive usable points`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumCuts = 1)
+        var installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), emptySet(), Cancellation.Never, adoptCurrent = true)
+        repeat(3) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), installed, Cancellation.Never)
+        }
+        assertEquals(setOf(0), installed)
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), installed, Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+    }
+
+    @Test
     fun `a tight observation should interrupt installed row aging`() {
         val rows = listOf(LinearAuthorityCut(0,
             SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
