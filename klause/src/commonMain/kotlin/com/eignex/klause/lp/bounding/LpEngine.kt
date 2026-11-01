@@ -144,7 +144,7 @@ internal class LpEngine(
     private val nodeWorkAllowance: () -> Long? = { null },
     private val containingWork: (Long) -> Unit = {},
     private val rootQueryPolicy: LpRootQueryPolicy = LpRootQueryPolicy.SHARED_WORK,
-    internal val reusePrimalTemplates: Boolean = false,
+    internal val reusePrimalTemplates: Boolean = true,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
