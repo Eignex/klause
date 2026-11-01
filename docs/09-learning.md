@@ -461,7 +461,9 @@ the same LBD priorities and tier lifetimes; a sweep event requires actual retire
 If complete candidate preparation cannot be funded, native and general clauses use
 the bounded handle-preserving window. The candidate index retains the best eligible
 LBD keys as a max-heap; each funded step can resume without a whole-store selection
-buffer. Permanent clauses and policy survivors reduce the heap quota. Mid rows
+buffer. Permanent clauses, protected reasons, unfunded rows and policy survivors
+reduce the heap quota. A pending eviction that gains protection also consumes that
+quota before the next heap step. Mid rows
 survive their demotion window, and classification clears survivor reuse flags.
 Current or historical reasons can retain additional rows above the soft cap. General
 reason snapshots and full physical compaction still require their complete funding;

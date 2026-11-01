@@ -23,6 +23,22 @@ import kotlin.test.assertTrue
 class ClauseDbTest {
 
     @Test
+    fun `live reasons should consume the ranked retention quota`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+            session.addLearnedClause(Clause(intArrayOf(4, 6)), 8)
+            session.addLearnedClause(Clause(intArrayOf(1)), 1)
+
+            repeat(8) { session.maintainCapWindow(2, 128L, 128L, { false }) { false } }
+
+            assertEquals(2, session.activeLearnedClauseCount)
+            assertTrue(session.isLearnedClause(0))
+            assertTrue(!session.isLearnedClause(1))
+        }
+    }
+
+    @Test
     fun `arithmetic rows should reduce the clause ranking quota`() {
         for (integer in listOf(false, true)) {
             val session = PropagationSession(Problem(4, 1, arrayOf(IntDomain(0, 10)),

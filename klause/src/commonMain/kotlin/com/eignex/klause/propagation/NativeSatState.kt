@@ -418,7 +418,10 @@ internal class NativeSatState(private val state: PropagationState) {
         private var prepared = -1
         private var protected = false
         override fun lbd(index: Int): Int = learnedLbd[index]
-        override fun keep(index: Int): Boolean = retain(index)
+        override fun keep(index: Int): Boolean {
+            val retained = retain(index)
+            return retained || protected
+        }
         override fun visited() { capVisits++ }
         override fun prepare(index: Int): Boolean {
             val price = 32L + literalCountOf(index).toLong() * 4L

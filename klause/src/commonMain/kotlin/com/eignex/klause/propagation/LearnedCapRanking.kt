@@ -59,7 +59,10 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
                 Stage.Retire -> {
                     budget.visit(if (pending == prepared) 0L else 8L)
                     budget.visit(0L)
-                    if (!policy.retire(pending)) candidates[write++] = pending
+                    if (!policy.retire(pending)) {
+                        candidates[write++] = pending
+                        floor++
+                    }
                     pending = -1
                     stage = Stage.Trim
                 }
@@ -75,6 +78,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         prepared = if (funded) index else -1
         if (!funded) {
             candidates[write++] = index
+            floor++
             stage = Stage.Trim
         } else if (policy.keep(index)) {
             candidates[write++] = index

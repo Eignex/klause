@@ -50,7 +50,11 @@ private fun PropagationState.generalCapPolicy(
         budget.visit(32L)
         return true
     }
-    override fun keep(index: Int): Boolean = retain(index)
+    override fun keep(index: Int): Boolean {
+        val retained = retain(index)
+        val clause = learned.store[index] as ClausePropagator
+        return retained || protected[index] || clause.literals.size <= 1 || learned.stages[index] and 1 == 0
+    }
     override fun visited() { learned.capVisits++ }
     override fun retire(index: Int): Boolean {
         val clause = learned.store[index] as ClausePropagator
