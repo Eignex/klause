@@ -40,6 +40,11 @@ internal class BooleanSatisfactionRepair(
 
     internal fun splitLiteral(): Int? = handle.splitLiteral()
 
+    internal fun retainPartition(literal: Int) {
+        check(!closed && started)
+        assumptions = handle.retainPartition(literal)
+    }
+
     private val handle = ResumableSatisfaction(solver, params.copy(assumptions = Assumptions.None), rebindable = true)
     private var started = false
     private var closed = false

@@ -206,8 +206,15 @@ internal class BooleanProofScheduler(
         require(search.matchesCondition(Assumptions(bools = context.scope.condition.bools)))
         require(search.splitLiteral() == literal)
         val lease = checkNotNull(tasks.acquire(worker, if (Lit.isPositive(literal)) 1 else 0))
+        try {
+            search.retainPartition(literal)
+        } catch (failure: Throwable) {
+            tasks.release(lease)
+            throw failure
+        }
         workers[worker].search = search
         workers[worker].lease = lease
+        started[worker] = lease
     }
 
     internal fun hasTask(worker: Int): Boolean = workers[worker].lease != null || pending > 0

@@ -356,6 +356,12 @@ internal class CpSatisfactionTraversal(
         return Lit.make(variable, cp.session.boolValue(variable) ?: return null)
     }
 
+    fun retainPartition(literal: Int) {
+        check(rebindable && !closed && run != null && sharedSession == null && rootOutcome == null)
+        require(traversal.partitionLiteral == null && splitLiteral() == literal)
+        traversal.partitionLiteral = literal
+    }
+
     fun rebind(assumptions: Assumptions) {
         check(rebindable && !closed)
         require(assumptions.numInts == 0 && assumptions.deductions.isEmpty &&
@@ -450,7 +456,8 @@ internal class CpSatisfactionTraversal(
                 finishQuery()
                 // Learned decision levels describe traversal, not every premise of the exhausted tree.
                 SearchOutcome.Exhausted(touchedAssumptionLevels = IntArray(
-                    currentAssumptions.numBools + currentAssumptions.numInts,
+                    currentAssumptions.numBools + currentAssumptions.numInts +
+                        (if (traversal.partitionLiteral != null) 1 else 0),
                 ) { it + 1 })
             }
 
@@ -543,6 +550,7 @@ private class CpSatisfactionTraversalPolicy(
 ) : SearchTraversalPolicy,
     SearchRunLifecycle {
     private val restart = RestartSchedule.from(params)
+    var partitionLiteral: Int? = null
 
     private val session: PropagationSession get() = cp.session
     val brancher = BacktrackBrancher(
@@ -587,7 +595,8 @@ private class CpSatisfactionTraversalPolicy(
         override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
             if (slice?.beforeBranch?.invoke() == true) return SearchNodeDisposition.Pause
             return when (simplify(context, false)) {
-                SearchRunDisposition.Continue -> SearchNodeDisposition.Expand
+                SearchRunDisposition.Continue -> if (outsidePartition(context)) SearchNodeDisposition.Prune
+                    else SearchNodeDisposition.Expand
                 SearchRunDisposition.Exhausted -> SearchNodeDisposition.Prune
                 SearchRunDisposition.Pause -> SearchNodeDisposition.Pause
                 SearchRunDisposition.Indeterminate -> SearchNodeDisposition.Indeterminate
@@ -595,6 +604,12 @@ private class CpSatisfactionTraversalPolicy(
         }
     }
     override val lifecycle: SearchRunLifecycle get() = this
+
+    private fun outsidePartition(context: SearchContext): Boolean {
+        val literal = partitionLiteral ?: return false
+        val value = context.boolValue(Lit.variable(literal)) ?: return false
+        return value != Lit.isPositive(literal)
+    }
 
     private val inprocessing = Inprocessing.from(params, sink?.search)
     private val learnedMemory = LearnedMemoryMaintenance()
@@ -604,6 +619,7 @@ private class CpSatisfactionTraversalPolicy(
     fun releaseRetainedState() { inprocessing?.reset() }
 
     fun resetScope() {
+        partitionLiteral = null
         inprocessing?.reset()
         learnedMemory.reset()
     }
