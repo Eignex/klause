@@ -53,8 +53,8 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
     val ownedRows: Int get() = objects
     val hasRetirement: Boolean get() = retiring != null
     val readWork: Long get() = maxOf(rows.readWork, ranks.readWork)
-    val scratchBytes: Long get() = maxOf(rows.scratchBytes, ranks.scratchBytes,
-        signatures.scratchBytes, watches.scratchBytes) + 64L
+    val scratchBytes: Long get() = maxOf(maxOf(rows.scratchBytes, ranks.scratchBytes),
+        maxOf(signatures.scratchBytes, watches.scratchBytes)) + 64L
     val ownedBytes: Long get() = payloadLiterals * Int.SIZE_BYTES + objects * 130L + watchNodes * 32L +
         signatures.size * 20L + watches.size * 24L + rows.ownedBytes + ranks.ownedBytes +
         signatures.ownedBytes + watches.ownedBytes + 72L
