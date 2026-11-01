@@ -420,10 +420,11 @@ internal class LpPropagator(
             val requested = queryAllowance?.invoke()
             val offered = when {
                 requested == null -> standard
-                standard == null -> requested
+                standard == null || standard == 0L -> requested
                 else -> minOf(standard, requested)
             }
-            val queryToken = if (offered != null && offered <= 0L) token or Cancellation { true } else token
+            val spent = (requested != null && requested <= 0L) || (standard != null && standard < 0L)
+            val queryToken = if (spent) token or Cancellation { true } else token
             val continuation = (continuationWorkAllowance ?: continuationAllowance)()
             if (continuation != null && current.state.depth == 0) {
                 val profile = effort()
