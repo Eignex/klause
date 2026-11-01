@@ -232,11 +232,11 @@ data class BacktrackParams(
      * meaningful when at least one pass (e.g. [vivification]) is enabled. Must be positive.
      */
     val inprocessingCadence: Int = 1,
-    /** Simplify Boolean clauses against unconditional root facts at scheduled restarts. Opt-in. */
+    /** Simplify Boolean clauses against unconditional facts at safe complete roots. */
     val rootSimplification: Boolean = false,
     /** Maximum source and learned clauses examined by one root simplification slice. */
     val rootSimplifyBatch: Int = 256,
-    /** Maximum failed-literal probes per scheduled restart; zero disables probing. */
+    /** Maximum failed-literal probes per scheduled root slice; zero disables probing. */
     val rootProbeBatch: Int = 0,
     /** Propagation work ceiling per root probe, in addition to the containing invocation token. */
     val rootProbeWork: Long = 8192L,
