@@ -440,7 +440,7 @@ class PropagationSession private constructor(
         // Point pins belong to a disposable verification root, never a reusable search root.
         fun forPointCheck(problem: BakedProblem, point: Assumptions, cancellation: Cancellation): PropagationSession =
             PropagationSession(
-                problem, cancellation, PROPAGATION_CANCEL_FLOOR, false, false, PropagationProblem(problem),
+                problem, cancellation, PROPAGATION_CANCEL_FLOOR, true, false, PropagationProblem(problem),
                 initialAssumptions = point,
             )
 
