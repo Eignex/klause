@@ -297,21 +297,6 @@ provenance with the traces. Compare logical events separately from physical timi
 and report an emergency-interrupted last segment as partial. Default scheduling,
 parallel deterministic batches and throughput qualification remain separate controls.
 
-[9140](https://lab.eignex.com/jobs/9140) repeats `php4`, `random3sat-50-200` and
-`sporttournament06` three times at seed 17 on `75aaf8357d`, with one Linux/amd64
-processor, matching installed-build/runtime hashes, presolve and LP off, 2,000 work
-units and a ten-second emergency deadline. Each source reproduces its complete
-logical trace. Two-unit slices repeatedly reseed workers on the optimization source
-and do not exercise imports.
-[9150](https://lab.eignex.com/jobs/9150) keeps the same source/build identities for
-`php4` and `sporttournament06`, with 4,000 work units, slices growing from 8 to 64,
-reseeding off and Luby-2 restarts. All three repeats reproduce selections, imports,
-rewards and termination. `php4` imports 17 peer clauses and credits 19 downstream
-uses; the optimization worker observes incumbent versions 3, 4 and 5 before the work
-limit. No emergency deadline fires. These are mechanism observations: source-check
-receipts are absent, native verdicts remain unverified, and no default activation or
-throughput improvement follows.
-
 This repository owns catalog selection, runtime configuration and build/launch recipes.
 
 `lab/native-lp.json` selects original MPS inputs through the same planner and runs
@@ -352,84 +337,27 @@ pinned HiGHS revision, separately from the frozen overflow and held-out cohorts.
 
 `bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
 work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,
-one MiB of input and four partition variables. Its provenance capture requires both
-`:klause-cli:installJvmDist` and `:klause-bench:installDist`; use the JVM flags from
-the bench manifest and `-XX:ActiveProcessorCount=1`. It records an ordinary F1 control,
-two attributed repeats, two independent replicas and bounded task qualification through
-actual finite solves. Source bytes, build/runtime identities, logical schedule and
-branch traces, preparation time, per-query native work, inprocessing counters, thread
-allocation and sampled heap are retained under `$OUT`. Lost, cancelled, stale and
-duplicate task completions exercise the same board that accepts scoped native results.
-Witnesses and stops leave coverage open; native refutations remain independently
-unverified. This diagnostic includes inline trace cost, uses no production task
-scheduler and establishes no equal-resource speed or heap benefit. Sampled heap and
-literal payload bytes are separate observations, not complete worker memory bounds.
-Optional `cost-repeats=1..12` adds two warmup cycles followed by balanced F1/cube/direct-pin
-cycles without branch or schedule trace I/O. The direct-pin control executes the same
-conditioned queries without a task board. Each control captures inclusive private
-preparation, native checking and retirement time, process CPU (including concurrent
-JIT/GC), thread allocation and root/total propagation work. Record storage has its
-own elapsed observation. Main elapsed time includes source identity capture,
-preparation, warmup, tracing, failed attempts and private retirement; lab process
-resources also contain startup and final process retirement. These nested scopes
-must not be summed with their containers.
-`slice-work` and `slice-max-work` default to 8 and 64 for diagnostic overlap;
-set them to the configured invocation values when evaluating applicability.
+one MiB of input and four partition variables. Submit it through the lab profile
+interface with `:klause-cli:installJvmDist` and `:klause-bench:installDist`, the JVM
+flags from the bench manifest and `-XX:ActiveProcessorCount=1`. Optional
+`cost-repeats=1..12` selects repeated cost captures. Set `slice-work` and
+`slice-max-work` explicitly when matching an invocation; their diagnostic defaults
+are 8 and 64.
 
-`bench.profile.BooleanProofSchedulerProfile` compares retained Boolean task workers
-with independent replicas on one hash-pinned DIMACS source. Required arguments are
-`suite=ID problem=NAME sha256=HEX work=N seed=N splits=N repeats=N`. Two workers
-receive consecutive explicit seeds, one core, the same containing decision/work cap
-and normal 5000/150000 work slices. Each balanced control pays source construction,
-bake, private setup, source witness checking and retirement; process CPU, thread
-allocation, root/total propagation and native coverage remain separate observations.
-One warmup precedes measured repeats. Optional `recipe=LABEL native=true|false`
-selects a fresh catalog recipe and preserves the same propagation backend in both
-controls; defaults are `input-order` and `false`. Optional `driver=repair|satisfaction|portfolio|portfolio-probe`
-selects constant-objective repair or direct retained satisfaction for task workers;
-the default is `repair`. The `portfolio` driver uses builder-owned workers, runtime
-source bindings, ordinary scheduling and clause sharing in both controls, enabling
-the internal task switch only in the task control. It requires `splits=2` and records
-truthful admission declines and their reason. The `portfolio-probe` driver uses
-the same bound workers and requires `splits=1`; the first ordinary whole-source
-probe retains its engine and charges when a live decision creates a two-cube board.
-It records `sourceProbeWork`, `sourceProbeSegments` and `partitionLiteral`; probe
-work is included in `schedulerWork`. A completed probe records zero tasks, and no
-live decision keeps the same whole-source query running. Its actual worker seeds are `seed+1000` and `seed+1001`;
-the direct drivers use `seed` and `seed+1`. The switch remains disabled in ordinary
-production selection. The replica control uses ordinary satisfaction in every case. Qualify against the applicable
-strong catalog recipes before drawing any production-admission conclusion.
-Use the explicit build/classpath and JVM
-controls of `BooleanProofCoverageProfile`. The scheduler is internal and pure Boolean
-satisfaction only; the profile supplies neither independent UNSAT checking nor a
-production activation decision. Optional `control=tasks|replicas|paired` and `warmups=0|1`
-permit separate fresh-process controls with `repeats=1`; defaults are `paired` and `1`.
-The Linux `wholeProcessPeakRssBytes` reading is the cumulative process high-water
-mark at control end, before record serialization and JVM/JFR exit. It includes
-startup and preceding controls but is not the final process-exit peak. It cannot
-attribute peak memory to one arm of a paired process. Sampled heap is not a peak-memory bound.
+`bench.profile.BooleanProofSchedulerProfile` accepts
+`suite=ID problem=NAME sha256=HEX work=N seed=N splits=N repeats=N` with the same
+build and JVM settings. Optional `recipe=LABEL native=true|false` defaults to
+`input-order` and `false`. Select `driver=repair|satisfaction|portfolio|portfolio-probe`
+with default `repair`; `portfolio` requires `splits=2` and `portfolio-probe` requires
+`splits=1`. Use `control=tasks|replicas|paired` and `warmups=0|1` for separate controls;
+defaults are `paired` and `1`. `capture=overlap` requires a portfolio driver and
+`control=replicas`.
 
-For serial cold controls on Linux, submit the committed
-`scripts/profile-boolean-proof-cold.sh` through a lab profile's `script` field,
-with the same install build tasks and no main/classpath/jvmArgs. Pass the scheduler
-profile's source, work, driver, recipe and split arguments plus `seeds=1,3` and
-`cold-repeats=2`. Each control gets a fresh JVM, heap2560MiB, one processor, default
-GC and no JFR. Balanced order alternates within each seed block. Common corpus
-resolution has a separate preparation receipt; child `process.tsv` retains full
-wall/user/system time, final process maximum RSS in KiB and exit status. Failed
-children retain their output and later controls still run. Kernel, CPU identity,
-allowed CPU set, cgroup path and serial start/finish events accompany the process
-receipts when the host exposes them; absent metadata remains unavailable. Keep the lab's complete
-preparation and kernel resource receipts; these cold profile controls do not supply
-ordinary CLI or independent source-checking qualification.
-
-Optional `capture=overlap` is restricted to a bound portfolio driver with
-`control=replicas`. It records bounded exact Boolean regions with original source
-coordinates, duplicate/repeat/declined entry counts and the normal schedule trace.
-Capture retirement is inside the control observation. These observed controls
-include attribution work and allocation and must stay separate from task-versus-
-replica timing comparisons. Declines make overlap a lower bound; entries prove
-neither native refutation nor saved work.
+For serial cold controls on Linux, submit `scripts/profile-boolean-proof-cold.sh`
+through a lab profile's `script` field with the same install build tasks and no
+main/classpath/jvmArgs. Pass the scheduler profile's source, work, driver, recipe
+and split arguments plus `seeds=1,3` and `cold-repeats=2`. Retain the output under
+`$OUT`; consult the lab's run guide for comparison and checking workflows.
 
 `lab/recipes/` contains the migrated lab recipes. `scripts/convert-lab-recipe.sh`
 translates legacy experiments or schedules from stdin without submitting them;
