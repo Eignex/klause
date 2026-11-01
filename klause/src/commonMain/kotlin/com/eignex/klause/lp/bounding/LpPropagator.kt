@@ -121,6 +121,8 @@ internal class LpPropagator(
     val floatTermination get() = owner?.lastFloatTermination
     val floatPaused: Boolean get() = owner?.floatPaused == true
 
+    val primalGuidanceState: String get() = withOwner { it.primalGuidanceState } ?: "ABSENT_OWNER"
+
     fun boundPremise(witness: Long): SearchAtomPremise = witnesses[witness] ?: SearchAtomPremise.Unavailable
 
     fun activeBoundPremise(column: Int, upper: Boolean): SearchAtomPremise? {

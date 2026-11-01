@@ -94,6 +94,23 @@ internal class LpScopedSolver(
         appendBasisWork, appendUnknownWork, reservedConstructionWork, constructionWork,
     )
 
+    val primalGuidanceState: String
+        get() {
+            if (closed) return "CLOSED"
+            val current = solver ?: return "UNPREPARED"
+            if (current !is ComponentLpSolverCapability) return "MONOLITHIC"
+            if (pendingFloat != null) return "PAUSED"
+            if (current.solvedExactState !== state) return "UNMATCHED_STATE"
+            val metrics = current.lastMetrics
+            val children = metrics.componentSolves.toLong() + metrics.componentReuses.toLong()
+            val attempted = when {
+                children <= 0L -> "NO_CHILD"
+                children == 1L -> "ONE_CHILD"
+                else -> "MULTIPLE_CHILDREN"
+            }
+            return "${current.lastTermination?.name ?: "NO_STOP"}_$attempted"
+        }
+
     init {
         require(maxRetainedRows >= 0 && refactorUpdateLimit > 0 && iterationLimit >= 0 && workLimit >= 0L)
     }

@@ -331,9 +331,24 @@ internal class LpEngine(
     internal fun retainRootPartialPrimalGuidance(relaxation: LpRelaxation, cancellation: Cancellation) {
         if (!params.lpPlan.componentOwnership) return
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "PARTIAL_OWNER_ATTEMPTED", 0L)
-        retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_OWNER_RETAINED") {
+        var ownerState = "NOT_READ"
+        val outcome = retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_OWNER_RETAINED") {
+            ownerState = propagator.primalGuidanceState
             propagator.partialPrimalGuidance(cancellation)
         }
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "PARTIAL_OWNER_${outcome.name}_$ownerState", 0L)
+    }
+
+    private enum class PartialPrimalRead {
+        DISABLED,
+        CONTINUOUS_SOURCE,
+        STALE_OWNER,
+        CANCELLED,
+        COMPLETE_GUIDANCE,
+        NO_ALLOWANCE,
+        NO_COORDINATES,
+        INVALID_SHAPE,
+        RETAINED,
     }
 
     private inline fun retainPartialPrimalGuidance(
@@ -341,21 +356,26 @@ internal class LpEngine(
         cancellation: Cancellation,
         outcome: String,
         read: () -> LpPrimalGuidance?,
-    ) {
-        if (!params.lpPlan.probe || problem.numRealVars != 0 ||
-            !ownsRootPrimalModel(relaxation.model) || cancellation()
-        ) return
+    ): PartialPrimalRead {
+        if (!params.lpPlan.probe) return PartialPrimalRead.DISABLED
+        if (problem.numRealVars != 0) return PartialPrimalRead.CONTINUOUS_SOURCE
+        if (!ownsRootPrimalModel(relaxation.model)) return PartialPrimalRead.STALE_OWNER
+        if (cancellation()) return PartialPrimalRead.CANCELLED
         val previous = rootRoundingWarmStart
-        if (previous?.primal != null && previous.knownColumns == null) return
+        if (previous?.primal != null && previous.knownColumns == null) return PartialPrimalRead.COMPLETE_GUIDANCE
         val model = relaxation.model
-        val work = partialPrimalGuidanceWork(model) ?: return
+        val work = partialPrimalGuidanceWork(model) ?: return PartialPrimalRead.NO_ALLOWANCE
         val started = TimeSource.Monotonic.markNow()
         noteNodeOverhead(work)
-        val guidance = read() ?: return
-        if (guidance.coordinates.size != model.n || guidance.known.size != model.n || cancellation()) return
+        val guidance = read() ?: return PartialPrimalRead.NO_COORDINATES
+        if (guidance.coordinates.size != model.n || guidance.known.size != model.n) {
+            return PartialPrimalRead.INVALID_SHAPE
+        }
+        if (cancellation()) return PartialPrimalRead.CANCELLED
         rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
             primal = guidance.coordinates, knownColumns = guidance.known)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", outcome, started.elapsedNow().inWholeNanoseconds)
+        return PartialPrimalRead.RETAINED
     }
 
     private fun partialPrimalGuidanceWork(model: LpModel): Long? {
