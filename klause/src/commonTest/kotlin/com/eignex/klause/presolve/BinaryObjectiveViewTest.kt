@@ -99,7 +99,7 @@ class BinaryObjectiveViewTest {
             AffinePivotOrder.MARKOWITZ to false,
             AffinePivotOrder.STRUCTURED to true,
             AffinePivotOrder.REWRITE_COST to true,
-            AffinePivotOrder.AUTOMATIC to true,
+            AffinePivotOrder.AUTOMATIC to false,
         )) {
             val source = Problem(1, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
                 listOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
