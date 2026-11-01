@@ -32,7 +32,7 @@ enum class AffinePivotOrder {
     STRUCTURED,
 
     /** The default query policy: structured rewrites for exact discrete optimization, Markowitz otherwise.
-     *  Retains binary integer inputs kept by binary substitution. */
+     *  Retains binary integer inputs when a separable cost view is available. */
     AUTOMATIC;
 
     internal val allowsStructuredRewrites: Boolean

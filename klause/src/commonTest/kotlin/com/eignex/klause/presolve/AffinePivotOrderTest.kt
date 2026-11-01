@@ -212,6 +212,21 @@ class AffinePivotOrderTest {
     }
 
     @Test
+    fun `automatic mixed costs should reconstruct a binary channel fold`() {
+        val source = Problem(1, 3,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 4), IntDomain(0, 4)), listOf(
+                Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+            ))
+
+        val delta = AffineSingletons.eliminateAffineSingletons(source.bake(),
+            objective = LinearObjective(boolWeights = longArrayOf(3), intCoefficients = longArrayOf(0, 1, 1)))
+        val rebuilt = assertNotNull(delta.reconstruct)(Sample(booleanArrayOf(true), longArrayOf(0, 1, 2)))
+
+        assertEquals(1L, rebuilt.ints[0])
+    }
+
+    @Test
     fun `automatic ordering should retain native channels outside discrete optimization`() {
         for (realCount in 0..1) {
             val source = Problem(3, 3, Array(3) { IntDomain(0, 4) }, listOf(

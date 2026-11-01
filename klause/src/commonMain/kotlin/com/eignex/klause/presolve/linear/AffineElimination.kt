@@ -18,6 +18,7 @@ import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.RebuildStep
+import com.eignex.klause.presolve.SeparableObjectiveView
 import com.eignex.klause.presolve.SharedIntOccurrence
 import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.SourceRebuilds
@@ -180,6 +181,13 @@ internal object AffineSingletons {
             val protected = protectedStructureColumns(problem, cancellation) ?: return null
             for (variable in protected) objVars.add(variable)
         }
+        val retainBinaryCostInputs = if (pivotOrder == AffinePivotOrder.AUTOMATIC &&
+            policy == AffinePivotOrder.STRUCTURED && domains != null && problem is BakedProblem && objective != null
+        ) {
+            val view = SeparableObjectiveView.create(problem, objective, cancellation)
+            if (cancellation()) return null
+            view != null
+        } else false
         val eliminated = BooleanArray(problem.numIntVars)
         // Once `x` is gone only its range survives, as the bound rows on its terms, so a pivot with interior
         // holes could be rebuilt onto a value the model excludes. A source declaration has nowhere to carry
@@ -192,7 +200,7 @@ internal object AffineSingletons {
                 ranges.isClosed(x) && !ranges.isBinary(x) && (problem.intDomainOrNull(x)?.holeCount ?: 0L) == 0L
             }
 
-            pivotOrder == AffinePivotOrder.AUTOMATIC && policy == AffinePivotOrder.STRUCTURED ->
+            retainBinaryCostInputs ->
                 { x: Int, partners: Int ->
                     !ranges.isBinary(x) && (partners == 1 || domains[x].holeCount == 0L)
                 }
