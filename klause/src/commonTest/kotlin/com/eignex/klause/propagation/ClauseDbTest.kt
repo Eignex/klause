@@ -310,6 +310,8 @@ class ClauseDbTest {
             assertEquals(true, session.boolValue(1))
 
             session.popToLevel(0)
+            session.pinBool(3, true)
+            session.popToLevel(0)
             repeat(4) { session.maintainCapWindow(0, 256L, 64L, { false }) { false } }
 
             assertEquals(0, session.activeLearnedClauseCount)
