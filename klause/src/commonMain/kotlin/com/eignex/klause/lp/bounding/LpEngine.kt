@@ -113,7 +113,9 @@ internal class RootRoundingWarmStart(
     val basis: Basis? = null,
     val primal: DoubleArray? = null,
     val knownColumns: BooleanArray? = null,
-)
+) {
+    var pinning: PropagationSession? = null
+}
 
 internal enum class LpRootQueryPolicy {
     SHARED_WORK,
@@ -161,6 +163,10 @@ internal class LpEngine(
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
     internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
+        set(value) {
+            if (field !== value) field?.pinning?.releaseRetainedState()
+            field = value
+        }
     internal var rootRoundingInterrupted: Boolean = false
     private val selectedSourceRelaxation: CpToLpRelaxation? by lazy {
         if (projections?.builtInRelaxation == false) {

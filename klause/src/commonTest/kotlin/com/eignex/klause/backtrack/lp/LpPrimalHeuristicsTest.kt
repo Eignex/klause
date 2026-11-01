@@ -46,6 +46,89 @@ import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
     @Test
+    fun `completed rounding pins resume under a fresh slice without repeated propagation charges`() {
+        val n = 4
+        val problem = Problem(0, n, Array(n) { IntDomain(0, 100L + it) }, arrayOf<Factor>(
+            Cumulative(IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong()),
+        ))
+        val objective = LinearObjective(intCoefficients = LongArray(n) { 1L })
+        val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+        val guidance = RootRoundingWarmStart(objective, relaxation, primal = DoubleArray(relaxation.model.n))
+        var expired = false
+        val slice = Cancellation {
+            if ((guidance.pinning?.decisionLevel ?: 0) > 0) expired = true
+            expired
+        }
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
+            SolveStatsSink("resumed-rounding-pins")).use { engine ->
+            engine.rootRoundingWarmStart = guidance
+            assertNull(engine.lpRoundingProbe(objective, slice))
+            val prefix = assertNotNull(guidance.pinning)
+            assertTrue(prefix.probeCancelled)
+            assertEquals(IntDomain(0, 0), prefix.intDomain(0))
+            val paid = engine.primalPropagationWork
+            assertTrue(paid > 0L)
+            assertNull(engine.lpRoundingProbe(objective, Cancellation { true }))
+            assertEquals(paid, engine.primalPropagationWork)
+
+            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+
+            assertTrue(expired)
+            assertEquals(List(n) { 0L }, assertNotNull(sample).ints.toList())
+            assertEquals(prefix.work, engine.primalPropagationWork)
+            assertTrue(engine.primalPropagationWork > paid)
+            assertNull(engine.rootRoundingWarmStart)
+        }
+    }
+
+    @Test
+    fun `changed rounding guidance or objective discards earlier completed pins`() {
+        for (changedObjective in listOf(false, true)) {
+            val n = 4
+            val problem = Problem(0, n, Array(n) { IntDomain(0, 100L + it) }, arrayOf<Factor>(
+                Cumulative(IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong()),
+            ))
+            val objective = LinearObjective(intCoefficients = LongArray(n) { 1L })
+            val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+            val guidance = RootRoundingWarmStart(objective, relaxation, primal = DoubleArray(relaxation.model.n))
+            val slice = Cancellation { (guidance.pinning?.decisionLevel ?: 0) > 0 }
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
+                SolveStatsSink("changed-rounding-pins")).use { engine ->
+                engine.rootRoundingWarmStart = guidance
+                assertNull(engine.lpRoundingProbe(objective, slice))
+                assertEquals(IntDomain(0, 0), assertNotNull(guidance.pinning).intDomain(0))
+                val next = if (changedObjective) LinearObjective(intCoefficients = LongArray(n) { 2L }) else objective
+                val layout = CpToLpRelaxation(problem, next).build(PropagationSession(problem))
+                engine.rootRoundingWarmStart = RootRoundingWarmStart(next, layout,
+                    primal = DoubleArray(layout.model.n) { 1.0 })
+
+                val sample = engine.lpRoundingProbe(next, Cancellation.Never)
+
+                assertEquals(List(n) { 1L }, assertNotNull(sample).ints.toList())
+            }
+        }
+    }
+
+    @Test
+    fun `rounding rebuilds initial propagation interrupted before a complete root`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+        val guidance = RootRoundingWarmStart(objective, relaxation, primal = DoubleArray(relaxation.model.n))
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
+            SolveStatsSink("interrupted-rounding-root")).use { engine ->
+            engine.rootRoundingWarmStart = guidance
+            assertNull(engine.lpRoundingProbe(objective, Cancellation { true }))
+            assertNull(guidance.pinning)
+
+            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+
+            assertEquals(listOf(0L, 1L), assertNotNull(sample).ints.toList())
+        }
+    }
+
+    @Test
     fun `masked rounding guidance respects source domains and unknown columns`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))

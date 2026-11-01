@@ -273,6 +273,11 @@ without another numerical solve; its propagation and source-publication checks
 still run. An incomplete or differently optimized point supplies no retained guidance.
 Rounding pins use probe fixpoints without materializing implication lists;
 an interrupted pin restores the last complete propagation state and withholds its proposal.
+Pure discrete nearest rounding keeps at most one private propagation session with
+that exact stored guide and objective. Later slices replace the probe token and
+reuse completed pins, charging only new propagation work. Interrupted initial
+propagation, a changed guide, a finished or rejected pinning attempt, and engine
+close discard the session. Retention renews no root, worker or invocation allowance.
 
 Preparation is capped at eight million modeled work units; root and node LP work
 stop at 150 million units or the containing invocation's smaller allowance.
