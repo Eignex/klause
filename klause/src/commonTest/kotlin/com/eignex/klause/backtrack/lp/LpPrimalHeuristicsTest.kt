@@ -46,7 +46,7 @@ import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
     @Test
-    fun `masked rounding guidance leaves unknown columns to domain choices`() {
+    fun `masked rounding guidance respects source domains and unknown columns`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
@@ -54,15 +54,19 @@ class LpPrimalHeuristicsTest {
         val known = BooleanArray(relaxation.model.n)
         known[relaxation.intColOf[0]] = true
 
-        val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
-            SolveStatsSink("masked-rounding-guidance")).use { engine ->
-            engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
-                primal = DoubleArray(relaxation.model.n) { 1.0 }, knownColumns = known)
+        for ((target, expected) in listOf(-1.0 to listOf(0L, 1L), 1.0 to listOf(1L, 0L))) {
+            val guide = DoubleArray(relaxation.model.n) { 1.0 }
+            guide[relaxation.intColOf[0]] = target
+            val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
+                SolveStatsSink("masked-rounding-guidance")).use { engine ->
+                engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
+                    primal = guide, knownColumns = known)
 
-            engine.lpRoundingProbe(objective, Cancellation.Never)
+                engine.lpRoundingProbe(objective, Cancellation.Never)
+            }
+
+            assertEquals(expected, assertNotNull(sample).ints.toList())
         }
-
-        assertEquals(listOf(1L, 0L), assertNotNull(sample).ints.toList())
     }
 
     @Test
