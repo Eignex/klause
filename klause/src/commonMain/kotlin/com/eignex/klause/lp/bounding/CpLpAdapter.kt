@@ -134,7 +134,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val exact = base.authoritativeWithTemplates(cancellation, onWork = engine::noteNodeOverhead) {
             engine.sink.lp.observeTemplateUse(exactBounds = it)
         } ?: return null
-        if (!engine.propagator.install(base, exact) || cancellation()) return null
+        if (!engine.propagator.install(base, exact, cancellation) || cancellation()) return null
         val model = requireNotNull(engine.propagator.state).ownerWorkingModel() ?: return null
         val rebound = base.withModel(model)
         currentModel = model

@@ -234,6 +234,8 @@ the compact immutable layout remains available for later node adoption, while ot
 retain their source emissions. Cut-bearing consultations keep propagation-derived root bounds,
 preserving completed cut-owner results across later node adoption.
 Completed cold layout construction and template imports debit the containing LP allowance.
+Fixed-layout installation uses the supplied root preparation token; the installed
+owner keeps its ordinary invocation cancellation for subsequent operations.
 An interrupted cold base charges its materialized columns, rows and coefficient entries before
 discarding them; that charge adds no retained authority.
 Retained source fragments charge each fresh emission before preparing the next region,

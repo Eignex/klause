@@ -340,6 +340,29 @@ class LpEngineTest {
     }
 
     @Test
+    fun `fixed root installation completes under its preparation token after slice expiry`() {
+        val problem = boundedProblem()
+        val factory = RecordingLpEngineFactory()
+        var sliceStopped = false
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false), cancellation = Cancellation { sliceStopped },
+                solveBudgetMillis = 30_000L),
+            SolveStatsSink("root-installation-token"), LpSolveContext(factory)).use { engine ->
+            sliceStopped = true
+            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            val prepared = factory.calls.size
+            assertTrue(prepared > 0)
+            sliceStopped = false
+
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            assertEquals(3.0, bound)
+            assertEquals(prepared, factory.calls.size)
+        }
+    }
+
+    @Test
     fun `ordinary component roots honor an empty cut selection from a nonempty pool`() {
         val problem = boundedProblem()
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),

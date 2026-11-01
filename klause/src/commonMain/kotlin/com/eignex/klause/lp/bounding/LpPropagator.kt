@@ -165,8 +165,8 @@ internal class LpPropagator(
         )
     }
 
-    fun install(key: Any, model: ExactLpModel): Boolean {
-        if (closed || cancellation()) return false
+    fun install(key: Any, model: ExactLpModel, token: Cancellation = cancellation): Boolean {
+        if (closed || token()) return false
         if (modelKey === key && owner != null) return true
         val context = proofContext
         reset()
