@@ -362,6 +362,9 @@ proof authority and resume the retained traversal. Declines and exhausted trials
 also resume it. Closing releases the private consumer, reconstruction and cursors
 after its final drains. Preparation, trial, reconstruction and checks consume the
 original containing deadline/work; cooperative overspend carries to later slices.
+Discovery and preparation debit the private coordinator's ledger. The canonical
+state's propagation and inprocessing counters retain its own engine visits.
+Converted private work joins consumer work in the containing slice budget and overspend debt.
 Retired consumers retain their converted decision and propagation work separately;
 the charged-work total includes preparation, trials and canonical checks.
 The scratch allowance gates a declared private buffer/reference-slot admission model;

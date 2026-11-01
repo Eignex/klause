@@ -100,6 +100,24 @@ class PrivateRebuildSatisfactionTest {
     }
 
     @Test
+    fun `eligibility scans should not count as canonical propagation`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
+            val params = BacktrackParams(nativeSat = native,
+                variableSelector = InputOrder, valueSelector = IndomainMin)
+            val canonical = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(params))
+
+            val trial = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(
+                params.copy(privateRebuildWork = 65_536L),
+            ))
+
+            assertEquals(canonical.stats.search.propagationWork.sum, trial.stats.search.propagationWork.sum)
+            assertTrue(trial.stats.search.learning.getValue("privateRebuildRootScanWork") > 0L)
+            assertTrue(trial.stats.search.learning.getValue("privateRebuildChargedWork") > 0L)
+        }
+    }
+
+    @Test
     fun `retired trial work should remain in the final charged ledger`() {
         for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(

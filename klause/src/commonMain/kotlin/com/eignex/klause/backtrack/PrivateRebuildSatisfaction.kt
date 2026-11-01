@@ -56,7 +56,7 @@ internal class PrivateRebuildSatisfaction(
     override val isDone: Boolean get() = done != null
     override val initialWork: Long = canonical.initialWork
     override val work: Long get() = saturatedWork(canonical.work,
-        saturatedWork(retiredClauseWork, consumer?.clauseWork ?: 0L) / PROPAGATION_WORK_PER_NODE)
+        trialSpent() / PROPAGATION_WORK_PER_NODE)
     override val stats: SolveStats
         get() {
             if (closed) return retainedStats
@@ -78,7 +78,7 @@ internal class PrivateRebuildSatisfaction(
             rootMark = mark
             val start = TimeSource.Monotonic.markNow()
             val pins = session.rootFixedVariableCount()
-            chargeRoot(session, scanWork)
+            charge(scanWork)
             note("RootScanWork", scanWork)
             note("RootScanNanos", start.elapsedNow().inWholeNanoseconds)
             if (pins > rootPins) {
@@ -104,7 +104,7 @@ internal class PrivateRebuildSatisfaction(
             if (work > allowance - spent || session.cancelRequested || lifetime() || rootCancellation()) false
             else {
                 spent += work
-                chargeRoot(session, work)
+                charge(work)
                 true
             }
         }
@@ -114,7 +114,7 @@ internal class PrivateRebuildSatisfaction(
         if (attemptedBinaryPairs.isEmpty()) {
             val entries = PrivateRebuildBinaryLearning.MAX_RELATIONS.toLong()
             if (entries > params.privateRebuildWork - trialSpent()) return false
-            chargeRoot(session, entries)
+            charge(entries)
             note("BinaryHistoryWork", entries)
             note("BinaryHistoryBytes", historyBytes)
             attemptedBinaryPairs = LongArray(PrivateRebuildBinaryLearning.MAX_RELATIONS)
@@ -211,16 +211,11 @@ internal class PrivateRebuildSatisfaction(
         saturatedWork(retiredClauseWork, consumer?.clauseWork ?: 0L))
 
     private fun charge(work: Long) {
-        chargeRoot(checkNotNull(root), work)
-    }
-
-    private fun chargeRoot(session: PropagationSession, work: Long) {
-        session.chargeInprocessingWork(work)
         chargedPrivateWork = saturatedWork(chargedPrivateWork, work)
     }
 
     private fun prepare(session: PropagationSession, containing: Cancellation) {
-        val preparationStart = session.work
+        val preparationStart = chargedPrivateWork
         note("Attempts")
         val meter = WorkMeter(::charge)
         val token = object : Cancellation {
@@ -237,7 +232,7 @@ internal class PrivateRebuildSatisfaction(
             (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L) / 2L
         }
         note("PreparationNanos", start.elapsedNow().inWholeNanoseconds)
-        note("PreparationWork", session.work - preparationStart)
+        note("PreparationWork", chargedPrivateWork - preparationStart)
         if (prepared == null || token()) {
             note("Declined")
             root = null

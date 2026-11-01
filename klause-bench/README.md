@@ -80,6 +80,8 @@ and the 16 KiB discovery scratch model spend the existing byte grant.
 reports the cumulative private allowance spent. These work
 counters are subsets of worker work, not additional totals to sum. Missing relations
 after a bounded scan do not establish an absence of opportunities.
+Private discovery and preparation debit the containing worker separately from
+canonical propagation counters.
 Use the same source, engine, presolve, seeds, processors, heap, containing allowance
 and deadline in the zero/trial arms. `nativePrivateRebuildAttempts`, `Consumers`,
 `Eliminated`, `SourceAccepted`, `RefutationDeferred`, `Declined` and `Retired`
