@@ -1,8 +1,6 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
 
 /**
  * The order affine elimination picks its pivots in. Elimination cost depends on the order as much as on
@@ -33,27 +31,16 @@ enum class AffinePivotOrder {
      *  Reuses existing exact binary cost channels within mixed integer objectives. */
     STRUCTURED,
 
-    /** The default query policy: structured rewrites for an exact discrete integer cost variable.
-     *  Uses Markowitz for other objectives and feasibility queries.
+    /** The default query policy: structured rewrites for exact discrete optimization, Markowitz otherwise.
      *  Retains binary integer inputs when a separable cost view is available. */
     AUTOMATIC;
 
     internal val allowsStructuredRewrites: Boolean
         get() = this == STRUCTURED || this == REWRITE_COST
 
-    internal fun forQuery(
-        problem: Problem,
-        objective: LinearObjective?,
-        cancellation: Cancellation,
-    ): AffinePivotOrder {
-        if (this != AUTOMATIC) return this
-        if (objective == null || problem.numRealVars != 0 || problem.semantics.isApproximate ||
-            objective.intCoefficientValues.size > 4096 || objective.boolWeightValues.size > 4096 ||
-            objective.realCoefficientValues.size > 4096
-        ) return MARKOWITZ
-        cancellation.charge((objective.intCoefficientValues.size + objective.boolWeightValues.size +
-            objective.realCoefficientValues.size).toLong())
-        if (cancellation()) return MARKOWITZ
-        return if (objective.singleIntObjective() != null) STRUCTURED else MARKOWITZ
+    internal fun forQuery(problem: Problem, optimizing: Boolean): AffinePivotOrder = when {
+        this != AUTOMATIC -> this
+        optimizing && problem.numRealVars == 0 && !problem.semantics.isApproximate -> STRUCTURED
+        else -> MARKOWITZ
     }
 }

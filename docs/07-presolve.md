@@ -88,9 +88,7 @@ default round cap; an explicit zero round cap still suppresses those schedules.
 ### Rewrite representation controls
 
 `AffinePivotOrder.AUTOMATIC` is the default query policy. For exact optimization
-of a single integer cost variable without continuous variables it uses `STRUCTURED`
-ordering. Objective discovery admits at most 4,096 entries in each coefficient lane
-and charges their scan to the preparation allowance. When a finite cost
+without continuous variables it uses `STRUCTURED` ordering. When a finite cost
 can be expanded into per-variable terms, it preserves binary integer inputs left
 by binary substitution to keep that definition available to search. This bounded
 cost-view discovery charges the preparation allowance and retains no view. Other
