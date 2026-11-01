@@ -60,7 +60,7 @@ class BooleanSatisfactionRepairTest {
     }
 
     @Test
-    fun `a retained task guard should preserve a feasible sibling after scoped refutation`() {
+    fun `a retained task root should preserve a feasible sibling after scoped refutation`() {
         val guarded = Problem(5, 0, emptyArray(), Array(8) { mask ->
             Clause(intArrayOf(Lit.make(0, true)) +
                 IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
@@ -72,7 +72,7 @@ class BooleanSatisfactionRepairTest {
                 search.begin(Assumptions(bools = mapOf(1 to true)), Long.MAX_VALUE,
                     Double.POSITIVE_INFINITY, Cancellation.Never)
                 assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L).reason)
-                search.retainPartition(assertNotNull(search.splitLiteral()))
+                assertTrue(search.retainPartition(assertNotNull(search.splitLiteral())))
                 val refuted = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
                 assertNull(refuted.sample)
                 assertEquals(TerminationReason.SearchExhausted, refuted.reason)

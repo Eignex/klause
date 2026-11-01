@@ -608,8 +608,9 @@ query pauses with a live Boolean decision. It reserves that decision's matching
 region for the retained probe engine before exposing the opposite region to its
 peer. Source and caller-condition admission precedes the probe; task identity and
 mapping authority are allocated only when that pause creates the board.
-The adopted lease continues the paused frames under its matching Boolean guard;
-it does not reseed the probe. Other leases begin their own complete cube condition.
+The adopted lease can retain the live Boolean decision as its conditioned root,
+continuing descendant frames without reseeding. Unsupported paused state begins
+the task with its complete cube condition, as do other leases.
 The original builder solver and immutable native projection remain available
 through the transfer. Probe work is a subset of each worker's cumulative work, not
 a refunded or additional charge. Without a live decision the same source query
@@ -623,7 +624,7 @@ mappings. Other shapes continue ordinary solving. Explicit
 non-native recipe and reports declines. Explicit enablement rejects optimization
 and parallel requests; omission leaves them on ordinary execution. Direct internal
 switches remain disabled by default. Result statistics distinguish actual partitions,
-native task closures, probe effort and explicit declines. An admitted fast probe
+native task closures, probe effort, retained-root transfers and explicit declines. An admitted fast probe
 retains its effort counters even when it creates no board. Combining schedules
 preserves their distinct observations.
 These counters do not establish independent checking or confer proof authority.

@@ -74,7 +74,7 @@ class BooleanProofSchedulerTest {
                 val literal = assertNotNull(search.splitLiteral())
                 BooleanProofScheduler(problem, context, listOf(Lit.variable(literal)),
                     List(2) { params }, true).use { scheduler ->
-                    scheduler.adopt(0, search, literal)
+                    assertTrue(scheduler.adopt(0, search, literal))
                     val result = scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 5000L)
 
                     assertEquals(Lit.isPositive(literal), assertNotNull(result.sample).boolValue(Lit.variable(literal)))

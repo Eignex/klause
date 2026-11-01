@@ -71,6 +71,8 @@ internal class BooleanProofPortfolio private constructor(
         private set
     var probeSegments: Int = 0
         private set
+    var retainedProbes: Int = 0
+        private set
     var partitionLiteral: Int? = null
         private set
     private val handles = arrayOfNulls<Lane>(parameters.size)
@@ -197,7 +199,7 @@ internal class BooleanProofPortfolio private constructor(
             if (!global()) search.splitLiteral()?.let { literal ->
                 val replacement = board(listOf(Lit.variable(literal)))
                 try {
-                    replacement.adopt(worker, search, literal)
+                    if (replacement.adopt(worker, search, literal)) retainedProbes++
                 } catch (failure: Throwable) {
                     runCatching { replacement.close() }.exceptionOrNull()?.let(failure::addSuppressed)
                     throw failure

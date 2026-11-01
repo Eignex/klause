@@ -159,6 +159,8 @@ class Portfolio(
         private set
     internal var lastBooleanProofProbeSegments: Int = 0
         private set
+    internal var lastBooleanProofRetainedProbes: Int = 0
+        private set
     internal var lastBooleanProofPartitionLiteral: Int? = null
         private set
     internal var lastBooleanProofTasks: Int = 0
@@ -245,6 +247,7 @@ class Portfolio(
         lastBooleanProofWork = 0L
         lastBooleanProofProbeWork = 0L
         lastBooleanProofProbeSegments = 0
+        lastBooleanProofRetainedProbes = 0
         lastBooleanProofPartitionLiteral = null
         lastBooleanProofDecline = if (disjointBooleanProof) "unsupported-schedule" else "disabled"
         var proofTasks: BooleanProofPortfolio? = null
@@ -376,6 +379,7 @@ class Portfolio(
         lastBooleanProofWork = proofTasks?.work ?: 0L
         lastBooleanProofProbeWork = proofTasks?.probeWork ?: 0L
         lastBooleanProofProbeSegments = proofTasks?.probeSegments ?: 0
+        lastBooleanProofRetainedProbes = proofTasks?.retainedProbes ?: 0
         lastBooleanProofPartitionLiteral = proofTasks?.partitionLiteral
         execution.exceptionOrNull()?.let { failure ->
             cleanup.exceptionOrNull()?.takeUnless { it === failure }?.let(failure::addSuppressed)
@@ -388,6 +392,7 @@ class Portfolio(
                 booleanProof = folded.portfolio.booleanProof + BooleanProofStats(
                     lastBooleanProofTasks, lastBooleanProofCompleted, lastBooleanProofProbeSegments,
                     lastBooleanProofProbeWork, lastBooleanProofWork, lastBooleanProofDecline,
+                    lastBooleanProofRetainedProbes,
                 ),
             ))
         }

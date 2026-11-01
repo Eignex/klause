@@ -209,6 +209,7 @@ class BooleanProofPortfolioTest {
             assertEquals(2, Lit.variable(assertNotNull(tasks.partitionLiteral)))
             assertEquals(2, tasks.size)
             assertEquals(1, tasks.probeSegments)
+            assertEquals(1, tasks.retainedProbes)
             assertTrue(probe > 0L)
             assertEquals(probe, tasks.work)
             assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
