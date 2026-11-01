@@ -551,6 +551,23 @@ internal class ComponentLpSolver(
         )
     }
 
+    override fun partialBoundDuals(cancellation: Cancellation): DoubleArray? {
+        if (!currentAuthority() || cancellation()) return null
+        if (lastTermination != LpFloatTermination.WORK && lastTermination != LpFloatTermination.PIVOTS) return null
+        val results = blockResults ?: return null
+        if (results.all { it == null }) return null
+        val duals = DoubleArray(model.m)
+        for (index in parts.indices) {
+            if (cancellation()) return null
+            val result = results[index] ?: continue
+            for (row in result.duals.indices) {
+                if (row % 256 == 0 && cancellation()) return null
+                duals[parts[index].rows[row]] = result.duals[row]
+            }
+        }
+        return duals.takeUnless { cancellation() }
+    }
+
     override fun nodeDeductions(
         duals: DoubleArray,
         observer: LpCertificationObserver?,

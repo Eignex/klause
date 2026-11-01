@@ -358,6 +358,11 @@ unfinished blocks contribute freshly checked zero-dual box bounds. Missing
 minimizing sides decline the aggregate. Every contribution uses the current
 child authority, and only their exact sum is projected to source units. This
 bound supplies no complete point, cut tableau or attainment claim.
+Root consumers lift completed child dual candidates with zero multipliers on unfinished
+blocks, reserving their copied vector inside the existing checking allocation. The whole-model
+bound-only checker verifies the candidate under the remaining root work and cancellation
+allowance before source projection. A refused check publishes no bound or point; the numerical
+query still yields after its adaptive quantum.
 Node consumers can prune against the existing source-objective cutoff after
 charging aggregation and certificate work; they do not publish branching coordinates
 or train directional history from the partial aggregate.

@@ -317,6 +317,8 @@ internal interface LpSolver : AutoCloseable {
  * component engine cannot accidentally hide the certification routes from its consumers.
  */
 internal interface ComponentLpSolverCapability : LpSolver {
+    fun partialBoundDuals(cancellation: Cancellation = Cancellation.Never): DoubleArray? = null
+
     fun nodeDeductions(
         duals: DoubleArray,
         observer: LpCertificationObserver? = null,

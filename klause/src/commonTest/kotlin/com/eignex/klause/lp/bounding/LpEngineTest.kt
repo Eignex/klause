@@ -456,6 +456,48 @@ class LpEngineTest {
     }
 
     @Test
+    fun `partial component root bounds honor the injected proof policy`() {
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 5) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
+        ))
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(if (model.m == 2) LpFloatAllowance(1L, 0) else allowance)
+                }
+            }
+        }
+        for (accepted in listOf(false, true)) {
+            val sink = SolveStatsSink("partial-component-root-policy")
+            val context = LpSolveContext(factory, LpCertificationPolicy { _, success -> accepted && success })
+            LpEngine(problem, LinearObjective(intCoefficients = LongArray(6) { 1L }, constant = 7L),
+                LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                    probe = false, rootCutHarvest = false)), sink, context).use { engine ->
+
+                val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+                if (accepted) assertEquals(9.0, bound) else assertTrue(bound.isNaN())
+                assertEquals(LpFloatTermination.WORK, engine.propagator.floatTermination)
+                assertFalse(engine.propagator.floatPaused)
+                if (accepted) {
+                    assertEquals(1L,
+                        sink.snapshot().lp.phases["ROOT_QUERY_ROOT"]?.outcomes?.get("COMPONENT_PARTIAL_BOUND"))
+                }
+            }
+        }
+    }
+
+    @Test
     fun `ordinary node pruning consumes a checked partial component bound`() {
         val problem = Problem(0, 6, Array(6) { IntDomain(0, 5) }, listOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),

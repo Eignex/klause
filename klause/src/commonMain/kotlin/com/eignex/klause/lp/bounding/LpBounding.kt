@@ -1508,13 +1508,17 @@ private fun LpEngine.retainedRootLpRelaxationBound(
                 else attempt.first.lastMetrics
             observeRootSolve(attempt.first, metrics)
             observeStage("AT_CERTIFICATION")
-            val lower = attempt.second?.let { retainedRootLowerBound(relaxation.model, it, cancellation) }
+            val lower = retainedRootLowerBound(
+                relaxation.model, attempt.second, cancellation,
+                attempt.first as? ComponentLpSolverCapability,
+            )
             retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
             val stopped = cancellation()
             val bound = if (stopped) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
             observeStage(
                 when {
                     stopped -> "CANCELLED_AFTER_QUERY"
+                    attempt.second == null && !bound.isNaN() -> "PARTIAL_BOUND"
                     attempt.second == null -> "NO_FLOAT_${attempt.first.lastTermination?.name ?: "NO_TERMINATION"}"
                     lower == null -> "CERTIFICATE_DECLINED"
                     bound.isNaN() -> "SOURCE_PROJECTION_DECLINED"
@@ -1571,9 +1575,11 @@ private fun LpEngine.standaloneRootLpRelaxationBound(
 
 private fun LpEngine.retainedRootLowerBound(
     model: LpModel,
-    result: FloatLpResult,
+    result: FloatLpResult?,
     cancellation: Cancellation,
+    component: ComponentLpSolverCapability? = null,
 ): Double? {
+    if (result == null && component == null) return null
     val projectionWork = model.extent() * LpNodeOverhead.EXACT
     if (retainedRootRemainingWork() <= projectionWork || cancellation()) return null
     // Source-range and objective projection scans share the existing whole-model overhead charge.
@@ -1582,14 +1588,22 @@ private fun LpEngine.retainedRootLowerBound(
     val defaults = ReconstructionLimits()
     val storage = if (sparseTrialActive) sink.lp.sparseTrial["CheckingReservedBytes"] ?: 0L else
         SPARSE_LP_CHECKING_ALLOCATION
+    val allocation = minOf(defaults.maxAllocation, storage)
+    val candidateBytes = if (result == null) model.m.toLong() * Double.SIZE_BYTES else 0L
+    if (candidateBytes > allocation) return null
+    val duals = result?.duals ?: run {
+        if (component == null) return null
+        component.partialBoundDuals(cancellation) ?: return null
+    }
+    if (cancellation()) return null
     val checked = certifyLpBoundOnly(
         model,
-        result.duals,
+        duals,
         defaults.copy(
             maxCoordinates = model.numVars,
             maxEntries = (model.doubleView?.colPtr ?: model.csc.colPtr)[model.n] + model.m,
             maxWork = remaining,
-            maxAllocation = minOf(defaults.maxAllocation, storage),
+            maxAllocation = allocation - candidateBytes,
         ),
         cancellation,
         rootCertificationObserver(),
