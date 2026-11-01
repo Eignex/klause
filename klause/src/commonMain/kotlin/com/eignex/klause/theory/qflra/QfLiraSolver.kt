@@ -235,7 +235,12 @@ class ExactLiraSearchComponent private constructor(
     private var node = root
     private var assignment: ExactLiraAssignment? = null
     private var outcome: ComponentCheck? = null
+    private var unconsumedLpPoint: List<BigFraction>? = null
     private var candidate: List<BigFraction>? = null
+        set(value) {
+            field = value
+            unconsumedLpPoint = null
+        }
     private var floatCandidate: DoubleArray? = null
     private var pointHintRows: List<PreparedSourceRow>? = null
     private var pointHintValues: IntArray? = null
@@ -1563,6 +1568,7 @@ class ExactLiraSearchComponent private constructor(
         if (operationStop()) return ComponentResult.Indeterminate
         dirty = false
         candidate = result.exactPrimal?.take(model.numRealVars + model.numIntVars)
+        unconsumedLpPoint = candidate
         if (result.verdict == LpVerdict.INFEASIBLE) {
             val explanation = lp.explainConflict(result.conflictSupport, context)
             smtStats?.observeConflict(explanation)
@@ -1584,7 +1590,7 @@ class ExactLiraSearchComponent private constructor(
             }
         }
         if (operationStop()) return ComponentResult.Indeterminate
-        captureCompleteWitness(candidate, LpClaim.FEASIBLE_COMPLETION)
+        captureCompleteWitness(candidate)
         // Source integer branching requires an independently checked continuous witness.
         return ComponentResult.Consistent
     }
@@ -1805,7 +1811,7 @@ class ExactLiraSearchComponent private constructor(
         return null
     }
 
-    private fun captureCompleteWitness(point: List<BigFraction>?, claim: LpClaim? = null) {
+    private fun captureCompleteWitness(point: List<BigFraction>?) {
         if (point == null || operationStop() || bools.any { it == UNASSIGNED } ||
             !node.selectsEveryDisjunction(model, disjunctionAtoms) ||
             node.nextDisequality(model, disjunctionAtoms, bools) != null
@@ -1813,7 +1819,10 @@ class ExactLiraSearchComponent private constructor(
         acceptWitness(point)?.let {
             assignment = it
             outcome = ComponentCheck.Feasible
-            claim?.consumed(primaryLpObserver)
+            if (point === unconsumedLpPoint) {
+                unconsumedLpPoint = null
+                LpClaim.FEASIBLE_COMPLETION.consumed(primaryLpObserver)
+            }
         }
     }
 

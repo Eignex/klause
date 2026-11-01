@@ -66,7 +66,7 @@ import kotlin.test.assertTrue
 
 class QfLiraSolverLpTest {
     @Test
-    fun `complete LP witnesses consume a feasible completion claim`() {
+    fun `complete LP witnesses consume a feasible completion claim once`() {
         val stats = LpStatsSink()
         ExactLiraSearchComponent(halfIntegerSource()).use { component ->
             component.observePrimaryLpWith(stats.certificationObserver(LpRoute.STANDALONE))
@@ -74,6 +74,7 @@ class QfLiraSolverLpTest {
 
             session.initialize()
 
+            assertIs<ComponentCheck.Feasible>(session.check())
             assertIs<ComponentCheck.Feasible>(session.check())
             assertEquals(1L, stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
                 .outcomes["FEASIBLE_COMPLETION"])
