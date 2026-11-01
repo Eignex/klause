@@ -67,7 +67,7 @@ class BooleanProofPortfolioTest {
         val workers = PortfolioBuilder.build(problem, scenario)
         try {
             var identities = 0
-            val admitted = BooleanProofPortfolio.forWorkers(workers, probeFirst = true,
+            val admitted = BooleanProofPortfolio.forWorkers(workers, probeFirst = true, nativeOnly = true,
                 newIdentity = { "task-authority-${++identities}" })
             assertNotNull(admitted).use { tasks ->
                 assertEquals(0, identities)
@@ -84,6 +84,40 @@ class BooleanProofPortfolioTest {
                 assertEquals(first.work + second.work, tasks.work)
                 assertEquals(1, identities)
             }
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `automatic task admission should decline nonnative ordered workers`() {
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = false)
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+            btPool = listOf { BacktrackWorkerConfig.ofParams("fixed", params) })
+        val workers = PortfolioBuilder.build(problem, scenario)
+        try {
+            assertNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true, nativeOnly = true))
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `cancelled task admission should leave original worker sessions available`() {
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+            btPool = listOf { BacktrackCatalog.byLabel("first-fail") })
+        val workers = PortfolioBuilder.build(problem, scenario)
+        try {
+            var decline: String? = null
+            val tasks = BooleanProofPortfolio.forWorkers(workers, probeFirst = true, nativeOnly = true,
+                cancellation = Cancellation { true },
+                newIdentity = { error("cancelled admission allocated task authority") }) {
+                decline = it
+            }
+
+            assertNull(tasks)
+            assertEquals("source-admission-cancelled", decline)
+            assertNotNull(workers[0].newResumableSolve()).close()
         } finally {
             workers.forEach { it.close() }
         }
@@ -175,6 +209,7 @@ class BooleanProofPortfolioTest {
             assertEquals(2, Lit.variable(assertNotNull(tasks.partitionLiteral)))
             assertEquals(2, tasks.size)
             assertEquals(1, tasks.probeSegments)
+            assertEquals(1, tasks.retainedProbes)
             assertTrue(probe > 0L)
             assertEquals(probe, tasks.work)
             assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))

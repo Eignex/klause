@@ -39,6 +39,7 @@ internal object LpLibrarySuite : BenchSuite {
     override fun describe() = BenchDescriptor("klause-lp-library", "Exact original MPS public Backtrack caller")
 
     override fun plan(request: BenchRequest): List<BenchCase> = NativeLpSuite.plan(request).map { case ->
+        require(case.attributes["format"] == Format.MPS.name) { "Library qualification requires original MPS" }
         require(case.parameters["exact"] == "true") { "Library qualification requires exact source semantics" }
         require(case.parameters["engine"] == "default" && case.parameters.keys.none { it.startsWith("param.") })
         require(case.parameters["lp"] == null && case.parameters["presolve"] == null)

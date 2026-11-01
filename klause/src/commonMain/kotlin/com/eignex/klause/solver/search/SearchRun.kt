@@ -30,6 +30,7 @@ class SearchRun internal constructor(
         }
     }
     private val frames = ArrayList<Frame>()
+    private var queryRoot = minimumDecisionLevel
     private var decisions = 0L
     private var decisionsSinceRestart = 0L
     private var sawIndeterminate = false
@@ -461,7 +462,7 @@ class SearchRun internal constructor(
         var conflict = initial
         learnedApplied = false
         repeat(MAX_NODE_BACKJUMPS) {
-            if (conflict.decisionLevel !in minimumDecisionLevel..session.decisionLevel) {
+            if (conflict.decisionLevel !in queryRoot..session.decisionLevel) {
                 return SearchLearnedConflictResult.Chronological
             }
             learnedApplied = true
@@ -524,7 +525,7 @@ class SearchRun internal constructor(
         }
     }
 
-    private fun restart(): SearchRunEvent? = when (session.restartAt(minimumDecisionLevel)) {
+    private fun restart(): SearchRunEvent? = when (session.restartAt(queryRoot)) {
         ComponentResult.Consistent -> {
             frames.clear()
             params.restart.onRestart()
@@ -550,9 +551,27 @@ class SearchRun internal constructor(
         SearchRunDisposition.Indeterminate -> finish(SearchRunEvent.Indeterminate.Component)
     }
 
+    internal fun retainBooleanRoot(literal: Int): Boolean {
+        if (modelContinuation != SearchModelContinuation.Chronological || queryRoot != minimumDecisionLevel ||
+            !started || terminal != null || sawIndeterminate || pendingModel != null || lastModel != null ||
+            consumedModel || pendingCancellation || retryingAssertion || budgetInterrupted) return false
+        val frame = frames.firstOrNull() ?: return false
+        if (frame.level != minimumDecisionLevel || session.decisionLevel <= frame.level ||
+            frame.decisions.size != 2) return false
+        val selected = frame.decisions.getOrNull(frame.next - 1) as? SearchDecision.Bool ?: return false
+        val opposite = frame.decisions.getOrNull(2 - frame.next) as? SearchDecision.Bool ?: return false
+        if (selected.literal != literal || opposite.literal != (literal xor 1) ||
+            session.boolValue(literal ushr 1) != (literal and 1 == 0)) return false
+        // The peer owns the complementary region; descendant frames and their charged work stay here.
+        frames.removeAt(0)
+        queryRoot = frame.level + 1
+        return true
+    }
+
     /** Reset traversal state after its components have been reseeded at root. */
     fun reset() {
         check(session.decisionLevel == minimumDecisionLevel) { "a search run may only reset at its root" }
+        queryRoot = minimumDecisionLevel
         frames.clear()
         decisions = 0L
         decisionsSinceRestart = 0L

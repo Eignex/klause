@@ -15,6 +15,7 @@ import com.eignex.klause.portfolio.PortfolioRewardPolicy
 import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -42,7 +43,7 @@ internal data class PortfolioInvocationControls(
     val onProgress: ((PortfolioEvent) -> Unit)? = null,
     val improvementProofShare: Double = 0.5,
     val includeRestartingProof: Boolean = false,
-    val booleanProofTasks: Boolean = false,
+    val booleanProofTasks: Boolean? = false,
 )
 
 internal class PortfolioInvocationPolicy(
@@ -123,8 +124,13 @@ internal class PortfolioInvocation(
             it.initialProbeWeights = selected.probeWeights
             it.improvementProofShare = controls.improvementProofShare
             it.includeRestartingProof = controls.includeRestartingProof
-            it.disjointBooleanProof = controls.booleanProofTasks
-            it.disjointBooleanProbe = controls.booleanProofTasks
+            val automatic = controls.booleanProofTasks == null && controls.parallelism == 1 && objective == null &&
+                selected.profile?.let { profile ->
+                    profile.problemClass == ProblemClass.Sat && !profile.optimizing
+                } == true
+            it.disjointBooleanProof = controls.booleanProofTasks == true || automatic
+            it.disjointBooleanProbe = it.disjointBooleanProof
+            it.automaticBooleanProof = automatic
         }
     } catch (failure: Throwable) {
         for (worker in workers.asReversed()) {

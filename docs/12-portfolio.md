@@ -586,7 +586,7 @@ implementation, and rotates ordinary-sized bounded
 slices across disjoint tasks, reusing each private session for sibling cubes.
 Construction, reseeding, failed attempts, checks and retirement retain their
 containing allowances and cumulative worker counters; it supplies no independent
-proof certificate or automatic admission policy. An internal portfolio coordinator
+proof certificate. An internal portfolio coordinator
 keeps source bindings, seed positions and channel origins on the original workers.
 Each lane holds its original session's exclusive owner, reports only its own work
 and emits source exhaustion after whole-board
@@ -608,17 +608,25 @@ query pauses with a live Boolean decision. It reserves that decision's matching
 region for the retained probe engine before exposing the opposite region to its
 peer. Source and caller-condition admission precedes the probe; task identity and
 mapping authority are allocated only when that pause creates the board.
+The adopted lease can retain the live Boolean decision as its conditioned root,
+continuing descendant frames without reseeding. Unsupported paused state begins
+the task with its complete cube condition, as do other leases.
 The original builder solver and immutable native projection remain available
 through the transfer. Probe work is a subset of each worker's cumulative work, not
 a refunded or additional charge. Without a live decision the same source query
 continues; fast completion creates no board.
 
-The direct integration switches are internal and disabled by default. The source
-pipeline exposes `boolean-proof-tasks=true` for opt-in single-core satisfaction
-execution under the same admission guards; optimization and parallel requests
-reject this control. Result statistics distinguish actual partitions, native task
-closures, probe effort and declines. Combining schedules preserves their distinct
-observations.
+The source pipeline automatically admits single-core satisfaction portfolios with
+two identical native first-fail recipes and the ordinary work schedule under these
+source guards. Admission polls caller cancellation while checking clauses and source
+mappings. Other shapes continue ordinary solving. Explicit
+`boolean-proof-tasks=false` disables admission; `true` also permits the bare
+non-native recipe and reports declines. Explicit enablement rejects optimization
+and parallel requests; omission leaves them on ordinary execution. Direct internal
+switches remain disabled by default. Result statistics distinguish actual partitions,
+native task closures, probe effort, retained-root transfers and explicit declines. An admitted fast probe
+retains its effort counters even when it creates no board. Combining schedules
+preserves their distinct observations.
 These counters do not establish independent checking or confer proof authority.
 
 ### Slice accounting and coverage
@@ -947,8 +955,21 @@ An interrupted point check keeps its candidate for the next slice; each attempt
 retains its construction and propagation charges. Closing discards query pins,
 auxiliary buffers and preparation cursors while keeping completed observations.
 
-Core refinement is disabled by default; `core-refinement=none|reasons|deletion`
-selects the private policy for curated and directly selected core workers.
+Curated single-lane mixed source execution selects an early reason-refined core
+trial for nonuniform Boolean objectives over at most 16,384 Boolean columns and
+16,384 factors, with at most two million literal entries in clauses, cardinalities
+and pseudo-Boolean rows or their reifications. Pseudo-Boolean row constants must
+fit signed words. It excludes integer and real columns and requires the sum of the
+absolute objective coefficients and constant to fit the exact scalar range below
+`2^53`. Eligibility scanning is cancellable and charges the containing invocation.
+The trial retains ordinary complete-worker coverage, worker positions, seeds and
+its existing auxiliary allowance. Explicit core settings, arm counts, recipes,
+annotations, backtrack edits and work-driven diagnostics retain their selected
+policy. Unsupported or interrupted eligibility retains the ordinary delayed,
+unrefined core policy.
+
+`core-refinement=none|reasons|deletion` explicitly selects the private policy for
+curated and directly selected core workers.
 Seed-proof projection uses the
 [historical reasons](09-learning.md#explanation-lifetime) of the existing query,
 without another propagation session or solve; unsupported seed conflicts and tree
@@ -991,11 +1012,14 @@ ordinary complete workers stall, with the allowance described in
 [resources](06-sessions.md#resource-allowances); parallel pools admit it immediately, and `core-guided`
 selects it directly.
 
-`core-early=true` removes only the first-incumbent admission condition in a mixed
-optimization pool on one lane with automatic backtrack workers and an eligible
-Boolean objective. Worker order, seeds, initial complete-worker coverage and the
-bounded auxiliary allowance stay fixed. The control also preserves the containing
-work allowance in diagnostic schedules. It does not expand core eligibility.
+`core-early=true` admits the eligible bounded core trial after initial ordinary
+complete-worker coverage, before heuristic first probes, in a mixed optimization pool
+on one lane with automatic backtrack workers and a Boolean objective. The trial keeps
+its opportunity across retained preparation and query slices until it finishes or
+its cumulative allowance stops it, on either side of the first incumbent. Worker
+positions, seeds, complete-worker coverage and auxiliary limits stay fixed, including
+the containing work allowance in diagnostic schedules. The control does not expand
+core eligibility.
 
 ### Exact theory strategy execution
 

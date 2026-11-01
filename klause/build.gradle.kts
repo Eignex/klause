@@ -106,16 +106,8 @@ kotlin.targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarge
     }
 }
 
-// A timestamped KMP root still redirects to mutable platform snapshots. Publish constraints too,
-// so downstream Gradle consumers resolve the same binaries as this build.
 dependencies {
     constraints {
-        for ((module, build) in mapOf("jvm" to 127, "linuxx64" to 127, "linuxarm64" to 127, "macosarm64" to 126)) {
-            val pinned = "0.3.4-20261101.114432-$build"
-            add("commonMainImplementation", "com.eignex:kumulant-$module:$pinned") {
-                version { strictly(pinned) }
-            }
-        }
         for (module in listOf("jvm", "linuxx64", "linuxarm64", "macosarm64")) {
             add("commonMainApi", "com.eignex:skema-$module:$skemaPin") {
                 version { strictly(skemaPin) }
