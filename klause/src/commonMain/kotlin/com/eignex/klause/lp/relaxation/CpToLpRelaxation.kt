@@ -90,7 +90,7 @@ import kotlin.time.TimeSource
 
 internal class LpAssemblyCancelled : RuntimeException()
 
-private fun Cancellation.checkLpAssembly() {
+internal fun Cancellation.checkLpAssembly() {
     if (this()) throw LpAssemblyCancelled()
 }
 

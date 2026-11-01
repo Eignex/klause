@@ -144,7 +144,8 @@ internal object LpTemplatePreparationProfile {
                                     meter.charge(it)
                                 }
                                 object : Cancellation {
-                                    override fun isCancelled(): Boolean = route != "primal" || stop() || consumerWork >= 48L
+                                    override fun isCancelled(): Boolean =
+                                        route != "primal" || stop() || consumerWork >= 48L
                                     override fun workMeter(): WorkMeter = consumerMeter
                                 }
                             } else token

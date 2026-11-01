@@ -2,6 +2,7 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -9,6 +10,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.lp.engine.ExactLpNumber
+import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.authoritativeModel
@@ -54,6 +57,10 @@ class LpPrimalTemplatesTest {
         LpScopedSolver(LpExactState(exact)).use { first ->
             LpScopedSolver(LpExactState(exact)).use { second ->
                 assertEquals(BigFraction.ofLong(6), assertNotNull(first.solve()).lowerBound)
+                assertTrue(first.push())
+                assertTrue(first.assertBound(relaxation.intColOf[0], false,
+                    ExactLpSide(ExactLpNumber.of(8L)), 1L))
+                assertEquals(BigFraction.ofLong(10), assertNotNull(first.solve()).lowerBound)
                 assertEquals(BigFraction.ofLong(6), assertNotNull(second.solve()).lowerBound)
                 assertNotSame(first.state, second.state)
             }
@@ -228,6 +235,23 @@ class LpPrimalTemplatesTest {
         assertNull(selection.borrowLpPrimal(objective, RootDomains(problem), Cancellation.Never))
         assertEquals(0, published)
         assertTrue(assembly > 0L)
+        assertTrue(selection.lpPreparationReuseUnits <= LpEmissionTemplates.MAX_UNITS)
+    }
+
+    @Test
+    fun `an unsupported source row should keep complete model reuse unavailable`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, arrayOf<Factor>(
+            AllDifferent(intArrayOf(0, 1, 2)),
+        ))
+        val selection = FactorProjectionProviders.Default.prepare(problem)
+        var reused = 0
+        repeat(8) {
+            buildPrimalSource(problem, objective, RootDomains(problem), Cancellation.Never, {}, selection,
+                onDefinition = { if (it == "REUSED") reused++ })
+        }
+
+        assertNull(selection.borrowLpPrimal(objective, RootDomains(problem), Cancellation.Never))
+        assertEquals(0, reused)
         assertTrue(selection.lpPreparationReuseUnits <= LpEmissionTemplates.MAX_UNITS)
     }
 

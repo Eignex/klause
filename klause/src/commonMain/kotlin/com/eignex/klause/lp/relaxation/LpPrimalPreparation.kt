@@ -24,12 +24,13 @@ internal fun buildPrimalSource(
     selection?.requireSource(problem)
     val reuse = reuseCompleteTemplates && reuseSourceTemplates && problem.numRealVars == 0 &&
         selection?.builtInRelaxation == true
-    if (cancellation()) throw LpAssemblyCancelled()
+    cancellation.checkLpAssembly()
     if (reuse) {
         val borrowed = selection?.borrowLpPrimal(objective, domains, cancellation)
-        if (cancellation()) throw LpAssemblyCancelled()
+        cancellation.checkLpAssembly()
         if (borrowed != null) {
             onDefinition("REUSED")
+            cancellation.checkLpAssembly()
             return borrowed
         }
     }
@@ -44,6 +45,6 @@ internal fun buildPrimalSource(
     if (reuse && selection?.rememberLpPrimal(relaxation, objective, domains, paidUnits, cancellation) == true) {
         onDefinition("PUBLISHED")
     }
-    if (cancellation()) throw LpAssemblyCancelled()
+    cancellation.checkLpAssembly()
     return relaxation
 }

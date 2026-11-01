@@ -196,12 +196,14 @@ class PreparedFactorProjections internal constructor(
             (previous is LpPreparationTemplates && previous.objectiveIndependent)
         ) return false
         token.charge(1L)
-        if (token() || LpPrimalTemplates.minimumUnits(problem, relaxation) > LpEmissionTemplates.MAX_UNITS ||
+        val completed = paidUnits.coerceIn(0L, LpEmissionTemplates.MAX_UNITS)
+        if (token() || completed == 0L ||
+            LpPrimalTemplates.minimumUnits(problem, relaxation) > LpEmissionTemplates.MAX_UNITS ||
             problem.numRealVars != 0 || relaxation.model.n == 0 || relaxation.model.doubleView != null ||
             relaxation.model.exactState != null || !builtInRelaxation
         ) return false
         val demand = (previous as? LpPrimalDemand)?.takeIf { it.scope.matches(lpTemplateNamespace, problem) }
-        val earned = (previous as? LpPrimalTemplates)?.replacementWork(paidUnits, token)
+        val earned = (previous as? LpPrimalTemplates)?.replacementWork(completed, token)
             ?: demand?.paidUnits ?: 0L
         if (token()) return false
         if (earned >= LpPrimalTemplates.captureWork(problem, relaxation)) {
@@ -209,7 +211,7 @@ class PreparedFactorProjections internal constructor(
                 earned)
             if (prepared == null) {
                 if (demand != null && !token()) cache.compareAndSet(previous, LpPrimalDemand(demand.scope,
-                    (demand.paidUnits + paidUnits).coerceAtMost(LpEmissionTemplates.MAX_UNITS)))
+                    (demand.paidUnits + completed).coerceAtMost(LpEmissionTemplates.MAX_UNITS)))
                 return false
             }
             return !token() && cache.compareAndSet(previous, prepared)
@@ -217,7 +219,7 @@ class PreparedFactorProjections internal constructor(
         if (previous is LpPrimalTemplates) return false
         val scope = demand?.scope ?: LpEmissionScope(lpTemplateNamespace, problem)
         val next = LpPrimalDemand(scope,
-            ((demand?.paidUnits ?: 0L) + paidUnits).coerceAtMost(LpEmissionTemplates.MAX_UNITS))
+            ((demand?.paidUnits ?: 0L) + completed).coerceAtMost(LpEmissionTemplates.MAX_UNITS))
         if (!token()) cache.compareAndSet(previous, next)
         return false
     }

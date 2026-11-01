@@ -54,7 +54,8 @@ internal class LpPrimalTemplates private constructor(
         token.charge(1L)
         if (token()) return 0L
         val previous = replacementDemand.load()
-        val next = PaidUnits((previous.units + completed).coerceAtMost(LpEmissionTemplates.MAX_UNITS))
+        val earned = previous.units + completed.coerceIn(0L, LpEmissionTemplates.MAX_UNITS)
+        val next = PaidUnits(earned.coerceAtMost(LpEmissionTemplates.MAX_UNITS))
         return if (!token() && replacementDemand.compareAndSet(previous, next)) previous.units else 0L
     }
 
