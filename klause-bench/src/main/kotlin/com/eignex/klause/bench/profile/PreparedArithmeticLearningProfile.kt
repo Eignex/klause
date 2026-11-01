@@ -261,6 +261,8 @@ internal object PreparedArithmeticLearningProfile {
 
         val accepting: Boolean get() = trace.javaClass.getMethod("getAccepting").invoke(trace) as Boolean
 
+        fun owns(session: PropagationSession): Boolean = native === session
+
         fun lifecycle(): JsonObject = buildJsonObject {
             val counts = native.javaClass.declaredMethods.single {
                 it.name.startsWith("learnedLifecycle") && it.parameterCount == 0
@@ -308,6 +310,10 @@ internal object PreparedArithmeticLearningProfile {
                     })
                 }
             })
+        }
+
+        fun boundary(kind: String, vararg data: Long) {
+            trace.javaClass.getMethod("boundary", String::class.java, LongArray::class.java).invoke(trace, kind, data)
         }
 
         fun record(kind: String, vararg data: Long) {

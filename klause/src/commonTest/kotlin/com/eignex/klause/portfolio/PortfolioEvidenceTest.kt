@@ -30,6 +30,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 class PortfolioEvidenceTest {
 
@@ -51,6 +52,35 @@ class PortfolioEvidenceTest {
         val optimum = assertIs<MinimizeResult.Optimal>(result)
         assertEquals(point, optimum.sample)
         assertEquals(7.0, optimum.objective)
+    }
+
+    @Test
+    fun `completion observation should retain native exhaustion before portfolio normalization`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 0)), emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = 7)
+        val identity = ModelIdentity.of(source, objective)
+        val invocation = EngineInvocation(source.prepareExecutionPlan(objective), identity, objective)
+        val point = Sample(booleanArrayOf(), longArrayOf(0))
+        val worker = PortfolioWorker.ofMinimize("exhausted", 0) { _, _, _, _ ->
+            sequenceOf(MinimizeResult.BestFound(point, 7.0, TerminationReason.SearchExhausted))
+        }.bindSource(SourceWorkerBinding(invocation, sharingInvocation = invocation)).also {
+            it.controlsObjectiveCutoff = true
+        }
+        var observation: OptimizationCompletionObservation? = null
+
+        Portfolio.thompson(listOf(worker)).use { portfolio ->
+            portfolio.completionObserver = { observation = it }
+            portfolio.minimize()
+        }
+
+        val captured = checkNotNull(observation)
+        assertEquals(TerminationReason.SearchExhausted,
+            assertIs<MinimizeResult.BestFound>(captured.nativeResult).reason)
+        val completion = checkNotNull(captured.completion)
+        assertIs<MinimizeResult.Optimal>(completion.result)
+        assertEquals(invocation, completion.invocation)
+        assertNull(captured.cutoff)
+        assertIs<Verification.Accepted<*, *>>(captured.verification)
     }
 
     @Test

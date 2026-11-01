@@ -182,6 +182,8 @@ class Portfolio(
         }
     internal var includeRestartingProof: Boolean = false
 
+    internal var completionObserver: ((OptimizationCompletionObservation) -> Unit)? = null
+
     internal var evidenceVerification: PortfolioEvidence? = workers.firstNotNullOfOrNull { it.evidenceModel }?.let {
         val verifier = PortfolioEvidence(it, CandidateVerifier.trusting())
         val binding = workers.firstNotNullOfOrNull { worker -> worker.sharingInvocation }
@@ -609,6 +611,7 @@ class Portfolio(
             if (failure is UnsoundnessException) claim.fault = failure.message
             (terminal as? MinimizeResult.WithSample)?.let { accept(claim, it) }
             check(claim)
+            val nativeTerminal = terminal
             val unrestrictedExhaustion = observedCutoffs[arm] == null &&
                 worker.family == ArmFamily.Backtrack && !worker.improvementOnly && !worker.auxiliaryProof &&
                 worker.permitsSourceProofs && worker.controlsObjectiveCutoff
@@ -638,11 +641,15 @@ class Portfolio(
                 val completed = terminal?.let { actual -> worker.evidenceInvocation?.let { invocation ->
                     CompletedEngineResult.Minimize(invocation, actual, executionCutoff = observedCutoffs[arm])
                 } }
-                claim.verified(evidenceVerification?.let { verifier ->
+                val verification = evidenceVerification?.let { verifier ->
                     if (completed != null) verifier.proof(worker, proofKind, completed)
                     else Verification.Indeterminate("worker completion has no runtime invocation")
-                })
+                }
+                claim.verified(verification)
                 claim.checkingNanos += checkingStarted.elapsedNow().inWholeNanoseconds
+                completionObserver?.invoke(OptimizationCompletionObservation(
+                    arm, worker, nativeTerminal, completed, observedCutoffs[arm], verification,
+                ))
             }
             claim.trialTime = evaluationStarted.elapsedNow()
             run.locked {
@@ -1593,6 +1600,15 @@ class Portfolio(
         )
     }
 }
+
+internal class OptimizationCompletionObservation(
+    val arm: Int,
+    val worker: PortfolioWorker,
+    val nativeResult: MinimizeResult?,
+    val completion: CompletedEngineResult.Minimize?,
+    val cutoff: Double?,
+    val verification: Verification<Unit, Unit>?,
+)
 
 // The share of the time a run has left that its arms' next segments may take together; see `Portfolio.segmentToken`.
 private const val REMAINING_SHARE = 0.5

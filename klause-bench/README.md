@@ -1527,3 +1527,14 @@ identities, reconstruction and exact costs match, and samples with every prepare
 coordinate pinned. It declines unsupported transports. `$OUT/point-replay.jsonl`
 records native results; it supplies no independent check. The point probe has a
 five-second/five-million-work cap and exits before search unless `point-only=false`.
+
+`portfolio=true` selects an elapsed mixed-portfolio replay with actual pooled
+incumbents; omit `cutoff` in this mode. It uses the prepared source-bound executor
+and emits worker composition, native and normalized completions, observed cutoffs,
+invocation matching, reconstructed points and optional learning boundaries. Check
+composition before relating a diagnostic trajectory to an ordinary run. Capture
+retains at most eight native sessions, each with 128 detailed events/2,048 words
+and the latest 64 boundaries of at most 16 words. Output is at most four MiB with
+128 KiB records and 128 points; omitted sessions and records are counted. Cutoff
+boundary payloads use `Double` bits. These native observations supply no independent
+proof check or timing comparison.
