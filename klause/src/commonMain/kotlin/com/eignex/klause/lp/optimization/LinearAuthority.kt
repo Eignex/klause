@@ -155,8 +155,8 @@ internal class LinearAuthority(
         }
         var pending = pointRound?.takeIf {
             it.query.matches(source, cuts = true, cutMask = it.query.cutMask,
-                checkUnselectedCuts = checkUnselectedCuts(it.query.cutMask),
-                retainMaskedCuts = retainMaskedCuts(it.query.cutMask))
+                checkUnselectedCuts = it.query.checkUnselectedCuts,
+                retainMaskedCuts = it.query.retainMaskedCuts)
         }
         if (pending == null) {
             pointRound = null

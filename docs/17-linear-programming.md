@@ -1230,9 +1230,9 @@ entries with 65,536 modeled scoring work and 1 MiB modeled allocation, within th
 containing cumulative source allowance. A template retains at most 64 selected IDs.
 Changing its source layout clears those IDs; every query rechecks guards, pins and
 derivations. Unselected cut rows are omitted from masked queries unless they belong
-to an adopted current family, whose inactive definitions retain its numerical
-layout. Changed row layouts invalidate numerical cursors through the ordinary
-compatibility checks. Changed activity invalidates completed guidance before
+to an adopted current family or a fully installed selected family, whose inactive
+definitions retain its numerical layout. Changed row layouts invalidate numerical
+cursors through the ordinary compatibility checks. Changed activity invalidates completed guidance before
 reusing the owner and its basis.
 Completed base bounds survive a paused or declined separation round. Checked base
 incumbents and terminals bypass extra separation. The ordinary default activates

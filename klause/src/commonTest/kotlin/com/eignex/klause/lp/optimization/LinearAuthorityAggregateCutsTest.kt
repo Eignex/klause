@@ -145,6 +145,65 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `retiring candidates should retain their base bound across repeated pauses`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf(
+            "left" to SourcePremise(SourceInequality(left.coefficients + (residual to BigFraction.ONE), left.rhs)),
+            "right" to SourcePremise(right),
+            "lower" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.ONE), BigFraction.ONE)),
+        )
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, real, residual) + triangle, premises,
+            (triangle + x + y).associateWith { BigFraction.ONE })
+        val child = source.atScope(source.scope.copy(condition = SourceCondition(
+            upper = mapOf(x to BigFraction.ZERO, y to BigFraction.ZERO))))
+        val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(4_000_000L) }
+        var pause = false
+        var blocked = false
+        val budget = SourceLpBudget(funding = funding, onWork = {
+            if (pause && !blocked && it.operations > 0L) {
+                blocked = true
+                funding.grant(0L)
+            }
+        })
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithPointCuts(source, Cancellation.Never)
+            repeat(3) { authority.advanceWithPointCuts(child, Cancellation.Never) }
+            val operations = budget.operations
+            pause = true
+
+            repeat(2) {
+                val paused = authority.advanceWithPointCuts(child, Cancellation.Never)
+
+                assertTrue(paused.paused)
+                assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
+                assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+                    assertIs<SourceClaim.Bound>(assertNotNull(paused.bound).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(child.withLinearAuthority()).verify(assertNotNull(paused.bound)))
+            }
+
+            funding.grant(4_000_000L)
+            val completed = authority.advanceWithPointCuts(child, Cancellation.Never)
+
+            assertFalse(completed.paused)
+            assertEquals(operations + 1, budget.operations)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+                assertIs<SourceClaim.Bound>(assertNotNull(completed.bound).claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(child.withLinearAuthority()).verify(assertNotNull(completed.bound)))
+        }
+    }
+
+    @Test
     fun `an ordinary recipe should replace a retained point selected layout`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
