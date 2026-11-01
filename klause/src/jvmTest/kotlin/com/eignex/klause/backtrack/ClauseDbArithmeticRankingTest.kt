@@ -9,6 +9,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.IntegerConflictRow
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.factorAt
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
