@@ -18,9 +18,34 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class PortfolioPlanTest {
+    @Test
+    fun `root maintenance policy should resolve without editing backtrack recipes`() {
+        for (requested in listOf(null, false, true)) {
+            val settings = requested?.let { listOf("root-maintenance=$it") }.orEmpty()
+
+            val plan = FinitePipeline.planPortfolio(PortfolioPlanRequest(
+                engine = FiniteEngine.BACKTRACK,
+                optimize = false,
+                cores = 1,
+                executionOptions = ExecutionOptions.parse(settings),
+                randomSeed = 17L,
+                defaultArms = 6,
+                lpCeiling = LpConfig.AGGRESSIVE,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+                nodeBudget = null,
+                annotationArm = null,
+            ))
+            val scenario = assertIs<PortfolioPlan.Execute>(plan).scenario
+
+            assertEquals(requested != false, scenario.rootMaintenance)
+            assertEquals(null, scenario.btEdit)
+        }
+    }
+
     @Test
     fun `diagnostic work should require a single lane`() {
         val params = EngineParams(listOf("portfolio-work=1000"))
