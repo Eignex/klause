@@ -174,7 +174,7 @@ private fun PropagationState.learnedSharingMemory(
         if (used) consumed++
     }
     val columns = listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
-        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach)
+        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)
     val protectedRows = protected.size > 0
     var metadata = 0L
     for (column in columns) {
@@ -248,6 +248,7 @@ private fun PropagationState.learnedSharingMemory(
         "sessionEventIndexReferenceCapacity" to (overflow?.referenceCapacity?.toLong() ?: 0L),
         "sessionEventLiveReferenceSlots" to events.dirtyVars.size.toLong() + events.dirtyMark.size,
         "learnedObjects" to learned.size.toLong(),
+        "learnedRetiredSlots" to learned.retiredCount.toLong(),
         "learnedPayloadBytes" to payload,
         "learnedMetadataCapacityBytes" to metadata,
         "learnedReferenceSlots" to learned.size.toLong() * 2L + (learned.integerRows?.size ?: 0),

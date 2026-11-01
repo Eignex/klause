@@ -284,6 +284,16 @@ capacity and report `learnedRetiredSlots` separately from active clause count.
 Window calls, charged work, visits and permanent, active and retained counts remain
 available in the released session's lifecycle totals.
 
+General CP uses the same handle-preserving clause retirement above a permanent
+clause floor. Its funded protection snapshot covers current Boolean and integer
+reasons, saved integer bounds and pending first assertions. Retired factor payloads
+remain readable for explanations while propagation queues, binary minimization and
+active-clause readers skip those rows. The candidate cursor survives appended
+clauses and is rebuilt when full compaction renumbers the store. Ownership includes
+the candidate index and every retained payload; logical retirement reports no
+physical release. Lifecycle totals identify the packed-native or general backend
+and distinguish boundary, floor and preparation deferrals.
+
 ## Pseudo-Boolean learning
 
 `pbLearning` auto-enables cutting-plane analysis for pure-Boolean models. Explicit
@@ -410,11 +420,12 @@ poll cancellation; unfinished preparation publishes no tier changes or sweep eve
 Insufficient work or scratch safely defers the cap sweep. Completed selection keeps
 the same LBD priorities and tier lifetimes; a sweep event requires actual retirement.
 
-If complete candidate preparation cannot be funded, the native permanent-floor
+If complete candidate preparation cannot be funded, the permanent-clause-floor
 case uses the bounded handle-preserving window. Permanent ownership already
 exhausts the cap, so every eligible local row is excess and no LBD ranking is needed.
 Mid rows survive their demotion window; each completed window clears survivor reuse
-flags. Other stores and caps retain the complete selection and remap preflight.
+flags. Other constraint kinds, shared stores and caps retain the complete selection
+and remap preflight.
 
 Shared learning also accepts an optional modeled-byte soft limit checked at
 propagation boundaries independently of restarts. Units, glue clauses, live reason

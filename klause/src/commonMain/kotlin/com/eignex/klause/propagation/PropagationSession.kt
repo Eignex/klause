@@ -1052,9 +1052,9 @@ class PropagationSession private constructor(
     }
 
     internal val activeLearnedClauseCount: Int
-        get() = retainedState?.nativeEngine?.activeCount ?: learnedClauseCount
+        get() = retainedState?.let { it.nativeEngine?.activeCount ?: it.learned.activeCount } ?: 0
 
-    internal fun maintainNativeCapWindow(
+    internal fun maintainCapWindow(
         cap: Int,
         maxWork: Long,
         maxScratchBytes: Long,
@@ -1065,7 +1065,8 @@ class PropagationSession private constructor(
             inprocessingRootPending
         ) return 0
         val retired = state.nativeEngine?.maintainCapWindow(cap, maxWork, maxScratchBytes,
-            { cancelRequested || cancelled() }, keep) ?: return 0
+            { cancelRequested || cancelled() }, keep)
+            ?: state.maintainGeneralCapWindow(cap, maxWork, maxScratchBytes, { cancelRequested || cancelled() }, keep)
         if (retired > 0) learnedClauseRevision++
         return retired
     }
@@ -1183,7 +1184,7 @@ class PropagationSession private constructor(
     }
 
     internal fun learnedLifecycle(): Map<String, Long> = retainedState?.let {
-        it.learned.lifecycle.snapshot() + (it.nativeEngine?.capWindowStatistics() ?: emptyMap()) +
+        it.learned.lifecycle.snapshot() + (it.nativeEngine?.capWindowStatistics() ?: it.learned.capWindowStatistics()) +
             (it.factorAttribution?.snapshot() ?: emptyMap())
     } ?: retiredLifecycle
 
@@ -1204,7 +1205,7 @@ class PropagationSession private constructor(
     }
 
     /** Retained learned-constraint slot count, including PB constraints and integer rows.
-     * Native retired slots remain addressable until a funded compaction remaps their generation. */
+     * Retired slots remain addressable until a funded compaction remaps their generation. */
     val learnedClauseCount: Int get() = retainedState?.let { it.nativeEngine?.count ?: it.learnedClauses.size } ?: 0
 
     /** LBD of the learned clause at [learnedIndex]. */
@@ -1232,10 +1233,10 @@ class PropagationSession private constructor(
         state.nativeEngine?.literalsOf(learnedIndex) ?: learnedClauseAt(learnedIndex).literals
 
     /** True iff [learnedIndex] names an active clause. Clause-only passes skip other constraint
-     * kinds and retired native slots. */
+     * kinds and retired slots. */
     internal fun isLearnedClause(learnedIndex: Int): Boolean =
         state.nativeEngine?.let { !it.retiredOf(learnedIndex) }
-            ?: (state.learnedClauses[learnedIndex] is ClausePropagator)
+            ?: (!state.learned.retiredOf(learnedIndex) && state.learnedClauses[learnedIndex] is ClausePropagator)
 
     /** Three-tier DB tier of learned clause [learnedIndex]. */
     internal fun learnedClauseTier(learnedIndex: Int): ClauseTier = state.learnedClauseTier(learnedIndex)

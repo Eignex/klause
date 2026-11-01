@@ -23,6 +23,18 @@ internal class LearnedClauseDb(
     val lifecycle = LearnedLifecycle()
     val stages = IntArrayList()
     val pendingAttach = IntArrayList()
+    internal val capCandidates = IntArrayList(1)
+    internal var capRead = 0
+    internal var capWrite = 0
+    internal var permanentClauseCount = 0
+    internal var retiredCount = 0
+    internal var capCalls = 0L
+    internal var capWork = 0L
+    internal var capVisits = 0L
+    internal var capBoundaryDefers = 0L
+    internal var capFloorDefers = 0L
+    internal var capPreparationDefers = 0L
+    private var capAllocationCharged = false
     val units = IntArrayList()
     var unitsPending = false
 
@@ -64,6 +76,54 @@ internal class LearnedClauseDb(
 
     /** Number of learned clauses. */
     val size: Int get() = store.size
+
+    internal val activeCount: Int get() = size - retiredCount
+
+    internal fun retiredOf(index: Int): Boolean = stages[index] and RETIRED != 0
+
+    internal fun trackCapClause(index: Int, isPermanent: Boolean): Long {
+        var work = 1L
+        if (!capAllocationCharged) {
+            work++
+            capAllocationCharged = true
+        }
+        if (isPermanent) permanentClauseCount++ else {
+            if (capCandidates.size == capCandidates.backingData.size) work += capCandidates.size * 3L
+            capCandidates.add(index)
+        }
+        return work
+    }
+
+    internal fun resetCapIndex() {
+        permanentClauseCount = 0
+        retiredCount = 0
+        capCandidates.clear()
+        capRead = 0
+        capWrite = 0
+    }
+
+    internal fun retire(index: Int) {
+        check(permanent[index] == 0 && !retiredOf(index))
+        stages[index] = stages[index] or RETIRED
+        retiredCount++
+        lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
+    }
+
+    internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) emptyMap() else mapOf(
+        "learnedCapGeneralBackend" to 1L,
+        "learnedCapCalls" to capCalls,
+        "learnedCapWork" to capWork,
+        "learnedCapVisits" to capVisits,
+        "learnedCapBoundaryDefers" to capBoundaryDefers,
+        "learnedCapFloorDefers" to capFloorDefers,
+        "learnedCapPreparationDefers" to capPreparationDefers,
+        "learnedCapPermanentClauses" to permanentClauseCount.toLong(),
+        "learnedCapRetainedSlots" to size.toLong(),
+        "learnedCapRetiredSlots" to retiredCount.toLong(),
+        "learnedCapActiveClauses" to activeCount.toLong(),
+    )
+
+    private companion object { const val RETIRED = 8 }
 }
 
 /** The origin of a learned clause the session derived itself rather than imported. */

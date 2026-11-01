@@ -27,6 +27,8 @@ internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int
     }
     val list = watches.byLit[lit]
     for (i in 0 until list.size) {
+        work++
+        if (retiredLearnedFactor(list[i])) continue
         val f = factorAt(list[i])
         if (f is ClausePropagator && f.literals.size == 2) {
             val a = f.literals[0]
@@ -79,6 +81,7 @@ internal fun PropagationState.addLearnedClause(
     if (clause.literals.size == 1) learned.units.add(newFid)
     learned.lbds.add(lbd)
     learned.permanent.add(if (permanent) 1 else 0)
+    work += learned.trackCapClause(learned.size - 1, permanent)
     learned.tier.add(ClauseTier.UNSET.ordinal)
     learned.usedFlags.add(0)
     learned.origins.add(origin)
@@ -218,7 +221,7 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
         return
     }
     val idx = fid - problem.numFactors
-    if (idx !in 0 until learned.usedFlags.size) return
+    if (idx !in 0 until learned.usedFlags.size || learned.retiredOf(idx)) return
     factorAttribution?.used(learned.store[idx])
     noteLearnedStage(idx, LearnedStage.Consumed, 2)
     if (learned.usedFlags[idx] == 0) learned.importUses.note(learned.origins[idx])
@@ -267,12 +270,15 @@ internal fun PropagationState.forgetLearnedClauses(
     arithmeticLearningTrace?.remap(baseFactorCount, remap)
     for (i in 0 until n) if (remap[i] < 0) {
         work++
-        learned.lifecycle.note(learnedKind(i), LearnedStage.Retired)
-        factorAttribution?.retire(learned.store[i])
+        if (!learned.retiredOf(i)) {
+            learned.lifecycle.note(learnedKind(i), LearnedStage.Retired)
+            factorAttribution?.retire(learned.store[i])
+        }
     }
 
     learned.units.clear()
     learned.integerRows?.clear()
+    learned.resetCapIndex()
     var w = 0
     for (i in 0 until n) {
         work++
@@ -287,6 +293,10 @@ internal fun PropagationState.forgetLearnedClauses(
             learned.tier[w] = learned.tier[i]
             learned.usedFlags[w] = learned.usedFlags[i]
             learned.origins[w] = learned.origins[i]
+            if (learned.retiredOf(w)) learned.retiredCount++
+            else if (propagator is ClausePropagator) {
+                work += learned.trackCapClause(w, learned.permanent[w] == 1)
+            }
             w++
         }
     }
@@ -406,7 +416,7 @@ internal fun PropagationState.forgetLearnedClauses(
         undo.maxReason[i] = remappedReason(undo.maxReason[i], remap, refBase)
     }
     for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
-        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach)) column.trim()
+        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) column.trim()
     return true
 }
 
@@ -481,24 +491,31 @@ private fun PropagationState.noteLearnedStage(index: Int, stage: LearnedStage, b
 internal fun PropagationState.referencedLearned(count: Int): BooleanArray {
     work += count
     val retained = BooleanArray(count)
+    collectLearnedReferences(retained) { work++ }
+    return retained
+}
+
+internal fun PropagationState.collectLearnedReferences(retained: BooleanArray, visit: () -> Unit) {
     fun protect(fid: Int) {
-        work++
+        visit()
         val index = fid - baseFactorCount
         if (index in retained.indices) retained[index] = true
     }
     boolReason.forEach(::protect)
     intMinReason.forEach(::protect)
     intMaxReason.forEach(::protect)
-    for (i in 0 until undo.size) if (undo.tag[i] == 1) {
-        work++
-        protect(undo.minReason[i])
-        protect(undo.maxReason[i])
+    for (i in 0 until undo.size) {
+        visit()
+        if (undo.tag[i] == 1) {
+            protect(undo.minReason[i])
+            protect(undo.maxReason[i])
+        }
     }
     for (i in 0 until learned.pendingAttach.size) {
+        visit()
         val fid = learned.pendingAttach[i]
         if (learned.stages[fid - baseFactorCount] and 2 == 0) protect(fid)
     }
-    return retained
 }
 
 private fun remappedReason(fid: Int, remap: IntArray, base: Int): Int =

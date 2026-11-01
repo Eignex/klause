@@ -325,7 +325,7 @@ internal class NativeSatState(private val state: PropagationState) {
         val protectedRows = protected.size > 0
         val columns = listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier,
             learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
-            capCandidates)
+            capCandidates, state.learned.capCandidates)
         var metadata = 0L
         for (column in columns) {
             sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
@@ -441,6 +441,7 @@ internal class NativeSatState(private val state: PropagationState) {
     }
 
     internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) emptyMap() else mapOf(
+        "learnedCapNativeBackend" to 1L,
         "learnedCapCalls" to capCalls,
         "learnedCapWork" to capWork,
         "learnedCapVisits" to capVisits,

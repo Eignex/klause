@@ -29,7 +29,7 @@ class NativeSatStateTest {
         session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
 
-        session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+        session.maintainCapWindow(1, 40L, 64L, { false }) { false }
         session.pinBool(0, false)
 
         assertNull(session.boolValue(1))
@@ -43,7 +43,7 @@ class NativeSatStateTest {
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
         session.addLearnedClause(Clause(intArrayOf(Lit.make(0, false))), 1, permanent = true)
 
-        val retired = session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+        val retired = session.maintainCapWindow(1, 40L, 64L, { false }) { false }
 
         assertEquals(0, retired)
         assertTrue(session.isLearnedClause(0))
@@ -59,7 +59,7 @@ class NativeSatStateTest {
 
         repeat(4) { attempt ->
             val before = session.work
-            retired += session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+            retired += session.maintainCapWindow(1, 40L, 64L, { false }) { false }
             assertTrue(session.work - before <= 40L)
             if (attempt == 0) session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
         }
@@ -75,7 +75,7 @@ class NativeSatStateTest {
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
         val before = session.work
 
-        val retired = session.maintainNativeCapWindow(1, 40L, 64L, { session.work - before >= 40L }) {
+        val retired = session.maintainCapWindow(1, 40L, 64L, { session.work - before >= 40L }) {
             error("cancelled policy callback")
         }
 
@@ -91,7 +91,7 @@ class NativeSatStateTest {
             session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
             session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
 
-            session.maintainNativeCapWindow(1, work, scratch, { false }) { false }
+            session.maintainCapWindow(1, work, scratch, { false }) { false }
 
             assertTrue(session.isLearnedClause(1))
             assertEquals(2, session.activeLearnedClauseCount)
@@ -106,7 +106,7 @@ class NativeSatStateTest {
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
         session.popToLevel(0)
 
-        val retired = session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+        val retired = session.maintainCapWindow(1, 40L, 64L, { false }) { false }
 
         assertEquals(0, retired)
         assertTrue(session.isLearnedClause(1))
@@ -117,7 +117,7 @@ class NativeSatStateTest {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
-        session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+        session.maintainCapWindow(1, 40L, 64L, { false }) { false }
 
         val exported = session.exportGlueClauses(9, 2, skipPermanent = true)
 
@@ -129,7 +129,7 @@ class NativeSatStateTest {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
-        session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+        session.maintainCapWindow(1, 40L, 64L, { false }) { false }
         val partners = ArrayList<Int>()
 
         session.explanationState.forEachBinaryPartner(Lit.make(0, true)) { partners.add(it) }
@@ -142,11 +142,11 @@ class NativeSatStateTest {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
-        session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+        session.maintainCapWindow(1, 40L, 64L, { false }) { false }
         session.forgetLearnedClauses { _, _ -> true }
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
 
-        session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+        session.maintainCapWindow(1, 40L, 64L, { false }) { false }
 
         assertEquals(2L, session.learnedLifecycle()["learningClauseRetired"])
         assertEquals(1, session.activeLearnedClauseCount)
@@ -157,14 +157,14 @@ class NativeSatStateTest {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
-        session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+        session.maintainCapWindow(1, 40L, 64L, { false }) { false }
         val before = session.learnedLifecycle()
 
         session.releaseRetainedState()
 
         assertEquals(before, session.learnedLifecycle())
         assertEquals(40L, session.learnedLifecycle()["learnedCapWork"])
-        assertEquals(0, session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false })
+        assertEquals(0, session.maintainCapWindow(1, 40L, 64L, { false }) { false })
     }
 
     @Test
