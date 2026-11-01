@@ -141,6 +141,10 @@ internal class ReconstructionMeter(
         work += units
     }
 
+    fun require(condition: Boolean, reason: ReconstructionDecline) {
+        if (!condition) throw ReconstructionStop(reason)
+    }
+
     fun poll() {
         if (cancellation()) throw ReconstructionStop(ReconstructionDecline.CANCELLED)
     }
@@ -1072,21 +1076,17 @@ private fun admitIntegerBoundInput(model: LpModel, duals: DoubleArray, meter: Re
     meter.poll()
     meter.step()
     val source = model.exactState?.model ?: throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
-    if (duals.size != model.m || !model.finiteExactInput()) {
-        throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
-    }
+    meter.require(duals.size == model.m && model.finiteExactInput(), ReconstructionDecline.INVALID_INPUT)
     val limits = meter.limits
-    if (model.n.toLong() + model.m > limits.maxCoordinates) {
-        throw ReconstructionStop(ReconstructionDecline.DIMENSION)
-    }
-    if (limits.maxBits < 128) throw ReconstructionStop(ReconstructionDecline.BITS)
+    meter.require(model.n.toLong() + model.m <= limits.maxCoordinates, ReconstructionDecline.DIMENSION)
+    meter.require(limits.maxBits >= 128, ReconstructionDecline.BITS)
     var entries = model.m.toLong()
     for (column in 0 until model.n) {
         meter.step()
-        if (!source.column(column).integral) throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
+        meter.require(source.column(column).integral, ReconstructionDecline.INVALID_INPUT)
         entries += source.columnEntries(column).size
     }
-    if (entries > limits.maxEntries) throw ReconstructionStop(ReconstructionDecline.DIMENSION)
+    meter.require(entries <= limits.maxEntries, ReconstructionDecline.DIMENSION)
     val vectorEntries = model.numVars.toLong() + 2L * model.m
     meter.step(vectorEntries)
     val vectorBytes = vectorEntries * Long.SIZE_BYTES
