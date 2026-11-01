@@ -204,6 +204,7 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
 
     fun attach(row: Row, host: ClauseWatchHost): ComponentResult {
         val literals = checkNotNull(row.literals)
+        charge(16L)
         orderWatches(literals, host)
         row.firstWatch = addWatch(row, literals[0])
         if (literals.size == 1) {
@@ -224,14 +225,13 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
         if (row.retired) return ComponentResult.Consistent
         val literals = checkNotNull(row.literals)
         if (literals.size == 1) {
-            val result = when (host.truth(literals[0])) {
+            charge(1L)
+            watchVisits++
+            return when (host.truth(literals[0])) {
                 true -> ComponentResult.Consistent
                 false -> conflict(row, host)
                 null -> imply(row, literals[0], host)
             }
-            charge(1L)
-            watchVisits++
-            return result
         }
         var unit = -1
         for (literal in literals) {

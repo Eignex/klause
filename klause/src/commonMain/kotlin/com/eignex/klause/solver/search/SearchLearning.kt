@@ -11,7 +11,6 @@ internal class SearchLearning(
     private val chargeWork: (Long) -> Unit = {},
 ) {
     val lifecycle = LearnedLifecycle()
-    private var deliveryWork: Long? = null
     private var learned = SharedLearnedStore(::chargeOrdinary)
     private var reasons = LearnedIndex<SharedLearnedStore.Row>()
     private var firstAttach: SharedLearnedStore.Row? = null
@@ -48,22 +47,7 @@ internal class SearchLearning(
     private var memoryDropped = false
 
     private fun chargeOrdinary(work: Long) {
-        val pending = deliveryWork
-        if (pending == null) chargeWork(work)
-        else deliveryWork = if (work > Long.MAX_VALUE - pending) Long.MAX_VALUE else pending + work
-    }
-
-    private fun <T> deliver(action: () -> T): T {
-        if (deliveryWork != null) return action()
-        deliveryWork = 0L
-        try {
-            return action()
-        } finally {
-            val work = checkNotNull(deliveryWork)
-            deliveryWork = null
-            // A completed mandatory consequence must advance before its cooperative work debt stops the slice.
-            chargeWork(work)
-        }
+        chargeWork(work)
     }
     val size: Int get() = learned.size
     val hasReasons: Boolean get() = reasons.size > 0
@@ -142,9 +126,12 @@ internal class SearchLearning(
     internal fun release() {
         ownershipRevision++
         mutationEpoch++
-        releasedWatchVisits += learned.watchVisits
-        learned = SharedLearnedStore(::chargeOrdinary)
-        reasons = LearnedIndex()
+        if (learned.ownedRows > 0 || reasons.size > 0) {
+            chargeOrdinary(96L)
+            releasedWatchVisits += learned.watchVisits
+            learned = SharedLearnedStore(::chargeOrdinary)
+            reasons = LearnedIndex()
+        }
         firstAttach = null
         lastAttach = null
         firstRecheck = null
@@ -155,7 +142,6 @@ internal class SearchLearning(
         unitsPending = false
         capActive = false
         memoryActive = false
-        chargeOrdinary(96L)
     }
 
     private fun protected(row: SharedLearnedStore.Row): Boolean =
@@ -275,14 +261,12 @@ internal class SearchLearning(
     fun propagate(host: ClauseWatchHost, boolTrail: IntArrayList): ComponentResult {
         while (firstAttach != null) {
             val row = checkNotNull(firstAttach)
-            val result = deliver {
-                if (row.stages and 8 == 0) {
-                    chargeOrdinary(16L)
-                    row.stages = row.stages or 8
-                    lifecycle.note(LearnedKind.Clause, LearnedStage.Asserted)
-                }
-                if (row.attached) learned.recheck(row, host) else learned.attach(row, host)
+            if (row.stages and 8 == 0) {
+                chargeOrdinary(16L)
+                row.stages = row.stages or 8
+                lifecycle.note(LearnedKind.Clause, LearnedStage.Asserted)
             }
+            val result = if (row.attached) learned.recheck(row, host) else learned.attach(row, host)
             if (result is ComponentResult.Indeterminate) return result
             chargeOrdinary(16L)
             firstAttach = row.attachNext
@@ -298,7 +282,7 @@ internal class SearchLearning(
         }
         while (firstRecheck != null) {
             val row = checkNotNull(firstRecheck)
-            val result = deliver { learned.recheck(row, host) }
+            val result = learned.recheck(row, host)
             if (result is ComponentResult.Indeterminate) return result
             chargeOrdinary(16L)
             removeRecheck(row)
@@ -306,11 +290,11 @@ internal class SearchLearning(
         }
         if (unitsPending) {
             unitsPending = false
-            val result = deliver { learned.propagateUnits(host) }
+            val result = learned.propagateUnits(host)
             if (result !is ComponentResult.Consistent) { unitsPending = true; return result }
         }
         while (propagatedTrail < boolTrail.size) {
-            val result = deliver { learned.propagate(boolTrail[propagatedTrail++] xor 1, host) }
+            val result = learned.propagate(boolTrail[propagatedTrail++] xor 1, host)
             if (result !is ComponentResult.Consistent) { propagatedTrail--; return result }
         }
         return ComponentResult.Consistent
