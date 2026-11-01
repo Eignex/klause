@@ -13,7 +13,11 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.SharingMemoryObservation
 
 /** Reduce the learned-clause database at a restart without discarding permanent or glue clauses. */
-internal fun forgetIfOverCap(session: PropagationSession, params: BacktrackParams, protectedPublication: Boolean = false) {
+internal fun forgetIfOverCap(
+    session: PropagationSession,
+    params: BacktrackParams,
+    protectedPublication: Boolean = false,
+) {
     if (protectedPublication) return
     val cap = params.maxLearnedClauses ?: return
     val learnedSize = session.learnedClauseCount

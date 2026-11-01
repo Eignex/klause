@@ -1253,8 +1253,8 @@ class PropagationSession private constructor(
     }
 
     internal fun learnedLifecycle(): Map<String, Long> = retainedState?.let {
-        it.learned.lifecycle.snapshot() + (it.factorAttribution?.snapshot() ?: emptyMap()) +
-            (it.propagationSchedule?.snapshot() ?: emptyMap())
+        it.learned.lifecycle.snapshot() + (it.nativeEngine?.capWindowStatistics() ?: emptyMap()) +
+            (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap())
     } ?: retiredLifecycle
 
     internal fun configureAttribution(

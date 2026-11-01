@@ -153,6 +153,21 @@ class NativeSatStateTest {
     }
 
     @Test
+    fun `releasing native cap state should preserve its charged totals`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+        val before = session.learnedLifecycle()
+
+        session.releaseRetainedState()
+
+        assertEquals(before, session.learnedLifecycle())
+        assertEquals(40L, session.learnedLifecycle()["learnedCapWork"])
+        assertEquals(0, session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false })
+    }
+
+    @Test
     fun `a root learned reason should remain in the conflict core after compaction`() {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(0, true, 1, true)), 2)
