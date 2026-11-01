@@ -6,8 +6,8 @@ import com.eignex.klause.util.IntArrayList
 /**
  * Boolean clauses hosted by the shared session rather than by a frontend-specific search loop.
  *
- * The clauses live in the same [WatchedClauseStore] the session uses for what it learns, so a
- * falsified literal wakes only the clauses watching it. CP's watched-clause implementation remains
+ * The clauses live in a [WatchedClauseStore], so a falsified literal wakes only the clauses
+ * watching it. CP's watched-clause implementation remains
  * its specialised finite-domain mechanism; open and hybrid component sets use this one. Its clause is
  * both the propagation and the conflict explanation.
  */

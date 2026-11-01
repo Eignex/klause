@@ -25,7 +25,11 @@ internal class QuadraticIntegerTraversalCursor(
     private var global = lifetime
     private val slice = SliceBudget(work, { 0L }, { 0L })
     private val session = SearchSession(
-        listOf(component), cancellation = Cancellation { global() },
+        listOf(component), cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = global()
+            override fun deadline() = global.deadline()
+            override fun workMeter() = global.workMeter()
+        },
         branchers = listOf(component), atoms = SearchAtomRegistry(boolCount),
     )
     private var run: SearchRun? = null
