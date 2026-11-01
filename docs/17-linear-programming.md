@@ -211,8 +211,9 @@ remain in their ordinary solve phases.
 
 A private feasibility-pump scope can reuse its completed root layout for subsequent
 objectives. Its problem and selected built-in propagation and relaxation mechanisms
-stay fixed; proposal pinning runs in separate sessions. Admission compares bounded
-objective-binding work with the completed layout's construction extent. A cheaper
+stay fixed; proposal pinning runs in separate sessions. Admission accepts the
+audited linear and Boolean source cohort, charging its factor inspection. It compares bounded
+objective-binding and admission work with the completed layout's construction extent. A cheaper
 binding retains only the current immutable model view, with no predecessor chain or
 shared numerical basis. Nonzero objective coordinates must already exist in that
 layout; new costs and checked affine shifts receive private arrays. Build-specific

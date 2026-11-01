@@ -219,7 +219,7 @@ internal class LpPrimalTemplates private constructor(
                 detached, problem, domains, holes, roots.toTypedArray(), live.toTypedArray()).takeUnless { token() }
         }
 
-        private fun eligible(factor: Factor): Boolean = when (factor) {
+        internal fun eligible(factor: Factor): Boolean = when (factor) {
             is Linear, is ReifiedLinear, is Clause, is Cardinality, is PseudoBoolean -> true
             is ExactLinear -> !factor.strict && factor.activator == LinearRow.ALWAYS &&
                 factor.variables.reals.isEmpty() && factor.constants is IntegerConstants

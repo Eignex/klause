@@ -4,6 +4,7 @@ import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpNodeOverhead
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpEmissionTemplates
+import com.eignex.klause.lp.relaxation.LpPrimalTemplates
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.checkLpAssembly
 import com.eignex.klause.lp.relaxation.withModel
@@ -95,10 +96,21 @@ internal class LpPumpPreparation private constructor(
                 val bindingWork = 1L + engine.problem.numIntVars + engine.problem.numBoolVars +
                     model.n * 3L + model.numVars
                 val construction = (model.n.toLong() + model.m + model.csc.rowIdx.size) * LpNodeOverhead.BUILD
-                val eligible = engine.projections?.builtInRelaxation == true &&
+                var eligible = engine.projections?.builtInRelaxation == true &&
                     engine.projections.nativePropagation && engine.problem.numRealVars == 0 &&
                     model.exactState == null && model.doubleView == null && model.n > 0 &&
-                    bindingWork <= LpEmissionTemplates.MAX_UNITS && bindingWork < construction
+                    bindingWork + engine.problem.numFactors + 1L <= LpEmissionTemplates.MAX_UNITS &&
+                    bindingWork + engine.problem.numFactors + 1L < construction
+                if (eligible) {
+                    for (factor in engine.problem.factors) {
+                        token.charge(1L)
+                        token.checkLpAssembly()
+                        if (!LpPrimalTemplates.eligible(factor)) {
+                            eligible = false
+                            break
+                        }
+                    }
+                }
                 outcome = if (eligible) "ADMITTED" else "DECLINED"
                 val prepared = if (eligible) LpPumpPreparation(engine, root) else null
                 token.checkLpAssembly()

@@ -93,7 +93,7 @@ class LpPrimalHeuristicsTest {
             LpSolveContext(factory), reusePumpPreparation = true, containingWork = {
                 if (armed) {
                     work += it
-                    if (work >= 2L) stopped = true
+                    if (work >= 3L) stopped = true
                 }
             }).use { engine ->
             val sample = engine.lpFeasibilityPump(objective, Cancellation { stopped }) {

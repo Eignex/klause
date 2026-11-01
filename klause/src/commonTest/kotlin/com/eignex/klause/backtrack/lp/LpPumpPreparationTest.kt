@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -121,6 +122,23 @@ class LpPumpPreparationTest {
             stopped = false
             assertEquals(BigFraction.ofLong(6),
                 solveAndCertify(assertNotNull(prepared.rebind(objective, Cancellation.Never)).model).lowerBound)
+        }
+    }
+
+    @Test
+    fun `unsupported source rows should keep private preparation unavailable`() {
+        val view = problem.withFactors(problem.factors + AllDifferent(intArrayOf(0, 1, 2)))
+        val selection = FactorProjectionProviders.Default.prepare(view)
+        val root = CpToLpRelaxation(view, objective, projections = selection, reuseSourceTemplates = false)
+            .build(RootDomains(view))
+        val sink = SolveStatsSink("pump-unsupported-row")
+        LpEngine(view, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+            projections = selection).use { engine ->
+            val prepared = LpPumpPreparation.create(engine, root, Cancellation.Never)
+
+            assertNull(prepared)
+            assertEquals(1L, sink.snapshot().lp.phases.getValue("PRIMAL_LP_PUMP_PREPARATION_ROOT")
+                .outcomes["DECLINED"])
         }
     }
 
