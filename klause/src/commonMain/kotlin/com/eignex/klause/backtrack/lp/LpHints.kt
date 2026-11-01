@@ -34,14 +34,13 @@ internal class LpHints(
     private val charge: (Long) -> Unit = {},
 ) : LpHintSink {
     private val collect = numIntVars.toLong() + numBoolVars <= 8192L
-    private val history = LpDirectionalHistory(observe, charge = charge, useClassPriors = directionalGains)
+    private val history = LpDirectionalHistory(observe, charge = charge)
     private var freshRecord = false
     private var pointModel: LpModel? = null
     private var boundRecorded = false
     private var unavailable = LpHintUnavailable.UNOBSERVED
     private var directionalChoice: VarRef? = null
     private var baselineChoice: VarRef? = null
-    private var priorChoice = false
     private var scopeModel: ExactLpModel? = null
     private var scopeRows: LpScopedRows? = null
     private var scopeVariables = IntArray(0)
@@ -66,7 +65,6 @@ internal class LpHints(
         unavailable = LpHintUnavailable.UNOBSERVED
         directionalChoice = null
         baselineChoice = null
-        priorChoice = false
         if (collect) history.beginNode(depth)
     }
 
@@ -139,7 +137,7 @@ internal class LpHints(
         if (directionalGains && scopeModel != null) {
             observe(if (directionalChoice == variable) "CONSUMED" else "FALLBACK")
             if (directionalChoice == variable) {
-                observe(if (priorChoice) "PRIOR_CONSUMED" else "VARIABLE_CONSUMED")
+                observe("VARIABLE_CONSUMED")
                 val comparison = when (baselineChoice) {
                     null -> "BASELINE_MISSING"
                     variable -> "BASELINE_AGREED"
@@ -150,7 +148,6 @@ internal class LpHints(
         }
         directionalChoice = null
         baselineChoice = null
-        priorChoice = false
         if (collect && scopeModel != null) {
             charge(129L)
             history.branch(variable, if (boundRecorded) value(variable, domain) else Double.NaN)
@@ -176,19 +173,9 @@ internal class LpHints(
         return history.score(variable, value(variable, domain))
     }
 
-    fun selected(variable: VarRef?, baseline: VarRef?, score: Double, baselineDomain: IntDomain? = null): VarRef? {
-        directionalChoice = variable
+    fun selected(variable: VarRef?, baseline: VarRef?, score: Double): VarRef? {
+        directionalChoice = variable.takeIf { score.isFinite() && score > 0.0 }
         baselineChoice = baseline
-        priorChoice = variable != null && history.usesPrior(variable)
-        if (priorChoice && baseline != null && variable != baseline) {
-            charge(1L)
-            val reference = history.referenceScore(baseline, value(baseline, baselineDomain))
-            if (!(score > reference)) {
-                directionalChoice = null
-                priorChoice = false
-                observe("PRIOR_REJECTED")
-            }
-        }
         return directionalChoice
     }
 
@@ -248,7 +235,6 @@ internal class LpHints(
         boundRecorded = false
         directionalChoice = null
         baselineChoice = null
-        priorChoice = false
         unavailable = LpHintUnavailable.UNOBSERVED
     }
 

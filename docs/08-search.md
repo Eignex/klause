@@ -261,23 +261,16 @@ The `lp-default` and `lp-aggressive` optimization recipes enable the finite cons
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
 and branching must be enabled. Two recent samples in each direction permit a
-variable's balanced gain score. A variable with at least one recent sample can fill
-missing confidence from a same-scope prior after two samples in each direction within
-its Boolean or integer coordinate class. Each direction weights its own mean by
-`min(count, 2) / 2` and the prior by the remaining weight. A fully observed direction
-uses only its own mean. Unobserved variables retain reduced-cost/fractionality scoring
-and the configured selector's precedence. Reliable variable history takes precedence
-over its class prior. A partially observed proposal can replace the current LP
-candidate only when its predicted gain exceeds that candidate's history or reliable
-class estimate. Missing reference estimates and ties retain the current candidate. A prior
-used for this comparison does not make an unobserved variable eligible to propose.
-Directional and reference scores use the same objective units; reduced costs remain
-part of the fallback scorer.
+variable's balanced gain score, combining the smaller predicted child gain with
+one sixth of the larger. Each estimate uses only that variable's observed gains;
+missing directions and unreliable history retain reduced-cost/fractionality scoring
+and the configured selector's precedence. Directional scores use the same objective
+units; reduced costs remain part of the fallback scorer.
 An invocation-local readiness check skips directional candidate lookups when no
 history can yield a score; its bookkeeping uses the same LP work allowance.
-Consumed choices distinguish variable history from class priors and record agreement
+Consumed choices record agreement
 with the current LP scorer, a changed variable, or a missing current LP candidate
-separately; a rejected proposal earns no consumption.
+separately.
 Committed observation attempts retain their branch direction. Missing immediate-child
 bound estimates distinguish LP admission gates, suspended or absent results and
 unavailable bounds. Scope changes, depth changes and replaced alternatives report discarded
@@ -288,11 +281,12 @@ Samples share one retained exact base model, active-row identity, objective mapp
 and incumbent cutoff. The cutoff context includes the local incumbent publication
 version and exact external bound, so changes hidden by floating precision invalidate
 history. Exact comparison work spends the existing allowance. Changed rows or cuts,
-layout or objective rescaling invalidate history and pending comparisons. Restart and assumption reseeding clear history.
+layout or objective rescaling invalidate history and pending comparisons. Restart and
+assumption reseeding clear history.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable
-histories, two class priors and 128 ancestor splits are retained; bookkeeping charges
+histories and 128 ancestor splits are retained; bookkeeping charges
 the existing LP work allowance and creates no extra LP query. Invocation close
 releases the scope.
 

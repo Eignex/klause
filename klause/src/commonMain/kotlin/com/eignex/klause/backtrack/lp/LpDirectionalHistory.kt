@@ -8,7 +8,6 @@ internal class LpDirectionalHistory(
     private val observe: (String) -> Unit,
     private val maxAge: Long = 256L,
     private val charge: (Long) -> Unit = {},
-    private val useClassPriors: Boolean = true,
 ) {
     private class Direction {
         var count = 0
@@ -21,8 +20,6 @@ internal class LpDirectionalHistory(
     private class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
 
     private val gains = HashMap<VarRef, Gains>()
-    private var integerPrior: Gains? = null
-    private var booleanPrior: Gains? = null
     private val parents = HashMap<Int, Parent>()
     private var pending: Pending? = null
     private var stamp = 0L
@@ -40,17 +37,13 @@ internal class LpDirectionalHistory(
         }
     }
 
-    val retainedEntries: Int get() = gains.size + parents.size +
-        (if (integerPrior != null) 1 else 0) + (if (booleanPrior != null) 1 else 0)
+    val retainedEntries: Int get() = gains.size + parents.size
 
-    val mayHaveScores: Boolean get() = (reliableStamp >= 0L && stamp - reliableStamp <= maxAge) ||
-        recent(integerPrior) || recent(booleanPrior)
+    val mayHaveScores: Boolean get() = reliableStamp >= 0L && stamp - reliableStamp <= maxAge
 
     fun clear(report: Boolean = true) {
         if (report) pending?.let { observeDirection("LOST_SCOPE", it) }
         gains.clear()
-        integerPrior = null
-        booleanPrior = null
         reliableStamp = -1L
         parents.clear()
         pending = null
@@ -72,14 +65,6 @@ internal class LpDirectionalHistory(
         val history = gains.getOrPut(child.parent.variable, ::Gains)
         update(if (child.up) history.up else history.down, normalized)
         if (recent(history)) reliableStamp = stamp
-        if (useClassPriors) {
-            charge(1L)
-            val prior = when (child.parent.variable) {
-                is VarRef.Bool -> booleanPrior ?: Gains().also { booleanPrior = it }
-                is VarRef.IntVar -> integerPrior ?: Gains().also { integerPrior = it }
-            }
-            update(if (child.up) prior.up else prior.down, normalized, prior = true)
-        }
         observe(if (child.up) "UP" else "DOWN")
     }
 
@@ -142,64 +127,37 @@ internal class LpDirectionalHistory(
         observe("${event}_${if (child.up) "UP" else "DOWN"}")
     }
 
-    fun score(variable: VarRef, value: Double): Double =
-        score(variable, value, initializeUnobserved = false).takeIf { it > 0.0 } ?: Double.NaN
-
-    fun referenceScore(variable: VarRef, value: Double): Double =
-        score(variable, value, initializeUnobserved = true)
-
-    private fun score(variable: VarRef, value: Double, initializeUnobserved: Boolean): Double {
+    fun score(variable: VarRef, value: Double): Double {
         if (!value.isFinite()) return Double.NaN
         if (variable is VarRef.Bool && (value < 0.0 || value > 1.0)) return Double.NaN
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return Double.NaN
-        val local = gains[variable]
-        val prior = if (reliable(local) == null) {
-            if (!useClassPriors) return Double.NaN
-            if (!initializeUnobserved &&
-                (local == null || local.down.count + local.up.count == 0)
-            ) return Double.NaN
-            charge(1L)
-            reliable(if (variable is VarRef.Bool) booleanPrior else integerPrior, prior = true)
-                ?: return Double.NaN
-        } else null
-        val samples = local ?: prior ?: return Double.NaN
-        val down = (if (prior == null) samples.down.mean else estimate(samples.down, prior.down)) * fraction
-        val up = (if (prior == null) samples.up.mean else estimate(samples.up, prior.up)) * (1.0 - fraction)
+        val samples = gains[variable] ?: return Double.NaN
+        expire(samples.down)
+        expire(samples.up)
+        if (!recent(samples)) return Double.NaN
+        val down = samples.down.mean * fraction
+        val up = samples.up.mean * (1.0 - fraction)
         val score = minOf(down, up) + maxOf(down, up) / 6.0
-        return score.takeIf { it.isFinite() && it >= 0.0 } ?: Double.NaN
-    }
-
-    fun usesPrior(variable: VarRef): Boolean = !recent(gains[variable])
-
-    private fun estimate(local: Direction, prior: Direction): Double {
-        val weight = minOf(local.count, RELIABILITY).toDouble() / RELIABILITY
-        return local.mean * weight + prior.mean * (1.0 - weight)
+        return score.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN
     }
 
     private fun recent(history: Gains?): Boolean = history != null &&
         history.down.count >= RELIABILITY && history.up.count >= RELIABILITY &&
         stamp - history.down.stamp <= maxAge && stamp - history.up.stamp <= maxAge
 
-    private fun reliable(history: Gains?, prior: Boolean = false): Gains? {
-        history ?: return null
-        expire(history.down, prior)
-        expire(history.up, prior)
-        return history.takeIf { it.down.count >= RELIABILITY && it.up.count >= RELIABILITY }
-    }
-
-    private fun update(direction: Direction, value: Double, prior: Boolean = false) {
-        expire(direction, prior)
+    private fun update(direction: Direction, value: Double) {
+        expire(direction)
         direction.count = minOf(direction.count + 1, 8)
         direction.mean += (value - direction.mean) / direction.count
         direction.stamp = stamp
     }
 
-    private fun expire(direction: Direction, prior: Boolean = false) {
+    private fun expire(direction: Direction) {
         if (direction.count > 0 && stamp - direction.stamp > maxAge) {
             direction.count = 0
             direction.mean = 0.0
-            observe(if (prior) "PRIOR_EXPIRED" else "EXPIRED")
+            observe("EXPIRED")
         }
     }
 

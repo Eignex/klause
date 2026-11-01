@@ -251,9 +251,9 @@ class LpHintsTest {
     }
 
     @Test
-    fun `baseline calibration applies only to partial directional proposals`() {
+    fun `only reliable variable history can override the baseline`() {
         for ((samples, gain, accepted) in listOf(
-            Triple(1, 1.0, false), Triple(1, 8.0, false), Triple(1, 16.0, true), Triple(2, 1.0, true),
+            Triple(1, 1.0, false), Triple(1, 8.0, false), Triple(1, 16.0, false), Triple(2, 1.0, true),
         )) {
             val builder = LpBuilder()
             repeat(3) { builder.addVar(0, 10, cost = if (it == 2) 100 else 1) }
