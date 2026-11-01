@@ -45,7 +45,7 @@ internal class PrivateRebuildWarmClauses private constructor(
                     translated, scratchBytes, normalizationWork)
             }
             val projection = PrivateRebuildClauseProjection.prepare(rebuild, fixed.size, ::visit) ?: return result()
-            for (index in 0 until session.learnedClauseCount) {
+            for (index in session.learnedClauseCount - 1 downTo 0) {
                 if (!visit(5L)) break
                 if (!session.isLearnedClause(index) || session.learnedClausePermanent(index) ||
                     session.learnedClauseOrigin(index) != OWN_ORIGIN) continue

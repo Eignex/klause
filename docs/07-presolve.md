@@ -286,7 +286,8 @@ A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker
 qualifies. The capture binds its exact source object and owns its clauses; preparation
 rechecks that its columns remain unfixed. The pinned source owns both captured
-premises. Their direct substitution replaces the larger column with a signed
+premises. Global consequences remain valid after their canonical learned entries
+are reclaimed. Their direct substitution replaces the larger column with a signed
 literal over the smaller column, retaining Boolean slots and `CopyLiteral`
 reconstruction. Unaffected rows retain their immutable objects. Changed rows reserve
 rewriting and normalization work before allocating; an incomplete substitution
@@ -325,9 +326,10 @@ Mapping composition separately charges its descriptor copies during preparation,
 including trials that produce no witness. The descriptors add their modeled
 primitive/reference storage before composition and copied-learning admission.
 
-Unused BVE allowance can copy globally learned clauses into the private model.
+Unused pass allowance can copy globally learned clauses into the private model.
 Only this canonical worker's non-permanent clauses over Boolean source columns
-qualify. Global pins remove satisfied clauses and false literals. A clause that
+qualify. Recent eligible learning is considered first within the byte and work grants.
+Global pins remove satisfied clauses and false literals. A clause that
 mentions an eliminated column can follow equivalent-literal substitutions and actual BVE parent descriptors in
 elimination order. A pure pivot's satisfying value lifts every projected model,
 so substituting it preserves learned consequences. Other pivots use one shortest
@@ -348,8 +350,8 @@ Each copied consequence owns its literal buffer and consumes the same
 work and modeled-memory grants; an exhausted local transfer grant retains the
 completed subset. The mapping composes through the enriched model's exact identity.
 These copies preserve consequences without sharing learned-store indexes or
-exchange cursors. Their work and time are preparation subsets; private baking
-and propagation include the added clauses.
+exchange cursors and survive canonical forgetting. Their work and time are
+preparation subsets; private baking and propagation include the added clauses.
 
 The private worker owns fresh watches, learning and search state. Canonical exchange
 cursors and pooled incumbent guidance stay with the retained canonical worker;
