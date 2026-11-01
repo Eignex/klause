@@ -22,7 +22,7 @@ val koblasPins = mapOf(
 )
 
 val skemaPins = listOf("skema", "skema-jvm", "skema-linuxx64", "skema-linuxarm64", "skema-macosarm64")
-    .associateWith { "0.3.1-20261031.204008-43" }
+    .associateWith { "0.4.0" }
 
 if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
     // Lab builds retain complete distributions; each fresh tree discards its incremental indexes.
@@ -35,7 +35,7 @@ if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
     }
 }
 
-// Koblas, Kumulant and Skema use timestamped snapshots; this endpoint is outside the conventions'
+// Koblas and Kumulant use timestamped snapshots; this endpoint is outside the conventions'
 // default repository set.
 allprojects {
     val targetProject = this
