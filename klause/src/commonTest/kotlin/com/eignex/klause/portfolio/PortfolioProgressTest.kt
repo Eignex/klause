@@ -125,11 +125,15 @@ class PortfolioProgressTest {
 
     @Test
     fun `deferred queries should require an accepted global improvement`() {
-        for ((improves, rejected) in listOf(false to false, true to false, true to true)) {
+        for ((improves, rejected, perSlice) in listOf(
+            Triple(false, false, 1), Triple(true, false, 1), Triple(true, true, 1), Triple(true, false, 2),
+        )) {
             var accepted = 0
             var queries = 0
+            val secondProbe = improves && perSlice == 1
             val workers = listOf(
-                trackingWorker("finder", 0, ScriptedSearch({ it == 0 || improves && it == 1 }) { }),
+                trackingWorker("finder", 0,
+                    ScriptedSearch({ it == 0 || (secondProbe && it == 1) }, perSlice = perSlice) { }),
                 trackingWorker("local", 1, ScriptedSearch({ true }, start = 2_000.0) { }),
                 trackingWorker("deferred", 2, ScriptedSearch({ false }) {
                     assertTrue(accepted >= 2)
