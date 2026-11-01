@@ -335,9 +335,10 @@ throughput improvement follows.
 
 This repository owns catalog selection, runtime configuration and build/launch recipes.
 
-`lab/native-lp.json` selects original MPS inputs through the same planner and runs
+`lab/native-lp.json` selects original MPS or SMT-LIB inputs through the same planner and runs
 the Linux x86_64 Native CLI with one processor. Its solve records use the ordinary
-independent source-check protocol. Native executable and ELF dependency hashes
+independent source-check protocol, with the output dialect selected from the source
+format. Native executable and ELF dependency hashes
 identify that runtime; the executing JVM harness has a separate byte identity.
 `heap-mib` and JVM GC flags do not describe the Native process. Comparison controls
 record the Native compiled GC policy, the containing memory grant and the harness's

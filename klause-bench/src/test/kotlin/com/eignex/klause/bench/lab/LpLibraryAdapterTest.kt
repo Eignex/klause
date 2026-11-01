@@ -4,13 +4,24 @@ import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.lab.bench.BenchRequest
 import java.nio.file.Files
 import java.util.Base64
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class LpLibraryAdapterTest {
+    @Test
+    fun `library plans should reject SMT sources before selecting the MPS caller`() {
+        val request = BenchRequest(parameters = mapOf(
+            "suite" to "smtlib-qfnra-core-v1", "name" to "exact/wide-exact-rational", "exact" to "true"))
+
+        assertFailsWith<IllegalArgumentException> { LpLibrarySuite.plan(request) }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `library callers should receive original source bytes from either storage form`(compressed: Boolean) {
