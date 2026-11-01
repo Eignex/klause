@@ -52,14 +52,17 @@ internal class PortfolioInvocationPolicy(
     val reserveBeforeIncumbentOnly: Boolean = false,
     probes: Set<Int> = emptySet(),
     probeWeights: IntArray = intArrayOf(),
+    probeRanks: IntArray = intArrayOf(),
     val onProgress: ((PortfolioEvent) -> Unit)? = null,
 ) {
     private val minimumShares = shares.copyOf()
     private val improvingProbes = probes.toSet()
     private val initialWeights = probeWeights.copyOf()
+    private val initialRanks = probeRanks.copyOf()
     val shares: DoubleArray get() = minimumShares.copyOf()
     val probes: Set<Int> get() = improvingProbes.toSet()
     val probeWeights: IntArray get() = initialWeights.copyOf()
+    val probeRanks: IntArray get() = initialRanks.copyOf()
 }
 
 @Suppress("TooGenericExceptionCaught") // construction failure closes every allocated worker and source service
@@ -122,6 +125,7 @@ internal class PortfolioInvocation(
             it.reserveBeforeIncumbentOnly = selected.reserveBeforeIncumbentOnly
             it.incumbentProbeArms = selected.probes
             it.initialProbeWeights = selected.probeWeights
+            it.initialProbeRanks = selected.probeRanks
             it.improvementProofShare = controls.improvementProofShare
             it.includeRestartingProof = controls.includeRestartingProof
             val automatic = controls.booleanProofTasks == null && controls.parallelism == 1 && objective == null &&

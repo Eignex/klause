@@ -179,6 +179,12 @@ class Portfolio(
             require(value.all { it > 0 })
             field = value.copyOf()
         }
+    internal var initialProbeRanks: IntArray = intArrayOf()
+        set(value) {
+            require(value.isEmpty() || value.size == workers.size)
+            require(value.all { it in workers.indices } && value.distinct().size == value.size)
+            field = value.copyOf()
+        }
     internal var improvementProofShare: Double = 0.5
         set(value) {
             require(value.isFinite() && value in 0.5..1.0)
@@ -1093,7 +1099,8 @@ class Portfolio(
                 it in eligible && !busy[it] && !retired[it]
             }
             val probe = if (dedicated) null else eligible.filter { !probed[it] && !busy[it] && !retired[it] }
-                .minByOrNull { if (workers[it].auxiliaryProof) 1 else 0 }
+                .minWithOrNull(compareBy<Int> { if (workers[it].auxiliaryProof) 1 else 0 }
+                    .thenBy { initialProbeRanks.getOrElse(it) { it } })
             val unprobed = eligible.any { !probed[it] && !retired[it] }
             val revisit = if (dedicated || earlyCore != null || improving || unprobed) {
                 null

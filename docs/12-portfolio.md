@@ -499,6 +499,15 @@ The scheduler assigns bounded slices, revisits pending preparation and reseeds s
 workers under the containing [allowance](06-sessions.md#resource-allowances).
 Scheduling changes work order, never publication authority.
 
+`portfolio-probes=heuristic-second` gives the first initially eligible local-search
+worker the probe after the leading complete worker. It applies to curated single-core
+mixed finite integer optimization with a containing deadline. Deferred, improvement-only
+and auxiliary workers keep their admission rules; early core trials keep their priority.
+The remaining probes retain their order, and all workers retain their identities, seeds,
+probe weights and work limits. Initial attempts and silent complete-worker coverage
+remain required. This option changes the state and time available to later probes;
+it grants no additional source allowance.
+
 The opt-in `portfolio-reward=source` ablation retains ordinary feasibility rewards.
 After a source incumbent exists, only an accepted strict incumbent or terminal
 closure earns reward. Violation reductions, created deductions and delayed sharing
