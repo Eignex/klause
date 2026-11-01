@@ -57,12 +57,11 @@ internal class NativeSatState(private val state: PropagationState) {
     private var capPendingReplayCalls = 0L
 
     // Per-learned-clause policy columns, parallel to the learned index — the native mirror of
-    // LearnedClauseDb's forgetting/three-tier metadata. `tier` holds a [ClauseTier] ordinal;
-    // `used` is a 0/1 reuse flag since the last reduction; `permanent` clauses survive every forget.
+    // LearnedClauseDb's forgetting/three-tier metadata. Recent use shares lifecycle storage;
+    // permanent clauses survive every forget.
     private val learnedLbd = IntArrayList()
     private val learnedPermanent = IntArrayList()
     private val learnedTier = IntArrayList()
-    private val learnedUsed = IntArrayList()
     private val learnedBoolReasons = IntArrayList(1)
     private val learnedAdmissions = LongArrayList(1)
     private val lifecycleStages = IntArrayList()
@@ -298,7 +297,6 @@ internal class NativeSatState(private val state: PropagationState) {
             capCandidates.add(i)
         }
         learnedTier.add(ClauseTier.UNSET.ordinal)
-        learnedUsed.add(0)
         state.work += 1L + when {
             learnedBoolReasons.size == learnedBoolReasons.backingData.size -> learnedBoolReasons.size * 3L + 1L
             learnedBoolReasons.size == 0 -> 1L
@@ -345,7 +343,7 @@ internal class NativeSatState(private val state: PropagationState) {
         capRanking.sharingMemory(sample, protectedRows)
         state.learned.capRanking.sharingMemory(sample, protectedRows)
         val columns = listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedBoolReasons,
-            learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
+            lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
             capCandidates, state.learned.capCandidates, state.learned.boolReasons)
         var metadata = capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes
         for (keys in listOf(learnedAdmissions, state.learned.admissions)) {
@@ -409,9 +407,9 @@ internal class NativeSatState(private val state: PropagationState) {
     fun setTierOf(i: Int, tier: ClauseTier) {
         learnedTier[i] = tier.ordinal
     }
-    fun usedOf(i: Int): Boolean = learnedUsed[i] == 1
+    fun usedOf(i: Int): Boolean = lifecycleStages[i] and RECENT_USED != 0
     fun clearUsed(i: Int) {
-        learnedUsed[i] = 0
+        lifecycleStages[i] = lifecycleStages[i] and RECENT_USED.inv()
     }
 
     internal fun maintainCapWindow(
@@ -460,12 +458,6 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         override fun visited() { capVisits++ }
         override fun prepare(index: Int): Boolean {
-            val price = CAP_ROW_POLICY_WORK + 8L
-            if (budget.remainingWork < CAP_ROW_POLICY_WORK) budget.visit(CAP_ROW_POLICY_WORK)
-            if (price > budget.remainingWork) {
-                budget.visit(16L - CAP_ROW_INSPECTION_WORK)
-                return false
-            }
             protected = capProtected(index, budget, CAP_ROW_POLICY_WORK)
             prepared = index
             return true
@@ -564,8 +556,8 @@ internal class NativeSatState(private val state: PropagationState) {
             state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Consumed)
             state.factorAttribution?.note(1 shl FactorFamily.Clause.ordinal, FactorAttribution.Metric.Consumed)
         }
-        if (learnedUsed[i] == 0) importUses.note(learnedOrigin[i])
-        learnedUsed[i] = 1
+        if (!usedOf(i)) importUses.note(learnedOrigin[i])
+        lifecycleStages[i] = lifecycleStages[i] or RECENT_USED
     }
 
     internal fun prepareReclamation(
@@ -584,7 +576,7 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         budget.atomic(learnedLits.backingData.size.toLong(), learnedLits.backingData.size.toLong() * Int.SIZE_BYTES)
         budget.atomic(learnedAdmissions.allocatedBytes / Long.SIZE_BYTES, learnedAdmissions.allocatedBytes)
-        for (column in listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedUsed, learnedBoolReasons,
+        for (column in listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedBoolReasons,
             lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos, capCandidates)) {
             budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
         }
@@ -660,7 +652,6 @@ internal class NativeSatState(private val state: PropagationState) {
             learnedLbd[target] = learnedLbd[i]
             learnedPermanent[target] = learnedPermanent[i]
             learnedTier[target] = learnedTier[i]
-            learnedUsed[target] = learnedUsed[i]
             state.work++
             learnedBoolReasons[target] = learnedBoolReasons[i]
             state.work++
@@ -682,7 +673,6 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedLbd.truncateTo(survivors)
         learnedPermanent.truncateTo(survivors)
         learnedTier.truncateTo(survivors)
-        learnedUsed.truncateTo(survivors)
         state.work += learnedBoolReasons.size.toLong() - survivors
         learnedBoolReasons.truncateTo(survivors)
         state.work += 2L + survivors.coerceAtLeast(1) * 2L
@@ -699,7 +689,7 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         state.work += learnedBoolReasons.size.toLong() * 2L
         for (column in listOf(learnedLits, learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedBoolReasons,
-            learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
+            lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
             capCandidates)) {
             column.trim()
         }
@@ -900,6 +890,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private companion object {
         const val RETIRED = 4
+        const val RECENT_USED = 8
         // Poll the deadline every 4096 propagated literals.
         const val CANCEL_POLL_MASK = 0xFFF
     }

@@ -72,11 +72,6 @@ internal class LearnedClauseDb(
      *  persistent state rather than a pure function of LBD. */
     val tier = IntArrayList()
 
-    /** 1 iff the learned clause has detected a conflict or forced a unit since the last reduction,
-     *  parallel to [store]. The three-tier reduction policy reads this to promote reused clauses
-     *  and demote idle ones, then clears it for survivors. */
-    val usedFlags = IntArrayList()
-
     /** The origin an imported clause came from, parallel to [store]; [OWN_ORIGIN] for one learned here. */
     val origins = IntArrayList()
 
@@ -89,6 +84,9 @@ internal class LearnedClauseDb(
     internal val activeCount: Int get() = size - retiredCount
 
     internal fun retiredOf(index: Int): Boolean = stages[index] and RETIRED != 0
+    internal fun usedOf(index: Int): Boolean = stages[index] and RECENT_USED != 0
+    internal fun markUsed(index: Int) { stages[index] = stages[index] or RECENT_USED }
+    internal fun clearUsed(index: Int) { stages[index] = stages[index] and RECENT_USED.inv() }
 
     internal fun trackCapObject(index: Int, isPermanent: Boolean, kind: LearnedKind = LearnedKind.Clause): Long {
         var work = 1L
@@ -140,7 +138,10 @@ internal class LearnedClauseDb(
         "learnedCapActiveClauses" to activeCount.toLong(),
     )
 
-    private companion object { const val RETIRED = 8 }
+    private companion object {
+        const val RETIRED = 8
+        const val RECENT_USED = 32
+    }
 }
 
 /** The origin of a learned clause the session derived itself rather than imported. */

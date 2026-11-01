@@ -96,7 +96,6 @@ internal fun PropagationState.addLearnedClause(
     learned.permanent.add(if (permanent) 1 else 0)
     work += learned.trackCapObject(learned.size - 1, permanent)
     learned.tier.add(ClauseTier.UNSET.ordinal)
-    learned.usedFlags.add(0)
     learned.origins.add(origin)
     if (clause.literals.size == 2) learned.binaryClauseCount++ // keep the binary-resolution gate current
     refPayloadStore.add(null)
@@ -142,7 +141,6 @@ internal fun PropagationState.addLearnedPb(
     learned.lbds.add(lbd)
     learned.permanent.add(if (permanent) 1 else 0)
     learned.tier.add(ClauseTier.UNSET.ordinal)
-    learned.usedFlags.add(0)
     learned.origins.add(OWN_ORIGIN)
     refPayloadStore.add(null)
     learned.lifecycle.note(LearnedKind.Pb, LearnedStage.Admitted)
@@ -174,7 +172,6 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     learned.lbds.add(lbd)
     learned.permanent.add(0)
     learned.tier.add(ClauseTier.UNSET.ordinal)
-    learned.usedFlags.add(0)
     learned.origins.add(OWN_ORIGIN)
     refPayloadStore.add(null)
     for (watch in propagator.initialIntEventWatches) intEvents.subscribeMidlife(watch, factor)
@@ -226,7 +223,7 @@ internal fun PropagationState.setLearnedClauseTier(learnedIndex: Int, tier: Clau
 /** True iff learned clause [learnedIndex] was used (conflict or unit) since the last
  *  reduction. */
 internal fun PropagationState.learnedClauseUsedSinceReduction(learnedIndex: Int): Boolean =
-    nativeEngine?.usedOf(learnedIndex) ?: (learned.usedFlags[learnedIndex] == 1)
+    nativeEngine?.usedOf(learnedIndex) ?: learned.usedOf(learnedIndex)
 
 /** Clear the reuse flag for learned clause [learnedIndex] — called for survivors at the
  *  end of a reduction so the next window measures fresh activity. */
@@ -235,7 +232,7 @@ internal fun PropagationState.clearLearnedClauseUsed(learnedIndex: Int) {
         it.clearUsed(learnedIndex)
         return
     }
-    learned.usedFlags[learnedIndex] = 0
+    learned.clearUsed(learnedIndex)
 }
 
 /** Mark learned clause [fid] (a factor id; ignored when it isn't a learned clause) as
@@ -247,11 +244,11 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
         return
     }
     val idx = fid - problem.numFactors
-    if (idx !in 0 until learned.usedFlags.size || learned.retiredOf(idx)) return
+    if (idx !in 0 until learned.size || learned.retiredOf(idx)) return
     factorAttribution?.used(learned.store[idx])
     noteLearnedStage(idx, LearnedStage.Consumed, 2)
-    if (learned.usedFlags[idx] == 0) learned.importUses.note(learned.origins[idx])
-    learned.usedFlags[idx] = 1
+    if (!learned.usedOf(idx)) learned.importUses.note(learned.origins[idx])
+    learned.markUsed(idx)
 }
 
 /**
@@ -327,7 +324,6 @@ internal fun PropagationState.forgetLearnedClauses(
             learned.lbds[w] = learned.lbds[i]
             learned.permanent[w] = learned.permanent[i]
             learned.tier[w] = learned.tier[i]
-            learned.usedFlags[w] = learned.usedFlags[i]
             learned.origins[w] = learned.origins[i]
             if (learned.retiredOf(w)) learned.retiredCount++
             else {
@@ -346,7 +342,6 @@ internal fun PropagationState.forgetLearnedClauses(
     learned.lbds.truncateTo(newCount)
     learned.permanent.truncateTo(newCount)
     learned.tier.truncateTo(newCount)
-    learned.usedFlags.truncateTo(newCount)
     learned.origins.truncateTo(newCount)
 
     // Static-factor entries at [0, problem.numFactors) stay untouched.
@@ -458,7 +453,7 @@ internal fun PropagationState.forgetLearnedClauses(
     work += learned.boolReasons.size.toLong() - w
     learned.boolReasons.truncateTo(w)
     for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
-        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) column.trim()
+        learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) column.trim()
     work += learned.boolReasons.size.toLong() * 2L
     learned.boolReasons.trim()
     work += 2L + w.coerceAtLeast(1) * 2L

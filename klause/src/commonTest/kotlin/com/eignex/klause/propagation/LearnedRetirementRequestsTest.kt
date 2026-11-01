@@ -237,7 +237,7 @@ class LearnedRetirementRequestsTest {
 
             assertEquals(LearnedRetirementStatus.Retired, selected.status)
             assertEquals(4, session.activeLearnedClauseCount)
-            for (index in 1..4) assertTrue(session.isLearnedClause(index))
+            for (index in 1..4) assertTrue(session.isLearnedClause(index), "native=$native grant=$grant index=$index")
         }
     }
 
@@ -366,25 +366,28 @@ class LearnedRetirementRequestsTest {
 
     @Test
     fun `request unlinking should release lookup ownership before recapture`() {
-        val session = PropagationSession(Problem(4, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = false)
-        repeat(24) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
-        val handles = (0 until 24).map { index ->
-            assertNotNull(session.queueLearnedRetirement(index, session.learnedRetirementGeneration,
-                256L, 256L, 16_384L, { false }).handle)
-        }
+        for (native in listOf(false, true)) for (order in listOf((0 until 24).toList(), (23 downTo 0).toList())) {
+            val session = PropagationSession(Problem(4, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            repeat(24) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+            val handles = order.map { index ->
+                assertNotNull(session.queueLearnedRetirement(index, session.learnedRetirementGeneration,
+                    256L, 256L, 16_384L, { false }).handle)
+            }
 
-        for (handle in handles) {
-            session.cancelLearnedRetirement(handle, 256L, 256L) { false }
-            session.acknowledgeLearnedRetirement(handle, 256L, 256L) { false }
-        }
-        repeat(24) { session.advanceLearnedRetirements(256L, 256L, { false }, publicationPending = false) }
-        val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
-        val captured = session.queueLearnedRetirement(0, session.learnedRetirementGeneration,
-            256L, 256L, 160L) { false }
+            for (handle in handles) {
+                session.cancelLearnedRetirement(handle, 256L, 256L) { false }
+                session.acknowledgeLearnedRetirement(handle, 256L, 256L) { false }
+            }
+            repeat(24) { session.advanceLearnedRetirements(256L, 256L, { false }, publicationPending = false) }
+            val memory = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+            val captured = session.queueLearnedRetirement(0, session.learnedRetirementGeneration,
+                256L, 256L, 160L) { false }
 
-        assertEquals(69L, memory["selectedRetirementOwnedBytes"])
-        assertEquals(LearnedRetirementStatus.Captured, captured.status)
-        assertTrue(captured.handle !== handles[0])
+            assertEquals(69L, memory["selectedRetirementOwnedBytes"])
+            assertEquals(LearnedRetirementStatus.Captured, captured.status)
+            assertTrue(captured.handle !== handles[order.indexOf(0)])
+        }
     }
 }
