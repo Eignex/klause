@@ -111,7 +111,7 @@ class PropagationSession private constructor(
         retiredWork = owner.work
         retiredPropagationNanos = owner.propagationNanos
         retiredPropagationCount = owner.propagations
-        retiredLifecycle = owner.learned.lifecycle.snapshot() + (owner.factorAttribution?.snapshot() ?: emptyMap())
+        retiredLifecycle = learnedLifecycle()
         retainedState = null
         levelStates = emptyArray()
         levelTop = 0
@@ -1183,7 +1183,8 @@ class PropagationSession private constructor(
     }
 
     internal fun learnedLifecycle(): Map<String, Long> = retainedState?.let {
-        it.learned.lifecycle.snapshot() + (it.factorAttribution?.snapshot() ?: emptyMap())
+        it.learned.lifecycle.snapshot() + (it.nativeEngine?.capWindowStatistics() ?: emptyMap()) +
+            (it.factorAttribution?.snapshot() ?: emptyMap())
     } ?: retiredLifecycle
 
     internal fun configureAttribution(enabled: Boolean, historicalTables: Boolean) {

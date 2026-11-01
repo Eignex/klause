@@ -281,6 +281,8 @@ retains its read and write cursors across later restarts and appended clauses.
 Retired rows stop propagation and export, while their slots and arena bytes remain
 owned until a funded full compaction reclaims them. Ownership reports include that
 capacity and report `learnedRetiredSlots` separately from active clause count.
+Window calls, charged work, visits and permanent, active and retained counts remain
+available in the released session's lifecycle totals.
 
 ## Pseudo-Boolean learning
 
