@@ -485,10 +485,14 @@ inprocessing, since derivations under assumption pins would not hold globally.
 
 Opt-in root simplification examines bounded slices of source and learned Boolean
 clauses against permanent root facts. An empty Boolean pin trail withholds the scan;
-without a pinned literal it cannot satisfy or shorten a Boolean clause. A shortened
-source clause enters as a permanent
-session-local replacement before its watches retire; immutable source text remains
-available for reasons. The propagation session owns unfinished source-watch retirement
+without a pinned literal it cannot satisfy or shorten a Boolean clause. Clauses
+affected by a new Boolean root fact can be reached through its prepared source-occurrence
+index. This bounded neighborhood alternates with the ordinary clause scan,
+retains its pin and occurrence positions across slices, and builds no index
+inside the pass. Unprepared projections retain the ordinary scan. A shortened
+source clause enters as a permanent session-local replacement before its watches
+retire; immutable source text remains available for reasons. The propagation session
+owns unfinished source-watch retirement
 after replacement admission. Pass reset or optional buffer release retains that record;
 a funded slice retires its watches before admitting another source replacement.
 Session close releases it. Satisfied source watches retire without changing variable IDs.

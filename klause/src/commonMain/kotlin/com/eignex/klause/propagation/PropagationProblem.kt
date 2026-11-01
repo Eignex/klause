@@ -64,6 +64,8 @@ class PropagationProblem private constructor(
         }
     }
 
+    internal fun preparedBoolOccurrences(variable: Int): IntArray? = preparedIndexes?.boolOccurrences?.get(variable)
+
     /** Propagator occurrences indexed by integer variable. */
     val intOccurrences: Array<IntArray> by lazy {
         preparedIndexes?.intOccurrences ?: run {
