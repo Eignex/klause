@@ -336,6 +336,10 @@ class PropagationState private constructor(
     // is still the one it fired on. Until then [currentLevel] holds the live decision count, an upper bound.
     private var deferredLevelClause: IntArray? = null
 
+    internal fun forgetDeferredClause(literals: IntArray) {
+        if (deferredLevelClause === literals) deferredLevelClause = null
+    }
+
     /** Settle the deferred level of the firing clause over [literals]; a no-op for any other fire. */
     internal fun settleClauseLevel(literals: IntArray) {
         if (deferredLevelClause === literals) currentLevel = maxLevelForClause(literals)
@@ -495,6 +499,8 @@ class PropagationState private constructor(
             n
         },
     )
+    internal val selectedRetirements = LearnedRetirementRequests()
+    internal var nextLearnedAdmissionKey = 0L
 
     // The native SAT lane does not use CP propagators or occurrence indices. Keep their tables
     // deferred so a clause-only state does not retain both representations of every factor.

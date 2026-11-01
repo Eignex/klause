@@ -47,6 +47,8 @@ internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int
 internal fun PropagationState.factorAt(fid: Int): Propagator = when {
     incremental && !factorAliveAt(fid) -> NoPropagator
 
+    retiredLearnedFactor(fid) -> NoPropagator
+
     fid < baseFactorCount ->
         if (nativeEngine == null) baseFactors[fid] else problem.factors[fid].propagatorProjection()
 
@@ -76,14 +78,24 @@ internal fun PropagationState.addLearnedClause(
     learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Constructed)
     learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Admitted)
     val newFid = totalFactorCount
-    learned.stages.add(0)
+    var initialStage = 16
+    for (literal in clause.literals) {
+        work++
+        if (Lit.variable(literal) >= problem.numBoolVars) {
+            initialStage = 0
+            break
+        }
+    }
+    learned.stages.add(initialStage)
+    work += learned.boolReasonAdmissionWork
+    learned.boolReasons.add(0)
+    addLearnedAdmissionKey()
     learned.store.add(clause)
     if (clause.literals.size == 1) learned.units.add(newFid)
     learned.lbds.add(lbd)
     learned.permanent.add(if (permanent) 1 else 0)
-    work += learned.trackCapClause(learned.size - 1, permanent)
+    work += learned.trackCapObject(learned.size - 1, permanent)
     learned.tier.add(ClauseTier.UNSET.ordinal)
-    learned.usedFlags.add(0)
     learned.origins.add(origin)
     if (clause.literals.size == 2) learned.binaryClauseCount++ // keep the binary-resolution gate current
     refPayloadStore.add(null)
@@ -119,11 +131,16 @@ internal fun PropagationState.addLearnedPb(
     )
     val newFid = totalFactorCount
     learned.stages.add(0)
+    work += learned.boolReasonAdmissionWork
+    learned.boolReasons.add(0)
+    addLearnedAdmissionKey()
     learned.store.add(prop)
+    learned.nonClauseCount++
+    work++
+    work += learned.trackCapObject(learned.size - 1, permanent, LearnedKind.Pb)
     learned.lbds.add(lbd)
     learned.permanent.add(if (permanent) 1 else 0)
     learned.tier.add(ClauseTier.UNSET.ordinal)
-    learned.usedFlags.add(0)
     learned.origins.add(OWN_ORIGIN)
     refPayloadStore.add(null)
     learned.lifecycle.note(LearnedKind.Pb, LearnedStage.Admitted)
@@ -141,14 +158,20 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     val propagator = LearnedIntegerPropagator(row)
     val factor = totalFactorCount
     learned.stages.add(0)
+    work += learned.boolReasonAdmissionWork
+    learned.boolReasons.add(0)
+    addLearnedAdmissionKey()
     learned.store.add(propagator)
-    val rows = learned.integerRows ?: ArrayList<LearnedIntegerPropagator>().also { learned.integerRows = it }
-    rows.add(propagator)
+    learned.nonClauseCount++
+    work++
+    work += learned.trackCapObject(learned.size - 1, false, LearnedKind.Integer)
+    val rows = learned.integerRows ?: LearnedIntegerRows().also { learned.integerRows = it; work++ }
+    work += rows.admissionWork
+    rows.admit(propagator)
     arithmeticLearningTrace?.stored(factor, "integer")
     learned.lbds.add(lbd)
     learned.permanent.add(0)
     learned.tier.add(ClauseTier.UNSET.ordinal)
-    learned.usedFlags.add(0)
     learned.origins.add(OWN_ORIGIN)
     refPayloadStore.add(null)
     for (watch in propagator.initialIntEventWatches) intEvents.subscribeMidlife(watch, factor)
@@ -200,7 +223,7 @@ internal fun PropagationState.setLearnedClauseTier(learnedIndex: Int, tier: Clau
 /** True iff learned clause [learnedIndex] was used (conflict or unit) since the last
  *  reduction. */
 internal fun PropagationState.learnedClauseUsedSinceReduction(learnedIndex: Int): Boolean =
-    nativeEngine?.usedOf(learnedIndex) ?: (learned.usedFlags[learnedIndex] == 1)
+    nativeEngine?.usedOf(learnedIndex) ?: learned.usedOf(learnedIndex)
 
 /** Clear the reuse flag for learned clause [learnedIndex] — called for survivors at the
  *  end of a reduction so the next window measures fresh activity. */
@@ -209,7 +232,7 @@ internal fun PropagationState.clearLearnedClauseUsed(learnedIndex: Int) {
         it.clearUsed(learnedIndex)
         return
     }
-    learned.usedFlags[learnedIndex] = 0
+    learned.clearUsed(learnedIndex)
 }
 
 /** Mark learned clause [fid] (a factor id; ignored when it isn't a learned clause) as
@@ -221,11 +244,11 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
         return
     }
     val idx = fid - problem.numFactors
-    if (idx !in 0 until learned.usedFlags.size || learned.retiredOf(idx)) return
+    if (idx !in 0 until learned.size || learned.retiredOf(idx)) return
     factorAttribution?.used(learned.store[idx])
     noteLearnedStage(idx, LearnedStage.Consumed, 2)
-    if (learned.usedFlags[idx] == 0) learned.importUses.note(learned.origins[idx])
-    learned.usedFlags[idx] = 1
+    if (!learned.usedOf(idx)) learned.importUses.note(learned.origins[idx])
+    learned.markUsed(idx)
 }
 
 /**
@@ -267,6 +290,8 @@ internal fun PropagationState.forgetLearnedClauses(
         remap[i] = if (retained[i]) newCount++ else -1
     }
     if (newCount == n) return true
+    work += selectedRetirements.remapWork
+    selectedRetirements.remap(remap)
     arithmeticLearningTrace?.remap(baseFactorCount, remap)
     for (i in 0 until n) if (remap[i] < 0) {
         work++
@@ -277,25 +302,36 @@ internal fun PropagationState.forgetLearnedClauses(
     }
 
     learned.units.clear()
-    learned.integerRows?.clear()
+    learned.integerRows?.let { rows -> work += rows.size.toLong() + 2L; rows.reset() }
     learned.resetCapIndex()
     var w = 0
     for (i in 0 until n) {
         work++
         if (remap[i] >= 0) {
             val propagator = learned.store[i]
-            if (propagator is LearnedIntegerPropagator) learned.integerRows?.add(propagator)
+            if (propagator is LearnedIntegerPropagator) {
+                val rows = checkNotNull(learned.integerRows)
+                work += rows.admissionWork
+                rows.admit(propagator)
+            }
             if (propagator is ClausePropagator && propagator.literals.size == 1) learned.units.add(baseFactorCount + w)
             learned.store[w] = learned.store[i]
             learned.stages[w] = learned.stages[i]
+            work++
+            learned.boolReasons[w] = learned.boolReasons[i]
+            work++
+            learned.admissions[w] = learned.admissions[i]
             learned.lbds[w] = learned.lbds[i]
             learned.permanent[w] = learned.permanent[i]
             learned.tier[w] = learned.tier[i]
-            learned.usedFlags[w] = learned.usedFlags[i]
             learned.origins[w] = learned.origins[i]
             if (learned.retiredOf(w)) learned.retiredCount++
-            else if (propagator is ClausePropagator) {
-                work += learned.trackCapClause(w, learned.permanent[w] == 1)
+            else {
+                work += learned.trackCapObject(w, learned.permanent[w] == 1, learnedKind(w))
+                if (propagator !is ClausePropagator) {
+                    learned.nonClauseCount++
+                    work++
+                }
             }
             w++
         }
@@ -306,7 +342,6 @@ internal fun PropagationState.forgetLearnedClauses(
     learned.lbds.truncateTo(newCount)
     learned.permanent.truncateTo(newCount)
     learned.tier.truncateTo(newCount)
-    learned.usedFlags.truncateTo(newCount)
     learned.origins.truncateTo(newCount)
 
     // Static-factor entries at [0, problem.numFactors) stay untouched.
@@ -321,7 +356,7 @@ internal fun PropagationState.forgetLearnedClauses(
     }
     while (refPayloadStore.size > rw) refPayloadStore.removeAt(refPayloadStore.size - 1)
     refPayloadStore = ArrayList(refPayloadStore)
-    learned.integerRows = learned.integerRows?.let { ArrayList(it) }
+    learned.integerRows?.let { rows -> work += rows.trimmingWork; rows.trim() }
 
     for (lit in watches.byLit.indices) {
         work++
@@ -394,7 +429,7 @@ internal fun PropagationState.forgetLearnedClauses(
     }
     learned.pendingAttach.truncateTo(pending)
     remapQueue(atoms.dirtyFactors, remap, refBase)
-    if (learned.integerRows != null) {
+    if (intEvents.overflow != null) {
         val overflow = intEvents.overflow
         work += (overflow?.primitiveCapacityBytes ?: 0L) + (overflow?.size?.toLong() ?: 0L) * (overflow?.size ?: 0)
         intEvents.remapLearned(remap, refBase)
@@ -415,9 +450,40 @@ internal fun PropagationState.forgetLearnedClauses(
         undo.minReason[i] = remappedReason(undo.minReason[i], remap, refBase)
         undo.maxReason[i] = remappedReason(undo.maxReason[i], remap, refBase)
     }
+    work += learned.boolReasons.size.toLong() - w
+    learned.boolReasons.truncateTo(w)
     for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
-        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) column.trim()
+        learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) column.trim()
+    work += learned.boolReasons.size.toLong() * 2L
+    learned.boolReasons.trim()
+    work += 2L + w.coerceAtLeast(1) * 2L
+    learned.admissions.truncateTo(w)
+    learned.admissions.trim()
     return true
+}
+
+private fun PropagationState.addLearnedAdmissionKey() {
+    val keys = learned.admissions
+    work += 3L + when {
+        keys.size.toLong() * Long.SIZE_BYTES == keys.allocatedBytes -> keys.size * 3L + 1L
+        keys.size == 0 -> 1L
+        else -> 0L
+    }
+    check(nextLearnedAdmissionKey < Long.MAX_VALUE)
+    keys.add(nextLearnedAdmissionKey++)
+}
+
+internal fun PropagationState.noteLearnedBoolReason(factor: Int, delta: Int) {
+    nativeEngine?.let {
+        it.noteBoolReason(factor, delta)
+        return
+    }
+    val index = factor - baseFactorCount
+    if (index !in 0 until learned.size) return
+    work += 2L
+    val count = learned.boolReasons[index] + delta
+    check(count >= 0)
+    learned.boolReasons[index] = count
 }
 
 /** Rewrite learned-clause factor ids stored in a per-variable reason array through [remap]

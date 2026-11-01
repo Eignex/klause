@@ -26,6 +26,7 @@ internal class ReclamationPreparation(
     var atomicUnits = 0L
         private set
     private var scratch = 0L
+    val remainingWork: Long get() = maxWork - work
 
     fun visit(units: Long = 1L, scratchBytes: Long = 0L) {
         if (cancelled() || units > maxWork - work || scratchBytes > maxScratchBytes - scratch) throw Deferred()
@@ -59,6 +60,8 @@ internal fun PropagationState.prepareReclamation(
     budget.visit(scratchBytes = count.toLong() * 29L + baseFactorCount.toLong() * Long.SIZE_BYTES)
     budget.atomic(baseFactorCount.toLong())
     budget.atomic(count.toLong() * 16L)
+    if (selectedRetirements.hasRequests) budget.atomic(selectedRetirements.remapWork)
+    budget.atomic(learned.admissions.allocatedBytes / Long.SIZE_BYTES, learned.admissions.allocatedBytes)
     val retained = BooleanArray(count)
     collectLearnedReferences(retained) { budget.visit() }
     budget.atomic(boolReason.size.toLong() + intMinReason.size + intMaxReason.size + undo.size * 3L)
@@ -78,7 +81,7 @@ internal fun PropagationState.prepareReclamation(
             budget.atomic(1L + (list?.backingData?.size ?: 0), (list?.backingData?.size?.toLong() ?: 0L) * 8L)
         }
     }
-    if (learned.integerRows != null) {
+    if (intEvents.overflow != null) {
         intEvents.overflow?.let { overflow ->
             budget.atomic(overflow.primitiveCapacityBytes + overflow.size.toLong() * overflow.size,
                 overflow.primitiveCapacityBytes * 2L + overflow.referenceCapacity.toLong() * Long.SIZE_BYTES * 2L)
@@ -91,8 +94,8 @@ internal fun PropagationState.prepareReclamation(
             }
         }
     }
-    for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
-        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) {
+    for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier, learned.boolReasons,
+        learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) {
         budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
     }
     arithmeticLearningTrace?.let { trace ->
@@ -118,7 +121,11 @@ internal fun PropagationState.ownLearned(sample: com.eignex.klause.util.SharingM
     when (prop) {
         is ClausePropagator -> ints(prop.literals)
         is PseudoBooleanPropagator -> { ints(prop.literals); ints(prop.byWeightDesc); longs(prop.weights) }
-        is LearnedIntegerPropagator -> { ints(prop.row.variables); longs(prop.row.coefficients) }
+        is LearnedIntegerPropagator -> {
+            sample.owned(prop, Int.SIZE_BYTES.toLong(), protected)
+            ints(prop.row.variables)
+            longs(prop.row.coefficients)
+        }
     }
     ints(refPayloadStore[baseFactorCount + index] as? IntArray)
 }

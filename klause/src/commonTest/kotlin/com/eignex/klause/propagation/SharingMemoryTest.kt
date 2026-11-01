@@ -146,10 +146,11 @@ class SharingMemoryTest {
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2, permanent = permanent)
             val state = session.explanationState
             val columns = listOf(state.learned.stages, state.learned.lbds, state.learned.permanent,
-                state.learned.tier, state.learned.usedFlags, state.learned.origins,
-                state.learned.units, state.learned.pendingAttach)
+                state.learned.tier, state.learned.boolReasons, state.learned.origins,
+                state.learned.units, state.learned.pendingAttach, state.learned.capCandidates)
             var dependencies = columns.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES } +
-                state.watches.pos.primitiveCapacityBytes
+                state.watches.pos.primitiveCapacityBytes + state.learned.capRanking.primitiveBytes +
+                state.learned.admissions.allocatedBytes + Int.SIZE_BYTES
             for (literal in listOf(0, 2)) {
                 dependencies += (state.watches.byLit[literal].backingData.size.toLong() +
                     state.watches.blockersByLit[literal].backingData.size) * Int.SIZE_BYTES
@@ -161,6 +162,9 @@ class SharingMemoryTest {
                 for (column in columns) {
                     sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, true)
                 }
+                state.learned.capRanking.sharingMemory(sample, true)
+                sample.owned(state.learned.admissions, state.learned.admissions.allocatedBytes + Int.SIZE_BYTES, true)
+                sample.ownedReferences(state.learned.admissions, 1L, true)
                 sample.ownedReferences(state.learned.store, state.learned.size.toLong(), true)
                 sample.ownedReferences(state.refPayloadStore, state.refPayloadStore.size.toLong(), true)
                 sample.owned(state.watches.pos, state.watches.pos.primitiveCapacityBytes, true)
@@ -175,7 +179,7 @@ class SharingMemoryTest {
             assertEquals(before.getValue("ownedReferenceSlots"), after.getValue("ownedReferenceSlots"))
             assertEquals(if (permanent) 0L else dependencies,
                 after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"))
-            assertEquals(if (permanent) 0L else state.learned.size.toLong() + state.refPayloadStore.size,
+            assertEquals(if (permanent) 0L else state.learned.size.toLong() + state.refPayloadStore.size + 5L,
                 after.getValue("protectedReferenceSlots") - before.getValue("protectedReferenceSlots"))
         }
     }

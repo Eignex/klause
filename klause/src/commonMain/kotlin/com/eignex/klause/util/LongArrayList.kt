@@ -52,6 +52,11 @@ internal class LongArrayList(initialCapacity: Int = 8) {
         size = 0
     }
 
+    fun trim() {
+        val capacity = size.coerceAtLeast(1)
+        if (data.size > capacity) data = data.copyOf(capacity)
+    }
+
     /** Truncate to [newSize], dropping the suffix. No-op if [newSize] is `>= size`. */
     fun truncateTo(newSize: Int) {
         if (newSize < size) size = newSize

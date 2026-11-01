@@ -4,6 +4,7 @@ import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedLifecycle
 import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.OriginCounts
 
 /**
@@ -24,15 +25,15 @@ internal class LearnedClauseDb(
     val stages = IntArrayList()
     val pendingAttach = IntArrayList()
     internal val capCandidates = IntArrayList(1)
-    internal var capRead = 0
-    internal var capWrite = 0
+    internal val capRanking = LearnedCapRanking(capCandidates)
     internal var permanentClauseCount = 0
+    internal var permanentArithmeticCount = 0
+    internal var nonClauseCount = 0
     internal var retiredCount = 0
     internal var capCalls = 0L
     internal var capWork = 0L
     internal var capVisits = 0L
     internal var capBoundaryDefers = 0L
-    internal var capFloorDefers = 0L
     internal var capPreparationDefers = 0L
     private var capAllocationCharged = false
     val units = IntArrayList()
@@ -45,7 +46,15 @@ internal class LearnedClauseDb(
      *  problem, not trail state); pruned by `forgetLearnedClauses`. */
     var store = ArrayList<LearnedPropagator>()
 
-    internal var integerRows: ArrayList<LearnedIntegerPropagator>? = null
+    internal var integerRows: LearnedIntegerRows? = null
+    internal val boolReasons = IntArrayList(1)
+    internal val admissions = LongArrayList(1)
+    internal val boolReasonAdmissionWork: Long
+        get() = 1L + when {
+            boolReasons.size == boolReasons.backingData.size -> boolReasons.size * 3L + 1L
+            boolReasons.size == 0 -> 1L
+            else -> 0L
+        }
 
     /** LBD (literal block distance) per learned clause, parallel to [store]: lower = more re-usable.
      *  Forgetting policies key on it (G. Audemard, L. Simon, "Predicting Learnt Clauses Quality in
@@ -63,11 +72,6 @@ internal class LearnedClauseDb(
      *  persistent state rather than a pure function of LBD. */
     val tier = IntArrayList()
 
-    /** 1 iff the learned clause has detected a conflict or forced a unit since the last reduction,
-     *  parallel to [store]. The three-tier reduction policy reads this to promote reused clauses
-     *  and demote idle ones, then clears it for survivors. */
-    val usedFlags = IntArrayList()
-
     /** The origin an imported clause came from, parallel to [store]; [OWN_ORIGIN] for one learned here. */
     val origins = IntArrayList()
 
@@ -80,14 +84,19 @@ internal class LearnedClauseDb(
     internal val activeCount: Int get() = size - retiredCount
 
     internal fun retiredOf(index: Int): Boolean = stages[index] and RETIRED != 0
+    internal fun usedOf(index: Int): Boolean = stages[index] and RECENT_USED != 0
+    internal fun markUsed(index: Int) { stages[index] = stages[index] or RECENT_USED }
+    internal fun clearUsed(index: Int) { stages[index] = stages[index] and RECENT_USED.inv() }
 
-    internal fun trackCapClause(index: Int, isPermanent: Boolean): Long {
+    internal fun trackCapObject(index: Int, isPermanent: Boolean, kind: LearnedKind = LearnedKind.Clause): Long {
         var work = 1L
         if (!capAllocationCharged) {
             work++
             capAllocationCharged = true
         }
-        if (isPermanent) permanentClauseCount++ else {
+        if (isPermanent) {
+            if (kind == LearnedKind.Clause) permanentClauseCount++ else permanentArithmeticCount++
+        } else {
             if (capCandidates.size == capCandidates.backingData.size) work += capCandidates.size * 3L
             capCandidates.add(index)
         }
@@ -96,17 +105,19 @@ internal class LearnedClauseDb(
 
     internal fun resetCapIndex() {
         permanentClauseCount = 0
+        permanentArithmeticCount = 0
+        nonClauseCount = 0
         retiredCount = 0
         capCandidates.clear()
-        capRead = 0
-        capWrite = 0
+        capRanking.reset()
     }
 
-    internal fun retire(index: Int) {
+    internal fun retire(index: Int, kind: LearnedKind) {
         check(permanent[index] == 0 && !retiredOf(index))
         stages[index] = stages[index] or RETIRED
         retiredCount++
-        lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
+        if (kind != LearnedKind.Clause) nonClauseCount--
+        lifecycle.note(kind, LearnedStage.Retired)
     }
 
     internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) emptyMap() else mapOf(
@@ -115,15 +126,22 @@ internal class LearnedClauseDb(
         "learnedCapWork" to capWork,
         "learnedCapVisits" to capVisits,
         "learnedCapBoundaryDefers" to capBoundaryDefers,
-        "learnedCapFloorDefers" to capFloorDefers,
+        "learnedCapFloorDefers" to 0L,
         "learnedCapPreparationDefers" to capPreparationDefers,
+        "learnedCapRankedPasses" to capRanking.passes,
         "learnedCapPermanentClauses" to permanentClauseCount.toLong(),
+        "learnedCapPermanentArithmetic" to permanentArithmeticCount.toLong(),
+        "learnedCapNonClauseFloor" to 0L,
+        "learnedCapActiveArithmetic" to nonClauseCount.toLong(),
         "learnedCapRetainedSlots" to size.toLong(),
         "learnedCapRetiredSlots" to retiredCount.toLong(),
         "learnedCapActiveClauses" to activeCount.toLong(),
     )
 
-    private companion object { const val RETIRED = 8 }
+    private companion object {
+        const val RETIRED = 8
+        const val RECENT_USED = 32
+    }
 }
 
 /** The origin of a learned clause the session derived itself rather than imported. */

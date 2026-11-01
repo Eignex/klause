@@ -121,7 +121,8 @@ They describe participation and consumption, without asserting causal benefit.
 One state owns at most 1,024 reason identities of at most 64 words each and 1,024
 learned provenance entries. Reason eviction and provenance exhaustion affect only
 diagnostics; missing identities use the unattributed family. Retirement releases
-learned provenance, and compaction preserves it by object identity. The native SAT
+learned provenance and diagnostic ring entries aliasing that clause's literals;
+compaction preserves retained provenance by object identity. The native SAT
 lane retains packed propagation and credits its clause family without constructing
 general propagator projections. Its fire counter counts BCP calls rather than
 general factor invocations. Disabling attribution retains no diagnostic maps.
@@ -228,7 +229,8 @@ and explicit completeness; see [sharing accounting](12-portfolio.md#shared-chann
 Observation never invokes retirement or materializes a reason. Partial data and
 historical peaks cannot authorize a byte-limit decision.
 Payload counts and index capacity have separate ownership;
-reference counts exclude platform object layout. An owner-aware aggregate counts
+reference counts exclude platform object layout. The bounded attribution reason ring
+and its modeled map references participate in this observation. An owner-aware aggregate counts
 each primitive payload or allocated index once, including aliased reasons; modeled
 references use eight bytes per slot for byte-limit policy. Completeness covers the
 enumerated owners, rather than the worker's entire heap. Active and historical
@@ -284,26 +286,57 @@ variable. Learned clauses live in a growable side buffer with a wrapping
 replacement-scan cursor per clause, and reductions compact them in place. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
 
-When permanent native clauses already fill a restart cap, a bounded window over
-non-permanent learned clauses can retire unused local rows without renumbering
-handles. Each row funds its policy update and live-reason scan before publication;
-units, pending rechecks and current root reasons survive. An unfinished window
-retains its read and write cursors across later restarts and appended clauses.
+When complete cap selection cannot be funded, a bounded window over non-permanent
+learned clauses retains the lowest LBD and stable-handle keys after permanent and
+tier-protected ownership. Its max-heap shares the candidate index with retained
+survivors. Funded heap steps, cursors and pending retirement survive later restarts
+and appended clauses; compaction resets them before handles change. Policy updates
+and reason-ownership checks are charged before publication. A later use protects a pending
+eviction; units, pending rechecks and current root reasons survive.
 Retired rows stop propagation and export, while their slots and arena bytes remain
 owned until a funded full compaction reclaims them. Ownership reports include that
 capacity and report `learnedRetiredSlots` separately from active clause count.
 Window calls, charged work, visits and permanent, active and retained counts remain
 available in the released session's lifecycle totals.
 
-General CP uses the same handle-preserving clause retirement above a permanent
-clause floor. Its funded protection snapshot covers current Boolean and integer
-reasons, saved integer bounds and pending first assertions. Retired factor payloads
-remain readable for explanations while propagation queues, binary minimization and
-active-clause readers skip those rows. The candidate cursor survives appended
-clauses and is rebuilt when full compaction renumbers the store. Ownership includes
-the candidate index and every retained payload; logical retirement reports no
-physical release. Lifecycle totals identify the packed-native or general backend
-and distinguish boundary, floor and preparation deferrals.
+General CP ranks learned clauses, pseudo-Boolean constraints and integer rows in
+the same candidate index. Permanent arithmetic constraints contribute to its floor.
+Pure-Boolean clauses keep a current-reason count updated by pinning and retraction;
+Boolean undo stores no historical factor handle. Admissions classify these clauses,
+and full compaction remaps their counters with their factor IDs. Their windows use
+those counts and pending-attachment flags without a store-sized protection mask.
+Other constraints use a funded snapshot covering current Boolean and integer reasons,
+saved integer bounds and pending first assertions. Eligible retired factors become inert
+stable-ID slots; propagation queues and active readers skip them. Integer rows own
+their position in a dense reference cache, allowing retirement to unlink a row
+without scanning other rows. Cache capacity and position fields remain part of
+modeled ownership; removing the last row releases the cache backing array. Full
+compaction rebuilds cache positions and remaps integer-event subscriptions even
+when no integer rows remain. The candidate cursor survives admissions and is
+rebuilt when full compaction renumbers the store. Lifecycle totals identify the
+packed-native or general backend and report completed ranking passes and
+boundary/preparation deferrals.
+
+Selected pure-Boolean retirement captures an opaque admission handle before a
+replacement is admitted. Immutable admission keys survive compaction; a bounded
+compressed binary index reuses an already-owned request instead of allocating another.
+Recent use shares the lifecycle word, while admission keys occupy a remapped column.
+A separate compaction generation rejects stale selections;
+captured handles retain no clause payload and survive later factor-ID remapping.
+The caller authorizes a request only after replacement propagation and required
+root/peer publication finish. Authorized requests stay kernel-owned when optional
+pass buffers are released. A bounded round-robin continuation rechecks current
+reasons and pending attachments, so protected requests do not block later eligible
+ones. Terminal results stay in the continuation signal until acknowledged and unlinked.
+Acknowledgement and request-owner release have separate funded steps; capture also
+checks its retained-metadata allowance. Deferred captures report observed minimum
+work, scratch or retained bytes. A caller distinguishes a fresh-slice retry from an
+unfundable class grant without accumulating credit for an atomic mutation.
+Reseeding or closing the scope
+invalidates outstanding handles. Selected retirement reports logical disabling,
+payload unlinking and full physical release separately. The cap index repairs
+externally retired heap and survivor entries through funded resumable steps before
+continuing its LBD ranking; its scalar continuation state remains modeled ownership.
 
 ## Pseudo-Boolean learning
 
@@ -456,12 +489,23 @@ poll cancellation; unfinished preparation publishes no tier changes or sweep eve
 Insufficient work or scratch safely defers the cap sweep. Completed selection keeps
 the same LBD priorities and tier lifetimes; a sweep event requires actual retirement.
 
-If complete candidate preparation cannot be funded, the permanent-clause-floor
-case uses the bounded handle-preserving window. Permanent ownership already
-exhausts the cap, so every eligible local row is excess and no LBD ranking is needed.
-Mid rows survive their demotion window; each completed window clears survivor reuse
-flags. Other constraint kinds, shared stores and caps retain the complete selection
-and remap preflight.
+If complete candidate preparation cannot be funded, native clauses and general learned constraints use
+the bounded handle-preserving window. The candidate index retains the best eligible
+LBD keys as a max-heap; each funded step can resume without a whole-store selection
+buffer. Permanent clauses, protected reasons and policy survivors
+reduce the heap quota. A pending eviction that gains protection also consumes that
+quota before the next heap step. Mid rows
+survive their demotion window, and classification clears survivor reuse flags.
+An unfunded next-row transaction suspends the cursor for a later grant.
+Current or historical reasons can retain additional rows above the soft cap.
+Native post-undo replay protects its queued clause handles and learned units without
+freezing unrelated retirement. Incomplete trail propagation, conflicts and root
+publication still defer the window.
+General retirement replaces its payload with an inert stable-ID slot and releases
+its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
+aliases. Stale watches skip that slot; their allocated capacity and policy columns
+remain owned until compaction. Arithmetic reason snapshots and full physical compaction
+still require their complete funding; shared stores retain the complete selection/remap path.
 
 Shared learning also accepts an optional modeled-byte soft limit checked at
 propagation boundaries independently of restarts. Units, glue clauses, live reason
