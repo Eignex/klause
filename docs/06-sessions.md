@@ -243,7 +243,13 @@ context consumes another retained attempt without replenishing the allowance;
 unchanged terminal failures do not restart recovery.
 
 Slice pricing is solver policy: LP work costs one node per 600 units and propagation
-one per 4000 visits. Inprocessing scans, probes, attachment and retirement enter
+one per 4000 visits. Resumable Boolean clause walks with definition repairs price
+factor, objective and implication inspections at the same visit rate, in addition
+to native instructions.
+An atomic choice completes before its work pause; later slices repay overspend.
+Native instruction slices and the containing decision/move quota retain their own
+units. Inspection work changes neither candidate ranking nor the native move count.
+Inprocessing scans, probes, attachment and retirement enter
 that propagation ledger; probe and visit diagnostics add no separate price.
 Fractional marks survive slices and the preparation-to-search transition.
 Overspend debt is settled once and repaid by later slices; a nested private search

@@ -3,6 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 
 internal class PreparedBooleanRepairs(val closure: BooleanRepairClosure?)
 
@@ -20,6 +21,7 @@ internal class BooleanRepairClosure private constructor(
     private val seeds: IntArray,
     private val inconsistent: Boolean,
     private val support: BooleanSupportRepairs?,
+    private val inspectionWork: WorkMeter?,
 ) {
     private var epoch = 0
     private var end = 0
@@ -150,6 +152,7 @@ internal class BooleanRepairClosure private constructor(
                 edges as Array<IntArray>, units.toIntArray(), clauses.toTypedArray(),
                 occurrences as Array<IntArray>, frozen, stamps, values, queue,
                 seedStamps, seedParity, seeds, inconsistent, support,
+                state.inspectionWork,
             )))
         }
     }
@@ -232,6 +235,7 @@ internal class BooleanRepairClosure private constructor(
     }
 
     private fun interrupted(cancellation: Cancellation): Boolean {
+        inspectionWork?.charge(1L)
         // Nested short clauses share the same bounded graph-visit window.
         if (operationsBeforePoll-- > 0) return false
         operationsBeforePoll = CANCELLATION_BATCH - 1

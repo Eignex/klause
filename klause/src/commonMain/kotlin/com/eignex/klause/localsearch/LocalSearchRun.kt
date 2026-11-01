@@ -1,16 +1,22 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.backtrack.SliceBudget
 import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.math.ceil
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
-internal fun interface LocalSearchCheckpoint {
+internal fun interface LocalSearchCheckpoint : WorkMeter {
     fun shouldPause(moves: Long): Boolean
+
+    override fun charge(units: Long) = Unit
+
+    val inspectionVisits: Long get() = 0L
 }
 
 internal class LocalSearchRunControl(private val lifetime: Cancellation) : LocalSearchCheckpoint {
@@ -22,15 +28,30 @@ internal class LocalSearchRunControl(private val lifetime: Cancellation) : Local
         private set
     var finished: Boolean = false
         private set
+    override var inspectionVisits: Long = 0L
+        private set
+    private val slice = SliceBudget(
+        nodeCount = { (instructions / LS_INSTRUCTIONS_PER_WORK).toLong() },
+        lpWork = { 0L },
+        propagationWork = { inspectionVisits },
+    )
+    var hasSliceAllowance: Boolean = true
+        private set
     val cancellation: Cancellation = Cancellation { token() }
-    val work: Long get() = (instructions / LS_INSTRUCTIONS_PER_WORK).toLong()
+    val work: Long get() = slice.spent()
+
+    override fun charge(units: Long) {
+        if (units > 0L) inspectionVisits += minOf(units, Long.MAX_VALUE - inspectionVisits)
+    }
 
     override fun shouldPause(moves: Long): Boolean {
         instructions = moves
-        return moves >= limit
+        return moves >= limit || slice.remainingNodes() == 0L
     }
 
-    fun offer(global: Cancellation, millis: Long, instructions: Long, available: Long) {
+    fun offer(global: Cancellation, millis: Long, instructions: Long, available: Long, sliceNodes: Long = -1L) {
+        slice.noteOverspend()
+        hasSliceAllowance = slice.begin(millis, sliceNodes)
         token = if (millis == Long.MAX_VALUE) {
             lifetime.lifetimeCancellation() or global
         } else {
@@ -46,6 +67,8 @@ internal class LocalSearchRunControl(private val lifetime: Cancellation) : Local
 
     fun allowCompletion() {
         limit = Long.MAX_VALUE
+        slice.noteOverspend()
+        slice.begin(Long.MAX_VALUE, -1L)
     }
 
     companion object {

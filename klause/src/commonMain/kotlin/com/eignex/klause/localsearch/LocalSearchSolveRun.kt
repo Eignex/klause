@@ -25,20 +25,32 @@ internal class LocalSearchSolveRun(
     override val work: Long get() = control.work
 
     override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
-        runInstructionSlice(global, sliceMillis, LocalSearchRunControl.instructionAllowance(sliceNodes))
+        executeSlice(global, sliceMillis, LocalSearchRunControl.instructionAllowance(sliceNodes), sliceNodes)
 
     override fun runInstructionSlice(
         global: Cancellation,
         sliceMillis: Long,
         sliceInstructions: Long,
+    ): SolveResult? = executeSlice(global, sliceMillis, sliceInstructions, -1L)
+
+    private fun executeSlice(
+        global: Cancellation,
+        sliceMillis: Long,
+        sliceInstructions: Long,
+        sliceNodes: Long,
     ): SolveResult? = runCatching {
-        advance(global, sliceMillis, sliceInstructions)
+        advance(global, sliceMillis, sliceInstructions, sliceNodes)
     }.getOrElse {
         close()
         throw it
     }
 
-    private fun advance(global: Cancellation, sliceMillis: Long, sliceInstructions: Long): SolveResult? {
+    private fun advance(
+        global: Cancellation,
+        sliceMillis: Long,
+        sliceInstructions: Long,
+        sliceNodes: Long,
+    ): SolveResult? {
         verdict?.let { return it }
         checkOpen()
         if (!supported) return unknown(TerminationReason.Unsupported)
@@ -52,8 +64,8 @@ internal class LocalSearchSolveRun(
         }
         val available = params.nodeBudget?.allowance?.movesLeft() ?: Long.MAX_VALUE
         if (available == 0L) return unknown(TerminationReason.BudgetExhausted)
-        control.offer(global, sliceMillis, sliceInstructions, available)
-        if (control.instructions >= control.limit || control.token()) return null
+        control.offer(global, sliceMillis, sliceInstructions, available, sliceNodes)
+        if (control.instructions >= control.limit || control.token() || !control.hasSliceAllowance) return null
         val live = checkNotNull(cursor)
         if (!live.hasNext()) return unknown(TerminationReason.BudgetExhausted)
         val sample = live.next() ?: return if (control.instructions >= maxInstructions) {

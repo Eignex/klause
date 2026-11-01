@@ -34,6 +34,7 @@ import com.eignex.klause.util.ExactIntegerSum
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntSwapSet
+import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.minus
 import com.eignex.klause.util.toDouble
 import kotlin.random.Random
@@ -160,6 +161,7 @@ class LocalSearchState private constructor(
         problem.factors.any { it is Element && it.arrIsVars }
     }
     internal var phaseTimer: LocalSearchPhaseTimer? = null
+    internal var inspectionWork: WorkMeter? = null
 
     /** Per-invariant dynamic constraint weights and their class-normalised baseline. */
     val weights: FactorWeightBook = FactorWeightBook(problem)
@@ -272,21 +274,25 @@ class LocalSearchState private constructor(
 
     internal fun checkScoringWork() {
         if (moveActive || scoringCancellation === Cancellation.Never) return
+        inspectionWork?.charge(1L)
         if (scoringCountdown-- > 0) return
         scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
         if (scoringCancellation()) throw LocalSearchScoringInterrupted
     }
 
     private fun checkProbeWork() {
-        if (probeActive && !restoringProbe && scoringCancellation !== Cancellation.Never && scoringCancellation()) {
-            throw LocalSearchScoringInterrupted
+        if (probeActive && !restoringProbe && scoringCancellation !== Cancellation.Never) {
+            inspectionWork?.charge(1L)
+            if (scoringCancellation()) throw LocalSearchScoringInterrupted
         }
     }
 
     private fun checkObjectiveProbeWork() {
+        val active = probeActive && !restoringProbe && scoringCancellation !== Cancellation.Never
+        if (active) inspectionWork?.charge(1L)
         if (scoringCountdown-- > 0) return
         scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
-        checkProbeWork()
+        if (active && scoringCancellation()) throw LocalSearchScoringInterrupted
     }
 
     // Break-count probe scratch. While breakProbeActive, updateViolation records each factor whose
