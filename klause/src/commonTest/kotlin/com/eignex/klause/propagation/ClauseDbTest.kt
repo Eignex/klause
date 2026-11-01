@@ -24,7 +24,9 @@ class ClauseDbTest {
 
     @Test
     fun `native replay should protect its reason while unrelated clauses retire`() {
-        val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = true)
+        val session = PropagationSession(Problem(4, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = true)
+        assertTrue(session.usesNativeSat)
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
         session.addLearnedClause(Clause(intArrayOf(4, 6)), 9)
         session.pinBool(0, false)
@@ -41,7 +43,9 @@ class ClauseDbTest {
 
     @Test
     fun `native pending units should survive retirement of unrelated clauses`() {
-        val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = true)
+        val session = PropagationSession(Problem(4, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = true)
+        assertTrue(session.usesNativeSat)
         session.addLearnedClause(Clause(intArrayOf(1)), 1)
         session.addLearnedClause(Clause(intArrayOf(2, 4)), 9)
         session.pinBool(3, true)
@@ -59,7 +63,9 @@ class ClauseDbTest {
     @Test
     fun `live reasons should consume the ranked retention quota`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = native)
+            val session = PropagationSession(Problem(4, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
             session.addLearnedClause(Clause(intArrayOf(4, 6)), 8)
             session.addLearnedClause(Clause(intArrayOf(1)), 1)
@@ -286,19 +292,21 @@ class ClauseDbTest {
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
         val before = session.work
 
-        val retired = session.maintainCapWindow(1, 128L, 128L, { session.work - before >= 36L }) {
+        val retired = session.maintainCapWindow(1, 128L, 128L, { session.work - before >= 32L }) {
             error("cancelled policy callback")
         }
 
         assertEquals(0, retired)
         assertTrue(session.isLearnedClause(1))
-        assertEquals(36L, session.work - before)
+        assertEquals(32L, session.work - before)
     }
 
     @Test
     fun `Boolean reason ownership should survive compaction and retraction`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = native)
+            val session = PropagationSession(Problem(4, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(4, 6)), 9)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
             session.pinBool(0, false)

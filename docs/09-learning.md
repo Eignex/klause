@@ -318,14 +318,20 @@ packed-native or general backend and report completed ranking passes and
 boundary/preparation deferrals.
 
 Selected pure-Boolean retirement captures an opaque admission handle before a
-replacement is admitted. A separate compaction generation rejects stale selections;
+replacement is admitted. Immutable admission keys survive compaction; a bounded
+compressed binary index reuses an already-owned request instead of allocating another.
+A separate compaction generation rejects stale selections;
 captured handles retain no clause payload and survive later factor-ID remapping.
 The caller authorizes a request only after replacement propagation and required
 root/peer publication finish. Authorized requests stay kernel-owned when optional
 pass buffers are released. A bounded round-robin continuation rechecks current
 reasons and pending attachments, so protected requests do not block later eligible
-ones. Terminal acknowledgement and request-owner release have separate funded steps;
-capture also checks its retained-metadata allowance. Reseeding or closing the scope
+ones. Terminal results stay in the continuation signal until acknowledged and unlinked.
+Acknowledgement and request-owner release have separate funded steps; capture also
+checks its retained-metadata allowance. Deferred captures report observed minimum
+work, scratch or retained bytes. A caller distinguishes a fresh-slice retry from an
+unfundable class grant without accumulating credit for an atomic mutation.
+Reseeding or closing the scope
 invalidates outstanding handles. Selected retirement reports logical disabling,
 payload unlinking and full physical release separately. The cap index repairs
 externally retired heap and survivor entries through funded resumable steps before

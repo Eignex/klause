@@ -7,6 +7,7 @@ import com.eignex.klause.util.SharingMemoryObservation
 
 internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
     selectedRetirements.sharingMemory(sample)
+    sample.owned(this, Long.SIZE_BYTES.toLong(), true)
     val protected = protectedLearnedMemory(sample)
     nativeEngine?.sharingMemory(sample, protected) ?: learnedSharingMemory(sample, protected)
     factorAttribution?.sharingMemory(sample)
@@ -179,7 +180,9 @@ private fun PropagationState.learnedSharingMemory(
         learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)
     val protectedRows = protected.size > 0
     learned.capRanking.sharingMemory(sample, protectedRows)
-    var metadata = 0L
+    var metadata = learned.capRanking.primitiveBytes + learned.admissions.allocatedBytes + Int.SIZE_BYTES
+    sample.owned(learned.admissions, learned.admissions.allocatedBytes + Int.SIZE_BYTES, protectedRows)
+    sample.ownedReferences(learned.admissions, 1L, protectedRows)
     for (column in columns) {
         sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
         sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)

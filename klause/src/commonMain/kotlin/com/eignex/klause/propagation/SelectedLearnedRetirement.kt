@@ -3,6 +3,9 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.solver.search.LearnedKind
 
+internal fun PropagationState.learnedAdmissionKey(index: Int): Long =
+    nativeEngine?.admissionKeyOf(index) ?: learned.admissions[index]
+
 internal fun PropagationState.validateSelectedLearnedRetirement(index: Int): LearnedRetirementStatus? {
     nativeEngine?.let {
         if (index !in 0 until it.count || it.retiredOf(index)) return LearnedRetirementStatus.StaleSelection
