@@ -18,6 +18,29 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `basis costs reject the point after a bound edit`() {
+        val builder = LpBuilder()
+        val x = builder.addVar(0, 2)
+        val y = builder.addVar(0, 1, cost = 3)
+        val z = builder.addVar(0, 1, cost = 5)
+        builder.addRow(intArrayOf(x, y, z), longArrayOf(2, 2, -2), Relation.EQ, 1)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val pointModel = assertNotNull(state.ownerWorkingModel())
+        LpScopedSolver(state).use { owner ->
+            assertNotNull(owner.solveFloat()?.second)
+            assertNotNull(owner.directionalCosts(pointModel, intArrayOf(x), 100_000L, Cancellation.Never) { assertTrue(it > 0L) })
+            assertTrue(owner.push())
+            assertTrue(owner.assertBound(x, true, ExactLpSide(ExactLpNumber.of(0L)), 1L))
+            var work = 0L
+
+            val costs = owner.directionalCosts(pointModel, intArrayOf(x), 100_000L, Cancellation.Never) { work += it }
+
+            assertNull(costs)
+            assertEquals(0L, work)
+        }
+    }
+
+    @Test
     fun `retained queries can finish after an earlier invocation token expires`() {
         val builder = LpBuilder()
         repeat(2) {

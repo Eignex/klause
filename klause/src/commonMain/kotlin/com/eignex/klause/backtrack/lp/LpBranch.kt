@@ -19,6 +19,8 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
     if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
     val directionalAvailable = hints.hasDirectionalScores()
     var best: VarRef? = null
+    var runner: VarRef? = null
+    var runnerScore = LP_BRANCH_MIN_SCORE
     var bestScore = LP_BRANCH_MIN_SCORE
     var directional: VarRef? = null
     var gainScore = LP_BRANCH_MIN_SCORE
@@ -31,8 +33,13 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
         }
         val s = hints.branchScore(VarRef.Bool(b))
         if (!s.isNaN() && s > bestScore) {
+            runner = best
+            runnerScore = bestScore
             bestScore = s
             best = VarRef.Bool(b)
+        } else if (s > runnerScore) {
+            runnerScore = s
+            runner = VarRef.Bool(b)
         }
     }
     for (i in 0 until problem.numIntVars) {
@@ -45,11 +52,23 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
         }
         val s = hints.branchScore(VarRef.IntVar(i))
         if (!s.isNaN() && s > bestScore) {
+            runner = best
+            runnerScore = bestScore
             bestScore = s
             best = VarRef.IntVar(i)
+        } else if (s > runnerScore) {
+            runnerScore = s
+            runner = VarRef.IntVar(i)
         }
     }
-    return hints.selected(directional, best, gainScore) ?: best
+    if (directional != null) return hints.selected(directional, best, gainScore) ?: best
+    val basis = hints.basisPick(
+        best, runner,
+        (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
+        (runner as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
+        ::directionalCosts,
+    )
+    return hints.selected(basis?.first, best, basis?.second ?: Double.NaN, basis = true) ?: best
 }
 
 /** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below

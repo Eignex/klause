@@ -4,6 +4,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.lp.bounding.LpHintSink
 import com.eignex.klause.lp.bounding.LpHintUnavailable
 import com.eignex.klause.lp.engine.ExactLpModel
+import com.eignex.klause.lp.engine.LpDirectionalCost
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpScopedRows
@@ -36,7 +37,8 @@ internal class LpHints(
     private val collect = numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge)
     private var freshRecord = false
-    private var pointModel: LpModel? = null
+    private var pointRelaxation: LpRelaxation? = null
+    private var basisChoice = false
     private var boundRecorded = false
     private var unavailable = LpHintUnavailable.UNOBSERVED
     private var directionalChoice: VarRef? = null
@@ -60,7 +62,8 @@ internal class LpHints(
         this.incumbentVersion = incumbentVersion
         this.externalExact = externalExact
         freshRecord = false
-        pointModel = null
+        pointRelaxation = null
+        basisChoice = false
         boundRecorded = false
         unavailable = LpHintUnavailable.UNOBSERVED
         directionalChoice = null
@@ -76,7 +79,7 @@ internal class LpHints(
 
     private fun recordEstimate(relaxation: LpRelaxation, bound: Double, checked: Boolean) {
         boundRecorded = false
-        if (!collect || relaxation.colVarId.size > 8192 || !freshRecord || pointModel !== relaxation.model) {
+        if (!collect || relaxation.colVarId.size > 8192 || !freshRecord || pointRelaxation?.model !== relaxation.model) {
             recordUnavailable(LpHintUnavailable.MODEL)
             return
         }
@@ -134,6 +137,7 @@ internal class LpHints(
     }
 
     fun branch(variable: VarRef, domain: IntDomain? = null) {
+        if (basisChoice && directionalChoice == variable) observe("BASIS_CONSUMED")
         if (directionalGains && scopeModel != null) {
             observe(if (directionalChoice == variable) "CONSUMED" else "FALLBACK")
             if (directionalChoice == variable) {
@@ -148,6 +152,7 @@ internal class LpHints(
         }
         directionalChoice = null
         baselineChoice = null
+        basisChoice = false
         if (collect && scopeModel != null) {
             charge(129L)
             history.branch(variable, if (boundRecorded) value(variable, domain) else Double.NaN)
@@ -173,7 +178,57 @@ internal class LpHints(
         return history.score(variable, value(variable, domain))
     }
 
-    fun selected(variable: VarRef?, baseline: VarRef?, score: Double): VarRef? {
+    fun basisPick(
+        baseline: VarRef?,
+        alternate: VarRef?,
+        baselineDomain: IntDomain?,
+        alternateDomain: IntDomain?,
+        estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>?,
+    ): Pair<VarRef, Double>? {
+        if (!collect || !directionalGains || !freshRecord || baseline == null || alternate == null) return null
+        val relaxation = pointRelaxation ?: return null
+        val baselineValue = value(baseline, baselineDomain)
+        val alternateValue = value(alternate, alternateDomain)
+        if (!fractional(baseline, baselineValue) || !fractional(alternate, alternateValue)) return null
+        val columns = intArrayOf(relaxation.column(baseline), relaxation.column(alternate))
+        if (columns.any { it < 0 }) return null
+        charge(4L)
+        observe("BASIS_ATTEMPT")
+        val costs = estimate(relaxation.model, columns)
+        if (costs == null || costs.size != 2) {
+            observe("BASIS_DECLINED")
+            return null
+        }
+        val baselineScore = basisScore(costs[0], baselineValue)
+        val alternateScore = basisScore(costs[1], alternateValue)
+        if (!baselineScore.isFinite() || !alternateScore.isFinite()) {
+            observe("BASIS_MISSING_DIRECTION")
+            return null
+        }
+        observe("BASIS_COMPARED")
+        return if (alternateScore > baselineScore && alternateScore > 1e-9) alternate to alternateScore else null
+    }
+
+    private fun LpRelaxation.column(variable: VarRef): Int = when (variable) {
+        is VarRef.IntVar -> intColOf.getOrElse(variable.varId) { -1 }
+        is VarRef.Bool -> boolColOf.getOrElse(variable.varId) { -1 }
+    }
+
+    private fun fractional(variable: VarRef, value: Double): Boolean = value.isFinite() &&
+        value - floor(value) in INT_TOL..(1.0 - INT_TOL) &&
+        (variable !is VarRef.Bool || value in 0.0..1.0)
+
+    private fun basisScore(cost: LpDirectionalCost?, value: Double): Double {
+        cost ?: return Double.NaN
+        if (!cost.down.isFinite() || !cost.up.isFinite() || cost.down < 0.0 || cost.up < 0.0) return Double.NaN
+        val fraction = value - floor(value)
+        val down = cost.down * fraction
+        val up = cost.up * (1.0 - fraction)
+        return minOf(down, up) + maxOf(down, up) / 6.0
+    }
+
+    fun selected(variable: VarRef?, baseline: VarRef?, score: Double, basis: Boolean = false): VarRef? {
+        basisChoice = basis && variable != null
         directionalChoice = variable.takeIf { score.isFinite() && score > 0.0 }
         baselineChoice = baseline
         return directionalChoice
@@ -231,7 +286,8 @@ internal class LpHints(
         incumbentVersion = 0L
         externalExact = null
         freshRecord = false
-        pointModel = null
+        pointRelaxation = null
+        basisChoice = false
         boundRecorded = false
         directionalChoice = null
         baselineChoice = null
@@ -261,7 +317,7 @@ internal class LpHints(
     override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
         recorded = true
         freshRecord = true
-        pointModel = relaxation.model
+        pointRelaxation = relaxation
         boundRecorded = false
         unavailable = LpHintUnavailable.NO_BOUND
         val model = relaxation.model

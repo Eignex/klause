@@ -270,9 +270,14 @@ The `lp-default` and `lp-aggressive` optimization recipes enable the finite cons
 and branching must be enabled. Two recent samples in each direction permit a
 variable's balanced gain score, combining the smaller predicted child gain with
 one sixth of the larger. Each estimate uses only that variable's observed gains;
-missing directions and unreliable history retain reduced-cost/fractionality scoring
-and the configured selector's precedence. Directional scores use the same objective
-units; reduced costs remain part of the fallback scorer.
+missing directions and unreliable history permit a bounded comparison of the current
+LP scorer's winner and runner-up. A matching retained optimal basis supplies one-row
+objective cost estimates in both directions, multiplied by their fractional movements
+and combined with the same balanced score. Only a strictly larger finite score changes
+the winner. These estimates remain current-node advice, separate from observed gains.
+Unsupported engines, stale or unfinished bases, missing directions and insufficient
+allowance retain reduced-cost/fractionality scoring and the configured selector's
+precedence. Directional scores use the same objective units.
 An invocation-local readiness check skips directional candidate lookups when no
 history can yield a score; its bookkeeping uses the same LP work allowance.
 Consumed choices record agreement

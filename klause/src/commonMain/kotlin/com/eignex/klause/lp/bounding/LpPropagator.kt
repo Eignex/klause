@@ -12,11 +12,13 @@ import com.eignex.klause.lp.engine.LpBoundAssertion
 import com.eignex.klause.lp.engine.LpBoundBatchResult
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpClaim
+import com.eignex.klause.lp.engine.LpDirectionalCost
 import com.eignex.klause.lp.engine.LpExactCitedSide
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpExactSupport
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpLayoutRemap
+import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpScopedMetrics
 import com.eignex.klause.lp.engine.LpScopedRow
@@ -399,6 +401,15 @@ internal class LpPropagator(
             onPreparation?.invoke(takePreparationMetrics(current))
         }
     } == true
+
+    fun directionalCosts(
+        pointModel: LpModel,
+        columns: IntArray,
+        allowance: Long,
+        token: Cancellation,
+        charge: (Long) -> Unit,
+    ): List<LpDirectionalCost?>? = if (closed || invalidated || token()) null else
+        owner?.directionalCosts(pointModel, columns, allowance, token, charge)
 
     fun solveFloat(
         warm: Basis? = null,

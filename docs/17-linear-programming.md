@@ -182,7 +182,14 @@ estimate; the search keeps that estimate kind in its history scope.
 Unavailable callbacks identify admission gates and incomplete numerical outcomes;
 they carry no optimum, bound or query authorization.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
-history lifetime.
+history lifetime. An optional numerical capability estimates directional objective
+costs from a retained optimal basis for at most two structural columns. Each basis-row
+solve scans oriented reduced costs, including logical columns, and converts its ratios
+to source-coordinate objective units. It neither pivots nor requests another LP solve
+or certificate. Analysis reserves its work before allocation, within the node's unspent
+query allowance and remaining containing and cumulative allowances; work and elapsed
+time are recorded separately. Changed exact states and incomplete or unsupported bases
+decline. The estimates never enter directional history or certify a branch bound.
 
 A node query that makes pivots but stops on its work allowance before returning a
 point grows the adaptive request within its existing ceiling and remaining

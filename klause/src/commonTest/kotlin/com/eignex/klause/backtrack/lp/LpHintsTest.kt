@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpDirectionalCost
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
@@ -26,6 +27,7 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpHintsTest {
@@ -45,6 +47,61 @@ class LpHintsTest {
         }
         hints.record(rel, primal, DoubleArray(rel.model.m))
         return hints
+    }
+
+    @Test
+    fun `basis comparison requires a strictly larger balanced directional gain`() {
+        for ((alternateCost, expected) in listOf(
+            LpDirectionalCost(4.0, 4.0) to VarRef.IntVar(1),
+            LpDirectionalCost(2.0, 6.0) to null,
+            LpDirectionalCost(1.0, 12.0) to null,
+            LpDirectionalCost(-1.0, 6.0) to null,
+            LpDirectionalCost(Double.NaN, 6.0) to null,
+            null to null,
+        )) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 2) }
+            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val hints = LpHints(2, 0, directionalGains = true)
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+
+            val selected = hints.basisPick(VarRef.IntVar(0), VarRef.IntVar(1), IntDomain(0, 2),
+                IntDomain(0, 2)) { model, columns ->
+                assertTrue(model === relaxation.model)
+                assertEquals(listOf(0, 1), columns.toList())
+                listOf(LpDirectionalCost(2.0, 6.0), alternateCost)
+            }
+
+            assertEquals(expected, selected?.first)
+        }
+    }
+
+    @Test
+    fun `basis comparison ignores missing points and excluded split neighbours`() {
+        for (decline in listOf("disabled", "next-node", "domain", "integral", "clear")) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 2) }
+            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val hints = LpHints(2, 0, directionalGains = decline != "disabled")
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(if (decline == "integral") 0.0 else 0.5, 0.5),
+                DoubleArray(0))
+            if (decline == "next-node") hints.beginNode(1, 100.0)
+            if (decline == "clear") hints.clear()
+            var estimates = 0
+
+            val selected = hints.basisPick(VarRef.IntVar(0), VarRef.IntVar(1),
+                if (decline == "domain") IntDomain(1, 2) else IntDomain(0, 2), IntDomain(0, 2)) { _, _ ->
+                estimates++
+                listOf(LpDirectionalCost(1.0, 1.0), LpDirectionalCost(4.0, 4.0))
+            }
+
+            assertNull(selected, decline)
+            assertEquals(0, estimates, decline)
+        }
     }
 
     @Test
