@@ -35,6 +35,7 @@ import com.eignex.klause.lp.engine.ceilLong
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.certifyLpBoundOnly
 import com.eignex.klause.lp.engine.certifyLpFarkas
+import com.eignex.klause.lp.engine.certifyLpIntegerBoundOnly
 import com.eignex.klause.lp.engine.checkedLpConflict
 import com.eignex.klause.lp.engine.checkedLpWitness
 import com.eignex.klause.lp.engine.exactBits
@@ -1596,7 +1597,7 @@ private fun LpEngine.retainedRootLowerBound(
         component.partialBoundDuals(cancellation) ?: return null
     }
     if (cancellation()) return null
-    val checked = certifyLpBoundOnly(
+    val checked = checkRetainedRootBound(
         model,
         duals,
         defaults.copy(
@@ -1606,14 +1607,33 @@ private fun LpEngine.retainedRootLowerBound(
             maxAllocation = allocation - candidateBytes,
         ),
         cancellation,
-        rootCertificationObserver(),
-        solveContext.certificationPolicy,
-    ).bound ?: return null
+    ) ?: return null
     if (cancellation()) return null
     val lower = if (model.hasIntegralObjective()) {
-        checked.value.ceilLong()?.let(BigFraction::ofLong) ?: checked.value
-    } else checked.value
+        checked.ceilLong()?.let(BigFraction::ofLong) ?: checked
+    } else checked
     return lower.lowerBoundDouble()
+}
+
+private fun LpEngine.checkRetainedRootBound(
+    model: LpModel,
+    duals: DoubleArray,
+    limits: ReconstructionLimits,
+    cancellation: Cancellation,
+): BigFraction? {
+    val observer = rootCertificationObserver()
+    val integer = if (model.exactState != null && !model.hasContinuous) {
+        certifyLpIntegerBoundOnly(model, duals, limits, cancellation, observer, solveContext.certificationPolicy)
+    } else null
+    integer?.bound?.let { return it.value }
+    if (cancellation()) return null
+    val work = minOf(retainedRootRemainingWork(), limits.maxWork - (integer?.metrics?.work ?: 0L))
+    val allocation = limits.maxAllocation - (integer?.metrics?.allocation ?: 0L)
+    if (work <= 0L || allocation <= 0L) return null
+    return certifyLpBoundOnly(
+        model, duals, limits.copy(maxWork = work, maxAllocation = allocation), cancellation,
+        observer, solveContext.certificationPolicy,
+    ).bound?.value
 }
 
 private fun LpEngine.recordRootQueryBound(relaxation: LpRelaxation, result: FloatLpResult) {

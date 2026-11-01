@@ -88,14 +88,17 @@ internal class RoundedDuals(val scaleBits: Int, val scale: Long, val mult: LongA
 /** Round the float duals `y` to integer multipliers at a capped power-of-two scale `2ᵏ`, or null when a
  *  dual is non-finite or its scaled value escapes the exactly-representable range (so [roundToLong]
  *  recovers the true nearest integer). */
-internal fun roundDuals(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): RoundedDuals? {
+internal fun roundDuals(
+    model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS, inspect: (() -> Unit)? = null,
+): RoundedDuals? {
     val m = model.m
     if (y.size != m) return null
-    val k = dualRoundingScaleBits(y, scaleBits) ?: return null
+    val k = dualRoundingScaleBits(y, scaleBits, inspect) ?: return null
     val scale = 1L shl k
     val scaleD = scale.toDouble()
     val mult = LongArray(m)
     for (i in 0 until m) {
+        inspect?.invoke()
         val s = y[i] * scaleD
         if (!s.isFinite() || abs(s) >= MAX_EXACT_INT) return null
         mult[i] = s.roundToLong()
@@ -272,7 +275,7 @@ internal fun integerCertifyUnchecked(
     scan: (() -> Unit)? = null,
 ): IntegerCertificate? {
     val integers = IntegerLpView.create(model) ?: return null
-    val rd = roundDuals(model, y, scaleBits) ?: return null
+    val rd = roundDuals(model, y, scaleBits, scan) ?: return null
     val m = model.m
     val n = model.n
     val scale = rd.scale

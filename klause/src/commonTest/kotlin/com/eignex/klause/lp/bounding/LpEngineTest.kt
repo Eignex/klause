@@ -15,6 +15,7 @@ import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpFloatTermination
@@ -477,19 +478,21 @@ class LpEngineTest {
                 }
             }
         }
-        for (accepted in listOf(false, true)) {
+        for (allowed in listOf(emptySet(), setOf(LpCertifier.INTEGER), setOf(LpCertifier.RATIONAL))) {
             val sink = SolveStatsSink("partial-component-root-policy")
-            val context = LpSolveContext(factory, LpCertificationPolicy { _, success -> accepted && success })
+            val context = LpSolveContext(factory, LpCertificationPolicy { certifier, success ->
+                success && certifier in allowed
+            })
             LpEngine(problem, LinearObjective(intCoefficients = LongArray(6) { 1L }, constant = 7L),
                 LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
                     probe = false, rootCutHarvest = false)), sink, context).use { engine ->
 
                 val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
 
-                if (accepted) assertEquals(9.0, bound) else assertTrue(bound.isNaN())
+                if (allowed.isNotEmpty()) assertEquals(9.0, bound) else assertTrue(bound.isNaN())
                 assertEquals(LpFloatTermination.WORK, engine.propagator.floatTermination)
                 assertFalse(engine.propagator.floatPaused)
-                if (accepted) {
+                if (allowed.isNotEmpty()) {
                     assertEquals(1L,
                         sink.snapshot().lp.phases["ROOT_QUERY_ROOT"]?.outcomes?.get("COMPONENT_PARTIAL_BOUND"))
                 }

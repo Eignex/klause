@@ -91,8 +91,9 @@ authorize reuse. The new source binding owns no predecessor snapshot, so repeate
 compatible preparations retain no generation chain.
 
 An internal selective-metadata preparation mode validates row identity and exact
-bound sides before retaining the row index. Node engines use this mode and own
-their numerical component partitions. A selected view whose handoff checked
+bound sides before retaining the row index. Explicit component-owned and admitted
+sparse-trial engines select this mode and own their numerical component partitions.
+Other node engines keep the ordinary mode. A selected view whose handoff checked
 ordered factor identities carries the same immutable layout token, so subsequent
 template preparations need no duplicate row scan. Other rewrites and explicit
 namespace remaps carry fresh tokens and validate their actual factor identities.
@@ -363,6 +364,9 @@ without a result, reserving their copied vector inside the existing checking all
 bound-only checker verifies the candidate under the remaining root work and cancellation
 allowance before source projection. A refused check publishes no bound or point; the numerical
 query still yields after its adaptive quantum.
+Closed integral authority first checks rounded integer multipliers in fixed-width
+arithmetic with bounded work, scratch and cancellation polling. Rational reconstruction
+receives only the remaining checking work and allocation after a declined integer attempt.
 Node consumers can prune against the existing source-objective cutoff after
 charging aggregation and certificate work; they do not publish branching coordinates
 or train directional history from the partial aggregate.
