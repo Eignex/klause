@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.lp.bounding.LpConfig
@@ -15,6 +16,22 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FactorAttributionTest {
+    @Test
+    fun `retiring a clause should release its aliased diagnostic reason`() {
+        val attribution = FactorAttribution(2)
+        val clause = ClausePropagator(intArrayOf(0, 1), intArrayOf(), intArrayOf(0, 2))
+        val other = intArrayOf(4)
+        val family = 1 shl FactorFamily.Table.ordinal
+        attribution.remember(clause.literals, family)
+        attribution.remember(other, family)
+
+        attribution.retire(clause)
+
+        assertEquals(1L, attribution.snapshot()["factorTrackedReasons"])
+        assertEquals(1 shl FactorFamily.Unattributed.ordinal, attribution.reasonFamily(clause.literals))
+        assertEquals(family, attribution.reasonFamily(other))
+    }
+
     @Test
     fun `ordinary table conflicts carry family attribution into consumed learning`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(

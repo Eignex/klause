@@ -13,6 +13,7 @@ import com.eignex.klause.factor.scheduling.DiffnPropagator
 import com.eignex.klause.factor.scheduling.DisjunctivePropagator
 import com.eignex.klause.factor.table.MddPropagator
 import com.eignex.klause.factor.table.TablePropagator
+import com.eignex.klause.util.SharingMemoryObservation
 
 internal enum class FactorFamily { Clause, Pb, Linear, Table, Mdd, Distinct, Scheduling, Integer, Other, Unattributed }
 
@@ -31,7 +32,8 @@ internal fun Propagator.propagationFamily(): FactorFamily = when (this) {
 
 internal class FactorAttribution(private val capacity: Int = 1024) {
     private val counts = Array(FactorFamily.entries.size) { LongArray(Metric.entries.size) }
-    private val reasons = HashMap<IntArray, Int>()
+    private data class RetainedReason(val families: Int, val slot: Int)
+    private val reasons = HashMap<IntArray, RetainedReason>()
     private val reasonRing = arrayOfNulls<IntArray>(capacity)
     private var nextReason = 0
     private val learned = HashMap<Propagator, Int>()
@@ -70,11 +72,11 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
         if (reasons.containsKey(reason)) return
         reasonRing[nextReason]?.let { reasons.remove(it) }
         reasonRing[nextReason] = reason
+        reasons[reason] = RetainedReason(mask, nextReason)
         nextReason = (nextReason + 1) % capacity
-        reasons[reason] = mask
     }
 
-    fun reasonFamily(reason: IntArray): Int = reasons[reason] ?: (1 shl FactorFamily.Unattributed.ordinal)
+    fun reasonFamily(reason: IntArray): Int = reasons[reason]?.families ?: (1 shl FactorFamily.Unattributed.ordinal)
 
     fun support(mask: Int, metric: Metric, size: Int) {
         note(mask, metric)
@@ -115,7 +117,20 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
         used(learned[propagator] ?: (1 shl FactorFamily.Unattributed.ordinal))
     }
 
-    fun retire(propagator: Propagator) { learned.remove(propagator) }
+    fun retire(propagator: Propagator) {
+        learned.remove(propagator)
+        if (propagator is ClausePropagator) reasons.remove(propagator.literals)?.let { reasonRing[it.slot] = null }
+    }
+
+    fun sharingMemory(sample: SharingMemoryObservation) {
+        sample.ownedReferences(reasonRing, reasonRing.size.toLong(), false)
+        sample.ownedReferences(reasons, reasons.size.toLong() * 2L, false)
+        sample.ownedReferences(learned, learned.size.toLong() * 2L, false)
+        for (reason in reasonRing) {
+            sample.step()
+            if (reason != null) sample.owned(reason, reason.size.toLong() * Int.SIZE_BYTES)
+        }
+    }
 
     fun snapshot(): Map<String, Long> = buildMap {
         for (family in FactorFamily.entries) for (metric in Metric.entries) {

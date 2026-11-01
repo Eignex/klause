@@ -78,7 +78,7 @@ class ClauseDbTest {
     }
 
     @Test
-    fun `general window retirement should disable propagation while retaining factor payload`() {
+    fun `general window retirement should disable propagation and release factor payload`() {
         val session = PropagationSession(Problem(4, 0, emptyArray(), arrayOf(Clause(intArrayOf(4, 6)))),
             nativeSat = false)
         session.addLearnedClause(Clause(intArrayOf(4, 6)), 9, permanent = true)
@@ -89,7 +89,7 @@ class ClauseDbTest {
         session.pinBool(0, false)
 
         assertNull(session.boolValue(1))
-        assertIs<ClausePropagator>(session.explanationState.factorAt(factor))
+        assertEquals(NoPropagator, session.explanationState.factorAt(factor))
         assertEquals(1, session.activeLearnedClauseCount)
     }
 
@@ -180,7 +180,7 @@ class ClauseDbTest {
     }
 
     @Test
-    fun `general retired slots should keep owned bytes until funded compaction`() {
+    fun `general retirement should release payload before funded index compaction`() {
         val session = PropagationSession(Problem(4, 0, emptyArray(), arrayOf(Clause(intArrayOf(4, 6)))),
             nativeSat = false)
         session.addLearnedClause(Clause(intArrayOf(4, 6)), 9, permanent = true)
@@ -192,7 +192,7 @@ class ClauseDbTest {
         session.forgetLearnedClauses { _, _ -> true }
         val compacted = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
-        assertEquals(before.getValue("ownedPrimitiveBytes"), logical.getValue("ownedPrimitiveBytes"))
+        assertTrue(logical.getValue("ownedPrimitiveBytes") < before.getValue("ownedPrimitiveBytes"))
         assertTrue(compacted.getValue("ownedPrimitiveBytes") < logical.getValue("ownedPrimitiveBytes"))
         assertEquals(1L, session.learnedLifecycle()["learningClauseRetired"])
     }

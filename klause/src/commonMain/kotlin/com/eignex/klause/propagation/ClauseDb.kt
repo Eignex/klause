@@ -47,6 +47,8 @@ internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int
 internal fun PropagationState.factorAt(fid: Int): Propagator = when {
     incremental && !factorAliveAt(fid) -> NoPropagator
 
+    retiredLearnedFactor(fid) -> NoPropagator
+
     fid < baseFactorCount ->
         if (nativeEngine == null) baseFactors[fid] else problem.factors[fid].propagatorProjection()
 

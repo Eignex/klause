@@ -121,7 +121,8 @@ They describe participation and consumption, without asserting causal benefit.
 One state owns at most 1,024 reason identities of at most 64 words each and 1,024
 learned provenance entries. Reason eviction and provenance exhaustion affect only
 diagnostics; missing identities use the unattributed family. Retirement releases
-learned provenance, and compaction preserves it by object identity. The native SAT
+learned provenance and diagnostic ring entries aliasing that clause's literals;
+compaction preserves retained provenance by object identity. The native SAT
 lane retains packed propagation and credits its clause family without constructing
 general propagator projections. Its fire counter counts BCP calls rather than
 general factor invocations. Disabling attribution retains no diagnostic maps.
@@ -228,7 +229,8 @@ and explicit completeness; see [sharing accounting](12-portfolio.md#shared-chann
 Observation never invokes retirement or materializes a reason. Partial data and
 historical peaks cannot authorize a byte-limit decision.
 Payload counts and index capacity have separate ownership;
-reference counts exclude platform object layout. An owner-aware aggregate counts
+reference counts exclude platform object layout. The bounded attribution reason ring
+and its modeled map references participate in this observation. An owner-aware aggregate counts
 each primitive payload or allocated index once, including aliased reasons; modeled
 references use eight bytes per slot for byte-limit policy. Completeness covers the
 enumerated owners, rather than the worker's entire heap. Active and historical
@@ -466,6 +468,9 @@ reduce the heap quota. A pending eviction that gains protection also consumes th
 quota before the next heap step. Mid rows
 survive their demotion window, and classification clears survivor reuse flags.
 Current or historical reasons can retain additional rows above the soft cap. General
+clause retirement replaces its payload with an inert stable-ID slot and releases its
+watch-position payload and deferred/diagnostic aliases. Stale watches skip that slot;
+their allocated capacity and policy columns remain owned until compaction. General
 reason snapshots and full physical compaction still require their complete funding;
 non-clause and shared stores retain the complete selection/remap path.
 

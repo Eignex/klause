@@ -8,6 +8,7 @@ import com.eignex.klause.util.SharingMemoryObservation
 internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
     val protected = protectedLearnedMemory(sample)
     nativeEngine?.sharingMemory(sample, protected) ?: learnedSharingMemory(sample, protected)
+    factorAttribution?.sharingMemory(sample)
     val reasons = sample.seen<IntArray>()
     var reasonBytes = 0L
     var reasonSlots = 0L

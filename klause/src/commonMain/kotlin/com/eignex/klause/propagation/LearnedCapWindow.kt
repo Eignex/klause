@@ -61,9 +61,13 @@ private fun PropagationState.generalCapPolicy(
         if (!mayDrop(index) || protected[index] || clause.literals.size <= 1 || learned.stages[index] and 1 == 0) {
             return false
         }
+        budget.visit(8L)
         budget.visit(0L)
         learned.retire(index)
         factorAttribution?.retire(clause)
+        forgetDeferredClause(clause.literals)
+        learned.store[index] = RetiredLearnedPropagator
+        refPayloadStore[baseFactorCount + index] = null
         return true
     }
 }
