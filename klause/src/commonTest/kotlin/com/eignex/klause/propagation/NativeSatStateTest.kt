@@ -125,6 +125,19 @@ class NativeSatStateTest {
     }
 
     @Test
+    fun `retired clauses should stay absent from binary implications`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.maintainNativeCapWindow(1, 40L, 64L, { false }) { false }
+        val partners = ArrayList<Int>()
+
+        session.explanationState.forEachBinaryPartner(Lit.make(0, true)) { partners.add(it) }
+
+        assertTrue(partners.isEmpty())
+    }
+
+    @Test
     fun `compacting retired slots should preserve exact retirement counts`() {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
