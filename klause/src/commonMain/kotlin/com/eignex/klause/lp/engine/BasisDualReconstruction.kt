@@ -223,23 +223,49 @@ private class BasisDualRun(
                     val bounds = a.bounds[basis.basicVars[layout.structuralSlots[equation]]]
                     bounds.lower == null || bounds.upper == null
                 }
-                val required = repairDirections(open, limits.dimension)
-                largestRestrictedColumns = maxOf(largestRestrictedColumns, required.size)
-                if (required.size > limits.dimension || (open.isNotEmpty() && required.isEmpty())) {
-                    decline = "DIMENSION"
-                    continue
-                }
-                val matched = selectOpenPivots(group, required)
-                if (matched == null) {
-                    decline = "OPEN_RANK"
-                    continue
-                }
-                if (required.isNotEmpty() && !solve(matched, required, local, restricted = true)) break
-                restrictedComponents++
-                restrictedColumns += required.size
+                if (!solveOpen(group, open, local, limits.dimension)) break
                 continue
             }
             if (!solve(group, selected, local)) break
+        }
+    }
+
+    private fun solveOpen(group: List<Int>, open: List<Int>, local: IntArray, dimension: Int): Boolean {
+        val initial = repairDirections(open, dimension)
+        meter.storage(64L + open.size * 8L + equations.size)
+        meter.step(initial.size.toLong())
+        val required = ArrayList<Int>(open.size).apply { addAll(initial) }
+        val chosen = BooleanArray(equations.size)
+        for (equation in required) {
+            meter.step()
+            chosen[equation] = true
+        }
+        while (true) {
+            largestRestrictedColumns = maxOf(largestRestrictedColumns, required.size)
+            if (required.size > dimension || (open.isNotEmpty() && required.isEmpty())) {
+                decline = "DIMENSION"
+                return true
+            }
+            val matched = selectOpenPivots(group, required)
+            if (matched == null) {
+                decline = "OPEN_RANK"
+                return true
+            }
+            if (required.isNotEmpty() && !solve(matched, required, local, restricted = true)) return false
+            var added = false
+            for (equation in open) {
+                meter.step()
+                if (!chosen[equation] && requiresMissingSide(equation)) {
+                    chosen[equation] = true
+                    required += equation
+                    added = true
+                }
+            }
+            if (!added) {
+                restrictedComponents++
+                restrictedColumns += required.size
+                return true
+            }
         }
     }
 

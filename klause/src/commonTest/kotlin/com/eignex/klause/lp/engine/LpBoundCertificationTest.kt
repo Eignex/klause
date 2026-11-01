@@ -10,6 +10,43 @@ import kotlin.test.assertTrue
 
 class LpBoundCertificationTest {
     @Test
+    fun `partial basis repair should restore a newly violated one sided direction`() {
+        val size = 129
+        val zero = ExactLpNumber.of(0L)
+        for (upper in listOf(false, true)) {
+            val sign = if (upper) 1L else -1L
+            val bounds = if (upper) ExactLpBounds(upper = ExactLpSide(zero)) else
+                ExactLpBounds(ExactLpSide(zero))
+            val source = assertNotNull(LpExactState(ExactLpModel(
+                List(size) { column ->
+                    listOf(column to 2L, (column + 1) % size to if (column == size - 1) -1L else 1L)
+                        .sortedBy { it.first }
+                        .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
+                },
+                List(size) { zero },
+                List(size * 2) { ExactLpColumn(bounds) },
+                List(size) { ExactLpRow() },
+                ExactLpObjective(List(size) { column ->
+                    when (column) {
+                        0 -> ExactLpNumber.of(sign * 3L)
+                        size - 1 -> ExactLpNumber.of(BigFraction.ofLong(sign * 49L) *
+                            BigFraction.ofLong(50L).reciprocal())
+                        else -> zero
+                    }
+                } + List(size) { zero }),
+            )).toWorkingModel())
+            val basis = Basis(IntArray(size) { it }, Array(size * 2) {
+                if (it < size) VarStatus.BASIC else if (upper) VarStatus.AT_UPPER else VarStatus.AT_LOWER
+            })
+
+            val result = certifyLpBoundOnly(source, DoubleArray(size) { sign * 0.99 },
+                ReconstructionLimits(maxAttempts = 1), basis = basis)
+
+            assertEquals(BigFraction.ZERO, assertNotNull(result.bound).value)
+        }
+    }
+
+    @Test
     fun `large basis repair should retain admissible one sided residuals`() {
         val size = 129
         val zero = ExactLpNumber.of(0L)

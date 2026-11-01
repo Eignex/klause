@@ -560,7 +560,11 @@ propose an admitted subset of dual coordinates for its open basic directions.
 Repair targets the exact residuals whose signs require absent bound sides,
 even when the full open set fits the dimension cap. Admissible one-sided
 residuals need not be zero. With no such basic residual, an admitted full open
-subsystem remains available for other column residues. Every untouched direction
+subsystem remains available for other column residues. A repair adds open basic
+directions whose residuals require missing sides after an earlier subsystem solve,
+retaining prior equations in the expanded proposal. Every expansion adds a direction
+and shares the original dimension, work, allocation and scalar limits. Every untouched
+direction
 remains subject to the complete dual check after the proposal changes its multipliers.
 Row-scaled floating elimination selects those coordinates within 16,384 projected
 cells and the containing certificate budget. Nonfinite or weak projected pivots
