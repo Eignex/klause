@@ -875,17 +875,6 @@ counts source rows once; `MixedCandidates`, `MixedComplementaryAttempts` and
 Bound-side alternatives and selected rows establish no useful bound or cost gain
 without subsequent checked support and actual frontier consumption.
 
-[9277](https://lab.eignex.com/jobs/9277) exercises both sources at `0af8492830`
-with ownership and root cuts toggled independently. With root cuts off, node
-queries reuse 4 and 27 child results; with cuts on, 2 and 3 cuts become active.
-All eight source witnesses pass the independent MIPLIB solchecker with zero
-violations and objectives 4 and 6. Witness checking does not certify optimality.
-Preparation takes 6.4 seconds through a verified build cache; the preceding
-[9275](https://lab.eignex.com/jobs/9275) takes 333 seconds to prepare and retains
-the unpinned controls that often finish in LP-free arms. Earlier admission,
-worker-loss and deadline failures retain no numerical outcome. These small
-controls support lifecycle consumption, without a timing or default-activation claim.
-
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
 ```sh
@@ -1192,26 +1181,6 @@ A component request does not establish that a component owner was constructed;
 use the component lifecycle counters for that. Query work is the delta of charged
 LP operations and overlaps assembly, numerical and certificate counters. Its time
 also includes nested stages; do not add those observations together.
-
-[9172](https://lab.eignex.com/jobs/9172) compares default and trial at
-`bde182ce9b`, seed 3, ten seconds and one Linux/amd64 processor, with matching
-source and installed-build/runtime hashes. On `cap6000`, 18,243 nonzeros across
-2,171 rows and 6,000 columns admit the trial. Native exact certification accepts
-the root lower bound -2,451,537, and ordinary search exports it to the shared
-objective floor; the root owner is retained for subsequent queries. The trial
-finds no witness. The default witness at -2,442,801 passes the external MIPLIB
-solchecker; that receipt certifies the witness, not the trial's bound or optimality.
-On `rentacar`, the ordinary root-node query reaches 132 pivots and reduces sampled
-violated basics from 815 to 794 before its work stop, without a certificate.
-
-The trial reserves about 529 MiB and 669 MiB respectively; measured process RSS
-peaks at about 258 MiB and 462 MiB. Preparation includes 287 seconds of remote
-compilation, and the four-case job takes about 417 seconds. These single-repeat
-controls establish bounded execution and useful native bound consumption, with
-large-source no-yield evidence retained. They establish no whole-source speedup,
-independent source proof or basis for default activation. Earlier controls and
-negatives remain in [9134](https://lab.eignex.com/jobs/9134) and
-[9166](https://lab.eignex.com/jobs/9166).
 
 ## Worker admission qualification
 
