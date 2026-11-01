@@ -15,6 +15,8 @@ import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.ResumableSolve
+import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.StatelessSession
@@ -64,9 +66,13 @@ class PortfolioWorkAccountingTest {
                     return null
                 }
             }
-            val native = PortfolioWorker.ofMinimize(
-                "priced", 0, countsInstructions = true, resumable = { handle },
-            ) { _, _, _, _ -> error("retained search required") }
+            val solver = object : ResumableOptimizer<BacktrackParams> by TrackingResumableOptimizer(handle) {
+                override fun session() = StatelessSession(this)
+            }
+            val native = PortfolioWorker.of(
+                "priced", 0, solver.session(), BacktrackParams(), LinearObjective(),
+                withInstructionBudget = { params, _ -> params },
+            )
             val worker = if (coordinates) {
                 native.objectiveCoordinateProposals(ModelIdentity.of(Any())) { null }
             } else native
@@ -108,10 +114,15 @@ class PortfolioWorkAccountingTest {
                 return null
             }
         }
+        val solver = object : ResumableSolver<BacktrackParams> by CountingResumableSolver(1) {
+            override fun session() = StatelessSession(this)
+            override fun resumableSolve(params: BacktrackParams): ResumableSolve = handle
+        }
         val arms = listOf(
-            PortfolioWorker.ofSolve("priced", 0, countsInstructions = true, resumable = { handle }) { _, _ ->
-                error("retained search required")
-            },
+            PortfolioWorker.of(
+                "priced", 0, solver.session(), BacktrackParams(),
+                withInstructionBudget = { params, _ -> params },
+            ),
             PortfolioWorker.ofSolve("done", 1) { _, _ -> SolveResult.Unsat() },
         )
 

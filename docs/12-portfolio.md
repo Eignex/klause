@@ -645,9 +645,9 @@ follow the
 
 Retained Boolean clause walks with definition repairs price scoring inspections
 alongside their native instructions. The scheduler passes both allowances through
-objective-coordinate wrappers and charges auxiliary work to the containing ledger,
-including atomic overspend. Native instruction limits retain their own currency;
-[local search](10-local-search.md) owns the inspected operations.
+session-ownership and objective-coordinate wrappers and charges auxiliary work to
+the containing ledger, including atomic overspend. Native instruction limits retain
+their own currency; [local search](10-local-search.md) owns the inspected operations.
 
 #### Private CP preparation
 
