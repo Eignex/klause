@@ -138,6 +138,8 @@ connected integer neighborhood without a root relaxation. The all-pinned
 rounded-root bootstrap is reserved for a center without that checked handoff.
 Continuous columns stay free, source
 cutoff checks remain exact, and later proposals retain their captured conditions.
+Imported points remain query incumbents and centers; only a point produced by the
+repair query enters companion discovery publication and original-source rechecking.
 If that first proposal pauses, it receives continuation after owed complete-worker
 coverage until the proposal finishes or the companion's existing allowance retires
 it. This trial grants no incumbent reward and does not renew work, allocation or
