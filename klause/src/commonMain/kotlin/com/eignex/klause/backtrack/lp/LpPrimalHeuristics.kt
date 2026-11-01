@@ -134,7 +134,8 @@ internal fun LpEngine.lpRoundingProbe(
                 }
                 if (attempt.fixpointCancelled || attempt.probeCancelled || cancellation()) {
                     rootRoundingInterrupted = true
-                    keepPinning = attempt === session && !attempt.fixpointCancelled
+                    keepPinning = attempt === session && !attempt.fixpointCancelled &&
+                        (sample != null || attempt.probeCancelled)
                     outcome = "CANCELLED"
                     return null
                 }
