@@ -8,8 +8,10 @@ import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpScopedRows
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.util.magnitudeBitLength
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.min
@@ -47,11 +49,17 @@ internal class LpHints(
     private var scopeConstant = 0L
     private var scopeCutoff = Double.NaN
     private var scopeChecked = false
+    private var scopeIncumbentVersion = 0L
+    private var scopeExternalExact: BigFraction? = null
     private var cutoff = Double.NaN
+    private var incumbentVersion = 0L
+    private var externalExact: BigFraction? = null
 
-    fun beginNode(depth: Int, bound: Double) {
+    fun beginNode(depth: Int, bound: Double, incumbentVersion: Long = 0L, externalExact: BigFraction? = null) {
         if (scopeModel != null) charge(1L)
         cutoff = bound
+        this.incumbentVersion = incumbentVersion
+        this.externalExact = externalExact
         freshRecord = false
         pointModel = null
         boundRecorded = false
@@ -78,10 +86,11 @@ internal class LpHints(
             recordUnavailable(LpHintUnavailable.MODEL)
             return
         }
-        charge(2L * relaxation.colVarId.size + 1L)
+        charge(2L * relaxation.colVarId.size + 3L + cutoffComparisonWork())
         if (scopeModel !== state.baseModel || scopeRows !== state.rows ||
             !scopeVariables.contentEquals(relaxation.colVarId) || !scopeBooleans.contentEquals(relaxation.colIsBool) ||
-            scopeConstant != relaxation.objectiveConstant || scopeCutoff != cutoff || scopeChecked != checked
+            scopeConstant != relaxation.objectiveConstant || scopeCutoff != cutoff || scopeChecked != checked ||
+            scopeIncumbentVersion != incumbentVersion || scopeExternalExact != externalExact
         ) {
             if (scopeModel != null) observe("INCOMPATIBLE")
             charge(history.retainedEntries.toLong() + 2L * relaxation.colVarId.size)
@@ -93,11 +102,20 @@ internal class LpHints(
             scopeConstant = relaxation.objectiveConstant
             scopeCutoff = cutoff
             scopeChecked = checked
+            scopeIncumbentVersion = incumbentVersion
+            scopeExternalExact = externalExact
         }
         // The scoped constant cancels in every gain; adding it can round away a small difference.
         boundRecorded = bound.isFinite()
         if (boundRecorded) observe(if (checked) "BOUND_RECORDED" else "OPTIMUM_RECORDED")
         history.record(bound)
+    }
+
+    private fun cutoffComparisonWork(): Long {
+        if (scopeExternalExact === externalExact) return 0L
+        val oldBits = scopeExternalExact?.let { maxOf(it.num.magnitudeBitLength(), it.den.magnitudeBitLength()) } ?: 0
+        val newBits = externalExact?.let { maxOf(it.num.magnitudeBitLength(), it.den.magnitudeBitLength()) } ?: 0
+        return 2L * ((maxOf(oldBits, newBits).toLong() + 63L) / 64L)
     }
 
     override fun recordInfeasible() = history.infeasible()
@@ -221,6 +239,10 @@ internal class LpHints(
         scopeVariables = IntArray(0)
         scopeBooleans = BooleanArray(0)
         scopeChecked = false
+        scopeIncumbentVersion = 0L
+        scopeExternalExact = null
+        incumbentVersion = 0L
+        externalExact = null
         freshRecord = false
         pointModel = null
         boundRecorded = false

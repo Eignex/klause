@@ -285,8 +285,10 @@ attempts separately. These observations spend the existing allowance and do not
 request another solve or supply a gain sample.
 
 Samples share one retained exact base model, active-row identity, objective mapping
-and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
-history and pending comparisons. Restart and assumption reseeding clear history.
+and incumbent cutoff. The cutoff context includes the local incumbent publication
+version and exact external bound, so changes hidden by floating precision invalidate
+history. Exact comparison work spends the existing allowance. Changed rows or cuts,
+layout or objective rescaling invalidate history and pending comparisons. Restart and assumption reseeding clear history.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable

@@ -19,6 +19,7 @@ import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
@@ -137,6 +138,34 @@ class LpHintsTest {
             if (change == "kind") hints.recordObjective(child, 11.0) else hints.recordBound(child, 11.0)
 
             assertEquals(0, observations.count { it == "DOWN" }, change)
+        }
+    }
+
+    @Test
+    fun `cutoff context changes reject gains when floating cutoffs are equal`() {
+        for (change in listOf("incumbent", "external", "unchanged")) {
+            val first = BigFraction.ofLong((1L shl 60) + 32L)
+            val second = BigFraction.ofLong((1L shl 60) + 33L)
+            assertEquals(first.toDouble(), second.toDouble())
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), 1L shl 60, intArrayOf(0), IntArray(0))
+            val observations = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, observe = observations::add)
+            hints.beginNode(0, first.toDouble(), 1L, first)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            hints.recordBound(relaxation, 1.0)
+            hints.branch(VarRef.IntVar(0))
+            hints.commit(SearchDecision.IntAtMost(0, 2), 1)
+
+            hints.beginNode(1, second.toDouble(), if (change == "incumbent") 2L else 1L,
+                if (change == "external") second else first)
+            hints.record(relaxation, doubleArrayOf(2.0), DoubleArray(0))
+            hints.recordBound(relaxation, 1.5)
+
+            assertEquals(if (change == "unchanged") 1 else 0, observations.count { it == "DOWN" }, change)
         }
     }
 
