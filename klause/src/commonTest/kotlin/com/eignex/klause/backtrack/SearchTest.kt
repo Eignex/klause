@@ -39,8 +39,10 @@ class SearchTest {
             branching = object : BacktrackBranching {
                 override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> = sequenceOf(3L)
 
-                override fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> =
-                    alternatives.reversed()
+                override fun orderAlternatives(
+                    variable: VarRef,
+                    alternatives: List<SearchDecision>,
+                ): List<SearchDecision> = alternatives.reversed()
             })
 
         val alternatives = brancher.nextBranch(SearchSession(emptyList()))

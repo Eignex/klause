@@ -214,7 +214,8 @@ class LpHintsTest {
 
     @Test
     fun `directional ordering tries the lower predicted gain without changing either alternative`() {
-        for (boolean in listOf(false, true)) for (enabled in listOf(false, true)) for (upGain in listOf(0.0, 1.0, 3.0)) {
+        for (boolean in listOf(false, true)) for (enabled in listOf(false, true))
+            for (upGain in listOf(0.0, 1.0, 3.0)) {
             val builder = LpBuilder()
             builder.addVar(0, if (boolean) 1 else 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
