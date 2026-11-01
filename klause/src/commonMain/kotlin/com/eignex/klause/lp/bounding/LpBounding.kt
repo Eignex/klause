@@ -1509,10 +1509,14 @@ private fun LpEngine.retainedRootLpRelaxationBound(
             val metrics = if (nodeUsesTrail) propagator.lastMetrics.copy(preparationOps = 0L)
                 else attempt.first.lastMetrics
             observeRootSolve(attempt.first, metrics)
+            val component = attempt.first as? ComponentLpSolverCapability
+            if (attempt.second?.optimal != true) {
+                retainRootPartialPrimalGuidance(relaxation, component, cancellation)
+            }
             observeStage("AT_CERTIFICATION")
             val lower = retainedRootLowerBound(
                 relaxation.model, attempt.second, cancellation,
-                attempt.first as? ComponentLpSolverCapability,
+                component,
             )
             retainRootPrimalGuidance(relaxation, attempt.second, cancellation)
             val stopped = cancellation()

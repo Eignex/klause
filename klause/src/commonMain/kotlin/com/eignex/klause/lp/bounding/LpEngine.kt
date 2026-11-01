@@ -33,6 +33,7 @@ import com.eignex.klause.lp.cut.ImpliedBoundSeparator
 import com.eignex.klause.lp.cut.KnapsackCoverSeparator
 import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.ComponentLpSolverCapability
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -111,6 +112,7 @@ internal class RootRoundingWarmStart(
     val relaxation: LpRelaxation,
     val basis: Basis? = null,
     val primal: DoubleArray? = null,
+    val knownColumns: BooleanArray? = null,
 )
 
 internal enum class LpRootQueryPolicy {
@@ -306,6 +308,36 @@ internal class LpEngine(
         noteNodeOverhead(1L)
         rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "OWNER_RETAINED", 0L)
+    }
+
+    internal fun retainRootPartialPrimalGuidance(
+        relaxation: LpRelaxation,
+        component: ComponentLpSolverCapability?,
+        cancellation: Cancellation,
+    ) {
+        if (!params.lpPlan.probe || problem.numRealVars != 0 || component == null ||
+            !ownsRootPrimalModel(relaxation.model) || cancellation()
+        ) return
+        val previous = rootRoundingWarmStart
+        if (previous?.primal != null && previous.knownColumns == null) return
+        val model = relaxation.model
+        val work = partialPrimalGuidanceWork(model) ?: return
+        val started = TimeSource.Monotonic.markNow()
+        noteNodeOverhead(work)
+        val guidance = component.partialPrimalGuidance(cancellation) ?: return
+        if (guidance.coordinates.size != model.n || guidance.known.size != model.n || cancellation()) return
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
+            primal = guidance.coordinates, knownColumns = guidance.known)
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "PARTIAL_RETAINED", started.elapsedNow().inWholeNanoseconds)
+    }
+
+    private fun partialPrimalGuidanceWork(model: LpModel): Long? {
+        val work = 8L * model.n + 2L * model.m
+        val bytes = model.n.toLong() * (Double.SIZE_BYTES + 1L)
+        if (bytes > ROOT_PRIMAL_GUIDANCE_BYTES || lpWorkAllowanceSpent(work) ||
+            retainedRootRemainingWork() <= work
+        ) return null
+        return work
     }
 
     internal fun retainRoundingPrimalGuidance(

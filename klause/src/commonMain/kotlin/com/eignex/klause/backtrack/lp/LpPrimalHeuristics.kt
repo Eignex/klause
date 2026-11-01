@@ -44,6 +44,7 @@ internal fun LpEngine.lpRoundingProbe(
             return null
         }
         val retained = rootRoundingWarmStart?.takeIf { it.objective === objective }
+        val knownColumns = retained?.knownColumns
         rootRoundingWarmStart = retained
         if (session.isUnsatAtRoot) {
             outcome = "DISCRETE_ROOT_REJECTED"
@@ -55,7 +56,8 @@ internal fun LpEngine.lpRoundingProbe(
             return null
         }
         val primal = retained?.primal?.also {
-            sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "REUSED", started.elapsedNow().inWholeNanoseconds)
+            val guidance = if (knownColumns == null) "REUSED" else "PARTIAL_REUSED"
+            sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", guidance, started.elapsedNow().inWholeNanoseconds)
         } ?: run {
             val result = try {
                 solvePrimalRelaxation(
@@ -79,7 +81,9 @@ internal fun LpEngine.lpRoundingProbe(
             } else retainRoundingPrimalGuidance(relaxation, result, objective)
             result.primal
         }
-        val reals = if (toleranceReals && problem.numRealVars > 0) relaxation.floatReals(primal, problem) else null
+        val reals = if (toleranceReals && problem.numRealVars > 0 && knownColumns == null) {
+            relaxation.floatReals(primal, problem)
+        } else null
         val seed = initial?.takeIf {
             it.numIntVars == problem.numIntVars && it.numBoolVars == problem.numBoolVars
         }
@@ -98,7 +102,9 @@ internal fun LpEngine.lpRoundingProbe(
                     if (col !in relaxation.colVarId.indices) {
                         null
                     } else if (seed == null) {
-                        primal.getOrNull(col)
+                        primal.getOrNull(col)?.takeIf {
+                            it.isFinite() && (knownColumns == null || knownColumns.getOrNull(col) == true)
+                        }
                     } else {
                         val variable = relaxation.colVarId[col]
                         if (relaxation.colIsBool[col]) {

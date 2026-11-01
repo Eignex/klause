@@ -15,6 +15,88 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `partial guidance marks only returned child coordinates`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNull(owner.resolveBounds(LpFloatAllowance(work = 0L, iterations = 2)))
+
+            val guide = assertNotNull(owner.partialPrimalGuidance())
+
+            assertEquals(listOf(false, true, true), guide.known.toList())
+            assertEquals(listOf(0.5, 0.5), guide.coordinates.filterIndexed { index, _ -> guide.known[index] })
+        }
+    }
+
+    @Test
+    fun `partial guidance snapshots own their coordinate buffers`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNull(owner.resolveBounds(LpFloatAllowance(work = 0L, iterations = 2)))
+            val first = assertNotNull(owner.partialPrimalGuidance())
+            first.coordinates.fill(5.0)
+            first.known.fill(false)
+
+            val next = assertNotNull(owner.partialPrimalGuidance())
+
+            assertEquals(listOf(false, true, true), next.known.toList())
+            assertEquals(listOf(0.5, 0.5), next.coordinates.filterIndexed { index, _ -> next.known[index] })
+        }
+    }
+
+    @Test
+    fun `cancelled partial guidance withholds coordinates`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNull(owner.resolveBounds(LpFloatAllowance(work = 0L, iterations = 2)))
+            for (stopAt in listOf(1, 4)) {
+                var polls = 0
+
+                val guide = owner.partialPrimalGuidance(Cancellation { ++polls >= stopAt })
+
+                assertNull(guide)
+            }
+        }
+    }
+
+    @Test
+    fun `partial guidance is withheld after a bound authority edit`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(trail.state.ownerWorkingModel()))).use { owner ->
+            assertNull(owner.resolveBounds(LpFloatAllowance(work = 0L, iterations = 2)))
+            assertNotNull(owner.partialPrimalGuidance())
+            assertTrue(trail.assertBound(1, false, ExactLpSide(ExactLpNumber.of(1L)), 7L))
+
+            assertTrue(owner.adopt(trail.state))
+
+            assertNull(owner.partialPrimalGuidance())
+        }
+    }
+
+    @Test
     fun `a completed logical child withholds a point on a strict boundary`() {
         val builder = LpBuilder()
         repeat(2) {

@@ -568,6 +568,37 @@ internal class ComponentLpSolver(
         return duals.takeUnless { cancellation() }
     }
 
+    override fun partialPrimalGuidance(cancellation: Cancellation): LpPrimalGuidance? {
+        if (!currentAuthority() || cancellation()) return null
+        if (lastTermination != LpFloatTermination.WORK && lastTermination != LpFloatTermination.PIVOTS) return null
+        val results = blockResults ?: return null
+        val guidance = LpPrimalGuidance(DoubleArray(model.n), BooleanArray(model.n))
+        for (index in parts.indices) {
+            if (cancellation()) return null
+            val result = results[index] ?: continue
+            if (!copyPrimalGuidance(parts[index], result, guidance, cancellation)) return null
+        }
+        return guidance.takeIf { it.known.any { known -> known } && !cancellation() }
+    }
+
+    private fun copyPrimalGuidance(
+        part: LpNeighborhood,
+        result: FloatLpResult,
+        guidance: LpPrimalGuidance,
+        cancellation: Cancellation,
+    ): Boolean {
+        if (result.primal.size != part.cols.size) return true
+        for (column in result.primal.indices) {
+            if (column % 256 == 0 && cancellation()) return false
+            val value = result.primal[column]
+            if (value.isFinite()) {
+                guidance.coordinates[part.cols[column]] = value
+                guidance.known[part.cols[column]] = true
+            }
+        }
+        return true
+    }
+
     override fun nodeDeductions(
         duals: DoubleArray,
         observer: LpCertificationObserver?,

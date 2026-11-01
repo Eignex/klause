@@ -370,6 +370,11 @@ receives only the remaining checking work and allocation after a declined intege
 Node consumers can prune against the existing source-objective cutoff after
 charging aggregation and certificate work; they do not publish branching coordinates
 or train directional history from the partial aggregate.
+Root rounding can copy finite returned child coordinates into a separate masked
+guide before bound checking. Unknown columns keep ordinary domain choices.
+The private coordinate and availability buffers spend the existing guidance byte
+limit and root work before allocation. This guide carries no complete LP point or
+proof authority; every proposed source assignment remains fully pinned and checked.
 
 The same explicit setting dispatches root tableau separation to the owning block.
 Lifted cuts retain all row multipliers, bound substitutions, integrality premises
@@ -513,8 +518,9 @@ An original-objective rounding probe can reuse a prepared retained root owner wh
 its exact model and root scope remain current. Its query adopts the current token
 and spends the smaller of the remaining primal, root and worker grants. Incomplete
 numerical work retains the private owner for an eligible later rounding slice;
-changed authority or objective uses ordinary construction. Only a complete point
-enters rounding, and every proposed assignment still requires source verification.
+queries with changed authority or objective use ordinary construction. Complete points and
+masked child-coordinate guides can steer rounding; every proposed assignment
+still requires source verification.
 
 Retained discrete root layouts prepare in private chunks before the first numerical
 consultation. Objective-column batches and factor batches charge materialized construction
