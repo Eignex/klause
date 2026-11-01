@@ -245,7 +245,9 @@ class LpPrimalHeuristicsTest {
 
     @Test
     fun `rounding reads returned child coordinates after the query invocation expires`() {
-        for (clearView in listOf(false, true)) {
+        for ((clearView, cancelChild) in listOf(
+            false to false, false to true, true to false, true to true,
+        )) {
             val problem = Problem(0, 7, Array(7) { IntDomain(0, 1) }, listOf(
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
                 Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
@@ -255,7 +257,7 @@ class LpPrimalHeuristicsTest {
             )).bake()
             val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1, 2, 1, 2))
             var expired = false
-            var returnedChildren = 0
+            var childCalls = 0
             val factory = RecordingLpEngineFactory(object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
                     model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
@@ -264,10 +266,12 @@ class LpPrimalHeuristicsTest {
                     val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
                         refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
                     return object : PersistentLpSolver by delegate {
-                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
-                            delegate.resolveBounds(LpFloatAllowance(allowance?.work ?: 0L, 1)).also {
-                                if (++returnedChildren == 3) expired = true
+                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                            if (cancelChild && childCalls == 2) expired = true
+                            return delegate.resolveBounds(LpFloatAllowance(allowance?.work ?: 0L, 1)).also {
+                                if (++childCalls == 3) expired = true
                             }
+                        }
                     }
                 }
             })

@@ -570,12 +570,21 @@ internal class ComponentLpSolver(
 
     override fun partialPrimalGuidance(cancellation: Cancellation): LpPrimalGuidance? {
         if (!currentAuthority() || cancellation()) return null
-        if (lastTermination != LpFloatTermination.WORK && lastTermination != LpFloatTermination.PIVOTS) return null
+        val termination = lastTermination
+        if (termination != LpFloatTermination.WORK && termination != LpFloatTermination.PIVOTS &&
+            termination != LpFloatTermination.CANCELLED
+        ) return null
         val results = blockResults ?: return null
         val guidance = LpPrimalGuidance(DoubleArray(model.n), BooleanArray(model.n))
         for (index in parts.indices) {
             if (cancellation()) return null
             val result = results[index] ?: continue
+            if (termination == LpFloatTermination.CANCELLED) {
+                val childStop = solvers[index].lastTermination
+                if (childStop != LpFloatTermination.OPTIMAL_CANDIDATE && childStop != LpFloatTermination.WORK &&
+                    childStop != LpFloatTermination.PIVOTS
+                ) continue
+            }
             if (!copyPrimalGuidance(parts[index], result, guidance, cancellation)) return null
         }
         return guidance.takeIf { it.known.any { known -> known } && !cancellation() }

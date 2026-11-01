@@ -57,8 +57,9 @@ internal class FloatLpResult(
      * Whether the solve reached a primal-feasible basis, i.e. the optimum.
      *
      * False for an iterate the solve stopped short of optimality — the dual simplex holds dual
-     * feasibility from its first basis, so such an iterate still carries a valid *bound*, which is the
-     * only thing it may be read for. It is not an optimum: no reduced-cost fixing, no tableau cuts, and
+     * feasibility from its first basis, so such an iterate still carries a valid *bound*. Its finite
+     * coordinates can guide a separately checked candidate without supplying a complete feasible
+     * point. It is not an optimum: no reduced-cost fixing, no tableau cuts, and
      * no claim of infeasibility rests on it.
      */
     val optimal: Boolean = true,

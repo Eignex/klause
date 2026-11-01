@@ -384,6 +384,9 @@ owner before another numerical query. The read uses the fresh consultation token
 and requires matching retained guide, objective, root model and current exact-state
 identities. Invalidating the active search view preserves this read when the scoped
 owner still holds that root state. Numerical queries retain their active-view requirement.
+After parent cancellation, a fresh read keeps only earlier returned children with
+optimal, WORK or PIVOTS stops. Cancelled or failed child coordinates stay unknown.
+This supplies no additional bound, certificate or complete-point authority.
 The private coordinate and availability buffers spend the existing guidance byte
 limit and root work before allocation. This guide carries no complete LP point or
 proof authority; every proposed source assignment remains fully pinned and checked.
