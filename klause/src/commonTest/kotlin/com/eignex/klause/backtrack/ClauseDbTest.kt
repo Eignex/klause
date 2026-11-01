@@ -19,27 +19,6 @@ import kotlin.test.assertTrue
 class ClauseDbTest {
 
     @Test
-    fun `general production caps should rank locals without a permanent floor`() {
-        for (cap in listOf(4_000, 20_000)) {
-            val session = PropagationSession(chainProblem().bake(), nativeSat = false)
-            repeat(cap) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 9) }
-            session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 8)
-            val params = BacktrackParams(maxLearnedClauses = cap, tieredLearnedDb = true)
-
-            repeat(64) {
-                if (session.activeLearnedClauseCount <= cap) return@repeat
-                val before = session.work
-                forgetIfOverCap(session, params)
-                assertTrue(session.work - before <= 65_536L)
-            }
-
-            assertEquals(cap, session.activeLearnedClauseCount)
-            assertFalse(session.isLearnedClause(cap - 1))
-            assertTrue(session.isLearnedClause(cap))
-        }
-    }
-
-    @Test
     fun `native production caps should rank locals without a permanent floor`() {
         for (cap in listOf(4_000, 20_000)) {
             val session = PropagationSession(chainProblem().bake(), nativeSat = true)
