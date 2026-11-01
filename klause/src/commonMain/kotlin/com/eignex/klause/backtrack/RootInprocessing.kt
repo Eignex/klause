@@ -20,6 +20,10 @@ internal class RootSimplificationPass : InprocessingPass {
     private var dropped = IntHashSet()
     private var revision = -1L
     private var pending: RootCandidate? = null
+    private var deferredFactor = -1
+    private var pinCursor = 0
+    private var occurrenceCursor = 0
+    private var preferNeighborhood = true
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
         sample.owned(dropped, dropped.allocatedBytes, protected)
@@ -39,6 +43,10 @@ internal class RootSimplificationPass : InprocessingPass {
         dropped = IntHashSet()
         revision = -1L
         pending = null
+        deferredFactor = -1
+        pinCursor = 0
+        occurrenceCursor = 0
+        preferNeighborhood = true
     }
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
@@ -58,6 +66,7 @@ internal class RootSimplificationPass : InprocessingPass {
         if (revision != session.learnedClauseRevision) {
             dropped = IntHashSet()
             pending = null
+            deferredFactor = -1
             cursor = 0
             scanEnd = count
             scanRoot = session.explanationState.undoTop
@@ -83,7 +92,7 @@ internal class RootSimplificationPass : InprocessingPass {
             }
             return
         }
-        if (cursor >= scanEnd && pending == null) {
+        if (cursor >= scanEnd && pending == null && deferredFactor < 0) {
             if (scanRoot != session.explanationState.undoTop) {
                 cursor = 0
                 scanRoot = session.explanationState.undoTop
@@ -92,17 +101,16 @@ internal class RootSimplificationPass : InprocessingPass {
         }
         var examined = 0
         var literalsVisited = 0
-        while ((pending != null || cursor < scanEnd) && examined++ < params.rootSimplifyBatch) {
+        while (examined++ < params.rootSimplifyBatch) {
             if (!session.canSimplifyRoot || literalsVisited >= ROOT_LITERAL_LIMIT || budget.stopped()) break
             var candidate = pending
             if (candidate == null) {
-                if (!budget.visit()) break
-                val factor = cursor++
+                val factor = nextFactor(session, budget) ?: break
                 budget.note("Candidates")
                 val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - literalsVisited)
                 if (literals == null) {
                     if (literalsVisited > 0) {
-                        cursor--
+                        deferredFactor = factor
                         break
                     }
                     continue
@@ -165,6 +173,49 @@ internal class RootSimplificationPass : InprocessingPass {
             cursor = 0
             scanEnd = session.rootClauseCount
         }
+    }
+
+    private fun nextFactor(session: PropagationSession, budget: InprocessingBudget): Int? {
+        if (deferredFactor >= 0) {
+            if (!budget.visit()) return null
+            val factor = deferredFactor
+            deferredFactor = -1
+            return factor
+        }
+        val nearbyFirst = preferNeighborhood
+        preferNeighborhood = !preferNeighborhood
+        if (nearbyFirst) neighborhoodFactor(session, budget)?.let { return it }
+        if (budget.stopped()) return null
+        if (cursor < scanEnd) {
+            if (!budget.visit()) return null
+            return cursor++
+        }
+        return if (nearbyFirst) null else neighborhoodFactor(session, budget)
+    }
+
+    private fun neighborhoodFactor(session: PropagationSession, budget: InprocessingBudget): Int? {
+        val pins = session.explanationState.boolPinOrder
+        while (pinCursor < pins.size) {
+            val variable = pins[pinCursor]
+            val occurrences = if (variable < session.problem.numBoolVars) {
+                session.projection.preparedBoolOccurrences(variable)
+            } else null
+            if (variable < session.problem.numBoolVars && occurrences == null) {
+                pinCursor = pins.size
+                occurrenceCursor = 0
+                budget.note("NeighborhoodUnavailable")
+                return null
+            }
+            if (!budget.visit()) return null
+            if (occurrences == null || occurrenceCursor >= occurrences.size) {
+                pinCursor++
+                occurrenceCursor = 0
+                continue
+            }
+            budget.note("NeighborhoodCandidates")
+            return occurrences[occurrenceCursor++]
+        }
+        return null
     }
 }
 
