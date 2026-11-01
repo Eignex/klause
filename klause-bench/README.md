@@ -107,8 +107,9 @@ The canonical worker retains its warm state during the trial. A private refutati
 resumes it and supplies no independently checked source proof. This control alone
 does not qualify automatic production activation or complete source-cost benefit.
 `WarmClausesCopied` and `WarmClauseLiterals` count bounded copies of owned global
-learning over retained columns. `WarmClauseWork` and `WarmClauseNanos` are subsets
-of preparation, not additional totals. Copies spend unused local BVE allowance
+learning over retained columns, considering recent eligible clauses first.
+`WarmClauseWork` and `WarmClauseNanos` are subsets
+of preparation, not additional totals. Copies spend unused local pass allowance
 and the remaining modeled scratch grant; canonical learning and exchange state
 remain owned by canonical.
 `BakeConstructionEntries` and `BakePropagationWork` expose the private root bake;

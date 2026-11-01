@@ -84,12 +84,30 @@ class PrivateRebuildWarmClausesTest {
             )), arrayOfNulls(4), 1_048_576L, 65_536L, Cancellation.Never))
 
             assertEquals(2, warm.clauses.size)
-            val copied = warm.clauses.first() as Clause
+            val copied = warm.clauses.single { (it as Clause).literals.size == 2 } as Clause
             assertContentEquals(intArrayOf(4, 6), copied.literals)
-            assertContentEquals(intArrayOf(2), (warm.clauses.last() as Clause).literals)
+            val projected = warm.clauses.single { (it as Clause).literals.size == 1 } as Clause
+            assertContentEquals(intArrayOf(2), projected.literals)
             assertEquals(1, warm.translated)
             assertNotSame(session.learnedClauseLiterals(0), copied.literals)
             assertEquals(3, session.learnedClauseCount)
+        }
+    }
+
+    @Test
+    fun `bounded imports should prefer recent owned learning`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(4, 6)),
+            )).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            session.addLearnedClause(Clause(intArrayOf(4, 6)), 2)
+
+            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(emptyList()),
+                arrayOfNulls(4), 1536L, 65_536L, Cancellation.Never))
+
+            assertContentEquals(intArrayOf(4, 6), (warm.clauses.single() as Clause).literals)
         }
     }
 

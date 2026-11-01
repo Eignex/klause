@@ -325,9 +325,10 @@ Mapping composition separately charges its descriptor copies during preparation,
 including trials that produce no witness. The descriptors add their modeled
 primitive/reference storage before composition and copied-learning admission.
 
-Unused BVE allowance can copy globally learned clauses into the private model.
+Unused pass allowance can copy globally learned clauses into the private model.
 Only this canonical worker's non-permanent clauses over Boolean source columns
-qualify. Global pins remove satisfied clauses and false literals. A clause that
+qualify. Recent eligible learning is considered first within the byte and work grants.
+Global pins remove satisfied clauses and false literals. A clause that
 mentions an eliminated column can follow equivalent-literal substitutions and actual BVE parent descriptors in
 elimination order. A pure pivot's satisfying value lifts every projected model,
 so substituting it preserves learned consequences. Other pivots use one shortest
