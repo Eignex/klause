@@ -34,10 +34,16 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         currentLevel: Int,
         fallback: ConflictAnalyzer.AnalysisResult.Learned,
     ): ConflictAnalyzer.AnalysisResult.LearnedIntegerRow? {
-        if (currentLevel !in 1..INTEGER_LEARNING_LEVELS || !fallback.asserting || fallback.literals.isEmpty() ||
-            fallback.backjumpLevel !in 0 until currentLevel) {
-            return decline("level-or-fallback")
+        if (currentLevel !in 1..INTEGER_LEARNING_LEVELS) {
+            state.arithmeticLearningTrace?.record("integer.level-limit", currentLevel.toLong(), factorId.toLong(),
+                state.baseFactorCount.toLong(), fallback.backjumpLevel.toLong(),
+                if (fallback.asserting) 1L else 0L, fallback.literals.size.toLong())
+            val originalSeed = factorId in 0 until state.baseFactorCount
+            return decline(if (originalSeed) "level-limit-original" else "level-limit-learned")
         }
+        if (!fallback.asserting) return decline("fallback-nonasserting")
+        if (fallback.literals.isEmpty()) return decline("fallback-empty")
+        if (fallback.backjumpLevel !in 0 until currentLevel) return decline("fallback-target")
         if ((state.learned.integerRows?.size ?: 0) >= INTEGER_LEARNING_ROWS) return decline("store-capacity")
         val target = fallback.backjumpLevel
         val trail = state.integerLearningTrailAtLevel?.invoke(target) ?: return decline("assertion-unavailable")

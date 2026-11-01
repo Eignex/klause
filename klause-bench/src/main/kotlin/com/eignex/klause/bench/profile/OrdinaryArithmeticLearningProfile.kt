@@ -58,7 +58,7 @@ internal object OrdinaryArithmeticLearningProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
             it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
-                "attribution", "recipe", "seed", "worker-seed", "route", "samples")
+                "attribution", "recipe", "seed", "worker-seed", "route", "samples", "models")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -69,6 +69,7 @@ internal object OrdinaryArithmeticLearningProfile {
         require(traceMode in setOf("initial", "first-integer", "none"))
         val tracing = traceMode != "none"
         val samples = (options["samples"] ?: "false").toBooleanStrict()
+        val models = (options["models"] ?: "true").toBooleanStrict()
         val lp = options["lp"] ?: "auto"
         require(lp in setOf("auto", "off"))
         val attribution = (options["attribution"] ?: "false").toBooleanStrict()
@@ -143,12 +144,14 @@ internal object OrdinaryArithmeticLearningProfile {
                     original, FiniteEngine.BACKTRACK, entry.objective,
                     cancellation = stop, solveCancellation = stop, randomSeed = seed,
                 ))
-                val originalJson = codec.encodeToString(original)
-                val preparedJson = codec.encodeToString(prepared.problem)
-                require(originalJson.encodeToByteArray().size <= 131_072 &&
-                    preparedJson.encodeToByteArray().size <= 131_072)
-                out.resolve("$label-original.json").writeText(originalJson)
-                out.resolve("$label-prepared.json").writeText(preparedJson)
+                val originalJson = if (models) codec.encodeToString(original) else null
+                val preparedJson = if (models) codec.encodeToString(prepared.problem) else null
+                if (originalJson != null && preparedJson != null) {
+                    require(originalJson.encodeToByteArray().size <= 131_072 &&
+                        preparedJson.encodeToByteArray().size <= 131_072)
+                    out.resolve("$label-original.json").writeText(originalJson)
+                    out.resolve("$label-prepared.json").writeText(preparedJson)
+                }
                 var native: PropagationSession? = null
                 var lastSession: PropagationSession? = null
                 var ignoredSessionAttachments = 0
@@ -300,6 +303,11 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("provenanceFingerprint", fingerprint)
                     put("original", originalJson)
                     put("prepared", preparedJson)
+                    put("modelsExported", models)
+                    put("originalIntegers", original.numIntVars)
+                    put("originalFactors", original.factors.size)
+                    put("preparedIntegers", prepared.problem.numIntVars)
+                    put("preparedFactors", prepared.problem.factors.size)
                     put("suite", suite)
                     put("problem", name)
                     put("sourceSha256", hash)

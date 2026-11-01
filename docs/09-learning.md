@@ -411,6 +411,8 @@ Boolean or order-atom metadata, native/shared targets, decline
 categories and stored arithmetic consumers. Literal metadata distinguishes cached
 atom levels from the analyzer's effective conflict level. Historical domain holes
 exclude later journalled carves; endpoint factor ids describe the live reason owner.
+Depth declines retain the native level boundary and distinguish original factor
+seeds from retained learning; ownership alone does not certify source suitability.
 Storage identities survive factor compaction and retire when their constraint is
 forgotten. Only actual changed bounds or Boolean pins count as consumer events.
 Focused windows retain a selector pick or actual branch attempt after each consumer;

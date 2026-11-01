@@ -1384,7 +1384,7 @@ Run `bench.profile.OrdinaryArithmeticLearningProfile` through `lab profile` with
 It accepts:
 
 `suite=ID problem=NAME sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off
-trace=first-integer|initial|none samples=false|true attribution=false|true
+trace=first-integer|initial|none samples=false|true models=true|false attribution=false|true
 recipe=source|satOptimized|conflictDriven seed=3 worker-seed=3 route=single|portfolio`.
 
 `recipe=source` uses the source search hints or the conflict-driven preset.
@@ -1404,7 +1404,9 @@ and branch markers. `trace=initial` retains the initial window. Each window admi
 its payload. The decline census covers observations from attachment until export,
 with at most 63 names of 96 characters plus `other`. Its source, endpoint and
 terminal observation counts overlap; classification truncation and saturation are
-reported. `trace=none` detaches capture observers and supplies no census.
+reported. Depth-limit counts distinguish original seeds from learned seeds;
+those counts do not establish that a seed meets arithmetic source requirements.
+`trace=none` detaches capture observers and supplies no census.
 
 `samples=true` writes per-arm JFR recordings capped at 32 MiB and caller/allocation
 summaries in `<arm>-samples.txt`. JFR setup, dump and analysis are outside arm
@@ -1423,7 +1425,9 @@ ordinary session counters before claiming source or performance qualification.
 
 Source bytes must match `sha256` after decompression and fit 1 MiB. Optional
 `source64=BASE64 format=FORMAT` accepts at most 96 KiB of encoded input. Canonical
-models admit 128 KiB each and live output admits 3 MiB. Set the execution timeout
+models admit 128 KiB each and live output admits 3 MiB. `models=false` omits
+canonical serialization and exports null model payloads plus coordinate/factor
+counts; source bytes and their hash remain retained. Set the execution timeout
 separately from `profile.runTimeoutSec`, which contains preparation and retries.
 Native reconstructed-point checks are diagnostic, not independent source checks.
 
