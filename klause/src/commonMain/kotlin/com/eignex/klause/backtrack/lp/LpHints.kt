@@ -32,6 +32,9 @@ internal class LpHints(
     private val history = LpDirectionalHistory(observe, charge = charge, useClassPriors = directionalGains)
     private var freshRecord = false
     private var objectiveRecorded = false
+    private var directionalChoice: VarRef? = null
+    private var baselineChoice: VarRef? = null
+    private var priorChoice = false
     private var scopeModel: ExactLpModel? = null
     private var scopeRows: LpScopedRows? = null
     private var scopeVariables = IntArray(0)
@@ -45,6 +48,9 @@ internal class LpHints(
         cutoff = bound
         freshRecord = false
         objectiveRecorded = false
+        directionalChoice = null
+        baselineChoice = null
+        priorChoice = false
         if (collect) history.beginNode(depth)
     }
 
@@ -84,6 +90,21 @@ internal class LpHints(
     }
 
     fun branch(variable: VarRef) {
+        if (directionalGains && scopeModel != null) {
+            observe(if (directionalChoice == variable) "CONSUMED" else "FALLBACK")
+            if (directionalChoice == variable) {
+                observe(if (priorChoice) "PRIOR_CONSUMED" else "VARIABLE_CONSUMED")
+                val comparison = when (baselineChoice) {
+                    null -> "BASELINE_MISSING"
+                    variable -> "BASELINE_AGREED"
+                    else -> "BASELINE_CHANGED"
+                }
+                observe(comparison)
+            }
+        }
+        directionalChoice = null
+        baselineChoice = null
+        priorChoice = false
         if (collect && scopeModel != null) {
             charge(129L)
             history.branch(variable, value(variable))
@@ -109,33 +130,20 @@ internal class LpHints(
         return history.score(variable, value(variable))
     }
 
-    fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> {
-        if (!collect || !directionalGains || !objectiveRecorded || alternatives.size != 2) return alternatives
-        val current = value(variable)
-        val up = if (hasDirectionalScores()) history.preferredUp(variable, current) else null
-        if (up == null) {
-            observe("SIDE_FALLBACK")
-            return alternatives
+    fun selected(variable: VarRef?, baseline: VarRef?, score: Double): VarRef? {
+        directionalChoice = variable
+        baselineChoice = baseline
+        priorChoice = variable != null && history.usesPrior(variable)
+        if (priorChoice && baseline != null && variable != baseline) {
+            charge(1L)
+            val reference = history.referenceScore(baseline, value(baseline))
+            if (!(score > reference)) {
+                directionalChoice = null
+                priorChoice = false
+                observe("PRIOR_REJECTED")
+            }
         }
-        charge(8L)
-        val split = floor(current)
-        fun matches(decision: SearchDecision, upper: Boolean): Boolean = when (decision) {
-            is SearchDecision.Bool -> variable == VarRef.Bool(decision.literal ushr 1) &&
-                (decision.literal and 1 == 0) == upper
-            is SearchDecision.IntAtMost -> !upper && variable == VarRef.IntVar(decision.variable) &&
-                decision.upper.toDouble() == split
-            is SearchDecision.IntAtLeast -> upper && variable == VarRef.IntVar(decision.variable) &&
-                decision.lower.toDouble() == split + 1.0
-            else -> false
-        }
-        val first = matches(alternatives[0], up)
-        if (!matches(alternatives[1], !up) || !first) {
-            if (!matches(alternatives[0], !up) || !matches(alternatives[1], up)) return alternatives
-        }
-        observe("SIDE_CONSUMED")
-        observe(if (history.usesPrior(variable)) "SIDE_PRIOR_CONSUMED" else "SIDE_VARIABLE_CONSUMED")
-        observe(if (first) "SIDE_BASELINE_AGREED" else "SIDE_BASELINE_CHANGED")
-        return if (first) alternatives else listOf(alternatives[1], alternatives[0])
+        return directionalChoice
     }
 
     private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {
@@ -176,6 +184,9 @@ internal class LpHints(
         scopeBooleans = BooleanArray(0)
         freshRecord = false
         objectiveRecorded = false
+        directionalChoice = null
+        baselineChoice = null
+        priorChoice = false
     }
 
     override fun clear() {

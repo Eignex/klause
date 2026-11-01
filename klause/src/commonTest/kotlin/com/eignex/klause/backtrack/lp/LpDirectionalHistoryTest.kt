@@ -5,7 +5,6 @@ import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
@@ -171,7 +170,7 @@ class LpDirectionalHistoryTest {
     }
 
     @Test
-    fun `a class prior leaves an unobserved candidate without a side preference`() {
+    fun `a baseline class reference leaves an unobserved candidate ineligible`() {
         val history = LpDirectionalHistory({})
         history.beginNode(0)
         history.record(10.0)
@@ -184,12 +183,12 @@ class LpDirectionalHistoryTest {
             }
         }
 
-        assertNull(history.preferredUp(VarRef.Bool(1), 0.5))
+        assertEquals(7.0 / 6.0, history.referenceScore(VarRef.Bool(1), 0.5), 1e-9)
         assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
     }
 
     @Test
-    fun `each direction blends local observations until its reliability threshold`() {
+    fun `both observed directions blend local gains until their reliability threshold`() {
         for (samples in listOf(1, 2)) {
             val history = LpDirectionalHistory({})
             history.beginNode(0)
@@ -210,11 +209,44 @@ class LpDirectionalHistoryTest {
                 history.commit(SearchDecision.IntAtMost(1, 2), 1)
                 history.beginNode(1)
                 history.record(11.0)
+                history.commit(SearchDecision.IntAtLeast(1, 3), 1)
+                history.beginNode(1)
+                history.record(13.0)
             }
 
             val score = history.score(VarRef.IntVar(1), 2.25)
 
-            assertEquals(if (samples == 1) 22.0 / 3.0 else 5.0, score, 1e-9)
+            assertEquals(if (samples == 1) 5.0 else 1.5, score, 1e-9)
+        }
+    }
+
+    @Test
+    fun `one sided local history keeps selection fallback despite a reliable class prior`() {
+        for (up in listOf(false, true)) {
+            val history = LpDirectionalHistory({})
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.IntVar(0), 2.25)
+            repeat(2) {
+                history.commit(SearchDecision.IntAtMost(0, 2), 1)
+                history.beginNode(1)
+                history.record(11.0)
+                history.commit(SearchDecision.IntAtLeast(0, 3), 1)
+                history.beginNode(1)
+                history.record(13.0)
+            }
+            val variable = VarRef.IntVar(1)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 2.25)
+            history.commit(if (up) SearchDecision.IntAtLeast(1, 3) else SearchDecision.IntAtMost(1, 2), 1)
+            history.beginNode(1)
+            history.record(if (up) 13.0 else 11.0)
+
+            val score = history.score(variable, 2.25)
+
+            assertTrue(score.isNaN())
+            assertTrue(history.referenceScore(variable, 2.25).isFinite())
         }
     }
 
@@ -236,6 +268,7 @@ class LpDirectionalHistoryTest {
                 }
             }
 
+            assertEquals(1.5 * gain, history.referenceScore(VarRef.IntVar(0), 2.25), 1e-9)
             if (gain == 0.0) assertTrue(history.score(VarRef.IntVar(0), 2.25).isNaN())
             else assertEquals(1.5, history.score(VarRef.IntVar(0), 2.25), 1e-9)
             assertFalse(history.usesPrior(VarRef.IntVar(0)))
@@ -269,7 +302,7 @@ class LpDirectionalHistoryTest {
 
             assertTrue(history.score(sameClass, 0.5).isFinite())
             assertTrue(history.score(otherClass, 0.5).isNaN())
-            assertNull(history.preferredUp(otherClass, 0.5))
+            assertTrue(history.referenceScore(otherClass, 0.5).isNaN())
         }
     }
 
@@ -290,7 +323,7 @@ class LpDirectionalHistoryTest {
 
         repeat(9) { history.beginNode(0) }
 
-        assertNull(history.preferredUp(VarRef.Bool(2), 0.5))
+        assertTrue(history.referenceScore(VarRef.Bool(2), 0.5).isNaN())
         assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
         assertFalse(history.mayHaveScores)
     }
@@ -330,7 +363,7 @@ class LpDirectionalHistoryTest {
 
         history.clear()
 
-        assertNull(history.preferredUp(VarRef.Bool(2), 0.5))
+        assertTrue(history.referenceScore(VarRef.Bool(2), 0.5).isNaN())
         assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
         assertFalse(history.mayHaveScores)
     }

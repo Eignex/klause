@@ -837,10 +837,10 @@ for three structures, skipped when LP is unavailable, the pool is explicit or
 annotated, or execution is parallel or single-engine. See
 [ordinary tableau admission](17-linear-programming.md).
 
-The `lp-default` and `lp-aggressive` optimization recipes consume scoped passive gains
-to order the children of the baseline-selected variable's split. Reliable variable
-estimates take precedence over class initialization of partial history. Missing
-estimates and ties preserve the existing child order. History spends
+The `lp-default` and `lp-aggressive` optimization recipes consume scoped passive gains.
+Reliable variable estimates take precedence. Proposals observed locally in both
+directions can replace the current LP candidate if their predicted gain exceeds its history or reliable
+class estimate. Unobserved variables keep current scoring. History spends
 the existing LP allowance; other recipes require an explicit directional setting. See
 [finite branching](08-search.md#finite-lp-directional-guidance).
 

@@ -1,8 +1,6 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.Impact
-import com.eignex.klause.backtrack.selector.IndomainMin
-import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.factor.global.AllDifferent
@@ -30,25 +28,6 @@ class SearchTest {
         intDomains = arrayOf(*domains),
         factors = arrayOf<Factor>(),
     )
-
-    @Test
-    fun `child ordering preserves the selected integer split`() {
-        val session = PropagationSession(problemOf(IntDomain(0, 10)))
-        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin)
-        val brancher = BacktrackBrancher(session, params, null, NoRestartSchedule,
-            branching = object : BacktrackBranching {
-                override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> = sequenceOf(3L)
-
-                override fun orderAlternatives(
-                    variable: VarRef,
-                    alternatives: List<SearchDecision>,
-                ): List<SearchDecision> = alternatives.reversed()
-            })
-
-        val alternatives = brancher.nextBranch(SearchSession(emptyList()))
-
-        assertEquals(listOf(SearchDecision.IntAtLeast(0, 4), SearchDecision.IntAtMost(0, 3)), alternatives)
-    }
 
     @Test
     fun `a non-enumerable domain decision should split at the bounds midpoint`() {
