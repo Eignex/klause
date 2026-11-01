@@ -119,7 +119,9 @@ internal class PrivateRebuildGeneration private constructor(
                     }
                     val remaining = literals.filter { fixed[Lit.variable(it)] == null }.toIntArray()
                     if (complementedRow) for (index in remaining.indices) {
-                        if (Lit.variable(remaining[index]) == complemented) remaining[index] = Lit.negate(remaining[index])
+                        if (Lit.variable(remaining[index]) == complemented) {
+                            remaining[index] = Lit.negate(remaining[index])
+                        }
                     }
                     if (remaining.isEmpty()) return null
                     residual.add(Clause(remaining))
