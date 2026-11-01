@@ -284,7 +284,8 @@ an exhaustive elimination pass.
 
 A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker
-qualifies. The capture binds its exact source object and owns its clauses; preparation
+qualifies. Discovery charges retained slot visits and skips logically retired entries
+before reading their literals. The capture binds its exact source object and owns its clauses; preparation
 rechecks that its columns remain unfixed. Global consequences remain valid after
 their canonical learned entries are reclaimed. Adding
 them to the pinned source preserves the premises of the source implication-graph
