@@ -286,13 +286,34 @@ class ClauseDbTest {
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
         val before = session.work
 
-        val retired = session.maintainCapWindow(1, 128L, 128L, { session.work - before >= 38L }) {
+        val retired = session.maintainCapWindow(1, 128L, 128L, { session.work - before >= 32L }) {
             error("cancelled policy callback")
         }
 
         assertEquals(0, retired)
         assertTrue(session.isLearnedClause(1))
-        assertEquals(38L, session.work - before)
+        assertEquals(32L, session.work - before)
+    }
+
+    @Test
+    fun `Boolean reason ownership should survive compaction and retraction`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(4, 6)), 9)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+            session.pinBool(0, false)
+
+            session.forgetLearnedClauses { _, _ -> false }
+            repeat(4) { session.maintainCapWindow(0, 256L, 64L, { false }) { false } }
+
+            assertEquals(1, session.activeLearnedClauseCount)
+            assertEquals(true, session.boolValue(1))
+
+            session.popToLevel(0)
+            repeat(4) { session.maintainCapWindow(0, 256L, 64L, { false }) { false } }
+
+            assertEquals(0, session.activeLearnedClauseCount)
+        }
     }
 
     @Test

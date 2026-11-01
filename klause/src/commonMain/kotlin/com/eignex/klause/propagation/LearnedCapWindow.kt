@@ -26,40 +26,54 @@ internal fun PropagationState.maintainGeneralCapWindow(
     val retiredBefore = learned.retiredCount
     try {
         budget.visit(0L, 64L)
-        budget.visit(learned.size.toLong(), learned.size.toLong())
-        val protected = BooleanArray(learned.size)
-        collectLearnedReferences(protected) { budget.visit() }
-        budget.visit(0L)
         learned.capRanking.advance(cap, learned.permanentClauseCount + learned.permanentArithmeticCount, budget,
-            generalCapPolicy(protected, budget, canDrop, keep))
+            generalCapPolicy(budget, canDrop, keep))
     } catch (_: ReclamationPreparation.Deferred) {
         learned.capPreparationDefers++
-        // Completed row transactions retain their handles; the next root rebuilds reason protection.
+        // Completed row transactions retain their handles; each resumed row rechecks its current owners.
     }
     return learned.retiredCount - retiredBefore
 }
 
 private fun PropagationState.generalCapPolicy(
-    protected: BooleanArray,
     budget: ReclamationPreparation,
     mayDrop: (Int) -> Boolean,
     retain: (Int) -> Boolean,
 ): LearnedCapPolicy = object : LearnedCapPolicy {
+    private var references: BooleanArray? = null
+    private var prepared = -1
+    private var protected = false
+    private fun retainedReason(index: Int): Boolean {
+        if (learned.stages[index] and 16 != 0) {
+            return learned.boolReasons[index] > 0 || learned.stages[index] and 4 != 0
+        }
+        val snapshot = references ?: run {
+            budget.visit(learned.size.toLong(), learned.size.toLong())
+            BooleanArray(learned.size).also {
+                collectLearnedReferences(it) { budget.visit() }
+                references = it
+            }
+        }
+        return snapshot[index]
+    }
     override fun lbd(index: Int): Int = learned.lbds[index]
     override fun prepare(index: Int): Boolean {
         budget.visit(32L)
+        protected = retainedReason(index)
+        prepared = index
         return true
     }
     override fun keep(index: Int): Boolean {
         val retained = retain(index)
         val prop = learned.store[index]
-        return retained || protected[index] || (prop is ClausePropagator && prop.literals.size <= 1) ||
+        return retained || protected || (prop is ClausePropagator && prop.literals.size <= 1) ||
             learned.stages[index] and 1 == 0
     }
     override fun visited() { learned.capVisits++ }
     override fun retire(index: Int): Boolean {
         val prop = learned.store[index]
-        if (!mayDrop(index) || protected[index] || (prop is ClausePropagator && prop.literals.size <= 1) ||
+        val pinned = if (prepared == index) protected else retainedReason(index)
+        if (!mayDrop(index) || pinned || (prop is ClausePropagator && prop.literals.size <= 1) ||
             learned.stages[index] and 1 == 0
         ) {
             return false

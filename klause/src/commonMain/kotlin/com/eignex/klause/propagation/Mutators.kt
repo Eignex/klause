@@ -153,6 +153,7 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
     // Dating it before that mark lets an asserting backjump erase several supposedly surviving literals.
     boolLevel[v] = maxOf(currentLevel, levelToDecisionVar.size)
     noteLearnedUse(currentFactor)
+    noteLearnedBoolReason(currentFactor, 1)
     boolReason[v] = currentFactor
     arithmeticLearningTrace?.pin(currentFactor, v, if (value) 1 else 0, "bool", boolLevel[v])
 

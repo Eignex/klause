@@ -174,7 +174,7 @@ private fun PropagationState.learnedSharingMemory(
         if (peer && used) consumedPeerImports++
         if (used) consumed++
     }
-    val columns = listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
+    val columns = listOf(learned.stages, learned.lbds, learned.permanent, learned.tier, learned.boolReasons,
         learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)
     val protectedRows = protected.size > 0
     var metadata = 0L

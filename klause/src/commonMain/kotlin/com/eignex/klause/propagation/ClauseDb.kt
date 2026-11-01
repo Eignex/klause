@@ -78,7 +78,17 @@ internal fun PropagationState.addLearnedClause(
     learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Constructed)
     learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Admitted)
     val newFid = totalFactorCount
-    learned.stages.add(0)
+    var initialStage = 16
+    for (literal in clause.literals) {
+        work++
+        if (Lit.variable(literal) >= problem.numBoolVars) {
+            initialStage = 0
+            break
+        }
+    }
+    learned.stages.add(initialStage)
+    work += learned.boolReasonAdmissionWork
+    learned.boolReasons.add(0)
     learned.store.add(clause)
     if (clause.literals.size == 1) learned.units.add(newFid)
     learned.lbds.add(lbd)
@@ -121,6 +131,8 @@ internal fun PropagationState.addLearnedPb(
     )
     val newFid = totalFactorCount
     learned.stages.add(0)
+    work += learned.boolReasonAdmissionWork
+    learned.boolReasons.add(0)
     learned.store.add(prop)
     learned.nonClauseCount++
     work++
@@ -146,6 +158,8 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     val propagator = LearnedIntegerPropagator(row)
     val factor = totalFactorCount
     learned.stages.add(0)
+    work += learned.boolReasonAdmissionWork
+    learned.boolReasons.add(0)
     learned.store.add(propagator)
     learned.nonClauseCount++
     work++
@@ -301,6 +315,8 @@ internal fun PropagationState.forgetLearnedClauses(
             if (propagator is ClausePropagator && propagator.literals.size == 1) learned.units.add(baseFactorCount + w)
             learned.store[w] = learned.store[i]
             learned.stages[w] = learned.stages[i]
+            work++
+            learned.boolReasons[w] = learned.boolReasons[i]
             learned.lbds[w] = learned.lbds[i]
             learned.permanent[w] = learned.permanent[i]
             learned.tier[w] = learned.tier[i]
@@ -432,9 +448,26 @@ internal fun PropagationState.forgetLearnedClauses(
         undo.minReason[i] = remappedReason(undo.minReason[i], remap, refBase)
         undo.maxReason[i] = remappedReason(undo.maxReason[i], remap, refBase)
     }
+    work += learned.boolReasons.size.toLong() - w
+    learned.boolReasons.truncateTo(w)
     for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
         learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) column.trim()
+    work += learned.boolReasons.size.toLong() * 2L
+    learned.boolReasons.trim()
     return true
+}
+
+internal fun PropagationState.noteLearnedBoolReason(factor: Int, delta: Int) {
+    nativeEngine?.let {
+        it.noteBoolReason(factor, delta)
+        return
+    }
+    val index = factor - baseFactorCount
+    if (index !in 0 until learned.size) return
+    work += 2L
+    val count = learned.boolReasons[index] + delta
+    check(count >= 0)
+    learned.boolReasons[index] = count
 }
 
 /** Rewrite learned-clause factor ids stored in a per-variable reason array through [remap]

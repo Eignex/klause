@@ -46,6 +46,13 @@ internal class LearnedClauseDb(
     var store = ArrayList<LearnedPropagator>()
 
     internal var integerRows: LearnedIntegerRows? = null
+    internal val boolReasons = IntArrayList(1)
+    internal val boolReasonAdmissionWork: Long
+        get() = 1L + when {
+            boolReasons.size == boolReasons.backingData.size -> boolReasons.size * 3L + 1L
+            boolReasons.size == 0 -> 1L
+            else -> 0L
+        }
 
     /** LBD (literal block distance) per learned clause, parallel to [store]: lower = more re-usable.
      *  Forgetting policies key on it (G. Audemard, L. Simon, "Predicting Learnt Clauses Quality in

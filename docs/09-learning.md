@@ -291,7 +291,7 @@ learned clauses retains the lowest LBD and stable-handle keys after permanent an
 tier-protected ownership. Its max-heap shares the candidate index with retained
 survivors. Funded heap steps, cursors and pending retirement survive later restarts
 and appended clauses; compaction resets them before handles change. Policy updates
-and live-reason scans are charged before publication. A later use protects a pending
+and reason-ownership checks are charged before publication. A later use protects a pending
 eviction; units, pending rechecks and current root reasons survive.
 Retired rows stop propagation and export, while their slots and arena bytes remain
 owned until a funded full compaction reclaims them. Ownership reports include that
@@ -301,8 +301,12 @@ available in the released session's lifecycle totals.
 
 General CP ranks learned clauses, pseudo-Boolean constraints and integer rows in
 the same candidate index. Permanent arithmetic constraints contribute to its floor.
-Its funded protection snapshot covers current Boolean and integer reasons, saved
-integer bounds and pending first assertions. Eligible retired factors become inert
+Pure-Boolean clauses keep a current-reason count updated by pinning and retraction;
+Boolean undo stores no historical factor handle. Admissions classify these clauses,
+and full compaction remaps their counters with their factor IDs. Their windows use
+those counts and pending-attachment flags without a store-sized protection mask.
+Other constraints use a funded snapshot covering current Boolean and integer reasons,
+saved integer bounds and pending first assertions. Eligible retired factors become inert
 stable-ID slots; propagation queues and active readers skip them. Integer rows own
 their position in a dense reference cache, allowing retirement to unlink a row
 without scanning other rows. Cache capacity and position fields remain part of
@@ -478,7 +482,7 @@ publication still defer the window.
 General retirement replaces its payload with an inert stable-ID slot and releases
 its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
 aliases. Stale watches skip that slot; their allocated capacity and policy columns
-remain owned until compaction. General reason snapshots and full physical compaction
+remain owned until compaction. Arithmetic reason snapshots and full physical compaction
 still require their complete funding; shared stores retain the complete selection/remap path.
 
 Shared learning also accepts an optional modeled-byte soft limit checked at

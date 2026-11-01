@@ -92,7 +92,7 @@ internal fun PropagationState.prepareReclamation(
             }
         }
     }
-    for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
+    for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier, learned.boolReasons,
         learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) {
         budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
     }

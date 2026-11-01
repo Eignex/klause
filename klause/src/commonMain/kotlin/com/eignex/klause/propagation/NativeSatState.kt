@@ -62,6 +62,7 @@ internal class NativeSatState(private val state: PropagationState) {
     private val learnedPermanent = IntArrayList()
     private val learnedTier = IntArrayList()
     private val learnedUsed = IntArrayList()
+    private val learnedBoolReasons = IntArrayList(1)
     private val lifecycleStages = IntArrayList()
     private val learnedUnits = IntArrayList()
     private var unitsPending = false
@@ -296,6 +297,12 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         learnedTier.add(ClauseTier.UNSET.ordinal)
         learnedUsed.add(0)
+        state.work += 1L + when {
+            learnedBoolReasons.size == learnedBoolReasons.backingData.size -> learnedBoolReasons.size * 3L + 1L
+            learnedBoolReasons.size == 0 -> 1L
+            else -> 0L
+        }
+        learnedBoolReasons.add(0)
         learnedOrigin.add(origin)
         learnedScanPos.add(0)
         learnedCount++
@@ -325,7 +332,7 @@ internal class NativeSatState(private val state: PropagationState) {
             if (lifecycleStages[index] and 1 == 0) sample.retain(protected, index)
         }
         val protectedRows = protected.size > 0
-        val columns = listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier,
+        val columns = listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedBoolReasons,
             learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
             capCandidates, state.learned.capCandidates)
         var metadata = 0L
@@ -432,7 +439,7 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         override fun visited() { capVisits++ }
         override fun prepare(index: Int): Boolean {
-            val price = 32L + literalCountOf(index).toLong() * 4L
+            val price = 40L
             if (budget.remainingWork < 32L) budget.visit(32L)
             if (price > budget.remainingWork) {
                 budget.visit(16L)
@@ -456,16 +463,18 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private fun capProtected(index: Int, budget: ReclamationPreparation, work: Long): Boolean {
         val length = literalCountOf(index)
-        budget.visit(work + length.toLong() * 4L)
+        budget.visit(work + 8L)
         budget.visit(0L)
-        var protected = length <= 1 || lifecycleStages[index] and 2 != 0
-        // Native antecedents are copied literals; Boolean undo saves no prior clause handle.
-        for (offset in 0 until length) {
-            budget.visit(0L)
-            if (state.boolReason[variableOf(index, offset)] == baseCount + index) protected = true
-        }
-        budget.visit(0L)
-        return protected
+        return length <= 1 || lifecycleStages[index] and 2 != 0 || learnedBoolReasons[index] > 0
+    }
+
+    internal fun noteBoolReason(factor: Int, delta: Int) {
+        val index = factor - baseCount
+        if (index !in 0 until learnedCount) return
+        state.work += 2L
+        val count = learnedBoolReasons[index] + delta
+        check(count >= 0)
+        learnedBoolReasons[index] = count
     }
 
     internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) emptyMap() else mapOf(
@@ -533,7 +542,7 @@ internal class NativeSatState(private val state: PropagationState) {
             if (lifecycleStages[index] and 1 == 0) retained[index] = true
         }
         budget.atomic(learnedLits.backingData.size.toLong(), learnedLits.backingData.size.toLong() * Int.SIZE_BYTES)
-        for (column in listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedUsed,
+        for (column in listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedUsed, learnedBoolReasons,
             lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos, capCandidates)) {
             budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
         }
@@ -608,6 +617,8 @@ internal class NativeSatState(private val state: PropagationState) {
             learnedPermanent[target] = learnedPermanent[i]
             learnedTier[target] = learnedTier[i]
             learnedUsed[target] = learnedUsed[i]
+            state.work++
+            learnedBoolReasons[target] = learnedBoolReasons[i]
             learnedOrigin[target] = learnedOrigin[i]
             learnedScanPos[target] = learnedScanPos[i]
             learnedWatchPos[2 * target] = learnedWatchPos[2 * i]
@@ -626,6 +637,8 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedPermanent.truncateTo(survivors)
         learnedTier.truncateTo(survivors)
         learnedUsed.truncateTo(survivors)
+        state.work += learnedBoolReasons.size.toLong() - survivors
+        learnedBoolReasons.truncateTo(survivors)
         learnedOrigin.truncateTo(survivors)
         learnedScanPos.truncateTo(survivors)
         learnedWatchPos.truncateTo(2 * survivors)
@@ -635,7 +648,8 @@ internal class NativeSatState(private val state: PropagationState) {
             state.work++
             if (!retiredOf(i) && clauseLen(baseCount + i) == 1) learnedUnits.add(baseCount + i)
         }
-        for (column in listOf(learnedLits, learnedStarts, learnedLbd, learnedPermanent, learnedTier,
+        state.work += learnedBoolReasons.size.toLong() * 2L
+        for (column in listOf(learnedLits, learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedBoolReasons,
             learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
             capCandidates)) {
             column.trim()
