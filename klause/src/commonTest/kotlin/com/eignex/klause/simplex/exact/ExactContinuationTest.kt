@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class ExactContinuationTest {
     @Test
-    fun `early arbitrary precision should avoid abandoned imports under the same ceiling`() {
+    fun `precision selection should preserve cumulative imports under the same ceiling`() {
         val huge = BigFraction.of(BIG_ONE shl 100, BIG_ONE)
         val input = ExactContinuationInput(
             listOf(
@@ -24,12 +24,16 @@ class ExactContinuationTest {
             listOf(0, 1, 2),
             List(3) { ContinuationStatus.BASIC } + List(3) { ContinuationStatus.FIXED },
         )
-        val limits = ExactContinuationLimits(maxImportPivots = 3)
+        val limits = ExactContinuationLimits(maxImportPivots = 3, preserveOverflowCheckpoint = false)
         val fixed = ExactContinuation(input)
         val early = ExactContinuation(input)
 
         val replayed = fixed.resume(limits)
         val direct = early.resume(limits.copy(startArbitraryPrecision = true))
+        val promoted = ExactContinuation(input).resume(limits.copy(preserveOverflowCheckpoint = true))
+        val paused = ExactContinuation(input)
+        val partial = paused.resume(limits.copy(maxImportPivots = 1))
+        val continued = paused.resume(limits.copy(preserveOverflowCheckpoint = true))
         val repeated = fixed.resume(limits.copy(startArbitraryPrecision = true))
 
         assertEquals(ContinuationDecline.IMPORT_LIMIT, replayed.metrics.decline)
@@ -42,6 +46,16 @@ class ExactContinuationTest {
         assertEquals(BigFraction.ONE, point[1] + huge * point[2])
         assertEquals(3, direct.metrics.imports)
         assertEquals(0, direct.metrics.restarts)
+        assertEquals(point, assertNotNull(promoted.values))
+        assertEquals(3, promoted.metrics.imports)
+        assertEquals(1, promoted.metrics.restarts)
+        assertTrue(requireNotNull(promoted.metrics.workByPhase[ContinuationPhase.PROMOTION]) > 0L)
+        assertEquals(point, assertNotNull(continued.values))
+        assertEquals(1, partial.metrics.imports)
+        assertEquals(2, continued.metrics.imports)
+        assertEquals(3, paused.usedImportPivots)
+        assertEquals(partial.metrics.work + continued.metrics.work, paused.usedWork)
+        assertEquals(partial.metrics.allocation + continued.metrics.allocation, paused.usedAllocation)
         assertEquals(ContinuationDecline.IMPORT_LIMIT, repeated.metrics.decline)
         assertEquals(0, repeated.metrics.imports)
         assertEquals(3, fixed.usedImportPivots)
@@ -67,6 +81,59 @@ class ExactContinuationTest {
 
         assertEquals(listOf(huge), assertNotNull(result.values))
         assertNull(result.ray)
+    }
+
+    @Test
+    fun `cancelled overflow promotion should keep a complete checkpoint and cumulative spending`() {
+        val initial = ExactContinuationInput(
+            listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(null),
+            emptyList(), listOf(ContinuationStatus.LOWER),
+        )
+        val huge = BigFraction.of(BIG_ONE shl 140, BIG_ONE)
+        val changed = ExactContinuationInput(
+            initial.columns, initial.rhs, listOf(huge), initial.upper,
+            initial.headings, initial.statuses,
+        )
+        val probe = ExactContinuation(initial)
+        assertNotNull(probe.resume().values)
+        var checks = 0
+        assertNotNull(probe.resume(replacement = changed, cancellation = Cancellation {
+            checks++
+            false
+        }).values)
+        var promotionInterruptions = 0
+        var previousCheckpoints = 0
+
+        for (cancelAt in 1..checks) {
+            val session = ExactContinuation(initial)
+            assertNotNull(session.resume().values)
+            val priorWork = session.usedWork
+            val priorAllocation = session.usedAllocation
+            var observed = 0
+
+            val cancelled = session.resume(
+                replacement = changed,
+                cancellation = Cancellation { ++observed == cancelAt },
+            )
+            if (cancelled.metrics.phase != ContinuationPhase.PROMOTION) continue
+            val retained = session.resume()
+
+            promotionInterruptions++
+            assertEquals(ContinuationDecline.CANCELLED, cancelled.metrics.decline)
+            assertNull(cancelled.values)
+            val point = assertNotNull(retained.values)
+            if (point == listOf(BigFraction.ZERO)) previousCheckpoints++ else assertEquals(listOf(huge), point)
+            assertEquals(0, retained.metrics.builds)
+            assertTrue(cancelled.metrics.work > 0L)
+            assertTrue(cancelled.metrics.allocation > 0L)
+            assertEquals(priorWork + cancelled.metrics.work + retained.metrics.work, session.usedWork)
+            assertEquals(
+                priorAllocation + cancelled.metrics.allocation + retained.metrics.allocation,
+                session.usedAllocation,
+            )
+        }
+        assertTrue(promotionInterruptions > 0)
+        assertTrue(previousCheckpoints > 0)
     }
 
     @Test

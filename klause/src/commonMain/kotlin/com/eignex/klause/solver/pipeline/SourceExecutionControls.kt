@@ -47,7 +47,9 @@ internal fun bindSourceExecutionControls(
     val resolvedPresolve = preparation.config.takeIf { presolveConfig != null || preparation.requested }
     val stop = cancellation or timeout or invocation.cancellation
     val companions = invocation.requestsFiniteNumericalCompanions
-    val finiteOptions = options.withoutPresolve().without("node-limit", "dry-run-presolve").let {
+    val finiteOptions = options.withoutPresolve().without(
+        "node-limit", "dry-run-presolve", "open-linear-incremental",
+    ).let {
         if (companions) it.withoutSourceCompanionControls() else it
     }
         .overriddenBy(ExecutionOptions(ExecutionOption.seed(seed)))
@@ -251,7 +253,9 @@ private fun FiniteSolveRequest.withSourceControls(
         presolveBudget = presolveBudget, cores = cores,
         executionOptions = policy.options(
             engine,
-            executionOptions.withoutPresolve().without("node-limit", "dry-run-presolve").let {
+            executionOptions.withoutPresolve().without(
+                "node-limit", "dry-run-presolve", "open-linear-incremental",
+            ).let {
                 if (numericalCompanions) it.withoutSourceCompanionControls() else it
             }.overriddenBy(options),
         ),

@@ -252,7 +252,7 @@ private fun appendRouteCertifierStats(
 internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String, String>> {
     val moves = stats.ls.moves.sum
     if (stats.run.backend != "ls" && moves == 0.0 && stats.ls.bestResidual == null &&
-        stats.ls.phaseNanos.isEmpty()
+        stats.ls.phaseNanos.isEmpty() && stats.ls.objectiveScoring.isEmpty()
     ) return emptyList()
 
     val out = ArrayList<Pair<String, String>>()
@@ -270,6 +270,9 @@ internal fun lsStatPairs(stats: SolveStats, solveTimeMs: Long): List<Pair<String
     }
     for ((phase, nanos) in stats.ls.phaseNanos.entries.sortedBy { it.key }) {
         out += "lsPhaseNanos.$phase" to nanos.toString()
+    }
+    for ((outcome, count) in stats.ls.objectiveScoring.entries.sortedBy { it.key }) {
+        out += "lsObjectiveScoring.$outcome" to count.toString()
     }
     if (solveTimeMs > 0L) out += "lsMovesPerSec" to round4(moves / (solveTimeMs / 1000.0))
     if (stats.ls.timeToBestMs >= 0L) out += "lsTimeToBest" to round4(stats.ls.timeToBestMs / 1000.0)
@@ -374,6 +377,14 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         stats.portfolio.maxSliceWork?.let { "portfolioMaxSliceWork" to "$it" },
         stats.portfolio.sliceGrowth?.let { "portfolioSliceGrowth" to "$it" },
     )
+    val proofs = stats.portfolio.booleanProof.flatMapIndexed { index, proof -> listOfNotNull(
+        "booleanProof.$index.tasks" to "${proof.tasks}",
+        "booleanProof.$index.nativeRefutations" to "${proof.nativeRefutations}",
+        "booleanProof.$index.probeSegments" to "${proof.probeSegments}",
+        "booleanProof.$index.probeWork" to "${proof.probeWork}",
+        "booleanProof.$index.workerWork" to "${proof.workerWork}",
+        proof.decline?.let { "booleanProof.$index.decline" to it },
+    ) }
     val schedule = stats.portfolio.arms.map { arm ->
         val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
         val sharing = arm.sharing.channels.entries.joinToString("") { (channel, t) ->
@@ -426,7 +437,7 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         "alnsBootstrapLsMillis" to "${alns.bootstrapLsMillis}",
         "alnsRepairMillis" to "${alns.repairMillis}",
     )
-    return listOfNotNull(profile, reseeding) + slices + schedule + phases + lifecycle + failures + inner
+    return listOfNotNull(profile, reseeding) + slices + proofs + schedule + phases + lifecycle + failures + inner
 }
 
 private fun diagnosticString(value: String): String = buildString {

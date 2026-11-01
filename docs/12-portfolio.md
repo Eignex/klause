@@ -83,8 +83,8 @@ checked-reconstruction publication mapping, private resumable state, and structu
 construction dimensions. Dimensions estimate setup
 size rather than elapsed time or retained bytes. Numerical requirements also carry
 the containing per-owner LP work/allocation ceilings, active-time limit and segment
-limits; construction uses those same ceilings. Candidate checks and typed terminal
-verification remain the authority boundary.
+limits; LP construction and retained queries share those ceilings. Candidate checks
+and typed terminal verification remain the authority boundary.
 
 `SearchEvent.WorkerAdmission` reports these requirements and explicit decline causes,
 distinguishing eligible catalog candidates from composition-selected workers.
@@ -93,6 +93,30 @@ their actual worker authority. Explicit named recipes bypass automatic filtering
 An explicit arm count, including the default-sized count, prevents automatic numerical
 companions. A missing complete affine capture declines both companions without
 removing finite workers.
+
+Ordinary shared affine preparation precedes worker factories. Final invocation stage
+counters report `finiteCompanionPreparationAttempts`, `finiteCompanionPreparationNs`,
+`finiteCompanionPreparationReady` and `finiteCompanionPreparationUnavailable`,
+including captures whose workers receive no query. The time spans duplicate
+difference-factor filtering and immutable capture; it excludes factories, queries,
+candidate checks and retirement. It belongs to containing solve time and grants no
+new allowance or source authority.
+
+`companion-admission=funded` requires incumbent-gated starts and a containing
+deadline. The same capability gate admits candidates only when both requested
+active lifetimes fit. Shared affine capture and private service construction wait
+for the first companion query. Capture obeys that query's time grant, the existing
+construction segment ceiling and the time left after both requested lifetimes.
+Each worker rechecks its own remaining lifetime before opening; a late start or
+unavailable capture retires without a source verdict. Finite recipes, indices and
+seed positions remain intact, including explicit selections.
+
+Deferred capture is attempted once for the pair and charged inside the opening
+worker's query and active lifetime. Its preparation counters are subsets of that
+query's time. `finiteCompanionAdmissionDeclined` records an unfunded initial pair;
+`finiteCompanionStartDeclines` records declined opening attempts. A pair receiving
+no query reports zero capture attempts. Final invocation accounting reads these
+shared counters once; worker summaries do not duplicate the capture.
 
 `source-incumbent-completion=true` lets the numerical and joint-repair companions
 use an approximate incumbent's Boolean and finite integer coordinates as advisory
@@ -110,9 +134,12 @@ finite witness admission permits source tolerance. Tolerance-only acceptance can
 authorize this exact handoff.
 
 With completion enabled, a checked pooled center starts joint repair in a small
-connected integer neighborhood. The all-pinned rounded-root bootstrap is reserved
-for a center without that checked handoff. Continuous columns stay free, source
+connected integer neighborhood without a root relaxation. The all-pinned
+rounded-root bootstrap is reserved for a center without that checked handoff.
+Continuous columns stay free, source
 cutoff checks remain exact, and later proposals retain their captured conditions.
+Imported points remain query incumbents and centers; only a point produced by the
+repair query enters companion discovery publication and original-source rechecking.
 If that first proposal pauses, it receives continuation after owed complete-worker
 coverage until the proposal finishes or the companion's existing allowance retires
 it. This trial grants no incumbent reward and does not renew work, allocation or
@@ -128,6 +155,17 @@ control defaults to false and changes neither worker admission nor lifetimes.
 Advisory keys retain value snapshots without producer certificates. Unsupported
 symbolic payloads, integers outside the recovery scalar limit and keys beyond the
 remaining modeled allocation are refused before retention.
+
+The admitted pair can reuse at most sixteen successful original-source completions
+under that same full identity and original-check callback. Each retained point belongs
+to its producing completion owner and is removed when that owner closes. Only immutable
+coordinate snapshots cross workers; producer certificates and failed or pending work
+stay private. Lookup and copied snapshots debit the consumer's existing funding, and
+each consumer retains its source witness and objective admission checks. Sharing grants
+no work, lifetime, bound or terminal authority.
+Consumers reserve the retained exact scalar payload under their own allocation ceiling.
+Completion statistics distinguish shared checked reuse from private recovery; both
+remain inside the consuming owner's completion time.
 
 `companion-integers=true` trials the same bounded companion pair on finite general
 integer/continuous sources. It changes only the binary-fragment restriction; size,
@@ -223,6 +261,12 @@ Clause accounting is reported per worker in `ArmSchedule.sharing.clauses` and as
 `clause*` fields in the CLI arm record. Pool payload belongs to one shared pool;
 primitive payload arrays are counted once by identity. Private clause-reference,
 global-flag, origin, key and payload-owner array capacities are modeled separately.
+Sources with no integer variables use a Boolean-only pool whose payload-owner
+index reserves one array per clause; atom payloads are declined. Empty export
+arrays use shared immutable zero-length arrays. `poolPayloadOwnerCapacityBytes`
+reports that index allocation, included in `poolPrivateIndexBytes`, and
+`poolBooleanOnly` identifies the layout. Growth and reclamation fund the selected
+layout before publishing it; consumers keep the same clauses, origins and cursors.
 `poolOwnedBytes` combines these modeled owners, excluding headers and allocator
 overhead. Repeated worker observations must not be summed.
 Worker `seenKeys` and `seenCapacityBytes` describe the session-spanning duplicate
@@ -230,15 +274,31 @@ filter, including exported and evicted keys. Its lifetime is the native session,
 not the pool generation. Compaction invalidates the drain cursor but preserves
 that filter. Reseeding a retained repair session keeps the filter with its
 learned database. A fresh session releases its backing arrays and reimports the current
-pool; resuming the same session retains both cursor and filter. Retirement releases
-the filter without sampling. An uncancelled retirement also drains uses and exports
+pool; resuming the same session retains both cursor and filter. Retirement records
+the pool and filter capacity counters, then releases the filter without traversing
+the store. An uncancelled retirement also drains uses and exports
 remaining glue; a cancelled retirement skips those scans.
+A retirement batch that could allocate or grow the worker's private key table
+can use the pool's existing index instead. If it fits the remaining entry capacity
+and has no byte limit, the pool deduplicates it under the publication lock. The
+generation cannot compact during that batch, so fresh keys need not enter the
+worker's retiring filter. Existing private keys still suppress earlier imports
+and exports. Batches that fit the existing private backing, entry pressure and
+byte limits keep the ordinary private admission and reclamation path. Capacity
+refusal happens before publication; exhausting
+publication funding ends the export without another allowance. Every candidate
+visit and pool operation retains its work, scratch and cancellation bounds.
 
 Glue export probes that same filter with the portable content key before copying
-native literals or constructing portable payloads. One temporary token buffer is
+native literals or constructing portable payloads. An empty filter skips duplicate
+probing. One temporary token buffer is
 reused across the scan and released with it; no second retained duplicate index is
 needed. Only completed export preparation admits publication keys. Pool eviction,
 session reseeding and reason retention follow the same filter lifetime.
+Native Boolean exports transfer the arena's fresh literal copy into the portable
+payload. Boolean-only imports pass that payload to the receiving store's owning
+copy; atom imports first translate the session-local literals. General-store
+exports build separate portable arrays.
 `exportDuplicates` counts previously shared candidates skipped before payload construction.
 With a byte limit, key probes charge work and poll cancellation under one lookup
 allowance per scan. Exhaustion discards the prepared export before admitting keys.
@@ -312,8 +372,8 @@ Telemetry exports mutually exclusive `memorySampleComplete`,
 `memorySamplePartial` and `memorySampleStale` flags, plus `memorySampleWork` and
 `memorySampleScratchEntries`. Each observation replaces current sample fields;
 partial samples cannot inherit absent fields from an earlier complete sample.
-Close removes current fields and marks the sample stale without a diagnostic
-scan. Retained `peak*` values remain historical per-field maxima and must never
+Close replaces current fields with pool and filter counters and marks the worker
+sample stale without a diagnostic scan. Retained `peak*` values remain historical per-field maxima and must never
 be used as a complete byte total or added into concurrent high-water marks.
 `drain*` fields describe
 transient batch storage. ALNS repair pools remain worker-private, skip search-conditioned permanent clauses
@@ -448,13 +508,36 @@ construction, preparation, checking and retirement retain their ordinary account
 
 `portfolio-reward=source-rate` prices finite positive accepted objective gains against
 observed factory and segment time. Segment time includes preparation, initialization
-and coordinator checks. Unproductive time and feasibility setup remain owed until
-that worker's next priced gain. Its gain rate is compared with other workers'
+and coordinator checks. Failed and refuted segments earn zero reward while their
+cost remains in the peer comparison. Unproductive time and feasibility setup remain
+owed until that worker's next priced gain. Its gain rate is compared with other workers'
 cumulative accepted-gain rate; common objective rescaling preserves this comparison.
-Feasibility retains ordinary rewards, idle credit earns no improvement reward, and
+Segments without a strict gain retain ordinary feasibility rewards. A segment
+that finds the first witness and then improves it prices those later accepted
+gains against its full startup and segment cost. The first witness itself supplies
+no invented objective gain. Publication gains accumulate in a common normalized
+scale, including batches whose raw sum would overflow. Phase diagnostics retain
+the segment's selection phase, and the ordinary ledger keeps its phase boundary.
+Idle credit earns no improvement reward, and
 accepted terminal closure earns unit reward. Accounting is private to an invocation.
 Source preparation, final retirement and independent checking keep their containing
 run costs; this score supplies neither witness nor proof authority.
+
+`portfolio-reward=source-rate-family` retains the worker rate and also prices gains
+by family. Observed factory and segment costs from every sibling remain owed until
+the family's next accepted gain, whose rate is compared with other families'
+cumulative rates. After an incumbent, every paid segment supplies fractional success
+and failure evidence, including zero-yield complete-search segments. Evidence and
+its fading follow paid segment time plus the worker's first factory cost, measured
+in base-slice durations. Splitting equal exposure across segments preserves its
+weight; zero-time observations add no evidence or fading. This prices objective
+yield without changing the selected complete-worker coverage scope or share;
+silence supplies no proof verdict.
+Before an incumbent, feasibility feedback uses the ordinary rules. After the
+first-witness segment settles, learned family evidence retains the configured
+`phase-retention` share. Classification priors and selected silent complete-worker
+coverage stay fixed. Shared source preparation, retirement and independent checks
+remain in containing-run accounting.
 
 ### Reproducible diagnostics
 
@@ -491,6 +574,8 @@ retains no trace buffer. Finite source invocations forward these events through
 `SearchEvent.PortfolioDiagnostic`; CLI verbose output renders them without a clock.
 The ordinary scheduler remains the default.
 
+### Boolean task sharing
+
 Boolean region attribution uses the [task coverage protocol](08-search.md#boolean-task-coverage)
 with the same source, full assumptions, objective cutoff and mapping identity. Schedule
 events and read/import/use counts do not establish duplicate region coverage. The task
@@ -499,8 +584,8 @@ terminal admission and owns no retained solver state. The internal Boolean task
 executor keeps one repair handle per worker, including a direct Boolean satisfaction
 implementation, and rotates ordinary-sized bounded
 slices across disjoint tasks, reusing each private session for sibling cubes.
-Construction, reseeding, failed attempts, checks and retirement remain inside
-its containing work and physical cost observations; it supplies no independent
+Construction, reseeding, failed attempts, checks and retirement retain their
+containing allowances and cumulative worker counters; it supplies no independent
 proof certificate or automatic admission policy. An internal portfolio coordinator
 keeps source bindings, seed positions and channel origins on the original workers.
 Each lane holds its original session's exclusive owner, reports only its own work
@@ -513,16 +598,28 @@ native propagation and the native first-fail recipe with Luby256.
 An omitted native backend resolves to native propagation. Every worker must match
 the same full recipe after removing seed, allowance, invocation hooks and captured
 pins; mixed shapes decline. Private model generations and uncaptured conditions decline.
+A separate engine bake can retain the unbaked plan only with identical Boolean
+coordinates and the same factor objects in the same order. Another baked generation
+does not establish this relationship.
 A known pooled cut adapter is dormant under the required LP-off satisfaction
 recipe and is omitted from task queries; active or opaque cut hooks decline.
 A separate internal probe-first mode postpones the board until a whole-source
 query pauses with a live Boolean decision. It reserves that decision's matching
 region for the retained probe engine before exposing the opposite region to its
-peer. The original builder solver and immutable native projection remain available
+peer. Source and caller-condition admission precedes the probe; task identity and
+mapping authority are allocated only when that pause creates the board.
+The original builder solver and immutable native projection remain available
 through the transfer. Probe work is a subset of each worker's cumulative work, not
 a refunded or additional charge. Without a live decision the same source query
-continues; fast completion creates no board. The integration switches are internal
-and disabled.
+continues; fast completion creates no board.
+
+The direct integration switches are internal and disabled by default. The source
+pipeline exposes `boolean-proof-tasks=true` for opt-in single-core satisfaction
+execution under the same admission guards; optimization and parallel requests
+reject this control. Result statistics distinguish actual partitions, native task
+closures, probe effort and declines. Combining schedules preserves their distinct
+observations.
+These counters do not establish independent checking or confer proof authority.
 
 ### Slice accounting and coverage
 
@@ -596,9 +693,14 @@ With multiple initial workers, `portfolio-probes=leader-half` gives the leading
 initially eligible complete worker half the probe budget; the others share the rest.
 Every sibling still receives a probe. The existing total probe reservation, segment
 caps and containing deadline stay fixed; worker slots and seeds do not change.
-This control requires a containing deadline and curated single-core mixed integer
+`portfolio-probes=lp-transfer` halves each initially eligible LP probe's relative
+weight and transfers that weight to the leading complete non-LP worker. Other
+siblings keep their ordinary relative shares. Deferred LP workers supply no weight;
+without eligible donors, the initial shares remain ordinary. Shares bound each
+offer against remaining time, so they do not fix durations or native work prefixes.
+Both controls require a containing deadline and curated single-core mixed integer
 optimization without Boolean or real columns. Explicit recipes and work diagnostics
-reject it; `ordinary` is the default. Deferred LP admission retains its separate boundary.
+reject them; `ordinary` is the default. Deferred LP admission retains its separate boundary.
 
 Before the first incumbent, an optimization arm with pending private preparation, or
 a local-search arm that has not executed an instruction, receives preparation
@@ -845,8 +947,21 @@ An interrupted point check keeps its candidate for the next slice; each attempt
 retains its construction and propagation charges. Closing discards query pins,
 auxiliary buffers and preparation cursors while keeping completed observations.
 
-Core refinement is disabled by default; `core-refinement=none|reasons|deletion`
-selects the private policy for curated and directly selected core workers.
+Curated single-lane mixed source execution selects an early reason-refined core
+trial for nonuniform Boolean objectives over at most 16,384 Boolean columns and
+16,384 factors, with at most two million literal entries in clauses, cardinalities
+and pseudo-Boolean rows or their reifications. Pseudo-Boolean row constants must
+fit signed words. It excludes integer and real columns and requires the sum of the
+absolute objective coefficients and constant to fit the exact scalar range below
+`2^53`. Eligibility scanning is cancellable and charges the containing invocation.
+The trial retains ordinary complete-worker coverage, worker positions, seeds and
+its existing auxiliary allowance. Explicit core settings, arm counts, recipes,
+annotations, backtrack edits and work-driven diagnostics retain their selected
+policy. Unsupported or interrupted eligibility retains the ordinary delayed,
+unrefined core policy.
+
+`core-refinement=none|reasons|deletion` explicitly selects the private policy for
+curated and directly selected core workers.
 Seed-proof projection uses the
 [historical reasons](09-learning.md#explanation-lifetime) of the existing query,
 without another propagation session or solve; unsupported seed conflicts and tree
@@ -889,11 +1004,14 @@ ordinary complete workers stall, with the allowance described in
 [resources](06-sessions.md#resource-allowances); parallel pools admit it immediately, and `core-guided`
 selects it directly.
 
-`core-early=true` removes only the first-incumbent admission condition in a mixed
-optimization pool on one lane with automatic backtrack workers and an eligible
-Boolean objective. Worker order, seeds, initial complete-worker coverage and the
-bounded auxiliary allowance stay fixed. The control also preserves the containing
-work allowance in diagnostic schedules. It does not expand core eligibility.
+`core-early=true` admits the eligible bounded core trial after initial ordinary
+complete-worker coverage, before heuristic first probes, in a mixed optimization pool
+on one lane with automatic backtrack workers and a Boolean objective. The trial keeps
+its opportunity across retained preparation and query slices until it finishes or
+its cumulative allowance stops it, on either side of the first incumbent. Worker
+positions, seeds, complete-worker coverage and auxiliary limits stay fixed, including
+the containing work allowance in diagnostic schedules. The control does not expand
+core eligibility.
 
 ### Exact theory strategy execution
 

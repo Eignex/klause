@@ -31,6 +31,7 @@ internal class ResumableSatisfaction(
     preparedSession: PropagationSession? = null,
     preparedSeed: PropagationResult? = null,
     private val rebindable: Boolean = false,
+    atRoot: ((PropagationSession) -> Boolean)? = null,
 ) : ResumableSolve {
     private val lifetimeToken = params0.cancellation.lifetimeCancellation()
     private var globalToken: Cancellation = params0.cancellation
@@ -62,7 +63,7 @@ internal class ResumableSatisfaction(
         preparedSession = preparedSession,
         preparedSeed = preparedSeed,
         rebindable = rebindable,
-        slice = TraversalSlice(pauses = { !globalToken() }, beforeBranch = {
+        slice = TraversalSlice(pauses = { !globalToken() }, atRoot = atRoot, beforeBranch = {
             slice.charge()
             slice.workExpired()
         }),
@@ -77,6 +78,11 @@ internal class ResumableSatisfaction(
     override val stats: SolveStats get() = sink.snapshot()
 
     override val work: Long get() = slice.spent()
+
+    internal val clauseWork: Long get() = saturatedWork(
+        sink.search.searchWork.coerceAtMost(Long.MAX_VALUE / PROPAGATION_WORK_PER_NODE) * PROPAGATION_WORK_PER_NODE,
+        traversal.propagationWork(),
+    )
 
     override val initialWork: Long = slice.spent()
 

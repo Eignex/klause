@@ -31,12 +31,10 @@ import kotlin.time.TimeSource
 internal class LinearIncumbentCompletion(
     private val budget: SourceLpBudget,
     private val originalCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+    private val shared: LinearIncumbentSharing? = null,
     private val observe: (String, Long) -> Unit,
 ) : AutoCloseable {
-    private class Attempt(val source: SourceProofContext, offered: Sample) {
-        val semantics = offered.semantics
-        val frame = offered.coordinateFrame
-        val seed = offered.copy().also { it.witnessCertificate = null }
+    private class Attempt(val key: LinearIncumbentSharing.Key) {
         var query: LinearAuthorityQuery? = null
         var point: List<BigFraction>? = null
         val progress = LinearPrimalRecoveryProgress()
@@ -79,11 +77,7 @@ internal class LinearIncumbentCompletion(
             }
             seedBytes += 64L + bits / 4L
         }
-        val previous = attempts.firstOrNull {
-            budget.observe(preparation = seed.numBoolVars.toLong() + seed.numIntVars + seed.numRealVars)
-            !token() && sameSource(it.source, source, token) && it.seed == seed &&
-                it.semantics == seed.semantics && it.frame === seed.coordinateFrame
-        }
+        val previous = attempts.firstOrNull { it.key.matches(source, seed, originalCheck, token, budget) }
         if (previous?.finished == true) {
             observe(if (previous.checked == null) "DeclineReused" else "CheckedReused", 1L)
             return previous.checked.takeUnless { token() }
@@ -97,12 +91,17 @@ internal class LinearIncumbentCompletion(
             observe("RetentionAllocation", 1L)
             return null
         }
-        val attempt = previous ?: Attempt(source, seed).also {
+        val attempt = previous ?: Attempt(LinearIncumbentSharing.Key(source, seed, originalCheck)).also {
             budget.funding?.charge(0L, seedBytes)
             attempts += it
             observe("Attempts", 1L)
         }
         if (budget.funding?.exhausted == true) return finish(attempt, null)
+        shared?.find(attempt.key, budget, token)?.let { point ->
+            observe("SharedCheckedReused", 1L)
+            return finish(attempt, point)
+        }
+        if (token()) return null
         if (attempt.query == null) {
             val prepared = prepare(source, seed, token)
             if (prepared == null) {
@@ -150,7 +149,11 @@ internal class LinearIncumbentCompletion(
         if (checking()) return null
         if (accepted && originalCheck != null) observe("OriginalChecked", 1L)
         observe(if (accepted) "Checked" else "Rejected", 1L)
-        return finish(attempt, proposed.takeIf { accepted })
+        val point = finish(attempt, proposed.takeIf { accepted })
+        if (point != null && shared?.remember(this, attempt.key, point, budget, token) == true) {
+            observe("SharedRetained", 1L)
+        }
+        return point
     }
 
     private fun seedPoint(query: LinearAuthorityQuery, seed: Sample, token: Cancellation): List<BigFraction>? {
@@ -227,20 +230,6 @@ internal class LinearIncumbentCompletion(
         override fun workMeter(): WorkMeter = meter
     }
 
-    private fun sameSource(left: SourceProofContext, right: SourceProofContext, token: Cancellation): Boolean {
-        if (left === right) return true
-        budget.observe(preparation = 2L * left.coordinateCount + 2L * right.coordinateCount +
-            left.premiseCount + right.premiseCount +
-            listOf(left.scope.condition, right.scope.condition).sumOf {
-                it.bools.size.toLong() + it.lower.size + it.upper.size + it.integerRows.size
-            })
-        return !token() && left.scope == right.scope && left.coordinates == right.coordinates &&
-            left.premises == right.premises &&
-            left.affineObjectiveAvailable == right.affineObjectiveAvailable && left.objective == right.objective &&
-            left.objectiveConstant == right.objectiveConstant && left.semantics == right.semantics &&
-            left.semanticsChecker === right.semanticsChecker
-    }
-
     private fun finish(attempt: Attempt, point: Sample?): Sample? {
         attempt.checked = point
         attempt.finished = true
@@ -260,7 +249,8 @@ internal class LinearIncumbentCompletion(
         try {
             resources.close()
         } finally {
-            budget.observe(preparation = attempts.size.toLong())
+            val sharingWork = shared?.release(this) ?: 0
+            budget.observe(preparation = attempts.size.toLong() + sharingWork)
             attempts.clear()
         }
     }

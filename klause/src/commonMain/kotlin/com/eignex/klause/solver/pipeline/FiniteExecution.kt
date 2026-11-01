@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.SearchOutcome
 import com.eignex.klause.backtrack.toBacktrackParams
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.ObjectiveSense
@@ -901,13 +902,16 @@ private fun executeSourceMinimum(
 }
 
 private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecutionCallbacks): FiniteExecutionResult {
+    val options = if (request.optimize && request.problem.fixedCumulativeScheduling()) {
+        ExecutionOptions(ExecutionOption.costAwarePropagation(true)).overriddenBy(request.executionOptions)
+    } else request.executionOptions
     val plan = FinitePipeline.planFixedBacktrack(
         FixedBacktrackPlanRequest(
             annotatedParams = request.searchHints?.toBacktrackParams(
                 request.problem.numBoolVars,
                 request.problem.numIntVars,
             ),
-            executionOptions = request.executionOptions,
+            executionOptions = options,
             randomSeed = request.randomSeed,
             cancellation = request.cancellation,
             nodeBudget = request.nodeBudget,
@@ -927,6 +931,20 @@ private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecu
     } else {
         executeFixedSatisfy(solver, params, request, callbacks, start)
     }
+}
+
+private fun Problem.fixedCumulativeScheduling(): Boolean {
+    if (numRealVars != 0) return false
+    var found = false
+    for (factor in factors) {
+        if (factor is Diffn) return false
+        if (factor !is Cumulative) continue
+        if (factor.presents.isNotEmpty() || factor.durationVars.isNotEmpty() ||
+            factor.resourceVars.isNotEmpty() || factor.capacityVar >= 0
+        ) return false
+        found = true
+    }
+    return found
 }
 
 private fun executeFixedSatisfy(
@@ -1070,12 +1088,20 @@ private fun executePortfolio(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
-    val leadingProbeBudget = when (val probes = request.executionOptions.reader()[ExecutionOption.portfolioProbes]) {
+    val admission = request.executionOptions.reader()[ExecutionOption.companionAdmission]
+    val fundedCompanions = when (admission) {
         null, "ordinary" -> false
-        "leader-half" -> true
-        else -> pipelineConfigError("portfolio-probes expects ordinary|leader-half, got `$probes`")
+        "funded" -> true
+        else -> pipelineConfigError("companion-admission expects ordinary|funded, got `$admission`")
     }
-    if (leadingProbeBudget && (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
+    val probePolicy = when (val probes = request.executionOptions.reader()[ExecutionOption.portfolioProbes]) {
+        null, "ordinary" -> InitialProbePolicy.ORDINARY
+        "leader-half" -> InitialProbePolicy.LEADER_HALF
+        "lp-transfer" -> InitialProbePolicy.LP_TRANSFER
+        else -> pipelineConfigError("portfolio-probes expects ordinary|leader-half|lp-transfer, got `$probes`")
+    }
+    if (probePolicy != InitialProbePolicy.ORDINARY &&
+        (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
         pipelineConfigError("portfolio-probes requires curated single-core mixed optimization")
     }
     val deferLpProbes = when (val start = request.executionOptions.reader()[ExecutionOption.portfolioLpStart]) {
@@ -1085,6 +1111,11 @@ private fun executePortfolio(
     }
     if (deferLpProbes && (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
         pipelineConfigError("portfolio-lp-start requires curated single-core mixed optimization")
+    }
+    val booleanProofTasks = request.executionOptions.reader()[ExecutionOption.booleanProofTasks] ?: false
+    if (booleanProofTasks && (request.optimize || request.cores != 1 ||
+            request.engine !in setOf(FiniteEngine.MIXED, FiniteEngine.BACKTRACK))) {
+        pipelineConfigError("boolean-proof-tasks requires single-core finite satisfaction")
     }
     val proofShare = request.executionOptions.reader()[ExecutionOption.portfolioProofShare]
     val proofWorkers = request.executionOptions.reader()[ExecutionOption.portfolioProofWorkers]
@@ -1106,8 +1137,10 @@ private fun executePortfolio(
             engine = request.engine,
             optimize = request.optimize,
             cores = request.cores,
-            executionOptions = request.executionOptions.without("portfolio-proof-share", "portfolio-proof-workers",
-                "portfolio-lp-start", "portfolio-probes"),
+            executionOptions = request.executionOptions.without(
+                "portfolio-proof-share", "portfolio-proof-workers", "portfolio-lp-start", "portfolio-probes",
+                "boolean-proof-tasks", "companion-admission",
+            ),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
             lpCeiling = request.lpConfig,
@@ -1130,7 +1163,7 @@ private fun executePortfolio(
             plan.scenario.annotationArm != null)) {
         pipelineConfigError("portfolio-lp-start requires a curated recipe pool")
     }
-    if (leadingProbeBudget && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+    if (probePolicy != InitialProbePolicy.ORDINARY && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
             plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
             plan.scenario.annotationArm != null)) {
         pipelineConfigError("portfolio-probes requires a curated recipe pool")
@@ -1143,12 +1176,19 @@ private fun executePortfolio(
 
         is PortfolioPlan.Execute -> Unit
     }
-    val scenario = clausalDefaultScenario(
+    val baseScenario = clausalDefaultScenario(
         plan.scenario,
         ProblemProfile.of(request.problem, request.optimize),
         request.defaultArms,
         explicitArms = request.executionOptions.explicitArms,
     )
+    val scenario = weightedCoreDefaultScenario(baseScenario, request.problem, request.objective,
+        request.executionOptions, request.cancellation)
+    if (scenario !== baseScenario) {
+        request.onPortfolioEvent?.invoke("portfolio", SearchEvent.WorkerAdmission("core-guided/weighted-default",
+            admitted = true, requirements = "bounded early trial with historical-reason refinement",
+            declines = emptyList(), selected = true))
+    }
     val executor = FinitePipeline.portfolioExecutor(
         request.problem,
         scenario,
@@ -1178,7 +1218,9 @@ private fun executePortfolio(
         improvementProofShare = proofShare ?: 0.5,
         deferLpProbes = deferLpProbes,
         includeRestartingProof = includeRestartingProof,
-        leadingProbeBudget = leadingProbeBudget,
+        probePolicy = probePolicy,
+        booleanProofTasks = booleanProofTasks,
+        fundedCompanions = fundedCompanions,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

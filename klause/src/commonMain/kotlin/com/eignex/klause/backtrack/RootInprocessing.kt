@@ -20,6 +20,11 @@ internal class RootSimplificationPass : InprocessingPass {
     private var dropped = IntHashSet()
     private var revision = -1L
     private var pending: RootCandidate? = null
+    private var deferredFactor = -1
+    private var pinCursor = 0
+    private var occurrenceCursor = 0
+    private var preferNeighborhood = true
+    private var neighborhoodLeft = 0
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
         sample.owned(dropped, dropped.allocatedBytes, protected)
@@ -39,6 +44,10 @@ internal class RootSimplificationPass : InprocessingPass {
         dropped = IntHashSet()
         revision = -1L
         pending = null
+        deferredFactor = -1
+        pinCursor = 0
+        occurrenceCursor = 0
+        preferNeighborhood = true
     }
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
@@ -58,6 +67,7 @@ internal class RootSimplificationPass : InprocessingPass {
         if (revision != session.learnedClauseRevision) {
             dropped = IntHashSet()
             pending = null
+            deferredFactor = -1
             cursor = 0
             scanEnd = count
             scanRoot = session.explanationState.undoTop
@@ -83,7 +93,7 @@ internal class RootSimplificationPass : InprocessingPass {
             }
             return
         }
-        if (cursor >= scanEnd && pending == null) {
+        if (cursor >= scanEnd && pending == null && deferredFactor < 0) {
             if (scanRoot != session.explanationState.undoTop) {
                 cursor = 0
                 scanRoot = session.explanationState.undoTop
@@ -92,17 +102,17 @@ internal class RootSimplificationPass : InprocessingPass {
         }
         var examined = 0
         var literalsVisited = 0
-        while ((pending != null || cursor < scanEnd) && examined++ < params.rootSimplifyBatch) {
+        neighborhoodLeft = ROOT_LITERAL_LIMIT
+        while (examined++ < params.rootSimplifyBatch) {
             if (!session.canSimplifyRoot || literalsVisited >= ROOT_LITERAL_LIMIT || budget.stopped()) break
             var candidate = pending
             if (candidate == null) {
-                if (!budget.visit()) break
-                val factor = cursor++
+                val factor = nextFactor(session, budget) ?: break
                 budget.note("Candidates")
                 val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - literalsVisited)
                 if (literals == null) {
                     if (literalsVisited > 0) {
-                        cursor--
+                        deferredFactor = factor
                         break
                     }
                     continue
@@ -166,6 +176,50 @@ internal class RootSimplificationPass : InprocessingPass {
             scanEnd = session.rootClauseCount
         }
     }
+
+    private fun nextFactor(session: PropagationSession, budget: InprocessingBudget): Int? {
+        if (deferredFactor >= 0) {
+            if (!budget.visit()) return null
+            val factor = deferredFactor
+            deferredFactor = -1
+            return factor
+        }
+        val nearbyFirst = preferNeighborhood
+        preferNeighborhood = !preferNeighborhood
+        if (nearbyFirst) neighborhoodFactor(session, budget)?.let { return it }
+        if (budget.stopped()) return null
+        if (cursor < scanEnd) {
+            if (!budget.visit()) return null
+            return cursor++
+        }
+        return if (nearbyFirst) null else neighborhoodFactor(session, budget)
+    }
+
+    private fun neighborhoodFactor(session: PropagationSession, budget: InprocessingBudget): Int? {
+        val pins = session.explanationState.boolPinOrder
+        while (pinCursor < pins.size && neighborhoodLeft > 0) {
+            val variable = pins[pinCursor]
+            val occurrences = if (variable < session.problem.numBoolVars) {
+                session.projection.preparedBoolOccurrences(variable)
+            } else null
+            if (variable < session.problem.numBoolVars && occurrences == null) {
+                pinCursor = pins.size
+                occurrenceCursor = 0
+                budget.note("NeighborhoodUnavailable")
+                return null
+            }
+            if (!budget.visit()) return null
+            neighborhoodLeft--
+            if (occurrences == null || occurrenceCursor >= occurrences.size) {
+                pinCursor++
+                occurrenceCursor = 0
+                continue
+            }
+            budget.note("NeighborhoodCandidates")
+            return occurrences[occurrenceCursor++]
+        }
+        return null
+    }
 }
 
 private class RootCandidate(val factor: Int, val literals: IntArray) {
@@ -176,7 +230,9 @@ private class RootCandidate(val factor: Int, val literals: IntArray) {
 
 internal class RootProbingPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true
-    private var cursor = 0
+    private var literalCursor = 0L
+    private var endpointCursor = 0L
+    private var preferEndpoint = false
     private var learnedCursor = 0
     private var revision = -1L
     private var neighborhood: IntArray? = null
@@ -186,7 +242,9 @@ internal class RootProbingPass : InprocessingPass {
     override val spending = InprocessingSpending(InprocessingKind.Probe)
 
     override fun reset() {
-        cursor = 0
+        literalCursor = 0L
+        endpointCursor = 0L
+        preferEndpoint = false
         learnedCursor = 0
         revision = -1L
         neighborhood = null
@@ -217,7 +275,7 @@ internal class RootProbingPass : InprocessingPass {
             budget.note("NeighborhoodCandidates")
             if (session.learnedClauseLiteralCount(index) !in 2..PROBE_NEIGHBORHOOD_LITERALS) continue
             val literals = session.rootClauseLiterals(session.problem.numFactors + index,
-                PROBE_NEIGHBORHOOD_LITERALS) ?: continue
+                PROBE_NEIGHBORHOOD_LITERALS, includePermanent = true, includeAtoms = true) ?: continue
             if (literals.size == 2 && literals[0] == Lit.negate(literals[1])) continue
             if (literals.any { budget.truth(it) == true }) continue
             neighborhood = literals
@@ -233,42 +291,126 @@ internal class RootProbingPass : InprocessingPass {
     }
 
     private fun probe(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
-        val variables = session.problem.numBoolVars
-        if (variables == 0) return
+        val variables = session.rootProbeVariableCount
+        val literalCandidates = 2L * variables
+        val endpointCandidates = 2L * session.problem.numIntVars
+        val candidates = literalCandidates + endpointCandidates
+        if (candidates == 0L) return
         preparationLeft = PROBE_NEIGHBORHOOD_CLAUSES
         var attempted = 0
         var examined = 0
+        var literalsExamined = 0L
+        var endpointsExamined = 0L
         val priorCancelled = session.probeCancelled
-        while (attempted < params.rootProbeBatch && examined < minOf(2L * variables, ROOT_LITERAL_LIMIT.toLong())) {
+        while (attempted < params.rootProbeBatch && examined < minOf(candidates, ROOT_LITERAL_LIMIT.toLong())) {
             if (!session.canSimplifyRoot || !budget.visit()) break
             val nearby = if (preferNeighborhood) neighborhoodLiteral(session, budget) else null
             if (budget.stopped()) break
-            val literal = nearby ?: cursor
-            if (nearby == null) cursor = (cursor + 1) % (2 * variables)
-            else neighborhoodPosition++
+            val endpoint = nearby == null && endpointsExamined < endpointCandidates &&
+                (preferEndpoint || literalsExamined >= literalCandidates)
+            val candidate = when {
+                nearby != null -> {
+                    neighborhoodPosition++
+                    nearby.toLong()
+                }
+                endpoint -> {
+                    val next = endpointCursor % endpointCandidates
+                    endpointCursor = (next + 1L) % endpointCandidates
+                    endpointsExamined++
+                    preferEndpoint = false
+                    next
+                }
+                else -> {
+                    val next = literalCursor % literalCandidates
+                    literalCursor = (next + 1L) % literalCandidates
+                    literalsExamined++
+                    preferEndpoint = true
+                    next
+                }
+            }
             preferNeighborhood = !preferNeighborhood
-            val variable = Lit.variable(literal)
+            val literal = if (endpoint) 0 else candidate.toInt()
+            val variable = if (endpoint) (candidate / 2L).toInt() else Lit.variable(literal)
+            val atMost = candidate % 2L == 0L
             examined++
             budget.note("Candidates")
-            if (session.boolValue(variable) != null) continue
+            val bound = if (endpoint) {
+                budget.note("EndpointCandidates")
+                if (!budget.visit(2)) break
+                val domain = session.intDomain(variable)
+                if (domain.min == domain.max) continue
+                budget.note("EndpointEligible")
+                if (atMost) domain.min else domain.max
+            } else {
+                if (variable < session.problem.numBoolVars) {
+                    if (session.boolValue(variable) != null) continue
+                } else if (!session.canProbeRootAtom(variable) || budget.truth(literal) != null) continue
+                0L
+            }
             attempted++
             budget.note("Eligible")
             budget.probe()
-            val start = session.work
-            val token = Cancellation { session.work - start >= params.rootProbeWork }
-            val result = session.withCancellation(token) { session.probeBool(variable, Lit.isPositive(literal)) }
+            val result = probe(session, params.rootProbeWork) {
+                if (endpoint) session.probeRootBound(variable, bound, atMost) else session.probeRootLiteral(literal)
+            }
             when (result) {
-                null -> if (!params.cancellation()) session.probeCancelled = priorCancelled
+                null -> {
+                    budget.note("Incomplete")
+                    if (!params.cancellation()) session.probeCancelled = priorCancelled
+                }
                 is PropagationResult.Unsat -> {
+                    budget.note("Refuted")
                     if (!budget.visit(3)) break
                     val before = session.work
-                    session.addRootDerivedClause(Clause(intArrayOf(Lit.negate(literal))), 1, OWN_ORIGIN, false)
+                    val unit = complement(session, literal, if (endpoint) variable else -1, bound, atMost)
+                    session.addRootDerivedClause(Clause(intArrayOf(unit)), 1, OWN_ORIGIN, false)
                     budget.note("AttachmentWork", session.work - before + 3L)
                     budget.note("Units")
+                    if (endpoint) budget.note("EndpointUnits")
                     if (nearby != null) neighborhood = null
                 }
-                else -> session.popLast()
+                else -> budget.note("Consistent")
             }
+        }
+    }
+
+    private fun complement(
+        session: PropagationSession,
+        literal: Int,
+        integer: Int,
+        bound: Long,
+        atMost: Boolean,
+    ): Int {
+        if (integer < 0) return Lit.negate(literal)
+        val atomSpace = session.rootProbeVariableCount
+        val unit = if (atMost) session.boundLeLit(integer, bound, false)
+            else session.boundGeLit(integer, bound, false)
+        if (session.rootProbeVariableCount > atomSpace) {
+            // Conservatively charge parallel registry buffers and threshold-index growth.
+            val atoms = session.rootProbeVariableCount - session.problem.numBoolVars
+            session.chargeInprocessingWork(16L * atoms)
+        }
+        return unit
+    }
+
+    private inline fun probe(
+        session: PropagationSession,
+        limit: Long,
+        crossinline action: () -> PropagationResult?,
+    ): PropagationResult? {
+        val start = session.work
+        val token = Cancellation { session.work - start >= limit }
+        val retracting = session.retractingListener
+        // Speculative retractions must not overwrite phases saved by ordinary search.
+        session.retractingListener = null
+        return try {
+            session.withCancellation(token) {
+                action()
+            }.also {
+                if (it != null && it !is PropagationResult.Unsat) session.popLast()
+            }
+        } finally {
+            session.retractingListener = retracting
         }
     }
 }

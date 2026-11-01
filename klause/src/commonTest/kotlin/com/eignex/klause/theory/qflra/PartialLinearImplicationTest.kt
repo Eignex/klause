@@ -8,7 +8,9 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.explainAtoms
+import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -17,6 +19,16 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PartialLinearImplicationTest {
+    @Test
+    fun `affine activity should decline when reconstruction exceeds the rational size limit`() {
+        val value = BigFraction.of(BIG_ONE shl 4095, BIG_ONE)
+        val arithmetic = PartialImplicationArithmetic(Cancellation.Never)
+
+        val activity = arithmetic.affineValue(value, BigFraction.ofLong(2), BigFraction.ZERO)
+
+        assertNull(activity)
+    }
+
     @Test
     fun `a negative coefficient uses a lower bound to explain an upper activity`() {
         val session = SearchSession(emptyList())

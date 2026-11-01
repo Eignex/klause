@@ -11,8 +11,7 @@ import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.VerifiedIncumbent
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.kumulant.stream.Mutex
 
 internal class PortfolioIncumbents<V>(
     val valueOf: (MinimizeResult.WithSample) -> V?,
@@ -56,7 +55,7 @@ internal class PortfolioIncumbents<V>(
             arithmetic: AlgebraicArithmetic,
             onResource: (PolynomialResource) -> Unit = {},
         ): PortfolioIncumbents<V> {
-            val lock = Concurrency.Strict.lock()
+            val lock = Mutex()
             fun <T> checked(action: () -> T): T? = try {
                 action()
             } catch (_: PolynomialInterrupted) {

@@ -221,8 +221,12 @@ windows carry no proof authority.
 
 Explicit numerical linear local search and ALNS use `JointLinearRepair` with the
 same retained neighborhood driver. A source LP point guides the initial integer
-rounding and orders fractional seed coordinates. Later proposals follow source
-row connectivity, including integer indicator triggers and paths through real
+rounding and orders fractional seed coordinates. With enabled incumbent completion,
+a checked external center supplies initial integer coordinates and the first
+connected neighborhood without a root relaxation. An unavailable center retains
+root guidance. Preparation checks spend the same cumulative LP funding as repair;
+import and consumption occur when the center supplies a proposal. Later proposals
+follow source row connectivity, including integer indicator triggers and paths through real
 columns, to free at most 32 related integers. Each walk visits at most 8,192
 adjacency entries; its index admits at most
 1,048,576 coordinates, rows and coefficient entries in total. Other integers stay

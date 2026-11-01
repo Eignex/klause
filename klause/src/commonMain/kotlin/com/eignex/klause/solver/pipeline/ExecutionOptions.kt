@@ -310,6 +310,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
             "root-rebuild-capture-visits", ValueKind.INT,
         )
 
+        /** Total preparation and trial work for a private Boolean generation; zero disables it. */
+        val privateRebuildWork: ExecutionOption<Long> = ExecutionOption("private-rebuild-work", ValueKind.LONG)
+
         /** Failed-literal probes per scheduled restart; zero disables probing. */
         val rootProbeBatch: ExecutionOption<Int> = ExecutionOption("root-probe-batch", ValueKind.INT)
 
@@ -334,6 +337,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val inprocessingGrowth: ExecutionOption<Int> = ExecutionOption("inprocessing-growth", ValueKind.INT)
         /** Non-inprocessing work required after a simplification attempt. */
         val inprocessingCooldown: ExecutionOption<Long> = ExecutionOption("inprocessing-cooldown", ValueKind.LONG)
+        /** Non-inprocessing work after the first complete root before optional slices. */
+        val inprocessingWarmupWork: ExecutionOption<Long> = ExecutionOption("inprocessing-warmup-work", ValueKind.LONG)
 
         /** The `lp-objective-cone` execution setting. */
         val lpObjectiveCone: ExecutionOption<Boolean> = ExecutionOption("lp-objective-cone", ValueKind.BOOLEAN)
@@ -513,6 +518,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Active companion lifetime in milliseconds, contained by the ordinary solve deadline. */
         val companionActiveMillis: ExecutionOption<Long> = ExecutionOption("companion-active-ms", ValueKind.LONG)
 
+        internal val companionAdmission: ExecutionOption<String> =
+            ExecutionOption("companion-admission", ValueKind.STRING)
+
         /** Stream physical phase and lifecycle progress independently of deterministic work diagnostics. */
         val portfolioProgress: ExecutionOption<Boolean> = ExecutionOption("portfolio-progress", ValueKind.BOOLEAN)
 
@@ -532,6 +540,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Select retained non-restarting workers or all complete sessions for proof coverage. */
         val portfolioProofWorkers: ExecutionOption<String> =
             ExecutionOption("portfolio-proof-workers", ValueKind.STRING)
+
+        /** Opt-in disjoint queries for eligible single-core Boolean satisfaction portfolios. */
+        val booleanProofTasks: ExecutionOption<Boolean> = ExecutionOption("boolean-proof-tasks", ValueKind.BOOLEAN)
 
         /** Select ordinary LP probes or defer them until the other initial probes finish or find an incumbent. */
         val portfolioLpStart: ExecutionOption<String> = ExecutionOption("portfolio-lp-start", ValueKind.STRING)
@@ -570,9 +581,10 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
                 subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch,
                 rootRebuildCaptureVisits,
+                privateRebuildWork,
                 rootProbeBatch, rootProbeWork, inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
                 inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth,
-                inprocessingCooldown, lpObjectiveCone, lpAutoOffReprobe,
+                inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,
                 lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
                 lpBranching, lpDirectionalGains,
                 lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning, integerRowLearning,
@@ -585,8 +597,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
                 clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, coreEarly, companionIntegers,
                 sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
-                coreRefinement, companionAfterIncumbent, companionActiveMillis, portfolioProgress,
+                coreRefinement, companionAfterIncumbent, companionActiveMillis, companionAdmission, portfolioProgress,
                 phaseRetention, portfolioReward, portfolioProofShare, portfolioProofWorkers, portfolioLpStart,
+                booleanProofTasks,
                 portfolioProbes, reseedStaleThreshold,
                 lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
             ).associateBy { it.id }

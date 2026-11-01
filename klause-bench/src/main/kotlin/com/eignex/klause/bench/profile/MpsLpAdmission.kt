@@ -140,12 +140,12 @@ internal object MpsLpAdmission {
         return objective?.let { if (plan.maximize) it.negated() else it }
     }
 
-    private fun recipes(problem: BakedProblem, objective: LinearObjective?, mix: EngineMix): JsonObject {
+    internal fun recipes(problem: BakedProblem, objective: LinearObjective?, mix: EngineMix): JsonObject {
         val scenario = PortfolioScenario.sequential(Kind.COP, mix, seed = 3L)
         val factsType = Class.forName("com.eignex.klause.portfolio.ProblemFacts")
         val companion = factsType.getField("Companion").get(null)
         val facts = companion.javaClass.methods.single { it.name == "of" }.invoke(
-            companion, problem, ProblemProfile.of(problem, true), scenario.lpCeiling, objective,
+            companion, problem, ProblemProfile.of(problem, true), scenario.lpCeiling, objective, null,
         )
         val compositionType = Class.forName("com.eignex.klause.portfolio.PortfolioComposition")
         val composition = compositionType.getField("INSTANCE").get(null)
@@ -263,6 +263,8 @@ internal object MpsLpAdmission {
             put("nonzeros", rowIndices.size)
             put("emittedDenseProxy", rows.toLong() * (columns.toLong() + rows + 1))
             put("rowComponents", rowCounts.size)
+            put("rowCoupledComponents", rowCounts.keys.count { (columnCounts[it] ?: 0) > 0 })
+            put("rowOnlyRows", rowCounts.entries.sumOf { (root, count) -> if (root in columnCounts) 0 else count })
             put("largestComponentRows", rowCounts.values.maxOrNull() ?: 0)
             put("largestComponentColumns", rowCounts.keys.maxOfOrNull { columnCounts[it] ?: 0 } ?: 0)
             put("isolatedColumns", (0 until columns).count { pointers[it] == pointers[it + 1] })

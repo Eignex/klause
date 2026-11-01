@@ -8,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntBounds
@@ -47,7 +48,25 @@ import kotlin.test.assertTrue
 
 class OpenTheorySolverTest {
     @Test
-    fun `incremental ordinary linear traversal should publish a strict guard consequence`() {
+    fun `default ordinary traversal should consume a shared affine bound`() {
+        val model = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true))),
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
+                LinearOp.LE, 1.0, strict = true),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(-4.0, 6.0),
+                LinearOp.GE, -2.0, strict = true),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+        val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
+
+        val result = assertIs<OpenTheoryResult.Sat>(engine.solve())
+
+        assertEquals(true, result.assignment.boolValue(1))
+        assertTrue((result.stats.smt.completeSearchStages?.get("PARTIAL_LINEAR_AFFINE_DEDUCTION") ?: 0L) > 0L)
+    }
+
+    @Test
+    fun `default ordinary linear traversal should publish a strict guard consequence`() {
         val model = Problem(2, 0, emptyArray(), arrayOf(
             ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
                 listOf(BigFraction.ofLong(2), BigFraction.ofLong(3)), LinearOp.LE, BigFraction.ONE),
@@ -56,7 +75,7 @@ class OpenTheorySolverTest {
         ), numRealVars = 2, realLower = DoubleArray(2), realUpper = DoubleArray(2))
         val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
 
-        val result = assertIs<OpenTheoryResult.Sat>(engine.solve(TheoryParams(openLinearIncremental = true)))
+        val result = assertIs<OpenTheoryResult.Sat>(engine.solve())
 
         val witness = result.assignment
         assertEquals(false, witness.boolValue(0))

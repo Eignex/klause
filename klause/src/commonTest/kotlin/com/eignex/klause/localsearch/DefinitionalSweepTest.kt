@@ -21,10 +21,110 @@ import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class DefinitionalSweepTest {
+    @Test
+    fun `nested Boolean costs should decline a complete flat cost sweep`() {
+        val problem = Problem(3, 0, emptyArray(), emptyArray())
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(1, intArrayOf(Lit.make(0, true)), true),
+            BoolFoldDefinition(2, intArrayOf(Lit.make(1, true)), false),
+        )))
+
+        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            LinearObjective(longArrayOf(0, 0, 7)), Cancellation.Never, captureBooleanCosts = true,
+        ))
+
+        assertNull(objective.booleanCostSweep)
+    }
+
+    @Test
+    fun `a bare Boolean cost should retain the ordinary definition view`() {
+        val problem = Problem(3, 0, emptyArray(), emptyArray())
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(2, intArrayOf(Lit.make(0, true), Lit.make(1, false)), true),
+        )))
+
+        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            LinearObjective(longArrayOf(3, 0, 7)), Cancellation.Never, captureBooleanCosts = true,
+        ))
+
+        assertNull(objective.booleanCostSweep)
+    }
+
+    @Test
+    fun `an unpriced definition should prevent complete Boolean cost maintenance`() {
+        val problem = Problem(4, 0, emptyArray(), emptyArray())
+        val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = listOf(
+            BoolFoldDefinition(2, intArrayOf(Lit.make(0, true)), true),
+            BoolFoldDefinition(3, intArrayOf(Lit.make(1, true)), false),
+        )))
+
+        val objective = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            LinearObjective(longArrayOf(0, 0, 7)), Cancellation.Never, captureBooleanCosts = true,
+        ))
+
+        assertNull(objective.booleanCostSweep)
+    }
+
+    @Test
+    fun `element objective gradients should follow the selected index`() {
+        for (variableArray in listOf(false, true)) {
+            val domains = arrayOf(IntDomain(0, 1), IntDomain(10, 20), IntDomain(10, 20), IntDomain(10, 20))
+            val source = Problem(0, 4, domains, listOf(Element(0, 3,
+                if (variableArray) longArrayOf(1, 2) else longArrayOf(10, 20), variableArray, indexOffset = 0)))
+            val sweep = assertNotNull(DefinitionalSweep.infer(source, intArrayOf(3)))
+            val objective = assertNotNull(sweep.functionalObjective(
+                LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))))
+            val assignment = com.eignex.klause.solver.Assignment(0, 4)
+            assignment.setInt(0, 1)
+            assignment.setInt(1, 10)
+            assignment.setInt(2, 20)
+            assignment.setInt(3, 20)
+
+            val delta = objective.deltaIfApplied(assignment, Move.IntSet(0, 0))
+
+            assertEquals(-10.0, delta, variableArray.toString())
+        }
+    }
+
+    @Test
+    fun `element objective gradients should retain the result for an invalid index`() {
+        val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(10, 20)),
+            listOf(Element(0, 1, longArrayOf(10, 20), arrIsVars = false, indexOffset = 0)))
+        val sweep = assertNotNull(DefinitionalSweep.infer(source, intArrayOf(1)))
+        val objective = assertNotNull(sweep.functionalObjective(LinearObjective(intCoefficients = longArrayOf(0, 1))))
+        val assignment = com.eignex.klause.solver.Assignment(0, 2)
+        assignment.setInt(0, 1)
+        assignment.setInt(1, 20)
+
+        val delta = objective.deltaIfApplied(assignment, Move.IntSet(0, 2))
+
+        assertEquals(0.0, delta)
+    }
+
+    @Test
+    fun `element objective gradients should read only the selected variable cell`() {
+        val source = Problem(0, 4,
+            arrayOf(IntDomain(0, 1), IntDomain(10, 20), IntDomain(10, 20), IntDomain(10, 20)),
+            listOf(Element(0, 3, longArrayOf(1, 2), arrIsVars = true, indexOffset = 0)))
+        val sweep = assertNotNull(DefinitionalSweep.infer(source, intArrayOf(3)))
+        val objective = assertNotNull(sweep.functionalObjective(
+            LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))))
+        val assignment = com.eignex.klause.solver.Assignment(0, 4)
+        assignment.setInt(0, 1)
+        assignment.setInt(1, 10)
+        assignment.setInt(2, 20)
+        assignment.setInt(3, 20)
+
+        for ((variable, expected) in listOf(1 to 0.0, 2 to -5.0)) {
+            assertEquals(expected, objective.deltaIfApplied(assignment, Move.IntSet(variable, 15)))
+        }
+    }
+
     @Test
     fun `definition inference should not spend work after its containing allowance stops`() {
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(10, 20)),

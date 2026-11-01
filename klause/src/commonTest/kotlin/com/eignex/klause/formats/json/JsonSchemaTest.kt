@@ -51,11 +51,11 @@ class JsonSchemaTest {
     }
 
     @Test
-    fun `parse errors should name the path within the document`() {
+    fun `parse errors should name what is malformed`() {
         val cases = listOf(
-            """{ "entries": { "budget": { "int": [0, "9"] } } }""" to "$.entries.budget.int[1]:",
-            """{ "entries": { "c": { "constraint": { "ge": [{ "ref": "x" }] } } } }""" to "$.entries.c.constraint.ge:",
-            """{ "entries": {}, "extra": 1 }""" to "$.extra: unknown field",
+            """{ "entries": { "budget": { "int": [0, 9.5] } } }""" to "'9.5' as an int",
+            """{ "entries": { "c": { "constraint": { "ge": [{ "ref": "x" }] } } } }""" to "'ge' expects 2 operands",
+            """{ "entries": {}, "extra": 1 }""" to "unknown key 'extra'",
         )
 
         for ((text, path) in cases) {

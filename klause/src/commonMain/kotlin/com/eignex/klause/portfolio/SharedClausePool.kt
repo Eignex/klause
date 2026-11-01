@@ -12,9 +12,7 @@ import com.eignex.klause.util.SharingMemorySnapshot
 import com.eignex.klause.util.SharingMemoryStatus
 import com.eignex.klause.util.mixLongKey
 import com.eignex.klause.util.openAddressingCapacity
-import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
-import com.eignex.kumulant.stream.lock
 
 /**
  * An append-only, de-duplicated pool of session-portable learned nogoods ([SharedClause]) shared
@@ -24,9 +22,8 @@ import com.eignex.kumulant.stream.lock
  *
  * Used by the [Portfolio] on any number of lanes: several lanes publish concurrently and need a real lock,
  * and across segments the pool is also the *persistent memory* that survives a backtrack arm's handle being
- * rebuilt. The [lock] comes from the executor's
- * [Concurrency] via [com.eignex.kumulant.stream.lock]: a no-op under `Concurrency.None` (the single
- * core pays nothing), a platform mutex under the parallel executor's concurrent writers.
+ * rebuilt. The [lock] is a [Mutex] sized to the executor: a no-op on a single core (which pays
+ * nothing), a platform mutex under the parallel executor's concurrent writers.
  *
  * De-dup is by [SharedClause.key]. A bounded [cap] stops growth: a publish that would overflow first
  * compacts the pool to half, keeping globally-published nogoods (soundness-motivated shares that
@@ -41,7 +38,7 @@ import com.eignex.kumulant.stream.lock
  * in modern SAT solvers", IJCAI 2009, https://www.ijcai.org/Proceedings/09/Papers/074.pdf.
  */
 internal class SharedClausePool(
-    private val lock: Mutex = Concurrency.None.lock(),
+    private val lock: Mutex = Mutex(concurrent = false),
     private val cap: Int = DEFAULT_CAP,
     internal val measureMemory: Boolean = false,
     internal val memorySampleWork: Long = SharingMemoryObservation.DEFAULT_WORK,
@@ -55,8 +52,9 @@ internal class SharedClausePool(
     internal val softLimitBytes: Long? = null,
     internal val reclamationWork: Long = DEFAULT_RECLAMATION_WORK,
     internal val reclamationScratchEntries: Int = DEFAULT_RECLAMATION_SCRATCH,
+    private val booleanOnly: Boolean = false,
 ) {
-    private var store = Store(0)
+    private var store = Store(0, booleanOnly)
     private var generation = 0
     private var compactions = 0L
     private var declined = 0L
@@ -76,6 +74,8 @@ internal class SharedClausePool(
             "poolOriginCapacityBytes" to store.capacity.toLong() * Int.SIZE_BYTES,
             "poolReferenceSlots" to store.capacity.toLong(),
             "poolPrivateIndexBytes" to store.indexBytes,
+            "poolPayloadOwnerCapacityBytes" to store.ownerCapacityBytes,
+            "poolBooleanOnly" to if (booleanOnly) 1L else 0L,
             "poolOwnedBytes" to store.ownedBytes,
             "poolProtectedBytes" to 0L,
             "poolGeneration" to generation.toLong(),
@@ -87,21 +87,28 @@ internal class SharedClausePool(
 
     /** Append the unseen clauses of [batch] (by key) as published by arm [origin], compacting on overflow.
      *  [isGlobal] marks a globally-published nogood for retention priority over filtered glue. A clause
-     *  already pooled keeps the arm that published it first. */
+     *  already pooled keeps the arm that published it first. With [stableGenerationOnly], a batch that
+     *  could require compaction returns -1 before publication. */
     fun publish(
         batch: List<SharedClause>,
         origin: Int = NO_ORIGIN,
         isGlobal: Boolean = false,
         maxWork: Long = reclamationWork,
         maxScratchEntries: Int = reclamationScratchEntries,
+        stableGenerationOnly: Boolean = false,
         cancelled: () -> Boolean = { false },
         charge: () -> Unit = {},
     ): Int = lock.withLock {
+        if (stableGenerationOnly && (softLimitBytes != null || batch.size > cap - store.size)) return@withLock -1
         val budget = Budget(maxWork, maxScratchEntries, cancelled, charge)
         var published = 0
         try {
             for (c in batch) {
                 budget.step()
+                if (booleanOnly && c.atomQuads.isNotEmpty()) {
+                    declined++
+                    continue
+                }
                 if (store.contains(c.key, budget)) continue
                 if (store.size >= cap || exceedsLimit(c, budget)) compact(budget)
                 if (store.size >= cap || exceedsLimit(c, budget)) {
@@ -178,13 +185,14 @@ internal class SharedClausePool(
     private fun exceedsLimit(clause: SharedClause, budget: Budget): Boolean {
         val limit = softLimitBytes ?: return false
         val capacity = if (store.size == store.capacity) nextCapacity() else store.capacity
-        return Store.indexBytes(capacity) + store.payloadBytes + store.additionalPayload(clause, budget) > limit
+        return Store.indexBytes(capacity, booleanOnly) + store.payloadBytes +
+            store.additionalPayload(clause, budget) > limit
     }
 
     private fun nextCapacity(): Int {
         val desired = minOf(cap, maxOf(1, store.capacity * 2))
         val limit = softLimitBytes ?: return desired
-        return if (Store.indexBytes(desired) + store.payloadBytes <= limit) desired else store.size + 1
+        return if (Store.indexBytes(desired, booleanOnly) + store.payloadBytes <= limit) desired else store.size + 1
     }
 
     private fun grow(budget: Budget) {
@@ -203,7 +211,7 @@ internal class SharedClausePool(
         sort(order, budget)
         val limit = softLimitBytes?.div(2L) ?: Long.MAX_VALUE
         var target = minOf(cap / 2, store.size / 2)
-        while (Store.indexBytes(target) > limit) {
+        while (Store.indexBytes(target, booleanOnly) > limit) {
             budget.step()
             target /= 2
         }
@@ -230,8 +238,8 @@ internal class SharedClausePool(
     }
 
     private fun preparedStore(capacity: Int, budget: Budget): Store {
-        budget.reserve(Store.scratchEntries(capacity))
-        return Store(capacity)
+        budget.reserve(Store.scratchEntries(capacity, booleanOnly))
+        return Store(capacity, booleanOnly)
     }
 
     private fun sort(order: IntArray, budget: Budget) {
@@ -269,19 +277,20 @@ internal class SharedClausePool(
         }
     }
 
-    private class Store(val capacity: Int) {
+    private class Store(val capacity: Int, private val booleanOnly: Boolean) {
         val clauses = arrayOfNulls<SharedClause>(capacity)
         val global = BooleanArray(capacity)
         val origins = IntArray(capacity)
         private val keyCapacity = if (capacity == 0) 0 else openAddressingCapacity(capacity)
-        private val ownerCapacity = if (capacity == 0) 0 else openAddressingCapacity(capacity * 2)
+        private val ownerCapacity = if (capacity == 0) 0 else payloadOwnerCapacity(capacity, booleanOnly)
         private val keys = LongArray(keyCapacity)
         private val used = BooleanArray(keyCapacity)
         private val owners = arrayOfNulls<Any>(ownerCapacity)
         var size = 0
         var payloadBytes = 0L
         val keyCapacityBytes: Long get() = keyCapacity.toLong() * 9L
-        val indexBytes: Long get() = indexBytes(capacity)
+        val ownerCapacityBytes: Long get() = ownerCapacity.toLong() * 8L
+        val indexBytes: Long get() = indexBytes(capacity, booleanOnly)
         val ownedBytes: Long get() = indexBytes + payloadBytes
 
         fun clause(index: Int): SharedClause = checkNotNull(clauses[index])
@@ -309,10 +318,10 @@ internal class SharedClausePool(
         fun additionalPayload(clause: SharedClause, budget: Budget): Long {
             if (size == 0) return clause.payloadBytes
             var bytes = 0L
-            if (owners[ownerSlot(clause.boolLits, budget)] == null) {
+            if ((!booleanOnly || clause.boolLits.isNotEmpty()) && owners[ownerSlot(clause.boolLits, budget)] == null) {
                 bytes += clause.boolLits.size.toLong() * Int.SIZE_BYTES
             }
-            if (owners[ownerSlot(clause.atomQuads, budget)] == null) {
+            if (!booleanOnly && owners[ownerSlot(clause.atomQuads, budget)] == null) {
                 bytes += clause.atomQuads.size.toLong() * Long.SIZE_BYTES
             }
             return bytes
@@ -326,16 +335,21 @@ internal class SharedClausePool(
             limit: Long = Long.MAX_VALUE,
         ): Boolean {
             val key = keySlot(clause.key, budget)
-            val boolOwner = ownerSlot(clause.boolLits, budget)
-            val atomOwner = ownerSlot(clause.atomQuads, budget, if (owners[boolOwner] == null) boolOwner else -1)
-            val boolBytes = if (owners[boolOwner] == null) clause.boolLits.size.toLong() * Int.SIZE_BYTES else 0L
-            val atomBytes = if (owners[atomOwner] == null) clause.atomQuads.size.toLong() * Long.SIZE_BYTES else 0L
+            val boolOwner = if (booleanOnly && clause.boolLits.isEmpty()) -1 else ownerSlot(clause.boolLits, budget)
+            val atomOwner = if (booleanOnly) -1 else
+                ownerSlot(clause.atomQuads, budget, if (owners[boolOwner] == null) boolOwner else -1)
+            val boolBytes = if (boolOwner >= 0 && owners[boolOwner] == null) {
+                clause.boolLits.size.toLong() * Int.SIZE_BYTES
+            } else 0L
+            val atomBytes = if (atomOwner >= 0 && owners[atomOwner] == null) {
+                clause.atomQuads.size.toLong() * Long.SIZE_BYTES
+            } else 0L
             if (ownedBytes + boolBytes + atomBytes > limit) return false
             budget.step()
             keys[key] = clause.key
             used[key] = true
-            owners[boolOwner] = clause.boolLits
-            owners[atomOwner] = clause.atomQuads
+            if (boolOwner >= 0) owners[boolOwner] = clause.boolLits
+            if (atomOwner >= 0) owners[atomOwner] = clause.atomQuads
             payloadBytes += boolBytes + atomBytes
             clauses[size] = clause
             global[size] = isGlobal
@@ -344,13 +358,16 @@ internal class SharedClausePool(
         }
 
         companion object {
-            fun indexBytes(capacity: Int): Long = if (capacity == 0) 0L else
-                capacity.toLong() * 13L + openAddressingCapacity(capacity).toLong() * 9L +
-                    openAddressingCapacity(capacity * 2).toLong() * 8L
+            private fun payloadOwnerCapacity(capacity: Int, booleanOnly: Boolean): Int =
+                openAddressingCapacity(if (booleanOnly) capacity else capacity * 2)
 
-            fun scratchEntries(capacity: Int): Long = if (capacity == 0) 0L else
+            fun indexBytes(capacity: Int, booleanOnly: Boolean): Long = if (capacity == 0) 0L else
+                capacity.toLong() * 13L + openAddressingCapacity(capacity).toLong() * 9L +
+                    payloadOwnerCapacity(capacity, booleanOnly).toLong() * 8L
+
+            fun scratchEntries(capacity: Int, booleanOnly: Boolean): Long = if (capacity == 0) 0L else
                 capacity.toLong() * 3L + openAddressingCapacity(capacity).toLong() * 2L +
-                    openAddressingCapacity(capacity * 2).toLong()
+                    payloadOwnerCapacity(capacity, booleanOnly).toLong()
         }
     }
 
@@ -445,16 +462,18 @@ internal class PoolClauseExchange(
         return object : ClauseExchange by exchange, ConditionedClauseExchange {}
     }
 
+    private fun ownedMemory(): Map<String, Long> = pool.memory() + mapOf(
+        "seenKeys" to seen.size.toLong(),
+        "seenCapacityBytes" to seen.allocatedBytes,
+    )
+
     private fun observe(session: PropagationSession) {
         val m = meter ?: return
         if (!pool.measureMemory) return
         val sample = session.sharingMemory(pool.memorySampleWork, pool.memorySampleScratchEntries)
         val work = sample.work
         m.clauseCount("accountingWork", work)
-        m.clauseMemorySample(pool.memory() + mapOf(
-            "seenKeys" to seen.size.toLong(),
-            "seenCapacityBytes" to seen.allocatedBytes,
-        ) + sample.telemetry())
+        m.clauseMemorySample(ownedMemory() + sample.telemetry())
     }
 
     private fun retainSession(session: PropagationSession) {
@@ -517,7 +536,7 @@ internal class PoolClauseExchange(
         meter?.imported(SharingChannel.Clauses, imported, drained.cursor)
         meter?.duplicates(SharingChannel.Clauses, duplicates)
         countUses(session)
-        export(session)
+        export(session, retiring = false)
         observe(session)
     }
 
@@ -537,7 +556,7 @@ internal class PoolClauseExchange(
         retainSession(session)
         if (!session.cancelRequested) {
             countUses(session)
-            export(session)
+            export(session, retiring = false)
         }
         observe(session)
     }
@@ -546,10 +565,10 @@ internal class PoolClauseExchange(
         if (sessionIdentity != null && sessionIdentity !== session.sharingIdentity) return@metered
         if (!session.cancelRequested) {
             countUses(session)
-            export(session)
+            export(session, retiring = true)
         }
         if (pool.measureMemory) meter?.clauseMemorySample(
-            SharingMemorySnapshot(SharingMemoryStatus.STALE, emptyMap(), 0L, 0).telemetry(),
+            ownedMemory() + SharingMemorySnapshot(SharingMemoryStatus.STALE, emptyMap(), 0L, 0).telemetry(),
         )
         if (sessionIdentity == null || sessionIdentity === session.sharingIdentity) {
             session.retainedSharingMemory = null
@@ -583,8 +602,24 @@ internal class PoolClauseExchange(
 
     /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
      *  trail). The `seen` set guards against re-export within a session; the pool de-dups globally. */
-    private fun export(session: PropagationSession) {
+    private fun export(session: PropagationSession, retiring: Boolean) {
         val candidates = exportCandidates(session) ?: return
+        if (retiring && candidates.isNotEmpty() && pool.softLimitBytes == null &&
+            !seen.canAddWithoutGrowing(candidates.size)
+        ) {
+            val published = pool.publish(candidates, origin,
+                isGlobal = false,
+                maxWork = pool.reclamationWork,
+                maxScratchEntries = pool.reclamationScratchEntries,
+                stableGenerationOnly = true,
+                cancelled = { session.cancelRequested },
+                charge = { session.chargeSharingWork(1L) },
+            )
+            if (published >= 0) {
+                meter?.exported(SharingChannel.Clauses, published)
+                return
+            }
+        }
         val fresh = candidates.filter { admit(it.key, session) == true }
         val published = if (fresh.isEmpty()) 0 else pool.publish(
             fresh,
@@ -595,9 +630,10 @@ internal class PoolClauseExchange(
         meter?.exported(SharingChannel.Clauses, published)
     }
 
-    private fun exportCandidates(session: PropagationSession): List<SharedClause>? {
+    private fun exportLookup(session: PropagationSession): ((Long) -> Boolean?)? {
+        if (seen.isEmpty()) return null
         var lookupWork = pool.reclamationWork
-        val alreadyShared: (Long) -> Boolean? = { key ->
+        return { key ->
             val known = if (pool.softLimitBytes == null) key in seen else seen.containsBounded(
                 key, lookupWork, cancelled = { session.cancelRequested },
                 charge = { lookupWork--; session.chargeSharingWork(1L) },
@@ -605,6 +641,10 @@ internal class PoolClauseExchange(
             if (known == true) meter?.clauseCount("exportDuplicates", 1L)
             known
         }
+    }
+
+    private fun exportCandidates(session: PropagationSession): List<SharedClause>? {
+        val alreadyShared = exportLookup(session)
         if (pool.softLimitBytes == null) return session.exportGlueClausesBounded(
             maxLbd, maxLen, skipPermanent, alreadyShared = alreadyShared, cancelled = { false },
         )

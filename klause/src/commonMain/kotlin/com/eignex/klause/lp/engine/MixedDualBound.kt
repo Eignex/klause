@@ -14,25 +14,36 @@ internal fun nodeDualCertificate(
     onAdditionalCertificate: ((LpDeductionCertificate) -> Unit)? = null,
     sharedMeter: MixedCertificateMeter? = null,
     preferredColumns: IntArray? = null,
+    scaleBits: Int = DEFAULT_SCALE_BITS,
+    requireIntegerPrimary: Boolean = false,
 ): LpDeductionCertificate? {
-    if (!model.hasContinuous) return integerCertify(model, duals, observer = observer)
+    if (!model.hasContinuous) return integerCertify(model, duals, scaleBits, observer)
     val meter = sharedMeter ?: MixedCertificateMeter(cancellation)
     val initialWork = meter.work
     val certificate = try {
         meter.poll()
         val state = model.exactState ?: throw LpProjectionStop()
         meter.reserve(model.numVars.toLong() * 16L + model.m * 8L + 128L)
-        meter.attempt(observer, "INTEGER") {
-            integerCertifyUnchecked(model, duals, DEFAULT_SCALE_BITS, allowMixed = true, scan = meter::step)
-        } ?: meter.attempt(observer, "ROUNDED") {
-            mixedCertificate(model, state, duals, meter)
-        } ?: meter.attempt(observer, "ENDPOINT_REPAIR") {
-            repairMixedEndpoints(model, state, duals, meter)
-        } ?: meter.attempt(observer, "RECONSTRUCTED") {
-            reconstructedMixedCertificate(model, state, duals, meter)
+        val integer = meter.attempt(observer, "INTEGER") {
+            integerCertifyUnchecked(model, duals, scaleBits, allowMixed = true, scan = meter::step)
+        }
+        if (requireIntegerPrimary) {
+            integer
+        } else {
+            integer ?: meter.attempt(observer, "ROUNDED") {
+                mixedCertificate(model, state, duals, meter)
+            } ?: meter.attempt(observer, "ENDPOINT_REPAIR") {
+                repairMixedEndpoints(model, state, duals, meter)
+            } ?: meter.attempt(observer, "RECONSTRUCTED") {
+                reconstructedMixedCertificate(model, state, duals, meter)
+            }
         }
     } catch (_: LpProjectionStop) {
         null
+    }
+    if (requireIntegerPrimary && certificate == null) {
+        observer?.observe(LpCertifier.INTEGER, false, LpCertifierCost.Metered(meter.work - initialWork))
+        return null
     }
     val integralObjective = model.hasIntegralObjective()
     val rows = if (!integralObjective && (certificate != null || onAdditionalCertificate != null)) {
@@ -581,6 +592,7 @@ internal class MixedCertificateMeter(private val cancellation: Cancellation) {
     private val meteredCancellation = cancellation.workMeter() != null
     private var reason = "UNSUPPORTED"
     val work: Long get() = meter.work
+    val allocation: Long get() = meter.allocation
     fun poll() {
         if (cancellation()) {
             reason = "CANCELLED"
@@ -605,6 +617,7 @@ internal class MixedCertificateMeter(private val cancellation: Cancellation) {
     fun step() = charge(1L, 0L, matrix = true)
     fun reconstructionStep() = charge(8L, 96L, matrix = false)
     fun reserve(bytes: Long) = charge(bytes / 8L + 1L, bytes, matrix = false)
+    fun protect(bytes: Long) = charge(0L, bytes, matrix = false)
 
     private fun charge(work: Long, bytes: Long, matrix: Boolean) {
         if (meteredCancellation || stride.due(work)) poll()

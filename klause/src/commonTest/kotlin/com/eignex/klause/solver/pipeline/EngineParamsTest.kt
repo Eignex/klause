@@ -22,10 +22,12 @@ class EngineParamsTest {
     @Test
     fun `source rate rewards should be an independent opt in`() {
         val ordinary = scenario(cores = 1)
-        val source = scenario(cores = 1, params = listOf("portfolio-reward=source-rate"))
+        for ((option, families) in listOf("source-rate" to false, "source-rate-family" to true)) {
+            val source = scenario(cores = 1, params = listOf("portfolio-reward=$option"))
 
-        assertIs<SourceRateReward>(source.rewardPolicy)
-        assertEquals(ordinary, source.copy(rewardPolicy = null))
+            assertEquals(families, assertIs<SourceRateReward>(source.rewardPolicy).priceFamilies)
+            assertEquals(ordinary, source.copy(rewardPolicy = null))
+        }
     }
 
     @Test
@@ -98,10 +100,12 @@ class EngineParamsTest {
         val configured = applyBacktrackParams(base, EngineParams(listOf(
             "root-simplification=true", "root-simplify-batch=7", "root-probe-batch=3", "root-probe-work=256",
             "root-rebuild-capture-visits=1024",
+            "private-rebuild-work=65536",
         )))
         assertEquals(true, configured.rootSimplification)
         assertEquals(7, configured.rootSimplifyBatch)
         assertEquals(1024, configured.rootRebuildCaptureVisits)
+        assertEquals(65_536L, configured.privateRebuildWork)
         assertEquals(3, configured.rootProbeBatch)
         assertEquals(256L, configured.rootProbeWork)
     }
@@ -111,12 +115,13 @@ class EngineParamsTest {
         val configured = applyBacktrackParams(com.eignex.klause.backtrack.BacktrackParams(), EngineParams(listOf(
             "inprocessing-work=100", "inprocessing-root-work=11", "inprocessing-probe-work=12",
             "inprocessing-subsume-work=13", "inprocessing-vivify-work=14", "inprocessing-interval=15",
-            "inprocessing-growth=16", "inprocessing-cooldown=17",
+            "inprocessing-growth=16", "inprocessing-cooldown=17", "inprocessing-warmup-work=18",
         )))
 
-        assertEquals(listOf(100L, 11L, 12L, 13L, 14L, 15L, 17L), listOf(configured.inprocessingWork,
+        assertEquals(listOf(100L, 11L, 12L, 13L, 14L, 15L, 17L, 18L), listOf(configured.inprocessingWork,
             configured.inprocessingRootWork, configured.inprocessingProbeWork, configured.inprocessingSubsumeWork,
-            configured.inprocessingVivifyWork, configured.inprocessingInterval, configured.inprocessingCooldown))
+            configured.inprocessingVivifyWork, configured.inprocessingInterval, configured.inprocessingCooldown,
+            configured.inprocessingWarmupWork))
         assertEquals(16, configured.inprocessingGrowth)
     }
 

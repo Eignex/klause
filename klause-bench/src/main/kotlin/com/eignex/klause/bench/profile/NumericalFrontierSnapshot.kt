@@ -66,6 +66,9 @@ internal class NumericalFrontierSnapshot(
             field(metrics, "dualRejection")?.let {
                 put("dualRejection", scalars(it, listOf("column", "upper", "reduced")))
             }
+            field(metrics, "basisDualRejection")?.let {
+                put("basisDualRejection", scalars(it, listOf("column", "upper", "reduced")))
+            }
             field(metrics, "vectorRejection")?.let {
                 put("vectorRejection", scalars(it, listOf("commonDenominator", "limit")))
             }

@@ -23,8 +23,7 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
-import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.kumulant.stream.Mutex
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.math.nextDown
@@ -40,7 +39,7 @@ internal class OpenLinearPortfolioResults(
     private data class Accepted(val result: LinearOptimizationResult, val rayValue: BigFraction?)
     private val accepted = AtomicReference<Accepted?>(null)
     private val sharedBound = AtomicReference<SourceEvidence?>(null)
-    private val boundExchange = SharedObjectiveBound(Concurrency.Strict.lock(), binding.model).also {
+    private val boundExchange = SharedObjectiveBound(Mutex(), binding.model).also {
         it.bindInvocation(binding)
     }
     private val handles = ArrayList<Pair<PortfolioWorker, AtomicReference<LinearPortfolioSearch?>>>()

@@ -92,6 +92,7 @@ internal data class ReconstructionMetrics(
     val entryRejection: ReconstructionEntryRejection? = null,
     val basisRepair: ReconstructionBasisMetrics? = null,
     val basisWork: Long = 0L,
+    val basisDualRejection: ReconstructionDualRejection? = null,
 )
 
 internal class ReconstructedCertificate(
@@ -129,6 +130,7 @@ internal class ReconstructionMeter(
     var entryRejection: ReconstructionEntryRejection? = null
     var basisRepair: ReconstructionBasisMetrics? = null
     var basisWork = 0L
+    var basisDualRejection: ReconstructionDualRejection? = null
     val spentWork: Long get() = work
     private var work = 0L
     private var allocation = 0L
@@ -194,7 +196,7 @@ internal class ReconstructionMeter(
     fun snapshot(decline: ReconstructionDecline?) = ReconstructionMetrics(
         attempts, pointChecks, dualChecks, rayChecks, pointSuccesses, dualSuccesses, raySuccesses,
         vectorRestarts, verificationRestarts, work, allocation, maxBits, decline, phase, dualRejection, vectorRejection,
-        entryRejection, basisRepair, basisWork,
+        entryRejection, basisRepair, basisWork, basisDualRejection,
     )
 
     fun basisLimits(): RationalBasisLimits = RationalBasisLimits(
@@ -554,7 +556,10 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
         } catch (_: ReconstructionOverflow) {
             meter.verificationRestarts++
             BigReconstructionVerifier(a, meter).dual(candidate, ray)
-        } ?: return
+        } ?: run {
+            if (usesBasis) meter.basisDualRejection = meter.dualRejection
+            return
+        }
         if (ray && !(checked.value.signum() > 0 || (checked.value.isZero && checked.strict))) return
         val support = a.support(candidate, checked.selected)
         meter.storage((candidate.size.toLong() + checked.selected.size) * 32L)

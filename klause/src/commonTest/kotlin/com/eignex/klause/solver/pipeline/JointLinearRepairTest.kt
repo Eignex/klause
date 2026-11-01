@@ -42,6 +42,66 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `completion repair should keep an imported point out of discovery publication`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(1), null, null),
+            factors = emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val center = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
+        val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.ofLong(2))
+
+        for (completion in listOf(false, true)) {
+            var publicationChecks = 0
+            JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = completion),
+                external = { center }, incumbentCompletionCheck = { _, _, _ -> publicationChecks++; true },
+            ).use { repair ->
+                var attempt = repair.attempt(condition, Cancellation.Never)
+                repeat(32) {
+                    if (attempt.result == ExactNeighborhoodResult.Paused) {
+                        attempt = repair.attempt(condition, Cancellation.Never)
+                    }
+                }
+
+                if (completion) {
+                    assertEquals(ExactNeighborhoodResult.Undecided, attempt.result)
+                    assertEquals(0, publicationChecks)
+                    assertEquals(center, attempt.feasiblePoint)
+                } else {
+                    assertEquals(center, assertIs<ExactNeighborhoodResult.Witness>(attempt.result).sample)
+                    assertEquals(1, publicationChecks)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a checked center should improve within one LP operation`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
+
+        val result = JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 1, maxFlips = 1),
+            external = { seed }).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                search.minimizeResult(TerminationReason.BudgetExhausted)
+            }
+        }
+
+        val sample = assertIs<MinimizeResult.WithSample>(result).sample
+        assertEquals(0L, sample.intValue(0))
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+            SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)))
+    }
+
+    @Test
     fun `accepted original checks should respect publication lifetime and funding`() {
         val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))

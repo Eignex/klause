@@ -85,6 +85,10 @@ worker recipes do not interpret these controls; admission and lifetime are separ
 produce a configuration error before worker execution, including when an adaptive
 restart schedule takes precedence.
 
+`--param inprocessing-warmup-work=N` withholds optional inprocessing until that much
+non-inprocessing work follows the first eligible complete root. Zero disables the
+warmup; see [root scheduling](09-learning.md#restarts-phases-and-inprocessing).
+
 `--param learned-memory-bytes=N` enables the optional learned-store modeled-byte
 soft limit. `learned-memory-work` (65,536 visits) and `learned-memory-scratch-bytes`
 (1 MiB) bound each attempt. All accept nonnegative values; zero work or scratch
@@ -126,6 +130,8 @@ this is separate from heap measurements and diagnostic payload-category sums.
   [phase accounting](12-portfolio.md#phase-progress-and-cost)), weighted objective controls
   (`core-early`, `core-refinement`, see [core search](12-portfolio.md#boolean-objective-core-search)), resource work
   (`node-limit`, `presolve-work-limit`, see [resource allowances](06-sessions.md#resource-allowances)),
+  `boolean-proof-tasks=true` for eligible single-core satisfaction portfolios
+  ([Boolean task coverage](12-portfolio.md#boolean-task-sharing)),
   `dry-run-presolve=true` for a preparation summary without solving, and presolve
   effort ([presolve](07-presolve.md)).
 - `--ozn FILE` (MiniZinc mode): render output with the native `.ozn` applier
@@ -149,6 +155,9 @@ has its own work currency, separate from `node-limit`:
 | Nonlinear integer | `nia-candidates`, `nia-moves`, `nia-cell-refinement`, `nia-cell-reuse`, `nia-cell-steering`, `nia-integer-roots`, plus the polynomial limits | [Integer candidates](16-nonlinear-arithmetic.md#nonlinear-integer-arithmetic) |
 | Quadratic optimization | the polynomial limits; open integers also use `nia-*` | [Quadratic execution](16-nonlinear-arithmetic.md#quadratic-strategy-execution) |
 | Transcendental | `nra-*` limits and shared exact-satisfaction controls | [Function checks](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) |
+
+`open-linear-incremental` defaults to true for complete open-linear traversal and
+is inactive when source preparation selects a finite route.
 
 Omitted limits use each route's defaults: linear and polynomial work are unlimited,
 nonlinear integer search caps candidates at 1,024 and heuristic moves at 256, and
@@ -182,8 +191,11 @@ and the historical Table retry. Both default to false. Attribution exports spars
 [attribution ownership](09-learning.md#propagation-and-explanation-attribution).
 
 `cost-aware-propagation=true` independently enables the bounded finite worklist
-policy described in [finite propagation](08-search.md#finite-propagation). It
-defaults to false and does not require attribution or historical refinement.
+policy described in [finite propagation](08-search.md#finite-propagation). Fixed
+integer optimization enables it for mandatory cumulative tasks with constant
+durations, demands and capacities and no placement constraints. Explicit `false`
+retains FIFO. Other routes default to false. The policy requires neither attribution
+nor historical refinement.
 
 `reason-preflight=true` independently checks recorded redundancy failures before
 historical sibling reconstruction. It defaults to false; see

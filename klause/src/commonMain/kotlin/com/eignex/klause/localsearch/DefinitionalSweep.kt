@@ -358,7 +358,11 @@ class DefinitionalSweep internal constructor(
     fun functionalObjective(objective: LinearObjective): IncrementalObjective? =
         functionalObjective(objective, Cancellation.Never)
 
-    internal fun functionalObjective(objective: LinearObjective, cancellation: Cancellation): IncrementalObjective? {
+    internal fun functionalObjective(
+        objective: LinearObjective,
+        cancellation: Cancellation,
+        captureBooleanCosts: Boolean = false,
+    ): IncrementalObjective? {
         if (cancellation()) return null
         for (coefficient in objective.realCoefficientValues) {
             cancellation.charge(1)
@@ -384,6 +388,7 @@ class DefinitionalSweep internal constructor(
             booleans.toIntArray(),
             LongArray(booleans.size) { objective.boolWeightValues[booleans[it]] },
             cancellation,
+            captureBooleanCosts,
         )
     }
 
@@ -408,6 +413,7 @@ class DefinitionalSweep internal constructor(
         boolTerms,
         boolTermCoeffs,
         Cancellation.Never,
+        false,
     )
 
     private fun functionalObjective(
@@ -418,6 +424,7 @@ class DefinitionalSweep internal constructor(
         boolTerms: IntArray,
         boolTermCoeffs: LongArray,
         cancellation: Cancellation,
+        captureBooleanCosts: Boolean,
     ): IncrementalObjective? {
         if (cancellation()) return null
         val intDefinitions = MutableIntObjectMap<SweepNode>()
@@ -463,7 +470,7 @@ class DefinitionalSweep internal constructor(
             if (!(if (isBool) reachableBools else reachableInts).add(id)) continue
             if (definition !is SweepNode.IntDef && definition !is SweepNode.BoolFold &&
                 definition !is LiteralIntDefinition && definition !is UnaryPredicateDefinition &&
-                definition !is CapturedBooleanDefinition
+                definition !is CapturedBooleanDefinition && definition !is ElementResultDefinition
             ) {
                 return null
             }
@@ -501,9 +508,12 @@ class DefinitionalSweep internal constructor(
 
                 is CapturedBooleanDefinition -> { intOf, _ -> if (node.holds(intOf)) 1L else 0L }
 
+                is ElementResultDefinition -> { intOf, _ -> node.compute(intOf) }
+
                 else -> return null
             }
-            cone.add(FunctionalObjective.Definition(node.out, node.outIsBool, node, compute))
+            cone.add(FunctionalObjective.Definition(node.out, node.outIsBool, node,
+                keepsOutputOnNoWrite = node is ElementResultDefinition, compute = compute))
             for (input in node.intInputs) {
                 cancellation.charge(1)
                 if (cancellation()) return null
@@ -528,8 +538,45 @@ class DefinitionalSweep internal constructor(
         val result = FunctionalObjective(
             terms, termCoeffs, constant, minimize, emptyList(), leaves.toIntArray(),
             boolTerms, boolTermCoeffs, emptyList(), boolLeaves.toIntArray(), cone,
+            booleanCostSweep = if (captureBooleanCosts) {
+                completeBooleanCostSweep(terms, boolTerms, boolTermCoeffs, cancellation)
+            } else null,
         )
         return if (cancellation()) null else result
+    }
+
+    private fun completeBooleanCostSweep(
+        terms: IntArray,
+        boolTerms: IntArray,
+        coefficients: LongArray,
+        cancellation: Cancellation,
+    ): DefinitionalSweep? {
+        if (terms.isNotEmpty() || nodes.size !in 1..250_000 || boolTerms.size > 250_000) return null
+        val priced = IntHashSet()
+        for (i in boolTerms.indices) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            if (boolTerms[i] !in 0 until 1_000_000) return null
+            if (coefficients[i] != 0L) priced.add(boolTerms[i])
+        }
+        val outputs = IntHashSet()
+        for (node in nodes) {
+            cancellation.charge(1)
+            if (cancellation()) return null
+            if (node !is SweepNode.BoolFold || node.out !in priced || !outputs.add(node.out)) return null
+        }
+        if (outputs.size != priced.size) return null
+        var readers = 0
+        for (node in nodes) {
+            val fold = node as SweepNode.BoolFold
+            for (literal in fold.ins) {
+                cancellation.charge(1)
+                if (cancellation()) return null
+                val input = Lit.variable(literal)
+                if (input !in 0 until 1_000_000 || input in outputs || ++readers > 2_000_000) return null
+            }
+        }
+        return this
     }
 
     /** One evaluable definition `out = f(inputs)` with its read-set exposed for cone indexing. */

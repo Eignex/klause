@@ -6,15 +6,21 @@ import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.lp.cut.CutSharing
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceCondition
+import com.eignex.klause.solver.evidence.SourceObjective
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.klause.solver.incumbent.EngineInvocation
+import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.util.Cancellation
@@ -33,15 +39,42 @@ class BooleanProofPortfolioTest {
     }).bake()
 
     @Test
+    fun `a separate baked generation should decline despite identical clause objects`() {
+        val foreign = Problem(5, 0, emptyArray(), problem.factors).bake()
+        val invocation = EngineInvocation(foreign.prepareExecutionPlan(), ModelIdentity.of(problem))
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+            btPool = listOf { BacktrackCatalog.byLabel("first-fail") })
+        val factories = PortfolioBuilder.factories(problem, scenario, null, null, null, null,
+            ProblemProfile.of(problem, false))
+        val workers = List(2) { slot ->
+            factories[slot % factories.size].materialize(slot, 1L, null)
+                .bindSource(SourceWorkerBinding(invocation))
+        }
+        try {
+            var decline: String? = null
+            assertNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true) { decline = it })
+
+            assertEquals("source-plan-or-objective-ineligible", decline)
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
     fun `native first fail workers should preserve full source task coverage`() {
         val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
             btPool = listOf { BacktrackCatalog.byLabel("first-fail") })
         val workers = PortfolioBuilder.build(problem, scenario)
         try {
-            assertNotNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true)).use { tasks ->
+            var identities = 0
+            val admitted = BooleanProofPortfolio.forWorkers(workers, probeFirst = true,
+                newIdentity = { "task-authority-${++identities}" })
+            assertNotNull(admitted).use { tasks ->
+                assertEquals(0, identities)
                 val first = tasks.open(0, Cancellation.Never)
                 assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
                 assertEquals(2, tasks.size)
+                assertEquals(1, identities)
                 assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
                 val second = tasks.open(1, Cancellation.Never)
                 val result = second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
@@ -49,9 +82,50 @@ class BooleanProofPortfolioTest {
                 assertTrue(result is SolveResult.Unsat)
                 assertEquals(2, tasks.completed)
                 assertEquals(first.work + second.work, tasks.work)
+                assertEquals(1, identities)
             }
         } finally {
             workers.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `a completed source probe should preserve caller pins without allocating task authority`() {
+        val pins = Assumptions(bools = mapOf(0 to true))
+        val params = BacktrackCatalog.byLabel("first-fail").build(0L, null).copy(assumptions = pins)
+        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+            btPool = listOf { BacktrackWorkerConfig.ofParams("pinned", params) })
+        val invocation = EngineInvocation(problem.prepareExecutionPlan(), ModelIdentity.of(problem),
+            sourceAssumptions = pins)
+        val factories = PortfolioBuilder.factories(problem, scenario, null, null, null, null,
+            ProblemProfile.of(problem, false))
+        val workers = List(2) { slot ->
+            factories[slot % factories.size].materialize(slot, 1L, null)
+                .bindSource(SourceWorkerBinding(invocation))
+        }
+        try {
+            val admitted = BooleanProofPortfolio.forWorkers(workers, probeFirst = true,
+                newIdentity = { error("completed source probe requested task authority") })
+            assertNotNull(admitted).use { tasks ->
+                val result = tasks.open(0, Cancellation.Never).runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+                assertTrue(result is SolveResult.Unsat)
+                assertEquals(pins.bools, assertNotNull(result.assumptionCore).bools)
+                assertEquals(0, tasks.size)
+            }
+        } finally {
+            workers.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `a probe first portfolio should reject objective context before opening a probe`() {
+        val objective = SourceObjective("sum-bools", ObjectiveSense.MINIMIZE)
+        val scoped = context.copy(scope = context.scope.copy(objective = objective))
+
+        assertFailsWith<IllegalArgumentException> {
+            BooleanProofPortfolio(problem, scoped, listOf(0), List(2) { BacktrackParams(nativeSat = false) },
+                probeFirst = true)
         }
     }
 

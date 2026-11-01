@@ -28,7 +28,7 @@ class SourceExecutionControlsTest {
             "(assert (<= (+ (* 2 x) (* 3 y)) 1))")
         val invocation = SourceSetup.prepare(SourceSetupRequest(parsed.source,
             ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
-        for ((options, expected) in listOf(emptyList<String>() to false,
+        for ((options, expected) in listOf(emptyList<String>() to true,
             listOf("open-linear-incremental=true") to true, listOf("open-linear-incremental=false") to false)) {
             val request = SourceExecutionRequest(invocation, ExecutionOptions.parse(options))
 
@@ -69,6 +69,42 @@ class SourceExecutionControlsTest {
             assertFalse(scenario.companionIntegers)
             assertEquals(4_000L, scenario.companionActiveMillis)
         }
+    }
+
+    @Test
+    fun `incremental linear control should leave finite source solving available`() {
+        val source = SmtLib.parse("(declare-const b Bool) (assert b)").source
+        for (engine in listOf(FiniteEngine.FIXED, FiniteEngine.BACKTRACK, FiniteEngine.MIXED)) {
+            for (enabled in listOf(false, true)) {
+                for (applicationFactory in listOf(false, true)) {
+                    val invocation = SourceSetup.prepare(SourceSetupRequest(source, ExecutionOperation.SATISFY, engine))
+                    val options = ExecutionOptions.parse(listOf("open-linear-incremental=$enabled"))
+                    val request = SourceExecutionRequest(invocation, options,
+                        finiteRequest = if (applicationFactory) { shape ->
+                            SourceExecutionPolicy().finiteRequest(shape, engine, executionOptions = options)
+                        } else null)
+
+                    val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(request))
+
+                    assertEquals(FiniteSolveVerdict.SAT,
+                        assertIs<FiniteSolveOutcome.Completed>(result.result.outcome).verdict)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `finite source execution should reject malformed incremental linear controls`() {
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SmtLib.parse("(declare-const b Bool) (assert b)").source,
+            ExecutionOperation.SATISFY, FiniteEngine.MIXED,
+        ))
+
+        val failure = assertFailsWith<PipelineConfigException> {
+            SourceExecutionRequest(invocation, ExecutionOptions.parse(listOf("open-linear-incremental=invalid")))
+        }
+
+        assertTrue("open-linear-incremental" in assertNotNull(failure.message))
     }
 
     @Test

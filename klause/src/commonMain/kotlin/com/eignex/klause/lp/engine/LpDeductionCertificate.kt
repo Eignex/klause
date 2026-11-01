@@ -10,6 +10,7 @@ internal interface LpDeductionCertificate {
     fun exactObjectiveBound(): BigFraction
     fun integralObjectiveRows(): IntArray? = null
     fun usesRationalArithmetic(): Boolean = false
+    fun fixingColumns(): IntArray? = null
 
     /** Whether row [row] carries nonzero dual weight, so its premises are cited by a deduction. */
     fun dualNonzeroRow(row: Int): Boolean

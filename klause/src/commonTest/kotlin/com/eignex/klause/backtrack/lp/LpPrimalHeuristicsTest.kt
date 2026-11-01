@@ -10,8 +10,10 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
@@ -19,6 +21,7 @@ import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
@@ -39,6 +42,150 @@ import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
     @Test
+    fun `an optimal rounding point survives interruption while its solver closes`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        var stopped = false
+        var solves = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newTableauSolver(
+                model: LpModel, cancellation: Cancellation, iterationLimit: Int, workLimit: Long,
+                trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): TableauCutSolver {
+                solves++
+                val delegate = ProductionLpEngineFactory.newTableauSolver(
+                    model, cancellation, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : TableauCutSolver by delegate {
+                    override fun close() {
+                        delegate.close()
+                        stopped = true
+                    }
+                }
+            }
+        }
+        val token = Cancellation { stopped }
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),
+            SolveStatsSink("closed-rounding-point"), LpSolveContext(factory),
+            nodeWorkAllowance = { if (stopped) 0L else 100_000L }).use { engine ->
+            assertNull(engine.lpRoundingProbe(objective, token))
+            assertTrue(engine.rootRoundingInterrupted)
+            stopped = false
+
+            val sample = engine.lpRoundingProbe(objective, token)
+
+            assertEquals(listOf(1L, 0L), assertNotNull(sample).ints.toList())
+            assertEquals(1, solves)
+        }
+    }
+
+    @Test
+    fun `completed rounding LP resumes without solving its original objective again`() {
+        for (sameObjective in listOf(true, false)) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+            val factory = RecordingLpEngineFactory()
+            var stopped = false
+            val token = Cancellation { stopped }
+
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
+                SolveStatsSink("resumed-rounding-point"), LpSolveContext(factory)).use { engine ->
+                val first = engine.lpRoundingProbe(objective, token, accept = {
+                    stopped = true
+                    null
+                })
+                assertNull(first)
+                assertTrue(engine.rootRoundingInterrupted)
+                val constructed = factory.calls.size
+                stopped = false
+                val next = if (sameObjective) objective else LinearObjective(intCoefficients = longArrayOf(2, 1))
+
+                val sample = engine.lpRoundingProbe(next, token)
+
+                val expected = if (sameObjective) listOf(1L, 0L) else listOf(0L, 1L)
+                assertEquals(expected, assertNotNull(sample).ints.toList())
+                if (sameObjective) assertEquals(constructed, factory.calls.size)
+                else assertTrue(factory.calls.size > constructed)
+            }
+        }
+    }
+
+    @Test
+    fun `completed root guidance avoids another rounding LP solve`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val factory = RecordingLpEngineFactory()
+
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
+            SolveStatsSink("root-guidance"), LpSolveContext(factory)).use { engine ->
+            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            val constructed = factory.calls.size
+
+            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+
+            assertEquals(listOf(1L, 0L), assertNotNull(sample).ints.toList())
+            assertEquals(constructed, factory.calls.size)
+        }
+    }
+
+    @Test
+    fun `retained root guidance still requires consumer acceptance`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        var offered = 0
+
+        val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
+            SolveStatsSink("declined-root-guidance")).use { engine ->
+            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            engine.lpRoundingProbe(objective, Cancellation.Never, accept = {
+                offered++
+                null
+            })
+        }
+
+        assertEquals(1, offered)
+        assertNull(sample)
+    }
+
+    @Test
+    fun `changed objective replaces completed root guidance`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+
+        val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
+            SolveStatsSink("changed-root-guidance")).use { engine ->
+            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            engine.lpRoundingProbe(LinearObjective(intCoefficients = longArrayOf(2, 1)), Cancellation.Never)
+        }
+
+        assertEquals(listOf(0L, 1L), assertNotNull(sample).ints.toList())
+    }
+
+    @Test
+    fun `refused root certificates grant no bound authority to rounding guidance`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val context = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
+
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
+            SolveStatsSink("uncertified-root-guidance"), context).use { engine ->
+            val lower = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+
+            assertTrue(lower.isNaN())
+            assertEquals(listOf(1L, 0L), assertNotNull(sample).ints.toList())
+        }
+    }
+
+    @Test
     fun `LP pinning should withhold a proposal when one cumulative fire is interrupted`() {
         val n = 32
         val problem = Problem(0, n, Array(n) { IntDomain(0, 100L + it) }, arrayOf<Factor>(
@@ -57,7 +204,7 @@ class LpPrimalHeuristicsTest {
         }
 
         assertNull(proposal)
-        assertTrue(session.fixpointCancelled)
+        assertTrue(session.probeCancelled)
         assertEquals(4, polls)
         assertEquals(IntDomain(0, 101), session.intDomain(1))
     }
@@ -81,7 +228,7 @@ class LpPrimalHeuristicsTest {
         }
 
         assertNull(proposal)
-        assertTrue(session.fixpointCancelled)
+        assertTrue(session.probeCancelled)
         assertEquals(IntDomain(0, 255), session.intDomain(1))
     }
 

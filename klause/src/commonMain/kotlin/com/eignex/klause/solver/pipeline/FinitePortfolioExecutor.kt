@@ -81,7 +81,9 @@ internal fun FinitePipeline.portfolioExecutor(
     improvementProofShare: Double = 0.5,
     deferLpProbes: Boolean = false,
     includeRestartingProof: Boolean = false,
-    leadingProbeBudget: Boolean = false,
+    probePolicy: InitialProbePolicy = InitialProbePolicy.ORDINARY,
+    booleanProofTasks: Boolean = false,
+    fundedCompanions: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -94,7 +96,7 @@ internal fun FinitePipeline.portfolioExecutor(
     if (deferLpProbes && !curatedFiniteInteger) {
         pipelineConfigError("portfolio-lp-start requires a curated single-core mixed finite integer optimization")
     }
-    if (leadingProbeBudget && (!curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
+    if (probePolicy != InitialProbePolicy.ORDINARY && (!curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
             cancellation.deadline() == null)) {
         pipelineConfigError("portfolio-probes requires curated elapsed single-core mixed finite integer optimization")
     }
@@ -103,13 +105,27 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionEligibility = numericalCompanions?.let {
         finiteNumericalCompanionEligibility(problem, scenario, objective, it)
     }
-    val companions = if (companionEligibility?.admitted == true) {
+    if (fundedCompanions && (!scenario.companionAfterIncumbent || cancellation.deadline() == null)) {
+        pipelineConfigError("companion-admission=funded requires companion-after-incumbent and a solve deadline")
+    }
+    val companionAdmission = if (fundedCompanions && companionEligibility?.admitted == true) {
+        FiniteNumericalCompanions.admission(problem, requireNotNull(objective),
+            cancellation or requireNotNull(numericalCompanions).cancellation or numericalCompanions.timeout,
+            companionEligibility.requirements.construction)
+    } else null
+    val companionPreparation = if (!fundedCompanions && companionEligibility?.admitted == true) {
         FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, companionEligibility.requirements.construction, scenario.companionAfterIncumbent,
             incumbentCompletionCheck)
     } else null
+    val companions = if (companionAdmission?.initiallyFunded == true) {
+        FiniteNumericalCompanions.deferred(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
+            cancellation, requireNotNull(companionEligibility).requirements.construction, companionAdmission,
+            incumbentCompletionCheck)
+    } else companionPreparation?.companions
     companionEligibility?.let { eligibility ->
-        val declines = if (eligibility.admitted && companions == null) listOf("complete-affine-capture-unavailable")
+        val declines = if (companionAdmission?.initiallyFunded == false) listOf("companion-lifetime-unfunded")
+        else if (eligibility.admitted && companions == null) listOf("complete-affine-capture-unavailable")
         else eligibility.declines
         val frontier = eligibility.requirements
         val repair = frontier.copy(authority = WorkerProofAuthority.WITNESS_ONLY,
@@ -154,6 +170,7 @@ internal fun FinitePipeline.portfolioExecutor(
             rewardPolicy = scenario.rewardPolicy,
             improvementProofShare = improvementProofShare,
             includeRestartingProof = includeRestartingProof,
+            booleanProofTasks = booleanProofTasks,
             onProgress = if (scenario.reportPortfolioProgress) { event ->
                 onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))
             } else null,
@@ -171,6 +188,13 @@ internal fun FinitePipeline.portfolioExecutor(
         objective,
         onFault,
         optimizationIncumbents = companions?.incumbents,
+        preparationStages = companionPreparation?.let {
+            mapOf("finiteCompanionPreparationAttempts" to 1L,
+                "finiteCompanionPreparationNs" to it.elapsedNanos,
+                "finiteCompanionPreparationReady" to if (companions != null) 1L else 0L,
+                "finiteCompanionPreparationUnavailable" to if (companions == null) 1L else 0L)
+        }.orEmpty(),
+        livePreparationStages = companionAdmission?.let { it::stages },
     ) { workers ->
         val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
         val shares = if (proofShares.isEmpty()) {
@@ -200,7 +224,8 @@ internal fun FinitePipeline.portfolioExecutor(
         }
         val deferred = if (deferLpProbes) deferredLpProbes(workers) else null
         val probeWeights = when {
-            leadingProbeBudget -> leadingProbeWeights(workers)
+            probePolicy == InitialProbePolicy.LEADER_HALF -> leadingProbeWeights(workers)
+            probePolicy == InitialProbePolicy.LP_TRANSFER -> lpTransferredProbeWeights(workers)
             companions == null -> intArrayOf()
             else -> IntArray(workers.size) { arm ->
                 if (workers[arm].label == "numerical/finite-companion") 3 else 1
@@ -222,12 +247,32 @@ internal fun leadingProbeWeights(workers: List<PortfolioWorker>): IntArray {
     return IntArray(workers.size) { if (it == leader) (initial.size - 1).coerceAtLeast(1) else 1 }
 }
 
+internal fun lpTransferredProbeWeights(workers: List<PortfolioWorker>): IntArray {
+    val initial = workers.indices.filter {
+        !workers[it].startAfterIncumbent && !workers[it].improvementOnly && !workers[it].auxiliaryProof
+    }
+    val leader = initial.firstOrNull {
+        workers[it].family == ArmFamily.Backtrack && workers[it].permitsSourceProofs && !workers[it].isLpProbe()
+    } ?: return intArrayOf()
+    val donors = initial.filter { workers[it].isLpProbe() }
+    if (donors.isEmpty()) return intArrayOf()
+    return IntArray(workers.size) { arm ->
+        when (arm) {
+            leader -> 2 + donors.size
+            in donors -> 1
+            else -> 2
+        }
+    }
+}
+
+private fun PortfolioWorker.isLpProbe(): Boolean = when (label) {
+    "bt/lp-default", "bt/lp-aggressive", "bt/lp-conservative" -> true
+    else -> false
+}
+
 internal fun deferredLpProbes(workers: List<PortfolioWorker>): ((PortfolioEvent) -> Unit)? {
     val delayed = workers.indices.filter {
-        when (workers[it].label) {
-            "bt/lp-default", "bt/lp-aggressive", "bt/lp-conservative" -> !workers[it].startAfterIncumbent
-            else -> false
-        }
+        workers[it].isLpProbe() && !workers[it].startAfterIncumbent
     }
     val pending = workers.indices.filter {
         it !in delayed && !workers[it].startAfterIncumbent &&

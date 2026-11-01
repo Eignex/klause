@@ -27,7 +27,7 @@ import kotlin.math.abs
 internal class FunctionalObjective internal constructor(
     /** Int objective terms `Σ termCoeffs[k]·terms[k]`, "lower is better": each term is a cone var
      *  (evaluated through [nodes]) or a bare int leaf. A single-variable objective is one term. */
-    terms: IntArray,
+    private val terms: IntArray,
     termCoeffs: LongArray,
     constant: Long,
     private val minimize: Boolean,
@@ -40,13 +40,14 @@ internal class FunctionalObjective internal constructor(
      *  is a bool cone var (evaluated through [boolNodes]) or a bare bool leaf; empty for a pure-int
      *  objective (the FlatZinc/XCSP3 case), non-empty for a bool-weighted objective over AND/OR
      *  indicators (OPB product terms, `array_bool_and`). */
-    boolTerms: IntArray = EmptyIntArray,
-    boolTermCoeffs: LongArray = EmptyLongArray,
+    private val boolTerms: IntArray = EmptyIntArray,
+    private val boolTermCoeffs: LongArray = EmptyLongArray,
     /** Bool defining nodes (AND/OR folds) in topological order. */
     boolNodes: List<BoolFold> = emptyList(),
     /** Bool decision (leaf) variables the bool cone reads. */
     val boolLeafVars: IntArray = EmptyIntArray,
     definitions: List<Definition> = emptyList(),
+    internal val booleanCostSweep: DefinitionalSweep? = null,
 ) : IncrementalObjective {
 
     /** Single-variable objective (the FlatZinc `defines_var` cone rooted at one variable). */
@@ -120,12 +121,17 @@ internal class FunctionalObjective internal constructor(
         val outIsBool: Boolean,
         /** The sweep node this definition evaluates, when it was read from a sweep. */
         val origin: DefinitionalSweep.SweepNode? = null,
+        val keepsOutputOnNoWrite: Boolean = false,
         val compute: ((Int) -> Long, (Int) -> Boolean) -> Long,
     )
 
     private val coneMemo = ConeMemo(
         nodes, terms, termCoeffs, constant, boolNodes, boolTerms, boolTermCoeffs, definitions,
     )
+
+    internal fun prepareBooleanDelta(numBooleans: Int): Sequence<PreparedBooleanObjectiveDelta?> =
+        if (terms.isNotEmpty()) sequenceOf(PreparedBooleanObjectiveDelta(null)) else
+            BooleanObjectiveDelta.preparation(coneMemo.ordered, boolTerms, boolTermCoeffs, minimize, numBooleans)
 
     /** The objective as a "lower is better" linear form over its terms, or null when a combined
      *  coefficient leaves the `Long` range. It agrees with the cones wherever every cone variable
@@ -215,7 +221,13 @@ internal class FunctionalObjective internal constructor(
                 val slot = boolSlots[id]
                 if (slot >= 0) values[slot] != 0L else boolBase(id)
             }
-            for (i in ordered.indices) values[i] = ordered[i].compute(intOf, boolOf)
+            for (i in ordered.indices) {
+                val definition = ordered[i]
+                val value = definition.compute(intOf, boolOf)
+                values[i] = if (definition.keepsOutputOnNoWrite && value == DefinitionalSweep.SweepNode.NO_WRITE) {
+                    intBase(definition.out)
+                } else value
+            }
             try {
                 var total = constant
                 for (k in terms.indices) total = addExact(total, mulExact(termCoeffs[k], intOf(terms[k])))

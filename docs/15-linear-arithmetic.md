@@ -77,7 +77,7 @@ A check proceeds in four steps:
 Retraction pops the LP scope together with the Boolean decisions that justified its
 rows and discards candidates, so a witness never outlives its premises.
 
-An opt-in partial-state probe can imply a uniquely represented comparison guard
+A partial-state probe can imply a uniquely represented comparison guard
 from exact intervals over its terms. Coefficient signs select the bounding sides;
 strict endpoints and every active bound premise enter the explanation. Missing
 bounds or ambiguous guards decline. The probe publishes through the shared Boolean
@@ -89,7 +89,15 @@ An optional decline cache reuses only a failed numerical comparison with the sam
 right-hand side and exact bound values and strictness. It retains no consequence
 or premise; changed bounds and every successful proof require fresh evaluation.
 
-The incremental opt-in indexes prepared rows by their Boolean activators and
+The incremental route also reads bounds on existing normalized affine slack
+columns. The normalization's scale selects the bounding side, and its offset
+reconstructs source activity under the same rational-size and operation limits.
+Each successful implication uses the current active bound premise and the
+normalization's declared-fixing premises. Probing creates no LP definition and
+retains no reason. It precedes individual-coordinate decline reuse, so an unchanged
+coordinate interval cannot hide a newly bounded affine expression.
+
+The incremental route indexes prepared rows by their Boolean activators and
 coefficient inputs. A literal change schedules only those source rows; retraction
 also schedules every assertion whose LP scope was popped. A change in the exact
 closed root-fixed source values schedules all rows for substitution. The component
@@ -101,13 +109,14 @@ the pending rows are asserted. Interrupted preparation or assertion leaves pendi
 work available for a later operation and publishes no assertion marker for an
 uncommitted bound batch.
 
-Ordinary complete traversal selects this combined route with
-`open-linear-incremental=true`. Positive-depth committed assertion markers follow
-a source-index trail in scope order; retraction removes only the suffix belonging
+Ordinary complete traversal selects this combined route by default;
+`open-linear-incremental=false` disables it. Positive-depth committed assertion
+markers follow a source-index trail in scope order; retraction removes only the suffix belonging
 to popped scopes. Root markers stay outside that trail. Interrupted batches append
 only their committed markers, so retry and backtrack keep the same assertion
 authority. Source-row visits, invalidations, interval visits, compatible declines
-and deductions are included in the traversal's stage counters.
+and deductions are included in the traversal's stage counters, with affine probes
+and consumed affine consequences reported separately.
 
 This route combines scoped assertion reuse with the exact-input decline cache and
 the explained interval producer before the numerical query. A compatible decline
@@ -157,6 +166,12 @@ sharing an activator must agree, or that activator receives no preference. These
 guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
 controls them: null enables direct preferences, a positive value also enables
 compound clause preferences, and zero disables steering.
+
+The incremental route batches unmetered point-hint cancellation polls in at most
+64 scalar visits. An attached operation or hint meter keeps every debit and its
+immediate stop check. Entry, result allocation and hint publication poll the current
+tokens directly, so an interrupted scan publishes no preferences. Source-bound
+proofs and numerical claims keep their own cancellation boundaries.
 
 ### Results and proof authority
 

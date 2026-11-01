@@ -334,14 +334,15 @@ cells retain their selected index guard, and a result alias supplies no arithmet
 
 Opposite-sign nonnegative combinations use checked signed arithmetic and integer
 gcd normalization. Each combination must remain conflicting. A retained row must
-propagate against the session's historical domains at its native backjump and the
-mapped shared target. The raw assertion target must have been a member of its
-historical domain; a later carve cannot remove that earlier membership, and a
-historical hole cannot supply a raw bound assertion. Literal counts do not establish
+propagate against the session's historical domains at its first-UIP clause's native
+backjump and the mapped shared target. Each combination checks that same native
+target, preserving clausal backjump selection. The raw assertion target must have
+been a member of its historical domain; a later carve cannot remove that earlier
+membership, and a historical hole cannot supply a raw bound assertion. Literal counts do not establish
 assertion. Foreign unavailable bound premises retain clause analysis. The producer
 admits at most 16 terms, 16 combinations, 64 native levels and 64 stored rows, with
 bounded duplicate lookup.
-Assertion checks reconstruct each historical term domain once per target level and
+Assertion checks reconstruct each historical term domain once per combination and
 reuse its exact activity for the candidate bounds. A retained row with the same
 normalized coefficients and a stronger bound suppresses a new consequence only
 when its guard is unconditional or identical; opposite or unrelated guards retain
@@ -399,6 +400,8 @@ atom levels from the analyzer's effective conflict level. Historical domain hole
 exclude later journalled carves; endpoint factor ids describe the live reason owner.
 Storage identities survive factor compaction and retire when their constraint is
 forgotten. Only actual changed bounds or Boolean pins count as consumer events.
+Focused windows retain a selector pick or actual branch attempt after each consumer;
+LP-guided attempts can bypass the heuristic selector.
 
 The trace is absent by default. Its fixed event and scalar-word allowances and
 per-payload limits stop capture with explicit truncation. Event lookups withhold a
@@ -482,10 +485,15 @@ inprocessing, since derivations under assumption pins would not hold globally.
 
 Opt-in root simplification examines bounded slices of source and learned Boolean
 clauses against permanent root facts. An empty Boolean pin trail withholds the scan;
-without a pinned literal it cannot satisfy or shorten a Boolean clause. A shortened
-source clause enters as a permanent
-session-local replacement before its watches retire; immutable source text remains
-available for reasons. The propagation session owns unfinished source-watch retirement
+without a pinned literal it cannot satisfy or shorten a Boolean clause. Clauses
+affected by a new Boolean root fact can be reached through its prepared source-occurrence
+index. This bounded neighborhood alternates with the ordinary clause scan,
+retains its pin and occurrence positions across slices, and builds no index
+inside the pass. Pin and occurrence walks admit at most 8,192 entries per slice
+even with an unlimited class grant. Unprepared projections retain the ordinary scan. A shortened
+source clause enters as a permanent session-local replacement before its watches
+retire; immutable source text remains available for reasons. The propagation session
+owns unfinished source-watch retirement
 after replacement admission. Pass reset or optional buffer release retains that record;
 a funded slice retires its watches before admitting another source replacement.
 Session close releases it. Satisfied source watches retire without changing variable IDs.
@@ -494,8 +502,20 @@ historical reasons and removes obsolete watches; attaching a shortened binary in
 both implication directions and evaluates facts already assigned at the root. There
 is no separate stale binary graph or whole-graph rebuild.
 
-Opt-in failed-literal probing alternates a bounded rotating set of Boolean literals
-with Boolean coordinates from newly examined learned clauses of two to eight literals.
+Opt-in failed-literal probing alternates a bounded rotating set of source Boolean
+and existing integer-bound literals with coordinates from newly examined learned
+clauses of two to eight literals. The global rotation alternates existing literals
+with unfixed integer endpoints, including columns without existing atoms. Separate
+cursors preserve endpoint progress when the atom registry grows. Each slice
+snapshots both candidate spaces and visits each global candidate at most once;
+scanning creates no atoms. A completed endpoint conflict names only the complementary
+unit it proves; registry and threshold-index growth enter the containing work and debt.
+Equality atoms decline. Bound probes use ordinary single-bound
+decisions and discard implied-result payloads, retaining the same undo and cancellation
+paths. A proved bound enters as a session-local clause over its semantic atom and
+publishes through the original integer coordinate.
+Permanent source replacements supply the same bounded priorities; their clauses and
+ownership remain protected. A priority supplies no deduction without an actual probe conflict.
 The learned cursor advances without replaying an exhausted unchanged neighborhood;
 compaction invalidates its indices. Preparation and retained literal storage share the
 probe class allowance and memory observation. Funded probing precedes cheap root
@@ -503,8 +523,10 @@ simplification so proved facts can refresh binaries in the same safe-root opport
 the invocation token. A completed root conflict proves the complementary unit, which is attached and
 propagated through ordinary search. Completed root facts are published to shared
 components before traversal resumes. Successful and interrupted probes retract to the
-complete root; interruption supplies no deduction. Clause scans and probes enter the
-existing inprocessing and propagation work counters. Cursors survive suspension and
+complete root; interruption supplies no deduction. Speculative retractions preserve
+the saved search phases while retaining ordinary unassignment notifications for
+variable selectors. Clause scans and probes enter the existing inprocessing and
+propagation work counters. Cursors survive suspension and
 reset on reseeding; learned indices never survive a pass snapshot.
 
 Both root passes require an unconditional complete decision-level-zero root. Assumptions,
@@ -556,13 +578,19 @@ Restart cadence remains a trigger. Optional propagation-work intervals and learn
 clause growth also request work at natural roots, without forcing a restart. The
 cooldown requires non-inprocessing work after an attempted slice and applies to
 restart requests too. The growth mark excludes the pass's own attachments, so a
-pass cannot earn its own next opportunity. Class rotation
+pass cannot earn its own next opportunity. Optional warmup starts work and growth
+marks at the first eligible complete root and withholds slices until the requested
+non-inprocessing work follows that root. Initialization cannot fund that warmup;
+scope reset renews its origin without forgiving debt. Required attachment and
+publication finish ahead of optional admission. Class rotation
 prevents a cheap pass from always taking the entire offered slice. Work and growth
-triggers and cooldown are disabled by default; the additional work ceilings are
+triggers, cooldown and warmup are disabled by default; the additional work ceilings are
 unlimited unless configured. Existing general off and SAT preset controls remain.
 Per-class attempted, eligible, shortened, unit, stopped and work counters diagnose
-applicability. Attachment, retirement and continuation work are subsets of class
-work, which itself overlaps containing propagation work. Root publication has a
+applicability. Probe outcomes distinguish a consistent fixpoint, a completed
+refutation and an interrupted attempt; these counters add no second work charge.
+Attachment, retirement and continuation work are subsets of class work, which
+overlaps containing propagation work. Root publication has a
 separate containing charge and also cannot earn the next trigger. Per-class, scheduled
 slice, continuation and publication durations keep disjoint latency buckets below
 one, ten, one hundred and one thousand milliseconds, plus a bucket for at least

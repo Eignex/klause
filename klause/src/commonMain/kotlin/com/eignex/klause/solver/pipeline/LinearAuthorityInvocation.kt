@@ -63,6 +63,7 @@ internal class LinearAuthorityInvocation(
     private val onIncumbentImport: (() -> Unit)? = null,
     private val onIncumbentUse: (() -> Unit)? = null,
     private val observeExternalIncumbents: Boolean = false,
+    sharedCompletions: LinearIncumbentSharing? = null,
     incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
 ) : AutoCloseable {
     init {
@@ -93,11 +94,12 @@ internal class LinearAuthorityInvocation(
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
         onWork = state.smt::observeSourceLp, funding = funding)
     private val completion = if (params.sourceIncumbentCompletion)
-        LinearIncumbentCompletion(budget, incumbentCompletionCheck) { stage, count ->
+        LinearIncumbentCompletion(budget, incumbentCompletionCheck, sharedCompletions) { stage, count ->
             val key = "numericalExternalCompletion$stage"
             externalOffers[key] = (externalOffers[key] ?: 0L) + count
         } else null
     val isDone: Boolean get() = result != null
+    val incumbentIsImported: Boolean get() = incumbent != null && incumbent === importedIncumbent
     fun captureTo(journal: LinearAuthorityCapture) = component.captureTo(journal)
     val work: Long get() = state.work.spent + funding.spent / LP_WORK_PER_NODE
     val stats: SolveStats get() = SolveStats(

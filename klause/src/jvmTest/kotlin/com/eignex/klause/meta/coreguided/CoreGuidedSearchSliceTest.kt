@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
@@ -17,7 +18,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @RunWith(Parameterized::class)
-class CoreGuidedSearchSliceTest(private val sliceWork: Long, private val nativeSat: Boolean) {
+class CoreGuidedSearchSliceTest(
+    private val sliceWork: Long,
+    private val nativeSat: Boolean,
+    private val refinement: CoreRefinementMode,
+) {
     @Test
     fun `sliced weight splitting should preserve the exact optimum and cumulative work`() {
         val problem = Problem(
@@ -32,8 +37,8 @@ class CoreGuidedSearchSliceTest(private val sliceWork: Long, private val nativeS
         ).bake()
         val objective = LinearObjective(longArrayOf(-7, -2, -1), constant = 10)
         val params = BacktrackParams(nativeSat = nativeSat, randomSeed = 3L)
-        val fresh = CoreGuidedSearch(problem, objective, params)
-        val sliced = CoreGuidedSearch(problem, objective, params)
+        val fresh = CoreGuidedSearch(problem, objective, params, coreRefinement = refinement)
+        val sliced = CoreGuidedSearch(problem, objective, params, coreRefinement = refinement)
         val expected = assertIs<MinimizeResult.Optimal>(fresh.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
         var result: MinimizeResult? = null
         var previousWork = 0L
@@ -59,8 +64,8 @@ class CoreGuidedSearchSliceTest(private val sliceWork: Long, private val nativeS
         ).bake()
         val objective = LinearObjective(longArrayOf(9_007_199_254_740_993L, Long.MAX_VALUE, Long.MIN_VALUE))
         val params = BacktrackParams(nativeSat = nativeSat, randomSeed = 3L)
-        val fresh = CoreGuidedSearch(problem, objective, params, stratify = true)
-        val sliced = CoreGuidedSearch(problem, objective, params, stratify = true)
+        val fresh = CoreGuidedSearch(problem, objective, params, stratify = true, coreRefinement = refinement)
+        val sliced = CoreGuidedSearch(problem, objective, params, stratify = true, coreRefinement = refinement)
         val expected = assertIs<MinimizeResult.Optimal>(fresh.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
         var result: MinimizeResult? = null
 
@@ -69,6 +74,8 @@ class CoreGuidedSearchSliceTest(private val sliceWork: Long, private val nativeS
         }
 
         val actual = assertIs<MinimizeResult.Optimal>(result)
+        val minimum = BigFraction.ofLong(Long.MIN_VALUE) + BigFraction.ofLong(9_007_199_254_740_993L)
+        assertEquals(minimum, objective.evaluateExact(actual.sample))
         assertEquals(objective.evaluateExact(expected.sample), objective.evaluateExact(actual.sample))
         assertEquals(fresh.preparationWork, sliced.preparationWork)
         assertEquals(fresh.thresholdVisits, sliced.thresholdVisits)
@@ -82,8 +89,8 @@ class CoreGuidedSearchSliceTest(private val sliceWork: Long, private val nativeS
         val problem = Problem(1024, 0, emptyArray(), emptyArray()).bake()
         val objective = LinearObjective(LongArray(1024) { 1L })
         val params = BacktrackParams(nativeSat = nativeSat, randomSeed = 3L)
-        val search = CoreGuidedSearch(problem, objective, params)
-        val fresh = CoreGuidedSearch(problem, objective, params)
+        val search = CoreGuidedSearch(problem, objective, params, coreRefinement = refinement)
+        val fresh = CoreGuidedSearch(problem, objective, params, coreRefinement = refinement)
         val expected = fresh.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
 
         val paused = search.runSlice(Cancellation { search.thresholdVisits >= sliceWork }, Long.MAX_VALUE, -1L) {
@@ -103,9 +110,11 @@ class CoreGuidedSearchSliceTest(private val sliceWork: Long, private val nativeS
 
     companion object {
         @JvmStatic
-        @Parameterized.Parameters(name = "sliceWork={0}, nativeSat={1}")
+        @Parameterized.Parameters(name = "sliceWork={0}, nativeSat={1}, refinement={2}")
         fun parameters(): List<Array<Any>> = listOf(1L, 5L, 200L).flatMap { work ->
-            listOf(false, true).map { native -> arrayOf(work, native) }
+            listOf(false, true).flatMap { native ->
+                listOf(CoreRefinementMode.NONE, CoreRefinementMode.REASONS).map { mode -> arrayOf(work, native, mode) }
+            }
         }
     }
 }

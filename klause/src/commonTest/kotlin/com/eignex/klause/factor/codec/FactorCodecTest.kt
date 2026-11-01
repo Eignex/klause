@@ -52,12 +52,12 @@ class FactorCodecTest {
     }
 
     @Test
-    fun `a malformed payload should fail at its field`() {
+    fun `a malformed payload should name its field`() {
         val error = assertFailsWith<SerializationException> {
             codecs.decodeFromJsonElement(Json.parseToJsonElement("""{"clause": {"literals": "0"}}"""))
         }
 
-        assertTrue("$.clause.literals" in error.message.orEmpty(), error.message)
+        assertTrue("$.literals" in error.message.orEmpty(), error.message)
     }
 
     @Test

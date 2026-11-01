@@ -107,21 +107,38 @@ internal class FamilyPolicy(
         }
     }
 
+    fun fade(retention: Double) {
+        require(retention in 0.0..1.0) { "family retention must be in [0, 1]" }
+        for (i in successes.indices) {
+            successes[i] *= retention
+            failures[i] *= retention
+        }
+    }
+
     /**
      * Record one segment of [family]: whether it [progressed], and [plateau] once an incumbent exists, when a
      * segment without progress counts against an observable family. Before that, only an observable family's
      * progress counts; complete-search deductions supply no evidence that its family is closer to a witness.
+     * An explicit [reward] prices zero-yield segments of every family after an incumbent.
+     * [weight] scales fading and evidence by paid exposure; a unit retains the ordinary segment update.
      */
-    fun record(family: ArmFamily, progressed: Boolean, plateau: Boolean) {
-        val retained = 2.0.pow(-1.0 / halfLife)
+    fun record(family: ArmFamily, progressed: Boolean, plateau: Boolean,
+        reward: Double? = null, weight: Double = 1.0) {
+        require(reward == null || reward in 0.0..1.0) { "family reward must be in [0, 1]" }
+        require(weight.isFinite() && weight >= 0.0) { "family evidence weight must be finite and nonnegative" }
+        if (weight == 0.0) return
+        val success = reward ?: if (progressed) 1.0 else 0.0
+        val unitRetention = 2.0.pow(-1.0 / halfLife)
+        val retained = if (weight == 1.0) unitRetention else 2.0.pow(-weight / halfLife)
+        // Equal paid exposure supplies the same evidence when split across segments.
+        val evidence = (1.0 - retained) / (1.0 - unitRetention)
         for (i in successes.indices) {
             successes[i] *= retained
             failures[i] *= retained
         }
-        if (progressed && (plateau || family.observable)) {
-            successes[family.ordinal] += 1.0
-        } else if (plateau && family.observable) {
-            failures[family.ordinal] += 1.0
+        if (plateau || family.observable) successes[family.ordinal] += success * evidence
+        if (plateau && (family.observable || progressed || reward != null)) {
+            failures[family.ordinal] += (1.0 - success) * evidence
         }
     }
 

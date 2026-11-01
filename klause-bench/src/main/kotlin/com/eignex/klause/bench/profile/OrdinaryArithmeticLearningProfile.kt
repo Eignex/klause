@@ -24,6 +24,9 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.search.SearchBranchAttemptObserver
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import com.sun.management.OperatingSystemMXBean
@@ -35,6 +38,8 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 internal object OrdinaryArithmeticLearningProfile {
@@ -121,18 +126,32 @@ internal object OrdinaryArithmeticLearningProfile {
                 var native: PropagationSession? = null
                 var capture: PreparedArithmeticLearningProfile.Capture? = null
                 var picks = 0
+                var attempts = 0
+                var attachment: String? = null
+                var integerRowsAtCapture: Long? = null
                 val base = entry.searchParams ?: BacktrackPresets.conflictDriven(randomSeed = 3L)
                 val selector = base.variableSelector
+                fun attach(session: PropagationSession, origin: String) {
+                    if (native == null) {
+                        native = session
+                        attachment = origin
+                        val recorder = PreparedArithmeticLearningProfile.Capture(
+                            session, 1024, 65536, captureFirstInteger = learning && traceMode == "first-integer",
+                        )
+                        capture = recorder
+                        integerRowsAtCapture = recorder.lifecycle()["learningIntegerAdmitted"]
+                            ?.jsonPrimitive?.longOrNull ?: 0L
+                    }
+                    check(native === session)
+                }
                 fun observing(delegate: VariableSelector): VariableSelector = object : VariableSelector by delegate {
                     override fun fresh(): VariableSelector = observing(delegate.fresh())
+                    override fun onSessionCreated(session: PropagationSession) {
+                        attach(session, "session-created")
+                        delegate.onSessionCreated(session)
+                    }
                     override fun pick(session: PropagationSession, rng: Random): VarRef? {
-                        if (native == null) {
-                            native = session
-                            capture = PreparedArithmeticLearningProfile.Capture(
-                                session, 1024, 65536, captureFirstInteger = learning && traceMode == "first-integer",
-                            )
-                        }
-                        check(native === session)
+                        attach(session, "selector-fallback")
                         val recorder = requireNotNull(capture)
                         picks++
                         val picked = delegate.pick(session, rng)
@@ -150,6 +169,14 @@ internal object OrdinaryArithmeticLearningProfile {
                     variableSelector = observing(selector), randomSeed = 3L, cancellation = stop,
                     maxDecisions = nodes, pbLearning = false, integerRowLearning = learning,
                     propagationAttribution = attribution,
+                    branchObserver = object : SearchBranchAttemptObserver {
+                        override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                            base.branchObserver?.onAttempt(decision, context)
+                            attempts++
+                            capture?.record("traversal.attempt", context.decisionLevel.toLong(),
+                                context.atomLiteral(decision)?.toLong() ?: -1L, attempts.toLong())
+                        }
+                    },
                     lpConfig = if (lp == "auto") LpConfig.AUTO else null,
                 )
                 var verdict = "preparation-terminal"
@@ -207,6 +234,9 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("timeoutMs", timeout)
                     put("traceMode", traceMode)
                     put("selectorPicks", picks)
+                    put("branchAttempts", attempts)
+                    put("captureAttachment", attachment)
+                    put("integerRowsAtCapture", integerRowsAtCapture)
                     put("verdict", verdict)
                     put("witness", witness)
                     put("nativeReconstructedPointCheck", checked)

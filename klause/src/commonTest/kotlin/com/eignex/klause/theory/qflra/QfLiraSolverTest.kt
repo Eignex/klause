@@ -20,6 +20,8 @@ import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.result.LpRoute
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -52,6 +54,39 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class QfLiraSolverTest {
+    @Test
+    fun `affine guard implications should use current bound premises after backtracking`() {
+        for (strict in listOf(false, true)) {
+            val source = Problem(3, 0, emptyArray(), arrayOf(
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
+                    LinearOp.LE, 1.0, strict),
+                ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(-4.0, 6.0),
+                    LinearOp.GE, -2.0, strict),
+            ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
+            ExactLiraSearchComponent(source).use { component ->
+                component.useIncrementalLinearPropagation()
+                val session = SearchSession(listOf(component))
+                assertIs<ComponentResult.Consistent>(session.initialize())
+                assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+                assertEquals(true, session.boolValue(1))
+                assertEquals(setOf(Lit.make(0, false), Lit.make(1, true)),
+                    assertNotNull(session.reasonFor(1)).literals.toSet())
+                session.popTo(0)
+
+                for (truth in listOf(false, true)) {
+                    assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(1, truth))))
+
+                    assertEquals(truth, session.boolValue(0))
+                    assertEquals(setOf(Lit.make(1, !truth), Lit.make(0, truth)),
+                        assertNotNull(session.reasonFor(0)).literals.toSet())
+                    assertNull(session.boolValue(2))
+                    session.popTo(0)
+                }
+            }
+        }
+    }
+
     @Test
     fun `incremental root refresh should substitute a column fixed by a later source row`() {
         for (strict in listOf(false, true)) {
@@ -468,7 +503,7 @@ class QfLiraSolverTest {
     }
 
     @Test
-    fun `existing source predicate should complete a deferred disjunction witness`() {
+    fun `existing source predicate consumes a deferred LP witness`() {
         val model = Problem(
             numBoolVars = 0,
             intBounds = openBounds(),
@@ -478,7 +513,9 @@ class QfLiraSolverTest {
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
             ),
         )
+        val stats = LpStatsSink()
         ExactLiraSearchComponent(model).use { component ->
+            component.observePrimaryLpWith(stats.certificationObserver(LpRoute.STANDALONE))
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(0, maxAtoms = 2))
             assertIs<ComponentResult.Consistent>(session.initialize())
             val split = assertNotNull(
@@ -489,6 +526,7 @@ class QfLiraSolverTest {
                 ),
             )
             assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Theory(split.positive)))
+            assertNull(stats.snapshot().phases["CLAIM_CONSUMPTION_STANDALONE"])
 
             val result = session.solve(0)
 
@@ -497,6 +535,8 @@ class QfLiraSolverTest {
                     .valueOf(component.assignmentKey),
             )
             assertEquals(BIG_ZERO, witness.intValue(0))
+            assertEquals(1L, stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
+                .outcomes["FEASIBLE_COMPLETION"])
         }
     }
 

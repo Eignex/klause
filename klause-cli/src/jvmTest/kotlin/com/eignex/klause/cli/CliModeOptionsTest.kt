@@ -17,6 +17,56 @@ import kotlin.test.assertTrue
 
 class CliModeOptionsTest {
     @Test
+    fun `finite source CLI should accept inprocessing warmup`() {
+        val source = File.createTempFile("inprocessing-warmup", ".cnf").apply {
+            writeText("p cnf 1 1\n1 0\n")
+            deleteOnExit()
+        }
+        for (work in listOf(0L, 4096L)) {
+            val output = capture {
+                assertEquals(0, runCli(arrayOf("-e", "cp", "--param",
+                    "inprocessing-warmup-work=$work", source.absolutePath)))
+            }
+
+            assertTrue("s SATISFIABLE" in output.lines(), output)
+        }
+    }
+
+    @Test
+    fun `incremental linear controls should leave finite SMT CLI solving available`() {
+        val source = File.createTempFile("incremental-finite", ".smt2").apply {
+            writeText("(declare-const b Bool) (assert b) (check-sat)")
+            deleteOnExit()
+        }
+        for (engine in listOf("fixed", "backtrack", "mixed")) {
+            for (enabled in listOf(false, true)) {
+                val output = capture {
+                    assertEquals(0, runCli(arrayOf("-e", engine, "--param",
+                        "open-linear-incremental=$enabled", source.absolutePath)))
+                }
+
+                assertTrue("sat" in output.lines(), output)
+            }
+        }
+    }
+
+    @Test
+    fun `finite SMT CLI should reject malformed incremental linear controls`() {
+        val source = File.createTempFile("incremental-malformed", ".smt2").apply {
+            writeText("(declare-const b Bool) (assert b) (check-sat)")
+            deleteOnExit()
+        }
+        var code = -1
+
+        val error = captureErr {
+            code = runCli(arrayOf("--param", "open-linear-incremental=invalid", source.absolutePath))
+        }
+
+        assertEquals(2, code, error)
+        assertTrue("open-linear-incremental" in error, error)
+    }
+
+    @Test
     fun `explicit default LP pricing should retain its flag provenance`() {
         val common = CommonOptions()
         assertEquals(false, common.lpPricingExplicit)

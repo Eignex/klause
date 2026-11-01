@@ -1,8 +1,7 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.util.Cancellation
-import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.kumulant.stream.Mutex
 
 /**
  * The components selected for one solver engine from its source model.
@@ -23,7 +22,7 @@ class SearchComponentSet(
 
     private val proposals = proposals.toList()
     private val components = components.toList()
-    private val openingLock = Concurrency.Strict.lock()
+    private val openingLock = Mutex()
     private var claimed = false
 
     init {

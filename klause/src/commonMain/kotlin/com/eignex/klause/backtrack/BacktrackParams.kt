@@ -450,14 +450,19 @@ data class BacktrackParams(
     val reasonPreflight: Boolean = false,
     /** Bounded propositional rebuild diagnostics within root simplification; zero disables capture. */
     val rootRebuildCaptureVisits: Int = 0,
+    /** Total preparation and trial work across private Boolean generations; zero disables rebuilding. */
+    val privateRebuildWork: Long = 0L,
     /**
      * Inline diagnostic observer for attempted shared decisions, before propagation can refute them.
      * The caller owns its scope, bounds and retention; callbacks must not mutate the search context.
      */
     val branchObserver: SearchBranchAttemptObserver? = null,
+    /** Non-inprocessing work after the first eligible complete root before optional slices; zero disables warmup. */
+    val inprocessingWarmupWork: Long = 0L,
 ) : SolverParams {
     init {
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }
+        require(privateRebuildWork in 0L..1_048_576L) { "private rebuild work must be in 0..1048576" }
         require(learnedMemoryBytes == null || learnedMemoryBytes >= 0L)
         require(learnedMemoryWork >= 0L && learnedMemoryScratchBytes >= 0L)
         require(rootSimplifyBatch > 0) { "root simplification batch must be positive" }
@@ -465,7 +470,9 @@ data class BacktrackParams(
         require(rootProbeWork > 0L) { "root probe work must be positive" }
         require(listOf(inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
             inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval,
-            inprocessingCooldown).all { it >= 0L }) { "inprocessing work limits must be nonnegative" }
+            inprocessingCooldown, inprocessingWarmupWork).all { it >= 0L }) {
+            "inprocessing work limits must be nonnegative"
+        }
         require(inprocessingGrowth >= 0) { "inprocessing growth must be nonnegative" }
         require(lubyRestartBase == null || lubyRestartBase > 0L) {
             "lubyRestartBase must be positive or null (off)"

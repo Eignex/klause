@@ -22,7 +22,11 @@ val koblasPins = mapOf(
 )
 
 val skemaPins = listOf("skema", "skema-jvm", "skema-linuxx64", "skema-linuxarm64", "skema-macosarm64")
-    .associateWith { "0.3.1-20261028.100806-19" }
+    .associateWith { "0.4.0" }
+
+val kumulantPins = mapOf("jvm" to 127, "linuxx64" to 127, "linuxarm64" to 127, "macosarm64" to 126)
+    .mapKeys { (module, _) -> "kumulant-$module" }
+    .mapValues { (_, build) -> "0.3.4-20261101.114432-$build" }
 
 if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
     // Lab builds retain complete distributions; each fresh tree discards its incremental indexes.
@@ -35,13 +39,13 @@ if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
     }
 }
 
-// Koblas, Kumulant and Skema use timestamped snapshots; this endpoint is outside the conventions'
+// Koblas and Kumulant use timestamped snapshots; this endpoint is outside the conventions'
 // default repository set.
 allprojects {
     val targetProject = this
-    // Direct Kumulant consumers need their own constraints to override its published Koblas and Skema pins.
+    // Direct consumers need platform constraints because timestamped KMP roots redirect to mutable snapshots.
     configurations.matching { it.name == "commonMainImplementation" || it.name == "implementation" }.all {
-        for ((module, pinned) in koblasPins + skemaPins) {
+        for ((module, pinned) in koblasPins + skemaPins + kumulantPins) {
             targetProject.dependencies.constraints.add(name, "com.eignex:$module:$pinned") {
                 version { strictly(pinned) }
             }

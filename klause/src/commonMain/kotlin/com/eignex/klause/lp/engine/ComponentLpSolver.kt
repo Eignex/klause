@@ -30,14 +30,19 @@ internal class ComponentLpSolver(
     ResumableLpSolver,
     TableauCutSolver {
     private val reusable = arrayOfNulls<FloatLpResult>(parts.size)
+    val rowOnlyRows: Int = parts.sumOf { if (it.cols.isEmpty()) it.rows.size else 0 }
     private class CheckedBound(val policy: LpCertificationPolicy, val bound: CertifiedLpBound)
     private val checkedBounds = arrayOfNulls<CheckedBound>(parts.size)
+    private val deductions = ComponentLpDeductionCache(parts.size)
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
     private var activeChild: LpSolver? = null
     private var solveStarted = false
     var queryAllowance: LpFloatAllowance? = null
     private val certificationKey = if (model.exactState == null) exactLpStateKey(model) else null
-    private var blockResults: List<FloatLpResult>? = null
+    private var blockResults: List<FloatLpResult?>? = null
+    private val solveOrder = parts.indices.sortedWith(
+        compareBy<Int> { parts[it].model.m.toLong() + parts[it].model.n }.thenBy { it },
+    )
     private var metrics = LpSolveMetrics()
     override var lastDegenerateColumns: Int = 0
         private set
@@ -91,6 +96,7 @@ internal class ComponentLpSolver(
         clearEvidence()
         reusable.fill(null)
         checkedBounds.fill(null)
+        deductions.clear()
         closeComponentSolvers(solvers, failure)
         failure?.let { throw it }
     }
@@ -178,9 +184,11 @@ internal class ComponentLpSolver(
         if (token()) return false
         try {
             for (index in solvers.indices) {
-                if (nextParts[index] === parts[index]) continue
-                reusable[index] = null
-                checkedBounds[index] = null
+                if (nextParts[index] !== parts[index]) {
+                    reusable[index] = null
+                    checkedBounds[index] = null
+                    deductions.invalidate(index)
+                }
                 if (!(solvers[index] as RetainedLpSolver).adopt(
                     checkNotNull(nextParts[index].model.exactState),
                     token,
@@ -199,6 +207,7 @@ internal class ComponentLpSolver(
                 clearEvidence()
                 reusable.fill(null)
                 checkedBounds.fill(null)
+                deductions.clear()
                 closeComponentSolvers(solvers, primary)
             }
             throw primary
@@ -294,6 +303,7 @@ internal class ComponentLpSolver(
             for (index in parts.indices) if (changed[index]) {
                 reusable[index] = null
                 checkedBounds[index] = null
+                deductions.invalidate(index)
             }
             clearEvidence()
             published = true
@@ -386,6 +396,7 @@ internal class ComponentLpSolver(
         recessionDirection = null
         reusable.fill(null)
         checkedBounds.fill(null)
+        deductions.clear()
         throw primary
     }
 
@@ -418,7 +429,8 @@ internal class ComponentLpSolver(
         var maxFill = 0.0
         var maxDensity = 0.0
         var maxDim = 0
-        val results = ArrayList<FloatLpResult>(parts.size)
+        val results = MutableList<FloatLpResult?>(parts.size) { null }
+        blockResults = results
         for (j in isolated) {
             val c = model.costD(j)
             val shifted = if (model.exactState == null) {
@@ -448,7 +460,7 @@ internal class ComponentLpSolver(
             primal[j] = shifted + model.loShiftD(j)
             objective += c * shifted
         }
-        for (k in parts.indices) {
+        for (k in solveOrder) {
             val part = parts[k]
             val reused = reusable[k]?.takeIf { it.optimal && it.exactState === part.model.exactState &&
                 solvers[k].solvedExactState === part.model.exactState }
@@ -491,7 +503,7 @@ internal class ComponentLpSolver(
                 lastColumns += solvers[k].lastColumns
             }
             if (!r.optimal && lastTermination == null) lastTermination = solvers[k].lastTermination
-            results.add(r)
+            results[k] = r
             if (part.model.exactState != null && r.optimal) reusable[k] = r
             objective += r.objective - part.model.objConstantD
             val sub = part.model
@@ -521,7 +533,7 @@ internal class ComponentLpSolver(
             return null
         }
         blockResults = results
-        if (results.all { it.optimal }) lastTermination = LpFloatTermination.OPTIMAL_CANDIDATE
+        if (results.all { it?.optimal == true }) lastTermination = LpFloatTermination.OPTIMAL_CANDIDATE
         return FloatLpResult(
             basis = basis,
             objective = model.objectiveD(objective),
@@ -532,25 +544,36 @@ internal class ComponentLpSolver(
             luMaxDensity = maxDensity,
             luMaxDim = maxDim,
             blocks = parts.size,
-            optimal = results.all { it.optimal },
+            optimal = results.all { it?.optimal == true },
             warmStarted = metrics.warmHits > 0,
             refactorizations = lastRefactorizations,
             exactState = model.exactState,
         )
     }
 
-    override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? {
-        if (!currentAuthority()) return null
+    override fun nodeDeductions(
+        duals: DoubleArray,
+        observer: LpCertificationObserver?,
+        policy: LpCertificationPolicy,
+        cancellation: Cancellation,
+        withAlternatives: Boolean,
+        sharedMeter: MixedCertificateMeter?,
+    ): ComponentLpDeductions? {
+        if (!currentAuthority() || recessionDirection != null) return null
         val results = blockResults ?: return null
+        if (results.any { it?.optimal != true }) return null
+        return deductions.certify(model, parts, isolated, results, duals, observer, policy,
+            cancellation, withAlternatives, sharedMeter)
+    }
+
+    override fun exactBound(observer: LpCertificationObserver?, policy: LpCertificationPolicy): CertifiedLpBound? {
+        val results = boundResults(policy) ?: return null
         var value = model.exactConstant()
         val citedRows = HashSet<Int>()
         val citedSides = ArrayList<LpExactCitedSide>()
         for (index in parts.indices) {
             val part = parts[index]
-            val bound = checkedBounds[index]?.takeIf { it.policy === policy }?.bound
-                ?: certifyLpBound(part.model, results[index].duals, observer, policy)?.also {
-                    if (part.model.exactState != null) checkedBounds[index] = CheckedBound(policy, it)
-                } ?: return null
+            val bound = checkedChildBound(index, results[index], observer, policy) ?: return null
             value += bound.value - part.model.exactConstant()
             model.exactState?.let { state ->
                 val support = bound.support ?: return null
@@ -585,31 +608,58 @@ internal class ComponentLpSolver(
         )
     }
 
+    private fun boundResults(policy: LpCertificationPolicy): List<FloatLpResult?>? {
+        if (!currentAuthority()) return null
+        val results = blockResults ?: return null
+        if (results.any { it == null }) {
+            if (model.exactState == null) return null
+            if (lastTermination != LpFloatTermination.WORK && lastTermination != LpFloatTermination.PIVOTS) return null
+            if (results.all { it == null } && checkedBounds.none { it?.policy === policy }) return null
+        }
+        return results
+    }
+
+    private fun checkedChildBound(
+        index: Int,
+        result: FloatLpResult?,
+        observer: LpCertificationObserver?,
+        policy: LpCertificationPolicy,
+    ): CertifiedLpBound? {
+        checkedBounds[index]?.takeIf { it.policy === policy }?.let { return it.bound }
+        val part = parts[index]
+        if (result == null) return certifyLpBound(part.model, DoubleArray(part.model.m), observer, policy)
+        return certifyLpBound(part.model, result.duals, observer, policy)?.also {
+            if (part.model.exactState != null) checkedBounds[index] = CheckedBound(policy, it)
+        }
+    }
+
     override fun exactWitness(
         observer: LpCertificationObserver?,
         policy: LpCertificationPolicy,
         cancellation: Cancellation,
     ): ExactLpWitness? {
-        if (!currentAuthority() || cancellation()) return null
+        if (!currentAuthority() || recessionDirection != null || cancellation()) return null
         val results = blockResults ?: return null
+        if (results.any { it == null }) return null
         val point = MutableList(model.n) { model.exactShift(it) }
         for (index in parts.indices) {
             val part = parts[index]
             if (cancellation()) return null
+            val result = results[index] ?: return null
             val exact = verifyExactBasis(
                 part.model,
-                results[index].basis,
+                result.basis,
                 cache = solvers[index].exactBasisCache ?: ExactBasisCache(),
                 cancellation = cancellation,
                 observer = observer,
             )
-            if (exact.singularRank != null) solvers[index].rejectSingularBasis(part.model, results[index].basis)
+            if (exact.singularRank != null) solvers[index].rejectSingularBasis(part.model, result.basis)
             val witness = policy.acceptNullable(
                 LpCertifier.EXACT_BASIS,
                 exact.witness,
             ) ?: policy.acceptNullable(
                 LpCertifier.EXACT_POINT,
-                exactPointWitness(part.model, results[index].primal, observer),
+                exactPointWitness(part.model, result.primal, observer),
             ) ?: return null
             for (column in part.cols.indices) point[part.cols[column]] = witness.primal[column]
         }
@@ -619,7 +669,7 @@ internal class ComponentLpSolver(
         return checkedLpWitness(model, point)
     }
 
-    private fun currentAuthority(): Boolean = !closed && if (model.exactState != null) {
+    private fun currentAuthority(): Boolean = !closed && activeSolve == null && if (model.exactState != null) {
         solvedExactState === model.exactState
     } else {
         certificationKey?.let { exactLpStateKey(model)?.contentEquals(it) } == true
@@ -630,7 +680,9 @@ internal class ComponentLpSolver(
     override fun mirCuts(maxCuts: Int): List<Cut> = localCuts(maxCuts) { owner, count -> owner.mirCuts(count) }
 
     private fun localCuts(maxCuts: Int, separate: (TableauCutSolver, Int) -> List<Cut>): List<Cut> {
-        if (!currentAuthority() || blockResults?.all { it.optimal } != true || maxCuts <= 0) return emptyList()
+        if (!currentAuthority() || recessionDirection != null ||
+            blockResults?.all { it?.optimal == true } != true || maxCuts <= 0
+        ) return emptyList()
         val cuts = ArrayList<Cut>()
         for (index in parts.indices) {
             val owner = solvers[index] as? TableauCutSolver ?: continue
@@ -723,9 +775,9 @@ internal class ComponentLpSolver(
 
 /**
  * Decompose [model] into its column components and wrap them as a [ComponentLpSolver], or null when
- * decomposition does not apply: fewer than two row-coupled blocks, or an empty structural row (its
- * feasibility is not attached to any column, so it belongs to no block — the monolithic engine
- * handles it). [engine] builds each block's solver — the same monolithic selection [newLpSolver]
+ * decomposition does not apply: fewer than two row-coupled blocks. Empty structural rows form
+ * a separate logical-column child, retaining their feasibility and objective authority.
+ * [engine] builds each block's solver — the same monolithic selection [newLpSolver]
  * uses, so a block solves exactly as the whole model would.
  */
 internal fun componentLpSolverOrNull(
@@ -734,17 +786,29 @@ internal fun componentLpSolverOrNull(
     engine: (LpModel, Cancellation) -> LpSolver,
 ): ComponentLpSolverCapability? = componentLpSolverOrNull(model, cancellation, engine, ::ComponentLpSolver)
 
-@Suppress("TooGenericExceptionCaught") // Construction owns every child it created, including after native failures.
 internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     model: LpModel,
     cancellation: Cancellation,
     engine: (LpModel, Cancellation) -> LpSolver,
     component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
+    projection: LpProjectionMeter? = null,
+): T? = componentLpSolverOrNull(model, cancellation, projection,
+    { part, token, _ -> engine(part, token) }, component)
+
+@Suppress("TooGenericExceptionCaught") // Construction owns every child it created, including after native failures.
+internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
+    model: LpModel,
+    cancellation: Cancellation,
+    projection: LpProjectionMeter?,
+    engine: (LpModel, Cancellation, Int) -> LpSolver,
+    component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
 ): T? {
     val n = model.n
     val m = model.m
     if (n == 0 || m < 2) return null
-    val rowIndex = model.rowIndex()
+    val rowIndex = model.rowIndex(projection)
+    projection?.reserve(5L * n + 4L * m + 4L * rowIndex.colIdx.size + 1L,
+        16L * n + 12L * m, matrix = true)
     // Union-find over columns sharing a row.
     val parent = IntArray(n) { it }
     fun find(x: Int): Int {
@@ -756,10 +820,15 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
         return r
     }
     val inRow = BooleanArray(n)
+    var rowOnlyRows = 0
     for (i in 0 until m) {
+        if (cancellation()) return null
         val from = rowIndex.rowPtr[i]
         val to = rowIndex.rowPtr[i + 1]
-        if (from == to) return null // empty structural row → monolithic
+        if (from == to) {
+            rowOnlyRows++
+            continue
+        }
         val root = find(rowIndex.colIdx[from])
         inRow[rowIndex.colIdx[from]] = true
         for (p in from + 1 until to) {
@@ -779,33 +848,58 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     }
     if (blocks < 2) return null
 
-    val blockCols = Array(blocks) { IntArrayList() }
+    val children = blocks + if (rowOnlyRows > 0) 1 else 0
+    projection?.reserve(n.toLong() + m, 128L * children + 8L * (n.toLong() + m), matrix = true)
+    val blockCols = Array(children) { IntArrayList() }
     for (j in 0 until n) if (inRow[j]) blockCols[blockOf[find(j)]].add(j)
-    val blockRows = Array(blocks) { IntArrayList() }
-    for (i in 0 until m) blockRows[blockOf[find(rowIndex.colIdx[rowIndex.rowPtr[i]])]].add(i)
+    val blockRows = Array(children) { IntArrayList() }
+    for (i in 0 until m) {
+        val from = rowIndex.rowPtr[i]
+        val block = if (from == rowIndex.rowPtr[i + 1]) blocks else blockOf[find(rowIndex.colIdx[from])]
+        blockRows[block].add(i)
+    }
     val isolated = IntArrayList()
     for (j in 0 until n) if (!inRow[j]) isolated.add(j)
 
-    val parts = ArrayList<LpNeighborhood>(blocks)
-    // One scratch buffer for the whole split: a fresh IntArray(m) per component makes the split alone
-    // O(components x m), which on a model with many small components outweighs every restriction it
-    // performs. Polled per component too - without it a long split never observes the deadline, since
-    // the budget is only checked once a solver exists.
-    val rowMapScratch = IntArray(model.m) { -1 }
-    for (b in 0 until blocks) {
-        if (cancellation()) return null
-        parts.add(
-            model.restrictTo(blockCols[b], blockRows[b], colMap = null, copyCosts = true, rowMapScratch),
-        )
-    }
+    val parts = model.componentRestrictions(blockCols, blockRows, rowIndex, cancellation, projection) ?: return null
     val solvers = ArrayList<LpSolver>(parts.size)
     try {
-        for (part in parts) solvers += engine(part.model, cancellation)
+        for (part in parts) solvers += engine(part.model, cancellation, rowOnlyRows)
         return component(model, parts, solvers, isolated.toIntArray())
     } catch (primary: Throwable) {
         closeComponentSolvers(solvers, primary)
         throw primary
     }
+}
+
+private fun LpModel.componentRestrictions(
+    blockCols: Array<IntArrayList>,
+    blockRows: Array<IntArrayList>,
+    rowIndex: LpRowIndex,
+    cancellation: Cancellation,
+    projection: LpProjectionMeter?,
+): List<LpNeighborhood>? {
+    val parts = ArrayList<LpNeighborhood>(blockCols.size)
+    // One scratch buffer for the whole split: a fresh IntArray(m) per component makes the split alone
+    // O(components x m), which on a model with many small components outweighs every restriction it
+    // performs. Polled per component too - without it a long split never observes the deadline, since
+    // the budget is only checked once a solver exists.
+    projection?.reserve(m.toLong(), 4L * m, matrix = true)
+    val rowMapScratch = IntArray(m) { -1 }
+    for (b in blockCols.indices) {
+        if (cancellation()) return null
+        val entries = (0 until blockRows[b].size).sumOf {
+            val row = blockRows[b][it]
+            (rowIndex.rowPtr[row + 1] - rowIndex.rowPtr[row]).toLong()
+        }
+        val dimensions = blockCols[b].size.toLong() + blockRows[b].size
+        projection?.reserve(8L * entries + dimensions + 1L,
+            128L * (entries + dimensions) + 64L, matrix = true)
+        parts.add(
+            restrictTo(blockCols[b], blockRows[b], colMap = null, copyCosts = true, rowMapScratch),
+        )
+    }
+    return parts
 }
 
 @Suppress("TooGenericExceptionCaught") // Release every child and preserve the original failure.

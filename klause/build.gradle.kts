@@ -31,8 +31,7 @@ eignexPublish {
 // local build/check and CI use the same target set. The release builds every target via -Ptargets.full.
 val fullTargets = providers.gradleProperty("targets.full").isPresent
 
-// Compact model JSON needs Skema's unreleased fixed-field nodes, root path decoding and integral tokens.
-val skemaPin = "0.3.1-20261028.100806-19"
+val skemaPin = "0.4.0"
 
 kotlin {
     compilerOptions {
@@ -56,7 +55,7 @@ kotlin {
             implementation("com.eignex:koblas:0.1.1-20261023.051622-264") {
                 version { strictly("0.1.1-20261023.051622-264") }
             }
-            implementation("com.eignex:kumulant:0.3.4-20261013.194059-67")
+            implementation("com.eignex:kumulant:0.3.4-20261101.114432-127")
             implementation("com.eignex:kpermute:1.3.0")
         }
         // BigInt is java.math.BigInteger on the JVM; native has no platform big integer to map onto.
@@ -77,6 +76,9 @@ val lpProfileSources = kotlin.sourceSets.create("lpProfile") {
 }
 kotlin.targets.withType<org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget>().configureEach {
     val main = compilations.getByName("main")
+    main.compileTaskProvider.configure {
+        mustRunAfter("linkLpProfileReleaseExecutableLinuxX64")
+    }
     val profile = compilations.create("lpProfile") {
         associateWith(main)
         defaultSourceSet.dependsOn(lpProfileSources)
@@ -92,9 +94,6 @@ kotlin.targets.withType<org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget>
 }
 kotlin.targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
     val main = compilations.getByName("main")
-    main.compileTaskProvider.configure {
-        mustRunAfter("stageLpProfileJvm")
-    }
     val profile = compilations.create("lpProfile") {
         associateWith(main)
         defaultSourceSet.dependsOn(lpProfileSources)
@@ -107,16 +106,8 @@ kotlin.targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarge
     }
 }
 
-// A timestamped KMP root still redirects to mutable platform snapshots. Publish constraints too,
-// so downstream Gradle consumers resolve the same binaries as this build.
 dependencies {
     constraints {
-        for ((module, build) in mapOf("jvm" to 67, "linuxx64" to 67, "linuxarm64" to 67, "macosarm64" to 66)) {
-            val pinned = "0.3.4-20261013.194059-$build"
-            add("commonMainImplementation", "com.eignex:kumulant-$module:$pinned") {
-                version { strictly(pinned) }
-            }
-        }
         for (module in listOf("jvm", "linuxx64", "linuxarm64", "macosarm64")) {
             add("commonMainApi", "com.eignex:skema-$module:$skemaPin") {
                 version { strictly(skemaPin) }

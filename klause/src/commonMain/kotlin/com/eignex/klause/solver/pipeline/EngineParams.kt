@@ -166,8 +166,10 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
     "root-simplification", "root-simplify-batch", "root-probe-batch", "root-probe-work",
     "root-rebuild-capture-visits",
+    "private-rebuild-work",
     "inprocessing-work", "inprocessing-root-work", "inprocessing-probe-work", "inprocessing-subsume-work",
     "inprocessing-vivify-work", "inprocessing-interval", "inprocessing-growth", "inprocessing-cooldown",
+    "inprocessing-warmup-work",
     "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-bound-max-pivots", "lp-adaptive-work",
     "lp-branching", "lp-directional-gains", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
@@ -215,6 +217,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val rootSimplification = p[ExecutionOption.rootSimplification]
     val rootSimplifyBatch = p[ExecutionOption.rootSimplifyBatch]
     val rootRebuildCaptureVisits = p[ExecutionOption.rootRebuildCaptureVisits]
+    val privateRebuildWork = p[ExecutionOption.privateRebuildWork]
     val rootProbeBatch = p[ExecutionOption.rootProbeBatch]
     val rootProbeWork = p[ExecutionOption.rootProbeWork]
     val inprocessingWork = p[ExecutionOption.inprocessingWork]
@@ -225,6 +228,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val inprocessingInterval = p[ExecutionOption.inprocessingInterval]
     val inprocessingGrowth = p[ExecutionOption.inprocessingGrowth]
     val inprocessingCooldown = p[ExecutionOption.inprocessingCooldown]
+    val inprocessingWarmupWork = p[ExecutionOption.inprocessingWarmupWork]
     val lpCone = p[ExecutionOption.lpObjectiveCone]
     val lpAutoOff = p[ExecutionOption.lpAutoOffReprobe]
     val lpKnapsack = p[ExecutionOption.lpKnapsackLagrangian]
@@ -253,8 +257,10 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         learnedMemoryBytes, learnedMemoryWork, learnedMemoryScratchBytes,
         subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch, rootProbeBatch, rootProbeWork,
         rootRebuildCaptureVisits,
+        privateRebuildWork,
         inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingSubsumeWork,
         inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth, inprocessingCooldown,
+        inprocessingWarmupWork,
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
         lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
         pbObjectiveCutoff, integerRowLearning, propagationAttribution, historicalTableReasons, costAwarePropagation,
@@ -288,6 +294,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         rootSimplification?.let { out = out.copy(rootSimplification = it) }
         rootSimplifyBatch?.let { out = out.copy(rootSimplifyBatch = it) }
         rootRebuildCaptureVisits?.let { out = out.copy(rootRebuildCaptureVisits = it) }
+        privateRebuildWork?.let { out = out.copy(privateRebuildWork = it) }
         rootProbeBatch?.let { out = out.copy(rootProbeBatch = it) }
         rootProbeWork?.let { out = out.copy(rootProbeWork = it) }
         inprocessingWork?.let { out = out.copy(inprocessingWork = it) }
@@ -298,6 +305,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         inprocessingInterval?.let { out = out.copy(inprocessingInterval = it) }
         inprocessingGrowth?.let { out = out.copy(inprocessingGrowth = it) }
         inprocessingCooldown?.let { out = out.copy(inprocessingCooldown = it) }
+        inprocessingWarmupWork?.let { out = out.copy(inprocessingWarmupWork = it) }
         lpCone?.let { out = out.copy(lpPlan = out.lpPlan.copy(objectiveCone = it)) }
         lpAutoOff?.let { out = out.copy(lpPlan = out.lpPlan.copy(autoOffReprobe = it)) }
         lpKnapsack?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }
@@ -721,7 +729,9 @@ internal fun buildPortfolioScenario(
         null, "ordinary" -> null
         "source" -> SourceProgressReward
         "source-rate" -> SourceRateReward()
-        else -> pipelineConfigError("portfolio-reward expects ordinary|source|source-rate, got `$reward`")
+        "source-rate-family" -> SourceRateReward(priceFamilies = true)
+        else -> pipelineConfigError(
+            "portfolio-reward expects ordinary|source|source-rate|source-rate-family, got `$reward`")
     }
     val reseedStaleThreshold = p[ExecutionOption.reseedStaleThreshold]
     val reportLsResiduals = p[ExecutionOption.lsResiduals] ?: false

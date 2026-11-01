@@ -233,6 +233,18 @@ search. Each variable's occurrence index lists each active factor once, so a mov
 updates every invariant reading the coordinate exactly once. Assignments, random
 generators, weights and invariant payloads belong to each live state.
 
+Unmaintained flat Boolean objective folds have a private reader index from leaf
+coordinates to priced terms. A primitive flip evaluates only those terms; compound
+flips combine parity and visit each affected term once. Cost differences retain exact
+integer cancellation before conversion to a score. Preparation resumes in batches
+of 256 entries and admits at most one million Boolean coordinates, 250,000 terms
+and two million reader entries. A maintained-network probe uses its saved coordinates
+to score the actual changed Boolean leaves, then restores the committed state.
+Nested, mixed and opaque objective cones use the generic evaluator. The index
+supplies heuristic scores;
+source witness and objective checks retain admission authority. Maintenance checks
+for the linear term view resume in batches of 256 definitions before move scoring.
+
 Invariants substitute a new value into every position that reads the moved
 coordinate. Product residuals are computed exactly, with a private 128-bit
 temporary on overflow, so an overflowing product cannot satisfy a signed-word
@@ -329,12 +341,26 @@ admits exact alias and affine reconstruction where supported. Construction spend
 containing allowance, cancellation discards the whole view, and a declined view
 keeps ordinary heuristic execution.
 
+When no move sweep survives, a functional, self-owned optimization recipe over a
+WCNF source can use the complete Boolean cost sweep captured with its objective.
+Every definition must be a priced flat Boolean fold over free leaves, and every priced term must have
+one unique definition. Capture admits at most one million Boolean coordinates,
+250,000 terms and two million literal readers, charging visits to preparation.
+The worker builds its network through ordinary resumable initialization; source
+validation and the canonical objective still admit incumbents. Existing move
+sweeps, other source formats, canonical or geometric guidance, ratcheted recipes
+and recipes without per-move invariants retain their selected definition view.
+
 Competing, cyclic and cycle-dependent outputs remain searched. Source bounds decide
 when signed-word kernels are safe; wider intermediates use exact evaluation.
 `functionalObjective(LinearObjective)` builds an optional gradient view from the
 materialized cones that agrees with the canonical objective at every feasible
 assignment. Source factors stay enforced, and hints grant no feasibility or proof
 authority.
+Native Element cones evaluate their selected constant or variable cell. An invalid
+index retains the stored result, matching the maintenance node's no-write behavior.
+Live-network scoring reads the canonical terms after the complete maintained probe,
+including output-domain clamping.
 
 Experimental channel views can leave admitted Boolean-value, Element-value or
 predicate outputs searched while retaining the other nodes in dependency order.

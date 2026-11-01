@@ -235,7 +235,12 @@ class ExactLiraSearchComponent private constructor(
     private var node = root
     private var assignment: ExactLiraAssignment? = null
     private var outcome: ComponentCheck? = null
+    private var unconsumedLpPoint: List<BigFraction>? = null
     private var candidate: List<BigFraction>? = null
+        set(value) {
+            field = value
+            unconsumedLpPoint = null
+        }
     private var floatCandidate: DoubleArray? = null
     private var pointHintRows: List<PreparedSourceRow>? = null
     private var pointHintValues: IntArray? = null
@@ -243,6 +248,7 @@ class ExactLiraSearchComponent private constructor(
     private var pointHintStop = Cancellation.Never
     private var dirty = true
     private var partialLinearPropagation = false
+    private var incrementalLinearPropagation = false
     private var partialLinearCandidates: List<PreparedSourceRow>? = null
     private var partialLinearInvocations = 0L
     private var partialLinearVisited = 0L
@@ -454,6 +460,11 @@ class ExactLiraSearchComponent private constructor(
     }
 
     internal fun useIncrementalLinearPropagation() {
+        useIncrementalSourceRows()
+        incrementalLinearPropagation = true
+    }
+
+    internal fun useIncrementalSourceRows() {
         usePartialLinearPropagation()
         reusePartialLinearDeclines()
         incrementalSourceRows = true
@@ -532,6 +543,8 @@ class ExactLiraSearchComponent private constructor(
         var visited = 0
         var eligible = 0
         var unexplained = 0
+        var affineProbes = 0
+        var affineDeductions = 0
         val previousUnchanged = partialLinearUnchanged
         val deductions = ArrayList<PartialLinearDeduction>()
         partialLinearInvocations++
@@ -550,14 +563,20 @@ class ExactLiraSearchComponent private constructor(
                 if (prepared.booleans.any { it != variable && bools[it] == UNASSIGNED }) continue
                 eligible++
                 val comparison = prepared.form.comparison(true) { bools[it] == TRUE }
-                val inputs = if (partialLinearCache) partialLinearInputs(comparison) ?: continue else null
+                val affine = if (incrementalLinearPropagation && comparison.terms.size > 1) {
+                    affineProbes++
+                    system.affineImplication(comparison, operationStop)
+                } else null
+                val inputs = if (affine == null && partialLinearCache) {
+                    partialLinearInputs(comparison) ?: continue
+                } else null
                 if (inputs != null && partialLinearDeclines[prepared] == inputs) {
                     partialLinearUnchanged++
                     continue
                 }
                 var unavailable = false
                 partialLinearEvaluations++
-                val implication = partialLinearImplication(comparison, { column, upper ->
+                val implication = affine ?: partialLinearImplication(comparison, { column, upper ->
                     val metadata = state.model.column(column)
                     if (metadata.tag != column || !metadata.origin.value.isZero) null
                     else state.activeSide(column, upper)?.let { active ->
@@ -586,6 +605,7 @@ class ExactLiraSearchComponent private constructor(
                 if (applyLocally && accept(decision, current) !is ComponentResult.Consistent) break
                 deductions += PartialLinearDeduction(prepared.address.factor, prepared.address.row,
                     variable, implication.truth, reason.literals.copyOf())
+                if (affine != null) affineDeductions++
             }
             return PartialLinearProbe(visited, eligible, unexplained, operationStop(), deductions)
         } finally {
@@ -597,6 +617,8 @@ class ExactLiraSearchComponent private constructor(
                 smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_DECLINE_REUSE",
                     partialLinearUnchanged - previousUnchanged)
                 smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_DEDUCTION", deductions.size.toLong())
+                smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_AFFINE_PROBE", affineProbes.toLong())
+                smtStats?.observeCompleteSearchStage("PARTIAL_LINEAR_AFFINE_DEDUCTION", affineDeductions.toLong())
             }
         }
     }
@@ -620,19 +642,27 @@ class ExactLiraSearchComponent private constructor(
         pointHintValues = null
         val rows = pointHintRows ?: return
         if (point.size != model.numRealVars + model.numIntVars || operationStop() || pointHintStop()) return
+        val poll = if (incrementalLinearPropagation) {
+            val stop = object : Cancellation {
+                override fun isCancelled() = operationStop() || pointHintStop()
+                override fun workMeter() = operationStop.workMeter() ?: pointHintStop.workMeter()
+            }
+            LinearOperationCancellation({ stop }) { false }.apply { begin() }
+        } else null
         operationStop.charge(model.numBoolVars.toLong() + point.size + 1L)
-        if (operationStop() || point.any { !hintScalar(it) }) return
+        if (operationStop() || point.any { !hintScalar(it, poll) }) return
+        if (poll != null && (operationStop() || pointHintStop())) return
         val values = IntArray(model.numBoolVars) { UNASSIGNED }
         for (prepared in rows) {
             operationStop.charge(1)
-            if (operationStop() || pointHintStop()) return
+            if (hintStopped(poll)) return
             val variable = prepared.row.activator
             if (values[variable] == DECLINED_HINT) continue
             val comparison = if (prepared.disjunction) null else prepared.form.hintComparison(
                 { variable -> bools[variable].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
-                ::hintScalar, ::hintPreflight,
+                { hintScalar(it, poll) }, { left, right -> hintPreflight(left, right, poll) },
             )
-            val preference = comparison?.let { hintTruth(it, point) }
+            val preference = comparison?.let { hintTruth(it, point, poll) }
             if (preference == null) {
                 values[variable] = DECLINED_HINT
                 continue
@@ -644,27 +674,33 @@ class ExactLiraSearchComponent private constructor(
                 values[variable] = value
             }
         }
-        if (operationStop() || pointHintStop()) return
+        if ((poll != null && poll()) || operationStop() || pointHintStop()) return
         pointHintLevel = context.decisionLevel
         pointHintValues = values
         smtStats?.observePointHintCapture(graph)
         observeCompleteStage(if (graph) "POINT_HINT_GRAPH_CAPTURE" else "POINT_HINT_LP_CAPTURE")
     }
 
-    private fun hintTruth(comparison: ExactComparison, point: List<BigFraction>): Boolean? =
-        hintTruth(comparison) { point.getOrNull(it) }
+    private fun hintTruth(
+        comparison: ExactComparison, point: List<BigFraction>, poll: Cancellation? = null,
+    ): Boolean? = hintTruth(comparison, poll) { point.getOrNull(it) }
 
-    private inline fun hintTruth(comparison: ExactComparison, value: (Int) -> BigFraction?): Boolean? {
+    private inline fun hintTruth(comparison: ExactComparison, value: (Int) -> BigFraction?): Boolean? =
+        hintTruth(comparison, null, value)
+
+    private inline fun hintTruth(
+        comparison: ExactComparison, poll: Cancellation?, value: (Int) -> BigFraction?,
+    ): Boolean? {
         var activity = BigFraction.ZERO
         for ((column, coefficient) in comparison.terms) {
             val coordinate = value(column) ?: return null
-            if (!hintPreflight(coefficient, coordinate)) return null
+            if (!hintPreflight(coefficient, coordinate, poll)) return null
             val product = coefficient * coordinate
-            if (!hintScalar(product) || !hintPreflight(activity, product)) return null
+            if (!hintScalar(product, poll) || !hintPreflight(activity, product, poll)) return null
             activity += product
-            if (!hintScalar(activity)) return null
+            if (!hintScalar(activity, poll)) return null
         }
-        if (!hintPreflight(activity, comparison.bound)) return null
+        if (!hintPreflight(activity, comparison.bound, poll)) return null
         return when (comparison.op) {
             LinearOp.LE -> if (comparison.strict) activity < comparison.bound else activity <= comparison.bound
             LinearOp.GE -> if (comparison.strict) activity > comparison.bound else activity >= comparison.bound
@@ -673,20 +709,26 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
-    private fun hintScalar(value: BigFraction): Boolean {
+    private fun hintScalar(value: BigFraction): Boolean = hintScalar(value, null)
+
+    private fun hintScalar(value: BigFraction, poll: Cancellation?): Boolean {
         val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         operationStop.charge(1L + bits / Long.SIZE_BITS)
-        return bits <= MAX_POINT_HINT_BITS && !operationStop() && !pointHintStop()
+        return bits <= MAX_POINT_HINT_BITS && !hintStopped(poll)
     }
 
-    private fun hintPreflight(left: BigFraction, right: BigFraction): Boolean {
+    private fun hintPreflight(left: BigFraction, right: BigFraction): Boolean = hintPreflight(left, right, null)
+
+    private fun hintPreflight(left: BigFraction, right: BigFraction, poll: Cancellation?): Boolean {
         val bits = maxOf(left.num.magnitudeBitLength(), left.den.magnitudeBitLength()).toLong() +
             maxOf(right.num.magnitudeBitLength(), right.den.magnitudeBitLength()) + 2L
         if (bits > MAX_POINT_HINT_BITS * 2L + 2L) return false
         val words = bits / Long.SIZE_BITS + 1L
         operationStop.charge(bits + words * words)
-        return !operationStop() && !pointHintStop()
+        return !hintStopped(poll)
     }
+
+    private fun hintStopped(poll: Cancellation?): Boolean = poll?.invoke() ?: (operationStop() || pointHintStop())
 
     init {
         require(preparedSource.validated || model.supportsExactLira() || model.supportsExactLra()) {
@@ -1526,10 +1568,12 @@ class ExactLiraSearchComponent private constructor(
         if (operationStop()) return ComponentResult.Indeterminate
         dirty = false
         candidate = result.exactPrimal?.take(model.numRealVars + model.numIntVars)
+        unconsumedLpPoint = candidate
         if (result.verdict == LpVerdict.INFEASIBLE) {
             val explanation = lp.explainConflict(result.conflictSupport, context)
             smtStats?.observeConflict(explanation)
             outcome = ComponentCheck.Infeasible(explanation)
+            LpClaim.CONTRADICTION.consumed(primaryLpObserver)
             return ComponentResult.Conflict(explanation)
         }
         if (complete && candidate != null) smtStats?.observeCompleteSearchLinearPoint()
@@ -1775,6 +1819,10 @@ class ExactLiraSearchComponent private constructor(
         acceptWitness(point)?.let {
             assignment = it
             outcome = ComponentCheck.Feasible
+            if (point === unconsumedLpPoint) {
+                unconsumedLpPoint = null
+                LpClaim.FEASIBLE_COMPLETION.consumed(primaryLpObserver)
+            }
         }
     }
 

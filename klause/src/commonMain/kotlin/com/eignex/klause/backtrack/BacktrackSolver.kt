@@ -21,6 +21,7 @@ import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
@@ -259,6 +260,18 @@ class BacktrackSolver internal constructor(
     }
 
     override fun solve(params: BacktrackParams): SolveResult {
+        if (PrivateRebuildSatisfaction.eligible(problem, params)) {
+            return try {
+                resumableSolve(params).use { search ->
+                    var result: SolveResult? = null
+                    while (result == null) result = search.runSlice(params.cancellation, Long.MAX_VALUE, -1L)
+                    result
+                }
+            } catch (stopped: SearchInitializationCancelled) {
+                SolveResult.Unknown(TerminationReason.BudgetExhausted, stopped.stats)
+                    .withSourceSemantics(problem.semantics)
+            }
+        }
         val sink = SolveStatsSink(backend = "backtrack")
         sink.start()
         return CpSatisfactionTraversal(problem, params, sink, lpSolveContext, singleModel = true).use { traversal ->
@@ -268,7 +281,9 @@ class BacktrackSolver internal constructor(
     }
 
     /** Open a satisfaction search that pauses and resumes across slices. See [ResumableSolve]. */
-    override fun resumableSolve(params: BacktrackParams): ResumableSolve = ResumableSatisfaction(this, params)
+    override fun resumableSolve(params: BacktrackParams): ResumableSolve =
+        if (PrivateRebuildSatisfaction.eligible(problem, params)) PrivateRebuildSatisfaction(this, params)
+        else ResumableSatisfaction(this, params)
 
     /**
      * The verdict a satisfaction [outcome] stands for, stopping [sink] for its counters. A model is re-derived from

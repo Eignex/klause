@@ -6,13 +6,16 @@ revision comparisons, reference solvers, witness checks, schedules and profiling
 
 Use the authenticated HTTP client at `https://lab.eignex.com`; see the lab's
 [run guide](https://github.com/Eignex/eignex-lab/blob/main/docs/runs.md).
-Report operational dependencies to the lab operations owner. SSH access, host
-discovery and server administration belong to that owner.
+SSH access, host discovery and server administration belong to agents explicitly
+working on eignex-lab operations. Report operational dependencies to that owner.
 
-Keep automatic placement. Each A/B workload, seed and repetition runs all arms
-on one machine in one worker attempt. Other rows, preparation and replacement
-attempts may use different compatible machines. Retain failed-attempt costs;
-worker loss replaces a complete unfinished row.
+A normal A/B case row contains one workload, seed and repetition across all arms.
+The lab runs every arm of that row on the same machine in one worker attempt.
+Other rows, preparation and replacement attempts may use different compatible
+machines; keep automatic placement without pinning the whole job. Worker loss
+replaces the complete unfinished row rather than mixing arms from different
+machines or attempts. Accepted rows remain valid; retain failed and preparation
+costs and report repeated infrastructure losses separately.
 
 A standalone `cp` control sets both `param.bt-arm=LABEL` and `param.arms=1`.
 Named recipes repeat across the configured worker slots otherwise. Check the
@@ -52,14 +55,76 @@ Whole-job active time must additionally include failed preparation, checking and
 artifact/retirement work from the lab job record.
 
 Qualification compares the same hashed source, seed, runtime, physical allocation
-and containing allowances with stable-ID work alone. A runtime rebuild requires
+and containing allowances with stable-ID work alone. Production activation requires
 the [private generation contract](../docs/07-presolve.md#private-worker-qualification),
 bounded ownership/reclamation, compatible consuming workers and a benefit after
-all lifecycle costs. A lack of new candidates on a complete propositional control
-supports only a bounded no-go for that control. Unsupported/partial views need an
-applicability or grant diagnosis and cannot support a general no-go.
+all lifecycle costs. A lack of new candidates describes only that complete
+propositional control. Unsupported/partial views need an applicability or grant
+diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
+
+`param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
+trial after new global root pins or an owned learned equivalence, with source reduction and a fresh consuming
+worker. Zero is the default. `ProgressPins` excludes baked-root facts;
+`RootScanWork` and `RootScanNanos` retain the eligibility cost. An unchanged
+baked root without a captured equivalence keeps its canonical traversal.
+`BinaryScanWork` and `BinaryScanNanos` retain bounded discovery costs;
+`BinaryRelations` counts captured reciprocal implications and `EquivalentColumns`
+counts actual source implication-graph merges. Discovery accepts only owned global
+binary learning and checks at most 128 binaries within 32,768 work per observation.
+`BinaryHistoryWork` and `BinaryHistoryBytes` retain the fixed history's initialization
+and primitive storage. At most 32 relations are attempted in one worker. Its history
+and the 16 KiB discovery scratch model spend the existing byte grant. These work
+counters are subsets of worker work, not additional totals to sum. Missing relations
+after a bounded scan do not establish an absence of opportunities.
+Use the same source, engine, presolve, seeds, processors, heap, containing allowance
+and deadline in the zero/trial arms. `nativePrivateRebuildAttempts`, `Consumers`,
+`Eliminated`, `SourceAccepted`, `RefutationDeferred`, `Declined` and `Retired`
+separate preparation from consumption, canonical publication and fallback.
+`PassStopped` identifies usable generations that retain completed pivots after
+the local BVE cap; later preparation and checks still obey the containing cap.
+`DeclinedUnsupported*` and `DeclinedMemory` identify integration refusals.
+`DeclinedPassStoppedEmpty` and `DeclinedPassCompleteEmpty` distinguish a local
+cap from a completed bounded pass with no elimination; neither excludes other
+structural opportunities. `DeclinedGrowthProxy` records a completed cheap
+count/literal-volume admission refusal; tautology or duplicate savings can
+still make other eliminations useful.
+`AdmittedColumns` counts the initial pivot set for successful generations;
+the private BVE pass protects other columns rather than analyzing their pivots.
+`BveIndexedFactors` and `BveSourceFactors` compare the indexed neighborhood with
+the pinned source; an equivalence-only trial reports zero BVE factors. A single admitted pivot indexes only its incident rows;
+multiple pivots use the full database. `ReusedSourceClauses` counts unchanged
+immutable inputs retained during pinning; later elimination can remove them.
+All scan and source-index transport work remains in preparation.
+Preparation, opening, trial, reconstruction, check and retirement timings have
+separate counters. The propagation ledger includes charged preparation,
+reconstruction and checks; do not add those work subsets again. `ModeledPrivateBytes` excludes the canonical
+worker, headers and allocator overhead; it is not RSS or a simultaneous heap peak.
+The canonical worker retains its warm state during the trial. A private refutation
+resumes it and supplies no independently checked source proof. This control alone
+does not qualify automatic production activation or complete source-cost benefit.
+`WarmClausesCopied` and `WarmClauseLiterals` count bounded copies of owned global
+learning over retained columns. `WarmClauseWork` and `WarmClauseNanos` are subsets
+of preparation, not additional totals. Copies spend unused local BVE allowance
+and the remaining modeled scratch grant; canonical learning and exchange state
+remain owned by canonical.
+`BakeConstructionEntries` and `BakePropagationWork` expose the private root bake;
+both debit the containing allowance and are preparation subsets.
+`OpeningConstructionWork` reserves the fresh consumer's setup visits in the same
+allowance. Reconstruction retains its source-entry charge and raises it when the
+actual replay descriptors and composed sample copies require more work.
+`MappingPreparationWork` includes descriptor ownership copies in preparation;
+their modeled storage also joins `ModeledPrivateBytes`.
+`WarmClausesTranslated` counts copied consequences transported through eliminated
+columns. Translation follows the captured BVE parents with one bounded resolvent
+per input and pivot, or a pure-value substitution. `WarmProjectionScratchBytes`
+records its conservative 16 KiB scratch reservation inside the existing byte grant;
+it joins `ModeledPrivateBytes` and is not additional live retained storage or RSS.
+Projection work remains inside `WarmClauseWork` and preparation. Tautological,
+wide or unsupported selected translations contribute no copied consequence.
+`WarmClauseNormalizationWork` records the final input-normalization reservation;
+it is a subset of transfer and preparation work, rather than another total to add.
 
 Run from the repository root with JDK 25 or newer:
 
@@ -96,6 +161,27 @@ classification. Fetched suites download their corpus during resolution.
 
 Named sets contain one `<suite>/<problem>` per line; `@name` includes another set
 and `#` starts a comment. They bypass default suite family caps.
+
+`suite=maxsat-maxcut` selects the [MaxSAT LIB weighted MaxCut family](https://www.cs.toronto.edu/maxsat-lib/maxsat-instances/master-set/weighted/maxcut/)
+from its compact archive. Names include `dimacs_mod/MANN_a9.clq` and
+`random/max_cut_60_500_9.asc`; model hashes identify the fetched bytes in lab records.
+
+For retained JFR captures, submit `lab/jfr-summary.json` through `lab run` with
+`bench.request.parameters` containing `source` (the job/artifact label), `sha256`
+and `gzip-base64` (at most 2 MiB). The SDK transports the payload in the frozen case
+file. The JDK recording reader verifies the capture hash and streams sampled stacks
+on the lab worker, limiting method aggregation to 32 frames per sample and 100,000
+distinct methods. Capture truncation and the analysis depth limit are reported
+separately. Large captures must not be passed through profile arguments:
+the generated shell command is subject to the operating system's argument-size limit.
+
+`param.ls-phase-times=true` also reports `lsObjectiveScoring.*`. `plain` and
+`functional` count the selected objective views; `maintained` counts index-preparation
+bypasses for functional views using maintained linear terms. `declined` and `prepared` count terminal Boolean
+index preparation outcomes. `indexed` and `generic` count completed candidate scores
+through the Boolean index and generic functional evaluator. Paused preparation and
+cancelled scoring do not count as completed outcomes. Counts accumulate across live
+states and workers; they establish execution, not a checked point or performance gain.
 
 `solve-one suite=ID problem=NAME out=DIR` accepts these controls:
 
@@ -209,6 +295,13 @@ Profile mains live in [bench/profile/](src/main/kotlin/com/eignex/klause/bench/p
 and run as lab profile jobs; consult the selected main for its arguments and
 retain its output through `$OUT`.
 
+Suite measurements `jfr`, `compilation` and `compilation+log` retain the CLI recording
+and write CPU, allocation and runtime-event summaries to `cases/N/out/solve.log`.
+Summary generation runs in the bench process after CLI exit, outside the subprocess
+`elapsedMs` and GNU time metrics and inside the containing case and job allowances.
+These instrumented captures support attribution; use separate uninstrumented controls
+for performance comparisons.
+
 Profile reflection reads the session's nullable retained propagation owner through
 `LivePropagationState`; live-only probes fail explicitly after release, and residual
 inspection declines a released session. Captures retain bounded diagnostic traces
@@ -241,6 +334,42 @@ receipts are absent, native verdicts remain unverified, and no default activatio
 throughput improvement follows.
 
 This repository owns catalog selection, runtime configuration and build/launch recipes.
+
+`lab/native-lp.json` selects original MPS inputs through the same planner and runs
+the Linux x86_64 Native CLI with one processor. Its solve records use the ordinary
+independent source-check protocol. Native executable and ELF dependency hashes
+identify that runtime; the executing JVM harness has a separate byte identity.
+`heap-mib` and JVM GC flags do not describe the Native process. Comparison controls
+record the Native compiled GC policy, the containing memory grant and the harness's
+512-MiB heap separately. `nativeAdapterElapsedNs` includes input verification,
+source decoding, identity capture, CLI execution and witness decoding. Keep that
+containing observation separate from CLI elapsed time and lab preparation/checking
+receipts. Only `none` and `resources` measurement modes are supported. Independent
+point checks do not certify Native optimality or infeasibility claims.
+
+`lab/library-lp-jvm.json` and `lab/library-lp-native.json` qualify the public baked
+`BacktrackSolver` library consumer separately from CLI source routing. The caller
+parses original MPS bytes with `toExactSourceProblem`, uses production LP dependencies
+and the `satOptimized` preset with 1000 instructions, and checks the returned point
+in original named coordinates before rendering it for the independent lab checker.
+It reports feasible points without upgrading solver statuses to source proofs.
+The subprocess includes parsing, exact lowering, baking, solving and source checking;
+the adapter also records source verification, runtime hashing and output decoding.
+Platform series, executable/library identities and runtime controls remain separate.
+Comparison fingerprints reuse `ComparisonProvenance` for the executing adapter and
+dependencies. JVM library callers also retain their compiled caller classes and an
+explicitly ordered classpath. Native caller source hashes identify the harness
+compiled into the separately hashed executable; its machine code remains part of
+that executable. Retained source and runtime identities accompany both series.
+Compressed corpus storage is decoded through the ordinary source-invocation path,
+which charges decoding to the remaining source budget and preserves the packed input.
+JVM staged-file identities live in `report/jvm-profile-files.json`; the record binds
+that full manifest by digest instead of repeating thousands of class entries.
+Combined Linux LP preparation finishes Native linking before compiling the JVM library
+and harness. The ordering keeps the Native compiler ahead of retained JVM compiler
+state without changing compiler flags or preparation resource caps.
+`lp-lifecycle-reuse-v1` selects the original mixed-integer `egout` MPS at the same
+pinned HiGHS revision, separately from the frozen overflow and held-out cohorts.
 
 `bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
 work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,
@@ -371,7 +500,16 @@ logical trace, and distinguish emergency interruption from completed work.
 `bench.profile.RewriteStructureProfile` takes `suite=ID problem=NAME sha256=HEX
 presolve=CONFIG`. It captures each structure-control arm through production source
 and finite preparation, then reuses projected source hints, maintained definition
-networks and core/Table-hull LP assembly. Each arm has a 30-second containing
+networks and core/Table-hull LP assembly. Optional
+`orders=markowitz,rewrite_cost` compares those pivot policies with structure
+protection disabled instead of comparing blanket protection. At most two arms run.
+Optional `source64=BASE64` or `sourceGzip64=BASE64` supplies hash-checked source bytes
+through the existing trajectory input reader. The input receipt records source size,
+load time and cancellation before enforcing the capture's source bounds.
+Before/after model snapshots retain objective, domains, factor kinds, support and
+word-sized declared rows, charging the same consumer-diagnostic allowance without
+materializing structural keys.
+Each arm has a 30-second containing
 deadline, five million preparation work units and one million consumer-diagnostic
 units; the whole capture has 120 seconds. Sources, lowered coordinates and factors
 are capped before consumer preparation. The report retains actual maintained
@@ -382,6 +520,12 @@ small affine Table control. The Element source under that identity retains a
 legacy start-index placement rejected by the independent checker; use
 `suite=rewrite-structure-canonical-v1 problem=element-cone` for its separately
 identified standard-list-index control.
+
+`bench.profile.AffineObjectiveProfile` accepts `batch64=` with a base64 JSON list
+of `suite=ID`, `problem=NAME`, `sha256=HEX` argument lists. Each list can add
+`presolve=CONFIG` and `pivotOrder=markowitz|rewrite_cost` to retain complete MPS
+residuals under those controls. Residual captures diagnose representation changes;
+they do not execute search or validate a source outcome.
 
 ## Corpus and build identity
 
@@ -411,6 +555,14 @@ an installation. Without it, each process captures its own installed-build hashe
 `set=weighted-search-qualification-v1` fixes an easy WCNF control, the scheduling
 WBO and haplotyping MaxSAT tails, and the weighted `mprime` incumbent control.
 
+The scoped automatic weighted-core source policy is described in
+[portfolios](../docs/12-portfolio.md#boolean-objective-core-search). Compare the
+default run against `param.core-early=false` and `param.core-refinement=none` at
+the same source revision, seeds, resources and containing allowance. That control
+retains delayed, unrefined core search. Keep actual admission/refinement consumption,
+checked outcomes and full preparation/checking/disposal costs; configured policy
+alone does not qualify production benefit.
+
 `bench.profile.WeightedSearchProfile` qualifies one hash-pinned WCNF/WBO source
 through ordinary finite preparation and retained core search. Arguments are
 `suite=ID problem=NAME sha256=HEX format=wcnf|wbo policy=ordinary|stratified|reasons|deletion
@@ -430,37 +582,10 @@ Boolean point checks and native bound authority are separate from the lab's
 independent source checks and independently validated proofs. Use ordinary lab
 adapter runs for source-matched admission and primal controls.
 
-[9178](https://lab.eignex.com/jobs/9178) and
-[9180](https://lab.eignex.com/jobs/9180) qualify the scheduling WBO at `d5a65676c0`,
-seed 3, with 250,000 work units, 200-unit slices and a 40-second containing
-allowance. Both retain the same source hash, 11,110 prepared Boolean columns,
-8,382 factors and a reconstructed objective-19 witness. Ordinary search spends
-204,186 final work units across 20 queries and 19 unit-weight cores; seed-reason
-projection spends 175 across two queries and one six-member weight-19 core.
-Retirement is included, and both closed trajectories release their query pins.
-Source preparation takes 18–20 seconds before these queries. These instrumented
-runs establish consumption and witness custody, without independently checked
-optimality or a throughput claim.
-
-[9179](https://lab.eignex.com/jobs/9179) runs the four-source set through eight
-CLI controls at the same revision, seed 3, one processor and 40 seconds per case.
-On the scheduling WBO, delayed reason projection consumes one weight-19 core and
-reports objective 19; delayed ordinary and earlier admission spend their auxiliary
-allowance on coarse cores. Direct ordinary and reason search also report 19, while
-LS and ALNS retain larger feasible objectives. On `mprime`, the mixed pool reports
-562 before core admission; both direct controls spend their allowance on bounds
-without a witness. On the MaxSAT tail, direct controls reach floor 5 without a
-witness, while every curated core receives zero segments. The candidate delayed
-case has no witness where its parent has one, so this elapsed run does not establish
-incumbent protection. Retain delayed admission and unrefined cores as defaults;
-reason projection remains an opt-in source-specific control, and direct core search
-does not replace the primal pool.
-
-Source hashes, full witnesses, installed binaries and resource receipts accompany
-these runs. The lab has no WBO/WCNF source-check adapter: requested independent
-validation produces no verdict for these formats. All reported feasibility and
-optimality claims remain native and unchecked. Source-matched reference rows also
-lack independently checked proofs; their objective agreement adds no proof authority.
+An adapter run requests `sourceValidation=true` and complete assignments; qualification
+requires an actual `VALID` receipt bound to the original source, witness, exact
+objective, checker and policy. Unsupported or missing checks establish no validation.
+Point checks do not certify native lower bounds, optimality or infeasibility.
 
 ## Clause sharing accounting
 
@@ -633,17 +758,21 @@ the same original sources, seeds, LP ceilings and containing solve allowance.
 An arm override uses `param.param.open-linear-incremental`: the outer prefix
 selects the adapter parameter.
 This combines touched source rows, exact-input decline reuse and explained
-interval delivery before the numerical query. Traversal stage counters expose
+interval delivery, including existing affine slack bounds, before the numerical
+query. Traversal stage counters expose
 source visits and invalidations, interval visits, retained declines and deductions;
 LP work and certification counters and whole-process measurements retain the cost
-of numerical repair and final completion. The automatic default remains disabled.
+of numerical repair and final completion. The incremental route is the ordinary
+default; explicit false selects the comparison control.
 
 `LinearRootOpeningProfile` accepts `inspect=partial-row-activation` for a pinned
 SMT source. It compares the existing cached partial interval producer with the
 same producer plus literal-to-row assertion scheduling. Both arms use seed 1,
 one processor, a containing 100,000,000-unit open-work allowance and the same
-forty-second emergency deadline. Fresh ordinary source preparation precedes each
-arm; exact prefix and continuation snapshots must agree. The profile reports row
+forty-second emergency deadline. This assertion-scheduling diagnostic uses
+individual-coordinate interval propagation in both arms; affine consequence
+delivery belongs to the ordinary combined-route controls. Fresh ordinary source
+preparation precedes each arm; exact prefix and continuation snapshots must agree. The profile reports row
 visits, literal touches, retracted assertions, compatible decline reuse, consumed
 guard implications, operation stops and producer/assertion/numerical time separately. These are
 direct library diagnostics; they supply neither a default CLI throughput claim nor
@@ -779,7 +908,8 @@ diagnostic proposals. `AggregatePair*` reports coverage, attempts and limiting
 stages; a partial generation establishes no general absence of useful cuts.
 `MpsProofFrontier certificateState=true` records retained completed guidance's
 certificate refusal, exact-basis repair dimensions and charged work/allocation in
-`certificate-state.json`. This optional post-solve observation issues no query and
+`certificate-state.json`, including the rejected basis proposal's column, side and
+exact reduced cost separately from later candidates. This optional post-solve observation issues no query and
 shares the existing capture deadline; scalar strings are capped at 4,096 characters.
 Missing state or a stopped inspection remains unavailable. Its owner scope can
 precede the current frontier leaf. It supplies no certificate authority, independent
@@ -817,233 +947,40 @@ The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/ba
 Run captures, timing comparisons and profiles through the lab. Harness unit tests
 use `./gradlew :klause-bench:test`; they do not run benchmark campaigns.
 
-### Claim-specific LP certification
+### LP claim diagnostics
 
-Certification diagnostics use the existing `lp.phases` map. `CLAIM_BOUND`,
-`CLAIM_CONTRADICTION`, `CLAIM_FEASIBLE_COMPLETION` and `CLAIM_ATTAINED_OPTIMUM`
-are keyed by consumer route, with inclusive nanoseconds, charged certificate work,
-and satisfied, reused or refusal outcomes. `CLAIM_CONSUMPTION` records accepted
-leaf packages and pruning consequences separately. Nested phase time and claim work
-overlap the existing certification counters; do not sum them. Source optimization
-exports deterministic claim work and outcomes under `CertificationCLAIM_*` in its existing stage map.
-Source active time stays in its containing budget rather than its logical trace.
-Compare costs with consumed claims and preserve unsuccessful requests. A cached bound
-without a point cannot satisfy attainment. Reconstruction attempts, cache admission,
-exact acceptance and resource ceilings retain their production settings.
+With debug statistics enabled, `lp.phases` distinguishes requested
+`CLAIM_BOUND`, `CLAIM_CONTRADICTION`, `CLAIM_FEASIBLE_COMPLETION` and
+`CLAIM_ATTAINED_OPTIMUM` packages from accepted `CLAIM_CONSUMPTION` events.
+Each request reports its route, inclusive nanoseconds, charged work and outcome.
+These metrics overlap the certification totals; do not add them together.
+Source optimization exposes the corresponding `CertificationCLAIM_*` stage entries.
 
-[Claim regression controls](https://github.com/Eignex/klause/pull/3865) cover
-production open refutation, real-leaf completion and repeated unchanged-leaf
-consumption, plus stronger requests, scoped invalidation and policy refusal.
-The nine initial JVM claim tests on `a8ba2a4a8f` take 0–11 ms each; JVM, Linux
-native and lint/docs CI pass at that revision.
-[9239](https://lab.eignex.com/jobs/9239) retains a failed applicability control:
-finite-only portfolio-work flags reject all six mixed numerical cases before solving.
-[9251](https://lab.eignex.com/jobs/9251) removes those flags and pins the same
-three vendored MPS sources, `d43182fe77`/`a8ba2a4a8f`, exact mode, presolve off,
-one lane and seed 17 under a 600-second containing allowance with source validation.
-Its receipts distinguish preparation, solve, witness checks and native proof flags.
-These controls establish no throughput improvement or independent proof validation.
+### LP lifecycle profiles
 
-### Numerical lifecycle profiles
+Submit the scripts below as lab profile jobs using the
+[eignex-lab run guide](https://github.com/Eignex/eignex-lab/blob/main/docs/runs.md).
+They require Linux x86_64; the lab supplies `LAB_WORKTREE` and `OUT`.
 
-`scripts/lp-template-preparation-profile.sh <source> [repeats] [steps]` accepts
-`cover-2x3` and `cover-3x3`. It compares disabled
-templates, object reuse, complete index reuse and selective metadata reuse on the
-existing MPS component fixtures. Submit as a lab profile script with build task
-`:klause:stageLpProfileJvm`, Linux x86_64 placement and a 180-second runtime cap.
-It includes repeated cold preparation, unchanged views, alternating bound, objective
-and row edits, and cancellation through actual relaxation assembly and native LP
-certification. Records
-retain source bytes/hash, total preparation/assembly/solve work, time, allocation,
-modeled retained units and negative results. One warmup precedes up to five measured
-rounds; mode order rotates. Equal native results across modes check consistency,
-without establishing independent source or optimality validation.
+| Script under `scripts/` | Arguments |
+|---|---|
+| `lp-lifecycle-profile.sh` | `mps-NAME [repeats] [jvm\|native\|both] [mode] [source-sha256 highs-revision]` |
+| `lp-lifecycle-qualification.sh` | `jvm\|native [repeats]` |
+| `lp-template-preparation-profile.sh` | `cover-2x3\|cover-3x3 [repeats] [steps]` |
 
-The unchanged-index controls [9363](https://lab.eignex.com/jobs/9363) and
-[9369](https://lab.eignex.com/jobs/9369), at `69cc7b2250`, compare all three modes
-through actual consuming LPs on the two frozen P3 MPS fixtures. Including cold
-setup, median preparation-plus-assembly falls from 4.73 to 4.10 ms over 32
-consumers and from 5.79 to 5.27 ms over 64; allocation falls by 202/353 KB.
-Charged template work falls from 5741/7454 to 1742/2036. Ordered coordinates add
-9/6 modeled retained units; the publication/storage cap stays unchanged.
-Alternating bounds, objectives and rows rejects complete-index reuse and retains
-selective rebuilding, including failed-validation cost. Objective churn increases
-assembly time by 7.1/2.7 percent in these controls. Disabled templates remain
-cheaper on these tiny sources, and whole-LP timings support no speedup claim.
-Native LP results agree across modes; their optimality is not independently checked.
+Lifecycle repeats range from one to five and default to three. Available modes are
+`lifecycle`, `claims`, `precision`, `checkpoint`, `checkpoint-feasibility` and
+`consumers`; the default is `lifecycle`. Sources outside the basis manifest require
+both their original SHA-256 and full HiGHS revision.
 
-`scripts/lp-lifecycle-profile.sh mps-afiro|mps-adlittle [repeats] [both|jvm|native]` runs one
-hash-pinned source from the existing basis corpus on JVM and Linux Native through
-the production source projection and scoped LP owner. Submit it as a lab profile
-script with build tasks `:klause:stageLpProfileJvm` and
-`:klause:linkLpProfileReleaseExecutableLinuxX64`, `base.timeout="180000"` and
-compatible Linux x86_64 placement. Fund remote build, source preparation, retries
-and cleanup separately through a finite `profile.runTimeoutSec` containing
-allowance. These bench-owned custom compilations have
-internal access to the engine and add no Maven artifacts. Ordinary CI compiles
-them and runs the shared deterministic regressions; it runs no profiling workload.
-When requested together, JVM profile staging precedes native compilation to avoid
-overlapping both compiler heaps in a bounded preparation worker.
-Separate runtime jobs request only the selected target's build task. They retain
-their own CPU identity and resource receipts; different placements do not support
-an absolute cross-runtime speed comparison.
+For JVM profiles, request `:klause:stageLpProfileJvm` as the lab build task.
+For Native profiles, request `:klause:linkLpProfileReleaseExecutableLinuxX64`.
+Prepare only the target used by a separate runtime job. Combined preparation links
+Native before staging JVM profiles. Template preparation profiles use the JVM task.
 
-The optional fourth script argument claims selects retained, observed requests
-for each claim kind. It includes unchanged repeats, an equal-valued replacement
-authority, bound and row edits and pops, objective-constant changes and row
-deactivation, with one warmup and the requested measured rounds. Records expose
-state revisions, ordered-basis/status comparisons, checked-result reuse and storage
-declines,
-reconstruction work and rejection details, continuation import position and
-cumulative-limit behavior, and refinement phase and lifetime spending. These are
-diagnostic controls; unchanged requests and changed scopes are separate samples.
-All work stays under the existing 120-second containing profile deadline. The
-ordinary source worker follows the controls under its own nested deadline.
-
-The fourth argument `precision` pairs fixed-width-first and early arbitrary precision
-through the same claim and authority controls, alternating arm order. Both keep
-the same cumulative numerical and verification limits. It also pairs real source
-workers through their internal consumer context, each with five seconds and the
-existing 1,000-instruction ceiling. Other modes keep the two-second worker control.
-Use complete query/certification time and actual allocation alongside import
-progress; whole-process RSS spans both arms. The `consumers` mode runs only the
-paired source workers for follow-up integration controls.
-
-Each owner runs cold, asserted-bound, bound-pop, appended-row and row-pop queries.
-Fresh owners at the same exact states control retained owners. One warmup precedes
-up to five alternating rounds, with phase observations enabled and disabled.
-Preparation, edits, query, certificate phases and retirement remain in the record.
-JVM thread allocation and whole-process RSS are separate measurements; native
-allocation is unavailable. Inclusive numerical and certificate phase timings must
-not be summed. Feasibility repair includes its transforms, pricing and updates;
-violation scans have a separate nested observation. Checkpoint wall time,
-including suspended caller time, is reported separately from repair. Query
-time less floating time includes certificate work, query scaffolding and bounded
-completion-trace materialization. The enabled/disabled comparison includes that
-diagnostic overhead. Record emission follows each query and
-enters the containing lifecycle time. The separate active total excludes record
-emission. Preparation and edit
-phase deltas include operations on retiring and replacement engines; invocation
-traces reset at the next solve. Scoped owner counters are cumulative gauges and
-must not be summed across queries.
-
-The same executable runs a fresh direct `satOptimized` worker on each runtime,
-with seed 3, 1,000 decision instructions and a two-second containing deadline.
-Its factory returns the production numerical owners with their resumable
-capabilities intact. Completion observers retain active numerical time, work,
-bounded traces and existing claim/certificate phases; pauses publish no completion.
-Containing cancellation closes the active owner and emits `profile-stop` with
-`complete=false`; partial records do not establish a completed capture.
-The worker record includes consumed LP prunes/fixings, its native result and full
-worker-coordinate sample. It establishes no CLI routing equivalence or independent
-source validation. Preparation, failed work and retirement remain in the worker
-allowance. Whole-process RSS spans the controlled lifecycles and this worker;
-it is separate from JVM per-lifecycle allocation.
-
-Original bytes, corpus manifest, revision, executable hashes, runtime, JFR and
-resource receipts accompany the records, including the official JFR allocation
-sample export. Numerical invocations retain the bounded progress samples and
-certificate work retains exact-input eligibility and declined reconstruction
-outcomes. These controlled LP edits establish no
-original-source result. Pair them with source-matched ordinary lab solver runs
-using independent source validation, deterministic work scheduling where applicable,
-and the same semantics and preparation controls. Kernel timings, pivot counts and
-modeled work alone establish no numerical policy improvement.
-
-[9279](https://lab.eignex.com/jobs/9279) repeats the ordinary `pure-real-min`
-source at `ec38f24632` and `f633ad442c`, with exact mode, presolve off, seed 3
-and one processor. All six native results retain objective `1/3`, three standalone
-pivots and 220 LP work units. Independent checking is unsupported because the
-checker accepts decimal witness coordinates only. The requested `gr4x6` selector
-matches no `miplib3` input. [9285](https://lab.eignex.com/jobs/9285) retains matching
-objective `3/2` on `open-real-min`; its independent checker rejects the MPS layout
-before checking the witness. Neither control establishes independent feasibility.
-
-[9286](https://lab.eignex.com/jobs/9286) repeats `blend-tiny` on the same revisions
-and runtime with 1,000 finite work units and fixed 200-unit slices. All six original
-witnesses at objective 9 pass the external solchecker with zero violations. The
-seven complete scheduling events match across all cases, ending after 29 charged
-work units without an emergency stop. Installed distributions match within each
-revision's repeats; the source and CLI hashes match across revisions. These are
-source and scheduling controls, not a throughput result or independently checked
-optimality proof.
-
-[9293](https://lab.eignex.com/jobs/9293) and [9294](https://lab.eignex.com/jobs/9294)
-capture Afiro on JVM and Linux Native at `e288e79cec`: 80 controlled queries per
-runtime, including warmup and three measured rounds. All corresponding exact
-results, points, terminations, pivots and charged work match across observation
-settings and runtimes. Each real worker consumes an attained-optimum claim after
-20 numerical pivots and 21,937 work units. Its captured coordinates remain separate
-from independently checked original-source claims.
-
-[9295](https://lab.eignex.com/jobs/9295) captures three Adlittle JVM rounds;
-[9300](https://lab.eignex.com/jobs/9300) captures one Native round plus warmup at
-the same revision. All 120 controlled queries remain indeterminate after a floating
-optimal candidate: reconstruction declines `CANDIDATE`, continuation reaches
-`IMPORT_LIMIT`, and refinement reaches `WORK`. Corresponding completed controls
-retain identical results and work. Both real workers return `Unknown` at their
-two-second limit, spending 1.65 seconds on JVM and 1.94 seconds on Native in the
-exact ladder. These failed claims remain part of the cost.
-
-Retained edit-stage observations expose the remaining cost. Entries below are
-ranges of stage medians; the Native Adlittle capture has one measured sample per
-stage. Claim time is inclusive and must not be added to numerical time.
-
-| Source/runtime | Numerical solve (ms) | Attainment claim (ms) | Timed process wall (s) | Peak process RSS (KiB) |
-|---|---:|---:|---:|---:|
-| Afiro/JVM | 0.153–0.273 | 2.80–3.51 | 2.93 | 126,632 |
-| Afiro/Native | 0.036–0.047 | 9.06–10.76 | 1.51 | 30,436 |
-| Adlittle/JVM | 0.102–0.194 | 494–559 | 58.20 | 187,376 |
-| Adlittle/Native | 0.131–0.152 | 1,740–1,867 | 98.61 | 42,192 |
-
-The process totals include warmup, diagnostics and the real worker; builds and
-source transfer have separate lab receipts. Different round counts, runtime startup
-and recording overhead prevent an absolute cross-runtime speed comparison.
-Adlittle's five-query JVM lifecycle allocates a median 1.03 GB with fresh owners
-and 0.84 GB with retention, with observations disabled. JFR allocation samples
-concentrate in exact continuation pivots and fraction arithmetic. Native allocator
-totals are unavailable; process RSS does not replace them.
-
-Retain the existing pricing, edge-weight, update/refactorization and allocation
-policies. The retention control removes most numerical work while certification
-dominates the remaining elapsed cost, including unsuccessful requests. These
-controls identify no justified numerical policy change or default activation;
-fewer pivots alone would misrepresent the Adlittle outcome. Exact acceptance and
-resource ceilings remain intact.
-
-Preparation failures in [9276](https://lab.eignex.com/jobs/9276) and
-[9282](https://lab.eignex.com/jobs/9282) precede numerical execution. The three-round
-Native Adlittle capture [9296](https://lab.eignex.com/jobs/9296) reaches the
-120-second containing limit after 49 completed queries and one cancelled query;
-it never reaches the real worker. Its 61 complete JSON records precede an aborted
-launcher and are partial evidence. [9298](https://lab.eignex.com/jobs/9298) loses
-its preparation daemon before running the structured-stop revision. None of these
-outcomes supplies a numerical improvement or a completed capture.
-
-### Early exact-import precision
-
-[Adlittle 9361](https://lab.eignex.com/jobs/9361) pairs the internal early-big
-request with fixed-width-first continuation under unchanged ceilings. The measured
-14-state attainment-request lifecycle takes 1.67 s and allocates 320 MB versus
-7.57 s and 1.35 GB. Early big completes 93 imports; fixed-width overflow replay
-spends 128 cumulative imports and stops at position 102/154. Conservative modeled
-cold import/check spending rises from 25.5 to 35.8 million work units and from
-147 to 242 MB, within the existing limits. Returned feasibility does not satisfy
-attainment: the exact bound remains unavailable under the existing reconstruction
-and refinement allowances.
-
-[The real JVM consumer](https://lab.eignex.com/jobs/9372) returns a best-known
-Adlittle point with one consumed feasible-completion claim under early big;
-fixed-width-first returns Unknown at the import ceiling. Both finish inside the
-equal five-second allowance. The observed invocation costs are 1.69 s/113 MB and
-3.59 s/315 MB; fixed-first worker order includes warming effects, so these are not
-a general throughput estimate. Process RSS spans both arms. The worker point is
-native checked, without an independent Adlittle source receipt or optimality proof.
-[Afiro 9373](https://lab.eignex.com/jobs/9373) preserves consumed attainment and
-compatible checked-package reuse in both arms. [Ordinary controls 9375](https://lab.eignex.com/jobs/9375)
-independently accept the original points/objectives 9 and exact 1/3; they do not
-independently prove optimality. Arithmetic selection stays opt-in, with numerical
-defaults, ceilings and proof acceptance unchanged.
+The qualification script runs Afiro, Adlittle, Avgas and Blending sequentially in
+`checkpoint-feasibility` mode, retaining one output directory per source. Profile
+records are diagnostics; use ordinary source-validated lab runs for source results.
 
 ### Bounded sparse admission trials
 
@@ -1093,20 +1030,61 @@ schedule does not reproduce mixed numerical elapsed schedules. Full-trace claims
 require the capture's complete artifact marker; source outcome claims require the
 corresponding independent checker receipts.
 
-`param.portfolio-reward=ordinary|source|source-rate` varies rewards independently of admission
-and coverage. `source` retains ordinary feasibility rewards, then rewards only
+`finiteCompanionPreparationAttempts`, `finiteCompanionPreparationNs`,
+`finiteCompanionPreparationReady` and `finiteCompanionPreparationUnavailable`
+record the invocation's ordinary eager affine capture before worker factories. Retain
+unavailable captures and captures followed by no worker query. This duration is
+inside containing solve time, separate from factory, query and retirement counters;
+it does not fund extra active time. Sampled JFR allocations cannot replace it when
+choosing a construction or useful-lifetime policy. Whole-job costs still retain
+exceptions that prevent a final invocation result.
+
+`param.companion-admission=funded` requires `param.companion-after-incumbent=true`
+and an elapsed deadline. It keeps the capability gate and explicit selections,
+declines a pair without room for both requested active lifetimes, and defers shared
+capture and private service construction until a funded first query. Capture pays
+the current query grant and cannot consume the reserved pair lifetime. Opening a
+later sibling requires room for that worker's requested lifetime. This control does
+not extend any active, work or allocation allowance; ordinary admission is default.
+`finiteCompanionAdmissionDeclined` and `finiteCompanionStartDeclines` distinguish
+initial funding from late opening refusals. Deferred preparation counters are
+inside the opening worker's segment, so do not add them to that segment again.
+Retain zero-query and unavailable captures. Compare ordinary-off, incumbent-gated
+eager construction, funded construction and a useful direct control with the same
+source, budget, reward, coverage and reseed settings before selecting production
+admission. A funded window alone does not establish useful handoff or net benefit.
+
+`param.portfolio-reward=ordinary|source|source-rate|source-rate-family` varies rewards
+independently of admission and coverage. `source` retains ordinary feasibility rewards, then rewards only
 accepted incumbent improvements and terminal closure. Retain phase/cost counters
 and source checks, including initialization, reseeding and retirement, when comparing
 it with ordinary rewards. Counter changes alone do not establish a benefit.
 `source-rate` prices finite positive accepted gain per observed factory and segment
 time, retaining unproductive and feasibility setup costs until the next gain.
+Strict accepted improvements after the first witness within the same segment are
+priced in that segment; its complete startup remains charged. The first witness
+has no synthetic gain. Phase labels remain selection-time observations, so use the
+accepted objective sequence as well as ledger credits when auditing that boundary.
+Failed and refuted segments earn zero while retaining their costs in peer pricing.
 Initialization and checking are already inside segment time. Compare it separately
 at fixed coverage, admission and reseeding, and retain the full containing-run ledger
 for source preparation, retirement and independent checking. Time-sensitive rewards
 make fixed-work traces sensitive to measured segment costs.
 
+`source-rate-family` also prices accepted family gains against all observed sibling
+factory and segment costs, retaining failed and unproductive work until the next
+family gain. Family feedback uses the fractional rate score for every paid
+post-incumbent segment, including silent complete-search segments. Complete workers
+retain the selected coverage scope and share. Compare ordinary, worker-rate and
+family-rate controls on the same binary at fixed probes, coverage, admission and reseeding. Full traces
+retain the phase, gains and inclusive costs needed to reconstruct both rate ledgers.
+
 `param.portfolio-probes=leader-half` redistributes the existing initial probe budget
 to give its leading complete worker half while retaining every sibling's probe.
+`lp-transfer` instead moves half of eligible LP probes' relative weight to the
+leading complete non-LP worker, retaining other siblings' ordinary relative shares.
+Deferred LP probes supply no weight. Actual durations remain bounded by the
+containing time and segment/work caps; equal relative shares do not fix a work prefix.
 Compare it with `ordinary` at fixed rewards, coverage, admission and reseeding.
 Worker slots, seeds, total reservation and deadlines remain fixed. A containing
 deadline is required; work diagnostics and explicit recipes reject this control.
@@ -1244,7 +1222,11 @@ retirement. Its live window admits 1,024 events and 65,536 words. Clauses above
 64 literals and endpoint markers above 32 words produce explicit omission events
 and a payload-omission count. A
 trace with omissions cannot establish the omitted premises. The selector wrapper
-delegates all decisions and notifications. Branch records keep only the chosen
+attaches capture when its fresh native session is created, before LP proposals,
+and delegates all decisions and notifications. The record reports that attachment
+and the admitted-row count at that boundary. Actual branch attempts carry their
+shared Boolean name when available, including LP-guided choices that bypass the
+selector. Branch records keep only the chosen
 coordinate and its domain; typed-row records keep their historical endpoints.
 The integer arm's `trace=first-integer` keeps the most recent conflict window until
 an integer object is admitted, then keeps its consumers, branch markers and
@@ -1352,6 +1334,10 @@ The CLI deadline includes frontend construction/preparation/search; compressed
 source decoding reduces its remaining allowance. MiniZinc compilation, preflight,
 artifact hashing and output reconstruction are outside that deadline and inside
 the containing case/job allowance. Independent checking is separate lab work.
+JFR measurements retain phase, caller and allocation summaries in `solve.log`.
+Summary analysis runs after CLI exit, outside its elapsed time and inside the
+containing case/job allowance. Sample shares and estimated allocations diagnose
+cost; instrumented timings do not qualify an ordinary production speedup.
 Retain complete active preparation/execution/checking charges, failures and
 retirement alongside CLI elapsed time; overlapping stage counters must not be
 summed as disjoint costs. Native proof flags do not certify source optimality or
@@ -1365,3 +1351,13 @@ Only this explicit content policy permits path-only comment differences; changed
 predicates, declarations, annotations, literals or remaining comments change the
 content identity. Ordinary inputs without this exact three-line header retain
 their raw identity. No source or compiled program is rewritten.
+
+Ordinary CLI qualification can request `param.boolean-proof-tasks=true` alongside
+`engines=cp`, `param.bt-arm=first-fail` and `param.arms=2`; the control defaults to
+false. Use the canonical lab runtime, source-checking and physical controls.
+Statistics expose `booleanProof.N.tasks`, `nativeRefutations`, `probeSegments`,
+`probeWork`, `workerWork` and an optional `decline`. A requested setting can decline
+or finish probing without a partition; require actual task observations before
+claiming task use. Probe work is a subset of worker work, while ordinary schedule
+charges retain reservations and coordinator checks. Native closures do not supply
+independent proof checking.
