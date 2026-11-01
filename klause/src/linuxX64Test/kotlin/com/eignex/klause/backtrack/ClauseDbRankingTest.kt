@@ -11,11 +11,11 @@ import kotlin.test.assertTrue
 internal class ClauseDbRankingTest {
     @Test
     @Suppress("FunctionNaming") // Native platform tests follow the common test naming convention.
-    internal fun `general production caps should rank locals without a permanent floor`() {
-        for (cap in listOf(4_000, 20_000)) {
+    internal fun `production caps should rank locals without a permanent floor`() {
+        for ((cap, nativeSat) in listOf(4_000 to false, 4_000 to true, 20_000 to false, 20_000 to true)) {
             val session = PropagationSession(Problem(3, 0, emptyArray(), arrayOf(
                 Clause(intArrayOf(1, 2)), Clause(intArrayOf(3, 4)),
-            )), nativeSat = false)
+            )), nativeSat = nativeSat)
             val clause = Clause(intArrayOf(1, 3, 4))
             repeat(cap) { session.addLearnedClause(clause, 9) }
             session.addLearnedClause(clause, 8)
