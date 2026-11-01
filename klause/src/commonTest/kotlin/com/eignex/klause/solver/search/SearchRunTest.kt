@@ -76,8 +76,10 @@ class SearchRunTest {
         val run = session.openRun(2, SearchSolveParams(maxDecisions = 4, restart = SearchRestart.Every(1)),
             modelContinuation = SearchModelContinuation.Chronological,
             nodePolicy = object : SearchNodePolicy {
-                override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
-                    if (pause && context.decisionLevel >= 1) SearchNodeDisposition.Pause else SearchNodeDisposition.Expand
+                override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
+                    if (pause && context.decisionLevel >= 1) return SearchNodeDisposition.Pause
+                    return SearchNodeDisposition.Expand
+                }
             })
         assertIs<SearchRunEvent.Paused>(run.next())
 
