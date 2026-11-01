@@ -265,8 +265,8 @@ reclamation attempts remain retryable.
 Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,
 queues and event indexes, with a conservative envelope for indivisible publication.
 Cancellation or an oversized envelope defers without mutation; accepted publication
-remaps the whole generation and trims retained primitive capacity. Shared search prepares
-a replacement generation and polls before swapping its stores and indexes. Protected
+remaps the whole generation and trims retained primitive capacity. Shared search retains
+stable handles and resumes separately funded owner removals. Protected
 state or an unfunded preparation permits continued search above the soft limit, with an
 explicit protected/deferred observation. Work debt supplies no hard pause-latency
 guarantee. Thresholds and default retention remain separate policy decisions.
@@ -496,19 +496,25 @@ publication still defer the window.
 General retirement replaces its payload with an inert stable-ID slot and releases
 its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
 aliases. Stale watches skip that slot; their allocated capacity and policy columns
-remain owned until compaction. Arithmetic reason snapshots and full physical compaction
-still require their complete funding; shared stores retain the complete selection/remap path.
+remain owned until compaction. Arithmetic reason snapshots and native/general full
+physical compaction still require their complete funding.
 
-Shared learning also accepts an optional modeled-byte soft limit checked at
-propagation boundaries independently of restarts. Units, glue clauses, live reason
-owners and pending first attachments form its protected floor; copied trail reasons
-and queued component publications remain privately protected. Reclamation prepares
-replacement stores, signatures, watches, stages, reason IDs and queues within a
-conservative work and scratch bound. Cancellation before publication discards the
-replacement; publication swaps the complete generation without callbacks. Rebuilding
-the indexes releases obsolete capacity as well as clause payload. Insufficient
-allowance defers reclamation, and a protected floor above the limit reports that
-condition while preserving the search state. Root reseeding releases obsolete copied
+Shared learning uses stable handles and bounded-height owned indexes for clauses,
+LBD ranking, watches, signatures and live reasons. Count-cap windows retire eligible
+clauses in descending LBD order, retaining older clauses on ties. A window fixes its
+admission boundary; appended clauses enter a later window. Epochs retain recent-use
+protection without a whole-store flag reset.
+The optional modeled-byte soft limit runs independently at propagation boundaries.
+Units, glue clauses, live reason owners and pending first attachments form its
+protected floor; copied trail reasons and queued component publications remain
+privately protected. Logical retirement disables propagation before separately funded
+watch, signature and index removal releases payload and metadata ownership. A partial
+release keeps its owner and cursor across calls. Each bounded mutation polls after
+its work debit and publishes without callbacks. Retired payload and unfinished
+metadata stay in ownership observations until released; partial observations supply
+no byte-limit authority. Unfinished maintenance bypasses completed-result caching.
+An insufficient atomic-operation grant explicitly defers while preserving the cursor.
+Root reseeding releases obsolete copied
 reasons; terminal release drops shared learning without rewriting lifetime counters.
 A cancelled automatic scan permits one propagation opportunity before another
 attempt, including when a suspended decision retracts and retries.
@@ -561,7 +567,9 @@ unchanged prefixes are not examined twice. Retired and non-clause source entries
 do not defer the remaining literal window. Once available occurrence walks cover
 every root pin, the ordinary cursor skips the remaining source suffix and continues
 through learned clauses. Missing indexes retain the full source scan. Learned
-compaction invalidates learned candidates while preserving stable source candidates.
+compaction invalidates learned candidates while preserving stable source candidates
+and source scan progress at an unchanged root. A changed root restarts the source
+scan after learned compaction.
 A shortened
 source clause enters as a permanent session-local replacement before its watches
 retire; immutable source text remains available for reasons. The propagation session

@@ -60,7 +60,7 @@ class SearchSession(
 
     private val singleComponent = components.singleOrNull()
     private val trail = SearchTrail()
-    private val learning = SearchLearning(learnedDb)
+    private val learning = SearchLearning(learnedDb) { work -> this.executionControls.cancellation.charge(work) }
     private val learnedDbParams = learnedDb
     internal var learningReclamation: SharedLearningReclamation? = null
         private set
@@ -953,10 +953,10 @@ class SearchSession(
             ).let { it.copy(work = it.work + reasons.work, scratchBytes = it.scratchBytes + scratch) }
         }
         learningReclamation = result
-        if (result.status != SharedLearningReclamationStatus.Cancelled) {
+        if (result.status != SharedLearningReclamationStatus.Cancelled && !result.continuationPending) {
             learningReclamationPosition = learningMemoryPosition()
             deferAutomaticReclamation = false
-        } else if (automatic) {
+        } else if (automatic && result.status == SharedLearningReclamationStatus.Cancelled) {
             // A failed decision retracts before retry; permit propagation before another optional scan.
             deferAutomaticReclamation = true
         }
