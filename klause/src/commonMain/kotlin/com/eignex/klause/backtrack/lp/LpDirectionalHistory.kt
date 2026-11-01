@@ -34,7 +34,10 @@ internal class LpDirectionalHistory(
         stamp++
         depth = level
         objective = Double.NaN
-        if (pending?.depth != level) pending = null
+        if (pending?.depth != level) {
+            pending?.let { observeDirection("LOST_DEPTH", it) }
+            pending = null
+        }
     }
 
     val retainedEntries: Int get() = gains.size + parents.size +
@@ -44,6 +47,7 @@ internal class LpDirectionalHistory(
         recent(integerPrior) || recent(booleanPrior)
 
     fun clear(report: Boolean = true) {
+        if (report) pending?.let { observeDirection("LOST_SCOPE", it) }
         gains.clear()
         integerPrior = null
         booleanPrior = null
@@ -62,6 +66,7 @@ internal class LpDirectionalHistory(
         val normalized = gain / child.distance
         if (!gain.isFinite() || gain < 0.0 || !normalized.isFinite()) {
             observe("UNUSABLE")
+            observeDirection("UNUSABLE", child)
             return
         }
         val history = gains.getOrPut(child.parent.variable, ::Gains)
@@ -88,6 +93,7 @@ internal class LpDirectionalHistory(
 
     fun commit(decision: SearchDecision, level: Int) {
         parents.keys.removeAll { it >= level }
+        pending?.let { observeDirection("LOST_REPLACED", it) }
         pending = null
         val parent = parents[level - 1] ?: return
         val floor = floor(parent.value)
@@ -111,16 +117,28 @@ internal class LpDirectionalHistory(
         val distance = if (up) floor + 1.0 - parent.value else parent.value - floor
         if (distance <= DISTANCE_TOL || distance >= 1.0 - DISTANCE_TOL) return
         pending = Pending(parent, up, distance, level)
+        observeDirection("COMMIT", checkNotNull(pending))
     }
 
     fun infeasible() {
-        if (pending != null) observe("INFEASIBLE")
+        pending?.let {
+            observe("INFEASIBLE")
+            observeDirection("INFEASIBLE", it)
+        }
         pending = null
     }
 
-    fun finishNode() {
-        if (pending != null) observe("MISSING")
+    fun finishNode(reason: String = "UNOBSERVED") {
+        pending?.let {
+            observe("MISSING")
+            observeDirection("MISSING_$reason", it)
+        }
         pending = null
+    }
+
+    private fun observeDirection(event: String, child: Pending) {
+        charge(1L)
+        observe("${event}_${if (child.up) "UP" else "DOWN"}")
     }
 
     fun score(variable: VarRef, value: Double): Double =

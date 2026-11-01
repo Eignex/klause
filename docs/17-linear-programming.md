@@ -172,6 +172,8 @@ One integer or disjunction leaf cannot refute its sibling branches.
 The model-facing bounding callback supplies pre-separation floating optima and
 checked infeasibility outcomes to finite search hints. Directional history accepts
 only compatible retained model and row scopes; it adds no certification request.
+Unavailable callbacks identify admission gates and incomplete numerical outcomes;
+they carry no optimum, bound or query authorization.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
 history lifetime.
 

@@ -398,7 +398,10 @@ internal fun LpEngine.sparseSafePrune(
     warm: Basis? = null,
     cutsAllowed: Boolean = false,
 ): LpNodeOutcome {
-    if (cancellation()) return LpNodeOutcome(false, null)
+    if (cancellation()) {
+        hints?.recordUnavailable(LpHintUnavailable.CANCELLED)
+        return LpNodeOutcome(false, null)
+    }
     // Gated residual fast path (pure-real satisfaction models): re-solve the persistent, structurally
     // node-invariant gated model with its kept LU factorization — a feasible node (the common case
     // along a dive) costs a few dual pivots instead of a fresh build + factorization. Any other
@@ -412,6 +415,7 @@ internal fun LpEngine.sparseSafePrune(
             // Unchanged enforcement after a feasible solve: the gated model is a pure function of the
             // enforcement, so this node's verdict is the memoized one — no solve at all.
             if (filter.lastFeasible && filter.enforced.contentEquals(filter.lastEnforced)) {
+                hints?.recordUnavailable(LpHintUnavailable.FEASIBILITY_ONLY)
                 return LpNodeOutcome(false, null)
             }
             filter.lastFeasible = false
@@ -437,6 +441,7 @@ internal fun LpEngine.sparseSafePrune(
             if (gatedResult != null) {
                 filter.enforced.copyInto(filter.lastEnforced)
                 filter.lastFeasible = true
+                hints?.recordUnavailable(LpHintUnavailable.FEASIBILITY_ONLY)
                 return LpNodeOutcome(false, null)
             }
             // Certify the candidate infeasibility on the gated model directly: restricted to the enforced
@@ -472,10 +477,19 @@ internal fun LpEngine.sparseSafePrune(
             }
         }
     }
-    val relaxation = nodeRelaxation(relaxer, session) ?: return LpNodeOutcome(false, null)
+    val relaxation = nodeRelaxation(relaxer, session) ?: run {
+        hints?.recordUnavailable(LpHintUnavailable.MODEL)
+        return LpNodeOutcome(false, null)
+    }
     activateCutAttribution(relaxation)
-    if (cancellation()) return LpNodeOutcome(false, null)
-    if (relaxation.model.n == 0 && relaxation.model.m == 0 && cutPool.size == 0) return LpNodeOutcome(false, null)
+    if (cancellation()) {
+        hints?.recordUnavailable(LpHintUnavailable.CANCELLED)
+        return LpNodeOutcome(false, null)
+    }
+    if (relaxation.model.n == 0 && relaxation.model.m == 0 && cutPool.size == 0) {
+        hints?.recordUnavailable(LpHintUnavailable.MODEL)
+        return LpNodeOutcome(false, null)
+    }
     sink.lp.observeSolve()
     val model = relaxation.model
     // Measured only at the root: the pass is O(nnz), and the matrix a node solves is the root's, so a
@@ -497,6 +511,7 @@ internal fun LpEngine.sparseSafePrune(
         sink.lp.observeEngineCost(LpRoute.NODE, propagator.lastMetrics)
         noteSolveOps(propagator.lastMetrics.workOps)
         observeNodePause()
+        hints?.recordUnavailable(LpHintUnavailable.SUSPENDED)
         return LpNodeOutcome(false, null)
     }
     val (simplex, floatResult) = attempted
@@ -510,13 +525,17 @@ internal fun LpEngine.sparseSafePrune(
     } else {
         observeSolveCost(sink, simplex)
     }
-    if (cancellation()) return LpNodeOutcome(false, null)
+    if (cancellation()) {
+        hints?.recordUnavailable(LpHintUnavailable.CANCELLED)
+        return LpNodeOutcome(false, null)
+    }
     // Candidate points supply degeneracy feedback; a missing point requires an explicit termination policy.
     floatResult?.let {
         observeNodeWork(it.optimal, simplex.lastDegenerateColumns, simplex.lastColumns, model.m)
     }
     if (floatResult == null) observeNodeWorkStop(simplex)
     val result = floatResult ?: run {
+        hints?.recordUnavailable(LpHintUnavailable.NO_RESULT)
         if (pruneWithComponentBound(relaxation, simplex, bound, sink, cancellation)) {
             return LpNodeOutcome(true, null)
         }

@@ -254,11 +254,7 @@ The `lp-default` and `lp-aggressive` optimization recipes enable the finite cons
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
 and branching must be enabled. Two recent samples in each direction permit a
-variable's balanced gain score. Directional reranking is limited to the two highest
-reduced-cost/fractionality candidates among open variables. Equal predicted gains
-retain the baseline winner; no qualifying LP candidate leaves the configured
-selector in control. Shortlist bookkeeping spends the existing LP allowance.
-A variable with at least one recent sample can fill
+variable's balanced gain score. A variable with at least one recent sample can fill
 missing confidence from a same-scope prior after two samples in each direction within
 its Boolean or integer coordinate class. Each direction weights its own mean by
 `min(count, 2) / 2` and the prior by the remaining weight. A fully observed direction
@@ -275,6 +271,11 @@ history can yield a score; its bookkeeping uses the same LP work allowance.
 Consumed choices distinguish variable history from class priors and record agreement
 with the current LP scorer, a changed variable, or a missing current LP candidate
 separately; a rejected proposal earns no consumption.
+Committed observation attempts retain their branch direction. Missing immediate-child
+optima distinguish LP admission gates, suspended or absent results and non-optimal
+points. Scope changes, depth changes and replaced alternatives report discarded
+attempts separately. These observations spend the existing allowance and do not
+request another solve or supply a gain sample.
 
 Samples share one retained exact base model, active-row identity, objective mapping
 and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate

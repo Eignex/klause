@@ -4,59 +4,51 @@ import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
 
-// Search owns variable identities and advisory ranking; the engine only supplies LP hints.
+/**
+ * Reduced-cost-average branching: pick the unassigned variable with the highest LP branch score
+ * (reduced-cost pseudo-cost × fractionality, [LpHints.branchScore]), or null when LP branching is off,
+ * the LP gives no fractional signal, or the residual problem is too wide to scan. Purely advisory — the
+ * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound
+ * branch, so search stays complete and correct regardless. `O(unassigned)` per call, capped.
+ *
+ * Lives in the search layer (not [LpEngine]'s home) because it reads the backtrack [VarRef] selector type
+ * and the search-owned [LpHints]; the engine only records LP solutions into the hint sink.
+ */
 internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?): VarRef? {
     hints ?: return null
     if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
     val directionalAvailable = hints.hasDirectionalScores()
     var best: VarRef? = null
     var bestScore = LP_BRANCH_MIN_SCORE
-    var runnerUp: VarRef? = null
-    var runnerUpScore = LP_BRANCH_MIN_SCORE
+    var directional: VarRef? = null
+    var gainScore = LP_BRANCH_MIN_SCORE
     for (b in 0 until problem.numBoolVars) {
         if (session.boolValue(b) != null) continue
-        val variable = VarRef.Bool(b)
-        if (directionalAvailable) noteNodeOverhead(1L)
-        val s = hints.branchScore(variable)
+        val gain = if (directionalAvailable) hints.directionalScore(VarRef.Bool(b)) else Double.NaN
+        if (gain > gainScore) {
+            gainScore = gain
+            directional = VarRef.Bool(b)
+        }
+        val s = hints.branchScore(VarRef.Bool(b))
         if (!s.isNaN() && s > bestScore) {
-            if (directionalAvailable) {
-                runnerUp = best
-                runnerUpScore = bestScore
-            }
             bestScore = s
-            best = variable
-        } else if (directionalAvailable && s > runnerUpScore) {
-            runnerUpScore = s
-            runnerUp = variable
+            best = VarRef.Bool(b)
         }
     }
     for (i in 0 until problem.numIntVars) {
         if (session.intDomain(i).isFixed) continue
-        val variable = VarRef.IntVar(i)
-        if (directionalAvailable) noteNodeOverhead(1L)
-        val s = hints.branchScore(variable)
+        val gain = if (directionalAvailable) hints.directionalScore(VarRef.IntVar(i)) else Double.NaN
+        if (gain > gainScore) {
+            gainScore = gain
+            directional = VarRef.IntVar(i)
+        }
+        val s = hints.branchScore(VarRef.IntVar(i))
         if (!s.isNaN() && s > bestScore) {
-            if (directionalAvailable) {
-                runnerUp = best
-                runnerUpScore = bestScore
-            }
             bestScore = s
-            best = variable
-        } else if (directionalAvailable && s > runnerUpScore) {
-            runnerUpScore = s
-            runnerUp = variable
+            best = VarRef.IntVar(i)
         }
     }
-    return if (directionalAvailable) hints.pickDirectional(best, runnerUp) ?: best else best
-}
-
-private fun LpHints.pickDirectional(baseline: VarRef?, runnerUp: VarRef?): VarRef? {
-    val baselineGain = baseline?.let { directionalScore(it) } ?: Double.NaN
-    val runnerUpGain = runnerUp?.let { directionalScore(it) } ?: Double.NaN
-    val replace = runnerUpGain > LP_BRANCH_MIN_SCORE &&
-        (baselineGain.isNaN() || runnerUpGain > baselineGain)
-    val candidate = if (replace) runnerUp else if (baselineGain > LP_BRANCH_MIN_SCORE) baseline else null
-    return selected(candidate, baseline, if (replace) runnerUpGain else baselineGain)
+    return hints.selected(directional, best, gainScore) ?: best
 }
 
 /** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below

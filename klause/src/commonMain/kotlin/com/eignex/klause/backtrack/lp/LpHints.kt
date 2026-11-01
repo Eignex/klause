@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.lp.bounding.LpHintSink
+import com.eignex.klause.lp.bounding.LpHintUnavailable
 import com.eignex.klause.lp.engine.ExactLpModel
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedRows
@@ -32,6 +33,7 @@ internal class LpHints(
     private val history = LpDirectionalHistory(observe, charge = charge, useClassPriors = directionalGains)
     private var freshRecord = false
     private var objectiveRecorded = false
+    private var unavailable = LpHintUnavailable.NO_QUERY
     private var directionalChoice: VarRef? = null
     private var baselineChoice: VarRef? = null
     private var priorChoice = false
@@ -48,6 +50,7 @@ internal class LpHints(
         cutoff = bound
         freshRecord = false
         objectiveRecorded = false
+        unavailable = LpHintUnavailable.NO_QUERY
         directionalChoice = null
         baselineChoice = null
         priorChoice = false
@@ -79,8 +82,13 @@ internal class LpHints(
 
     override fun recordInfeasible() = history.infeasible()
 
+    override fun recordUnavailable(reason: LpHintUnavailable) {
+        if (scopeModel != null) charge(1L)
+        unavailable = reason
+    }
+
     fun finishNode(state: LpExactState? = null) {
-        history.finishNode()
+        history.finishNode(unavailable.name)
         if (scopeModel != null && state != null &&
             (scopeModel !== state.baseModel || scopeRows !== state.rows)
         ) {
@@ -187,6 +195,7 @@ internal class LpHints(
         directionalChoice = null
         baselineChoice = null
         priorChoice = false
+        unavailable = LpHintUnavailable.NO_QUERY
     }
 
     override fun clear() {
@@ -212,6 +221,7 @@ internal class LpHints(
     override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
         recorded = true
         freshRecord = true
+        unavailable = LpHintUnavailable.NON_OPTIMAL
         val model = relaxation.model
         solveStamp++
         for (col in relaxation.colVarId.indices) {

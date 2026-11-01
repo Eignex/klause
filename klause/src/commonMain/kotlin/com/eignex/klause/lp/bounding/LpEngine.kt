@@ -967,7 +967,10 @@ internal class LpEngine(
         requireOpen()
         lpBackjump = null
         for (b in bounds) {
-            if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) return true
+            if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) {
+                if (b !is LpSimplexBound) lpHints?.recordUnavailable(LpHintUnavailable.EARLIER_BOUND)
+                return true
+            }
         }
         return false
     }
@@ -1069,17 +1072,14 @@ internal class LpEngine(
             objectiveVar: Int,
             objectiveAscending: Boolean,
         ): Boolean {
-            val lpRelaxerL = lpRelaxer ?: return false
-            if (params.lpPlan.realResidual && residualOversized) return false
-            if (lpEffortGovernor.allowanceSpent) return false
+            val lpRelaxerL = lpRelaxer ?: return skip(LpHintUnavailable.MODEL)
+            if (params.lpPlan.realResidual && residualOversized) return skip(LpHintUnavailable.MODEL)
+            if (lpEffortGovernor.allowanceSpent) return skip(LpHintUnavailable.ALLOWANCE)
             lpEffortGovernor.observeNode()
-            if (!params.lpPlan.realResidual && (
-                    session.decisionLevel > params.lpPlan.boundMaxDepth ||
-                        ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
-                        !lpLadder.shouldRun()
-                    )
-            ) {
-                return false
+            if (!params.lpPlan.realResidual) {
+                if (session.decisionLevel > params.lpPlan.boundMaxDepth) return skip(LpHintUnavailable.DEPTH)
+                if (++lpCheckCounter % params.lpPlan.boundEvery != 0) return skip(LpHintUnavailable.CADENCE)
+                if (!lpLadder.shouldRun()) return skip(LpHintUnavailable.LADDER)
             }
             // The ladder's run rung decides whether during-search cuts separate at this node.
             val cutsAllowed = lpLadder.cutsEnabled
@@ -1128,6 +1128,11 @@ internal class LpEngine(
             }
             lpLadder.record(outcome.prune)
             return outcome.prune
+        }
+
+        private fun skip(reason: LpHintUnavailable): Boolean {
+            lpHints?.recordUnavailable(reason)
+            return false
         }
     }
 

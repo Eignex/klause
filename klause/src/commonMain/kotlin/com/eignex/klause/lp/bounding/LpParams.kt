@@ -31,6 +31,21 @@ class LpParams(
         LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed, zeroObjectivePricing)
 }
 
+internal enum class LpHintUnavailable {
+    NO_QUERY,
+    ALLOWANCE,
+    DEPTH,
+    CADENCE,
+    LADDER,
+    MODEL,
+    SUSPENDED,
+    NO_RESULT,
+    NON_OPTIMAL,
+    CANCELLED,
+    EARLIER_BOUND,
+    FEASIBILITY_ONLY,
+}
+
 /**
  * The LP-solution sink [LpEngine] records each node's fractional primal and reduced costs into. The
  * search-layer branching-hint store (`LpHints`) implements it; presolve passes no sink. Keeping the engine
@@ -44,6 +59,8 @@ internal interface LpHintSink {
     fun recordObjective(relaxation: LpRelaxation, objective: Double) {}
 
     fun recordInfeasible() {}
+
+    fun recordUnavailable(reason: LpHintUnavailable) {}
 
     /** Record an LP solution's [primal] and [duals] against [relaxation]'s column→variable map. */
     fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray)

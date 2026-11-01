@@ -34,19 +34,25 @@ class LpDirectionalHistoryTest {
 
     @Test
     fun `missing children cannot borrow a later descendant objective`() {
-        val observations = ArrayList<String>()
-        val history = LpDirectionalHistory(observations::add)
-        history.beginNode(0)
-        history.record(10.0)
-        history.branch(VarRef.IntVar(0), 2.25)
-        history.commit(SearchDecision.IntAtMost(0, 2), 1)
-        history.beginNode(1)
-        history.finishNode()
+        for (up in listOf(false, true)) {
+            for (reason in listOf("NO_QUERY", "CADENCE", "NON_OPTIMAL")) {
+                val observations = ArrayList<String>()
+                val history = LpDirectionalHistory(observations::add)
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(VarRef.IntVar(0), 2.25)
+                val decision = if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2)
+                history.commit(decision, 1)
+                history.beginNode(1)
+                history.finishNode(reason)
 
-        history.beginNode(2)
-        history.record(15.0)
+                history.beginNode(2)
+                history.record(15.0)
 
-        assertEquals(listOf("MISSING"), observations)
+                val side = if (up) "UP" else "DOWN"
+                assertEquals(listOf("COMMIT_$side", "MISSING", "MISSING_${reason}_$side"), observations)
+            }
+        }
     }
 
     @Test
@@ -62,7 +68,7 @@ class LpDirectionalHistoryTest {
 
             history.record(value)
 
-            assertEquals(listOf("UNUSABLE"), observations)
+            assertEquals(listOf("COMMIT_DOWN", "UNUSABLE", "UNUSABLE_DOWN"), observations)
         }
         val history = LpDirectionalHistory({})
         history.beginNode(0)
@@ -110,7 +116,7 @@ class LpDirectionalHistoryTest {
         history.beginNode(1)
         history.record(11.0)
 
-        assertEquals(listOf("RESET"), observations)
+        assertEquals(listOf("COMMIT_DOWN", "LOST_SCOPE_DOWN", "RESET"), observations)
     }
 
     @Test
@@ -126,7 +132,7 @@ class LpDirectionalHistoryTest {
         history.infeasible()
         history.finishNode()
 
-        assertEquals(listOf("INFEASIBLE"), observations)
+        assertEquals(listOf("COMMIT_DOWN", "INFEASIBLE", "INFEASIBLE_DOWN"), observations)
     }
 
     @Test
