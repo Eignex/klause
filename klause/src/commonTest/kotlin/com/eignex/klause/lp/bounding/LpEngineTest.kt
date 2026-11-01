@@ -341,7 +341,7 @@ class LpEngineTest {
 
     @Test
     fun `fixed root installation completes under its preparation token after slice expiry`() {
-        val problem = boundedProblem()
+        val problem = boundedProblem().bake()
         val factory = RecordingLpEngineFactory()
         var sliceStopped = false
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
@@ -349,15 +349,17 @@ class LpEngineTest {
                 probe = false, rootCutHarvest = false), cancellation = Cancellation { sliceStopped },
                 solveBudgetMillis = 30_000L),
             SolveStatsSink("root-installation-token"), LpSolveContext(factory)).use { engine ->
+            val base = assertNotNull(engine.lpRelaxer).build(RootDomains(problem))
             sliceStopped = true
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            val installed = assertNotNull(engine.cpAdapter.sourceRootRelaxation(base, Cancellation.Never))
+            assertTrue(engine.propagator.prepare(Cancellation.Never, 100_000L))
             val prepared = factory.calls.size
             assertTrue(prepared > 0)
             sliceStopped = false
 
-            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            val result = assertNotNull(engine.solveNode(installed.model, null, Cancellation.Never)?.second)
 
-            assertEquals(3.0, bound)
+            assertEquals(3.0, result.objective)
             assertEquals(prepared, factory.calls.size)
         }
     }
