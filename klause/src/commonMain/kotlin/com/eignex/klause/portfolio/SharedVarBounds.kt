@@ -10,7 +10,6 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
-import com.eignex.kumulant.stream.lock
 
 /**
  * Cross-arm **globally-valid** decision-level-0 integer-variable bound tightenings of one portfolio — the
@@ -32,7 +31,7 @@ import com.eignex.kumulant.stream.lock
  */
 internal class SharedVarBounds(
     numIntVars: Int,
-    private val lock: Mutex = Concurrency.None.lock(),
+    private val lock: Mutex = Mutex(concurrent = false),
     private val identity: ModelIdentity? = null,
 ) {
     private val lo = LongArray(numIntVars) { Long.MIN_VALUE }

@@ -32,8 +32,7 @@ import com.eignex.klause.util.SchedulingCancellation
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import com.eignex.kumulant.bandit.UnivariateBandit
-import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.kumulant.stream.Mutex
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random
@@ -834,7 +833,7 @@ class Portfolio(
         fun restrictAvailability(available: (Int) -> Boolean) { availability = available }
         private val started = runTimeSource.markNow()
         private val epoch = invocationStarted ?: started
-        private val lock = (if (lanes > 1) Concurrency.Strict else Concurrency.None).lock()
+        private val lock = Mutex(concurrent = lanes > 1)
         private val stopped = AtomicBoolean(false)
 
         /** The run's token: the caller's, stopped early once any lane settles the run. */

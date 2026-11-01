@@ -11,8 +11,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.kumulant.stream.Mutex
 
 internal fun TranscendentalProblem.prepareTranscendentalExecutionPlan(): PreparedSourcePlan = PreparedSourcePlan(
     this, PreparedExecution.Transcendental(this),
@@ -166,7 +165,7 @@ internal class TranscendentalPortfolioInvocation(
 }
 
 private class TranscendentalNativeScope(private val params: TranscendentalTheoryParams, cores: Int) {
-    private val lock = (if (cores > 1) Concurrency.Strict else Concurrency.None).lock()
+    private val lock = Mutex(concurrent = cores > 1)
     private var charged = 0L
     private val external = params.timeout or params.cancellation
     val work: Long get() = lock.withLock { charged }

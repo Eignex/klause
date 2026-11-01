@@ -5,8 +5,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.kumulant.stream.Mutex
 
 internal class QuadraticNativeScope private constructor(
     private val params: PolynomialTheoryParams,
@@ -126,7 +125,7 @@ internal class QuadraticNativeScope private constructor(
     }
 
     private class Ledger {
-        val lock = Concurrency.Strict.lock()
+        val lock = Mutex()
         var polynomialWork = 0L
         var quadraticWork = 0L
         var projected = 0L

@@ -1,15 +1,13 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.util.Cancellation
-import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
-import com.eignex.kumulant.stream.lock
 
 internal class InvariantNetworkPreparation(
     sweep: DefinitionalSweep?,
     numIntVars: Int,
     numBoolVars: Int,
-    private val lock: Mutex = Concurrency.Strict.lock(),
+    private val lock: Mutex = Mutex(),
 ) {
     private val steps = sweep?.networkPreparation(numIntVars, numBoolVars)?.iterator()
     private var complete = false
