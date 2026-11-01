@@ -174,7 +174,9 @@ internal object LpTemplatePreparationProfile {
                                         override fun workMeter(): WorkMeter = consumerMeter
                                     }
                                 } else token
-                                val consumer = if (route == "primal" || pump != null) null else CpToLpRelaxation(view, cost,
+                                val consumer = if (route == "primal" || pump != null) {
+                                    null
+                                } else CpToLpRelaxation(view, cost,
                                     projections = selectedView, templateStats = sink,
                                     reuseSourceTemplates = mode != "disabled", reuseTemplateIndexes = mode != "object",
                                     reuseTemplateMetadata = mode == "candidate" && route == "standalone",
@@ -214,7 +216,10 @@ internal object LpTemplatePreparationProfile {
                                                     if (it == "REUSED") wholeModelsReused++
                                                     if (it == "PUBLISHED") wholeModelsPublished++
                                                 })
-                                        } else checkNotNull(consumer).build(RootDomains(view), cancellation = consumerToken)
+                                        } else {
+                                            checkNotNull(consumer).build(RootDomains(view),
+                                                cancellation = consumerToken)
+                                        }
                                         envelopeConstant = relaxation.objectiveConstant
                                         finishAssembly()
                                         val solving = System.nanoTime()
@@ -237,7 +242,8 @@ internal object LpTemplatePreparationProfile {
                                     results.add("cancelled")
                                     return@consumers
                                 } finally {
-                                    retainedUnits = maxOf(retainedUnits, consumer?.preparationTemplates?.storageUnits ?: 0L)
+                                    retainedUnits = maxOf(retainedUnits,
+                                        consumer?.preparationTemplates?.storageUnits ?: 0L)
                                     sourceCacheUnits = maxOf(sourceCacheUnits, selectedView.lpPreparationReuseUnits)
                                 }
                                 importSolveRetirementBytes = sumBytes(importSolveRetirementBytes,
@@ -275,7 +281,8 @@ internal object LpTemplatePreparationProfile {
                         val record = buildJsonObject {
                             put("source", file.name)
                             put("route", route)
-                            put("cancelWorkLimit", if (route in listOf("primal", "pump") && change == "cancel") 48L else null)
+                            put("cancelWorkLimit",
+                                if (route in listOf("primal", "pump") && change == "cancel") 48L else null)
                             put("freshRootBuilds", pump?.freshBuilds)
                             put("rootContextsOpened", pump?.contextsOpened)
                             put("rootContextsRetired", pump?.contextsRetired)
