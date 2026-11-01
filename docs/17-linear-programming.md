@@ -155,6 +155,12 @@ separate; see [MPS semantics](05-arithmetic-formats.md).
 Consumers decide when to request certified bounds, fixings, conflicts or witnesses
 and how to apply and retract them. Their policy stays outside the engine.
 
+An opt-in finite propagation trace checks consumed trivial linear prunes against a
+fresh exact sum of Boolean values and signed integer endpoints. It retains the first
+disagreement separately from truncated trace payloads, within four million entry
+visits and 65,536 checks. Exhausted or declined observations supply no conclusion;
+the audit does not alter pruning or result authority.
+
 Finite tuple-packing substitution exposes placement selectors as ordinary Boolean
 columns. Per-Table choice rows and shared occupied-value capacities use the core
 cardinality projection, independently of scalar Table hull admission. Native source

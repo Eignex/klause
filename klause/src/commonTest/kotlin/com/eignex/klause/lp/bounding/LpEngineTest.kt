@@ -27,6 +27,7 @@ import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.tightenOpenIntBounds
+import com.eignex.klause.propagation.ArithmeticLearningTrace
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
@@ -39,9 +40,50 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpEngineTest {
+    @Test
+    fun `linear prune audit should detect a foreign cached objective contribution`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(2, 4)), emptyArray())
+        val session = PropagationSession(problem)
+        session.implyBool(0, true)
+        assertTrue(session.installObjectiveBoolBound(longArrayOf(20)))
+        val trace = ArithmeticLearningTrace().apply { auditLinearBounds = true }
+        session.explanationState.arithmeticLearningTrace = trace
+
+        val pruned = LpEngine(problem,
+            LinearObjective(boolWeights = longArrayOf(5), intCoefficients = longArrayOf(3), constant = 7),
+            LpParams(), SolveStatsSink("linear-prune-audit")).use { engine ->
+            engine.pruneNode(session, 25.0, -1, true)
+        }
+
+        assertTrue(pruned)
+        assertEquals(1, trace.linearAuditChecks)
+        assertEquals(3L, trace.linearAuditVisits)
+        assertEquals(25.0.toBits(), assertNotNull(trace.firstLinearDisagreement).data[0])
+    }
+
+    @Test
+    fun `linear prune audit should agree with signed mixed objective contributions`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(2, 4)), emptyArray())
+        val session = PropagationSession(problem)
+        session.implyBool(0, true)
+        val trace = ArithmeticLearningTrace().apply { auditLinearBounds = true }
+        session.explanationState.arithmeticLearningTrace = trace
+
+        val pruned = LpEngine(problem,
+            LinearObjective(boolWeights = longArrayOf(5), intCoefficients = longArrayOf(-3), constant = 7),
+            LpParams(), SolveStatsSink("signed-linear-prune-audit")).use { engine ->
+            engine.pruneNode(session, 0.0, -1, true)
+        }
+
+        assertTrue(pruned)
+        assertEquals(1, trace.linearAuditChecks)
+        assertNull(trace.firstLinearDisagreement)
+    }
+
     @Test
     fun `complete component node deductions honor the injected proof policy`() {
         for (accepted in listOf(false, true)) {

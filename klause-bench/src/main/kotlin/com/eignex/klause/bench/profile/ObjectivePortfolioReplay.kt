@@ -232,6 +232,7 @@ internal object ObjectivePortfolioReplay {
     internal fun observing(
         params: BacktrackParams,
         captures: MutableList<PreparedArithmeticLearningProfile.Capture>,
+        auditLinearBounds: Boolean = false,
         omitted: () -> Unit,
     ): BacktrackParams {
         var capture: PreparedArithmeticLearningProfile.Capture? = null
@@ -242,8 +243,10 @@ internal object ObjectivePortfolioReplay {
                 if (existing != null) {
                     capture = existing
                 } else if (captures.size < 8) {
+                    check(!auditLinearBounds || captures.isEmpty()) { "linear audit requires one native session" }
                     capture = PreparedArithmeticLearningProfile.Capture(
                         session, maxWords = 2048, retainBoundaries = true, seed = params.randomSeed,
+                        auditLinearBounds = auditLinearBounds,
                     )
                         .also { recorder ->
                             captures.add(recorder)

@@ -246,6 +246,10 @@ retain its output through `$OUT`. `ObjectiveCutoffProfile` accepts
 `initial-uncut-work=N` runs the first retained query without a cutoff for at most
 N work units before enabling the requested fixed cutoff; it shares the containing
 search allowance and records the actual first-query work and cutoff state.
+With `cache-audit=false`, `linear-bound-audit=true` checks actual trivial linear
+prunes against fresh exact objective bounds in one retained native session. The
+trace reports completed checks, visited entries, declines, allowance exhaustion
+and the first disagreement; missing observations cannot qualify correctness.
 
 Suite measurements `jfr`, `compilation` and `compilation+log` retain the CLI recording
 and write CPU, allocation and runtime-event summaries to `cases/N/out/solve.log`.

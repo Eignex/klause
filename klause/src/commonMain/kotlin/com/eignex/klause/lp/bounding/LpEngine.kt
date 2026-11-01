@@ -1010,7 +1010,19 @@ internal class LpEngine(
             effectiveBound: Double,
             objectiveVar: Int,
             objectiveAscending: Boolean,
-        ): Boolean = linearBoundDominates(session, effectiveBound)
+        ): Boolean {
+            val dominated = linearBoundDominates(session, effectiveBound)
+            if (dominated && effectiveBound.isFinite()) {
+                session.explanationState.arithmeticLearningTrace?.observeLinearPrune(
+                    minOf(session.problem.numBoolVars, objective.boolWeightValues.size).toLong() +
+                        minOf(session.problem.numIntVars, objective.intCoefficientValues.size) + 1L,
+                    effectiveBound, session.decisionLevel,
+                ) {
+                    linearBoundDominates(session, checkNotNull(BigFraction.ofDouble(effectiveBound)))
+                }
+            }
+            return dominated
+        }
     }
 
     /** Scheduling-feasibility prune arm (energetic and cumulative-flow — same prune family): every

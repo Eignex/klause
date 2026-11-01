@@ -10,13 +10,24 @@ internal class ArithmeticLearningTrace(
 
     val events = ArrayList<Event>()
     var retainBoundaries = false
-    val attached: Boolean get() = accepting || retainBoundaries
+    val attached: Boolean get() = accepting || retainBoundaries || auditLinearBounds
     val boundaries = ArrayList<Event>(64)
     var discardedBoundaries = 0L
         private set
     var observedCutoffBits: Long? = null
         private set
     var firstFiniteRead: Event? = null
+        private set
+    var auditLinearBounds = false
+    var linearAuditChecks = 0
+        private set
+    var linearAuditVisits = 0L
+        private set
+    var linearAuditDeclines = 0L
+        private set
+    var linearAuditLimitReached = false
+        private set
+    var firstLinearDisagreement: Event? = null
         private set
 
     var truncated = false
@@ -67,6 +78,23 @@ internal class ArithmeticLearningTrace(
         if (observedCutoffBits == bits) return
         observedCutoffBits = bits
         boundary("minimize.cutoff-read", bits, nativeLevel.toLong(), sharedLevel.toLong())
+    }
+
+    fun observeLinearPrune(entries: Long, cutoff: Double, level: Int, freshDominates: () -> Boolean) {
+        if (!auditLinearBounds || firstLinearDisagreement != null || linearAuditLimitReached) return
+        if (entries !in 1L..8193L) {
+            linearAuditDeclines++
+            return
+        }
+        if (linearAuditChecks == 65536 || entries > 4_000_000L - linearAuditVisits) {
+            linearAuditLimitReached = true
+            return
+        }
+        val agrees = freshDominates()
+        linearAuditVisits += entries
+        linearAuditChecks++
+        if (!agrees) firstLinearDisagreement = Event("objective.linear-prune-disagreement",
+            longArrayOf(cutoff.toBits(), level.toLong(), linearAuditChecks.toLong(), linearAuditVisits))
     }
 
     fun beginConflict(factorId: Int, level: Int, trail: Int) {

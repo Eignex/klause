@@ -42,7 +42,7 @@ internal object ObjectiveCutoffProfile {
         require(options.keys.all { it in setOf("suite", "problem", "sha256", "source64", "sourceGzip64",
             "cutoff", "seed", "order", "presolve", "presolve-work", "work", "slice-work", "timeout-ms",
             "point64", "point-sha256", "point-only", "portfolio", "initial-bt-probe-ms", "defer-bt-continuation",
-            "cache-audit", "initial-uncut-work") })
+            "cache-audit", "initial-uncut-work", "linear-bound-audit") })
         require((options["point64"] == null) == (options["point-sha256"] == null))
         require(options["point-only"] == null || options["point64"] != null)
         val portfolio = (options["portfolio"] ?: "false").toBooleanStrict()
@@ -58,6 +58,8 @@ internal object ObjectiveCutoffProfile {
         val timeout = (options["timeout-ms"] ?: "10000").toLong().also { require(it in 1..30_000L) }
         val maximumWork = (options["work"] ?: "150000").toLong().also { require(it in 1..1_000_000L) }
         val cacheAudit = (options["cache-audit"] ?: "true").toBooleanStrict()
+        val linearAudit = (options["linear-bound-audit"] ?: "false").toBooleanStrict()
+        require(!linearAudit || (!portfolio && !cacheAudit))
         val initialUncutWork = (options["initial-uncut-work"] ?: "0").toLong().also {
             require(it in 0..maximumWork)
         }
@@ -121,7 +123,7 @@ internal object ObjectiveCutoffProfile {
         var cutoffActive = initialUncutWork == 0L
         val stop = containing or Cancellation.after(timeout.milliseconds) or Cancellation { audit?.stopped == true }
         val base = BacktrackPresets.satOptimized(randomSeed = seed + 1000L, cancellation = stop)
-        val observed = if (audit == null) ObjectivePortfolioReplay.observing(base, captures) {
+        val observed = if (audit == null) ObjectivePortfolioReplay.observing(base, captures, linearAudit) {
             error("fixed-cutoff native capture allowance exhausted")
         } else base.copy(variableSelector = audit.observing(base.variableSelector))
         val params = observed.copy(
@@ -185,6 +187,7 @@ internal object ObjectiveCutoffProfile {
                     put("cutoff", cutoff)
                     put("initialUncutWork", initialUncutWork)
                     put("cacheAuditEnabled", cacheAudit)
+                    put("linearBoundAuditEnabled", linearAudit)
                     put("preparationNs", preparationNs)
                     put("preparationWork", budget.spent())
                     put("searchNs", System.nanoTime() - searchStarted)

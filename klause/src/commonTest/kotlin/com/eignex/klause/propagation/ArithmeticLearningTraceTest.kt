@@ -22,6 +22,34 @@ import kotlin.test.assertTrue
 
 class ArithmeticLearningTraceTest {
     @Test
+    fun `linear prune audit should withhold observations beyond its visit allowance`() {
+        val trace = ArithmeticLearningTrace().apply { auditLinearBounds = true }
+        var calls = 0
+        repeat(489) {
+            trace.observeLinearPrune(8192L, 25.0, 0) { calls++; true }
+        }
+
+        assertEquals(488, calls)
+        assertEquals(3_997_696L, trace.linearAuditVisits)
+        assertTrue(trace.linearAuditLimitReached)
+        assertNull(trace.firstLinearDisagreement)
+    }
+
+    @Test
+    fun `linear prune disagreement should survive detailed trace truncation`() {
+        val trace = ArithmeticLearningTrace(maxEvents = 1, maxWords = 1).apply { auditLinearBounds = true }
+        trace.record("first", 1L)
+        trace.record("second", 2L)
+
+        trace.observeLinearPrune(3L, 25.0, 4) { false }
+
+        assertTrue(trace.truncated)
+        assertTrue(trace.attached)
+        assertContentEquals(longArrayOf(25.0.toBits(), 4L, 1L, 3L),
+            requireNotNull(trace.firstLinearDisagreement).data)
+    }
+
+    @Test
     fun `focused capture should retain branch attempts within its allowance`() {
         for (kind in listOf("traversal.pick", "traversal.attempt")) {
             val trace = ArithmeticLearningTrace(maxEvents = 4, maxWords = 16).apply { captureFirstInteger = true }

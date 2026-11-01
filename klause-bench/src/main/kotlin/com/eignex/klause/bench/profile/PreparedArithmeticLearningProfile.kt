@@ -247,6 +247,7 @@ internal object PreparedArithmeticLearningProfile {
         captureFirstInteger: Boolean = false,
         retainBoundaries: Boolean = false,
         private val seed: Long? = null,
+        auditLinearBounds: Boolean = false,
     ) {
         private val field = LivePropagationState.require(native).javaClass.getDeclaredField("arithmeticLearningTrace")
             .apply { isAccessible = true }
@@ -258,6 +259,8 @@ internal object PreparedArithmeticLearningProfile {
                 .invoke(trace, captureFirstInteger)
             trace.javaClass.getMethod("setRetainBoundaries", Boolean::class.javaPrimitiveType)
                 .invoke(trace, retainBoundaries)
+            trace.javaClass.getMethod("setAuditLinearBounds", Boolean::class.javaPrimitiveType)
+                .invoke(trace, auditLinearBounds)
             field.set(LivePropagationState.require(native), trace)
         }
 
@@ -290,6 +293,23 @@ internal object PreparedArithmeticLearningProfile {
             }
             put("words", trace.javaClass.getMethod("getWords").invoke(trace) as Int)
             put("seed", seed)
+            put("linearPruneAudit", buildJsonObject {
+                put("enabled", trace.javaClass.getMethod("getAuditLinearBounds").invoke(trace) as Boolean)
+                put("checks", trace.javaClass.getMethod("getLinearAuditChecks").invoke(trace) as Int)
+                put("visits", trace.javaClass.getMethod("getLinearAuditVisits").invoke(trace) as Long)
+                put("declines", trace.javaClass.getMethod("getLinearAuditDeclines").invoke(trace) as Long)
+                put("visitLimit", 4_000_000L)
+                put("checkLimit", 65536)
+                put("limitReached", trace.javaClass.getMethod("getLinearAuditLimitReached").invoke(trace) as Boolean)
+                val disagreement = trace.javaClass.getMethod("getFirstLinearDisagreement").invoke(trace)
+                put("firstDisagreement", if (disagreement == null) JsonNull else buildJsonObject {
+                    val data = disagreement.javaClass.getMethod("getData").invoke(disagreement) as LongArray
+                    put("cutoff", Double.fromBits(data[0]))
+                    put("nativeLevel", data[1])
+                    put("check", data[2])
+                    put("visits", data[3])
+                })
+            })
             val first = trace.javaClass.getMethod("getFirstFiniteRead").invoke(trace)
             put("firstFiniteCutoff", if (first == null) JsonNull else buildJsonObject {
                 val data = first.javaClass.getMethod("getData").invoke(first) as LongArray
