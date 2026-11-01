@@ -76,7 +76,7 @@ internal object AffineSingletons {
         capWide: Boolean = false,
         incrementalTouchedVars: IntArray? = null,
         maxFactors: Int = AFFINE_MAX_FACTORS,
-        pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+        pivotOrder: AffinePivotOrder = AffinePivotOrder.AUTOMATIC,
         objective: LinearObjective? = null,
         preserveStructure: Boolean = false,
     ): PassDelta {
@@ -121,7 +121,7 @@ internal object AffineSingletons {
         objectiveIntVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
         maxFactors: Int = AFFINE_MAX_FACTORS,
-        pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+        pivotOrder: AffinePivotOrder = AffinePivotOrder.AUTOMATIC,
         objective: LinearObjective? = null,
         preserveStructure: Boolean = false,
     ): SourceDelta {
@@ -164,6 +164,7 @@ internal object AffineSingletons {
         if (problem.numIntVars == 0) return null
         // The entry scan alone can dominate optional preparation on very large models.
         if (problem.factors.size > maxFactors) return null
+        val policy = pivotOrder.forQuery(problem, objective != null)
         val objectiveRewrite = objective?.takeUnless { problem.semantics.isApproximate }
             ?.let { AffineObjective(it, cancellation) }
         if (objectiveRewrite?.interrupted == true) return null
@@ -215,7 +216,7 @@ internal object AffineSingletons {
         // unchanged since the previous run reached its fixpoint), so the scan need only test the factors
         // those variables appear in — O(delta) instead of O(factors) on the common fruitless re-run.
         if (sharedIntOcc != null) {
-            val seed = SeedOcc(problem.factors, sharedIntOcc, pivotOrder.allowsStructuredRewrites)
+            val seed = SeedOcc(problem.factors, sharedIntOcc, policy.allowsStructuredRewrites)
             val hasCandidate = if (incrementalTouchedVars != null) {
                 anyTouchedVarHeadsCandidate(
                     seed,
@@ -238,7 +239,7 @@ internal object AffineSingletons {
         // The session-maintained index matches the pristine input factor order, so the first candidate
         // search reads it instead of rebuilding an O(factors) index; each fold then patches only the
         // occurrence entries of the rewritten factors rather than re-indexing the whole set.
-        val ws = WorkingSet(problem.factors, eliminated.size, sharedIntOcc, pivotOrder.allowsStructuredRewrites)
+        val ws = WorkingSet(problem.factors, eliminated.size, sharedIntOcc, policy.allowsStructuredRewrites)
         // Each elimination rewrites only the factors mentioning the pivot and appends bound rows, so the
         // per-elimination cost is O(occurrences of x) rather than O(factors). The candidate scan still
         // walks the live factors in order (the elimination order is selection-order-sensitive), but the
@@ -249,7 +250,7 @@ internal object AffineSingletons {
         // the order as much as on the set: folding the cheap pivots first shrinks the graph, so folds that
         // would have been expensive become cheap or stop existing. The gates below (fill-in budget, absorb
         // cap) can only refuse a fold; they cannot defer one.
-        val order = AffinePivotOrders.new(pivotOrder, ws, eliminated, objVars, capWide, pivotable, cancellation)
+        val order = AffinePivotOrders.new(policy, ws, eliminated, objVars, capWide, pivotable, cancellation)
         // Cumulative substitution fill-in (Σ pivot-degree · substituted-terms). A dense chain of wide
         // folds is superlinear and can dominate presolve on large models where it barely simplifies;
         // once the budget is spent the loop stops, leaving the remaining affine-defined variables to be

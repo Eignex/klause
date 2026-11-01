@@ -194,7 +194,7 @@ class AffinePivotOrderTest {
     }
 
     @Test
-    fun `structured ordering should avoid the larger rewrite through native channels`() {
+    fun `automatic optimization should avoid the larger rewrite through native channels`() {
         val source = Problem(2, 3,
             arrayOf(IntDomain(0, 4), IntDomain(-4, 4), IntDomain(0, 4)), listOf(
                 Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
@@ -204,12 +204,29 @@ class AffinePivotOrderTest {
             ))
 
         val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
-            objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 1)),
-            pivotOrder = AffinePivotOrder.STRUCTURED)
+            objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 1)))
         val rebuilt = assertNotNull(delta.rebuild.asSampleLift())(
             Sample(booleanArrayOf(true, true), longArrayOf(3, 0, 1)))
 
         assertEquals(2L, rebuilt.ints[1])
+    }
+
+    @Test
+    fun `automatic ordering should retain native channels outside discrete optimization`() {
+        for (realCount in 0..1) {
+            val source = Problem(3, 3, Array(3) { IntDomain(0, 4) }, listOf(
+                Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.GE, 2),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(2), LinearOp.GE, 2),
+            ), numRealVars = realCount, realLower = DoubleArray(realCount) { 0.0 },
+                realUpper = DoubleArray(realCount) { 1.0 })
+
+            val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
+                objective = if (realCount == 0) null else LinearObjective(boolWeights = longArrayOf(1, 1, 1)))
+
+            assertTrue(delta.isEmpty)
+        }
     }
 
     @Test

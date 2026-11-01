@@ -31,6 +31,8 @@ internal object AffinePivotOrders {
 
         AffinePivotOrder.REWRITE_COST ->
             MarkowitzOrder(ws, eliminated, objectiveIntVars, capWide, pivotable, cancellation, minimizeRewrite = true)
+
+        AffinePivotOrder.AUTOMATIC -> error("Automatic affine order requires a query context")
     }
 
     private class StableIdOrder(

@@ -95,9 +95,12 @@ class BinaryObjectiveViewTest {
 
     @Test
     fun `structured rewrites should reconstruct a projected binary cost within a mixed objective`() {
-        for ((order, projected) in listOf(AffinePivotOrder.MARKOWITZ to false,
-            AffinePivotOrder.STRUCTURED to true, AffinePivotOrder.REWRITE_COST to true)
-        ) {
+        for ((order, projected) in listOf(
+            AffinePivotOrder.MARKOWITZ to false,
+            AffinePivotOrder.STRUCTURED to true,
+            AffinePivotOrder.REWRITE_COST to true,
+            AffinePivotOrder.AUTOMATIC to true,
+        )) {
             val source = Problem(1, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
                 listOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
             val original = LinearObjective(intCoefficients = longArrayOf(3, 5), constant = 7)

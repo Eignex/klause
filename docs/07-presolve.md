@@ -87,13 +87,16 @@ default round cap; an explicit zero round cap still suppresses those schedules.
 
 ### Rewrite representation controls
 
+`AffinePivotOrder.AUTOMATIC` is the default query policy. It selects `STRUCTURED`
+for exact optimization without continuous variables and `MARKOWITZ` for other
+queries. Explicit pivot policies retain their own consumer admission.
+
 `AffinePivotOrder.STRUCTURED` keeps Markowitz ordering between definitions. It
 retains the first admitted declaration-order pivot for aliases and ordinary
-consumers. When that pivot needs the added native reified or comparison-clause
-support, it tries the smallest incident rewrite payload first. Consumer admission
+consumers. When that pivot uses a native reified or comparison-clause
+consumer, it tries the smallest incident rewrite payload first. Consumer admission
 checks walk the maintained occurrence index and charge the phase allowance. It
 also reuses existing exact binary cost channels within mixed integer objectives.
-`MARKOWITZ` remains the default policy.
 
 `AffinePivotOrder.REWRITE_COST` retains Markowitz ordering between definitions and
 tries the smallest rewrite payload among an equality's unit pivots first. It sums

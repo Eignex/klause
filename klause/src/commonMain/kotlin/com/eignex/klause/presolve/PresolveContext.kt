@@ -24,7 +24,7 @@ data class PresolveContext(
     /** Whether affine elimination should cap wide folds. */
     val affineUnderdetermined: Boolean = false,
     /** Configured affine pivot order. */
-    val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+    val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.AUTOMATIC,
     /** The presolve phase's shared work allowance. */
     val presolveBudget: PresolveBudget? = null,
     /** Incremental subsumption state. */
