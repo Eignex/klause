@@ -253,6 +253,8 @@ class LpPrimalHeuristicsTest {
             Linear(intArrayOf(1, 1), intArrayOf(5, 6), LinearOp.GE, 1),
         )).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1, 2, 1, 2))
+        var expired = false
+        var returnedChildren = 0
         val factory = RecordingLpEngineFactory(object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
@@ -262,7 +264,9 @@ class LpPrimalHeuristicsTest {
                     refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
                 return object : PersistentLpSolver by delegate {
                     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
-                        delegate.resolveBounds(LpFloatAllowance(allowance?.work ?: 0L, 1))
+                        delegate.resolveBounds(LpFloatAllowance(allowance?.work ?: 0L, 1)).also {
+                            if (++returnedChildren == 3) expired = true
+                        }
                 }
             }
         })
@@ -271,9 +275,10 @@ class LpPrimalHeuristicsTest {
                 rootCutHarvest = false)), SolveStatsSink("deferred-child-guidance"),
             LpSolveContext(factory)).use { engine ->
             assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
-            val expired = Cancellation { factory.floatAllowances.isNotEmpty() }
-            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), expired)
+            val token = Cancellation { expired }
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), token)
             val queries = factory.floatAllowances.size
+            assertTrue(expired)
             assertTrue(bound.isNaN())
             assertTrue(queries > 0)
 
