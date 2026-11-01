@@ -170,6 +170,8 @@ data class PortfolioScenario(
     val sharingMemoryScratch: Int = 4_096,
     /** Optional modeled byte limit per shared learned-clause pool. */
     val sharingMemoryBytes: Long? = null,
+    /** Apply bounded root defaults to eligible curated satisfaction recipes. */
+    val rootMaintenance: Boolean = true,
 ) {
     init {
         require(sharingMemoryWork >= 0L && sharingMemoryScratch >= 0) { "sharing memory limits must be nonnegative" }
@@ -348,7 +350,7 @@ internal object PortfolioComposition {
         val nodeBudget = scenario.nodeBudget
         val zeroObjectivePricing = scenario.zeroObjectivePricing
         val edit = scenario.btEdit
-        val boundedRoot = scenario.engine == EngineMix.BACKTRACK && annotationArm == null &&
+        val boundedRoot = scenario.rootMaintenance && scenario.engine == EngineMix.BACKTRACK && annotationArm == null &&
             facts.profile.problemClass == ProblemClass.PseudoBoolean && !facts.profile.optimizing
         if (btPool != null) {
             // The `--lp` ceiling bounds the pool, and an injected pool is still the pool: capping only the
