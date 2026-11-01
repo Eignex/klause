@@ -90,6 +90,57 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `a complete source neighborhood should skip unaffected source clauses`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), Array<Factor>(130) { index ->
+                Clause(when (index) {
+                    0 -> intArrayOf(1)
+                    129 -> intArrayOf(0, 2, 4)
+                    else -> intArrayOf(4, 6)
+                })
+            }).bake()
+            val projection = PropagationProblem.preparation(source).asSequence().filterNotNull().last()
+            val session = PropagationSession(projection, nativeSat = native)
+            val work = session.work
+            val stats = SearchStatsSink()
+
+            RootSimplificationPass().run(session, BacktrackParams(), stats)
+            val partners = ArrayList<Int>()
+            session.explanationState.forEachBinaryPartner(2) { partners.add(it) }
+
+            assertEquals(listOf(4), partners)
+            assertEquals(2L, stats.snapshot().learning.getValue("inprocessRootCandidates"))
+            assertTrue(session.work - work < 64L)
+        }
+    }
+
+    @Test
+    fun `learned compaction should retain an indexed source candidate`() {
+        for (native in listOf(false, true)) {
+            val source = problem(intArrayOf(1), intArrayOf(0, 2, 4)).bake()
+            val projection = PropagationProblem.preparation(source).asSequence().filterNotNull().last()
+            val session = PropagationSession(projection, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(2, 6)), 2)
+            val pass = RootSimplificationPass()
+            val stats = SearchStatsSink()
+            repeat(32) {
+                if (stats.snapshot().learning["inprocessRootNeighborhoodCandidates"] == null) {
+                    pass.run(session, BacktrackParams(inprocessingRootWork = 1L), stats)
+                }
+            }
+            assertEquals(1L, stats.snapshot().learning.getValue("inprocessRootNeighborhoodCandidates"))
+            session.forgetLearnedClauses { _, _ -> false }
+            assertEquals(0, session.learnedClauseCount)
+
+            pass.run(session, BacktrackParams(), null)
+            val partners = ArrayList<Int>()
+            session.explanationState.forEachBinaryPartner(2) { partners.add(it) }
+
+            assertEquals(listOf(4), partners)
+        }
+    }
+
+    @Test
     fun `new root facts should extend the source neighborhood after an earlier slice`() {
         for ((native, prepared) in listOf(false to false, false to true, true to true)) {
             val source = Problem(6, 0, emptyArray(), Array<Factor>(130) { index ->
