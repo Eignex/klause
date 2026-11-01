@@ -34,8 +34,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.kumulant.stream.Mutex
 
 internal class QuadraticPortfolioInvocation(
     private val plan: PreparedSourcePlan,
@@ -61,7 +60,7 @@ internal class QuadraticPortfolioInvocation(
     private val limits = PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells)
     private val evaluation = AlgebraicArithmetic(PolynomialArithmetic(verification, limits))
     private val terminalArithmetic = AlgebraicArithmetic(PolynomialArithmetic(verification, limits))
-    private val terminalLock = Concurrency.Strict.lock()
+    private val terminalLock = Mutex()
     private val incumbents = PortfolioIncumbents.mappedAlgebraic(
         valueOf = { candidate ->
             val value = objective.evaluateExact(candidate.sample, evaluation)
