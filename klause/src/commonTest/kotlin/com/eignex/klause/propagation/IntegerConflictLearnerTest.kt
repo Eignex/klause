@@ -390,12 +390,12 @@ class IntegerConflictLearnerTest {
         assertIs<ConflictAnalyzer.AnalysisResult.Learned>(capped.learnedClause)
         native.popToLevel(0)
         native.forgetLearnedClauses { index, _ -> index != 0 }
+        assertEquals(INTEGER_LEARNING_ROWS - 1, native.explanationState.learned.integerRows?.size)
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
 
         val retried = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
 
         assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(retried.learnedClause)
-        assertEquals(INTEGER_LEARNING_ROWS - 1, native.explanationState.learned.integerRows?.size)
     }
 
     @Test

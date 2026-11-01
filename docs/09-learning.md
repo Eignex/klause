@@ -320,6 +320,7 @@ boundary/preparation deferrals.
 Selected pure-Boolean retirement captures an opaque admission handle before a
 replacement is admitted. Immutable admission keys survive compaction; a bounded
 compressed binary index reuses an already-owned request instead of allocating another.
+Recent use shares the lifecycle word, while admission keys occupy a remapped column.
 A separate compaction generation rejects stale selections;
 captured handles retain no clause payload and survive later factor-ID remapping.
 The caller authorizes a request only after replacement propagation and required
@@ -491,10 +492,11 @@ the same LBD priorities and tier lifetimes; a sweep event requires actual retire
 If complete candidate preparation cannot be funded, native clauses and general learned constraints use
 the bounded handle-preserving window. The candidate index retains the best eligible
 LBD keys as a max-heap; each funded step can resume without a whole-store selection
-buffer. Permanent clauses, protected reasons, unfunded rows and policy survivors
+buffer. Permanent clauses, protected reasons and policy survivors
 reduce the heap quota. A pending eviction that gains protection also consumes that
 quota before the next heap step. Mid rows
 survive their demotion window, and classification clears survivor reuse flags.
+An unfunded next-row transaction suspends the cursor for a later grant.
 Current or historical reasons can retain additional rows above the soft cap.
 Native post-undo replay protects its queued clause handles and learned units without
 freezing unrelated retirement. Incomplete trail propagation, conflicts and root

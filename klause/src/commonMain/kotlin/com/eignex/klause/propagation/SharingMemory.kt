@@ -177,7 +177,7 @@ private fun PropagationState.learnedSharingMemory(
         if (used) consumed++
     }
     val columns = listOf(learned.stages, learned.lbds, learned.permanent, learned.tier, learned.boolReasons,
-        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)
+        learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)
     val protectedRows = protected.size > 0
     learned.capRanking.sharingMemory(sample, protectedRows)
     var metadata = learned.capRanking.primitiveBytes + learned.admissions.allocatedBytes + Int.SIZE_BYTES
