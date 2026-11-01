@@ -28,7 +28,9 @@ class LpScopedSolverTest {
         val pointModel = assertNotNull(state.ownerWorkingModel())
         LpScopedSolver(state).use { owner ->
             assertNotNull(owner.solveFloat()?.second)
-            assertNotNull(owner.directionalCosts(pointModel, intArrayOf(x), 100_000L, Cancellation.Never) { assertTrue(it > 0L) })
+            assertNotNull(owner.directionalCosts(pointModel, intArrayOf(x), 100_000L, Cancellation.Never) {
+                assertTrue(it > 0L)
+            })
             assertTrue(owner.push())
             assertTrue(owner.assertBound(x, true, ExactLpSide(ExactLpNumber.of(0L)), 1L))
             var work = 0L

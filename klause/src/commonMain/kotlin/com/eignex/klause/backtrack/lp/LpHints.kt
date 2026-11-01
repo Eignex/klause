@@ -79,7 +79,9 @@ internal class LpHints(
 
     private fun recordEstimate(relaxation: LpRelaxation, bound: Double, checked: Boolean) {
         boundRecorded = false
-        if (!collect || relaxation.colVarId.size > 8192 || !freshRecord || pointRelaxation?.model !== relaxation.model) {
+        if (!collect || relaxation.colVarId.size > 8192 || !freshRecord ||
+            pointRelaxation?.model !== relaxation.model
+        ) {
             recordUnavailable(LpHintUnavailable.MODEL)
             return
         }
