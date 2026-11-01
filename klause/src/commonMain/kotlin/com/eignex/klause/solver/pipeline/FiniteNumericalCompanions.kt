@@ -90,6 +90,7 @@ internal class FiniteNumericalCompanions private constructor(
     private val afterIncumbent: Boolean,
     private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?,
     private val admission: FiniteCompanionAdmission? = null,
+    private val afterImprovement: Boolean = false,
 ) {
     class Preparation(val companions: FiniteNumericalCompanions?, val elapsedNanos: Long)
 
@@ -123,7 +124,10 @@ internal class FiniteNumericalCompanions private constructor(
                         activeLimit = requireNotNull(cost.activeMillis).milliseconds,
                         sliceLimit = requireNotNull(cost.sliceMillis).milliseconds)
                 }) { _, _, _, _ -> error("numerical companion runs only by slice") }.bindEvidence(identity)
-                worker.also { it.startAfterIncumbent = afterIncumbent }
+                worker.also {
+                    it.startAfterIncumbent = afterIncumbent
+                    it.startAfterAcceptedImprovement = afterImprovement
+                }
             },
             factory(firstArm + 1, ArmFamily.LocalSearch) { slot ->
                 lateinit var companion: PortfolioWorker
@@ -143,7 +147,10 @@ internal class FiniteNumericalCompanions private constructor(
                             "finiteJointCompanion", activeLimit = requireNotNull(cost.activeMillis).milliseconds)
                     }) { _, _, _, _ -> error("joint companion runs only by slice") }
                     .bindEvidence(identity, provesResults = false)
-                companion.also { it.startAfterIncumbent = afterIncumbent }
+                companion.also {
+                    it.startAfterIncumbent = afterIncumbent
+                    it.startAfterAcceptedImprovement = afterImprovement
+                }
             },
         )
     }
@@ -217,9 +224,10 @@ internal class FiniteNumericalCompanions private constructor(
 
         fun deferred(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: Cancellation, cost: WorkerConstructionCost, admission: FiniteCompanionAdmission,
-            incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?): FiniteNumericalCompanions =
+            incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?,
+            afterImprovement: Boolean = false): FiniteNumericalCompanions =
             FiniteNumericalCompanions(model, objective, null, params, cancellation, cost, true,
-                incumbentCompletionCheck, admission)
+                incumbentCompletionCheck, admission, afterImprovement)
 
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: Cancellation, cost: WorkerConstructionCost,

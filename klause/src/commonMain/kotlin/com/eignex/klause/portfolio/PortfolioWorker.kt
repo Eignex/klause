@@ -78,6 +78,7 @@ class PortfolioWorker private constructor(
     internal var earlyCoreTrial: Boolean = false
 
     internal var startAfterIncumbent: Boolean = false
+    internal var startAfterAcceptedImprovement: Boolean = false
     internal var booleanProofRecipe: BooleanProofRecipe? = null
     internal var constructionNanos: Long = 0
     internal var createdNanos: Long = 0

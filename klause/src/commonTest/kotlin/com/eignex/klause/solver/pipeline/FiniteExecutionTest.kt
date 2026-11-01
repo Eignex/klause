@@ -93,7 +93,9 @@ class FiniteExecutionTest {
     @Test
     fun `funded companion admission should reject missing start contracts`() {
         for (settings in listOf(listOf("companion-admission=never"), listOf("companion-admission=funded"),
-            listOf("companion-admission=funded", "companion-after-incumbent=true"))) {
+            listOf("companion-admission=funded", "companion-after-incumbent=true"),
+            listOf("companion-admission=progress-funded"),
+            listOf("companion-admission=progress-funded", "companion-after-incumbent=true"))) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -108,9 +110,12 @@ class FiniteExecutionTest {
 
     @Test
     fun `typed and parsed funded admission should reach the source portfolio`() {
-        for (options in listOf(ExecutionOptions(ExecutionOption.companionAdmission("funded"),
-            ExecutionOption.companionAfterIncumbent(true)), ExecutionOptions.parse(listOf(
-            "companion-admission=funded", "companion-after-incumbent=true")))) {
+        val variants = listOf("funded", "progress-funded").flatMap { admission ->
+            listOf(ExecutionOptions(ExecutionOption.companionAdmission(admission),
+                ExecutionOption.companionAfterIncumbent(true)), ExecutionOptions.parse(listOf(
+                "companion-admission=$admission", "companion-after-incumbent=true")))
+        }
+        for (options in variants) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)

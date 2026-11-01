@@ -1091,8 +1091,8 @@ private fun executePortfolio(
     val admission = request.executionOptions.reader()[ExecutionOption.companionAdmission]
     val fundedCompanions = when (admission) {
         null, "ordinary" -> false
-        "funded" -> true
-        else -> pipelineConfigError("companion-admission expects ordinary|funded, got `$admission`")
+        "funded", "progress-funded" -> true
+        else -> pipelineConfigError("companion-admission expects ordinary|funded|progress-funded, got `$admission`")
     }
     val probePolicy = when (val probes = request.executionOptions.reader()[ExecutionOption.portfolioProbes]) {
         null, "ordinary" -> InitialProbePolicy.ORDINARY
@@ -1223,6 +1223,7 @@ private fun executePortfolio(
         probePolicy = probePolicy,
         booleanProofTasks = booleanProofTasks,
         fundedCompanions = fundedCompanions,
+        waitForCompanionImprovement = admission == "progress-funded",
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {
