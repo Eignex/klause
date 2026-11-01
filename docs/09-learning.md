@@ -273,6 +273,15 @@ variable. Learned clauses live in a growable side buffer with a wrapping
 replacement-scan cursor per clause, and reductions compact them in place. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
 
+When permanent native clauses already fill a restart cap, a bounded window over
+non-permanent learned clauses can retire unused local rows without renumbering
+handles. Each row funds its policy update and live-reason scan before publication;
+units, pending rechecks and current root reasons survive. An unfinished window
+retains its read and write cursors across later restarts and appended clauses.
+Retired rows stop propagation and export, while their slots and arena bytes remain
+owned until a funded full compaction reclaims them. Ownership reports include that
+capacity and report `learnedRetiredSlots` separately from active clause count.
+
 ## Pseudo-Boolean learning
 
 `pbLearning` auto-enables cutting-plane analysis for pure-Boolean models. Explicit
@@ -398,6 +407,12 @@ and worst-case ranking work against `learnedMemoryWork` and
 poll cancellation; unfinished preparation publishes no tier changes or sweep event.
 Insufficient work or scratch safely defers the cap sweep. Completed selection keeps
 the same LBD priorities and tier lifetimes; a sweep event requires actual retirement.
+
+If complete candidate preparation cannot be funded, the native permanent-floor
+case uses the bounded handle-preserving window. Permanent ownership already
+exhausts the cap, so every eligible local row is excess and no LBD ranking is needed.
+Mid rows survive their demotion window; each completed window clears survivor reuse
+flags. Other stores and caps retain the complete selection and remap preflight.
 
 Shared learning also accepts an optional modeled-byte soft limit checked at
 propagation boundaries independently of restarts. Units, glue clauses, live reason
