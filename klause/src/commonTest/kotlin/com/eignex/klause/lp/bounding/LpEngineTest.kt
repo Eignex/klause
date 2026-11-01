@@ -52,6 +52,26 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `numerical root preparation finishes before the bounded root query`() {
+        val sink = SolveStatsSink("paid-numerical-root-preparation")
+        LpEngine(boundedProblem().bake(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)), sink).use { engine ->
+            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            val prepared = assertNotNull(engine.propagator.metrics)
+            val paid = prepared.preparationWork
+            val query = Cancellation { engine.propagator.metrics?.preparationSuccesses == 0L }
+
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), query)
+
+            assertTrue(paid > 0L)
+            assertEquals(3.0, bound)
+            assertEquals(paid, assertNotNull(engine.propagator.metrics).preparationWork)
+            assertEquals(1L, sink.snapshot().lp.phases["ROOT_NUMERICAL_PREPARATION_ROOT"]?.outcomes?.get("READY"))
+        }
+    }
+
+    @Test
     fun `paused root layout preparation retains charged construction`() {
         val problem = boundedProblem().bake()
         val sink = SolveStatsSink("paused-root-layout")

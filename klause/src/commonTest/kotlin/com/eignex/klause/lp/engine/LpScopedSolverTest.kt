@@ -18,6 +18,24 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `spent construction funding should not repeat declined preparation`() {
+        val builder = LpBuilder()
+        val column = builder.addVar(0L, 5L, cost = 1L)
+        builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            assertFalse(owner.prepare(Cancellation.Never, 1L))
+            val paid = owner.metrics.preparationWork
+
+            val ready = owner.prepare(Cancellation.Never, 0L)
+
+            assertFalse(ready)
+            assertTrue(paid > 0L)
+            assertEquals(paid, owner.metrics.preparationWork)
+        }
+    }
+
+    @Test
     fun `retained queries can finish after an earlier invocation token expires`() {
         val builder = LpBuilder()
         repeat(2) {

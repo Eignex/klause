@@ -1175,6 +1175,9 @@ all preparation, failed work and retirement belong to the containing comparison.
 installation across private worker pauses. Its work and time include completed and
 discarded chunks; waiting between slices is excluded. A ready layout grants no bound.
 These are subsets of containing LP work; nested template costs are not additional totals.
+`ROOT_NUMERICAL_PREPARATION_ROOT` separates private numerical-owner readiness from
+layout readiness. Its work and time are included in layout preparation and ordinary
+LP construction totals; do not add these nested counters.
 `ROOT_QUERY_ROOT` records the requested component, sparse or standalone route and
 its work, cancellation, layout, numerical, certification or projection stop.
 A component request does not establish that a component owner was constructed;

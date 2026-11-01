@@ -502,7 +502,10 @@ before yielding to the worker's slice. A paused builder retains only its source-
 assembly buffers; no partial layout, point or certificate is available to consumers.
 Resumption keeps the same builder and cumulative root and LP funding. Containing
 cancellation or spent cumulative funding retires it. Completion prepares the source
-layout and its private exact state before the consultation-local numerical clock starts.
+layout, private exact state and numerical owner before the consultation-local numerical clock starts.
+Numerical construction uses the same remaining cumulative root and LP allowance; completed
+and declined preparation charges that allowance before a query. Only a complete private owner
+survives a pause. Each query adopts its own cancellation token before using that owner's basis.
 The consultation adopts that state only while its source-root model, exact state and root scope remain current.
 Incumbent validation can retire pending construction, and engine closure releases its private buffers.
 Atomic projection and row emission retain the worker's ordinary overspend accounting.

@@ -98,11 +98,19 @@ internal class LpScopedSolver(
         require(maxRetainedRows >= 0 && refactorUpdateLimit > 0 && iterationLimit >= 0 && workLimit >= 0L)
     }
 
-    fun prepare(token: Cancellation = cancellation): Boolean {
+    fun prepare(token: Cancellation = cancellation): Boolean = prepare(token, null)
+
+    fun prepare(token: Cancellation, workAllowance: Long?): Boolean {
         requireAvailable()
         if (closed || token() || state.model.m > maxRetainedRows) return false
         if (solver != null) return true
-        solver = prepared(state, token)?.first ?: return false
+        if (workAllowance != null && workAllowance <= 0L) return false
+        val available = when {
+            workAllowance == null -> workLimit
+            workLimit <= 0L -> workAllowance
+            else -> minOf(workLimit, workAllowance)
+        }
+        solver = prepared(state, token, workBudget = available)?.first ?: return false
         return true
     }
 

@@ -910,10 +910,22 @@ internal class LpEngine(
                 if (!token() && base.persistentEligible && !base.model.hasContinuous) {
                     persistentRelaxation = base
                     preparedRootRelaxation = cpAdapter.sourceRootRelaxation(base, token)
-                    if (preparedRootRelaxation == null) cpAdapter.reset()
+                    if (preparedRootRelaxation == null) cpAdapter.reset() else prepareRootNumericalOwner(token)
                 }
                 persistentRelaxer = relaxer
             })
+    }
+
+    private fun prepareRootNumericalOwner(cancellation: Cancellation) {
+        val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.ROOT),
+            LpSolvePhase.ROOT_NUMERICAL_PREPARATION)
+        val before = totalSolveWork()
+        var outcome = "DECLINED"
+        try {
+            if (propagator.prepare(cancellation, retainedRootCumulativeWork())) outcome = "READY"
+        } finally {
+            timer.finish(outcome, totalSolveWork() - before)
+        }
     }
 
     private fun preparePersistentLayout(relaxer: CpToLpRelaxation, cancellation: Cancellation): Boolean {

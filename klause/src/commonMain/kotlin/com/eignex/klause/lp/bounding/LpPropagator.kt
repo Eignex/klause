@@ -400,6 +400,15 @@ internal class LpPropagator(
         }
     } == true
 
+    fun prepare(token: Cancellation, workAllowance: Long): Boolean = withOwner { current ->
+        try {
+            current.prepare(token, workAllowance)
+        } finally {
+            lastMetrics = takePreparationMetrics(current)
+            onPreparation?.invoke(lastMetrics)
+        }
+    } == true
+
     fun solveFloat(
         warm: Basis? = null,
         token: Cancellation = cancellation,
