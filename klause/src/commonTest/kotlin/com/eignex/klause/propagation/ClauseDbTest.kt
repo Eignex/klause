@@ -25,7 +25,8 @@ class ClauseDbTest {
     @Test
     fun `arithmetic rows should reduce the clause ranking quota`() {
         for (integer in listOf(false, true)) {
-            val session = PropagationSession(Problem(4, 1, arrayOf(IntDomain(0, 10)), emptyArray()), nativeSat = false)
+            val session = PropagationSession(Problem(4, 1, arrayOf(IntDomain(0, 10)),
+                arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
             if (integer) {
                 val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
                     longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))

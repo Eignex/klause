@@ -152,14 +152,13 @@ class ClauseDbTest {
                 nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
             session.addLearnedClause(Clause(intArrayOf(4, 6)), 8)
+            repeat(4) { session.addLearnedClause(Clause(intArrayOf(8, 10)), 9, permanent = true) }
             var stop = true
-            var before = session.work
-            val params = BacktrackParams(maxLearnedClauses = 1, tieredLearnedDb = true,
-                learnedMemoryWork = 64L, cancellation = Cancellation { stop && session.work - before >= 52L })
+            val params = BacktrackParams(maxLearnedClauses = 5, tieredLearnedDb = true,
+                learnedMemoryWork = 128L,
+                cancellation = Cancellation { stop && session.learnedLifecycle().getValue("learnedCapVisits") >= 2L })
             forgetIfOverCap(session, params)
-            before = session.work
-            forgetIfOverCap(session, params)
-            assertEquals(2, session.activeLearnedClauseCount)
+            assertEquals(6, session.activeLearnedClauseCount)
 
             stop = false
             session.pinBool(0, false)
