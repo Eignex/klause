@@ -75,8 +75,8 @@ counts actual signed alias substitutions. Discovery accepts only owned global
 binary learning and checks at most 128 binaries within 32,768 work per observation.
 `BinaryHistoryWork` and `BinaryHistoryBytes` retain the fixed history's initialization
 and primitive storage. At most 32 relations are attempted in one worker. Its history
-and the 16 KiB discovery scratch model spend the existing byte grant. counters include retired trial decision and propagation work in `TrialWork`, and
-`ChargedWork` reports the cumulative private allowance spent. These work
+and the 16 KiB discovery scratch model spend the existing byte grant.
+`TrialWork` retains retired trial decision and propagation work; `ChargedWork` reports the cumulative private allowance spent. These work
 counters are subsets of worker work, not additional totals to sum. Missing relations
 after a bounded scan do not establish an absence of opportunities.
 Use the same source, engine, presolve, seeds, processors, heap, containing allowance
