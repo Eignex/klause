@@ -117,7 +117,13 @@ class RootInprocessingTest {
     @Test
     fun `learned compaction should retain an indexed source candidate`() {
         for (native in listOf(false, true)) {
-            val source = problem(intArrayOf(1), intArrayOf(0, 2, 4)).bake()
+            val source = Problem(4, 0, emptyArray(), Array<Factor>(130) { index ->
+                Clause(when (index) {
+                    0 -> intArrayOf(1)
+                    129 -> intArrayOf(0, 2, 4)
+                    else -> intArrayOf(4, 6)
+                })
+            }).bake()
             val projection = PropagationProblem.preparation(source).asSequence().filterNotNull().last()
             val session = PropagationSession(projection, nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(2, 6)), 2)
@@ -269,7 +275,7 @@ class RootInprocessingTest {
         for (native in listOf(false, true)) {
             val source = Problem(5001, 0, emptyArray(), arrayOf<Factor>(
                 Clause(IntArray(5000) { it * 2 }), Clause(IntArray(5000) { it * 2 + 1 }),
-                Clause(intArrayOf(10000)),
+                Clause(intArrayOf(0)),
             ))
             val session = PropagationSession(source.bake(), nativeSat = native)
             val pass = RootSimplificationPass()
