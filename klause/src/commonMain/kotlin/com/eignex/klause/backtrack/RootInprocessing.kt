@@ -24,6 +24,7 @@ internal class RootSimplificationPass : InprocessingPass {
     private var pinCursor = 0
     private var occurrenceCursor = 0
     private var preferNeighborhood = true
+    private var neighborhoodLeft = 0
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
         sample.owned(dropped, dropped.allocatedBytes, protected)
@@ -101,6 +102,7 @@ internal class RootSimplificationPass : InprocessingPass {
         }
         var examined = 0
         var literalsVisited = 0
+        neighborhoodLeft = ROOT_LITERAL_LIMIT
         while (examined++ < params.rootSimplifyBatch) {
             if (!session.canSimplifyRoot || literalsVisited >= ROOT_LITERAL_LIMIT || budget.stopped()) break
             var candidate = pending
@@ -195,7 +197,7 @@ internal class RootSimplificationPass : InprocessingPass {
 
     private fun neighborhoodFactor(session: PropagationSession, budget: InprocessingBudget): Int? {
         val pins = session.explanationState.boolPinOrder
-        while (pinCursor < pins.size) {
+        while (pinCursor < pins.size && neighborhoodLeft > 0) {
             val variable = pins[pinCursor]
             val occurrences = if (variable < session.problem.numBoolVars) {
                 session.projection.preparedBoolOccurrences(variable)
@@ -207,6 +209,7 @@ internal class RootSimplificationPass : InprocessingPass {
                 return null
             }
             if (!budget.visit()) return null
+            neighborhoodLeft--
             if (occurrences == null || occurrenceCursor >= occurrences.size) {
                 pinCursor++
                 occurrenceCursor = 0

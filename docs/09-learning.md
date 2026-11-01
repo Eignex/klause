@@ -489,7 +489,8 @@ without a pinned literal it cannot satisfy or shorten a Boolean clause. Clauses
 affected by a new Boolean root fact can be reached through its prepared source-occurrence
 index. This bounded neighborhood alternates with the ordinary clause scan,
 retains its pin and occurrence positions across slices, and builds no index
-inside the pass. Unprepared projections retain the ordinary scan. A shortened
+inside the pass. Pin and occurrence walks admit at most 8,192 entries per slice
+even with an unlimited class grant. Unprepared projections retain the ordinary scan. A shortened
 source clause enters as a permanent session-local replacement before its watches
 retire; immutable source text remains available for reasons. The propagation session
 owns unfinished source-watch retirement
