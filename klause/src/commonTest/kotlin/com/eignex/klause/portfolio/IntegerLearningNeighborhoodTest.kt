@@ -47,6 +47,24 @@ class IntegerLearningNeighborhoodTest {
     }
 
     @Test
+    fun `sparse neighbors should remain discoverable after disjoint equalities`() {
+        val factors = mutableListOf<Factor>()
+        repeat(32) { group ->
+            factors.add(Linear(longArrayOf(-1, -1, -1, 1, 1, 1),
+                IntArray(6) { group * 6 + it }, LinearOp.LE, 0))
+        }
+        for (start in listOf(192, 201)) {
+            factors.add(Linear(LongArray(9) { 1L }, IntArray(9) { start + it }, LinearOp.EQ, 1))
+        }
+        factors.add(Linear(LongArray(9) { 1L }, intArrayOf(0, 1, 2, 210, 211, 212, 213, 214, 215), LinearOp.EQ, 1))
+        val problem = Problem(0, 216, Array(216) { IntDomain(0, 1) }, factors)
+
+        val neighborhood = IntegerLearningNeighborhood.inspect(problem)
+
+        assertTrue(neighborhood.compatible)
+    }
+
+    @Test
     fun `an exhausted probe should withhold a later compatible neighbor`() {
         val equality = Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1)
         val factors = mutableListOf<Factor>(equality)

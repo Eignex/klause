@@ -32,8 +32,8 @@ internal class IntegerLearningNeighborhood(val compatible: Boolean, val limited:
             IntegerLearningNeighborhood(compatible, limited, INTEGER_NEIGHBORHOOD_WORK - remaining)
 
         fun inspect(problem: Problem): IntegerLearningNeighborhood {
-            val rows = mutableListOf<Row>()
-            val equalities = mutableListOf<Row>()
+            val rows = mutableMapOf<Int, MutableList<Row>>()
+            val equalities = mutableMapOf<Int, MutableList<Row>>()
             for ((factor, value) in problem.factors.withIndex()) {
                 if (!visit()) return result(false)
                 val form = value.linearForm as? LinearForm.Conjunction ?: continue
@@ -43,14 +43,24 @@ internal class IntegerLearningNeighborhood(val compatible: Boolean, val limited:
                     if (limited) return result(false)
                     candidate ?: continue
                     val previous = if (candidate.equality) rows else equalities
-                    for (other in previous) {
+                    val seen = HashSet<Row>()
+                    for (ref in candidate.refs) {
                         if (!visit()) return result(false)
-                        if (candidate.factor == other.factor) continue
-                        if (combines(candidate, other)) return result(true)
-                        if (limited) return result(false)
+                        for (other in previous[ref].orEmpty()) {
+                            if (!visit()) return result(false)
+                            if (candidate.factor == other.factor || !seen.add(other)) continue
+                            if (combines(candidate, other)) return result(true)
+                            if (limited) return result(false)
+                        }
                     }
-                    rows.add(candidate)
-                    if (candidate.equality) equalities.add(candidate)
+                    for (ref in candidate.refs) {
+                        if (!visit()) return result(false)
+                        rows.getOrPut(ref) { mutableListOf() }.add(candidate)
+                        if (candidate.equality) {
+                            if (!visit()) return result(false)
+                            equalities.getOrPut(ref) { mutableListOf() }.add(candidate)
+                        }
+                    }
                 }
             }
             return result(false)
