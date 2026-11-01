@@ -369,6 +369,30 @@ internal object Suites {
                     format = Format.WCNF,
                 )
             },
+            DynamicSuite(
+                "maxsat-maxcut",
+                "MaxSAT LIB weighted MaxCut instances (fetched; compact family archive)",
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.maxsatLibMaxcut,
+                    CorpusSelection.Layout.Flat("maxsat_instances/master_set/weighted/maxcut", "wcnf"),
+                    sel,
+                    Category.OPTIMIZATION,
+                    format = Format.WCNF,
+                )
+            },
+            DynamicSuite(
+                "maxsat-haplotyping",
+                "Pinned MSE 2024 weighted haplotyping instance (fetched through ZIP ranges)",
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.maxsatHaplotyping,
+                    CorpusSelection.Layout.Flat("", "wcnf", familyOf = ::maxsatFamily),
+                    sel,
+                    Category.OPTIMIZATION,
+                    format = Format.WCNF,
+                )
+            },
         )
     }
 
@@ -1111,6 +1135,25 @@ internal object ExternalCollections {
         fetch = FetchMethod.Zip,
     )
 
+    val maxsatLibMaxcut = ExternalCollection(
+        id = "maxsat-lib-weighted-maxcut",
+        url = "https://www.cs.toronto.edu/maxsat-lib/maxsat-instances/downloads/weighted/maxcut_wt.zip",
+        license = "MaxSAT Evaluation (academic benchmarks)",
+        reason = "438KiB MaxSAT LIB weighted MaxCut family; fetched rather than vendored",
+        fetch = FetchMethod.Zip,
+    )
+
+    val maxsatHaplotyping = ExternalCollection(
+        id = "mse24-weighted-haplotyping-pinned-v1",
+        url = maxsatExactWeighted.url,
+        license = maxsatExactWeighted.license,
+        reason = "one original weighted source selected from the MSE'24 ZIP without fetching unrelated instances",
+        fetch = FetchMethod.ZipMember(
+            "haplotyping-pedigrees_wt-ped2.B.recomb1-0.01-3.wcnf.xz",
+            "ecb87265f5a647882414411190438a41faf8a8c8cf442a8c92e0cb940c146e9f",
+        ),
+    )
+
     val miplib2010 = ExternalCollection(
         id = "miplib2010",
         url = "https://miplib2010.zib.de/download/miplib2010-1.1.3-complete.tgz",
@@ -1214,7 +1257,13 @@ private fun archiveSuite(
     subDir: String,
 ): DynamicSuite {
     val layout = CorpusSelection.Layout.Flat(subDir, "smt2")
-    return DynamicSuite(id, description, defaultPerFamily = 1, sourceLayout = ArchiveSourceLayout(collection, layout)) {
+    return DynamicSuite(
+        id,
+        description,
+        defaultPerFamily = 1,
+        sourceLayout = ArchiveSourceLayout(collection, layout),
+        namedProvider = { names -> CorpusSelection.named(collection, layout, names, Category.CSP, Format.SMTLIB) },
+    ) {
         CorpusSelection.select(collection, layout, it, Category.CSP, format = Format.SMTLIB)
     }
 }

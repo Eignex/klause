@@ -9,11 +9,90 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class SearchRunTest {
+    @Test
+    fun `a retained Boolean root should enumerate its region and reset to the whole source`() {
+        val session = SearchSession(emptyList())
+        session.initialize()
+        val run = session.openRun(2, modelContinuation = SearchModelContinuation.Chronological)
+        var pause = true
+        run.pauseBeforeDecision = { pause && session.decisionLevel >= 1 }
+        assertIs<SearchRunEvent.Paused>(run.next())
+
+        assertTrue(run.retainBooleanRoot(Lit.make(0, false)))
+        pause = false
+        repeat(2) {
+            val model = assertIs<SearchRunEvent.Satisfied>(run.next()).model
+            assertEquals(false, model.valueOf(SearchBoolValue(0)))
+            assertEquals(it == 1, model.valueOf(SearchBoolValue(1)))
+        }
+        assertIs<SearchRunEvent.Exhausted>(run.next())
+        session.popTo(0)
+        run.reset()
+
+        repeat(4) {
+            val model = assertIs<SearchRunEvent.Satisfied>(run.next()).model
+            assertEquals(it >= 2, model.valueOf(SearchBoolValue(0)))
+            assertEquals(it % 2 == 1, model.valueOf(SearchBoolValue(1)))
+        }
+        assertIs<SearchRunEvent.Exhausted>(run.next())
+    }
+
+    @Test
+    fun `a mismatched retained Boolean root should leave the whole traversal intact`() {
+        val session = SearchSession(emptyList())
+        session.initialize()
+        val run = session.openRun(2, modelContinuation = SearchModelContinuation.Chronological)
+        var pause = true
+        run.pauseBeforeDecision = { pause && session.decisionLevel >= 1 }
+        assertIs<SearchRunEvent.Paused>(run.next())
+
+        assertFalse(run.retainBooleanRoot(Lit.make(0, true)))
+        pause = false
+
+        repeat(4) {
+            val model = assertIs<SearchRunEvent.Satisfied>(run.next()).model
+            assertEquals(it >= 2, model.valueOf(SearchBoolValue(0)))
+            assertEquals(it % 2 == 1, model.valueOf(SearchBoolValue(1)))
+        }
+        assertIs<SearchRunEvent.Exhausted>(run.next())
+    }
+
+    @Test
+    fun `restarts and learned conflicts should preserve a retained Boolean root`() {
+        val session = SearchSession(listOf(object : SearchComponent {
+            override fun check(context: SearchContext): ComponentCheck = if (context.boolValue(1) == false) {
+                ComponentCheck.Infeasible(SearchExplanation(intArrayOf(Lit.make(1, true))))
+            } else ComponentCheck.Feasible
+        }))
+        session.initialize()
+        var pause = true
+        val run = session.openRun(2, SearchSolveParams(maxDecisions = 4, restart = SearchRestart.Every(1)),
+            modelContinuation = SearchModelContinuation.Chronological,
+            nodePolicy = object : SearchNodePolicy {
+                override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
+                    if (pause && context.decisionLevel >= 1) return SearchNodeDisposition.Pause
+                    return SearchNodeDisposition.Expand
+                }
+            })
+        assertIs<SearchRunEvent.Paused>(run.next())
+
+        assertTrue(run.retainBooleanRoot(Lit.make(0, false)))
+        pause = false
+        val model = assertIs<SearchRunEvent.Satisfied>(run.next()).model
+
+        assertEquals(false, model.valueOf(SearchBoolValue(0)))
+        assertEquals(true, model.valueOf(SearchBoolValue(1)))
+        assertEquals(2L, session.learnedClauseStats().restarts)
+        assertIs<SearchRunEvent.Exhausted>(run.next())
+    }
+
     @Test
     fun `root reset should retire an exhausted fragment budget`() {
         var remaining = 1

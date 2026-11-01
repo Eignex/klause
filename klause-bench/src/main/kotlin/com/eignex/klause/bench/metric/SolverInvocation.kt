@@ -240,7 +240,7 @@ internal object SolverInvocation {
      *  and the SMT-LIB convention (`sat`/`unsat`/`unknown` + `; key=value` comments) for `.smt2`. */
     internal enum class Dialect { MINIZINC, PB_COMPETITION, SMT_LIB }
 
-    private fun dialectFor(format: Format): Dialect = when {
+    internal fun dialectFor(format: Format): Dialect = when {
         format == Format.XCSP3 || format == Format.MPS || format == Format.OPB -> Dialect.PB_COMPETITION
         format == Format.DIMACS || format == Format.WCNF -> Dialect.PB_COMPETITION
         format == Format.SMTLIB -> Dialect.SMT_LIB

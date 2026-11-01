@@ -17,6 +17,22 @@ import kotlin.test.assertTrue
 
 class CliModeOptionsTest {
     @Test
+    fun `finite source CLI should accept inprocessing warmup`() {
+        val source = File.createTempFile("inprocessing-warmup", ".cnf").apply {
+            writeText("p cnf 1 1\n1 0\n")
+            deleteOnExit()
+        }
+        for (work in listOf(0L, 4096L)) {
+            val output = capture {
+                assertEquals(0, runCli(arrayOf("-e", "cp", "--param",
+                    "inprocessing-warmup-work=$work", source.absolutePath)))
+            }
+
+            assertTrue("s SATISFIABLE" in output.lines(), output)
+        }
+    }
+
+    @Test
     fun `incremental linear controls should leave finite SMT CLI solving available`() {
         val source = File.createTempFile("incremental-finite", ".smt2").apply {
             writeText("(declare-const b Bool) (assert b) (check-sat)")

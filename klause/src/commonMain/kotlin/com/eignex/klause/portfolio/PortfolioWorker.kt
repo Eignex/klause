@@ -75,6 +75,10 @@ class PortfolioWorker private constructor(
 
     internal var auxiliaryProof: Boolean = false
 
+    internal var earlyCoreTrial: Boolean = false
+
+    internal var retainInitialProofCoverage: Boolean = false
+
     internal var startAfterIncumbent: Boolean = false
     internal var booleanProofRecipe: BooleanProofRecipe? = null
     internal var constructionNanos: Long = 0
@@ -210,6 +214,8 @@ class PortfolioWorker private constructor(
                         override val chargedInstructions: Long
                             get() = (child as? InstructionSlicedSearch)?.chargedInstructions
                                 ?: child.stats.ls.moves.sum.toLong()
+                        override val auxiliaryWork: Long
+                            get() = (child as? InstructionSlicedSearch)?.auxiliaryWork ?: 0L
                         override val canReseed: Boolean get() = (child as? ReseedGuard)?.canReseed ?: true
                         override val canContinuePreparation: Boolean
                             get() = (child as? ReseedGuard)?.canContinuePreparation ?: false
@@ -241,6 +247,25 @@ class PortfolioWorker private constructor(
                             val terminal = if (child is InstructionSlicedSearch) {
                                 child.runInstructionSlice(global, sliceMillis, sliceInstructions, accept)
                             } else child.runSlice(global, sliceMillis, sliceInstructions, accept)
+                            return terminal?.let(::checked)
+                        }
+
+                        override fun runScheduledSlice(
+                            global: Cancellation,
+                            sliceMillis: Long,
+                            sliceInstructions: Long,
+                            sliceWork: Long,
+                            instructionsPerWork: Double,
+                            onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                        ): MinimizeResult? {
+                            val accept: (MinimizeResult.WithSample) -> Unit = { point ->
+                                proposal(point.sample)?.let(onIncumbent)
+                            }
+                            val terminal = if (child is InstructionSlicedSearch) {
+                                child.runScheduledSlice(
+                                    global, sliceMillis, sliceInstructions, sliceWork, instructionsPerWork, accept,
+                                )
+                            } else child.runSlice(global, sliceMillis, sliceWork, accept)
                             return terminal?.let(::checked)
                         }
                     }

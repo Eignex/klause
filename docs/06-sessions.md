@@ -85,10 +85,16 @@ rows, symmetry reductions and extra components reject this path. Exchanges requi
 an internal conditioned-export promise; unmarked exchanges reject it. Portfolio task
 lanes can first advance a whole-source query and transfer its retained engine into
 a matching task lease. The original source, caller pins, policy and containing quota
-must match; transfer retains cumulative work and learned state. Retained satisfaction
-checks its decision allowance before entering another assertion and charges each
-committed decision through the shared execution controls; reseeding renews neither. Lanes acquire the original session owner through the same guarded wrapper as ordinary
-satisfaction, and release it on terminal completion, failure or explicit retirement.
+must match; transfer retains cumulative work and learned state. A live complementary
+Boolean frame can become the query root: the peer owns its opposite alternative,
+while descendant frames remain pending. Restarts and learned backjumps preserve
+that root, which qualifies the complete query condition. Unsupported paused state
+reseeds the matching task instead. Starting a sibling restores the original root and
+reseeds its own pins. Retained satisfaction checks its decision allowance before
+entering another assertion and charges each committed decision through the shared
+execution controls; reseeding renews neither. Lanes acquire the original session
+owner through the same guarded wrapper as ordinary satisfaction, and release it on
+terminal completion, failure or explicit retirement.
 
 ALNS records retained repair observations as a best found point or an unknown
 result with that scoped stop reason. The observation carries no unpinned
@@ -243,7 +249,17 @@ context consumes another retained attempt without replenishing the allowance;
 unchanged terminal failures do not restart recovery.
 
 Slice pricing is solver policy: LP work costs one node per 600 units and propagation
-one per 4000 visits. Inprocessing scans, probes, attachment and retirement enter
+one per 4000 visits. Resumable Boolean clause walks with definition repairs price
+factor and objective inspections at that visit rate, and integer implication and
+support-queue visits at one per 128000, in addition to native instructions.
+The portfolio passes both grants and its instruction price to retained counted
+handles, including session-ownership and objective-coordinate wrappers. Auxiliary
+inspection work joins the portfolio's containing work ledger even when an atomic
+choice overruns its grant.
+An atomic choice completes before its work pause; later slices repay overspend.
+Native instruction slices and the containing decision/move quota retain their own
+units. Inspection work changes neither candidate ranking nor the native move count.
+Inprocessing scans, probes, attachment and retirement enter
 that propagation ledger; probe and visit diagnostics add no separate price.
 Fractional marks survive slices and the preparation-to-search transition.
 Overspend debt is settled once and repaid by later slices; a nested private search

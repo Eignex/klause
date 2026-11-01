@@ -411,7 +411,7 @@ class LocalSearchEngineTest {
     }
 
     @Test
-    fun `resumable minimization should report active phase times only when requested`() {
+    fun `resumable minimization should report active phases and objective views only when requested`() {
         for (enabled in listOf(false, true)) {
             val problem = Problem(
                 0,
@@ -434,7 +434,9 @@ class LocalSearchEngineTest {
 
                 assertEquals(paused, handle.stats.ls.phaseNanos)
                 assertEquals(enabled, paused.isNotEmpty())
+                assertEquals(enabled, handle.stats.ls.objectiveScoring.isNotEmpty())
                 if (enabled) {
+                    assertEquals(1L, handle.stats.ls.objectiveScoring.getValue("plain"))
                     assertEquals(setOf("preparation", "seeding", "selection", "application", "other"), paused.keys)
                     assertTrue(paused.values.all { it >= 0L })
                     assertTrue(paused.values.sum() > 0L)

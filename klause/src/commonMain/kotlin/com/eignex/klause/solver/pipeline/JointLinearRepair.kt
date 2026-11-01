@@ -340,7 +340,9 @@ internal class JointLinearRepair(
             ?.coerceIn(1, QUERY_SLICE_MILLIS) ?: QUERY_SLICE_MILLIS
         val result = active.runSlice(Cancellation.Never, millis, QUERY_SLICE_WORK) { _, _ -> }
         val snapshot = result ?: active.snapshot(TerminationReason.BudgetExhausted)
-        val sample = snapshot.incumbent?.takeIf {
+        val imported = completion != null && active.incumbentIsImported
+        if (imported && snapshot.incumbent != null) observe("jointRepairImportedPointWithheld")
+        val sample = snapshot.incumbent?.takeUnless { imported }?.takeIf {
             condition.cutoff == null || requireNotNull(objective).evaluateExact(it) < condition.cutoff
         }
         if (sample != null) {

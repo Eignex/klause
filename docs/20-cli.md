@@ -80,6 +80,10 @@ Solver-control flags are common to every mode; `--help` lists every parameter.
 produce a configuration error before worker execution, including when an adaptive
 restart schedule takes precedence.
 
+`--param inprocessing-warmup-work=N` withholds optional inprocessing until that much
+non-inprocessing work follows the first eligible complete root. Zero disables the
+warmup; see [root scheduling](09-learning.md#restarts-phases-and-inprocessing).
+
 `--param learned-memory-bytes=N` enables the optional learned-store modeled-byte
 soft limit. `learned-memory-work` (65,536 visits) and `learned-memory-scratch-bytes`
 (1 MiB) bound each attempt. All accept nonnegative values; zero work or scratch
@@ -121,8 +125,9 @@ this is separate from heap measurements and diagnostic payload-category sums.
   [phase accounting](12-portfolio.md#phase-progress-and-cost)), weighted objective controls
   (`core-early`, `core-refinement`, see [core search](12-portfolio.md#boolean-objective-core-search)), resource work
   (`node-limit`, `presolve-work-limit`, see [resource allowances](06-sessions.md#resource-allowances)),
-  `boolean-proof-tasks=true` for eligible single-core satisfaction portfolios
-  ([Boolean task coverage](12-portfolio.md#boolean-task-sharing)),
+  `boolean-proof-tasks=false|true` to disable or explicitly request disjoint Boolean tasks
+  (eligible single-core native first-fail satisfaction portfolios admit them automatically;
+  see [Boolean task coverage](12-portfolio.md#boolean-task-sharing)),
   `dry-run-presolve=true` for a preparation summary without solving, and presolve
   effort ([presolve](07-presolve.md)).
 - `--ozn FILE` (MiniZinc mode): render output with the native `.ozn` applier

@@ -1,16 +1,25 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
+import com.eignex.klause.backtrack.PROPAGATION_WORK_PER_NODE
+import com.eignex.klause.backtrack.SliceBudget
 import com.eignex.klause.solver.lifetimeCancellation
+import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.math.ceil
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
-internal fun interface LocalSearchCheckpoint {
+internal fun interface LocalSearchCheckpoint : WorkMeter {
     fun shouldPause(moves: Long): Boolean
+
+    override fun charge(units: Long) = Unit
+
+    val inspectionVisits: Long get() = 0L
+    val repairVisits: Long get() = 0L
+    val repairWork: WorkMeter get() = this
 }
 
 internal class LocalSearchRunControl(private val lifetime: Cancellation) : LocalSearchCheckpoint {
@@ -22,15 +31,47 @@ internal class LocalSearchRunControl(private val lifetime: Cancellation) : Local
         private set
     var finished: Boolean = false
         private set
+    private var scoringVisits = 0L
+    override var repairVisits: Long = 0L
+        private set
+    override val inspectionVisits: Long get() = scoringVisits + minOf(repairVisits, Long.MAX_VALUE - scoringVisits)
+    override val repairWork = WorkMeter { units ->
+        if (units > 0L) repairVisits += minOf(units, Long.MAX_VALUE - repairVisits)
+    }
+    private val pricedInspections: Long get() = scoringVisits + minOf(
+        repairVisits / (BOOLEAN_REPAIR_VISITS_PER_WORK / PROPAGATION_WORK_PER_NODE),
+        Long.MAX_VALUE - scoringVisits,
+    )
+    private var pricedInstructions = 0.0
+    private var instructionsPerWork = LS_INSTRUCTIONS_PER_WORK
+    private val slice = SliceBudget(
+        nodeCount = { pricedInstructions.toLong() },
+        lpWork = { 0L },
+        propagationWork = { pricedInspections },
+    )
+    var hasSliceAllowance: Boolean = true
+        private set
     val cancellation: Cancellation = Cancellation { token() }
-    val work: Long get() = (instructions / LS_INSTRUCTIONS_PER_WORK).toLong()
+    val work: Long get() = slice.spent()
+    val auxiliaryWork: Long get() = pricedInspections / PROPAGATION_WORK_PER_NODE
 
-    override fun shouldPause(moves: Long): Boolean {
-        instructions = moves
-        return moves >= limit
+    override fun charge(units: Long) {
+        if (units > 0L) scoringVisits += minOf(units, Long.MAX_VALUE - scoringVisits)
     }
 
-    fun offer(global: Cancellation, millis: Long, instructions: Long, available: Long) {
+    override fun shouldPause(moves: Long): Boolean {
+        pricedInstructions += (moves - instructions).coerceAtLeast(0L) / instructionsPerWork
+        instructions = moves
+        return moves >= limit || slice.remainingNodes() == 0L
+    }
+
+    fun offer(
+        global: Cancellation, millis: Long, instructions: Long, available: Long, sliceNodes: Long = -1L,
+        instructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
+    ) {
+        slice.noteOverspend()
+        this.instructionsPerWork = instructionsPerWork
+        hasSliceAllowance = slice.begin(millis, sliceNodes)
         token = if (millis == Long.MAX_VALUE) {
             lifetime.lifetimeCancellation() or global
         } else {
@@ -46,6 +87,8 @@ internal class LocalSearchRunControl(private val lifetime: Cancellation) : Local
 
     fun allowCompletion() {
         limit = Long.MAX_VALUE
+        slice.noteOverspend()
+        slice.begin(Long.MAX_VALUE, -1L)
     }
 
     companion object {
@@ -53,6 +96,8 @@ internal class LocalSearchRunControl(private val lifetime: Cancellation) : Local
         else ceil(nodes * LS_INSTRUCTIONS_PER_WORK).toLong()
     }
 }
+
+internal const val BOOLEAN_REPAIR_VISITS_PER_WORK = 128_000L
 
 internal abstract class LocalSearchRun<V>(
     protected val sink: SolveStatsSink,

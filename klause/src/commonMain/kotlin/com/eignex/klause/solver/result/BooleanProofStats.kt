@@ -18,4 +18,6 @@ data class BooleanProofStats(
     val workerWork: Long,
     /** Diagnostic reason the model, workers or schedule declined sharing; null for admitted probing. */
     val decline: String? = null,
+    /** Paused probes continued from their retained conditioned root, without reseeding. */
+    val retainedProbes: Int = 0,
 )

@@ -16,14 +16,14 @@ import kotlin.test.assertTrue
 class PrivateRebuildBinaryLearningTest {
     @Test
     fun `owned reciprocal implications should capture a source bound equivalence without root pins`() {
-        for (native in listOf(false, true)) {
+        for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
-                Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
+                Clause(intArrayOf(1, replacement, 4)), Clause(intArrayOf(1, replacement, 5)),
+                Clause(intArrayOf(0, Lit.negate(replacement), 6)), Clause(intArrayOf(0, Lit.negate(replacement), 7)),
             )).bake()
             val session = PropagationSession(source, nativeSat = native)
-            session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
-            session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
+            session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
+            session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
 
             val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
 
@@ -46,15 +46,37 @@ class PrivateRebuildBinaryLearningTest {
 
     @Test
     fun `an owned binary should close a reciprocal source implication`() {
-        val source = Problem(3, 0, emptyArray(), arrayOf(
+        for (replacement in listOf(2, 3)) {
+            val source = Problem(3, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(1, replacement)), Clause(intArrayOf(0, Lit.negate(replacement), 4)),
+                Clause(intArrayOf(0, Lit.negate(replacement), 5)),
+            )).bake()
+            val session = PropagationSession(source)
+            session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
+
+            val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true }
+
+            assertNotNull(captured)
+        }
+    }
+
+    @Test
+    fun `recent binaries should close a source implication within a linear scan grant`() {
+        val learning = (2 until 82).map { Clause(intArrayOf(1, Lit.make(it, true))) }
+        val source = Problem(82, 0, emptyArray(), (listOf(
             Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3, 4)), Clause(intArrayOf(0, 3, 5)),
-        )).bake()
+        ) + learning).toTypedArray()).bake()
         val session = PropagationSession(source)
         session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
+        for (clause in learning) session.addLearnedClause(clause, 2)
+        var spent = 0L
 
-        val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true }
+        val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { work ->
+            if (work > 4096L - spent) false else { spent += work; true }
+        }
 
         assertNotNull(captured)
+        assertTrue(spent <= 4096L)
     }
 
     @Test
@@ -71,6 +93,26 @@ class PrivateRebuildBinaryLearningTest {
 
             val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true }
 
+            assertNull(captured)
+        }
+    }
+
+    @Test
+    fun `logically retired binaries should withhold a reciprocal capture`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
+                Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
+            )).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(1, 2)), 9)
+            session.addLearnedClause(Clause(intArrayOf(0, 3)), 9)
+            assertEquals(1, session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { it == 0 })
+            assertTrue(session.canSimplifyRoot)
+
+            val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true }
+
+            assertEquals(2, session.learnedClauseCount)
             assertNull(captured)
         }
     }

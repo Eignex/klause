@@ -2,8 +2,10 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.NodeBudget
+import com.eignex.klause.backtrack.selector.IndomainMax
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
@@ -53,6 +55,32 @@ class BooleanProofSchedulerTest {
 
                 assertEquals(1, adopted.task)
                 assertTrue(scheduler.nativeCoverageComplete)
+            }
+        }
+    }
+
+    @Test
+    fun `an adopted probe should finish within its original remaining decision allowance`() {
+        val problem = Problem(5, 0, emptyArray(), arrayOf(
+            Clause(IntArray(5) { Lit.make(it, true) }),
+        )).bake()
+        for (native in listOf(false, true)) {
+            val budget = NodeBudget(5L)
+            val params = BacktrackParams(nativeSat = native, nodeBudget = budget,
+                variableSelector = InputOrder, valueSelector = IndomainMin)
+            BacktrackSolver(problem).openBooleanProof(params).use { search ->
+                search.begin(Assumptions.None, params.maxDecisions, Double.POSITIVE_INFINITY, Cancellation.Never)
+                assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, 2L).reason)
+                val literal = assertNotNull(search.splitLiteral())
+                BooleanProofScheduler(problem, context, listOf(Lit.variable(literal)),
+                    List(2) { params }, true).use { scheduler ->
+                    assertTrue(scheduler.adopt(0, search, literal))
+                    val result = scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+                    assertEquals(Lit.isPositive(literal), assertNotNull(result.sample).boolValue(Lit.variable(literal)))
+                    assertEquals(4L, budget.spent)
+                    assertFalse(scheduler.nativeCoverageComplete)
+                }
             }
         }
     }

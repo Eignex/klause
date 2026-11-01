@@ -165,34 +165,36 @@ class SourceRateRewardTest {
 
     @Test
     fun `silent complete workers should retain coverage under gain rate rewards`() {
-        for ((priceFamilies, restarting) in listOf(
-            false to false, false to true, true to false, true to true,
-        )) {
-            var slices = 0
-            val base = ScriptedSearch({ false }) {}
-            val proof = object : ResumableSearch by base {
-                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
-                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
-                    base.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
-                    return if (++slices == 3) MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 999.0)
-                    else null
+        for (retention in listOf(0.0, 0.25, 1.0)) {
+            for ((priceFamilies, restarting) in listOf(
+                false to false, false to true, true to false, true to true,
+            )) {
+                var slices = 0
+                val base = ScriptedSearch({ false }) {}
+                val proof = object : ResumableSearch by base {
+                    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                        base.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
+                        return if (++slices == 3) MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 999.0)
+                        else null
+                    }
                 }
+                val workers = listOf(
+                    trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) {}).also {
+                        it.restartingSearch = true
+                        it.family = ArmFamily.LocalSearch
+                    },
+                    trackingWorker("proof", 1, proof).also { it.restartingSearch = restarting },
+                )
+
+                val result = Portfolio(workers, fixedBandit(2, 0), baseSliceWork = 2, maxSliceWork = 2,
+                    reseedStaleThreshold = 0, phaseRetention = retention, diagnostics = PortfolioDiagnostics(32),
+                    rewardPolicy = SourceRateReward(priceFamilies)).also {
+                    it.includeRestartingProof = restarting
+                }.use { it.minimize(Cancellation.Never) }
+
+                assertIs<MinimizeResult.Optimal>(result)
             }
-            val workers = listOf(
-                trackingWorker("finder", 0, ScriptedSearch({ it == 0 }) {}).also {
-                    it.restartingSearch = true
-                    it.family = ArmFamily.LocalSearch
-                },
-                trackingWorker("proof", 1, proof).also { it.restartingSearch = restarting },
-            )
-
-            val result = Portfolio(workers, fixedBandit(2, 0), baseSliceWork = 2, maxSliceWork = 2,
-                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(32),
-                rewardPolicy = SourceRateReward(priceFamilies)).also {
-                it.includeRestartingProof = restarting
-            }.use { it.minimize(Cancellation.Never) }
-
-            assertIs<MinimizeResult.Optimal>(result)
         }
     }
 

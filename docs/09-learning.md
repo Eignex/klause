@@ -284,6 +284,27 @@ variable. Learned clauses live in a growable side buffer with a wrapping
 replacement-scan cursor per clause, and reductions compact them in place. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
 
+When permanent native clauses already fill a restart cap, a bounded window over
+non-permanent learned clauses can retire unused local rows without renumbering
+handles. Each row funds its policy update and live-reason scan before publication;
+units, pending rechecks and current root reasons survive. An unfinished window
+retains its read and write cursors across later restarts and appended clauses.
+Retired rows stop propagation and export, while their slots and arena bytes remain
+owned until a funded full compaction reclaims them. Ownership reports include that
+capacity and report `learnedRetiredSlots` separately from active clause count.
+Window calls, charged work, visits and permanent, active and retained counts remain
+available in the released session's lifecycle totals.
+
+General CP uses the same handle-preserving clause retirement above a permanent
+clause floor. Its funded protection snapshot covers current Boolean and integer
+reasons, saved integer bounds and pending first assertions. Retired factor payloads
+remain readable for explanations while propagation queues, binary minimization and
+active-clause readers skip those rows. The candidate cursor survives appended
+clauses and is rebuilt when full compaction renumbers the store. Ownership includes
+the candidate index and every retained payload; logical retirement reports no
+physical release. Lifecycle totals identify the packed-native or general backend
+and distinguish boundary, floor and preparation deferrals.
+
 ## Pseudo-Boolean learning
 
 `pbLearning` auto-enables cutting-plane analysis for pure-Boolean models. Explicit
@@ -456,6 +477,13 @@ poll cancellation; unfinished preparation publishes no tier changes or sweep eve
 Insufficient work or scratch safely defers the cap sweep. Completed selection keeps
 the same LBD priorities and tier lifetimes; a sweep event requires actual retirement.
 
+If complete candidate preparation cannot be funded, the permanent-clause-floor
+case uses the bounded handle-preserving window. Permanent ownership already
+exhausts the cap, so every eligible local row is excess and no LBD ranking is needed.
+Mid rows survive their demotion window; each completed window clears survivor reuse
+flags. Other constraint kinds, shared stores and caps retain the complete selection
+and remap preflight.
+
 Shared learning also accepts an optional modeled-byte soft limit checked at
 propagation boundaries independently of restarts. Units, glue clauses, live reason
 owners and pending first attachments form its protected floor; copied trail reasons
@@ -506,10 +534,25 @@ inprocessing, since derivations under assumption pins would not hold globally.
 
 Opt-in root simplification examines bounded slices of source and learned Boolean
 clauses against permanent root facts. An empty Boolean pin trail withholds the scan;
-without a pinned literal it cannot satisfy or shorten a Boolean clause. A shortened
-source clause enters as a permanent
-session-local replacement before its watches retire; immutable source text remains
-available for reasons. The propagation session owns unfinished source-watch retirement
+without a pinned literal it cannot satisfy or shorten a Boolean clause. Clauses
+affected by a new Boolean root fact can be reached through a source-occurrence index
+prepared ahead of traversal or cached by ordinary propagation. This bounded
+neighborhood alternates with the ordinary clause scan,
+retains its pin and occurrence positions across slices, and builds no index
+inside the pass. Pin and occurrence walks admit at most 8,192 entries per slice
+even with an unlimited class grant. Projections without an available index retain
+the ordinary scan. An indexed candidate at the ordinary cursor advances both walks;
+unchanged prefixes are not examined twice. Retired and non-clause source entries
+do not defer the remaining literal window. Once available occurrence walks cover
+every root pin, the ordinary cursor skips the remaining source suffix and continues
+through learned clauses. Missing indexes retain the full source scan. Learned
+compaction invalidates learned candidates while preserving stable source candidates
+and source scan progress at an unchanged root. A changed root restarts the source
+scan after learned compaction.
+A shortened
+source clause enters as a permanent session-local replacement before its watches
+retire; immutable source text remains available for reasons. The propagation session
+owns unfinished source-watch retirement
 after replacement admission. Pass reset or optional buffer release retains that record;
 a funded slice retires its watches before admitting another source replacement.
 Session close releases it. Satisfied source watches retire without changing variable IDs.

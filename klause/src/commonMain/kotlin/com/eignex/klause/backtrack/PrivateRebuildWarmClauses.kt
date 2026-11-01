@@ -25,6 +25,7 @@ internal class PrivateRebuildWarmClauses private constructor(
             byteLimit: Long,
             allowance: Long,
             cancellation: Cancellation,
+            complementedVariable: Int = -1,
         ): PrivateRebuildWarmClauses? {
             if (!session.canSimplifyRoot || cancellation()) return null
             var spent = 0L
@@ -52,7 +53,14 @@ internal class PrivateRebuildWarmClauses private constructor(
                 val size = session.learnedClauseLiteralCount(index)
                 if ((size + 1L) * 512L > byteLimit - bytes - scratchBytes) continue
                 if (!visit(size * 3L + 1L)) break
-                val source = session.learnedClauseLiterals(index)
+                val canonical = session.learnedClauseLiterals(index)
+                val source = if (complementedVariable >= 0) {
+                    if (!visit(size.toLong())) break
+                    IntArray(size) {
+                        val literal = canonical[it]
+                        if (Lit.variable(literal) == complementedVariable) Lit.negate(literal) else literal
+                    }
+                } else canonical
                 var needsProjection = false
                 var supported = true
                 for (literal in source) {

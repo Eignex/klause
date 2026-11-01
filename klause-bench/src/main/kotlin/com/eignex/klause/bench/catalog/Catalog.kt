@@ -90,6 +90,10 @@ internal sealed interface FetchMethod {
      *  compressed inside, e.g. XCSP3 `*.xml.lzma`). */
     data object Zip : FetchMethod
 
+    /** Fetch the uniquely named ZIP member through bounded HTTP ranges, unpack optional XZ compression,
+     *  and require the original plain bytes to match [sha256]. [name] is a basename, not an archive path. */
+    data class ZipMember(val name: String, val sha256: String) : FetchMethod
+
     /** Download each of [names] from under [ExternalCollection.url] and [convert] it, (file name, text) to
      *  (instance name, file text) pairs written as `<instance>.<extension>`, for a library whose instances need
      *  translating, such as OR-Library's own text formats into MPS. */
@@ -191,6 +195,8 @@ internal data class DynamicSuite(
     val defaultPerFamily: Int? = null,
     val sourceLayout: ArchiveSourceLayout? = null,
     val admit: ((ProblemRef) -> Boolean)? = null,
+    /** Exact identity lookup for fixed sets, without enumerating the rest of a large corpus. */
+    val namedProvider: ((List<String>) -> List<ProblemRef>)? = null,
     val provider: (CorpusSelection.Selection) -> List<ProblemRef>,
 )
 
@@ -226,6 +232,13 @@ internal object Catalog {
     }
 
     fun discovered(dynamic: DynamicSuite): List<ProblemRef> = dynamic.provider(CorpusSelection.Selection())
+
+    fun named(id: String, names: List<String>): List<ProblemRef> {
+        val dynamic = dynamicSuites.firstOrNull { it.id == id }
+        dynamic?.namedProvider?.let { return it(names) }
+        val wanted = names.toSet()
+        return uncapped(id).problems.filter { it.name in wanted }
+    }
 
     fun selected(dynamic: DynamicSuite, selection: CorpusSelection.Selection): Suite {
         val admit = dynamic.admit

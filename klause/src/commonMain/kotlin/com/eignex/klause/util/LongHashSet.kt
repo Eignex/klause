@@ -158,6 +158,11 @@ internal class LongHashSet(initialCapacity: Int = 8) {
         return out
     }
 
+    internal fun canAddWithoutGrowing(count: Int): Boolean {
+        require(count >= 0)
+        return (size.toLong() + count) * 2L <= keys.size.toLong()
+    }
+
     internal val allocatedBytes: Long get() = if (used === EMPTY_USED) 0L else keys.size.toLong() * 9L
 
     internal fun release() {

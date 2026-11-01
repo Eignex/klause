@@ -24,18 +24,18 @@ import kotlin.test.assertTrue
 class PrivateRebuildSatisfactionTest {
     @Test
     fun `an owned learned equivalence should publish a checked witness without root pins`() {
-        for (native in listOf(false, true)) {
+        for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
-                Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
+                Clause(intArrayOf(1, replacement, 4)), Clause(intArrayOf(1, replacement, 5)),
+                Clause(intArrayOf(0, Lit.negate(replacement), 6)), Clause(intArrayOf(0, Lit.negate(replacement), 7)),
             )).bake()
             var opens = 0
             var closes = 0
             val exchange = object : ClauseExchange {
                 override fun onSearchStart(session: PropagationSession) {
                     opens++
-                    session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
-                    session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
+                    session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
+                    session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
                 }
                 override fun onSearchClose(session: PropagationSession) { closes++ }
                 override fun onRestart(session: PropagationSession) = Unit
@@ -96,6 +96,43 @@ class PrivateRebuildSatisfactionTest {
             assertTrue(stats.getValue("privateRebuildMappingPreparationWork") > 0L)
             assertEquals(1, opens)
             assertEquals(1, closes)
+        }
+    }
+
+    @Test
+    fun `eligibility scans should not count as canonical propagation`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
+            val params = BacktrackParams(nativeSat = native,
+                variableSelector = InputOrder, valueSelector = IndomainMin)
+            val canonical = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(params))
+
+            val trial = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(
+                params.copy(privateRebuildWork = 65_536L),
+            ))
+
+            assertEquals(canonical.stats.search.propagationWork.sum, trial.stats.search.propagationWork.sum)
+            assertTrue(trial.stats.search.learning.getValue("privateRebuildRootScanWork") > 0L)
+            assertTrue(trial.stats.search.learning.getValue("privateRebuildChargedWork") > 0L)
+        }
+    }
+
+    @Test
+    fun `retired trial work should remain in the final charged ledger`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
+                Clause(intArrayOf(4, 6)), Clause(intArrayOf(5, 7)),
+            )).bake()
+
+            val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+                nativeSat = native, privateRebuildWork = 65_536L,
+                variableSelector = InputOrder, valueSelector = IndomainMin,
+            )))
+
+            val learning = result.stats.search.learning
+            assertTrue(learning.getValue("privateRebuildChargedWork") >=
+                learning.getValue("privateRebuildPreparationWork") + learning.getValue("privateRebuildTrialWork"))
         }
     }
 

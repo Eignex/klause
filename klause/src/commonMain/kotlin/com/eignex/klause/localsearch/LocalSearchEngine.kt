@@ -23,6 +23,7 @@ import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.asSearchStream
 import com.eignex.klause.solver.executionCapabilities
+import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.result.LocalSearchStatsSink
@@ -321,6 +322,8 @@ internal class LocalSearchEngine(
             LocalSearchState.preparation(model, Random(seed), effectiveAssumptions, prepared), params, checkpoint,
         )
         state.phaseTimer = timing
+        state.inspectionWork = checkpoint
+        state.repairWork = checkpoint?.repairWork
         state.compoundTally = compoundTally
         state.violationSoftCap = params.violationSoftCap
         state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
@@ -328,6 +331,12 @@ internal class LocalSearchEngine(
         if (state.invariants?.hasBooleanLiterals == true) {
             state.booleanRepairs = preparedValue(BooleanRepairClosure.preparation(state), params, checkpoint).closure
         }
+        if (state.booleanRepairs == null) {
+            state.inspectionWork = null
+            state.repairWork = null
+        }
+        timing?.inspectionVisits = checkpoint?.takeIf { state.booleanRepairs != null }?.let { { it.inspectionVisits } }
+        timing?.repairVisits = checkpoint?.takeIf { state.booleanRepairs != null }?.let { { it.repairVisits } }
         return state
     }
 
@@ -360,7 +369,10 @@ internal class LocalSearchEngine(
 
     private fun phaseTimer(params: LocalSearchParams, sink: SolveStatsSink?): LocalSearchPhaseTimer? {
         if (!params.reportPhaseTimes || sink == null) return null
-        return LocalSearchPhaseTimer().also { sink.ls.phaseNanos = it::snapshot }
+        return LocalSearchPhaseTimer().also {
+            sink.ls.phaseNanos = it::snapshot
+            sink.ls.objectiveScoring = it::objectiveScoringSnapshot
+        }
     }
 
     /** A one-line summary of this engine's configuration under [params]. */
@@ -1223,9 +1235,13 @@ internal class LocalSearchEngine(
         // Plumb shaping into the state so strategies consulting shapedBreakScore see the objective
         // during pre-feasibility moves. Only CostShaping.Linear contributes a non-zero lambda;
         // FeasibilityFirst leaves it at 0.0, identical to the no-shaping path.
+        timing?.recordObjectiveScoring(if (objective is FunctionalObjective) "functional" else "plain")
         state.shaping.objective = objective
         state.shaping.shapingLambda = (params.costShaping as? CostShaping.Linear)?.lambda ?: 0.0
         state.shaping.feasibilityGated = params.costShaping.feasibilityGated
+        timing.inPhase("preparation") {
+            prepareSteps(state.prepareObjectiveDelta(objective), params, checkpoint)
+        }
         if (params.objectiveGuidance == ObjectiveGuidance.Geometric) {
             timing.inPhase("preparation") {
                 prepareSteps(prepareObjectiveProposals(state, params.lsObjective), params, checkpoint)

@@ -21,6 +21,25 @@ import kotlin.test.assertTrue
 
 class PrivateRebuildWarmClausesTest {
     @Test
+    fun `complementing source coordinates should preserve owned consequences`() {
+        for (complemented in listOf(0, 1)) for (variable in listOf(0, 1)) {
+            val learned = Clause(intArrayOf(Lit.make(variable, true), 4))
+            val source = Problem(3, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 3)), learned,
+            )).bake()
+            val session = PropagationSession(source)
+            session.addLearnedClause(learned, 2)
+
+            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session,
+                SourceRebuilds(listOf(RebuildStep.CopyLiteral(1, 0))), arrayOfNulls(3),
+                1_048_576L, 65_536L, Cancellation.Never, complemented))
+
+            assertContentEquals(intArrayOf(Lit.make(0, variable != complemented), 4),
+                (warm.clauses.single() as Clause).literals)
+        }
+    }
+
+    @Test
     fun `equivalent literal reconstruction should translate owned learning in either polarity`() {
         for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
             val source = Problem(3, 0, emptyArray(), arrayOf(
@@ -71,6 +90,59 @@ class PrivateRebuildWarmClausesTest {
             assertEquals(1, warm.translated)
             assertNotSame(session.learnedClauseLiterals(0), copied.literals)
             assertEquals(3, session.learnedClauseCount)
+        }
+    }
+
+    @Test
+    fun `reclaimed learning should be excluded from a fresh snapshot`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(4, 6)),
+            )).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            session.addLearnedClause(Clause(intArrayOf(4, 6)), 2)
+            session.forgetLearnedClauses { index, _ -> index == 1 }
+
+            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(emptyList()),
+                arrayOfNulls(4), 1_048_576L, 65_536L, Cancellation.Never))
+
+            assertContentEquals(intArrayOf(4, 6), (warm.clauses.single() as Clause).literals)
+        }
+    }
+
+    @Test
+    fun `logically retired clauses should be excluded from a fresh snapshot`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(4, 6)),
+            )).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+            session.addLearnedClause(Clause(intArrayOf(4, 6)), 9)
+            assertEquals(1, session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { it == 1 })
+
+            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(emptyList()),
+                arrayOfNulls(4), 1_048_576L, 65_536L, Cancellation.Never))
+
+            assertEquals(2, session.learnedClauseCount)
+            assertContentEquals(intArrayOf(4, 6), (warm.clauses.single() as Clause).literals)
+        }
+    }
+
+    @Test
+    fun `copied consequences should survive canonical forgetting`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(emptyList()),
+                arrayOfNulls(2), 1_048_576L, 65_536L, Cancellation.Never))
+
+            session.forgetLearnedClauses { _, _ -> false }
+
+            assertEquals(0, session.learnedClauseCount)
+            assertContentEquals(intArrayOf(0, 2), (warm.clauses.single() as Clause).literals)
         }
     }
 

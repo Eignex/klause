@@ -17,6 +17,28 @@ internal class LocalSearchPhaseTimer(
     private var phase: String = "other"
     private var running: Boolean = false
     private var last: Long = 0L
+    private val objectiveScoring = linkedMapOf(
+        "plain" to 0L,
+        "functional" to 0L,
+        "maintained" to 0L,
+        "declined" to 0L,
+        "prepared" to 0L,
+        "indexed" to 0L,
+        "generic" to 0L,
+    )
+
+    fun recordObjectiveScoring(outcome: String) {
+        val previous = objectiveScoring.getValue(outcome)
+        if (previous < Long.MAX_VALUE) objectiveScoring[outcome] = previous + 1L
+    }
+
+    var inspectionVisits: (() -> Long)? = null
+    var repairVisits: (() -> Long)? = null
+
+    fun objectiveScoringSnapshot(): Map<String, Long> = objectiveScoring.toMutableMap().apply {
+        inspectionVisits?.let { put("inspection-visits", it()) }
+        repairVisits?.let { put("repair-visits", it()) }
+    }
 
     fun enter(next: String): String {
         require(next in nanos)
