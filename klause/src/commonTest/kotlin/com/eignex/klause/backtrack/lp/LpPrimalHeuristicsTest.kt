@@ -244,6 +244,48 @@ class LpPrimalHeuristicsTest {
     }
 
     @Test
+    fun `rounding reads returned child coordinates after the query invocation expires`() {
+        val problem = Problem(0, 7, Array(7) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(3, 4), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(5, 6), LinearOp.GE, 1),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1, 2, 1, 2))
+        val factory = RecordingLpEngineFactory(object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(LpFloatAllowance(allowance?.work ?: 0L, 1))
+                }
+            }
+        })
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("deferred-child-guidance"),
+            LpSolveContext(factory)).use { engine ->
+            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            val expired = Cancellation { factory.floatAllowances.isNotEmpty() }
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), expired)
+            val queries = factory.floatAllowances.size
+            assertTrue(bound.isNaN())
+            assertTrue(queries > 0)
+
+            val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+
+            assertTrue(sample.ints.take(3).sum() >= 2L)
+            assertEquals(listOf(1L, 0L, 1L, 0L), sample.ints.drop(3))
+            assertEquals(queries, factory.floatAllowances.size)
+        }
+    }
+
+    @Test
     fun `rounding reuses prepared components after a cancelled root query`() {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),

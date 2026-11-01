@@ -18,6 +18,7 @@ import com.eignex.klause.lp.engine.LpExactSupport
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpPrimalGuidance
 import com.eignex.klause.lp.engine.LpScopedMetrics
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpScopedSolver
@@ -408,6 +409,9 @@ internal class LpPropagator(
             onPreparation?.invoke(lastMetrics)
         }
     } == true
+
+    fun partialPrimalGuidance(token: Cancellation): LpPrimalGuidance? =
+        withOwner { it.partialPrimalGuidance(token) }
 
     fun solveFloat(
         warm: Basis? = null,

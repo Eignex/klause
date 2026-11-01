@@ -114,6 +114,12 @@ internal class LpScopedSolver(
         return true
     }
 
+    fun partialPrimalGuidance(token: Cancellation): LpPrimalGuidance? {
+        requireAvailable()
+        if (closed || token()) return null
+        return (solver as? ComponentLpSolverCapability)?.partialPrimalGuidance(token)
+    }
+
     fun push(token: Cancellation = cancellation): Boolean = edit(token) { it.push(token) }
 
     fun assertBound(

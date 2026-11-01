@@ -38,8 +38,12 @@ internal fun LpEngine.lpRoundingProbe(
     val started = TimeSource.Monotonic.markNow()
     var outcome = "RELAXATION_DECLINED"
     rootRoundingInterrupted = false
-    val retained = rootRoundingWarmStart?.takeIf { it.objective === objective }
-    rootRoundingWarmStart = retained
+    val pending = rootRoundingWarmStart?.takeIf { it.objective === objective }
+    rootRoundingWarmStart = pending
+    if (pending != null && pending.primal == null) {
+        retainRootPartialPrimalGuidance(pending.relaxation, cancellation)
+    }
+    val retained = rootRoundingWarmStart
     val resumed = retained?.pinning
     val session = resumed ?: PropagationSession(problem, cancellation)
     val previousWork = if (resumed == null) 0L else session.work

@@ -46,6 +46,7 @@ import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPhaseTimer
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpPrimalGuidance
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolveSession
@@ -321,7 +322,27 @@ internal class LpEngine(
         component: ComponentLpSolverCapability?,
         cancellation: Cancellation,
     ) {
-        if (!params.lpPlan.probe || problem.numRealVars != 0 || component == null ||
+        if (component == null) return
+        retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_RETAINED") {
+            component.partialPrimalGuidance(cancellation)
+        }
+    }
+
+    internal fun retainRootPartialPrimalGuidance(relaxation: LpRelaxation, cancellation: Cancellation) {
+        if (!params.lpPlan.componentOwnership) return
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "PARTIAL_OWNER_ATTEMPTED", 0L)
+        retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_OWNER_RETAINED") {
+            propagator.partialPrimalGuidance(cancellation)
+        }
+    }
+
+    private inline fun retainPartialPrimalGuidance(
+        relaxation: LpRelaxation,
+        cancellation: Cancellation,
+        outcome: String,
+        read: () -> LpPrimalGuidance?,
+    ) {
+        if (!params.lpPlan.probe || problem.numRealVars != 0 ||
             !ownsRootPrimalModel(relaxation.model) || cancellation()
         ) return
         val previous = rootRoundingWarmStart
@@ -330,11 +351,11 @@ internal class LpEngine(
         val work = partialPrimalGuidanceWork(model) ?: return
         val started = TimeSource.Monotonic.markNow()
         noteNodeOverhead(work)
-        val guidance = component.partialPrimalGuidance(cancellation) ?: return
+        val guidance = read() ?: return
         if (guidance.coordinates.size != model.n || guidance.known.size != model.n || cancellation()) return
         rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
             primal = guidance.coordinates, knownColumns = guidance.known)
-        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "PARTIAL_RETAINED", started.elapsedNow().inWholeNanoseconds)
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", outcome, started.elapsedNow().inWholeNanoseconds)
     }
 
     private fun partialPrimalGuidanceWork(model: LpModel): Long? {

@@ -18,6 +18,22 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `reading child guidance does not construct a numerical owner`() {
+        val builder = LpBuilder()
+        val column = builder.addVar(0L, 5L, cost = 1L)
+        builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val factory = RecordingLpEngineFactory()
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(factory), componentSplit = true).use { owner ->
+
+            val guidance = owner.partialPrimalGuidance(Cancellation.Never)
+
+            assertNull(guidance)
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
+
+    @Test
     fun `spent construction funding should not repeat declined preparation`() {
         val builder = LpBuilder()
         val column = builder.addVar(0L, 5L, cost = 1L)
