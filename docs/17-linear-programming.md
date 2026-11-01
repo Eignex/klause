@@ -574,6 +574,12 @@ phase contributes only completed deductions. Interrupted root rounding retains i
 relaxation layout and basis for later slices. A completed rounding LP can retain its
 coordinates under the same bounded guidance allowance after charging the solve, avoiding another LP solve
 when pinning resumes. Every retry consumes the remaining root and LP allowances.
+Ordinary rounding and pump assembly receives the current containing cancellation token.
+Materialized column, row and coefficient entries debit the same root and LP allowances
+as their numerical solves, including interrupted assembly. Completed construction
+polls after its final debit before returning a layout; subsequent numerical queries
+receive the remaining allowance. The root assembly phase records this work and
+elapsed time independently of numerical solve observations.
 Root rounding and pumping propose discrete assignments for mixed
 models, but a relaxation point supplies a target, never witness authority.
 

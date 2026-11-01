@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.snapshotAssignment
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpNodeOverhead
 import com.eignex.klause.lp.bounding.RootRoundingWarmStart
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -10,7 +11,9 @@ import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.SessionDomains
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.propagation.PropagationResult
@@ -49,7 +52,11 @@ internal fun LpEngine.lpRoundingProbe(
             outcome = "DISCRETE_ROOT_REJECTED"
             return null
         }
-        val relaxation = retained?.relaxation ?: CpToLpRelaxation(problem, objective).build(session)
+        val relaxation = retained?.relaxation ?: buildPrimalRelaxation(objective, session, cancellation) ?: run {
+            rootRoundingInterrupted = true
+            outcome = "CANCELLED"
+            return null
+        }
         if (relaxation.model.n == 0) {
             outcome = "EMPTY_RELAXATION"
             return null
@@ -354,7 +361,7 @@ private fun LpEngine.solveRelaxation(
     val session = PropagationSession(problem, cancellation)
     try {
         if (session.isUnsatAtRoot) return null
-        val relaxation = CpToLpRelaxation(problem, obj).build(session)
+        val relaxation = buildPrimalRelaxation(obj, session, cancellation) ?: return null
         if (relaxation.model.n == 0) return null
         val result = try {
             solvePrimalRelaxation(relaxation.model, cancellation, primal = true)
@@ -365,6 +372,33 @@ private fun LpEngine.solveRelaxation(
         return relaxation to result.primal
     } finally {
         primalPropagationWork += session.work
+    }
+}
+
+private fun LpEngine.buildPrimalRelaxation(
+    objective: LinearObjective,
+    session: PropagationSession,
+    cancellation: Cancellation,
+): LpRelaxation? {
+    val started = TimeSource.Monotonic.markNow()
+    val allowance = rootPrimalWorkBudget()
+    var work = 0L
+    var outcome = "FAILED"
+    val token = cancellation or Cancellation { allowance > 0L && work >= allowance }
+    fun debit(units: Long) {
+        work += units
+        noteNodeOverhead(units)
+    }
+    return try {
+        if (token()) throw LpAssemblyCancelled()
+        CpToLpRelaxation(problem, objective, preparationCancellation = token, onTemplateWork = ::debit)
+            .buildWithWork(SessionDomains(session), token) { debit(it * LpNodeOverhead.BUILD) }
+            .also { outcome = "COMPLETE" }
+    } catch (_: LpAssemblyCancelled) {
+        outcome = "CANCELLED"
+        null
+    } finally {
+        sink.lp.observePrimalPhase("PRIMAL_LP_ASSEMBLY", outcome, started.elapsedNow().inWholeNanoseconds, work)
     }
 }
 

@@ -856,6 +856,19 @@ internal class CpToLpRelaxation(
         }
     }
 
+    fun buildWithWork(
+        domains: RelaxationDomains,
+        cancellation: Cancellation,
+        onWork: (Long) -> Unit,
+    ): LpRelaxation {
+        var result: LpRelaxation? = null
+        prepareBuild(domains, cancellation, onWork) {
+            (cancellation or preparationCancellation).checkLpAssembly()
+            result = it
+        }.forEach { }
+        return checkNotNull(result)
+    }
+
     fun prepareBuild(
         domains: RelaxationDomains,
         cancellation: Cancellation,

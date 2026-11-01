@@ -42,6 +42,65 @@ import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
     @Test
+    fun `primal assembly should stop before a numerical owner after its containing debit cancels`() {
+        for (pump in listOf(false, true)) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+            val sink = SolveStatsSink("cancelled-primal-assembly")
+            val factory = RecordingLpEngineFactory()
+            var armed = false
+            var stopped = false
+            var charged = 0L
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+                LpSolveContext(factory), containingWork = {
+                    charged += it
+                    if (armed) stopped = true
+                }).use { engine ->
+                val before = engine.totalSolveWork()
+                val owners = factory.calls.size
+                charged = 0L
+                armed = true
+
+                val result = if (pump) engine.lpFeasibilityPump(objective, Cancellation { stopped })
+                else engine.lpRoundingProbe(objective, Cancellation { stopped })
+
+                assertNull(result)
+                assertEquals(owners, factory.calls.size)
+                val phase = sink.snapshot().lp.phases.getValue("PRIMAL_LP_ASSEMBLY_ROOT")
+                assertEquals(1L, phase.outcomes["CANCELLED"])
+                assertTrue(phase.work > 0L)
+                assertEquals(phase.work, charged)
+                assertEquals(phase.work, engine.totalSolveWork() - before)
+            }
+        }
+    }
+
+    @Test
+    fun `primal assembly should spend the existing root grant before opening a numerical owner`() {
+        for (pump in listOf(false, true)) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+            val sink = SolveStatsSink("spent-primal-assembly")
+            val factory = RecordingLpEngineFactory()
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, rootMaxWork = 1L)),
+                sink, LpSolveContext(factory)).use { engine ->
+                val owners = factory.calls.size
+
+                val result = if (pump) engine.lpFeasibilityPump(objective, Cancellation.Never)
+                else engine.lpRoundingProbe(objective, Cancellation.Never)
+
+                assertNull(result)
+                assertEquals(owners, factory.calls.size)
+                val phase = sink.snapshot().lp.phases.getValue("PRIMAL_LP_ASSEMBLY_ROOT")
+                assertEquals(1L, phase.outcomes["CANCELLED"])
+                assertTrue(phase.work > 0L)
+            }
+        }
+    }
+
+    @Test
     fun `an optimal rounding point survives interruption while its solver closes`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
@@ -435,7 +494,10 @@ class LpPrimalHeuristicsTest {
             assertNotNull(engine.lpFeasibilityPump(objective, Cancellation.Never))
         }
 
-        assertEquals(listOf(12_000L, 7_000L), limits)
+        val assembly = sink.snapshot().lp.phases.getValue("PRIMAL_LP_ASSEMBLY_ROOT")
+        assertEquals(1L, assembly.outcomes["COMPLETE"])
+        assertTrue(assembly.work > 0L)
+        assertEquals(listOf(12_000L - assembly.work, 7_000L - assembly.work), limits)
     }
 
     @Test

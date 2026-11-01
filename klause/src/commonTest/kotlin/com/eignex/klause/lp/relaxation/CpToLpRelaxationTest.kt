@@ -30,6 +30,24 @@ import kotlin.test.assertTrue
 
 class CpToLpRelaxationTest {
     @Test
+    fun `charged assembly should report work when its debit cancels`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+        ))
+        var cancelled = false
+        var work = 0L
+
+        assertFailsWith<LpAssemblyCancelled> {
+            CpToLpRelaxation(problem, null).buildWithWork(RootDomains(problem), Cancellation { cancelled }) {
+                work += it
+                cancelled = true
+            }
+        }
+
+        assertTrue(work > 0L)
+    }
+
+    @Test
     fun `completed assembly reports no discarded work`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
