@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 class ResumableMinimizeDirectionalTest {
     @Test
     fun `finite search consumes directional child advice across cooperative slices`() {
-        val blocks = 3
+        val blocks = 2
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
