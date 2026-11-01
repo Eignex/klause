@@ -19,6 +19,22 @@ import kotlin.test.assertTrue
 class ClauseDbTest {
 
     @Test
+    fun `general production caps should retire locals above a permanent floor`() {
+        for (cap in listOf(4_000, 20_000)) {
+            val session = PropagationSession(chainProblem().bake(), nativeSat = false)
+            repeat(cap) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 9, permanent = true) }
+            session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 9)
+            val before = session.work
+
+            forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = cap, tieredLearnedDb = true))
+
+            assertEquals(cap, session.activeLearnedClauseCount)
+            assertEquals(1L, session.learnedLifecycle()["learningClauseRetired"])
+            assertTrue(session.work - before <= 65_536L)
+        }
+    }
+
+    @Test
     fun `pending publication should preserve native cap candidates`() {
         val session = PropagationSession(chainProblem().bake(), nativeSat = true)
         session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 9, permanent = true)

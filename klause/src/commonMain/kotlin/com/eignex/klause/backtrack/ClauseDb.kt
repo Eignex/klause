@@ -25,7 +25,7 @@ internal fun forgetIfOverCap(
     val startWork = session.work
     val prepared = prepareCapReduction(session, params, learnedSize, params.tieredLearnedDb)
     if (prepared == null) {
-        forgetNativeWindow(session, params, cap, startWork)
+        forgetWindow(session, params, cap, startWork)
         return
     }
     if (params.tieredLearnedDb) {
@@ -62,8 +62,8 @@ private fun forgetTiered(
     }
 }
 
-private fun forgetNativeWindow(session: PropagationSession, params: BacktrackParams, cap: Int, startWork: Long) {
-    val retired = session.maintainNativeCapWindow(cap,
+private fun forgetWindow(session: PropagationSession, params: BacktrackParams, cap: Int, startWork: Long) {
+    val retired = session.maintainCapWindow(cap,
         (params.learnedMemoryWork - (session.work - startWork)).coerceAtLeast(0L),
         params.learnedMemoryScratchBytes, { params.cancellation() }) { index ->
         val lbd = session.learnedClauseLbd(index)

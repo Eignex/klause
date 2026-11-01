@@ -205,6 +205,10 @@ class PropagationState private constructor(
 
     /** Enqueue [fid] if not already queued this run. */
     internal fun propEnq(fid: Int) {
+        if (retiredLearnedFactor(fid)) {
+            work++
+            return
+        }
         if (propStamp[fid] != propGen) {
             propStamp[fid] = propGen
             propQueue.addLast(fid)
@@ -1302,6 +1306,10 @@ class PropagationState private constructor(
                 selected
             }
             propStamp[fid] = propGen - 1 // mark dequeued (≠ propGen) so it can re-enqueue
+            if (retiredLearnedFactor(fid)) {
+                work++
+                continue
+            }
             val f = factorAt(fid)
             // Cheap bake: defer an expensive factor's first fire (heavy state build + sweep) to the
             // first search fire. It re-enqueues if a cheap factor later wakes it, and is skipped again.

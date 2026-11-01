@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -15,8 +16,164 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ClauseDbTest {
+
+    @Test
+    fun `general window retirement should disable propagation while retaining factor payload`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(), arrayOf(Clause(intArrayOf(4, 6)))),
+            nativeSat = false)
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9, permanent = true)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+        val factor = session.problem.numFactors + 1
+
+        session.maintainCapWindow(1, 128L, 128L, { false }) { false }
+        session.pinBool(0, false)
+
+        assertNull(session.boolValue(1))
+        assertIs<ClausePropagator>(session.explanationState.factorAt(factor))
+        assertEquals(1, session.activeLearnedClauseCount)
+    }
+
+    @Test
+    fun `general window retirement should protect a live integer bound reason`() {
+        val session = PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 10)), emptyArray()), nativeSat = false)
+        val atom = session.explanationState.atomVarLe(0, 5)
+        val index = session.learnedClauseCount
+        session.addLearnedClause(Clause(intArrayOf(0, Lit.make(atom, true))), 9)
+        session.addLearnedClause(Clause(intArrayOf(1)), 1, permanent = true)
+        assertEquals(session.problem.numFactors + index, session.explanationState.intMaxReason[0])
+
+        val retired = session.maintainCapWindow(1, 65_536L, 1_048_576L, { false }) { false }
+
+        assertEquals(0, retired)
+        assertTrue(session.isLearnedClause(index))
+    }
+
+    @Test
+    fun `general window retirement should protect a historical integer bound reason`() {
+        val session = PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 10)), emptyArray()), nativeSat = false)
+        val atom = session.explanationState.atomVarLe(0, 5)
+        val index = session.learnedClauseCount
+        session.addLearnedClause(Clause(intArrayOf(0, Lit.make(atom, true))), 9)
+        session.addLearnedClause(Clause(intArrayOf(1)), 1, permanent = true)
+        val stronger = session.explanationState.atomVarLe(0, 3)
+        session.addLearnedClause(Clause(intArrayOf(Lit.make(stronger, true))), 1, permanent = true)
+        val factor = session.problem.numFactors + index
+        val undo = session.explanationState.undo
+        assertTrue(session.explanationState.intMaxReason[0] != factor)
+        assertTrue((0 until undo.size).any { undo.tag[it] == 1 && undo.maxReason[it] == factor })
+
+        val retired = session.maintainCapWindow(1, 65_536L, 1_048_576L, { false }) { false }
+
+        assertEquals(0, retired)
+        assertTrue(session.isLearnedClause(index))
+    }
+
+    @Test
+    fun `general window retirement should protect a pending first assertion`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(), arrayOf(Clause(intArrayOf(4, 6)))),
+            nativeSat = false)
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9, permanent = true)
+        val factor = session.explanationState.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+        session.explanationState.deferLearnedAttachment(factor)
+
+        val retired = session.maintainCapWindow(1, 128L, 128L, { false }) { false }
+        session.pinBool(0, false)
+
+        assertEquals(0, retired)
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `general window progress should resume across appended clauses`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(), arrayOf(Clause(intArrayOf(4, 6)))),
+            nativeSat = false)
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9, permanent = true)
+        repeat(3) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+        var retired = 0
+
+        repeat(4) { attempt ->
+            val before = session.work
+            retired += session.maintainCapWindow(1, 64L, 128L, { false }) { false }
+            assertTrue(session.work - before <= 64L)
+            if (attempt == 0) session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+        }
+
+        assertEquals(4, retired)
+        assertEquals(1, session.activeLearnedClauseCount)
+    }
+
+    @Test
+    fun `general window cancellation at the debit should preserve the row`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(), arrayOf(Clause(intArrayOf(4, 6)))),
+            nativeSat = false)
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9, permanent = true)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+        val before = session.work
+
+        val retired = session.maintainCapWindow(1, 128L, 128L, { session.work - before >= 38L }) {
+            error("cancelled policy callback")
+        }
+
+        assertEquals(0, retired)
+        assertTrue(session.isLearnedClause(1))
+        assertEquals(38L, session.work - before)
+    }
+
+    @Test
+    fun `general retired slots should keep owned bytes until funded compaction`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(), arrayOf(Clause(intArrayOf(4, 6)))),
+            nativeSat = false)
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9, permanent = true)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+        val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        session.maintainCapWindow(1, 128L, 128L, { false }) { false }
+        val logical = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        session.forgetLearnedClauses { _, _ -> true }
+        val compacted = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(before.getValue("ownedPrimitiveBytes"), logical.getValue("ownedPrimitiveBytes"))
+        assertTrue(compacted.getValue("ownedPrimitiveBytes") < logical.getValue("ownedPrimitiveBytes"))
+        assertEquals(1L, session.learnedLifecycle()["learningClauseRetired"])
+    }
+
+    @Test
+    fun `releasing general window state should preserve charged totals`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(), arrayOf(Clause(intArrayOf(4, 6)))),
+            nativeSat = false)
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9, permanent = true)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+        session.maintainCapWindow(1, 128L, 128L, { false }) { false }
+        val before = session.learnedLifecycle()
+
+        session.releaseRetainedState()
+
+        assertEquals(before, session.learnedLifecycle())
+        assertEquals(0, session.maintainCapWindow(1, 128L, 128L, { false }) { false })
+    }
+
+    @Test
+    fun `reseeded general windows should accept fresh clause slots`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(), arrayOf(Clause(intArrayOf(4, 6)))),
+            nativeSat = false)
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9, permanent = true)
+        repeat(3) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+        session.maintainCapWindow(1, 64L, 128L, { false }) { false }
+        session.seed(Assumptions.None)
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9, permanent = true)
+        val index = session.learnedClauseCount
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+
+        session.maintainCapWindow(1, 65_536L, 1_048_576L, { false }) { false }
+
+        assertTrue(!session.isLearnedClause(index))
+    }
+
     @Test
     fun `cancellation should retain native learning until component retraction permits resumption`() {
         for (nativeSat in listOf(false, true)) {
