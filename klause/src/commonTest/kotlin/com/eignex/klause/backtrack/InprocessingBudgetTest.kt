@@ -15,6 +15,38 @@ import kotlin.test.assertTrue
 
 class InprocessingBudgetTest {
     @Test
+    fun `containing exhaustion should withhold optional work without creating class debt`() {
+        val session = PropagationSession(Problem(2, 0, emptyArray(),
+            arrayOf<Factor>(Clause(intArrayOf(0, 2)))).bake())
+        val spending = InprocessingSpending(InprocessingKind.Root)
+        val params = BacktrackParams(inprocessingRootWork = 10L)
+        spending.run(session, params, null, containingWork = 3L) { budget ->
+            budget.charge(5)
+            assertEquals(0L, budget.remaining)
+            assertTrue(budget.stopped())
+        }
+
+        var remaining = 0L
+        spending.run(session, params, null, containingWork = 3L) { remaining = it.remaining }
+
+        assertEquals(3L, remaining)
+    }
+
+    @Test
+    fun `remaining work should include class debt before a containing grant`() {
+        val session = PropagationSession(Problem(2, 0, emptyArray(),
+            arrayOf<Factor>(Clause(intArrayOf(0, 2)))).bake())
+        val spending = InprocessingSpending(InprocessingKind.Root)
+        val params = BacktrackParams(inprocessingRootWork = 3L)
+        spending.run(session, params, null, containingWork = 10L) { it.charge(5) }
+
+        var remaining = 0L
+        spending.run(session, params, null, containingWork = 10L) { remaining = it.remaining }
+
+        assertEquals(1L, remaining)
+    }
+
+    @Test
     fun `zero class allowances should withhold all enabled passes`() {
         for (native in listOf(false, true)) {
             val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(

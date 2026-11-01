@@ -36,6 +36,7 @@ class RootInprocessingTest {
         for (native in listOf(false, true)) {
             val problem = problem(intArrayOf(1), intArrayOf(0, 2, 4))
             val session = PropagationSession(problem.bake(), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
 
             RootSimplificationPass().run(session, BacktrackParams(), null)
             session.forgetLearnedClauses { _, _ -> false }
@@ -190,6 +191,7 @@ class RootInprocessingTest {
     fun `a pending retirement should invalidate learned candidates after compaction`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
             session.addLearnedClause(Clause(intArrayOf(0, 4, 6)), 3)
             val pass = RootSimplificationPass()
@@ -359,6 +361,7 @@ class RootInprocessingTest {
     fun `root refresh should preserve imported origin through compaction`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             session.importClause(SharedClause(intArrayOf(0, 2, 4), longArrayOf(), 3), origin = 7)
 
             RootSimplificationPass().run(session, BacktrackParams(), null)
@@ -378,6 +381,7 @@ class RootInprocessingTest {
         for ((native, work) in listOf(false to Long.MAX_VALUE, true to Long.MAX_VALUE,
             false to 10L, true to 10L, false to 1L, true to 1L)) {
             val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             session.addLearnedClause(Clause(intArrayOf(0, 4, 6)), 3)
             val pass = RootSimplificationPass()
@@ -396,6 +400,7 @@ class RootInprocessingTest {
     fun `a satisfied root clause should retain its live historical reason`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             val reason = assertNotNull(session.boolReasonClause(1)).toList()
 
