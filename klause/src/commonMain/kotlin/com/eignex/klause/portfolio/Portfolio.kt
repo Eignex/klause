@@ -127,6 +127,7 @@ class Portfolio(
      * different jobs, so the scheduler starts the second with only a weak memory of who did well at the first:
      * enough that it need not re-explore every arm, little enough that a few segments overturn it. The search
      * itself carries over whole. Applies to [thompson]'s policy; another policy keeps its evidence.
+     * Priced family evidence retains the same fraction; the classification priors stay fixed.
      */
     private val phaseRetention: Double = DEFAULT_PHASE_RETENTION,
     /** The model's classification, which sets the lean each engine family starts from; null leans none. */
@@ -1232,6 +1233,7 @@ class Portfolio(
             ledger.resetPhase()
             proofLedger?.resetPhase()
             (bandit as? DiscountedThompson)?.fade(phaseRetention)
+            if ((scopedReward as? SourceRateReward)?.priceFamilies == true) families.fade(phaseRetention)
         }
 
         private fun owedArm(eligibleArms: List<Int>): Int? {
