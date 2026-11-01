@@ -140,7 +140,14 @@ interface ResumableSolve : AutoCloseable {
 }
 
 internal interface InstructionSlicedSolve : ResumableSolve {
+    val auxiliaryWork: Long get() = 0L
+
     fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long): SolveResult?
+
+    fun runScheduledSlice(
+        global: Cancellation, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
+        instructionsPerWork: Double,
+    ): SolveResult? = runInstructionSlice(global, sliceMillis, sliceInstructions)
 }
 
 internal interface IncumbentBootstrapSearch : ResumableSearch {
@@ -150,6 +157,16 @@ internal interface IncumbentBootstrapSearch : ResumableSearch {
 internal interface InstructionSlicedSearch : ResumableSearch {
     /** Cumulative scheduling instructions; LNS allowances can differ from observed inner-engine work. */
     val chargedInstructions: Long get() = stats.ls.moves.sum.toLong()
+    val auxiliaryWork: Long get() = 0L
+
+    fun runScheduledSlice(
+        global: Cancellation,
+        sliceMillis: Long,
+        sliceInstructions: Long,
+        sliceWork: Long,
+        instructionsPerWork: Double,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+    ): MinimizeResult? = runInstructionSlice(global, sliceMillis, sliceInstructions, onIncumbent)
 
     fun runInstructionSlice(
         global: Cancellation,

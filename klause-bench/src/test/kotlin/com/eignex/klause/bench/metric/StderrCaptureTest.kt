@@ -60,9 +60,14 @@ class StderrCaptureTest {
     @ParameterizedTest
     @ValueSource(strings = ["\n", "\r", "\r\n", ""])
     fun `a refusal split across reads is classified past the prefix`(ending: String) {
-        val bytes = ("x".repeat(20_000) + "\nklause MPS: declined" + ending).toByteArray()
+        val prefix = "x".repeat(20_000) + "\n"
+        val bytes = (prefix + "klause MPS: declined" + ending).toByteArray()
         val input = object : ByteArrayInputStream(bytes) {
-            override fun read(buffer: ByteArray, offset: Int, length: Int): Int = super.read(buffer, offset, 1)
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                val remainingPrefix = prefix.length - pos
+                val count = minOf(length, if (remainingPrefix > 0) remainingPrefix else 1)
+                return super.read(buffer, offset, count)
+            }
         }
 
         val result = StderrCapture(input).start().await(100, processKilled = false)
