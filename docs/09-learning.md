@@ -471,12 +471,15 @@ buffer. Permanent clauses, protected reasons, unfunded rows and policy survivors
 reduce the heap quota. A pending eviction that gains protection also consumes that
 quota before the next heap step. Mid rows
 survive their demotion window, and classification clears survivor reuse flags.
-Current or historical reasons can retain additional rows above the soft cap. General
-retirement replaces its payload with an inert stable-ID slot and releases its
-watch-position payload, integer-row cache entry and applicable deferred/diagnostic aliases. Stale watches skip that slot;
-their allocated capacity and policy columns remain owned until compaction. General
-reason snapshots and full physical compaction still require their complete funding;
-shared stores retain the complete selection/remap path.
+Current or historical reasons can retain additional rows above the soft cap.
+Native post-undo replay protects its queued clause handles and learned units without
+freezing unrelated retirement. Incomplete trail propagation, conflicts and root
+publication still defer the window.
+General retirement replaces its payload with an inert stable-ID slot and releases
+its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
+aliases. Stale watches skip that slot; their allocated capacity and policy columns
+remain owned until compaction. General reason snapshots and full physical compaction
+still require their complete funding; shared stores retain the complete selection/remap path.
 
 Shared learning also accepts an optional modeled-byte soft limit checked at
 propagation boundaries independently of restarts. Units, glue clauses, live reason

@@ -51,6 +51,9 @@ internal class NativeSatState(private val state: PropagationState) {
     private var capCalls = 0L
     private var capWork = 0L
     private var capVisits = 0L
+    private var capBoundaryDefers = 0L
+    private var capPreparationDefers = 0L
+    private var capPendingReplayCalls = 0L
 
     // Per-learned-clause policy columns, parallel to the learned index — the native mirror of
     // LearnedClauseDb's forgetting/three-tier metadata. `tier` holds a [ClauseTier] ordinal;
@@ -393,9 +396,13 @@ internal class NativeSatState(private val state: PropagationState) {
         keep: (Int) -> Boolean,
     ): Int {
         capCalls++
-        if (maxScratchBytes < 64L || !initialized || pendingConflict || unitsPending ||
-            recheckHead < rechecks.size || bcpHead != state.boolPinOrder.size || state.runCancelled
-        ) return 0
+        if (unitsPending || recheckHead < rechecks.size) capPendingReplayCalls++
+        if (maxScratchBytes < 64L || !initialized || pendingConflict ||
+            bcpHead != state.boolPinOrder.size || state.runCancelled
+        ) {
+            capBoundaryDefers++
+            return 0
+        }
         val before = retiredCount
         val budget = ReclamationPreparation(maxWork, maxScratchBytes, cancelled) {
             state.work += it
@@ -405,6 +412,7 @@ internal class NativeSatState(private val state: PropagationState) {
             budget.visit(0L, 64L)
             capRanking.advance(cap, permanentCount, budget, capPolicy(budget, canDrop, keep))
         } catch (_: ReclamationPreparation.Deferred) {
+            capPreparationDefers++
             // Heap steps and pending retirement keep their handles across roots.
         }
         return retiredCount - before
@@ -465,6 +473,9 @@ internal class NativeSatState(private val state: PropagationState) {
         "learnedCapCalls" to capCalls,
         "learnedCapWork" to capWork,
         "learnedCapVisits" to capVisits,
+        "learnedCapBoundaryDefers" to capBoundaryDefers,
+        "learnedCapPreparationDefers" to capPreparationDefers,
+        "learnedCapPendingReplayCalls" to capPendingReplayCalls,
         "learnedCapRankedPasses" to capRanking.passes,
         "learnedCapPermanentClauses" to permanentCount.toLong(),
         "learnedCapRetainedSlots" to learnedCount.toLong(),
