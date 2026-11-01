@@ -23,6 +23,7 @@ internal class RootSimplificationPass : InprocessingPass {
     private var deferredFactor = -1
     private var pinCursor = 0
     private var occurrenceCursor = 0
+    private var sourceNeighborhoodAvailable = true
     private var preferNeighborhood = false
     private var neighborhoodLeft = 0
 
@@ -47,6 +48,7 @@ internal class RootSimplificationPass : InprocessingPass {
         deferredFactor = -1
         pinCursor = 0
         occurrenceCursor = 0
+        sourceNeighborhoodAvailable = true
         preferNeighborhood = false
     }
 
@@ -66,11 +68,7 @@ internal class RootSimplificationPass : InprocessingPass {
         val count = session.rootClauseCount
         if (revision != session.learnedClauseRevision) {
             dropped = IntHashSet()
-            pending = null
-            deferredFactor = -1
-            cursor = 0
-            scanEnd = count
-            scanRoot = session.explanationState.undoTop
+            refreshClauseScan(session)
         }
         revision = session.learnedClauseRevision
         if (count == 0) return
@@ -88,8 +86,7 @@ internal class RootSimplificationPass : InprocessingPass {
             dropped = IntHashSet()
             revision = session.learnedClauseRevision
             if (session.learnedClauseCount < beforeCount) {
-                cursor = 0
-                scanEnd = session.rootClauseCount
+                refreshClauseScan(session)
             }
             return
         }
@@ -173,9 +170,18 @@ internal class RootSimplificationPass : InprocessingPass {
             revision = session.learnedClauseRevision
         }
         if (session.learnedClauseCount < beforeCompaction) {
-            cursor = 0
-            scanEnd = session.rootClauseCount
+            refreshClauseScan(session)
         }
+    }
+
+    private fun refreshClauseScan(session: PropagationSession) {
+        if ((pending?.factor ?: -1) >= session.problem.numFactors) pending = null
+        if (deferredFactor >= session.problem.numFactors) deferredFactor = -1
+        val root = session.explanationState.undoTop
+        // Learned remapping leaves source identities and unchanged root facts intact.
+        cursor = if (scanRoot == root) minOf(cursor, session.problem.numFactors) else 0
+        scanEnd = session.rootClauseCount
+        scanRoot = root
     }
 
     private fun nextFactor(session: PropagationSession, budget: InprocessingBudget): Int? {
@@ -189,6 +195,13 @@ internal class RootSimplificationPass : InprocessingPass {
         preferNeighborhood = !preferNeighborhood
         if (nearbyFirst) neighborhoodFactor(session, budget)?.let { return it }
         if (budget.stopped()) return null
+        if (sourceNeighborhoodAvailable && pinCursor == session.explanationState.boolPinOrder.size &&
+            cursor < session.problem.numFactors) {
+            if (!budget.visit()) return null
+            // Every source clause changed by a root pin belongs to its completed occurrence walk.
+            budget.note("SourceSkipped", (session.problem.numFactors - cursor).toLong())
+            cursor = session.problem.numFactors
+        }
         if (cursor < scanEnd) {
             if (!budget.visit()) return null
             return cursor++
@@ -204,6 +217,7 @@ internal class RootSimplificationPass : InprocessingPass {
                 session.projection.readyBoolOccurrences(variable)
             } else null
             if (variable < session.problem.numBoolVars && occurrences == null) {
+                sourceNeighborhoodAvailable = false
                 pinCursor = pins.size
                 occurrenceCursor = 0
                 budget.note("NeighborhoodUnavailable")

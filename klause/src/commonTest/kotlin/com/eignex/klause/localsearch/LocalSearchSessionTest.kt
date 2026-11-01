@@ -28,6 +28,24 @@ import kotlin.test.assertTrue
 
 class LocalSearchSessionTest {
 
+    @Test
+    fun `a scheduled incumbent consumer failure should release session ownership`() {
+        val session = LocalSearchSolver(Problem(0, 0, emptyArray(), emptyArray()).bake()).session()
+        val params = LocalSearchParams(maxFlips = 1L)
+        val handle = assertIs<InstructionSlicedSearch>(session.resumable(LinearObjective(), params))
+
+        assertFailsWith<IllegalArgumentException> {
+            handle.runScheduledSlice(Cancellation.Never, Long.MAX_VALUE, 1L, 1L, 0.8) {
+                throw IllegalArgumentException("consumer")
+            }
+        }
+
+        session.resumableSolve(params).use { next ->
+            assertIs<SolveResult.Sat>(next.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+        }
+        session.close()
+    }
+
     private fun weightLearningProblem(): Problem = Problem(
         numBoolVars = 6,
         numIntVars = 0,

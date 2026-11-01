@@ -98,6 +98,26 @@ class PrivateRebuildBinaryLearningTest {
     }
 
     @Test
+    fun `logically retired binaries should withhold a reciprocal capture`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
+                Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
+            )).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(1, 2)), 9)
+            session.addLearnedClause(Clause(intArrayOf(0, 3)), 9)
+            assertEquals(1, session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { it == 0 })
+            assertTrue(session.canSimplifyRoot)
+
+            val captured = PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true }
+
+            assertEquals(2, session.learnedClauseCount)
+            assertNull(captured)
+        }
+    }
+
+    @Test
     fun `an attempted relation should not trigger another generation`() {
         val source = Problem(3, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3, 4)), Clause(intArrayOf(0, 3, 5)),

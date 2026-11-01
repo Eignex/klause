@@ -12,11 +12,15 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.InstructionSlicedSolve
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
+import com.eignex.klause.solver.ResumableSolve
+import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.StatelessSession
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
@@ -35,6 +39,101 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
 class PortfolioWorkAccountingTest {
+    @Test
+    fun `scheduled optimization should charge auxiliary work beyond its native instructions`() {
+        for (coordinates in listOf(false, true)) {
+            val offers = ArrayList<Pair<Long, Long>>()
+            val handle = object : InstructionSlicedSearch {
+                override var chargedInstructions = 0L
+                override var auxiliaryWork = 0L
+                override val isDone: Boolean get() = false
+                override val stats: SolveStats get() = SolveStats.EMPTY
+                override fun runSlice(
+                    global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                ): MinimizeResult? = error("scheduled slice required")
+                override fun runInstructionSlice(
+                    global: Cancellation, sliceMillis: Long, sliceInstructions: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                ): MinimizeResult? = error("scheduled slice required")
+                override fun runScheduledSlice(
+                    global: Cancellation, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
+                    instructionsPerWork: Double, onIncumbent: (MinimizeResult.WithSample) -> Unit,
+                ): MinimizeResult? {
+                    offers += sliceInstructions to sliceWork
+                    chargedInstructions += 3L
+                    auxiliaryWork += 11L
+                    return null
+                }
+            }
+            val solver = object : ResumableOptimizer<BacktrackParams> by TrackingResumableOptimizer(handle) {
+                override fun session() = StatelessSession(this)
+            }
+            val native = PortfolioWorker.of(
+                "priced", 0, solver.session(), BacktrackParams(), LinearObjective(),
+                withInstructionBudget = { params, _ -> params },
+            )
+            val worker = if (coordinates) {
+                native.objectiveCoordinateProposals(ModelIdentity.of(Any())) { null }
+            } else native
+            val arms = listOf(
+                worker,
+                PortfolioWorker.ofMinimize("done", 1) { _, _, _, _ -> sequenceOf(MinimizeResult.Infeasible()) },
+            )
+
+            val result = Portfolio(
+                arms, fixedBandit(2, arm = 0), baseSliceWork = 7L, lsInstructionsPerWork = 1.5,
+            ).use { it.minimize(Cancellation { offers.isNotEmpty() }) }
+
+            assertEquals(listOf(10L to 7L), offers)
+            assertEquals(13L, result.stats.portfolio.arms[0].work)
+        }
+    }
+
+    @Test
+    fun `scheduled satisfaction should charge auxiliary work beyond its native instructions`() {
+        var auxiliary = 0L
+        val offers = ArrayList<Pair<Long, Long>>()
+        val handle = object : InstructionSlicedSolve {
+            override val auxiliaryWork: Long get() = auxiliary
+            override val isDone: Boolean get() = false
+            override val stats: SolveStats get() = SolveStats(
+                ls = LocalSearchStats(moves = SumResult(if (auxiliary == 0L) 0.0 else 3.0)),
+            )
+            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
+                error("scheduled slice required")
+            override fun runInstructionSlice(
+                global: Cancellation, sliceMillis: Long, sliceInstructions: Long,
+            ): SolveResult? = error("scheduled slice required")
+            override fun runScheduledSlice(
+                global: Cancellation, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
+                instructionsPerWork: Double,
+            ): SolveResult? {
+                offers += sliceInstructions to sliceWork
+                auxiliary = 11L
+                return null
+            }
+        }
+        val solver = object : ResumableSolver<BacktrackParams> by CountingResumableSolver(1) {
+            override fun session() = StatelessSession(this)
+            override fun resumableSolve(params: BacktrackParams): ResumableSolve = handle
+        }
+        val arms = listOf(
+            PortfolioWorker.of(
+                "priced", 0, solver.session(), BacktrackParams(),
+                withInstructionBudget = { params, _ -> params },
+            ),
+            PortfolioWorker.ofSolve("done", 1) { _, _ -> SolveResult.Unsat() },
+        )
+
+        val result = Portfolio(
+            arms, fixedBandit(2, arm = 0), baseSliceWork = 7L, lsInstructionsPerWork = 1.5,
+        ).use { it.solve(Cancellation { offers.isNotEmpty() }) }
+
+        assertEquals(listOf(10L to 7L), offers)
+        assertEquals(13L, result.stats.portfolio.arms[0].work)
+    }
+
     private fun lsArm(problem: Problem, objective: LinearObjective): PortfolioWorker = PortfolioWorker.of(
         "ls",
         0,

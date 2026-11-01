@@ -3,6 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 
 internal class PreparedBooleanRepairs(val closure: BooleanRepairClosure?)
 
@@ -20,9 +21,12 @@ internal class BooleanRepairClosure private constructor(
     private val seeds: IntArray,
     private val inconsistent: Boolean,
     private val support: BooleanSupportRepairs?,
+    private val repairWork: WorkMeter?,
 ) {
     private var epoch = 0
     private var end = 0
+    private var unitHead = 0
+    private var unitTail = 0
     private var supportHead = 0
     private var supportTail = 0
     private var operationsBeforePoll = 0
@@ -128,6 +132,10 @@ internal class BooleanRepairClosure private constructor(
                 yield(null)
                 val clauseStamps = IntArray(clauses.size)
                 yield(null)
+                val unitRows = IntArray(clauses.size + 1)
+                yield(null)
+                val unitStamps = IntArray(clauses.size)
+                yield(null)
                 val breakStamps = IntArray(size)
                 yield(null)
                 val breakScores = IntArray(size)
@@ -136,13 +144,15 @@ internal class BooleanRepairClosure private constructor(
                 yield(null)
                 val objectiveScores = DoubleArray(size)
                 yield(null)
-                BooleanSupportRepairs(rows, clauseStamps, breakStamps, breakScores, objectiveStamps, objectiveScores)
+                BooleanSupportRepairs(rows, clauseStamps, unitRows, unitStamps,
+                    breakStamps, breakScores, objectiveStamps, objectiveScores)
             } else null
             @Suppress("UNCHECKED_CAST")
             yield(PreparedBooleanRepairs(BooleanRepairClosure(
                 edges as Array<IntArray>, units.toIntArray(), clauses.toTypedArray(),
                 occurrences as Array<IntArray>, frozen, stamps, values, queue,
                 seedStamps, seedParity, seeds, inconsistent, support,
+                state.repairWork,
             )))
         }
     }
@@ -172,9 +182,12 @@ internal class BooleanRepairClosure private constructor(
             stamps.fill(0)
             seedStamps.fill(0)
             support?.clauseStamps?.fill(0)
+            support?.unitStamps?.fill(0)
             epoch = 1
         } else epoch++
         end = 0
+        unitHead = 0
+        unitTail = 0
         supportHead = 0
         supportTail = 0
         var seedCount = 0
@@ -222,6 +235,7 @@ internal class BooleanRepairClosure private constructor(
     }
 
     private fun interrupted(cancellation: Cancellation): Boolean {
+        repairWork?.charge(1L)
         // Nested short clauses share the same bounded graph-visit window.
         if (operationsBeforePoll-- > 0) return false
         operationsBeforePoll = CANCELLATION_BATCH - 1
@@ -243,23 +257,21 @@ internal class BooleanRepairClosure private constructor(
     private fun expand(cancellation: Cancellation, supportState: LocalSearchState?): Boolean {
         var cursor = 0
         val scratch = support
-        while (cursor < end || supportHead != supportTail) {
-            while (cursor < end) {
-                if (interrupted(cancellation)) return false
-                val literal = queue[cursor++]
-                for (forced in edges[literal]) {
+        while (cursor < end || unitHead != unitTail || supportHead != supportTail) {
+            // Coalescing a row's pending falsifications avoids rescanning it for every forced literal.
+            // Mandatory rows reach their fixpoint before any heuristic supporter is chosen.
+            while (cursor < end || unitHead != unitTail) {
+                while (cursor < end) {
                     if (interrupted(cancellation)) return false
-                    if (!force(forced)) return false
+                    if (!expandLiteral(queue[cursor++], cancellation, supportState != null)) return false
                 }
-                for (row in occurrences[literal]) {
+                if (unitHead != unitTail && scratch != null) {
                     if (interrupted(cancellation)) return false
+                    val row = scratch.unitRows[unitHead]
+                    unitHead++
+                    if (unitHead == scratch.unitRows.size) unitHead = 0
+                    scratch.unitStamps[row] = 0
                     if (!expandClause(clauses[row], cancellation, null)) return false
-                    if (supportState != null && scratch != null && scratch.clauseStamps[row] != epoch) {
-                        scratch.clauseStamps[row] = epoch
-                        scratch.rows[supportTail] = row
-                        supportTail++
-                        if (supportTail == scratch.rows.size) supportTail = 0
-                    }
                 }
             }
             if (supportHead != supportTail && scratch != null) {
@@ -272,6 +284,32 @@ internal class BooleanRepairClosure private constructor(
             }
         }
         return !cancellation.isCancelled()
+    }
+
+    private fun expandLiteral(literal: Int, cancellation: Cancellation, withSupport: Boolean): Boolean {
+        for (forced in edges[literal]) {
+            if (interrupted(cancellation)) return false
+            if (!force(forced)) return false
+        }
+        val rows = occurrences[literal]
+        if (rows.isEmpty()) return true
+        val pending = checkNotNull(support)
+        for (row in rows) {
+            if (interrupted(cancellation)) return false
+            if (pending.unitStamps[row] != epoch) {
+                pending.unitStamps[row] = epoch
+                pending.unitRows[unitTail] = row
+                unitTail++
+                if (unitTail == pending.unitRows.size) unitTail = 0
+            }
+            if (withSupport && pending.clauseStamps[row] != epoch) {
+                pending.clauseStamps[row] = epoch
+                pending.rows[supportTail] = row
+                supportTail++
+                if (supportTail == pending.rows.size) supportTail = 0
+            }
+        }
+        return true
     }
 
     // Unforced live values are not premises for a proposal's unit consequences.
@@ -328,6 +366,8 @@ internal class BooleanRepairClosure private constructor(
 private class BooleanSupportRepairs(
     val rows: IntArray,
     val clauseStamps: IntArray,
+    val unitRows: IntArray,
+    val unitStamps: IntArray,
     private val breakStamps: IntArray,
     private val breakScores: IntArray,
     private val objectiveStamps: IntArray,

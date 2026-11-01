@@ -94,6 +94,59 @@ class PrivateRebuildWarmClausesTest {
     }
 
     @Test
+    fun `reclaimed learning should be excluded from a fresh snapshot`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(4, 6)),
+            )).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            session.addLearnedClause(Clause(intArrayOf(4, 6)), 2)
+            session.forgetLearnedClauses { index, _ -> index == 1 }
+
+            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(emptyList()),
+                arrayOfNulls(4), 1_048_576L, 65_536L, Cancellation.Never))
+
+            assertContentEquals(intArrayOf(4, 6), (warm.clauses.single() as Clause).literals)
+        }
+    }
+
+    @Test
+    fun `logically retired clauses should be excluded from a fresh snapshot`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(4, 6)),
+            )).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+            session.addLearnedClause(Clause(intArrayOf(4, 6)), 9)
+            assertEquals(1, session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { it == 1 })
+
+            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(emptyList()),
+                arrayOfNulls(4), 1_048_576L, 65_536L, Cancellation.Never))
+
+            assertEquals(2, session.learnedClauseCount)
+            assertContentEquals(intArrayOf(4, 6), (warm.clauses.single() as Clause).literals)
+        }
+    }
+
+    @Test
+    fun `copied consequences should survive canonical forgetting`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(emptyList()),
+                arrayOfNulls(2), 1_048_576L, 65_536L, Cancellation.Never))
+
+            session.forgetLearnedClauses { _, _ -> false }
+
+            assertEquals(0, session.learnedClauseCount)
+            assertContentEquals(intArrayOf(0, 2), (warm.clauses.single() as Clause).literals)
+        }
+    }
+
+    @Test
     fun `learned clauses should project through either pivot polarity without excluding source points`() {
         for (native in listOf(false, true)) for (pivot in listOf(0, 1)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(

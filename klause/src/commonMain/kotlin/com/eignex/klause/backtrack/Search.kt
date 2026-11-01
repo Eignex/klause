@@ -653,7 +653,7 @@ private class CpSatisfactionTraversalPolicy(
 
     override fun onRestart(context: SearchContext): SearchRunDisposition {
         params.clauseExchange?.onRestart(session)
-        forgetIfOverCap(session, params)
+        forgetIfOverCap(session, params, inprocessing?.retainsPublication == true)
         val simplified = simplify(context, true)
         if (simplified != SearchRunDisposition.Continue) return simplified
         pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment) }

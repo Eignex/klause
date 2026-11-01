@@ -284,8 +284,10 @@ an exhaustive elimination pass.
 
 A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker
-qualifies. The capture binds its exact source object and owns its clauses; preparation
-rechecks that its columns remain unfixed. Adding
+qualifies. Discovery charges retained slot visits and skips logically retired entries
+before reading their literals. The capture binds its exact source object and owns its clauses; preparation
+rechecks that its columns remain unfixed. Global consequences remain valid after
+their canonical learned entries are reclaimed. Adding
 them to the pinned source preserves the premises of the source implication-graph
 pass. A complemented pair flips one column in the private source view before
 the equal-valued graph pass. The source mapping reverses that flip when lifting a
@@ -349,8 +351,8 @@ Each copied consequence owns its literal buffer and consumes the same
 work and modeled-memory grants; an exhausted local transfer grant retains the
 completed subset. The mapping composes through the enriched model's exact identity.
 These copies preserve consequences without sharing learned-store indexes or
-exchange cursors. Their work and time are preparation subsets; private baking
-and propagation include the added clauses.
+exchange cursors and survive canonical forgetting. Their work and time are
+preparation subsets; private baking and propagation include the added clauses.
 
 The private worker owns fresh watches, learning and search state. Canonical exchange
 cursors and pooled incumbent guidance stay with the retained canonical worker;
@@ -361,6 +363,11 @@ proof authority and resume the retained traversal. Declines and exhausted trials
 also resume it. Closing releases the private consumer, reconstruction and cursors
 after its final drains. Preparation, trial, reconstruction and checks consume the
 original containing deadline/work; cooperative overspend carries to later slices.
+Discovery and preparation debit the private coordinator's ledger. The canonical
+state's propagation and inprocessing counters retain its own engine visits.
+Converted private work joins consumer work in the containing slice budget and overspend debt.
+Retired consumers retain their converted decision and propagation work separately;
+the charged-work total includes preparation, trials and canonical checks.
 The scratch allowance gates a declared private buffer/reference-slot admission model;
 it excludes object headers, the canonical worker and allocator overhead. Physical
 overlap memory and total cost require separate measurement. Zero disables this
@@ -858,6 +865,8 @@ indeterminate. [Portfolio admission](12-portfolio.md#witnesses-and-proof-scope) 
 finite integer point and checks the selected original-source relations. The point is
 the session's private root, so incompatible caller pins still refute it. Prepared
 custom providers keep their selected factories and required original checks.
+Pure Boolean clause points use native clause propagation when the selected
+factories permit it, without constructing the general watcher index.
 Cancellation or unavailable required checking returns indeterminate. Every exit
 reports the propagation work through the caller's accounting hook, and no scratch
 state survives a check.

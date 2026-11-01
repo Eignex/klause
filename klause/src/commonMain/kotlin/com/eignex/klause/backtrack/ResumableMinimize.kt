@@ -1540,7 +1540,7 @@ internal class ResumableMinimize(
             boundExchange.applySharedFloor()
             boundExchange.publishFloor()
             boundExchange.importGlobalVarBounds()
-            forgetIfOverCap(session, params)
+            forgetIfOverCap(session, params, inprocessing?.retainsPublication == true)
             val simplified = simplify(context, true)
             if (simplified != SearchRunDisposition.Continue) return simplified
             pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment) }
