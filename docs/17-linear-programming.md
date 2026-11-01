@@ -509,6 +509,12 @@ coordinates under the same bounded guidance allowance after charging the solve, 
 when pinning resumes. Every retry consumes the remaining root and LP allowances.
 Root rounding and pumping propose discrete assignments for mixed
 models, but a relaxation point supplies a target, never witness authority.
+An original-objective rounding probe can reuse a prepared retained root owner while
+its exact model and root scope remain current. Its query adopts the current token
+and spends the smaller of the remaining primal, root and worker grants. Incomplete
+numerical work retains the private owner for an eligible later rounding slice;
+changed authority or objective uses ordinary construction. Only a complete point
+enters rounding, and every proposed assignment still requires source verification.
 
 Retained discrete root layouts prepare in private chunks before the first numerical
 consultation. Objective-column batches and factor batches charge materialized construction

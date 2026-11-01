@@ -69,6 +69,45 @@ import kotlin.test.assertTrue
 
 class LpPropagatorTest {
     @Test
+    fun `consumer query grants cannot increase the containing allowance`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
+            .build(PropagationSession(problem))
+        for (requested in listOf(50_000L, 200_000L)) {
+            val factory = RecordingLpEngineFactory()
+            LpPropagator(object : LpSearchPolicy {},
+                effort = { LpEffortProfile(work = 100_000L) },
+                solveContext = LpSolveContext(factory),
+                queryWorkAllowance = { 100_000L },
+            ).use { lp ->
+                assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+
+                assertNotNull(lp.solveFloat(queryAllowance = { requested }))
+
+                assertEquals(minOf(100_000L, requested), assertNotNull(factory.floatAllowances.single()).work)
+            }
+        }
+    }
+
+    @Test
+    fun `spent consumer query grants supply no floating work`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
+            .build(PropagationSession(problem))
+        LpPropagator(object : LpSearchPolicy {},
+            effort = { LpEffortProfile(work = 100_000L) },
+            queryWorkAllowance = { 100_000L },
+        ).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+
+            val result = lp.solveFloat(queryAllowance = { 0L })
+
+            assertNull(result)
+            assertEquals(0L, lp.lastMetrics.workOps - assertNotNull(lp.metrics).preparationWork)
+        }
+    }
+
+    @Test
     fun `cold preparation is charged before query and continuation grants are read`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))

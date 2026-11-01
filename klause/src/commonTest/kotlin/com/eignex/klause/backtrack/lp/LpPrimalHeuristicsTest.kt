@@ -25,6 +25,7 @@ import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
@@ -130,6 +131,47 @@ class LpPrimalHeuristicsTest {
             assertEquals(listOf(1L, 0L), assertNotNull(sample).ints.toList())
             assertEquals(constructed, factory.calls.size)
         }
+    }
+
+    @Test
+    fun `rounding reuses prepared components after a cancelled root query`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 1, 2))
+        val factory = RecordingLpEngineFactory()
+
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("prepared-component-rounding"),
+            LpSolveContext(factory)).use { engine ->
+            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), Cancellation { true })
+            val constructed = factory.calls.size
+
+            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+
+            assertEquals(listOf(1L, 0L, 1L, 0L), assertNotNull(sample).ints.toList())
+            assertEquals(constructed, factory.calls.size)
+        }
+    }
+
+    @Test
+    fun `prepared component rounding respects a changed objective`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1))).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+
+        val sample = LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("changed-prepared-rounding")).use { engine ->
+            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+
+            engine.lpRoundingProbe(LinearObjective(intCoefficients = longArrayOf(2, 1)), Cancellation.Never)
+        }
+
+        assertEquals(listOf(0L, 1L), assertNotNull(sample).ints.toList())
     }
 
     @Test

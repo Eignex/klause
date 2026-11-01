@@ -413,22 +413,30 @@ internal class LpPropagator(
         warm: Basis? = null,
         token: Cancellation = cancellation,
         continuationWorkAllowance: (() -> Long?)? = null,
+        queryAllowance: (() -> Long?)? = null,
     ): Pair<LpSolver, FloatLpResult?>? =
         solveOwned(token.takeIf { onPreparation != null }) { current ->
-            val offered = queryWorkAllowance()
+            val standard = queryWorkAllowance()
+            val requested = queryAllowance?.invoke()
+            val offered = when {
+                requested == null -> standard
+                standard == null -> requested
+                else -> minOf(standard, requested)
+            }
+            val queryToken = if (offered != null && offered <= 0L) token or Cancellation { true } else token
             val continuation = (continuationWorkAllowance ?: continuationAllowance)()
             if (continuation != null && current.state.depth == 0) {
                 val profile = effort()
                 return@solveOwned current.advanceFloat(
                     (offered ?: profile.work).coerceAtLeast(1L),
-                    LpFloatAllowance(continuation.coerceAtLeast(1L), profile.iterations), token,
+                    LpFloatAllowance(continuation.coerceAtLeast(1L), profile.iterations), queryToken,
                 ).also { solved = true }
             }
             val allowance = if (solved || offered != null) {
-                effort().let { LpFloatAllowance(offered ?: it.work, it.iterations) }
+                effort().let { LpFloatAllowance((offered ?: it.work).coerceAtLeast(0L), it.iterations) }
             } else null
             // An explicit query allowance uses the scoped owner's retained basis and factors.
-            current.solveFloat(if (allowance != null) null else warm, token, allowance).also { solved = true }
+            current.solveFloat(if (allowance != null) null else warm, queryToken, allowance).also { solved = true }
         }
 
     fun solve(

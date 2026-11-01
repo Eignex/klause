@@ -377,6 +377,7 @@ private fun LpEngine.solvePrimalRelaxation(
 ): FloatLpResult? {
     requireOpen()
     if (cancellation()) return null
+    if (ownsRootPrimalModel(model)) return solveRetainedPrimalRelaxation(cancellation, observeResult)
     val started = TimeSource.Monotonic.markNow()
     val simplex = newTableauCutSolver(model, cancellation,
         workLimit = rootPrimalWorkBudget(), factory = solveContext.engineFactory, pricing = pricingOptions)
@@ -399,6 +400,41 @@ private fun LpEngine.solvePrimalRelaxation(
                 val stage = if (primal) "PRIMAL_LP_PRIMAL" else "PRIMAL_LP_DUAL"
                 sink.lp.observePrimalPhase(stage, outcome, started.elapsedNow().inWholeNanoseconds)
             }
+        }
+    }
+}
+
+private fun LpEngine.solveRetainedPrimalRelaxation(
+    cancellation: Cancellation,
+    observeResult: ((FloatLpResult?, LpFloatTermination?) -> Unit)?,
+): FloatLpResult? {
+    val started = TimeSource.Monotonic.markNow()
+    var outcome = "RETAINED_DECLINED"
+    val remaining = minOf(rootPrimalWorkBudget(), retainedRootRemainingWork())
+    if (remaining <= 0L) return null
+    val token = cancellation or Cancellation { retainedRootRemainingWork() <= 0L }
+    try {
+        val attempt = propagator.solveFloat(token = token, queryAllowance = {
+            minOf(rootPrimalWorkBudget(), retainedRootRemainingWork()).coerceAtLeast(1L)
+        })
+        val result = attempt?.second
+        val termination = propagator.floatTermination
+        outcome = if (result?.optimal == true) "RETAINED_OPTIMAL" else {
+            "RETAINED_${termination?.name ?: "OTHER"}"
+        }
+        observeResult?.invoke(result, termination)
+        if (result?.optimal != true && (termination == LpFloatTermination.WORK ||
+                termination == LpFloatTermination.PIVOTS || termination == LpFloatTermination.CANCELLED)
+        ) {
+            rootRoundingInterrupted = true
+        }
+        attempt?.first?.let(::observeSparseTrial)
+        return result?.takeIf { it.optimal }
+    } finally {
+        try {
+            observeRootWork(propagator.lastMetrics.copy(preparationOps = 0L), finished = !propagator.floatPaused)
+        } finally {
+            sink.lp.observePrimalPhase("PRIMAL_LP_DUAL", outcome, started.elapsedNow().inWholeNanoseconds)
         }
     }
 }

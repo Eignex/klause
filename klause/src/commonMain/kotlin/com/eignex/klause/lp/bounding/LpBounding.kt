@@ -1488,6 +1488,7 @@ private fun LpEngine.retainedRootLpRelaxationBound(
         return Double.NaN
     }
     val continuation = if (sparseTrialActive) ::retainedRootRemainingWork else null
+    retainRootPrimalOwner(relaxation)
     try {
         while (retainedRootRemainingWork() > 0L && !cancellation()) {
             observeStage("AT_NUMERICAL_QUERY")

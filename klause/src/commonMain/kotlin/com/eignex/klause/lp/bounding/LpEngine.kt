@@ -109,7 +109,7 @@ internal class GatedResidual(
 internal class RootRoundingWarmStart(
     val objective: LinearObjective,
     val relaxation: LpRelaxation,
-    val basis: Basis,
+    val basis: Basis? = null,
     val primal: DoubleArray? = null,
 )
 
@@ -293,6 +293,19 @@ internal class LpEngine(
         if (cancellation()) return
         rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
+    }
+
+    internal fun ownsRootPrimalModel(model: LpModel): Boolean = retainedRootEnabled &&
+        cpAdapter.currentModel === model && model.exactState != null &&
+        propagator.state === model.exactState && model.exactState.depth == 0
+
+    internal fun retainRootPrimalOwner(relaxation: LpRelaxation) {
+        if (!params.lpPlan.probe || !ownsRootPrimalModel(relaxation.model) ||
+            rootRoundingWarmStart?.primal != null || lpWorkAllowanceSpent(1L)
+        ) return
+        noteNodeOverhead(1L)
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation)
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "OWNER_RETAINED", 0L)
     }
 
     internal fun retainRoundingPrimalGuidance(
@@ -922,7 +935,10 @@ internal class LpEngine(
         val before = totalSolveWork()
         var outcome = "DECLINED"
         try {
-            if (propagator.prepare(cancellation, retainedRootCumulativeWork())) outcome = "READY"
+            if (propagator.prepare(cancellation, retainedRootCumulativeWork())) {
+                outcome = "READY"
+                preparedRootRelaxation?.let(::retainRootPrimalOwner)
+            }
         } finally {
             timer.finish(outcome, totalSolveWork() - before)
         }
