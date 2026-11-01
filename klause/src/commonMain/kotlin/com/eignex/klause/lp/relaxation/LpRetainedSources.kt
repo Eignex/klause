@@ -286,7 +286,7 @@ internal class LpRetainedSources(
             val hints = if (relaxer.reuseRetainedDefinitions && keys.isNotEmpty() &&
                 fragment.model.exactState == null && fragment.model.doubleView == null
             ) IntArray(fragment.model.n) else null
-            val source = importFragment(fragment, staged, keys, hints, cancellation) ?: return null
+            val source = importFragment(emission, staged, keys, hints, cancellation) ?: return null
             require(source.objective.scale.value == BigFraction.ONE && source.objective.externalConstant.value.isZero)
             val mapped = hints ?: IntArray(source.n)
             for (local in mapped.indices) {
@@ -426,41 +426,68 @@ internal class LpRetainedSources(
     }
 
     private fun importFragment(
-        fragment: LpRelaxation,
+        emission: LpEmission,
         staged: List<Column>,
         keys: Map<ColumnKey, Int>,
         hints: IntArray?,
         cancellation: Cancellation,
     ): ExactLpModel? {
+        val fragment = emission.relaxation
         val model = fragment.model
-        if (hints != null) {
-            var work = 0L
-            var reused = 0
-            val source = try {
-                model.authoritativeModel { local ->
-                    work++
-                    cancellation.charge(1L)
-                    checkCancellation(cancellation)
-                    if (!fragment.canBorrowIntegerColumn(local)) return@authoritativeModel null
-                    val global = keys[ColumnKey.Source(CutSourceKind.INTEGER, fragment.colVarId[local])]
-                        ?: return@authoritativeModel null
-                    val column = staged[global]
-                    if (!column.sourceBoundsMemoized) relaxer.observeRetainedBoundCheck()
-                    val definition = column.compactColumn(model, local) ?: return@authoritativeModel null
-                    hints[local] = global + 1
-                    reused++
-                    definition
-                }
-            } finally {
-                relaxer.observeTemplateWork(work)
-            }
-            checkCancellation(cancellation)
-            relaxer.observeRetainedBoundTemplates(reused)
-            return source
-        }
-        return if (fragment.preparationTemplates != null && model.exactState == null && model.doubleView == null) {
+        val retained = emission.sourceDefinition?.read(cancellation, relaxer::observeTemplateWork)
+        checkCancellation(cancellation)
+        val source = if (hints != null) {
+            importWithColumnHints(fragment, retained, staged, keys, hints, cancellation)
+        } else retained ?: if (fragment.preparationTemplates != null &&
+            model.exactState == null && model.doubleView == null
+        ) {
             fragment.authoritativeWithTemplates(cancellation, onWork = relaxer::observeTemplateWork)
         } else model.authoritativeModel()
+        checkCancellation(cancellation)
+        if (retained != null) relaxer.observeEmissionImportModels(reused = 1)
+        else if (source != null && emission.sourceDefinition?.publish(source, cancellation,
+                relaxer::observeTemplateWork) == true
+        ) relaxer.observeEmissionImportModels(published = 1)
+        checkCancellation(cancellation)
+        return source
+    }
+
+    private fun importWithColumnHints(
+        fragment: LpRelaxation,
+        retained: ExactLpModel?,
+        staged: List<Column>,
+        keys: Map<ColumnKey, Int>,
+        hints: IntArray,
+        cancellation: Cancellation,
+    ): ExactLpModel? {
+        val model = fragment.model
+        var work = 0L
+        var reused = 0
+        fun preparedColumn(local: Int): ExactLpColumn? {
+            work++
+            cancellation.charge(1L)
+            checkCancellation(cancellation)
+            if (!fragment.canBorrowIntegerColumn(local)) return null
+            val global = keys[ColumnKey.Source(CutSourceKind.INTEGER, fragment.colVarId[local])] ?: return null
+            val column = staged[global]
+            if (!column.sourceBoundsMemoized) relaxer.observeRetainedBoundCheck()
+            val definition = column.compactColumn(model, local) ?: return null
+            hints[local] = global + 1
+            reused++
+            return definition
+        }
+        val source = try {
+            if (retained != null) {
+                // Current catalog hints need their own checks; immutable source columns carry no owner state.
+                for (local in 0 until model.n) preparedColumn(local)
+                retained
+            } else model.authoritativeModel(::preparedColumn)
+        } finally {
+            relaxer.observeTemplateWork(work)
+        }
+        checkCancellation(cancellation)
+        relaxer.observeRetainedBoundTemplates(reused)
+        return source
     }
 
     private fun LpRelaxation.canBorrowIntegerColumn(index: Int): Boolean =

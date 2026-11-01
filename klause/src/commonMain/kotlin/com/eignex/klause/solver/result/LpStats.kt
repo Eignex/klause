@@ -514,6 +514,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     private var templateRetainedFullChecks = 0L
     private var templateEmissionFragments = 0L
     private var templateEmissionPublications = 0L
+    private var templateEmissionImportModels = 0L
+    private var templateEmissionImportPublications = 0L
     val cutLifecycle = LpCutStats { key, delta ->
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
@@ -554,6 +556,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         rows: Int = 0, bounds: Int = 0, exactBounds: Int = 0, retainedBounds: Int = 0,
         retainedFullChecks: Int = 0,
         emissionFragments: Int = 0, emissionPublications: Int = 0,
+        emissionImportModels: Int = 0, emissionImportPublications: Int = 0,
     ) {
         if (!templateAssemblySeen) {
             templateAssemblySeen = true
@@ -566,6 +569,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         templateRetainedFullChecks += retainedFullChecks
         templateEmissionFragments += emissionFragments
         templateEmissionPublications += emissionPublications
+        templateEmissionImportModels += emissionImportModels
+        templateEmissionImportPublications += emissionImportPublications
     }
 
     private fun phaseSnapshot(): Map<String, LpPhaseStats> {
@@ -602,6 +607,12 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                     if (templateEmissionFragments != 0L) put("EMISSION_FRAGMENTS_REUSED", templateEmissionFragments)
                     if (templateEmissionPublications != 0L) {
                         put("EMISSION_FRAGMENTS_PUBLISHED", templateEmissionPublications)
+                    }
+                    if (templateEmissionImportModels != 0L) {
+                        put("EMISSION_IMPORT_MODELS_REUSED", templateEmissionImportModels)
+                    }
+                    if (templateEmissionImportPublications != 0L) {
+                        put("EMISSION_IMPORT_MODELS_PUBLISHED", templateEmissionImportPublications)
                     }
                 })))
             }

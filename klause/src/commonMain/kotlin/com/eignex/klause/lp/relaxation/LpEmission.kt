@@ -46,6 +46,7 @@ internal class LpEmission(
     val region: LpEmissionRegion,
     val relaxation: LpRelaxation,
     val dependencies: LpEmissionDependencies,
+    val sourceDefinition: LpEmissionSourceDefinition? = null,
 )
 
 internal class LpEmissionUpdate(

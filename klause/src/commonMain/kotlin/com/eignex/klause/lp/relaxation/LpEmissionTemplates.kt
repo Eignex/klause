@@ -10,6 +10,8 @@ import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.ExactLpModel
+import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.lp.statesUpperBound
@@ -21,6 +23,32 @@ import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 internal sealed interface LpPreparationReuse
+
+internal class LpEmissionSourceDefinition(
+    private val preparationWork: Long = 1L,
+    private val storageLimit: Long = 0L,
+) {
+    private val completed = AtomicReference<ExactLpModel?>(null)
+
+    fun read(cancellation: Cancellation, onWork: (Long) -> Unit): ExactLpModel? {
+        cancellation.charge(1L)
+        val current = completed.load()
+        onWork(1L)
+        return current.takeUnless { cancellation() }
+    }
+
+    fun publish(model: ExactLpModel, cancellation: Cancellation, onWork: (Long) -> Unit): Boolean {
+        try {
+            cancellation.charge(preparationWork)
+            if (cancellation()) return false
+            // Complete the layout memo before the immutable source model crosses consumer boundaries.
+            if (model.layoutStorage.total !in 0L..storageLimit) return false
+        } finally {
+            onWork(preparationWork)
+        }
+        return !cancellation() && completed.compareAndSet(null, model)
+    }
+}
 
 internal class LpEmissionScope(private val namespace: Any, problem: Problem) {
     private val semantics = problem.semantics
@@ -122,7 +150,7 @@ internal class LpEmissionTemplates private constructor(
         val constant = objective?.constant ?: 0L
         return if (found.relaxation.objectiveConstant == constant) found else LpEmission(
             found.region, found.relaxation.withModel(found.relaxation.model, reboundObjectiveConstant = constant),
-            found.dependencies,
+            found.dependencies, found.sourceDefinition,
         )
     }
 
@@ -132,12 +160,12 @@ internal class LpEmissionTemplates private constructor(
         minimumUnits: Long,
         cancellation: Cancellation,
         onWork: (Long) -> Unit,
-    ): Boolean {
+    ): LpEmission? {
         val factorId = emission.region.index
         val slot = slots[factorId and (slots.size - 1)]
         val previous = slot.load()
         // Collisions retain an admitted coordinate instead of thrashing during ordered source scans.
-        if (previous != null && previous.factorId != factorId) return false
+        if (previous != null && previous.factorId != factorId) return null
         var delta = 0L
         var reserved = false
         var published = false
@@ -149,26 +177,29 @@ internal class LpEmissionTemplates private constructor(
                     cancellation.charge(count)
                     return !cancellation()
                 }
-                val units = validatedExtent(emission, minimumUnits, ::visit) ?: return false
+                val units = validatedExtent(emission, minimumUnits, ::visit) ?: return null
                 if (!visit(1L + problem.factors[factorId].intVars.size * 3L +
                         emission.dependencies.validationUnits * 4L)
-                ) return false
+                ) return null
                 delta = units - (previous?.storageUnits ?: 0L)
                 if (delta > 0L) {
-                    if (!reserve(delta)) return false
+                    if (!reserve(delta)) return null
                     reserved = true
                 }
                 val captured = LpEmission(
                     emission.region, emission.relaxation, emission.dependencies.endpointSnapshot(),
+                    emission.relaxation.model.let {
+                        LpEmissionSourceDefinition(1L + it.n + it.m + it.csc.rowIdx.size, units - minimumUnits)
+                    },
                 )
                 Entry(factorId, problem.factors[factorId], captured, units, problem)
             } finally {
                 onWork(work)
             }
-            if (cancellation()) return false
+            if (cancellation()) return null
             published = slot.compareAndSet(previous, next)
             if (published && delta < 0L) release(-delta)
-            return published
+            return next.emission.takeIf { published }
         } finally {
             if (reserved && !published) release(delta)
         }
@@ -240,7 +271,7 @@ internal class LpEmissionTemplates private constructor(
             ) return null
             val units = 64L + model.n * 40L + model.m * 32L + model.csc.rowIdx.size * 4L +
                 factor.intVars.size * 3L + emission.dependencies.validationUnits * 8L
-            if (units !in MIN_ENTRY_UNITS..MAX_ENTRY_UNITS) return null
+            if (units < MIN_ENTRY_UNITS || units + sourceDefinitionUnits(model) > MAX_ENTRY_UNITS) return null
             return units
         }
 
@@ -254,12 +285,15 @@ internal class LpEmissionTemplates private constructor(
                     model.colContinuous[column]
                 ) return null
             }
-            var units = minimumUnits
+            var units = minimumUnits + sourceDefinitionUnits(model)
             for (premise in model.rowPremises) {
-                units += (premise?.vars?.size ?: 0) * 4L + (premise?.boolLits?.size ?: 0)
+                units += (premise?.vars?.size ?: 0) * 8L + (premise?.boolLits?.size ?: 0) * 2L
                 if (units > MAX_ENTRY_UNITS) return null
             }
             return units
         }
+
+        private fun sourceDefinitionUnits(model: LpModel): Long =
+            64L + model.numVars * 24L + model.n * 3L + model.m * 12L + model.csc.rowIdx.size * 6L
     }
 }

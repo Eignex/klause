@@ -13,6 +13,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedSolver
+import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -26,6 +27,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpEmissionTemplatesTest {
@@ -64,6 +66,10 @@ class LpEmissionTemplatesTest {
             assertNotSame(models[1], models[2])
             assertEquals(1L, sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE")
                 .outcomes["EMISSION_FRAGMENTS_REUSED"])
+            assertEquals(1L, sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE")
+                .outcomes["EMISSION_IMPORT_MODELS_REUSED"])
+            assertEquals(1L, sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE")
+                .outcomes["EMISSION_IMPORT_MODELS_PUBLISHED"])
             assertTrue(selection.lpEmissionTemplateUnits in 1L..LpEmissionTemplates.MAX_UNITS)
         }
     }
@@ -243,6 +249,45 @@ class LpEmissionTemplatesTest {
     }
 
     @Test
+    fun `post debit cancellation should withhold a completed source definition publication`() {
+        val definition = LpEmissionSourceDefinition()
+        val model = LpRetainedSources.emptyModel()
+        var cancelled = false
+
+        val published = definition.publish(model, Cancellation { cancelled }) { cancelled = true }
+
+        assertFalse(published)
+        assertNull(definition.read(Cancellation.Never) {})
+        assertTrue(definition.publish(model, Cancellation.Never) {})
+        assertSame(model, definition.read(Cancellation.Never) {})
+    }
+
+    @Test
+    fun `post debit cancellation should withhold a completed source definition borrow`() {
+        val definition = LpEmissionSourceDefinition()
+        val model = LpRetainedSources.emptyModel()
+        assertTrue(definition.publish(model, Cancellation.Never) {})
+        var cancelled = false
+
+        val borrowed = definition.read(Cancellation { cancelled }) { cancelled = true }
+
+        assertNull(borrowed)
+        assertSame(model, definition.read(Cancellation.Never) {})
+    }
+
+    @Test
+    fun `a completed source definition exceeding its reservation should remain unpublished`() {
+        val definition = LpEmissionSourceDefinition()
+        val model = assertNotNull(CpToLpRelaxation(source, objective).build(RootDomains(source))
+            .model.authoritativeModel())
+
+        val published = definition.publish(model, Cancellation.Never) {}
+
+        assertFalse(published)
+        assertNull(definition.read(Cancellation.Never) {})
+    }
+
+    @Test
     fun `current Boolean restrictions should remain private when a reified fragment is shared`() {
         val problem = Problem(1, 3, Array(3) { IntDomain(0, 10) }, arrayOf<Factor>(
             ReifiedLinear(0, intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6),
@@ -275,6 +320,8 @@ class LpEmissionTemplatesTest {
 
         assertEquals(2L, sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE")
             .outcomes["EMISSION_FRAGMENTS_REUSED"])
+        assertEquals(1L, sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE")
+            .outcomes["EMISSION_IMPORT_MODELS_REUSED"])
     }
 
     @Test

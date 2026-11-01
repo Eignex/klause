@@ -236,6 +236,10 @@ internal object LpTemplatePreparationProfile {
                                 assembly?.outcomes?.get("RETAINED_BOUND_REUSES") ?: 0L)
                             put("retainedFullBoundChecks", assembly?.outcomes?.get("RETAINED_FULL_BOUND_CHECKS") ?: 0L)
                             put("emissionFragmentsReused", assembly?.outcomes?.get("EMISSION_FRAGMENTS_REUSED") ?: 0L)
+                            put("emissionImportModelsReused",
+                                assembly?.outcomes?.get("EMISSION_IMPORT_MODELS_REUSED") ?: 0L)
+                            put("emissionImportModelsPublished",
+                                assembly?.outcomes?.get("EMISSION_IMPORT_MODELS_PUBLISHED") ?: 0L)
                             put("emissionFragmentsPublished",
                                 assembly?.outcomes?.get("EMISSION_FRAGMENTS_PUBLISHED") ?: 0L)
                             put("peakRetainedTemplateUnits", retainedUnits)

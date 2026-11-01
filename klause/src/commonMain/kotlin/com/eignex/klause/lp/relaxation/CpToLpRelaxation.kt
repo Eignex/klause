@@ -711,6 +711,10 @@ internal class CpToLpRelaxation(
         templateStats?.observeTemplateUse(retainedFullChecks = 1)
     }
 
+    internal fun observeEmissionImportModels(reused: Int = 0, published: Int = 0) {
+        templateStats?.observeTemplateUse(emissionImportModels = reused, emissionImportPublications = published)
+    }
+
     internal fun observeTemplateWork(work: Long) {
         onTemplateWork(work)
     }
@@ -947,11 +951,11 @@ internal class CpToLpRelaxation(
             onWork?.invoke(work)
         }
         cancellation.checkLpAssembly()
-        if (share && projections?.rememberLpEmission(emitted, requireNotNull(attempt), cancellation,
-                onTemplateWork) == true
-        ) templateStats?.observeTemplateUse(emissionPublications = 1)
+        val retained = if (share) projections?.rememberLpEmission(emitted, requireNotNull(attempt),
+            cancellation, onTemplateWork) else null
+        if (retained != null) templateStats?.observeTemplateUse(emissionPublications = 1)
         cancellation.checkLpAssembly()
-        return emitted
+        return retained ?: emitted
     }
 
     /**

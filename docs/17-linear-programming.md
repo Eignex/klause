@@ -169,6 +169,17 @@ allowance before publication and poll again after the debit. Fragment publicatio
 and reuse observations establish definition reuse, not numerical consumption or
 certified deductions.
 
+An admitted fragment reserves space for both its primitive arrays and a completed
+exact source definition within the same entry and index ceilings. An actual
+successful source import can publish that immutable definition, including its
+coefficient entries, source columns and premise metadata. Its layout memo is
+completed under the current allowance before atomic publication. Later imports reuse it
+after the fragment's current guards and each current owner-catalog hint have
+passed. The definition carries source columns, not live owner bounds, a basis or
+a checked result. Its publication and borrowing debit the current allowance and
+poll after the debit; cancellation withholds either operation. Separate observations
+count these normalized definitions independently of primitive fragment reuse.
+
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.
 Cold preparation first checks a necessary work lower bound within the same cap.

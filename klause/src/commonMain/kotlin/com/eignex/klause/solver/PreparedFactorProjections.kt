@@ -125,13 +125,13 @@ class PreparedFactorProjections internal constructor(
         attempt: Any,
         token: Cancellation,
         onWork: (Long) -> Unit,
-    ): Boolean {
+    ): LpEmission? {
         val cache = lpTemplateCache
         val previous = cache.load()
         val metadata = (previous as? LpObservedMetadata)?.metadata ?: previous as? LpPreparationTemplates
         if (metadata != null && (metadata.objectiveIndependent ||
                 metadata.storageUnits > LpEmissionTemplates.MAX_UNITS - LpObservedMetadata.STORAGE_UNITS)
-        ) return false
+        ) return null
         var work = 0L
         val units = try {
             LpEmissionTemplates.extent(problem, emission) { count ->
@@ -142,7 +142,7 @@ class PreparedFactorProjections internal constructor(
         } finally {
             onWork(work)
         }
-        if (units == null || token()) return false
+        if (units == null || token()) return null
         if (previous is LpEmissionTemplates && previous.scope.matches(lpTemplateNamespace, problem)) {
             return previous.offer(problem, emission, units, token, onWork)
         }
@@ -152,15 +152,16 @@ class PreparedFactorProjections internal constructor(
         return if (demand != null && demand.attempt !== attempt &&
             demand.paidUnits >= LpEmissionTemplates.indexUnits(capacity) * 4L
         ) {
-            val prepared = LpEmissionTemplates.create(demand.scope, capacity, token, onWork) ?: return false
-            cache.compareAndSet(previous, prepared) && prepared.offer(problem, emission, units, token, onWork)
+            val prepared = LpEmissionTemplates.create(demand.scope, capacity, token, onWork) ?: return null
+            if (cache.compareAndSet(previous, prepared)) prepared.offer(problem, emission, units, token, onWork)
+            else null
         } else {
             val scope = demand?.scope ?: LpEmissionScope(lpTemplateNamespace, problem)
             val paid = ((demand?.paidUnits ?: 0L) + units)
                 .coerceAtMost(LpEmissionTemplates.MAX_UNITS)
             val next = LpEmissionDemand(scope, attempt, paid)
             cache.compareAndSet(previous, if (metadata == null) next else LpObservedMetadata(metadata, next))
-            false
+            null
         }
     }
 
