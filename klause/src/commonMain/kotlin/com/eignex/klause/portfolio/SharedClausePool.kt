@@ -539,7 +539,7 @@ internal class PoolClauseExchange(
         meter?.imported(SharingChannel.Clauses, imported, drained.cursor)
         meter?.duplicates(SharingChannel.Clauses, duplicates)
         countUses(session)
-        export(session)
+        export(session, retiring = false)
         observe(session)
     }
 
@@ -559,7 +559,7 @@ internal class PoolClauseExchange(
         retainSession(session)
         if (!session.cancelRequested) {
             countUses(session)
-            export(session)
+            export(session, retiring = false)
         }
         observe(session)
     }
@@ -605,9 +605,11 @@ internal class PoolClauseExchange(
 
     /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
      *  trail). The `seen` set guards against re-export within a session; the pool de-dups globally. */
-    private fun export(session: PropagationSession, retiring: Boolean = false) {
+    private fun export(session: PropagationSession, retiring: Boolean) {
         val candidates = exportCandidates(session) ?: return
-        if (retiring && candidates.isNotEmpty() && pool.softLimitBytes == null) {
+        if (retiring && candidates.isNotEmpty() && pool.softLimitBytes == null &&
+            !seen.canAddWithoutGrowing(candidates.size)
+        ) {
             val published = pool.publish(candidates, origin,
                 isGlobal = false,
                 maxWork = pool.reclamationWork,
