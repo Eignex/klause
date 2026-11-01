@@ -465,8 +465,11 @@ buffer. Permanent clauses, protected reasons, unfunded rows and policy survivors
 reduce the heap quota. A pending eviction that gains protection also consumes that
 quota before the next heap step. Mid rows
 survive their demotion window, and classification clears survivor reuse flags.
-Current or historical reasons can retain additional rows above the soft cap. General
-reason snapshots and full physical compaction still require their complete funding;
+Current or historical reasons can retain additional rows above the soft cap.
+Native post-undo replay protects its queued clause handles and learned units without
+freezing unrelated retirement. Incomplete trail propagation, conflicts and root
+publication still defer the window.
+General reason snapshots and full physical compaction still require their complete funding;
 non-clause and shared stores retain the complete selection/remap path.
 
 Shared learning also accepts an optional modeled-byte soft limit checked at

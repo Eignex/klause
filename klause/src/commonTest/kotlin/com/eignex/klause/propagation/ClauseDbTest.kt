@@ -23,6 +23,40 @@ import kotlin.test.assertTrue
 class ClauseDbTest {
 
     @Test
+    fun `native replay should protect its reason while unrelated clauses retire`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = true)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9)
+        session.pinBool(0, false)
+        session.popToLevel(0)
+
+        val retired = session.maintainCapWindow(1, 128L, 128L, { false }) { false }
+
+        assertEquals(1, retired)
+        assertTrue(session.isLearnedClause(0))
+        assertTrue(!session.isLearnedClause(1))
+        session.pinBool(1, false)
+        assertEquals(true, session.boolValue(0))
+    }
+
+    @Test
+    fun `native pending units should survive retirement of unrelated clauses`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = true)
+        session.addLearnedClause(Clause(intArrayOf(1)), 1)
+        session.addLearnedClause(Clause(intArrayOf(2, 4)), 9)
+        session.pinBool(3, true)
+        session.popToLevel(0)
+
+        val retired = session.maintainCapWindow(1, 128L, 128L, { false }) { false }
+
+        assertEquals(1, retired)
+        assertTrue(session.isLearnedClause(0))
+        assertTrue(!session.isLearnedClause(1))
+        session.pinBool(3, false)
+        assertEquals(false, session.boolValue(0))
+    }
+
+    @Test
     fun `live reasons should consume the ranked retention quota`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = native)
