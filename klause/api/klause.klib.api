@@ -15889,7 +15889,7 @@ final class com.eignex.klause.solver.result/ArmSchedule { // com.eignex.klause.s
 }
 
 final class com.eignex.klause.solver.result/BooleanProofStats { // com.eignex.klause.solver.result/BooleanProofStats|null[0]
-    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Long, kotlin/Long, kotlin/String? = ...) // com.eignex.klause.solver.result/BooleanProofStats.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Long;kotlin.Long;kotlin.String?){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Long, kotlin/Long, kotlin/String? = ..., kotlin/Int = ...) // com.eignex.klause.solver.result/BooleanProofStats.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Long;kotlin.Long;kotlin.String?;kotlin.Int){}[0]
 
     final val decline // com.eignex.klause.solver.result/BooleanProofStats.decline|{}decline[0]
         final fun <get-decline>(): kotlin/String? // com.eignex.klause.solver.result/BooleanProofStats.decline.<get-decline>|<get-decline>(){}[0]
@@ -15899,6 +15899,8 @@ final class com.eignex.klause.solver.result/BooleanProofStats { // com.eignex.kl
         final fun <get-probeSegments>(): kotlin/Int // com.eignex.klause.solver.result/BooleanProofStats.probeSegments.<get-probeSegments>|<get-probeSegments>(){}[0]
     final val probeWork // com.eignex.klause.solver.result/BooleanProofStats.probeWork|{}probeWork[0]
         final fun <get-probeWork>(): kotlin/Long // com.eignex.klause.solver.result/BooleanProofStats.probeWork.<get-probeWork>|<get-probeWork>(){}[0]
+    final val retainedProbes // com.eignex.klause.solver.result/BooleanProofStats.retainedProbes|{}retainedProbes[0]
+        final fun <get-retainedProbes>(): kotlin/Int // com.eignex.klause.solver.result/BooleanProofStats.retainedProbes.<get-retainedProbes>|<get-retainedProbes>(){}[0]
     final val tasks // com.eignex.klause.solver.result/BooleanProofStats.tasks|{}tasks[0]
         final fun <get-tasks>(): kotlin/Int // com.eignex.klause.solver.result/BooleanProofStats.tasks.<get-tasks>|<get-tasks>(){}[0]
     final val workerWork // com.eignex.klause.solver.result/BooleanProofStats.workerWork|{}workerWork[0]
@@ -15910,7 +15912,8 @@ final class com.eignex.klause.solver.result/BooleanProofStats { // com.eignex.kl
     final fun component4(): kotlin/Long // com.eignex.klause.solver.result/BooleanProofStats.component4|component4(){}[0]
     final fun component5(): kotlin/Long // com.eignex.klause.solver.result/BooleanProofStats.component5|component5(){}[0]
     final fun component6(): kotlin/String? // com.eignex.klause.solver.result/BooleanProofStats.component6|component6(){}[0]
-    final fun copy(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/String? = ...): com.eignex.klause.solver.result/BooleanProofStats // com.eignex.klause.solver.result/BooleanProofStats.copy|copy(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Long;kotlin.Long;kotlin.String?){}[0]
+    final fun component7(): kotlin/Int // com.eignex.klause.solver.result/BooleanProofStats.component7|component7(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/String? = ..., kotlin/Int = ...): com.eignex.klause.solver.result/BooleanProofStats // com.eignex.klause.solver.result/BooleanProofStats.copy|copy(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Long;kotlin.Long;kotlin.String?;kotlin.Int){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/BooleanProofStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/BooleanProofStats.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/BooleanProofStats.toString|toString(){}[0]
