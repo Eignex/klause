@@ -176,8 +176,9 @@ private class BooleanBoundAudit(private val weights: LongArray) {
     private var session: PropagationSession? = null
     private var visits = 0L
     private var observations = 0L
+    private var visitLimitReached = false
     private var failure: JsonObject? = null
-    val stopped: Boolean get() = failure != null || visits >= 4_000_000L
+    val stopped: Boolean get() = failure != null || visitLimitReached
 
     init {
         require(weights.all { it >= 0L })
@@ -205,12 +206,13 @@ private class BooleanBoundAudit(private val weights: LongArray) {
         val live = session ?: return
         if (stopped) return
         if (weights.size > 4_000_000L - visits) {
-            visits = 4_000_000L
+            visitLimitReached = true
             return
         }
         var fresh = 0L
         for (variable in weights.indices) if (live.boolValue(variable) == true) fresh += weights[variable]
         visits += weights.size
+        visitLimitReached = visits == 4_000_000L
         observations++
         val cached = live.objectiveBoolLowerBound()
         // With nonnegative weights an uninstalled cache is zero, hence cannot cause an overshoot.
@@ -226,6 +228,7 @@ private class BooleanBoundAudit(private val weights: LongArray) {
         put("attached", session != null)
         put("observations", observations)
         put("visits", visits)
+        put("visitLimitReached", visitLimitReached)
         put("stopped", stopped)
         put("overshoot", failure ?: JsonNull)
     }

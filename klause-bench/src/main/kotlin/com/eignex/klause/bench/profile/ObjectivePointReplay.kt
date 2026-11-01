@@ -97,7 +97,7 @@ internal object ObjectivePointReplay {
         })
         if (sourceResult !is SampleResult.Found || stop()) return
         val point = sourceResult.sample
-        check(namedPins.all { (variable, value) -> point.intValue(variable) == value })
+        check(names.all { (name, variable) -> point.intValue(variable) == values.getValue(name).jsonPrimitive.long })
         val mapping = prepared.javaClass.getDeclaredField("sourceMapping").apply { isAccessible = true }.get(prepared)
         requireNotNull(mapping)
         val mappingSource = mapping.javaClass.getDeclaredField("source").apply { isAccessible = true }.get(mapping)
