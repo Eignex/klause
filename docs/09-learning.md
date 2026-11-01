@@ -526,8 +526,8 @@ do not defer the remaining literal window. Once available occurrence walks cover
 every root pin, the ordinary cursor skips the remaining source suffix and continues
 through learned clauses. Missing indexes retain the full source scan. Learned
 compaction invalidates learned candidates while preserving stable source candidates
-and source scan progress at an unchanged root. New root facts reopen the source
-scan when learned compaction changes its indices.
+and source scan progress at an unchanged root. A changed root restarts the source
+scan after learned compaction.
 A shortened
 source clause enters as a permanent session-local replacement before its watches
 retire; immutable source text remains available for reasons. The propagation session
