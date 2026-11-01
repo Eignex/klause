@@ -6,7 +6,6 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
-import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.CostShaping
@@ -84,6 +83,7 @@ internal object LocalSearchTrajectory {
             "channel", "presolve", "center64", "timeoutMillis", "traceCoordinates",
             "ownerReplay", "ownerWork", "ownerFragmentWork", "ownerSelectors", "selectorsFromWalk", "ownerConflicts",
             "ownerRecipes", "owners", "ownerSeed",
+            "format", "preparationEngine", "walkSeed",
         )
         require(options.keys.containsAll(required) && options.keys.all {
             it in required || it in optional || it == "selectors"
@@ -94,9 +94,11 @@ internal object LocalSearchTrajectory {
             options["source64"], options["sourceGzip64"],
         )
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        out.resolve("source.xml").writeBytes(bytes)
+        val format = options["format"] ?: "xcsp3"
+        require(format in setOf("xcsp3", "mps"))
+        out.resolve(if (format == "mps") "source.mps" else "source.xml").writeBytes(bytes)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
-        val parsed = Xcsp3.parse(bytes.decodeToString())
+        val parsed = trajectoryModel(bytes, format)
         if (parsed.problem.numBoolVars.toLong() + parsed.problem.numIntVars > TRAJECTORY_COORDINATE_LIMIT ||
             parsed.problem.numFactors > TRAJECTORY_FACTOR_LIMIT
         ) {
@@ -119,11 +121,21 @@ internal object LocalSearchTrajectory {
         require(parsed.sense == ObjectiveSense.MINIMIZE)
         val channel = options["channel"]?.let { ChannelView.valueOf(it) }
         require(channel != null || objective != null)
-        val engine = if (channel == null) FiniteEngine.MIXED else FiniteEngine.LOCAL_SEARCH
+        val engine = when (options["preparationEngine"]) {
+            null -> if (channel == null) FiniteEngine.MIXED else FiniteEngine.LOCAL_SEARCH
+            "mixed" -> FiniteEngine.MIXED
+            "ls" -> FiniteEngine.LOCAL_SEARCH
+            else -> error("unsupported trajectory preparation engine")
+        }
         val variants = if (channel == null) listOf(
             ViewSpec("false", false, ChannelView.Maintained), ViewSpec("true", true, ChannelView.Maintained),
-        ) else listOf(ViewSpec("maintained", false, ChannelView.Maintained), ViewSpec(channel.name, false, channel))
+        ) else listOf(
+            ViewSpec("maintained", false, ChannelView.Maintained),
+            ViewSpec("channel-${channel.name}", false, channel),
+        )
+        require(variants.map { it.label.lowercase() }.distinct().size == variants.size)
         val seed = options.getValue("seed").toLong()
+        val walkSeed = options["walkSeed"]?.toLong() ?: seed
         val ownerSeed = options["ownerSeed"]?.toLong() ?: seed
         val moves = options.getValue("moves").toLong().also { require(it in 1..1_000_000) }
         val timeoutMillis = options["timeoutMillis"]?.toLong()?.also { require(it in 100..60000) } ?: 60000L
@@ -178,6 +190,7 @@ internal object LocalSearchTrajectory {
             put("revision", Reports.readGitSha() ?: System.getenv("LAB_WORKTREE")?.let(::File)?.name
                 ?.takeIf { it.matches(Regex("[0-9a-f]{40}")) })
             put("sourceSha256", sha256(bytes))
+            put("sourceFormat", format)
             put("sourceMode", if ("source64" in options || "sourceGzip64" in options) "embedded" else "catalog")
             put("declaredSemantics", parsed.semantics.declared.toString())
             put("effectiveSemantics", parsed.semantics.effective.toString())
@@ -187,6 +200,8 @@ internal object LocalSearchTrajectory {
             put("architecture", System.getProperty("os.arch"))
             put("channel", channel?.name)
             put("preparationEngine", engine.name)
+            put("preparationSeed", seed)
+            put("walkSeed", walkSeed)
             put("presolve", if (skipPresolve) "off" else "default")
             put("objectiveTreatment", when {
                 objective == null -> "none"
@@ -420,10 +435,10 @@ internal object LocalSearchTrajectory {
                         seedImplicitOnRestart = recipe.seedImplicitOnRestart,
                     )
                     val trace = if (mode == "repair") RepairTrajectory.attach(solver,
-                        "${options.getValue("recipe")}; linear shaping 1; seeded tie stream $seed",
+                        "${options.getValue("recipe")}; linear shaping 1; seeded tie stream $walkSeed",
                         traceCoordinates) else null
                     val params = LocalSearchParams(
-                        randomSeed = seed, maxFlips = if (walk) moves else 1L, cancellation = walkStop,
+                        randomSeed = walkSeed, maxFlips = if (walk) moves else 1L, cancellation = walkStop,
                         costShaping = CostShaping.Linear(lambda = 1.0), lsObjective = gradient,
                         normalizeWeightsByClass = true, reportResiduals = true,
                         initialAssignment = workingInitial,
