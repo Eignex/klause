@@ -492,7 +492,9 @@ neighborhood alternates with the ordinary clause scan,
 retains its pin and occurrence positions across slices, and builds no index
 inside the pass. Pin and occurrence walks admit at most 8,192 entries per slice
 even with an unlimited class grant. Projections without an available index retain
-the ordinary scan. A shortened
+the ordinary scan. An indexed candidate at the ordinary cursor advances both walks;
+unchanged prefixes are not examined twice. Retired and non-clause source entries
+do not defer the remaining literal window. A shortened
 source clause enters as a permanent session-local replacement before its watches
 retire; immutable source text remains available for reasons. The propagation session
 owns unfinished source-watch retirement
