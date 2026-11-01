@@ -285,15 +285,14 @@ an exhaustive elimination pass.
 A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker
 qualifies. The capture binds its exact source object and owns its clauses; preparation
-rechecks that its columns remain unfixed. Adding
-them to the pinned source preserves the premises of the source implication-graph
-pass. A complemented pair flips one column in the private source view before
-the equal-valued graph pass. The source mapping reverses that flip when lifting a
-witness; canonical learned literals receive the same flip before private projection.
-Equivalent and complemented columns retain Boolean slots and record `CopyLiteral`
-reconstruction; transitive binary deletion alone opens no consumer. Literal
-remapping reserves normalization work before the graph pass receives half the
-remaining allowance. Discovery visits recent learning first, scanning at most 128 eligible binaries and
+rechecks that its columns remain unfixed. The pinned source owns both captured
+premises. Their direct substitution replaces the larger column with a signed
+literal over the smaller column, retaining Boolean slots and `CopyLiteral`
+reconstruction. Unaffected rows retain their immutable objects. Changed rows reserve
+rewriting and normalization work before allocating; an incomplete substitution
+publishes no view. Reconstruction and copied learning use the same signed alias.
+The substitution receives half the remaining pass allowance. Discovery visits recent
+learning first, scanning at most 128 eligible binaries and
 32,768 work units per root observation, inside the cumulative trial allowance.
 Reciprocal matching uses a temporary fixed-capacity key table and one source walk
 for the retained learned keys. Table initialization and probes consume discovery work.
@@ -361,6 +360,8 @@ proof authority and resume the retained traversal. Declines and exhausted trials
 also resume it. Closing releases the private consumer, reconstruction and cursors
 after its final drains. Preparation, trial, reconstruction and checks consume the
 original containing deadline/work; cooperative overspend carries to later slices.
+Retired consumers retain their converted decision and propagation work separately;
+the charged-work total includes preparation, trials and canonical checks.
 The scratch allowance gates a declared private buffer/reference-slot admission model;
 it excludes object headers, the canonical worker and allocator overhead. Physical
 overlap memory and total cost require separate measurement. Zero disables this

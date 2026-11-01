@@ -11,12 +11,6 @@ internal class PrivateRebuildBinaryLearning private constructor(
     val key: Long,
     val clauses: Array<Clause>,
 ) {
-    val complementedVariable: Int
-        get() {
-            val literals = clauses[0].literals
-            return if (Lit.isPositive(literals[0]) == Lit.isPositive(literals[1])) Lit.variable(literals[0]) else -1
-        }
-
     companion object {
         const val SCRATCH_BYTES: Long = 16_384L
         const val MAX_RELATIONS: Int = 32

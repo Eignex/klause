@@ -324,6 +324,7 @@ internal class PrivateRebuildSatisfaction(
         try {
             search.close()
         } finally {
+            note("TrialWork", search.clauseWork)
             retiredClauseWork = saturatedWork(retiredClauseWork, search.clauseWork)
             retiredStats = retiredStats.mergedWith(search.stats)
             consumer = null
@@ -358,6 +359,7 @@ internal class PrivateRebuildSatisfaction(
                 generation = null
                 pendingBinary = null
                 attemptedBinaryPairs = longArrayOf()
+                note("ChargedWork", trialSpent())
                 retainedStats = stats
                 closed = true
             }
