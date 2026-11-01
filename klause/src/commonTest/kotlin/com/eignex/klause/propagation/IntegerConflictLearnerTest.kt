@@ -43,53 +43,6 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
-    fun `an oversized latest pivot should retain an older compact asserting consequence`() {
-        val seedVariables = intArrayOf(0, 1, 2) + IntArray(13) { it + 4 }
-        val latestVariables = intArrayOf(2, 3) + IntArray(14) { it + 17 }
-        val state = PropagationState(Problem(0, 31, Array(31) {
-            when (it) {
-                0 -> IntDomain(0, 6)
-                1 -> IntDomain(0, 12)
-                2, 3 -> IntDomain(0, 24)
-                else -> IntDomain(0, 0)
-            }
-        }, arrayOf(
-            Linear(intArrayOf(2, 1, -1) + IntArray(13) { 1 }, seedVariables, LinearOp.LE, 0),
-            Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-            Linear(intArrayOf(1, -1) + IntArray(14) { 1 }, latestVariables, LinearOp.LE, 0),
-        )), Assumptions.None)
-        state.undoLogging = true
-        state.integerRowLearning = true
-        assertTrue(state.setIntMaxAsDecision(2, 7))
-        val firstTarget = state.undo.size
-        assertTrue(state.setIntMaxAsDecision(3, 6))
-        val secondTarget = state.undo.size
-        state.integerLearningTrailAtLevel = { level ->
-            when (level) {
-                1 -> firstTarget
-                2 -> secondTarget
-                else -> null
-            }
-        }
-        assertTrue(state.setIntMinAsDecision(0, 2))
-        state.currentFactor = 1
-        assertTrue(state.factorAt(1).propagate(state, 1))
-        state.currentFactor = 2
-        assertTrue(state.factorAt(2).propagate(state, 2))
-        state.currentFactor = 0
-        assertFalse(state.factorAt(0).propagate(state, 0))
-
-        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(state.conflictAnalyzer.analyze(0))
-
-        assertEquals(15, learned.row.variables.size)
-        assertEquals(4L, learned.row.coefficient(0))
-        assertEquals(0L, learned.row.coefficient(1))
-        assertEquals(-1L, learned.row.coefficient(2))
-        assertEquals(0L, learned.row.bound)
-        assertEquals(learned.fallbackClause.backjumpLevel, learned.backjumpLevel)
-    }
-
-    @Test
     fun `either equality conflict direction should retain the same asserting row`() {
         for (sign in listOf(-1, 1)) {
             val native = PropagationSession(Problem(0, 3,

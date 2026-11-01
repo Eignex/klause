@@ -368,10 +368,8 @@ target, preserving clausal backjump selection. The raw assertion target must hav
 been a member of its historical domain; a later carve cannot remove that earlier
 membership, and a historical hole cannot supply a raw bound assertion. Literal counts do not establish
 assertion. Foreign unavailable bound premises retain clause analysis. The producer
-admits at most 16 terms, 16 pivot attempts, 64 native levels and 64 stored rows, with
-bounded duplicate lookup. A pivot whose combination exceeds the row shape or
-guard contract spends an attempt and leaves the conflicting row available to older
-qualified endpoints. Successful combinations share the same attempt limit.
+admits at most 16 terms, 16 combinations, 64 native levels and 64 stored rows, with
+bounded duplicate lookup.
 Assertion checks reconstruct each historical term domain once per combination and
 reuse its exact activity for the candidate bounds. A retained row with the same
 normalized coefficients and a stronger bound suppresses a new consequence only
