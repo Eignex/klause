@@ -225,7 +225,7 @@ private class BasisDualRun(
                 }
                 val required = if (open.size <= limits.dimension) open else {
                     meter.storage(64L + open.size * 8L)
-                    open.filter(::requiresMissingSide)
+                    open.filterTo(ArrayList<Int>(open.size), ::requiresMissingSide)
                 }
                 largestRestrictedColumns = maxOf(largestRestrictedColumns, required.size)
                 if (required.size > limits.dimension || (open.isNotEmpty() && required.isEmpty())) {
