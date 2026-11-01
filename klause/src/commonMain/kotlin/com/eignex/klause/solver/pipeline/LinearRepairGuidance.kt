@@ -19,16 +19,18 @@ internal class LinearRepairGuidance : AutoCloseable {
 
     fun remember(source: SourceProofContext, point: Map<SourceCoordinate, Double>,
         budget: SourceLpBudget, token: Cancellation): Boolean {
-        if (closed || hint != null || point.isEmpty() || point.size > MAX_COLUMNS || token()) return false
+        if (closed || hint != null || point.isEmpty() || point.size > MAX_COLUMNS ||
+            source.coordinateCount > MAX_COLUMNS || token()) return false
         val funding = budget.funding ?: return false
-        val work = 1L + 2L * point.size
-        val bytes = 256L + 128L * point.size
+        val work = 1L + 2L * point.size + source.coordinateCount
+        val bytes = 256L + 128L * point.size + 64L * source.coordinateCount
         if (funding.availableWork <= work || funding.remainingAllocation <= bytes) return false
         budget.observe(preparation = work)
         funding.charge(0L, bytes)
+        val coordinates = source.coordinates
         val copy = LinkedHashMap<SourceCoordinate, Double>()
         for ((coordinate, value) in point) {
-            if (token() || coordinate !in source.coordinates || !value.isFinite()) return false
+            if (token() || coordinate !in coordinates || !value.isFinite()) return false
             copy[coordinate] = value
         }
         if (token()) return false
