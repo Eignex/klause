@@ -185,21 +185,21 @@ internal class NumericalAggregateSnapshot(private val stop: Cancellation, privat
         val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityReplay")
         val owner = type.getField("INSTANCE").get(null)
         val run = type.declaredMethods.single { it.name == "runWithCandidates" }
-        val projected = type.declaredMethods.single { it.name == "boundProjections" }
+        val generated = type.declaredMethods.single { it.name == "generatedAggregates" }
         val context = field(record, "context") as SourceProofContext
         val snapshot = NumericalSelectionSnapshot(stop)
-        for (arm in listOf("disabled", "individual", "individual-and-aggregate", "individual-and-projected")) {
+        for (arm in listOf("disabled", "individual", "individual-and-aggregate", "individual-and-generated")) {
             if (stop()) return
             val additional = if (arm == "individual-and-aggregate") candidates else emptyList()
-            val result = if (arm == "individual-and-projected") {
-                projected.invoke(owner, record, 20_000_000L, 67_108_864L, stop)
+            val result = if (arm == "individual-and-generated") {
+                generated.invoke(owner, record, 20_000_000L, 67_108_864L, stop)
             } else run.invoke(owner, record, null, additional, arm != "disabled", 20_000_000L, 67_108_864L, stop)
             emit(buildJsonObject {
                 put("originalQuery", field(record, "id") as Int)
                 put("scope", scope(context.scope))
                 put("arm", arm)
                 put("additionalCandidates", additional.size)
-                put("projectionDiscoveryIncluded", arm == "individual-and-projected")
+                put("aggregateDiscoveryIncluded", arm == "individual-and-generated")
                 put("freshBasis", true)
                 put("diagnosticOnly", true)
                 put("maximumWork", 20_000_000L)

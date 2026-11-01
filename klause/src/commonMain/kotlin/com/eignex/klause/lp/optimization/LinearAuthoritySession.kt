@@ -89,8 +89,24 @@ internal class LinearAuthoritySession(
         }
         effort = profile
         if (sides != packed.columns || inactive != packed.inactiveRows || this.authority != authority) {
+            var mappingWork = 0L
+            var mappingAllocation = 0L
+            val suspended = if (sparse == null) packed.inactiveRows else checkNotNull(sparse)
+                .emittedInactiveRows(packed.inactiveRows, token) { work, allocation ->
+                    mappingWork += work
+                    mappingAllocation += allocation
+                    budget.observe(preparation = work)
+                    budget.funding?.charge(0L, allocation)
+                    budget.funding?.paused != true
+                }
+            onLifecycle("InactiveRowMappingWork", mappingWork)
+            onLifecycle("InactiveRowMappingAllocation", mappingAllocation)
+            if (suspended == null) {
+                close()
+                return null
+            }
             if (!current.pop(0, token) || !current.push(token)) return null
-            if (!current.suspend(packed.inactiveRows.mapTo(HashSet()) { it.toLong() }, token)) return null
+            if (!current.suspend(suspended.mapTo(HashSet()) { it.toLong() }, token)) return null
             val assertions = ArrayList<LpBoundAssertion>()
             for ((id, column) in packed.columns.withIndex()) {
                 if (token()) return null

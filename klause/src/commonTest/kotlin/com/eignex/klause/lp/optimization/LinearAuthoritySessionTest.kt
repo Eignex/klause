@@ -4,6 +4,7 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLp
 import com.eignex.klause.lp.SparseSourceLpPolicy
+import com.eignex.klause.lp.SparseSourceLpRowPolicy
 import com.eignex.klause.lp.engine.ExactLpBounds
 import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
@@ -34,6 +35,37 @@ class LinearAuthoritySessionTest {
         override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
     }
     private val scope = SourceScope(SourceRevision("session-fixture", "exact-affine"))
+
+    @Test
+    fun `suspending a row after a packed equality should preserve scoped bounds and the numerical owner`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ofLong(2)),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.ONE), BigFraction.ofLong(2)),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ONE }, BigFraction.ONE),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+            ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
+        )
+        val root = assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never))
+        val retired = assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never, setOf(6)))
+        val costs = listOf(BigFraction.MINUS_ONE, BigFraction.ZERO)
+        val policy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES)
+        LinearAuthoritySession(SourceLpBudget()).use { session ->
+            val first = assertNotNull(session.advance(root, costs, BigFraction.ZERO, scope,
+                Cancellation.Never, policy, observer) { guidance, _, _ -> guidance })
+            assertEquals(BigFraction.ofLong(2).reciprocal().negated(), assertNotNull(first.bound).value)
+
+            val changed = assertNotNull(session.advance(retired, costs, BigFraction.ZERO, scope,
+                Cancellation.Never, policy, observer) { guidance, _, _ -> guidance })
+            val restored = assertNotNull(session.advance(root, costs, BigFraction.ZERO, scope,
+                Cancellation.Never, policy, observer) { guidance, _, _ -> guidance })
+
+            assertEquals(BigFraction.MINUS_ONE, assertNotNull(changed.bound).value)
+            assertEquals(assertNotNull(first.bound).value, assertNotNull(restored.bound).value)
+            assertEquals(1L, session.preparations)
+        }
+    }
 
     @Test
     fun `batched source rebinding should preserve witnesses strict rows and scope retraction`() {

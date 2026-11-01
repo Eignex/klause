@@ -76,6 +76,11 @@ original-unit qualification.
 
 Solver-control flags are common to every mode; `--help` lists every parameter.
 
+The `source-cuts`, `source-point-cuts` and `source-aggregate-cuts` Boolean parameters
+configure [source cut selection](17-linear-programming.md#cuts) in direct numerical
+frontiers and admitted numerical companions of ordinary linear sources. Finite
+worker recipes do not interpret these controls; admission and lifetime are separate.
+
 `--param luby=N` requires a strictly positive integer. Zero and negative units
 produce a configuration error before worker execution, including when an adaptive
 restart schedule takes precedence.

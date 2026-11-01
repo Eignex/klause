@@ -53,7 +53,9 @@ internal enum class LpPointRejection {
 
 internal enum class ReconstructionPhase { INPUT, POINT, DUAL, RAY, SUPPORT, VIOLATION, VECTOR, BASIS, SCHEDULE }
 
-internal data class ReconstructionDualRejection(val column: Int, val upper: Boolean, val reduced: BigFraction)
+internal data class ReconstructionDualRejection(
+    val column: Int, val upper: Boolean, val reduced: BigFraction, val basic: Boolean? = null,
+)
 internal data class ReconstructionVectorRejection(val commonDenominator: BigInt, val limit: BigInt)
 internal data class ReconstructionEntryRejection(val row: Int, val value: BigFraction)
 internal data class ReconstructionBasisMetrics(
@@ -69,6 +71,7 @@ internal data class ReconstructionBasisMetrics(
     val decline: String? = null,
     val restrictedComponents: Int = 0,
     val restrictedColumns: Int = 0,
+    val largestRestrictedColumns: Int = 0,
 )
 
 internal data class ReconstructionMetrics(
@@ -91,6 +94,7 @@ internal data class ReconstructionMetrics(
     val entryRejection: ReconstructionEntryRejection? = null,
     val basisRepair: ReconstructionBasisMetrics? = null,
     val basisWork: Long = 0L,
+    val basisDualRejection: ReconstructionDualRejection? = null,
 )
 
 internal class ReconstructedCertificate(
@@ -128,6 +132,7 @@ internal class ReconstructionMeter(
     var entryRejection: ReconstructionEntryRejection? = null
     var basisRepair: ReconstructionBasisMetrics? = null
     var basisWork = 0L
+    var basisDualRejection: ReconstructionDualRejection? = null
     val spentWork: Long get() = work
     private var work = 0L
     private var allocation = 0L
@@ -193,7 +198,7 @@ internal class ReconstructionMeter(
     fun snapshot(decline: ReconstructionDecline?) = ReconstructionMetrics(
         attempts, pointChecks, dualChecks, rayChecks, pointSuccesses, dualSuccesses, raySuccesses,
         vectorRestarts, verificationRestarts, work, allocation, maxBits, decline, phase, dualRejection, vectorRejection,
-        entryRejection, basisRepair, basisWork,
+        entryRejection, basisRepair, basisWork, basisDualRejection,
     )
 
     fun basisLimits(): RationalBasisLimits = RationalBasisLimits(
@@ -545,7 +550,7 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
         }
     }
 
-    fun dual(candidate: List<BigFraction>, ray: Boolean, usesBasis: Boolean = false) {
+    fun dual(candidate: List<BigFraction>, ray: Boolean, usesBasis: Boolean = false, basis: Basis? = null) {
         meter.phase = if (ray) ReconstructionPhase.RAY else ReconstructionPhase.DUAL
         if (ray) meter.rayChecks++ else meter.dualChecks++
         val checked = try {
@@ -553,7 +558,12 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
         } catch (_: ReconstructionOverflow) {
             meter.verificationRestarts++
             BigReconstructionVerifier(a, meter).dual(candidate, ray)
-        } ?: return
+        } ?: run {
+            if (usesBasis) meter.basisDualRejection = meter.dualRejection?.let {
+                it.copy(basic = basis?.status?.get(it.column) == VarStatus.BASIC)
+            }
+            return
+        }
         if (ray && !(checked.value.signum() > 0 || (checked.value.isZero && checked.strict))) return
         val support = a.support(candidate, checked.selected)
         meter.storage((candidate.size.toLong() + checked.selected.size) * 32L)
@@ -812,7 +822,9 @@ private fun reconstructCandidates(
                 if (y != null) {
                     if (goal == ReconstructionGoal.BOUND && basis != null && !basisAttempted) {
                         basisAttempted = true
-                        current.basisDual(y, basis)?.let { current.dual(it, ray = false, usesBasis = true) }
+                        current.basisDual(y, basis)?.let {
+                            current.dual(it, ray = false, usesBasis = true, basis = basis)
+                        }
                     }
                     if (goal != ReconstructionGoal.BOUND || current.bound == null) {
                         val vector = reconstructExactVector(y, denominator, meter)

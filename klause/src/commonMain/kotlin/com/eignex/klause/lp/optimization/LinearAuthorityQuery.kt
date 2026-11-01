@@ -30,17 +30,24 @@ internal class LinearAuthorityQuery private constructor(
     val activeCuts: Int,
     val activeMixedCuts: Int,
     val cutMask: Set<Int>?,
+    val checkUnselectedCuts: Boolean,
     val checkedCuts: Set<Int>,
     val installedCuts: Set<Int>,
     val cutFamilies: Map<Int, CutFamily>,
+    val retainMaskedCuts: Boolean,
 ) {
     val context: SourceProofContext = source.withLinearAuthority()
     val closureRows: List<ExactRationalInequality> = rows.map {
         ExactRationalInequality(it.columns, it.coefficients, it.rhs)
     }
 
-    fun matches(other: SourceProofContext, cuts: Boolean = false, cutMask: Set<Int>? = null): Boolean =
-        this.cuts == cuts && this.cutMask == cutMask && (source === other ||
+    fun matches(
+        other: SourceProofContext, cuts: Boolean = false, cutMask: Set<Int>? = null,
+        checkUnselectedCuts: Boolean = true,
+        retainMaskedCuts: Boolean = false,
+    ): Boolean = this.cuts == cuts && this.cutMask == cutMask &&
+        this.checkUnselectedCuts == checkUnselectedCuts && this.retainMaskedCuts == retainMaskedCuts &&
+        (source === other ||
         (source.scope == other.scope &&
             source.coordinates == other.coordinates &&
             source.premises == other.premises &&
@@ -56,6 +63,8 @@ internal class LinearAuthorityQuery private constructor(
             cutMask: Set<Int>? = null,
             consequences: List<SourceEvidence> = emptyList(),
             onCut: (CutFamily, String, Long) -> Unit = { _, _, _ -> },
+            checkUnselectedCuts: Boolean = true,
+            retainMaskedCuts: Boolean = false,
         ): LinearAuthorityQuery? {
             val coordinates = template?.coordinates ?: source.numericCoordinates()
             val numeric = template?.numeric ?: source.numericContext()
@@ -82,7 +91,10 @@ internal class LinearAuthorityQuery private constructor(
             var activeMixedCuts = 0
             var cutVerificationWork = 0L
             val cuts = template?.cuts?.rows.orEmpty()
-            val active = cuts.indices.filter { id -> cuts[id].owners.none { it in inactive } }
+            val active = cuts.indices.filter { id ->
+                (checkUnselectedCuts || cutMask == null || id in cutMask) &&
+                    cuts[id].owners.none { it in inactive }
+            }
             val checks = if (active.isEmpty()) emptyList() else {
                 SourceEvidenceVerifier(numeric.atScope(source.scope), maximumSteps = maximumCutProofSteps)
                     .verifyAll(active.map { id ->
@@ -100,12 +112,13 @@ internal class LinearAuthorityQuery private constructor(
             for ((id, cut) in cuts.withIndex()) {
                 if (cancellation()) return null
                 onCut(cut.family, when {
+                    !checkUnselectedCuts && cutMask != null && id !in cutMask -> "RETIRED_CANDIDATE"
                     id !in active -> "INACTIVE_PREMISE"
                     id !in accepted -> "VERIFICATION_DECLINED"
                     cutMask != null && id !in cutMask -> "UNSELECTED"
                     else -> "INSTALLED"
                 }, 1L)
-                if (cutMask != null && id !in cutMask) continue
+                if (cutMask != null && id !in cutMask && !retainMaskedCuts) continue
                 if (id in accepted && (cutMask == null || id in cutMask)) {
                     cutFamilies[cited.size] = cut.family
                     activeCuts++
@@ -135,10 +148,12 @@ internal class LinearAuthorityQuery private constructor(
             val sign = if (source.scope.objective?.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
                 else BigFraction.MINUS_ONE
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
-            return LinearAuthorityQuery(source, coordinates, cited, rows, inactive, unconditional && inactive.isEmpty(),
+            return LinearAuthorityQuery(source, coordinates, cited, rows, inactive,
+                unconditional && (inactive.isEmpty() || retainMaskedCuts),
                 costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts,
-                cutMask?.toSet(), accepted.toSet(), accepted.filterTo(HashSet()) { cutMask == null || it in cutMask },
-                cutFamilies.toMap())
+                cutMask?.toSet(), checkUnselectedCuts, accepted.toSet(),
+                accepted.filterTo(HashSet()) { cutMask == null || it in cutMask },
+                cutFamilies.toMap(), retainMaskedCuts)
         }
     }
 }
