@@ -452,13 +452,20 @@ protection disabled instead of comparing blanket protection. At most two arms ru
 Optional `source64=BASE64` or `sourceGzip64=BASE64` supplies hash-checked source bytes
 through the existing trajectory input reader. The input receipt records source size,
 load time and cancellation before enforcing the capture's source bounds.
-Before/after model snapshots retain objective, domains, factor kinds, support and
-word-sized declared rows, charging the same consumer-diagnostic allowance without
-materializing structural keys.
-Each arm has a 30-second containing
-deadline, five million preparation work units and one million consumer-diagnostic
-units; the whole capture has 120 seconds. Sources, lowered coordinates and factors
-are capped before consumer preparation. The report retains actual maintained
+Before/after discrete model snapshots retain the objective, exact domain sets,
+root Boolean facts when baked, complete ordered structural keys, support and
+word-sized declared rows. Snapshot work spends the consumer-diagnostic allowance;
+domain capture declines when neither holes nor surviving values fit 65,536 entries.
+Heuristic hints, internal factor storage order and worker-state identity require
+separate observations.
+Optional `seed`, `timeoutMillis`, `presolveMillis`, `presolveWork` and `impactLimit`
+match recorded preparation controls. Defaults are seed 3, a 30-second arm deadline,
+five million preparation units and impact limit 65,536. The phase deadline is at
+most the arm deadline; explicit preparation work is capped at one billion units.
+Disable impact collection with `impactLimit=0` when replaying ordinary preparation.
+Each arm has one million consumer-diagnostic units; the whole capture has 120
+seconds. Sources and prepared models have at most 4,096 coordinates/factors and
+65,536 structural-key weight. The report retains actual maintained
 definitions/input edges/depth and emitted rows/columns/nonzeros. The forced LP
 views establish representation effects; ordinary worker admission and whole-source
 outcomes require separate adapter runs. Use `suite=rewrite-structure-v1` for the

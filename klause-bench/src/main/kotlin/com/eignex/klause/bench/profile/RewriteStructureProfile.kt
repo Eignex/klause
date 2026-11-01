@@ -3,6 +3,7 @@ package com.eignex.klause.bench.profile
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.linearRows
@@ -10,6 +11,9 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
@@ -21,8 +25,11 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.util.Cancellation
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -34,7 +41,15 @@ internal object RewriteStructureProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         val required = setOf("suite", "problem", "sha256", "presolve")
         require(options.keys.containsAll(required) &&
-            (options.keys - required - setOf("orders", "source64", "sourceGzip64")).isEmpty())
+            (options.keys - required - setOf("orders", "source64", "sourceGzip64", "seed",
+                "timeoutMillis", "presolveMillis", "presolveWork", "impactLimit")).isEmpty())
+        val seed = options["seed"]?.toLong() ?: 3L
+        val timeoutMillis = (options["timeoutMillis"]?.toLong() ?: 30000L).also { require(it in 100..30000) }
+        val presolveMillis = (options["presolveMillis"]?.toLong() ?: timeoutMillis)
+            .also { require(it in 1..timeoutMillis) }
+        val presolveWork = (options["presolveWork"]?.toLong() ?: 5_000_000L)
+            .also { require(it in 1..1_000_000_000L) }
+        val impactLimit = (options["impactLimit"]?.toInt() ?: 65536).also { require(it in 0..65536) }
         val arms = options["orders"]?.split(',')?.map { name ->
             val order = AffinePivotOrder.valueOf(name.uppercase())
             Triple(order.name.lowercase(), false, order)
@@ -60,29 +75,31 @@ internal object RewriteStructureProfile {
         out.resolve("source.xml").writeBytes(bytes)
         for ((label, preserve, order) in arms) {
             val started = System.nanoTime()
-            val stop = containing or Cancellation.after(30.seconds)
+            val stop = containing or Cancellation.after(timeoutMillis.milliseconds)
             val parsed = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
             require(parsed.problem.numIntVars + parsed.problem.numBoolVars <= 4096 &&
                 parsed.problem.numFactors <= 4096)
             require(parsed.problem.factors.sumOf { it.structuralKeyWeight.toLong() } <= 65536 && !stop())
             val objective = parsed.objective?.toLinearObjective()
-            val budget = PresolveBudget(5_000_000)
+            val budget = PresolveBudget(presolveWork)
+            val preparationStop = budget.orSpent(stop or Cancellation.after(presolveMillis.milliseconds))
             val invocation = SourceSetup.prepare(SourceSetupRequest(
                 if (parsed.definedVars.isEmpty()) SourceAttachment(parsed.problem, parsed.definitionHints)
                 else SourceAttachment(parsed.problem, parsed.definedVars, emptyList(), parsed.definitionHints),
                 if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
-                FiniteEngine.MIXED, objective = objective, cancellation = stop,
+                FiniteEngine.MIXED, objective = objective, cancellation = preparationStop,
             ))
             val plan = requireNotNull(invocation.preparedPlan)
             val prepared = FinitePipeline.prepare(FinitePipelineRequest(
                 requireNotNull(plan.model), FiniteEngine.MIXED, objective,
                 presolveConfig = PresolveConfig.parse(options.getValue("presolve"))
                     .withAffinePivotOrder(order)
-                    .withEffort(preserveStructure = preserve, structuralImpactLimit = 65536),
-                explicitPresolveConfig = true, cancellation = stop, solveCancellation = stop,
-                presolveBudget = budget, preparedPlan = plan, randomSeed = 3,
+                    .withEffort(preserveStructure = preserve, structuralImpactLimit = impactLimit),
+                explicitPresolveConfig = true, cancellation = preparationStop, solveCancellation = stop,
+                presolveBudget = budget, preparedPlan = plan, randomSeed = seed,
             ))
             val preparationNs = System.nanoTime() - started
+            val preparationStopped = preparationStop()
             val diagnostics = PresolveBudget(1_000_000)
             val diagnosticStop = diagnostics.orSpent(stop)
             writeModel(out.resolve("before-$label.json"), requireNotNull(plan.model), objective, diagnosticStop)
@@ -122,6 +139,12 @@ internal object RewriteStructureProfile {
                 put("preserveStructure", preserve)
                 put("affinePivotOrder", order.name)
                 put("presolve", options.getValue("presolve"))
+                put("seed", seed)
+                put("timeoutMillis", timeoutMillis)
+                put("presolveMillis", presolveMillis)
+                put("presolveWorkAllowance", presolveWork)
+                put("structuralImpactLimit", impactLimit)
+                put("preparationStopped", preparationStopped)
                 put("declaredSemantics", parsed.semantics.declared.toString())
                 put("effectiveSemantics", parsed.semantics.effective.toString())
                 put("preparationNs", preparationNs)
@@ -165,21 +188,40 @@ internal object RewriteStructureProfile {
     }
 
     private fun writeModel(file: File, problem: Problem, objective: LinearObjective?, stop: Cancellation) {
+        require(problem.numRealVars == 0 && problem.numBoolVars + problem.numIntVars <= 4096 &&
+            problem.numFactors <= 4096)
+        stop.charge(problem.numFactors.toLong())
+        check(!stop())
+        require(problem.factors.sumOf { it.structuralKeyWeight.toLong() } <= 65536)
+        val root = (problem as? BakedProblem)?.baked
+        val implied = root as? PropagationResult.Implied
         val snapshot = buildJsonObject {
+            put("schemaVersion", 2)
             put("objective", objective.toString())
+            put("declaredSemantics", problem.semantics.declared.toString())
+            put("effectiveSemantics", problem.semantics.effective.toString())
             put("booleans", problem.numBoolVars)
             put("integers", problem.numIntVars)
+            put("rootFactsObserved", root != null)
+            put("rootUnsat", root is PropagationResult.Unsat)
+            put("rootBooleans", buildJsonArray {
+                for (variable in 0 until problem.numBoolVars) {
+                    stop.charge(1)
+                    check(!stop())
+                    add(implied?.boolValueOrNull(variable)?.let { JsonPrimitive(it) } ?: JsonNull)
+                }
+            })
             put("domains", JsonArray((0 until problem.numIntVars).map { variable ->
-                stop.charge(1)
-                check(!stop())
-                JsonPrimitive(problem.intDomainOrNull(variable).toString())
+                domainSnapshot((problem as? BakedProblem)?.rootIntDomain(variable)
+                    ?: problem.intDomainOrNull(variable), stop)
             }))
             put("factors", buildJsonArray {
                 for (factor in problem.factors) {
-                    stop.charge(1L + factor.intVars.size + factor.boolVars.size)
+                    stop.charge(1L + factor.structuralKeyWeight + factor.intVars.size + factor.boolVars.size)
                     check(!stop())
                     add(buildJsonObject {
                         put("kind", factor::class.simpleName)
+                        put("structuralKey", factor.structuralKey().toString())
                         put("integers", JsonArray(factor.intVars.map { JsonPrimitive(it) }))
                         put("booleans", JsonArray(factor.boolVars.map { JsonPrimitive(it) }))
                         put("rows", buildJsonArray {
@@ -206,6 +248,32 @@ internal object RewriteStructureProfile {
         }
         check(!stop())
         file.writeText(snapshot.toString())
+    }
+
+    private fun domainSnapshot(domain: IntDomain?, stop: Cancellation): JsonElement {
+        if (domain == null) return JsonNull
+        val holes = domain.holeCount <= domain.valueCount
+        val entries = if (holes) domain.holeCount else domain.valueCount
+        require(entries <= 65536)
+        stop.charge(3 + entries)
+        check(!stop())
+        return buildJsonObject {
+            put("min", domain.min)
+            put("max", domain.max)
+            put(if (holes) "holes" else "values", buildJsonArray {
+                if (holes) {
+                    domain.forEachHole { value ->
+                        check(!stop())
+                        add(JsonPrimitive(value))
+                    }
+                } else {
+                    domain.span().forEach { value ->
+                        check(!stop())
+                        add(JsonPrimitive(value))
+                    }
+                }
+            })
+        }
     }
 
     private fun get(owner: Any, property: String): Any? =
