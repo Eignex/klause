@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
@@ -98,6 +99,15 @@ internal class ResumableSatisfaction(
     }
 
     internal fun splitLiteral(): Int? = traversal.splitLiteral()
+
+    internal fun retainPartition(literal: Int): Assumptions {
+        check(rebindable && !closed && done == null)
+        val restricted = Assumptions(bools = assumptions.bools +
+            (Lit.variable(literal) to Lit.isPositive(literal)))
+        traversal.retainPartition(literal)
+        assumptions = restricted
+        return restricted
+    }
 
     internal fun rebind(assumptions: Assumptions, cancellation: Cancellation) {
         check(rebindable && !closed)

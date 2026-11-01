@@ -50,7 +50,10 @@ scheduler grant before creating a partition. A paused query supplies its first l
 Boolean decision after caller pins; root-fixed and unread columns supply no pivot.
 The same engine transfers into the matching cube of a two-region partition, retaining
 its learning, root work, statistics and containing quota. Sibling reseeding can replay
-search, and that replay remains charged. A completed source probe needs neither a
+search, and that replay remains charged. The adopted probe keeps its live frames;
+a query-local Boolean guard prunes opposite fixed values without creating a learned
+source clause. The guard survives restarts, joins the refutation condition and clears
+when another query begins. A completed source probe needs neither a
 partition nor a peer root. Lost probes and task attempts retain charges.
 It runs through an explicit internal entry point; ordinary portfolio selection
 retains its existing policy.
