@@ -35,7 +35,7 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
-    fun `prepared MPS search should consume templates retained from LP harvest`() {
+    fun `prepared MPS search should consume LP bounds after a no-op harvest`() {
         val relative = "klause-bench/smoke-corpus/lp-component-split/cover-2x3.mps"
         val source = listOf(File(relative), File("../$relative")).first { it.isFile }
 
@@ -48,20 +48,11 @@ class MpsModeTest {
 
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
         assertTrue("o 4" in text.lines(), text)
-        val reused = Regex("lpPhase_TEMPLATE_PREPARATION_[A-Z]+_FACTORS_REUSED=(\\d+)").findAll(text)
-            .sumOf { it.groupValues[1].toLong() }
-        val exactBounds = Regex("lpPhase_TEMPLATE_ASSEMBLY_[A-Z]+_EXACT_BOUND_OBJECTS=(\\d+)").findAll(text)
-            .sumOf { it.groupValues[1].toLong() }
-        val rows = Regex("lpPhase_TEMPLATE_ASSEMBLY_[A-Z]+_ROWS=(\\d+)").findAll(text)
-            .sumOf { it.groupValues[1].toLong() }
-        val rebound = Regex("lpPhase_TEMPLATE_PREPARATION_[A-Z]+_SOURCE_REBOUND=(\\d+)").findAll(text)
-            .sumOf { it.groupValues[1].toLong() }
+        assertTrue("c presolveInvocation_FINITE_lp-harvest_COMPLETE_MISS_Calls=1" in text.lines(), text)
+        assertTrue("c lpRootBound=3.0" in text.lines(), text)
         val pruned = Regex("lpBoundPruned=(\\d+)").findAll(text).sumOf { it.groupValues[1].toLong() }
-        assertTrue(reused > 0L, text)
-        assertTrue(exactBounds > 0L, text)
-        assertTrue(rows > 0L, text)
-        assertTrue(rebound > 0L, text)
         assertTrue(pruned > 0L, text)
+        assertFalse("lpPhase_TEMPLATE_PREPARATION_" in text, text)
     }
 
     @Test
