@@ -155,6 +155,12 @@ separate; see [MPS semantics](05-arithmetic-formats.md).
 Consumers decide when to request certified bounds, fixings, conflicts or witnesses
 and how to apply and retract them. Their policy stays outside the engine.
 
+The trivial objective bound caches Boolean contributions only with no retained
+decisions. Its baseline contains permanent root facts; later pins and backtracks
+update a reversible penalty. Before installation is safe, each read scans the
+current assignment. A propagator's effective reason level does not establish that
+the search is at its root.
+
 An opt-in finite propagation trace checks consumed trivial linear prunes against a
 fresh exact sum of Boolean values and signed integer endpoints. It retains the first
 disagreement separately from truncated trace payloads, within four million entry

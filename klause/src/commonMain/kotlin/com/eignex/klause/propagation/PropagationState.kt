@@ -752,14 +752,15 @@ class PropagationState private constructor(
 
     /**
      * Install the incremental objective bool lower bound from [weights] (indexed by bool var id). A no-op
-     * unless at the root (`currentLevel == 0`) and not already installed: the baseline sums the current
-     * level-0 contributions, which are never undone, so subsequent pins/undos maintain the bound soundly
+     * unless no decisions are retained and it is not already installed. A propagator's effective level
+     * can be zero above the search root. The baseline sums contributions that cannot be undone, so later
+     * pins/undos maintain the bound soundly
      * on the reversible trail. Returns true once (or while) the incremental bound is live; false when it
      * declined (not at root, or the baseline overflowed) so the caller rescans instead.
      */
     internal fun installObjectiveBoolBound(weights: LongArray): Boolean {
         if (objBoolWeights != null) return true
-        if (currentLevel != 0) return false
+        if (levelToDecisionVar.isNotEmpty()) return false
         var base = 0L
         val nb = minOf(problem.numBoolVars, weights.size)
         for (b in 0 until nb) {
