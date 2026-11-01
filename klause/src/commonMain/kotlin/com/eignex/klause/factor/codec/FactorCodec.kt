@@ -5,7 +5,6 @@ import com.eignex.skema.schemaJsonConfig
 import com.eignex.skema.serialization.CompactSerializer
 import com.eignex.skema.serialization.JsonNode
 import com.eignex.skema.serialization.JsonNodeCatalog
-import com.eignex.skema.serialization.decodeFromJsonElement
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -111,7 +110,7 @@ class FactorCodecs(codecs: List<FactorCodec<*, *>>) {
      */
     fun decodeFromJsonElement(element: JsonElement): Factor {
         requireKnownKey(element, "$")
-        return factor(json.decodeFromJsonElement(nodeSerializer, element, catalog))
+        return factor(json.decodeFromJsonElement(nodeSerializer, element))
     }
 
     internal fun payload(factor: Factor, path: String): Any {

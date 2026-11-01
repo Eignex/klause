@@ -34,27 +34,13 @@ internal class PrivateRebuildSatisfaction(
     private var rootMark = -1
     private var rootPins = (solver.problem.rootDeductions as PropagationResult.Implied).boolKeys.size
     private var chargedPrivateWork = 0L
-    private val canonical = ResumableSatisfaction(solver, sharedParams, ownsWorkDebt = false, atRoot = {
-        val mark = it.explanationState.undoTop
-        val scanWork = solver.problem.numBoolVars.toLong()
-        if (mark == rootMark || !it.canSimplifyRoot || scanWork > params.privateRebuildWork - trialSpent()) false
-        else {
-            rootMark = mark
-            val start = TimeSource.Monotonic.markNow()
-            val pins = it.rootFixedVariableCount()
-            it.chargeInprocessingWork(scanWork)
-            chargedPrivateWork = saturatedWork(chargedPrivateWork, scanWork)
-            note("RootScanWork", scanWork)
-            note("RootScanNanos", start.elapsedNow().inWholeNanoseconds)
-            if (pins <= rootPins) false
-            else {
-                note("ProgressPins", (pins - rootPins).toLong())
-                rootPins = pins
-                root = it
-                true
-            }
-        }
-    })
+    private var binaryCount = 0
+    private var binaryRevision = 0L
+    private var attemptedBinaryPairs = longArrayOf()
+    private var attemptedBinaryCount = 0
+    private var pendingBinary: PrivateRebuildBinaryLearning? = null
+    private var rootCancellation: Cancellation = Cancellation.Never
+    private val canonical = ResumableSatisfaction(solver, sharedParams, ownsWorkDebt = false, atRoot = ::atRoot)
     private var generation: PrivateRebuildGeneration? = null
     private var consumer: ResumableSatisfaction? = null
     private var retiredStats = SolveStats.EMPTY
@@ -83,6 +69,63 @@ internal class PrivateRebuildSatisfaction(
         observations[name] = saturatedWork(observations[name] ?: 0L, value)
     }
 
+    private fun atRoot(session: PropagationSession): Boolean {
+        if (!session.canSimplifyRoot) return false
+        val mark = session.explanationState.undoTop
+        val scanWork = solver.problem.numBoolVars.toLong()
+        if (mark != rootMark) {
+            if (scanWork > params.privateRebuildWork - trialSpent()) return false
+            rootMark = mark
+            val start = TimeSource.Monotonic.markNow()
+            val pins = session.rootFixedVariableCount()
+            chargeRoot(session, scanWork)
+            note("RootScanWork", scanWork)
+            note("RootScanNanos", start.elapsedNow().inWholeNanoseconds)
+            if (pins > rootPins) {
+                note("ProgressPins", (pins - rootPins).toLong())
+                rootPins = pins
+                root = session
+                return true
+            }
+        }
+        if ((binaryCount == session.learnedClauseCount && binaryRevision == session.learnedClauseRevision) ||
+            attemptedBinaryCount == PrivateRebuildBinaryLearning.MAX_RELATIONS) return false
+        binaryCount = session.learnedClauseCount
+        binaryRevision = session.learnedClauseRevision
+        val historyBytes = PrivateRebuildBinaryLearning.MAX_RELATIONS * Long.SIZE_BYTES.toLong()
+        if (params.learnedMemoryScratchBytes < PrivateRebuildBinaryLearning.SCRATCH_BYTES + historyBytes) return false
+        var spent = 0L
+        val allowance = minOf(PrivateRebuildBinaryLearning.SCAN_WORK,
+            (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L))
+        val start = TimeSource.Monotonic.markNow()
+        val captured = PrivateRebuildBinaryLearning.capture(
+            session, attemptedBinaryPairs, attemptedBinaryCount,
+        ) { work ->
+            if (work > allowance - spent || session.cancelRequested || lifetime() || rootCancellation()) false
+            else {
+                spent += work
+                chargeRoot(session, work)
+                true
+            }
+        }
+        note("BinaryScanWork", spent)
+        note("BinaryScanNanos", start.elapsedNow().inWholeNanoseconds)
+        if (captured == null || rootCancellation()) return false
+        if (attemptedBinaryPairs.isEmpty()) {
+            val entries = PrivateRebuildBinaryLearning.MAX_RELATIONS.toLong()
+            if (entries > params.privateRebuildWork - trialSpent()) return false
+            chargeRoot(session, entries)
+            note("BinaryHistoryWork", entries)
+            note("BinaryHistoryBytes", historyBytes)
+            attemptedBinaryPairs = LongArray(PrivateRebuildBinaryLearning.MAX_RELATIONS)
+        }
+        attemptedBinaryPairs[attemptedBinaryCount++] = captured.key
+        pendingBinary = captured
+        root = session
+        note("BinaryRelations")
+        return true
+    }
+
     override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
         done?.let { return it }
         check(!closed) { "search is closed" }
@@ -99,7 +142,13 @@ internal class PrivateRebuildSatisfaction(
         fun millis(): Long = (deadline - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
         try {
             if (consumer == null && root == null) {
-                canonical.runSlice(global, millis(), nodes())?.let { return finish(it) }
+                val result = try {
+                    rootCancellation = token
+                    canonical.runSlice(global, millis(), nodes())
+                } finally {
+                    rootCancellation = Cancellation.Never
+                }
+                result?.let { return finish(it) }
             }
             val pending = root
             if (consumer == null && pending != null && !token()) prepare(pending, token)
@@ -162,7 +211,11 @@ internal class PrivateRebuildSatisfaction(
         saturatedWork(retiredClauseWork, consumer?.clauseWork ?: 0L))
 
     private fun charge(work: Long) {
-        checkNotNull(root).chargeInprocessingWork(work)
+        chargeRoot(checkNotNull(root), work)
+    }
+
+    private fun chargeRoot(session: PropagationSession, work: Long) {
+        session.chargeInprocessingWork(work)
         chargedPrivateWork = saturatedWork(chargedPrivateWork, work)
     }
 
@@ -176,8 +229,11 @@ internal class PrivateRebuildSatisfaction(
             override fun workMeter(): WorkMeter = meter
         }
         val start = TimeSource.Monotonic.markNow()
-        val prepared = PrivateRebuildGeneration.prepare(session, params.learnedMemoryScratchBytes, token,
-            onDecline = { note("Declined$it") }) {
+        val binary = pendingBinary
+        pendingBinary = null
+        val prepared = PrivateRebuildGeneration.prepare(session,
+            params.learnedMemoryScratchBytes - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(), token,
+            onDecline = { note("Declined$it") }, learnedBinary = binary) {
             (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L) / 2L
         }
         note("PreparationNanos", start.elapsedNow().inWholeNanoseconds)
@@ -190,8 +246,9 @@ internal class PrivateRebuildSatisfaction(
         generation = prepared
         if (prepared.passStopped) note("PassStopped")
         note("Eliminated", prepared.eliminated.toLong())
+        note("EquivalentColumns", prepared.equivalenceMerges.toLong())
         note("AdmittedColumns", prepared.admittedColumns.toLong())
-        note("ModeledPrivateBytes", prepared.modeledBytes)
+        note("ModeledPrivateBytes", prepared.modeledBytes + attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong())
         note("WarmClausesRetained", session.learnedClauseCount.toLong())
         note("WarmClausesCopied", prepared.warmClauses.clauses.size.toLong())
         note("WarmClauseLiterals", prepared.warmClauses.literals)
@@ -299,6 +356,8 @@ internal class PrivateRebuildSatisfaction(
             } finally {
                 root = null
                 generation = null
+                pendingBinary = null
+                attemptedBinaryPairs = longArrayOf()
                 retainedStats = stats
                 closed = true
             }

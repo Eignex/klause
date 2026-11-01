@@ -10,7 +10,6 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
-import com.eignex.kumulant.stream.lock
 
 /**
  * The cross-arm objective **lower** bound of one minimisation portfolio — the dual of the
@@ -30,7 +29,7 @@ import com.eignex.kumulant.stream.lock
  * a platform mutex under the parallel one.
  */
 internal class SharedObjectiveBound(
-    private val lock: Mutex = Concurrency.None.lock(),
+    private val lock: Mutex = Mutex(concurrent = false),
     private val identity: ModelIdentity? = null,
 ) {
     private var lb = Double.NEGATIVE_INFINITY

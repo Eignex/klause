@@ -2,7 +2,6 @@ package com.eignex.klause.portfolio
 
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
-import com.eignex.kumulant.stream.lock
 
 /**
  * What each arm's shared contributions did for the pool: a clause taking part in another arm's conflict or unit, a
@@ -12,7 +11,7 @@ import com.eignex.kumulant.stream.lock
  *
  * The [lock] comes from the executor's [Concurrency], as for the pools it sits beside.
  */
-internal class ContributionTally(private val lock: Mutex = Concurrency.None.lock()) {
+internal class ContributionTally(private val lock: Mutex = Mutex(concurrent = false)) {
     private val counts = Array(Contribution.entries.size) { DoubleArray(0) }
 
     /** Count [amount] of [origin]'s contributions of [kind]; a negative origin names no arm and is ignored. */

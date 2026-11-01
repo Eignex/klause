@@ -2,7 +2,6 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.util.Cancellation
-import com.eignex.kumulant.core.Concurrency
 
 internal class PortfolioWorkerSlot(
     val index: Int,
@@ -50,7 +49,6 @@ internal class PortfolioInvocationResources(
 ) : AutoCloseable {
     init { require(count > 0 && parallelism > 0) }
     val lanes: Int = minOf(count, parallelism)
-    val concurrency: Concurrency = if (lanes > 1) Concurrency.Strict else Concurrency.None
     private val quotas = if (lanes > 1) nodeBudget?.quotas(count) else null
     private val workerSlots: List<PortfolioWorkerSlot> = List(count) { index ->
         PortfolioWorkerSlot(index, seed, cancellation, quotas?.get(index) ?: nodeBudget, count, completeSlots)

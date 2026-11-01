@@ -32,8 +32,7 @@ import com.eignex.klause.util.SchedulingCancellation
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import com.eignex.kumulant.bandit.UnivariateBandit
-import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.kumulant.stream.Mutex
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random
@@ -834,7 +833,7 @@ class Portfolio(
         fun restrictAvailability(available: (Int) -> Boolean) { availability = available }
         private val started = runTimeSource.markNow()
         private val epoch = invocationStarted ?: started
-        private val lock = (if (lanes > 1) Concurrency.Strict else Concurrency.None).lock()
+        private val lock = Mutex(concurrent = lanes > 1)
         private val stopped = AtomicBoolean(false)
 
         /** The run's token: the caller's, stopped early once any lane settles the run. */
@@ -1333,8 +1332,12 @@ class Portfolio(
                 val family = policyFamily(arm)
                 val observableSearch = family.observable && work > 0L && !claim.preparing &&
                     failure !is SearchInitializationCancelled
+                val familyReward = (scopedReward as? SourceRateReward)?.familyReward
+                val familyWeight = if (familyReward == null) 1.0 else
+                    (settled.nanos.coerceAtLeast(0L).toDouble() + settled.constructionNanos.coerceAtLeast(0L)) /
+                        (baseSliceMillis.toDouble() * 1_000_000.0)
                 families.record(family, progressed = reward > 0.0, plateau = improving || observableSearch,
-                    reward = (scopedReward as? SourceRateReward)?.familyReward)
+                    reward = familyReward, weight = familyWeight)
             }
             // Credit an arm earns while others run, from peers using what it shared, pays out now as one segment's
             // evidence: an arm the policy has stopped picking would otherwise hold it forever.

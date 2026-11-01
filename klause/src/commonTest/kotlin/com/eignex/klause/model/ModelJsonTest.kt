@@ -305,27 +305,27 @@ class ModelJsonTest {
     }
 
     @Test
-    fun `malformed payloads report their compact paths`() {
+    fun `malformed payloads name the failing operator or field`() {
         val cases = listOf(
-            """{"int":[0]}""" to "$.int: expected 2 operands",
-            """{"int":[0,"9"]}""" to "$.int[1]: expected INT",
-            """{"int":[5,1]}""" to "$.int: IntSpec needs min <= max",
+            """{"int":[0]}""" to "'int' expects 2 operands",
+            """{"int":[0,9.5]}""" to "'9.5' as an int",
+            """{"int":[5,1]}""" to "IntSpec needs min <= max",
             """{"intDomain":{"lower":0,"upper":9,"values":[[0,2],[3,4]]}}""" to
-                "$.intDomain: IntDomainSpec runs must ascend with gaps",
-            """{"float":{"min":0.0,"max":1.0,"bucket":3}}""" to "$.float.bucket: unknown field",
-            """{"constraint":{"and":[{"ref":"a"},{"bogus":1}]}}""" to "$.constraint.and[1].bogus: unknown operator",
-            """{"constraint":{"ge":[{"ref":"x"},1.5]}}""" to "$.constraint.ge[1]: expected INT",
-            """{"constraint":{"ge":[{"mul":[2.5,{"ref":"x"}]},1]}}""" to "$.constraint.ge[0].mul[0]: expected INT",
-            """{"constraint":{"ge":{"left":{"ref":"x"},"right":1}}}""" to "$.constraint.ge: expected an operand array",
-            """{"constraint":{"notRef":{"name":"p"}}}""" to "$.constraint.notRef: expected STRING",
-            """{"${'$'}type":"int","min":0,"max":1}""" to "$: expected exactly one operator",
+                "IntDomainSpec runs must ascend with gaps",
+            """{"float":{"min":0.0,"max":1.0,"bucket":3}}""" to "unknown key 'bucket'",
+            """{"constraint":{"and":[{"ref":"a"},{"bogus":1}]}}""" to "unknown operator 'bogus'",
+            """{"constraint":{"ge":[{"ref":"x"},1.5]}}""" to "'1.5' as an int",
+            """{"constraint":{"ge":[{"mul":[2.5,{"ref":"x"}]},1]}}""" to "'2.5' as an int",
+            """{"constraint":{"ge":{"left":{"ref":"x"},"right":1}}}""" to "'ge' expects 2 operands",
+            """{"constraint":{"notRef":{"name":"p"}}}""" to "at path: $.name",
+            """{"${'$'}type":"int","min":0,"max":1}""" to "expected exactly one operator",
         )
 
         for ((payload, message) in cases) {
             val error = assertFailsWith<SerializationException>(payload) {
                 SchemaJson.decodeFromString(SchemaEntry.serializer(), payload)
             }
-            assertTrue(error.message.orEmpty().startsWith(message), error.message)
+            assertTrue(message in error.message.orEmpty(), error.message)
         }
     }
 

@@ -5,14 +5,12 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.util.Cancellation
-import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
-import com.eignex.kumulant.stream.lock
 
 internal class LocalSearchPreparation(
     problem: Problem,
     domains: Array<IntDomain>?,
-    private val lock: Mutex = Concurrency.Strict.lock(),
+    private val lock: Mutex = Mutex(),
     selection: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
 ) {
     val shareable: Boolean = selection == null || selection.builtInScoring

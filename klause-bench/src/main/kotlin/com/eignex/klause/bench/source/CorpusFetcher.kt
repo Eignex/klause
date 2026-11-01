@@ -65,20 +65,53 @@ internal object CorpusFetcher {
     private fun xdgCacheHome(): File = System.getenv("XDG_CACHE_HOME")?.takeIf { it.isNotBlank() }?.let { File(it) }
         ?: File(System.getProperty("user.home"), ".cache")
 
-    /** Resolve [source] to a file, fetching an external collection if needed. */
-    fun resolve(source: ProblemSource): File = when (source) {
+    /**
+     * Whether this process plans for a lab that accepts declared input hashes in place of local bytes: the lab sets
+     * `LAB_DECLARED_INPUTS` (mapped to this property by the lab adapter), publishes inputs by content hash and verifies
+     * every fetched byte. Only then may a plan select from a [CorpusIndex] without materializing the collection.
+     */
+    val declaredInputs: Boolean get() = System.getProperty("klause.bench.declaredInputs") == "true"
+
+    private val indexes: CorpusIndexes get() = CorpusIndexes(storageRoot)
+
+    /**
+     * [collection] by its index alone, or null when its bytes are already local (the tree is then authoritative and
+     * cheap), when [declaredInputs] is off, or when no index describes its pack. A missing local index is fetched from
+     * the mirror; the pack itself is never downloaded here.
+     */
+    fun indexed(collection: ExternalCollection): IndexedCollection? {
+        if (!declaredInputs || present(collection.id)) return null
+        val index = indexes.local(collection.id) ?: mirror?.let { remote ->
+            storageRoot.mkdirs()
+            runCatching { remote.index(collection.id, storageRoot) }.onFailure {
+                System.err.println("corpus index of '${collection.id}' unavailable: ${it.javaClass.simpleName}")
+            }.getOrNull()?.also(indexes::save)
+        } ?: return null
+        return indexes.view(index)
+    }
+
+    /** The root to discover [collection]'s instances under: its index listing when [indexed], else its fetched tree. */
+    fun listing(collection: ExternalCollection): File = indexed(collection)?.root ?: ensure(collection)
+
+    private fun present(id: String): Boolean = listOf(storageRoot, cacheRoot).any { root ->
+        File(root, id).let { it.isDirectory && it.list()?.isNotEmpty() == true }
+    }
+
+    /** Resolve [source] to a file, fetching an external collection if needed. [root] locates a collection's tree; an
+     *  index listing ([IndexedCollection.root]) resolves the same relative path without the collection's bytes. */
+    fun resolve(source: ProblemSource, root: (ExternalCollection) -> File = ::ensure): File = when (source) {
         is ProblemSource.Prepared -> source.file.also { require(it.isFile) }
 
         is ProblemSource.Vendored -> File(workspaceRoot(), source.workspaceRelPath).also {
             require(it.isFile) { "vendored file missing: ${source.workspaceRelPath}" }
         }
 
-        is ProblemSource.External -> stored(File(ensure(source.collection), source.relPath)).also {
+        is ProblemSource.External -> stored(File(root(source.collection), source.relPath)).also {
             require(it.isFile) { "instance '${source.relPath}' not found in collection '${source.collection.id}'" }
         }
 
         is ProblemSource.ExternalIndexed -> {
-            val files = ensure(source.collection).walkTopDown()
+            val files = root(source.collection).walkTopDown()
                 .filter { it.isFile && CorpusFiles.formatExtension(it) == source.ext }
                 .sortedBy { CorpusFiles.plainPath(it.name) }
                 .distinctBy { CorpusFiles.plainPath(it.path) }
@@ -105,6 +138,9 @@ internal object CorpusFetcher {
         emptyList()
     }
 
+    private fun mirrorWrite(): Boolean =
+        (System.getenv("LAB_CORPUS_MIRROR_WRITE") ?: System.getenv("KLAUSE_BENCH_CORPUS_MIRROR_WRITE")) == "true"
+
     /** [file] when present, otherwise its plain or compressed counterpart. Catalog paths may name either form. */
     private fun stored(file: File): File {
         if (file.isFile) return file
@@ -128,10 +164,12 @@ internal object CorpusFetcher {
         val cache = cache()
         cache.markUsed(collection.id)
         var fetched = false
+        var packed = false
+        val remote = mirror
         val directory = CorpusStore(storageRoot, cacheRoot).ensure(collection.id) { dir ->
-            val remote = mirror
             if (remote?.restore(collection.id, dir) == true) {
                 fetched = true
+                packed = true
                 return@ensure
             }
             cache.enforce()
@@ -146,15 +184,22 @@ internal object CorpusFetcher {
                 is FetchMethod.GbdFiles -> gbdFiles(collection, method, dir)
             }
             collection.extensionless?.let { (marker, ext) -> nameBare(dir, marker, ext) }
-            val mirrorWrite = System.getenv(
-                "LAB_CORPUS_MIRROR_WRITE",
-            ) ?: System.getenv("KLAUSE_BENCH_CORPUS_MIRROR_WRITE")
-            if (remote != null && mirrorWrite == "true") {
-                runCatching { remote.publish(collection.id, dir) }.onFailure {
+            if (remote != null && mirrorWrite()) {
+                runCatching { packed = remote.publish(collection.id, dir) }.onFailure {
                     System.err.println("corpus mirror publication deferred: ${it.javaClass.simpleName}")
                 }
             }
             fetched = true
+        }
+        // Only a tree that is the stored pack may be indexed: a pack another fetch published first can differ.
+        if (packed && indexes.local(collection.id) == null) {
+            val index = CorpusIndex.of(collection.id, directory)
+            indexes.save(index)
+            if (remote != null && mirrorWrite()) {
+                runCatching { remote.publishIndex(index, storageRoot) }.onFailure {
+                    System.err.println("corpus index publication deferred: ${it.javaClass.simpleName}")
+                }
+            }
         }
         if (fetched) {
             cache.recordSize(collection.id)

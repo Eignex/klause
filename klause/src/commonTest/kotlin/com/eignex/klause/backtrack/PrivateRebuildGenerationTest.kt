@@ -23,6 +23,51 @@ import kotlin.test.assertTrue
 
 class PrivateRebuildGenerationTest {
     @Test
+    fun `learned equivalences should open a reconstructable private consumer without root pins`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
+                Clause(intArrayOf(0, 3, 6)), Clause(intArrayOf(0, 3, 7)),
+            )).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(1, 2)), 2)
+            session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
+            val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
+
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
+                Cancellation.Never, learnedBinary = captured))
+            val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
+                BacktrackParams(nativeSat = native),
+            ))
+            val point = generation.reconstruct(reduced.assignment)
+
+            assertEquals(1, generation.equivalenceMerges)
+            assertNotSame(source, generation.problem)
+            assertTrue(source.factors.all { factor ->
+                (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+            })
+            assertNull(session.boolValue(0))
+            assertEquals(4, source.numFactors)
+        }
+    }
+
+    @Test
+    fun `matching dimensions should not grant another source learned equivalence authority`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3, 4)), Clause(intArrayOf(0, 3, 5)),
+        )).bake()
+        val session = PropagationSession(source)
+        session.addLearnedClause(Clause(intArrayOf(0, 3)), 2)
+        val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
+        val unrelated = Problem(3, 0, emptyArray(), source.factors.copyOf()).bake()
+
+        val generation = PrivateRebuildGeneration.prepare(PropagationSession(unrelated), 1_048_576L,
+            Cancellation.Never, learnedBinary = captured)
+
+        assertNull(generation)
+    }
+
+    @Test
     fun `global root progress should produce reconstructable private eliminations`() {
         for (native in listOf(false, true)) {
             val source = Problem(5, 0, emptyArray(), arrayOf(

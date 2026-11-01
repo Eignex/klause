@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.resources
 
-import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stream.lock
+import com.eignex.kumulant.stream.Mutex
 
 internal class NodeAllowance private constructor(
     val limit: Long,
@@ -69,7 +68,7 @@ internal class NodeAllowance private constructor(
     }
 
     private class Ledger {
-        val lock = Concurrency.Strict.lock()
+        val lock = Mutex()
     }
 }
 
