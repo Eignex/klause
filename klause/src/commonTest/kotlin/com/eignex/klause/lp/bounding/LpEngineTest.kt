@@ -319,7 +319,7 @@ class LpEngineTest {
     }
 
     @Test
-    fun `ordinary component roots yield after their adaptive numerical query`() {
+    fun `ordinary component roots yield checked partial bounds after their adaptive query`() {
         val problem = Problem(0, 120, Array(120) { IntDomain(0, 1) }, (0 until 120).map { variable ->
             val next = (variable / 60) * 60 + (variable + 1) % 60
             Linear(intArrayOf(1, 1), intArrayOf(variable, next), LinearOp.GE, 1)
@@ -332,7 +332,7 @@ class LpEngineTest {
 
             val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
 
-            assertTrue(bound.isNaN())
+            assertEquals(30.0, bound)
             assertEquals(LpFloatTermination.WORK, engine.propagator.floatTermination)
             assertFalse(engine.propagator.floatPaused)
         }
