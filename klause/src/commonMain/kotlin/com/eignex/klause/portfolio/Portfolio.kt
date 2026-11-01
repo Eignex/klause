@@ -154,9 +154,12 @@ class Portfolio(
     internal var reserveBeforeIncumbentOnly: Boolean = false
     internal var disjointBooleanProof: Boolean = false
     internal var disjointBooleanProbe: Boolean = false
+    internal var automaticBooleanProof: Boolean = false
     internal var lastBooleanProofProbeWork: Long = 0L
         private set
     internal var lastBooleanProofProbeSegments: Int = 0
+        private set
+    internal var lastBooleanProofRetainedProbes: Int = 0
         private set
     internal var lastBooleanProofPartitionLiteral: Int? = null
         private set
@@ -244,13 +247,15 @@ class Portfolio(
         lastBooleanProofWork = 0L
         lastBooleanProofProbeWork = 0L
         lastBooleanProofProbeSegments = 0
+        lastBooleanProofRetainedProbes = 0
         lastBooleanProofPartitionLiteral = null
         lastBooleanProofDecline = if (disjointBooleanProof) "unsupported-schedule" else "disabled"
         var proofTasks: BooleanProofPortfolio? = null
         if (disjointBooleanProof && lanes == 1 && baseSliceWork == 5000L &&
             maxSliceWork == 150000L && sliceGrowth == 1.5) {
             lastBooleanProofDecline = null
-            proofTasks = BooleanProofPortfolio.forWorkers(workers, disjointBooleanProbe) {
+            proofTasks = BooleanProofPortfolio.forWorkers(workers, disjointBooleanProbe,
+                nativeOnly = automaticBooleanProof, cancellation = cancellation) {
                 lastBooleanProofDecline = it
             }
             proofTasks?.let { run.restrictAvailability(it::available) }
@@ -374,6 +379,7 @@ class Portfolio(
         lastBooleanProofWork = proofTasks?.work ?: 0L
         lastBooleanProofProbeWork = proofTasks?.probeWork ?: 0L
         lastBooleanProofProbeSegments = proofTasks?.probeSegments ?: 0
+        lastBooleanProofRetainedProbes = proofTasks?.retainedProbes ?: 0
         lastBooleanProofPartitionLiteral = proofTasks?.partitionLiteral
         execution.exceptionOrNull()?.let { failure ->
             cleanup.exceptionOrNull()?.takeUnless { it === failure }?.let(failure::addSuppressed)
@@ -381,10 +387,12 @@ class Portfolio(
         }
         cleanup.getOrThrow()
         val stats = run.folded().let { folded ->
-            if (!disjointBooleanProof) folded else folded.copy(portfolio = folded.portfolio.copy(
+            val reportAttempt = disjointBooleanProof && (!automaticBooleanProof || proofTasks != null)
+            if (!reportAttempt) folded else folded.copy(portfolio = folded.portfolio.copy(
                 booleanProof = folded.portfolio.booleanProof + BooleanProofStats(
                     lastBooleanProofTasks, lastBooleanProofCompleted, lastBooleanProofProbeSegments,
                     lastBooleanProofProbeWork, lastBooleanProofWork, lastBooleanProofDecline,
+                    lastBooleanProofRetainedProbes,
                 ),
             ))
         }

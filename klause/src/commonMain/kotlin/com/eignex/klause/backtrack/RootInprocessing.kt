@@ -23,7 +23,8 @@ internal class RootSimplificationPass : InprocessingPass {
     private var deferredFactor = -1
     private var pinCursor = 0
     private var occurrenceCursor = 0
-    private var preferNeighborhood = true
+    private var sourceNeighborhoodAvailable = true
+    private var preferNeighborhood = false
     private var neighborhoodLeft = 0
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
@@ -47,7 +48,8 @@ internal class RootSimplificationPass : InprocessingPass {
         deferredFactor = -1
         pinCursor = 0
         occurrenceCursor = 0
-        preferNeighborhood = true
+        sourceNeighborhoodAvailable = true
+        preferNeighborhood = false
     }
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
@@ -66,8 +68,8 @@ internal class RootSimplificationPass : InprocessingPass {
         val count = session.rootClauseCount
         if (revision != session.learnedClauseRevision) {
             dropped = IntHashSet()
-            pending = null
-            deferredFactor = -1
+            if ((pending?.factor ?: -1) >= session.problem.numFactors) pending = null
+            if (deferredFactor >= session.problem.numFactors) deferredFactor = -1
             cursor = 0
             scanEnd = count
             scanRoot = session.explanationState.undoTop
@@ -108,6 +110,7 @@ internal class RootSimplificationPass : InprocessingPass {
             var candidate = pending
             if (candidate == null) {
                 val factor = nextFactor(session, budget) ?: break
+                if (factor < session.problem.numFactors && session.rootSourceClauseSize(factor) == 0) continue
                 budget.note("Candidates")
                 val literals = session.rootClauseLiterals(factor, ROOT_LITERAL_LIMIT - literalsVisited)
                 if (literals == null) {
@@ -188,6 +191,13 @@ internal class RootSimplificationPass : InprocessingPass {
         preferNeighborhood = !preferNeighborhood
         if (nearbyFirst) neighborhoodFactor(session, budget)?.let { return it }
         if (budget.stopped()) return null
+        if (sourceNeighborhoodAvailable && pinCursor == session.explanationState.boolPinOrder.size &&
+            cursor < session.problem.numFactors) {
+            if (!budget.visit()) return null
+            // Every source clause changed by a root pin belongs to its completed occurrence walk.
+            budget.note("SourceSkipped", (session.problem.numFactors - cursor).toLong())
+            cursor = session.problem.numFactors
+        }
         if (cursor < scanEnd) {
             if (!budget.visit()) return null
             return cursor++
@@ -200,9 +210,10 @@ internal class RootSimplificationPass : InprocessingPass {
         while (pinCursor < pins.size && neighborhoodLeft > 0) {
             val variable = pins[pinCursor]
             val occurrences = if (variable < session.problem.numBoolVars) {
-                session.projection.preparedBoolOccurrences(variable)
+                session.projection.readyBoolOccurrences(variable)
             } else null
             if (variable < session.problem.numBoolVars && occurrences == null) {
+                sourceNeighborhoodAvailable = false
                 pinCursor = pins.size
                 occurrenceCursor = 0
                 budget.note("NeighborhoodUnavailable")
@@ -215,8 +226,16 @@ internal class RootSimplificationPass : InprocessingPass {
                 occurrenceCursor = 0
                 continue
             }
+            val factor = occurrences[occurrenceCursor++]
+            if (occurrenceCursor == occurrences.size) {
+                pinCursor++
+                occurrenceCursor = 0
+            }
+            if (factor < cursor && scanRoot == session.explanationState.undoTop) continue
+            if (factor != cursor && session.rootSourceClauseSize(factor) < 2) continue
             budget.note("NeighborhoodCandidates")
-            return occurrences[occurrenceCursor++]
+            if (factor == cursor) cursor++
+            return factor
         }
         return null
     }

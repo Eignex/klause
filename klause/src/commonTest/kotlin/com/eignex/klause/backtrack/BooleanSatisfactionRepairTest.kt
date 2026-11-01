@@ -60,6 +60,37 @@ class BooleanSatisfactionRepairTest {
     }
 
     @Test
+    fun `a retained task root should preserve a feasible sibling after scoped refutation`() {
+        val guarded = Problem(5, 0, emptyArray(), Array(8) { mask ->
+            Clause(intArrayOf(Lit.make(0, true)) +
+                IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
+        }).bake()
+        for (native in listOf(false, true)) {
+            val params = BacktrackParams(nativeSat = native, lubyRestartBase = 1L,
+                variableSelector = InputOrder, valueSelector = IndomainMin)
+            BacktrackSolver(guarded).openBooleanProof(params).use { search ->
+                search.begin(Assumptions(bools = mapOf(1 to true)), Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY, Cancellation.Never)
+                assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L).reason)
+                assertTrue(search.retainPartition(assertNotNull(search.splitLiteral())))
+                val refuted = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+                assertNull(refuted.sample)
+                assertEquals(TerminationReason.SearchExhausted, refuted.reason)
+                assertTrue(search.stats.search.restarts.sum > 0.0)
+
+                search.begin(Assumptions(bools = mapOf(0 to true, 1 to true, 2 to false)), Long.MAX_VALUE,
+                    Double.POSITIVE_INFINITY, Cancellation.Never)
+                val sibling = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+
+                val sample = assertNotNull(sibling.sample)
+                assertTrue(sample.boolValue(0))
+                assertTrue(sample.boolValue(1))
+                assertFalse(sample.boolValue(2))
+            }
+        }
+    }
+
+    @Test
     fun `an unpinned first query should remain reusable after completion`() {
         for (native in listOf(false, true)) {
             BacktrackSolver(problem).openBooleanProof(BacktrackParams(nativeSat = native)).use { search ->

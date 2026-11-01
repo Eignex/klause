@@ -198,7 +198,7 @@ internal class BooleanProofScheduler(
         )
     }
 
-    internal fun adopt(worker: Int, search: BooleanSatisfactionRepair, literal: Int) {
+    internal fun adopt(worker: Int, search: BooleanSatisfactionRepair, literal: Int): Boolean {
         check(!closed && satisfactionQueries)
         require(worker in workers.indices && workers[worker].search == null && workers[worker].lease == null)
         require(splitVariablesForValidation == setOf(Lit.variable(literal)))
@@ -206,8 +206,16 @@ internal class BooleanProofScheduler(
         require(search.matchesCondition(Assumptions(bools = context.scope.condition.bools)))
         require(search.splitLiteral() == literal)
         val lease = checkNotNull(tasks.acquire(worker, if (Lit.isPositive(literal)) 1 else 0))
+        val retained = try {
+            search.retainPartition(literal)
+        } catch (failure: Throwable) {
+            tasks.release(lease)
+            throw failure
+        }
         workers[worker].search = search
         workers[worker].lease = lease
+        if (retained) started[worker] = lease
+        return retained
     }
 
     internal fun hasTask(worker: Int): Boolean = workers[worker].lease != null || pending > 0

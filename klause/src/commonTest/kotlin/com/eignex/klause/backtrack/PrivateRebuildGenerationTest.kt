@@ -52,6 +52,33 @@ class PrivateRebuildGenerationTest {
     }
 
     @Test
+    fun `owned equivalence premises should survive canonical forgetting`() {
+        for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(1, replacement, 4)), Clause(intArrayOf(1, replacement, 5)),
+                Clause(intArrayOf(0, Lit.negate(replacement), 6)), Clause(intArrayOf(0, Lit.negate(replacement), 7)),
+            )).bake()
+            val session = PropagationSession(source, nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
+            session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
+            val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
+            session.forgetLearnedClauses { _, _ -> false }
+
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
+                Cancellation.Never, learnedBinary = captured))
+            val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
+                BacktrackParams(nativeSat = native),
+            ))
+            val point = generation.reconstruct(reduced.assignment)
+
+            assertEquals(0, session.learnedClauseCount)
+            assertTrue(source.factors.all { factor ->
+                (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+            })
+        }
+    }
+
+    @Test
     fun `new root pins should withhold an earlier learned equivalence capture`() {
         val source = Problem(4, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(1, 2, 4)), Clause(intArrayOf(1, 2, 5)),
