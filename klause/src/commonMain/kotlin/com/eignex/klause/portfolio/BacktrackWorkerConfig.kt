@@ -211,13 +211,24 @@ internal class BacktrackWorkerConfig(
             nodeBudget: NodeBudget? = null,
             zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
             facts: ProblemFacts = ProblemFacts.assumed(kind),
+            automaticIntegerLearning: Boolean = false,
             edit: ((BacktrackParams) -> BacktrackParams)? = null,
         ): List<BacktrackWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
             val order = BacktrackCatalog.ranked(kind, facts)
+            val arithmeticIndex = if (automaticIntegerLearning && kind == Kind.COP && facts.integerColumnsOnly &&
+                facts.binaryIntegers && facts.integerLinear && facts.compactCardinalityEquality &&
+                facts.compactIntegerNeighborhood &&
+                lpCeiling.resolved(LpTechnique.BOUNDING)) {
+                order.indexOfFirst { it.label == "satOptimized" }
+            } else -1
             return List(count) {
+                val recipe = order[it % order.size]
+                val automatic = if (it == arithmeticIndex) {
+                    recipe.editing { params -> params.copy(integerRowLearning = true) }
+                } else recipe
                 BacktrackWorkerConfig(
-                    order[it % order.size].editing(edit).capLp(lpCeiling).spending(nodeBudget),
+                    automatic.editing(edit).capLp(lpCeiling).spending(nodeBudget),
                     zeroObjectivePricing,
                 )
             }

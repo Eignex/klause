@@ -1254,8 +1254,10 @@ class PropagationSession private constructor(
     }
 
     internal fun learnedLifecycle(): Map<String, Long> = retainedState?.let {
-        it.learned.lifecycle.snapshot() + (it.nativeEngine?.capWindowStatistics() ?: it.learned.capWindowStatistics()) +
+        val counts = it.learned.lifecycle.snapshot() +
+            (it.nativeEngine?.capWindowStatistics() ?: it.learned.capWindowStatistics()) +
             (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap())
+        if (it.integerRowLearning) counts + ("learningIntegerSessions" to 1L) else counts
     } ?: retiredLifecycle
 
     internal fun configureAttribution(

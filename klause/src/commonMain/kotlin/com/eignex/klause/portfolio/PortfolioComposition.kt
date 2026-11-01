@@ -378,7 +378,8 @@ internal object PortfolioComposition {
             nodeBudget,
             zeroObjectivePricing,
             facts,
-            curatedEdit,
+            automaticIntegerLearning = scenario.cores == 1 && scenario.engine == EngineMix.BACKTRACK,
+            edit = curatedEdit,
         )
         if (annotationArm == null || count < 2) return base
         val annotation = BacktrackWorkerConfig.ofParams("annotation", annotationArm.copy(nodeBudget = nodeBudget))

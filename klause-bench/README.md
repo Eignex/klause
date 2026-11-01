@@ -1114,86 +1114,71 @@ the investigation cost rather than becoming a solver regression.
 
 ## Prepared arithmetic learning
 
-`bench.profile.OrdinaryArithmeticLearningProfile` takes `suite=ID problem=NAME
-sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off trace=first-integer|initial
-attribution=false|true`.
-It runs clause and opt-in
-integer-row arms through ordinary finite preparation and backtrack traversal,
-without a decision replay. The existing bounded arithmetic trace records source
-conflicts, historical endpoint rows, mapped admission, retained consumers and
-retirement. Its live window admits 1,024 events and 65,536 words. Clauses above
-64 literals and endpoint markers above 32 words produce explicit omission events
-and a payload-omission count. A
-trace with omissions cannot establish the omitted premises. The selector wrapper
-attaches capture when its fresh native session is created, before LP proposals,
-and delegates all decisions and notifications. The record reports that attachment
-and the admitted-row count at that boundary. Actual branch attempts carry their
-shared Boolean name when available, including LP-guided choices that bypass the
-selector. Branch records keep only the chosen
-coordinate and its domain; typed-row records keep their historical endpoints.
-The integer arm's `trace=first-integer` keeps the most recent conflict window until
-an integer object is admitted, then keeps its consumers, branch markers and
-retirement. Other post-admission details are omitted. Discarded-window/event/word
-counts and omitted observations are explicit; the live event and word caps stay
-fixed. `trace=initial` keeps the initial window instead. The clause arm keeps its
-initial window. Deadlines, decisions and total work/lifecycle counts cover the
-entire invocation; discarding diagnostic data resets no solver allowance.
+Run `bench.profile.OrdinaryArithmeticLearningProfile` through `lab profile` with
+`:klause-cli:installJvmDist`, `:klause-bench:installDist` and
+`:klause-bench:prepareLabRuntime`, using the installed bench library classpath.
+It accepts:
 
-Plain source bytes are hashed after corpus decompression with a 1 MiB input limit.
-A catalog hash mismatch retains the bytes and observed digest and stops before solving.
-Optional `source64=BASE64 format=FORMAT` uses the existing 96 KiB encoded-input
-loader and requires the same source digest, avoiding runtime corpus discovery.
-Original source bytes, canonical original/prepared models and installed provenance
-remain in the capture. Bounded records also go to stdout, including both canonical
-models, so retained live output can expose a capture awaiting file publication.
-The live stream includes build/runtime provenance and references its fingerprint
-from each arm. Canonical models admit 128 KiB each and live output admits 3 MiB.
-A terminal drain allows five seconds plus 1.1 seconds per 64 KiB log chunk for
-asynchronous publication; it is inside the profile allowance and outside the arm
-timer. Each arm's deadline contains loading, preparation, solving,
-reconstruction, native point checking and retirement. Native propagation work is a
-subset of invocation cost; the arm timer excludes record serialization and output.
-Process CPU and invocation-thread allocated bytes cover that interval, including
-diagnostic recording; other threads' allocations are excluded. Unsupported counters
-remain null. Optional propagation attribution exposes mechanism work and reason costs.
-Completed optimization can release its native state before inspection. Such arms
-retain the solver's lifecycle snapshot and report `retirementInspection=solver-released`;
-stored-row counts are unavailable rather than zero, and no second retraction is attempted.
-Set the profile execution limit separately from `profile.runTimeoutSec`, which
-contains remote preparation, cache work, retries, capture and retirement. The
-instrumented capture supplies neither independent
-source checking nor a throughput claim. Use an ordinary lab adapter comparison
-with source validation for whole-source outcomes; a missing consumer requires
-further source or integration diagnosis. Defaults and export scope remain separate.
+`suite=ID problem=NAME sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off
+trace=first-integer|initial|none samples=false|true models=true|false attribution=false|true
+recipe=source|satOptimized|conflictDriven seed=3 worker-seed=3 route=single|portfolio
+learning-placement=automatic|observed`.
 
-The [prepared-source regression](https://github.com/Eignex/klause/pull/3856) parses
-FlatZinc search annotations and uses ordinary solution-preserving preparation and
-production enumeration. The same guarded retained object owns different later
-upper bounds, then retires after its guard is negated. Twenty reconstructed source
-points satisfy both original relations. At `1a9a2cb15a`,
-[CI](https://github.com/Eignex/klause/actions/runs/40863068552) passes JVM, native
-and lint/docs; the prepared-source JVM test takes 62 ms.
+`recipe=source` uses the source search hints or the conflict-driven preset.
+Preparation uses `seed`. Single-worker traversal defaults `worker-seed` to `seed`;
+portfolio traversal derives its offset from the observed recipe.
+The `single` route runs clause and opt-in integer-row arms. The `portfolio` route
+requires unannotated pure binary integer optimization and retains the curated CP
+pool. Its trial preserves automatic learning; the control overrides it to false.
+Select the observed SAT or conflict-driven slot with `recipe` and `worker-seed`;
+the portfolio default is `satOptimized` at `seed + 1000`.
+`learning-placement=observed` enables integer learning only on the observed slot
+in the portfolio trial. This explicit placement override is diagnostic;
+`automatic` preserves the production selector. Clause controls disable integer learning.
 
-At `f7eeda662c`, [lab 9307](https://lab.eignex.com/jobs/9307) parses frozen original
-`MagicSquare-sum-06_c23` XCSP3 bytes with digest
-`f8bf86880a7020f41783f247b670c613f7a4615c640f5764210b630f20e53af2`.
-Ordinary preparation retains the overlapping linear sources. The trace includes
-the historical endpoint rows, complete fallback and an unguarded 16-term consequence,
-mapped to level 12 and stored as identity 0 / factor 1490. That same object forces
-variable 9 at most 19, then 16 after pick 48 and 15 after pick 49; sibling reuse also
-survives undo. The event cap cuts later observations, so retirement of this object
-is established by the prepared-source regression, not by the catalog trace.
-Catalog lifecycle counters report 16 admitted/consumed rows and 16 retired rows.
+Inspect `ordinary-learning.jsonl`, source bytes, canonical original/prepared models
+and `provenance.json` under `OUT`. Capture covers the selected slot's first attached
+native session; ignored later attachments are reported. `trace=first-integer`
+retains the latest conflict window until integer admission, followed by consumers
+and branch markers. `trace=initial` retains the initial window. Each window admits
+1,024 events and 65,536 words; inspect omission and truncation fields before using
+its payload. The decline census covers observations from attachment until export,
+with at most 63 names of 96 characters plus `other`. Its source, endpoint and
+terminal observation counts overlap; classification truncation and saturation are
+reported. Depth-limit counts distinguish original seeds from learned seeds;
+those counts do not establish that a seed meets arithmetic source requirements.
+`trace=none` detaches capture observers and supplies no census.
 
-Both arms retain seed 3, a 10-second deadline and `maxDecisions=4096`. The clause arm
-returns SAT with native reconstruction checks; the integer arm stops at its node
-limit as Unknown. Neither supplies independent source certification or a speedup.
-The containing run takes 282.799 seconds, including 87.923 seconds of compilation;
-the source command takes 33.769 seconds including output drain. Placement is automatic
-on macOS arm64, JDK 25.0.4.1+1, with advisory one-CPU / 4,608 MiB resource receipts.
-The smaller magic-square source's AllDifferent-only conflicts, compressed-byte
-hash refusal, worker network failure, earlier truncated captures and preparation
-timeouts retain their costs and provenance in the external campaign ledger.
+`samples=true` writes per-arm JFR recordings capped at 32 MiB and caller/allocation
+summaries in `<arm>-samples.txt`. JFR setup, dump and analysis are outside arm
+timers and inside the containing profile allowance. Invocation CPU and elapsed
+counters cover the whole portfolio; thread allocation excludes other threads.
+Unavailable counters remain null. The fixed clause/integer order shares one JVM,
+so use ordinary lab comparisons with source validation for performance claims.
+
+Run `bench.profile.ArithmeticLearningApplicabilityProfile` through the same lab
+profile build with `suite=ID max=64 timeout-ms=10000` to inspect up to 64 MPS
+sources in filename order. `after=NAME` continues after an exact catalog name
+without changing the per-run bound. It prepares bounded inputs and reads the production
+selector's facts and configured integer-learning slots without starting search.
+Neighborhood probe work and a limited-probe flag distinguish budget exhaustion
+from a completed negative source-shape check.
+`applicability.jsonl` retains source hashes, preparation declines and policy facts.
+This is an in-process finite preparation view; confirm CLI applicability with actual
+ordinary session counters before claiming source or performance qualification.
+Optional `problems=NAME,...` selects up to eight exact MPS names. `pairs=true`
+counts coefficient cancellation between unconditional unit-magnitude row directions,
+with 65,536 input terms and 1,048,576 pair visits. Completeness and unsupported
+rows are explicit. Compact coefficient pairs do not certify conflicting bounds,
+historical reasons, mapped assertion, admission or source benefit.
+
+Source bytes must match `sha256` after decompression and fit 1 MiB. Optional
+`source64=BASE64 format=FORMAT` accepts at most 96 KiB of encoded input. Canonical
+models admit 128 KiB each and live output admits 3 MiB. `models=false` omits
+canonical serialization and exports null model payloads plus coordinate/factor
+counts; source bytes and their hash remain retained. Set the execution timeout
+separately from `profile.runTimeoutSec`, which contains preparation and retries.
+Native reconstructed-point checks are diagnostic, not independent source checks.
 
 ## Comparable sweep controls
 

@@ -894,6 +894,22 @@ annotated, or execution is parallel or single-engine. See
   [bounded evaluation](#auxiliary-incumbent-evaluation),
   and an unproductive trial retires it without claiming exhaustion.
 
+Single-core curated CP optimization over binary integer columns and complete
+unconditional integer linear rows uses its first `satOptimized` recipe for bounded
+integer-row learning when the LP ceiling permits bounding and the model contains
+a mandatory equality of 3–16 terms that normalizes to unit coefficients. Signed
+terms represent complemented binary columns; the normalized cardinality must leave
+at least one term free. A distinct compact unit-coefficient row must share a
+cancellable column with that equality and leave 1–16 terms after combination.
+The shape probe indexes compact rows by their columns and admits at most 4,096
+factor, row, coefficient, index and reference-comparison visits; exhaustion
+retains clause-only selection. This checks source
+compatibility, not conflict, historical explanation or assertion authority.
+It spends the existing slot's allowance and keeps rows private to its prepared
+session. Caller edits follow this policy, so an explicit integer-row setting has
+authority. Named pools, annotation templates and model-specific replacement recipes
+supply their own parameters.
+
 #### Satisfaction pools
 
 Finite CSP palettes admit `support-aware` after the SAT guard and conflict-driven

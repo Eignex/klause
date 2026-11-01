@@ -32,6 +32,73 @@ import kotlin.test.assertTrue
 
 class ArmNeedsTest {
     @Test
+    fun `integer only coordinates should exclude Boolean and empty integer projections`() {
+        for ((booleans, integers) in listOf(0 to 2, 1 to 2, 1 to 0)) {
+            val model = Problem(booleans, integers, Array(integers) { IntDomain(0, 1) }, emptyArray()).bake()
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.OFF)
+
+            assertEquals(booleans == 0 && integers > 0, facts.integerColumnsOnly)
+        }
+    }
+
+    @Test
+    fun `compact signed and scaled cardinality equalities should be recognized`() {
+        val rows = listOf(
+            Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1),
+            Linear(longArrayOf(2, 2, 2), intArrayOf(0, 1, 2), LinearOp.EQ, 2),
+            Linear(longArrayOf(-2, -2, -2), intArrayOf(0, 1, 2), LinearOp.EQ, -2),
+            Linear(longArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            Linear(LongArray(16) { 1L }, IntArray(16) { it }, LinearOp.EQ, 8),
+            ExactLinear.of(
+                IntArray(3) { Term.ofIntVar(it) }, List(3) { BigFraction.ofLong(2).reciprocal() },
+                LinearOp.EQ, BigFraction.ofLong(2).reciprocal(),
+            ),
+        )
+        for (row in rows) {
+            val model = Problem(0, 16, Array(16) { IntDomain(0, 1) }, listOf(row)).bake()
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE)
+
+            assertTrue(facts.compactCardinalityEquality)
+        }
+    }
+
+    @Test
+    fun `inequalities weighted equalities and forced cardinalities should decline arithmetic eligibility`() {
+        val rows = listOf(
+            Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1),
+            Linear(longArrayOf(1, 2, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1),
+            Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 3),
+            Linear(longArrayOf(2, 2, 2), intArrayOf(0, 1, 2), LinearOp.EQ, 1),
+            Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1),
+            Linear(LongArray(17) { 1L }, IntArray(17) { it }, LinearOp.EQ, 8),
+        )
+        for (row in rows) {
+            val model = Problem(0, 17, Array(17) { IntDomain(0, 1) }, listOf(row)).bake()
+
+            val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE)
+
+            assertFalse(facts.compactCardinalityEquality)
+        }
+    }
+
+    @Test
+    fun `compatible compact rows should enable the ordinary arithmetic worker`() {
+        val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1),
+            Linear(longArrayOf(-1, 1), intArrayOf(2, 3), LinearOp.LE, 0),
+        )).bake()
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE)
+
+        val arms = BacktrackWorkerConfig.diverse(Kind.COP, 6, facts = facts, automaticIntegerLearning = true)
+
+        assertEquals(listOf("satOptimized"),
+            arms.filter { it.recipe.build(1L, null).integerRowLearning }.map { it.label })
+    }
+
+    @Test
     fun `curated eligibility should identify the missing objective without changing explicit recipes`() {
         val facts = ProblemFacts.assumed(Kind.CSP)
         val required = setOf(ArmNeed.Objective)
