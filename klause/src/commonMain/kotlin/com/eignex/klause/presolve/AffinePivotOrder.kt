@@ -31,7 +31,8 @@ enum class AffinePivotOrder {
      *  Reuses existing exact binary cost channels within mixed integer objectives. */
     STRUCTURED,
 
-    /** The default query policy: structured rewrites for exact discrete optimization, Markowitz otherwise. */
+    /** The default query policy: structured rewrites for exact discrete optimization, Markowitz otherwise.
+     *  Retains binary integer inputs kept by binary substitution. */
     AUTOMATIC;
 
     internal val allowsStructuredRewrites: Boolean

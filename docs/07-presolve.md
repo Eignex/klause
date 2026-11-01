@@ -87,9 +87,11 @@ default round cap; an explicit zero round cap still suppresses those schedules.
 
 ### Rewrite representation controls
 
-`AffinePivotOrder.AUTOMATIC` is the default query policy. It selects `STRUCTURED`
-for exact optimization without continuous variables and `MARKOWITZ` for other
-queries. Explicit pivot policies retain their own consumer admission.
+`AffinePivotOrder.AUTOMATIC` is the default query policy. For exact optimization
+without continuous variables it uses `STRUCTURED` ordering and preserves binary
+integer inputs retained by binary substitution, keeping their cost definitions
+available to search. Other queries use `MARKOWITZ`. Explicit pivot policies retain
+their own consumer admission.
 
 `AffinePivotOrder.STRUCTURED` keeps Markowitz ordering between definitions. It
 retains the first admitted declaration-order pivot for aliases and ordinary

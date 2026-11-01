@@ -192,6 +192,11 @@ internal object AffineSingletons {
                 ranges.isClosed(x) && !ranges.isBinary(x) && (problem.intDomainOrNull(x)?.holeCount ?: 0L) == 0L
             }
 
+            pivotOrder == AffinePivotOrder.AUTOMATIC && policy == AffinePivotOrder.STRUCTURED ->
+                { x: Int, partners: Int ->
+                    !ranges.isBinary(x) && (partners == 1 || domains[x].holeCount == 0L)
+                }
+
             domains.any { it.holeCount > 0L } -> { x: Int, partners: Int ->
                 partners == 1 || domains[x].holeCount == 0L
             }
