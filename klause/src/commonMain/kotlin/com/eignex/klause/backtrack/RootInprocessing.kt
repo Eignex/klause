@@ -52,9 +52,14 @@ internal class RootSimplificationPass : InprocessingPass {
         preferNeighborhood = false
     }
 
-    override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
+    override fun run(
+        session: PropagationSession,
+        params: BacktrackParams,
+        stats: SearchStatsSink?,
+        containingWork: Long,
+    ) {
         if (!session.canSimplifyRoot) return
-        spending.run(session, params, stats) { budget ->
+        spending.run(session, params, stats, containingWork = containingWork) { budget ->
             simplify(session, params, budget)
             PrivateRebuildCapture.observe(session, budget, params.rootRebuildCaptureVisits)
         }
@@ -308,9 +313,16 @@ internal class RootProbingPass : InprocessingPass {
         return null
     }
 
-    override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
+    override fun run(
+        session: PropagationSession,
+        params: BacktrackParams,
+        stats: SearchStatsSink?,
+        containingWork: Long,
+    ) {
         if (!session.canSimplifyRoot || params.rootProbeWork <= 0L) return
-        spending.run(session, params, stats) { budget -> probe(session, params, budget) }
+        spending.run(session, params, stats, containingWork = containingWork) { budget ->
+            probe(session, params, budget)
+        }
     }
 
     private fun probe(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {

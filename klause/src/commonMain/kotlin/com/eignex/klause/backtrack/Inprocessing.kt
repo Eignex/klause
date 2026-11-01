@@ -29,7 +29,12 @@ internal interface InprocessingPass {
 
     /** Run one bounded slice with [session] at the post-seed root, leaving it there, and count the work it
      *  does into [stats] so a work-sliced search is charged for it. */
-    fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?)
+    fun run(
+        session: PropagationSession,
+        params: BacktrackParams,
+        stats: SearchStatsSink?,
+        containingWork: Long = Long.MAX_VALUE,
+    )
 
     /** Drop per-search cursors; called when the engine reseeds onto a fragment. */
     fun reset()
@@ -37,6 +42,8 @@ internal interface InprocessingPass {
     fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean = true) = Unit
 
     fun releaseRetainedBuffers() = reset()
+
+    fun rootPublished() = Unit
 }
 
 /**
@@ -123,6 +130,7 @@ internal class Inprocessing(
         }
         publication = null
         needsPublication = result == ComponentResult.Indeterminate
+        if (result == ComponentResult.Consistent) for (pass in passes) pass.rootPublished()
         return result
     }
 
@@ -138,7 +146,8 @@ internal class Inprocessing(
             val token = Cancellation { params.cancellation() || session.work - beforeResume >= limit }
             session.withCancellation(params.cancellation) {
                 session.withInprocessingCancellation(token) {
-                    pendingRoot?.spending?.run(session, params, stats, resumingRoot = true) {
+                    pendingRoot?.spending?.run(session, params, stats, resumingRoot = true,
+                        containingWork = limit) {
                         session.resumeInprocessingRoot()
                     }
                 }
@@ -200,9 +209,11 @@ internal class Inprocessing(
                         if (session.cancelRequested || session.fixpointCancelled || session.isUnsatAtRoot) {
                             return@withInprocessingCancellation
                         }
+                        val containingWork = (offered - (session.work - start)).coerceAtLeast(0L)
+                        if (containingWork == 0L) return@withInprocessingCancellation
                         val pass = passes[nextPass]
                         nextPass = (nextPass + 1) % passes.size
-                        pass.run(session, params, stats)
+                        pass.run(session, params, stats, containingWork)
                         if (session.fixpointCancelled) pendingRoot = pass
                     }
                 }
@@ -217,6 +228,7 @@ internal class Inprocessing(
         }
         needsPublication = session.fixpointCancelled || session.isUnsatAtRoot ||
             session.explanationState.undoTop != rootMark
+        if (!needsPublication) for (pass in passes) pass.rootPublished()
         return needsPublication
     }
 

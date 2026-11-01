@@ -5,16 +5,23 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.ReclamationStatus
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.SearchStatsSink
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchComponent
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -25,18 +32,32 @@ class InprocessingTest {
         override val preservesVariables: Boolean = true,
         private val work: Long = 0L,
         private val grow: Boolean = false,
+        private val rootUnit: Boolean = false,
     ) : InprocessingPass {
         var runs = 0
         var resets = 0
+        var containingWork = 0L
+        var publications = 0
 
-        override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
+        override fun run(
+            session: PropagationSession,
+            params: BacktrackParams,
+            stats: SearchStatsSink?,
+            containingWork: Long,
+        ) {
+            this.containingWork = containingWork
             runs++
             session.chargeInprocessingWork(work)
             if (grow) session.addRootDerivedClause(Clause(intArrayOf(0, 2)), 2, 0, false)
+            if (rootUnit) session.addRootDerivedClause(Clause(intArrayOf(0)), 1, 0, false)
         }
 
         override fun reset() {
             resets++
+        }
+
+        override fun rootPublished() {
+            publications++
         }
     }
 
@@ -209,6 +230,77 @@ class InprocessingTest {
         repeat(3) { loop.onRestart(session, params) }
 
         assertEquals(listOf(1, 1, 0), passes.map { it.runs })
+    }
+
+    @Test
+    fun `a later pass should receive only the remaining containing allowance`() {
+        val first = CountingPass(work = 3L)
+        val second = CountingPass()
+        val loop = Inprocessing(listOf(first, second), cadence = 1)
+
+        loop.onRestart(session(), BacktrackParams(inprocessingWork = 7L))
+
+        assertEquals(4L, second.containingWork)
+    }
+
+    @Test
+    fun `completed publication should notify passes without running another slice`() {
+        val session = session()
+        val cp = CpSearchComponent(session)
+        val context = SearchSession(listOf(cp))
+        assertIs<ComponentResult.Consistent>(context.initialize())
+        val pass = CountingPass(rootUnit = true)
+        val loop = Inprocessing(listOf(pass), cadence = 1)
+        val params = BacktrackParams()
+        assertTrue(loop.onRestart(session, params))
+        assertEquals(0, pass.publications)
+
+        val result = loop.refreshRoot(cp, context, params)
+
+        assertIs<ComponentResult.Consistent>(result)
+        assertEquals(1, pass.publications)
+        assertEquals(1, pass.runs)
+        assertEquals(true, context.boolValue(0))
+    }
+
+    @Test
+    fun `cancelled publication should withhold pass notification`() {
+        val session = session()
+        val cp = CpSearchComponent(session)
+        val context = SearchSession(listOf(cp))
+        assertIs<ComponentResult.Consistent>(context.initialize())
+        val pass = CountingPass(rootUnit = true)
+        val loop = Inprocessing(listOf(pass), cadence = 1)
+        val params = BacktrackParams()
+        assertTrue(loop.onRestart(session, params))
+
+        val result = loop.refreshRoot(cp, context, params.copy(cancellation = Cancellation { true }))
+
+        assertNull(result)
+        assertEquals(0, pass.publications)
+        assertTrue(loop.retainsPublication)
+    }
+
+    @Test
+    fun `indeterminate peer publication should withhold pass notification`() {
+        val session = session()
+        val cp = CpSearchComponent(session)
+        val peer = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                ComponentResult.Indeterminate
+        }
+        val context = SearchSession(listOf(cp, peer))
+        assertIs<ComponentResult.Consistent>(context.initialize())
+        val pass = CountingPass(rootUnit = true)
+        val loop = Inprocessing(listOf(pass), cadence = 1)
+        val params = BacktrackParams()
+        assertTrue(loop.onRestart(session, params))
+
+        val result = loop.refreshRoot(cp, context, params)
+
+        assertIs<ComponentResult.Indeterminate>(result)
+        assertEquals(0, pass.publications)
+        assertTrue(loop.retainsPublication)
     }
 
     @Test

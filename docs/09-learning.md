@@ -629,7 +629,9 @@ The containing invocation and worker work allowance includes scans, occurrence-i
 preparation, probing, attachment propagation and protected retirement. Scans enter
 the propagation-work ledger; diagnostic probe and visit counts add no second charge.
 Each of the four classes has a separate work ceiling inside the scheduled slice's
-total ceiling. Zero withholds that class. Completed atomic copying, sorting and
+total ceiling. Each pass receives the containing remainder after earlier passes;
+its remaining optional work is the smaller of that remainder and its class grant
+after debt repayment. Zero withholds that class. Completed atomic copying, sorting and
 compaction can overspend; the class and scheduled loop repay their respective debt
 before admitting more work. Separate containing and per-class debt-added and
 debt-repaid counters retain those charges without adding work. Reseeding resets
@@ -641,7 +643,10 @@ The containing invocation still cancels them. An interrupted root attachment kee
 its queued fixpoint and completes under the next invocation before publishing root
 facts or making a decision. Root publication retains its bounded scan across slices.
 It retains the CP publisher so a consequence reaches peers without creating another
-private decision level in its producer.
+private decision level in its producer. Passes receive a completion marker after
+consistent publication, or after a slice that requires no publication. Cancellation,
+an indeterminate peer and an unfinished attachment withhold that marker. The marker
+records completion without running another class slice or granting more work.
 
 A completed root scan waits for changed input. Appended learned clauses extend its
 remaining range without replaying unchanged sources; new permanent root facts or

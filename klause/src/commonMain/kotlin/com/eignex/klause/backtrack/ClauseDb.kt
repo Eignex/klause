@@ -251,11 +251,16 @@ internal class VivificationPass(startCursor: Int = 0) : InprocessingPass {
         revision = -1L
     }
 
-    override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
+    override fun run(
+        session: PropagationSession,
+        params: BacktrackParams,
+        stats: SearchStatsSink?,
+        containingWork: Long,
+    ) {
         if (!session.canSimplifyRoot) return
         if (revision != session.learnedClauseRevision) clear()
         revision = session.learnedClauseRevision
-        spending.run(session, params, stats) { advance(session, params, it) }
+        spending.run(session, params, stats, containingWork = containingWork) { advance(session, params, it) }
     }
 
     private fun advance(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
