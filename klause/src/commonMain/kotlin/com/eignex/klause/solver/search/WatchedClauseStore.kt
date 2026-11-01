@@ -5,11 +5,10 @@ import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.SharingMemoryObservation
 
 /**
- * Assignment view and consequence sink a [WatchedClauseStore] propagates through.
+ * Assignment view and consequence sink for a clause store.
  *
  * The store owns the watch invariant; the host owns what an implication or a conflict means. That
- * split is what lets one mechanism serve both the model's own clauses and the clauses a session has
- * learned, instead of each keeping its own copy of the same loop.
+ * split lets source and shared learned stores use the same assignment and consequence boundary.
  */
 internal interface ClauseWatchHost {
     /** Truth of [literal] under the current assignment, or null when its variable is unassigned. */
