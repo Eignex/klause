@@ -1234,7 +1234,13 @@ private fun archiveSuite(
     subDir: String,
 ): DynamicSuite {
     val layout = CorpusSelection.Layout.Flat(subDir, "smt2")
-    return DynamicSuite(id, description, defaultPerFamily = 1, sourceLayout = ArchiveSourceLayout(collection, layout)) {
+    return DynamicSuite(
+        id,
+        description,
+        defaultPerFamily = 1,
+        sourceLayout = ArchiveSourceLayout(collection, layout),
+        namedProvider = { names -> CorpusSelection.named(collection, layout, names, Category.CSP, Format.SMTLIB) },
+    ) {
         CorpusSelection.select(collection, layout, it, Category.CSP, format = Format.SMTLIB)
     }
 }

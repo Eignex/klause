@@ -119,6 +119,24 @@ internal object CorpusSelection {
             val ext: String,
             val familyOf: (String) -> String = { it.substringBefore('/') },
         ) : Layout {
+            /** A fixed set already knows its paths; do not enumerate unrelated corpus members. */
+            fun named(root: File, names: List<String>): List<Discovered> {
+                val base = if (subDir.isEmpty()) root else File(root, subDir)
+                return names.distinct().mapNotNull { name ->
+                    require(name.isNotBlank() && name.length <= 2048)
+                    require(name.split('/').none { it.isEmpty() || it == "." || it == ".." })
+                    require(name.none { it == '\\' || it.code < 32 || it.code == 127 })
+                    val plain = File(base, "$name.$ext")
+                    val compressed = File(base, "$name.$ext${CorpusFiles.SUFFIX}")
+                    val source = when {
+                        plain.isFile -> plain
+                        compressed.isFile -> compressed
+                        else -> return@mapNotNull null
+                    }
+                    Discovered(name, source.relativeTo(root).path, familyKey = familyOf(name))
+                }
+            }
+
             override fun discover(root: File): List<Discovered> {
                 val base = if (subDir.isEmpty()) root else File(root, subDir)
                 if (!base.isDirectory) return emptyList()
@@ -155,7 +173,31 @@ internal object CorpusSelection {
                 "the layout prefix does not match the fetched tree"
         }
         val chosen = applySelection(discovered, selection)
-        return chosen.map { d ->
+        return references(collection, root, chosen, category, format, expected)
+    }
+
+    /** Resolve exact flat-corpus names with the same provenance as full discovery. Missing members
+     * remain absent so the caller's existing missing-set-member check can report them. */
+    fun named(
+        collection: ExternalCollection,
+        layout: Layout.Flat,
+        names: List<String>,
+        category: Category,
+        format: Format,
+    ): List<ProblemRef> {
+        val root = CorpusFetcher.listing(collection)
+        return references(collection, root, layout.named(root, names), category, format, null)
+    }
+
+    private fun references(
+        collection: ExternalCollection,
+        root: File,
+        discovered: List<Discovered>,
+        category: Category,
+        format: Format,
+        expected: ((File) -> Expected)?,
+    ): List<ProblemRef> =
+        discovered.map { d ->
             ProblemRef(
                 name = d.name,
                 format = format,
@@ -167,7 +209,6 @@ internal object CorpusSelection {
                 family = d.family,
             )
         }
-    }
 
     /** Apply per-family cap (head or seeded sample), interleave, then overall cap. */
     fun applySelection(all: List<Discovered>, sel: Selection): List<Discovered> =
