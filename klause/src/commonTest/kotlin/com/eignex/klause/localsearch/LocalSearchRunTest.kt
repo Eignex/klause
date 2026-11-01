@@ -14,6 +14,16 @@ import kotlin.test.assertTrue
 
 class LocalSearchRunTest {
     @Test
+    fun `scheduled slices should retain the configured native instruction price`() {
+        val control = LocalSearchRunControl(Cancellation.Never)
+        control.offer(Cancellation.Never, Long.MAX_VALUE, 10L, Long.MAX_VALUE, 7L, 1.5)
+
+        assertFalse(control.shouldPause(9L))
+        assertTrue(control.shouldPause(10L))
+        assertEquals(6L, control.work)
+    }
+
+    @Test
     fun `inspection work should pause a node slice before its native instruction grant ends`() {
         val control = LocalSearchRunControl(Cancellation.Never)
         control.offer(Cancellation.Never, Long.MAX_VALUE, 80L, Long.MAX_VALUE, 100L)

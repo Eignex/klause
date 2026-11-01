@@ -246,6 +246,9 @@ Slice pricing is solver policy: LP work costs one node per 600 units and propaga
 one per 4000 visits. Resumable Boolean clause walks with definition repairs price
 factor, objective and implication inspections at the same visit rate, in addition
 to native instructions.
+The portfolio passes both grants and its instruction price to retained counted
+handles, including objective-coordinate wrappers. Auxiliary inspection work joins
+the portfolio's containing work ledger even when an atomic choice overruns its grant.
 An atomic choice completes before its work pause; later slices repay overspend.
 Native instruction slices and the containing decision/move quota retain their own
 units. Inspection work changes neither candidate ranking nor the native move count.

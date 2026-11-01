@@ -1,8 +1,9 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.backtrack.PROPAGATION_WORK_PER_NODE
 import com.eignex.klause.backtrack.SliceBudget
-import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.lifetimeCancellation
+import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
@@ -30,8 +31,10 @@ internal class LocalSearchRunControl(private val lifetime: Cancellation) : Local
         private set
     override var inspectionVisits: Long = 0L
         private set
+    private var pricedInstructions = 0.0
+    private var instructionsPerWork = LS_INSTRUCTIONS_PER_WORK
     private val slice = SliceBudget(
-        nodeCount = { (instructions / LS_INSTRUCTIONS_PER_WORK).toLong() },
+        nodeCount = { pricedInstructions.toLong() },
         lpWork = { 0L },
         propagationWork = { inspectionVisits },
     )
@@ -39,18 +42,24 @@ internal class LocalSearchRunControl(private val lifetime: Cancellation) : Local
         private set
     val cancellation: Cancellation = Cancellation { token() }
     val work: Long get() = slice.spent()
+    val auxiliaryWork: Long get() = inspectionVisits / PROPAGATION_WORK_PER_NODE
 
     override fun charge(units: Long) {
         if (units > 0L) inspectionVisits += minOf(units, Long.MAX_VALUE - inspectionVisits)
     }
 
     override fun shouldPause(moves: Long): Boolean {
+        pricedInstructions += (moves - instructions).coerceAtLeast(0L) / instructionsPerWork
         instructions = moves
         return moves >= limit || slice.remainingNodes() == 0L
     }
 
-    fun offer(global: Cancellation, millis: Long, instructions: Long, available: Long, sliceNodes: Long = -1L) {
+    fun offer(
+        global: Cancellation, millis: Long, instructions: Long, available: Long, sliceNodes: Long = -1L,
+        instructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
+    ) {
         slice.noteOverspend()
+        this.instructionsPerWork = instructionsPerWork
         hasSliceAllowance = slice.begin(millis, sliceNodes)
         token = if (millis == Long.MAX_VALUE) {
             lifetime.lifetimeCancellation() or global

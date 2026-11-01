@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.solver.InstructionSlicedSearch
+import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
@@ -19,6 +20,18 @@ internal class LocalSearchOptimizeRun(
     private var started = false
 
     override val work: Long get() = control.work
+    override val auxiliaryWork: Long get() = control.auxiliaryWork
+
+    override fun runScheduledSlice(
+        global: Cancellation,
+        sliceMillis: Long,
+        sliceInstructions: Long,
+        sliceWork: Long,
+        instructionsPerWork: Double,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+    ): MinimizeResult? = executeSlice(
+        global, sliceMillis, sliceInstructions, sliceWork, onIncumbent, instructionsPerWork,
+    )
 
     override fun runSlice(
         global: Cancellation,
@@ -42,8 +55,9 @@ internal class LocalSearchOptimizeRun(
         sliceInstructions: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
+        instructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
     ): MinimizeResult? = runCatching {
-        advance(global, sliceMillis, sliceInstructions, sliceNodes, onIncumbent)
+        advance(global, sliceMillis, sliceInstructions, sliceNodes, onIncumbent, instructionsPerWork)
     }.getOrElse {
         close()
         throw it
@@ -55,11 +69,12 @@ internal class LocalSearchOptimizeRun(
         sliceInstructions: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
+        instructionsPerWork: Double,
     ): MinimizeResult? {
         verdict?.let { return it }
         checkOpen()
         val available = params.nodeBudget?.allowance?.movesLeft() ?: Long.MAX_VALUE
-        control.offer(global, sliceMillis, sliceInstructions, available, sliceNodes)
+        control.offer(global, sliceMillis, sliceInstructions, available, sliceNodes, instructionsPerWork)
         if (control.token() || sliceInstructions == 0L) return null
         if (available == 0L) {
             if (!started) {

@@ -98,6 +98,7 @@ class Portfolio(
      * [lsInstructionsPerWork] instructions of its counted allowance; ALNS spends it across its own outer
      * destroy/repair loop instead of one inner solve (see [com.eignex.klause.meta.alns.Alns]'s class KDoc). A
      * common unit is what lets one schedule give every arm a comparable turn.
+     * Retained Boolean clause walks also charge their priced scoring inspections to this allowance.
      *
      * A counted segment ends at its work or at its time slice, whichever comes first. A segment bounded by time
      * pauses somewhere different on every run, and since the search resumes from wherever it stopped, every counter
@@ -292,10 +293,13 @@ class Portfolio(
                 } else if (handle != null) {
                     val workBefore = handle.work - if (opening) handle.initialWork else 0L
                     val instructionsBefore = if (worker.acceptsInstructionBudget) handle.stats.ls.moves.sum else 0.0
+                    val auxiliaryBefore = (handle as? InstructionSlicedSolve)?.auxiliaryWork ?: 0L
                     val outcome = runCatching {
                         val millis = remainingMillis(armToken)
                         if (worker.acceptsInstructionBudget && handle is InstructionSlicedSolve) {
-                            handle.runInstructionSlice(run.token, millis, instructionsOf(claim))
+                            handle.runScheduledSlice(
+                                run.token, millis, instructionsOf(claim), claim.handleNodes, lsInstructionsPerWork,
+                            )
                         } else {
                             handle.runSlice(run.token, millis, claim.handleNodes)
                         }
@@ -303,7 +307,10 @@ class Portfolio(
                     r = outcome.getOrNull()
                     failure = outcome.exceptionOrNull()
                     work = if (worker.acceptsInstructionBudget) {
-                        countedInstructions(claim, handle.stats.ls.moves.sum - instructionsBefore)
+                        countedInstructions(
+                            claim, handle.stats.ls.moves.sum - instructionsBefore,
+                            ((handle as? InstructionSlicedSolve)?.auxiliaryWork ?: 0L) - auxiliaryBefore,
+                        )
                     } else {
                         handle.work - workBefore
                     }
@@ -563,6 +570,7 @@ class Portfolio(
                 work = (openingFailure as? SearchInitializationCancelled)?.work ?: 0L
             } else if (handle != null) {
                 val workBefore = handle.work - if (opening) handle.initialWork else 0L
+                val auxiliaryBefore = (handle as? InstructionSlicedSearch)?.auxiliaryWork ?: 0L
                 val instructionsBefore = if (worker.acceptsInstructionBudget) {
                     (handle as? InstructionSlicedSearch)?.chargedInstructions ?: handle.stats.ls.moves.sum.toLong()
                 } else {
@@ -572,7 +580,11 @@ class Portfolio(
                 val outcome = runCatching {
                     val millis = remainingMillis(armToken)
                     if (worker.acceptsInstructionBudget && handle is InstructionSlicedSearch) {
-                        handle.runInstructionSlice(run.token, millis, instructionsOf(claim)) { accept(claim, it) }
+                        handle.runScheduledSlice(
+                            run.token, millis, instructionsOf(claim), claim.handleNodes, lsInstructionsPerWork,
+                        ) {
+                            accept(claim, it)
+                        }
                     } else {
                         handle.runSlice(run.token, millis, claim.handleNodes) { accept(claim, it) }
                     }
@@ -582,7 +594,10 @@ class Portfolio(
                 work = if (worker.acceptsInstructionBudget) {
                     val instructions = (handle as? InstructionSlicedSearch)?.chargedInstructions
                         ?: handle.stats.ls.moves.sum.toLong()
-                    countedInstructions(claim, (instructions - instructionsBefore).toDouble())
+                    countedInstructions(
+                        claim, (instructions - instructionsBefore).toDouble(),
+                        ((handle as? InstructionSlicedSearch)?.auxiliaryWork ?: 0L) - auxiliaryBefore,
+                    )
                 } else {
                     handle.work - workBefore
                 }
@@ -1480,13 +1495,14 @@ class Portfolio(
         }
     }
 
-    private fun countedInstructions(claim: Claim, instructions: Double): Long {
+    private fun countedInstructions(claim: Claim, instructions: Double, auxiliaryWork: Long = 0L): Long {
         val spent = (instructions / lsInstructionsPerWork).toLong()
-        return when {
+        val native = when {
             claim.whole -> spent
             instructions >= instructionsOf(claim) -> claim.sliceWork
             else -> minOf(spent, claim.sliceWork)
         }
+        return native + auxiliaryWork.coerceIn(0L, Long.MAX_VALUE - native)
     }
 
     /**
