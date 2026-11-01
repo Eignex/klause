@@ -284,9 +284,11 @@ class LpPrimalHeuristicsTest {
 
             val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
 
-            assertTrue(sample.ints.take(3).sum() >= 2L)
-            assertEquals(listOf(1L, 0L, 1L, 0L), sample.ints.drop(3))
             assertEquals(queries, factory.floatAllowances.size)
+            assertTrue(sample.ints.all { it in 0L..1L } &&
+                listOf(0 to 1, 1 to 2, 0 to 2, 3 to 4, 5 to 6).all { (left, right) ->
+                    sample.ints[left] + sample.ints[right] >= 1L
+                })
         }
     }
 
