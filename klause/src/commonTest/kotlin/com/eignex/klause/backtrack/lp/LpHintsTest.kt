@@ -255,8 +255,14 @@ class LpHintsTest {
                 }
                 assertEquals(expected, alternatives)
             }
-            assertEquals(if (enabled && upGain != 1.0) 2 else 0, observations.count { it == "SIDE_CONSUMED" })
-            assertEquals(if (enabled && upGain != 1.0) 1 else 0, observations.count { it == "SIDE_BASELINE_CHANGED" })
+            assertEquals(
+                if (enabled && upGain != 1.0) 2 else 0,
+                observations.count { it == "SIDE_CONSUMED" },
+            )
+            assertEquals(
+                if (enabled && upGain != 1.0) 1 else 0,
+                observations.count { it == "SIDE_BASELINE_CHANGED" },
+            )
         }
     }
 
