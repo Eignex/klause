@@ -51,9 +51,11 @@ class ResumableMinimizeDirectionalTest {
         val objective = LinearObjective(intCoefficients = LongArray(variables) { if (it % 3 == 0) 1L else 2L })
         ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
             var slices = 0
-            while (slices++ < 128 && !search.isDone &&
-                (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("SIDE_CONSUMED") ?: 0L) == 0L
-            ) {
+            while (slices++ < 128 && !search.isDone) {
+                val outcomes = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
+                if ((outcomes?.get("DOWN") ?: 0L) >= 2L && (outcomes?.get("UP") ?: 0L) >= 2L &&
+                    (outcomes?.get("SIDE_CONSUMED") ?: 0L) > 0L
+                ) break
                 search.runSlice(Cancellation.Never, 1000L, 32L) {}
             }
 
