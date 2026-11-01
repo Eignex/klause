@@ -102,12 +102,14 @@ multiple pivots use the full database. `ReusedSourceClauses` counts unchanged
 immutable inputs retained during pinning; later elimination can remove them.
 All scan and source-index transport work remains in preparation.
 Preparation, opening, trial, reconstruction, check and retirement timings have
-separate counters. The propagation ledger includes charged preparation,
+separate counters. The private coordinator ledger includes charged preparation,
 reconstruction and checks; do not add those work subsets again. `ModeledPrivateBytes` excludes the canonical
 worker, headers and allocator overhead; it is not RSS or a simultaneous heap peak.
 The canonical worker retains its warm state during the trial. A private refutation
 resumes it and supplies no independently checked source proof. This control alone
 does not qualify automatic production activation or complete source-cost benefit.
+`WarmClausesRetained` counts canonical learned-store slots, including logically retired
+entries awaiting compaction; it is not an active-clause count.
 `WarmClausesCopied` and `WarmClauseLiterals` count bounded copies of owned global
 learning over retained columns. `WarmClauseWork` and `WarmClauseNanos` are subsets
 of preparation, not additional totals. Copies spend unused local BVE allowance
