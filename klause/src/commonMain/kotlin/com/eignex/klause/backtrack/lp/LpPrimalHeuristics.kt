@@ -394,7 +394,7 @@ private fun LpEngine.buildPrimalRelaxation(
         debit(it)
     }
     val token = object : Cancellation {
-        override fun isCancelled(): Boolean = cancellation() || allowance > 0L && work >= allowance
+        override fun isCancelled(): Boolean = cancellation() || (allowance > 0L && work >= allowance)
         override fun deadline() = cancellation.deadline()
         override fun workMeter(): WorkMeter = meter
     }
