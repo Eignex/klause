@@ -1397,7 +1397,7 @@ Select the observed SAT or conflict-driven slot with `recipe` and `worker-seed`;
 the portfolio default is `conflictDriven` at `seed + 1001`.
 `learning-placement=observed` enables integer learning only on the observed slot
 in the portfolio trial. This explicit placement override is diagnostic;
-`automatic` preserves the production selector. Both controls disable integer learning.
+`automatic` preserves the production selector. Clause controls disable integer learning.
 
 Inspect `ordinary-learning.jsonl`, source bytes, canonical original/prepared models
 and `provenance.json` under `OUT`. Capture covers the selected slot's first attached
@@ -1426,6 +1426,11 @@ selector's facts and configured integer-learning slots without starting search.
 `applicability.jsonl` retains source hashes, preparation declines and policy facts.
 This is an in-process finite preparation view; confirm CLI applicability with actual
 ordinary session counters before claiming source or performance qualification.
+Optional `problems=NAME,...` selects up to eight exact MPS names. `pairs=true`
+counts coefficient cancellation between unconditional unit-magnitude row directions,
+with 65,536 input terms and 1,048,576 pair visits. Completeness and unsupported
+rows are explicit. Compact coefficient pairs do not certify conflicting bounds,
+historical reasons, mapped assertion, admission or source benefit.
 
 Source bytes must match `sha256` after decompression and fit 1 MiB. Optional
 `source64=BASE64 format=FORMAT` accepts at most 96 KiB of encoded input. Canonical

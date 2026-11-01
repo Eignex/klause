@@ -33,13 +33,19 @@ internal object ArithmeticLearningApplicabilityProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all { it in setOf("suite", "max", "timeout-ms") })
+        require(options.keys.all { it in setOf("suite", "max", "timeout-ms", "problems", "pairs") })
         val suite = requireNotNull(options["suite"])
+        val names = options["problems"]?.split(',')?.toSet()
+        require(names == null || names.size in 1..8)
+        val pairs = (options["pairs"] ?: "false").toBooleanStrict()
+        require(!pairs || names != null)
         val max = (options["max"] ?: "64").toInt().also { require(it in 1..64) }
         val timeout = (options["timeout-ms"] ?: "10000").toLong().also { require(it in 1..10_000L) }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        val sources = Catalog.uncapped(suite).problems.filter { it.format == Format.MPS }.sortedBy { it.name }.take(max)
+        val catalog = Catalog.uncapped(suite).problems.filter { it.format == Format.MPS }
+        require(names == null || names.all { name -> catalog.any { it.name == name } })
+        val sources = catalog.filter { names == null || it.name in names }.sortedBy { it.name }.take(max)
         out.resolve("applicability.jsonl").bufferedWriter().use { output ->
             sources.forEachIndexed { index, source ->
                 val directory = out.resolve(index.toString()).apply { mkdirs() }
@@ -95,6 +101,7 @@ internal object ArithmeticLearningApplicabilityProfile {
                         put("objective", prepared.objective != null)
                         put("annotatedSearch", entry.searchParams != null)
                         put("policy", policy(model, prepared.objective, entry.searchParams != null))
+                        if (pairs) put("sourceShape", ArithmeticLearningSourceShape.inspect(model))
                     } catch (error: IllegalArgumentException) {
                         decline(error)
                     } catch (error: IllegalStateException) {
