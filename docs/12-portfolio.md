@@ -925,6 +925,16 @@ aggressive LP; applicability, model class and LP ceilings order and filter it. R
 variable shaving and hull pruning remain explicit plan options, and curated
 satisfaction workers harvest root cuts only with an explicit `lp-root-cuts=true`.
 
+Curated backtrack-only pseudo-Boolean satisfaction pools enable bounded
+[root maintenance](09-learning.md#restarts-phases-and-inprocessing) on every complete worker.
+Each safe-root slice shares a 4,096-work grant: cheap simplification receives 256 work,
+and up to two failed-literal probes share 3,072 work with an 8,192-work per-probe
+ceiling. Root scans examine at most 256 clauses per slice. Natural-root scheduling
+uses a 32-work interval, eight-clause growth and a 32-work cooldown, with no warmup.
+These allowances remain inside each worker's containing slice. Explicit backtrack
+edits apply after these defaults. Named pools and source annotations keep their
+selected parameters; native clausal proof admission retains its own policy.
+
 Clausal complete-search recipes use clause learning, EMA restarts and a true-first
 saved phase; their balanced and stable variants differ in VSIDS decay (0.975, 0.99)
 and database cap (4000, 2000). Pseudo-Boolean models keep their cutting-plane

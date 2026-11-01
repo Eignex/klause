@@ -348,6 +348,8 @@ internal object PortfolioComposition {
         val nodeBudget = scenario.nodeBudget
         val zeroObjectivePricing = scenario.zeroObjectivePricing
         val edit = scenario.btEdit
+        val boundedRoot = scenario.engine == EngineMix.BACKTRACK && annotationArm == null &&
+            facts.profile.problemClass == ProblemClass.PseudoBoolean && !facts.profile.optimizing
         if (btPool != null) {
             // The `--lp` ceiling bounds the pool, and an injected pool is still the pool: capping only the
             // curated one leaves `--lp` silently ignored whenever the caller names its arms.
@@ -366,7 +368,8 @@ internal object PortfolioComposition {
                 } else {
                     params.copy(lpPlan = params.lpPlan.copy(rootCutHarvest = false))
                 }
-                edit?.invoke(rootParams) ?: rootParams
+                val defaults = if (boundedRoot) rootParams.boundedRootMaintenance() else rootParams
+                edit?.invoke(defaults) ?: defaults
             }
         } else {
             edit
@@ -384,6 +387,20 @@ internal object PortfolioComposition {
         val annotation = BacktrackWorkerConfig.ofParams("annotation", annotationArm.copy(nodeBudget = nodeBudget))
         return base.dropLast(1) + BacktrackWorkerConfig(annotation, zeroObjectivePricing)
     }
+
+    private fun BacktrackParams.boundedRootMaintenance(): BacktrackParams = copy(
+        rootSimplification = true,
+        rootSimplifyBatch = 256,
+        rootProbeBatch = 2,
+        rootProbeWork = 8192L,
+        inprocessingWork = 4096L,
+        inprocessingRootWork = 256L,
+        inprocessingProbeWork = 3072L,
+        inprocessingInterval = 32L,
+        inprocessingGrowth = 8,
+        inprocessingCooldown = 32L,
+        inprocessingWarmupWork = 0L,
+    )
 
     private fun mixedArms(scenario: PortfolioScenario, facts: ProblemFacts): List<WorkerConfig> {
         // At least one of each engine once count ≥ 2; below that the single slot goes to LS (the
