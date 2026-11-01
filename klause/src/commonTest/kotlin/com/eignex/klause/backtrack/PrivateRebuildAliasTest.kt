@@ -25,7 +25,7 @@ class PrivateRebuildAliasTest {
             ))
 
             val delta = PrivateRebuildAlias.reduce(source, premises, Cancellation.Never)
-            val reduced = source.withSourcePassDelta(delta)
+            val reduced = assertNotNull(source.withSourcePassDelta(delta))
             val lift = assertNotNull(delta.rebuild.asSampleLift())
 
             assertTrue(reduced.factors.all { (it as Clause).literals.none { literal -> Lit.variable(literal) == 1 } })
@@ -49,7 +49,9 @@ class PrivateRebuildAliasTest {
         val premises = arrayOf(Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3)))
         val source = Problem(4, 0, emptyArray(), arrayOf(unchanged, premises[0], premises[1]))
 
-        val reduced = source.withSourcePassDelta(PrivateRebuildAlias.reduce(source, premises, Cancellation.Never))
+        val reduced = assertNotNull(source.withSourcePassDelta(
+            PrivateRebuildAlias.reduce(source, premises, Cancellation.Never),
+        ))
 
         assertSame(unchanged, reduced.factors.single())
     }
