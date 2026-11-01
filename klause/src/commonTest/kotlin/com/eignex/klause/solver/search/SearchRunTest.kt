@@ -72,10 +72,13 @@ class SearchRunTest {
             } else ComponentCheck.Feasible
         }))
         session.initialize()
-        val run = session.openRun(2, SearchSolveParams(maxDecisions = 4, restart = SearchRestart.Every(1)),
-            modelContinuation = SearchModelContinuation.Chronological)
         var pause = true
-        run.pauseBeforeDecision = { pause && session.decisionLevel >= 1 }
+        val run = session.openRun(2, SearchSolveParams(maxDecisions = 4, restart = SearchRestart.Every(1)),
+            modelContinuation = SearchModelContinuation.Chronological,
+            nodePolicy = object : SearchNodePolicy {
+                override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
+                    if (pause && context.decisionLevel >= 1) SearchNodeDisposition.Pause else SearchNodeDisposition.Expand
+            })
         assertIs<SearchRunEvent.Paused>(run.next())
 
         assertTrue(run.retainBooleanRoot(Lit.make(0, false)))
