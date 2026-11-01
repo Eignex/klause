@@ -688,6 +688,7 @@ class LpRetainedSourcesTest {
             ))
             var lower = 0L
             val domains = object : RelaxationDomains {
+                override val honorsOpenSides: Boolean get() = lower == 0L
                 override fun intDomain(varId: Int): IntDomain = problem.finiteIntDomain(varId).let {
                     if (varId == 1) it.withMinAtLeast(lower) else it
                 }
