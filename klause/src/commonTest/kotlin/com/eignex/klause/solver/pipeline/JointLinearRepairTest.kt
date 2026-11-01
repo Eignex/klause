@@ -42,6 +42,40 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `shared root guidance should improve the useful disconnected integer on the first query`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(0, 0, 1))
+        val guidance = LinearRepairGuidance()
+        LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true, repairGuidance = guidance).use {
+            it.run { _, _ -> }
+            assertEquals(1L, it.stats.smt.completeSearchStages?.get("numericalRepairGuidancePublished"))
+        }
+
+        for (shared in listOf(false, true)) {
+            JointLinearRepair(model, source, objective,
+                TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 1, maxFlips = 1),
+                external = { seed }, repairGuidance = guidance.takeIf { shared }).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    var done = false
+                    repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                    val sample = (search.minimizeResult(TerminationReason.BudgetExhausted) as? MinimizeResult.WithSample)
+                        ?.sample
+                    if (shared) {
+                        assertEquals(0L, assertNotNull(sample).intValue(2))
+                        assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairSharedGuidanceQueries"))
+                        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
+                            .verify(SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)))
+                    } else assertNull(sample)
+                    assertNull(repair.stats.smt.completeSearchStages?.get("jointRepairRootQueries"))
+                }
+            }
+        }
+    }
+
+    @Test
     fun `completion repair should keep an imported point out of discovery publication`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(1), null, null),
             factors = emptyArray(), numRealVars = 1,

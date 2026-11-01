@@ -51,6 +51,7 @@ internal class JointLinearRepair(
     private val observeExternalIncumbents: Boolean = false,
     sharedCompletions: LinearIncumbentSharing? = null,
     private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+    private val repairGuidance: LinearRepairGuidance? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
 
@@ -81,6 +82,7 @@ internal class JointLinearRepair(
     private var query: LinearAuthorityInvocation? = null
     private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
+    private var guidedProposal: ExactNeighborhoodCondition? = null
     var incumbentTrialPending = false
         private set
     private var closed = false
@@ -206,7 +208,13 @@ internal class JointLinearRepair(
                 // A checked center needs no all-pinned rounded-root bootstrap.
                 val proposalRound = if (pooled != null && completion != null)
                     round.coerceAtMost(Long.MAX_VALUE - 1) + 1 else round
+                val hint = if (pooled != null && completion != null) repairGuidance?.find(source) else null
+                val guided = hint?.let { requireNotNull(selection).guide(it, from, budget, stop) } == true
+                if (hint == null && pooled != null && completion != null && repairGuidance != null) {
+                    observe("jointRepairSharedGuidanceUnavailable")
+                }
                 requireNotNull(selection).propose(from, pooled?.bools ?: bools, width, proposalRound, radius, limit)
+                    .also { guidedProposal = it.takeIf { guided } }
             },
         )
     }
@@ -329,6 +337,7 @@ internal class JointLinearRepair(
                 }
             }
             pending = condition
+            if (condition === guidedProposal) observe("jointRepairSharedGuidanceQueries")
             query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)),
                 params.copy(sourceIncumbentCompletion = false),
                 external = { externalIncumbent() ?: anchor }, state = state, borrowedAuthority = authority,
@@ -432,6 +441,7 @@ internal class JointLinearRepair(
         if (closed) return
         closed = true
         incumbentTrialPending = false
+        guidedProposal = null
         val resources = SearchInvocationResources()
         resources.own(authority)
         completion?.let(resources::own)

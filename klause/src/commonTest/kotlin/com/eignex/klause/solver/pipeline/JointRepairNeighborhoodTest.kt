@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceInequality
@@ -14,6 +16,49 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class JointRepairNeighborhoodTest {
+    @Test
+    fun `shared guidance should rank source inputs by their distance from the checked center`() {
+        val columns = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("shared-seeds", "exact")),
+            columns.toSet(), emptyMap())
+        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+        val budget = SourceLpBudget(funding = funding)
+        val guidance = LinearRepairGuidance()
+        guidance.remember(source, mapOf(columns[0] to 0.25, columns[1] to 100.0, columns[2] to 0.0),
+            budget, Cancellation.Never)
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 4, 0, Cancellation.Never,
+            sourceIntegers = intArrayOf(0, 2, 3)))
+        val centers = listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE, BigFraction.ZERO)
+
+        repair.guide(assertNotNull(guidance.find(source)), centers, budget, Cancellation.Never)
+        val condition = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
+
+        assertEquals(mapOf(0 to BigFraction.ZERO, 3 to BigFraction.ZERO), condition.lower)
+    }
+
+    @Test
+    fun `cancelled or unfunded guidance should retain the ordinary seed order`() {
+        val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("shared-decline", "exact")),
+            columns.toSet(), emptyMap())
+        val retained = SourceLpFunding(1000, 1000).also { it.grant(1000) }
+        val guidance = LinearRepairGuidance()
+        guidance.remember(source, mapOf(columns[2] to 0.0), SourceLpBudget(funding = retained), Cancellation.Never)
+        val centers = listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE)
+
+        for (limit in listOf("work", "allocation", "cancelled")) {
+            val funding = SourceLpFunding(if (limit == "work") 0 else 1000,
+                if (limit == "allocation") 0 else 1000).also { it.grant(1000) }
+            val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never))
+            repair.guide(assertNotNull(guidance.find(source)), centers, SourceLpBudget(funding = funding),
+                Cancellation { limit == "cancelled" })
+
+            val condition = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
+
+            assertEquals(mapOf(1 to BigFraction.ZERO, 2 to BigFraction.ONE), condition.lower)
+        }
+    }
+
     @Test
     fun `initial repair should leave integer backed real columns outside the source complement`() {
         val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }

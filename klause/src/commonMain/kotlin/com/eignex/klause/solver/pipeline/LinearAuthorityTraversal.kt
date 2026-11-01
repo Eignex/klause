@@ -73,6 +73,7 @@ internal class LinearAuthorityTraversal(
     feedbackRequest: LinearAuthorityFeedbackRequest? = null,
     composeBooleanBranches: Boolean = false,
     aggregateBranching: Boolean = false,
+    private val repairGuidance: LinearRepairGuidance? = null,
 ) : SearchBrancher, SearchBranchProposal, SearchNodePolicy, AutoCloseable {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
@@ -471,6 +472,9 @@ internal class LinearAuthorityTraversal(
             return SearchNodeDisposition.Pause
         }
         current.pending = false
+        if (current === root && repairGuidance?.remember(source, result.relaxedPoint, budget, cancellation) == true) {
+            observe("numericalRepairGuidancePublished")
+        }
         linkCapture(branch.scope)
         val lateBefore = feedback?.lateCollections
         val numericalFeedback = feedback?.consume(branch)?.also { onNumericalFeedback?.invoke(it) }
