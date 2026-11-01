@@ -308,6 +308,13 @@ internal class LpEngine(
         cpAdapter.currentModel === model && model.exactState != null &&
         propagator.state === model.exactState && model.exactState.depth == 0
 
+    private fun retainedRootPrimalStateMatches(relaxation: LpRelaxation): Boolean {
+        val retained = rootRoundingWarmStart ?: return false
+        val state = relaxation.model.exactState ?: return false
+        return retainedRootEnabled && retained.objective === objective && retained.relaxation === relaxation &&
+            propagator.state === state && state.depth == 0
+    }
+
     internal fun retainRootPrimalOwner(relaxation: LpRelaxation) {
         if (!params.lpPlan.probe || !ownsRootPrimalModel(relaxation.model) ||
             rootRoundingWarmStart?.primal != null || lpWorkAllowanceSpent(1L)
@@ -332,7 +339,8 @@ internal class LpEngine(
         if (!params.lpPlan.componentOwnership) return
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "PARTIAL_OWNER_ATTEMPTED", 0L)
         var ownerState = "NOT_READ"
-        val outcome = retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_OWNER_RETAINED") {
+        val outcome = retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_OWNER_RETAINED",
+            retainedOwnerRead = true) {
             ownerState = propagator.primalGuidanceState
             propagator.partialPrimalGuidance(cancellation)
         }
@@ -355,11 +363,14 @@ internal class LpEngine(
         relaxation: LpRelaxation,
         cancellation: Cancellation,
         outcome: String,
+        retainedOwnerRead: Boolean = false,
         read: () -> LpPrimalGuidance?,
     ): PartialPrimalRead {
         if (!params.lpPlan.probe) return PartialPrimalRead.DISABLED
         if (problem.numRealVars != 0) return PartialPrimalRead.CONTINUOUS_SOURCE
-        if (!ownsRootPrimalModel(relaxation.model)) return PartialPrimalRead.STALE_OWNER
+        val currentOwner = ownsRootPrimalModel(relaxation.model) ||
+            retainedOwnerRead && retainedRootPrimalStateMatches(relaxation)
+        if (!currentOwner) return PartialPrimalRead.STALE_OWNER
         if (cancellation()) return PartialPrimalRead.CANCELLED
         val previous = rootRoundingWarmStart
         if (previous?.primal != null && previous.knownColumns == null) return PartialPrimalRead.COMPLETE_GUIDANCE

@@ -245,50 +245,54 @@ class LpPrimalHeuristicsTest {
 
     @Test
     fun `rounding reads returned child coordinates after the query invocation expires`() {
-        val problem = Problem(0, 7, Array(7) { IntDomain(0, 1) }, listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(3, 4), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(5, 6), LinearOp.GE, 1),
-        )).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1, 2, 1, 2))
-        var expired = false
-        var returnedChildren = 0
-        val factory = RecordingLpEngineFactory(object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
-                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
-            ): PersistentLpSolver {
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
-                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
-                return object : PersistentLpSolver by delegate {
-                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
-                        delegate.resolveBounds(LpFloatAllowance(allowance?.work ?: 0L, 1)).also {
-                            if (++returnedChildren == 3) expired = true
-                        }
+        for (clearView in listOf(false, true)) {
+            val problem = Problem(0, 7, Array(7) { IntDomain(0, 1) }, listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(3, 4), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(5, 6), LinearOp.GE, 1),
+            )).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1, 2, 1, 2))
+            var expired = false
+            var returnedChildren = 0
+            val factory = RecordingLpEngineFactory(object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                    workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                        refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                    return object : PersistentLpSolver by delegate {
+                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                            delegate.resolveBounds(LpFloatAllowance(allowance?.work ?: 0L, 1)).also {
+                                if (++returnedChildren == 3) expired = true
+                            }
+                    }
                 }
+            })
+            LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                    rootCutHarvest = false)), SolveStatsSink("deferred-child-guidance"),
+                LpSolveContext(factory)).use { engine ->
+                assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+                val token = Cancellation { expired }
+                val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), token)
+                val queries = factory.floatAllowances.size
+                assertTrue(expired)
+                assertTrue(bound.isNaN())
+                assertTrue(queries > 0)
+
+                if (clearView) engine.cpAdapter.retract(0)
+
+                val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+
+                assertEquals(queries, factory.floatAllowances.size)
+                assertTrue(sample.ints.all { it in 0L..1L } &&
+                    listOf(0 to 1, 1 to 2, 0 to 2, 3 to 4, 5 to 6).all { (left, right) ->
+                        sample.ints[left] + sample.ints[right] >= 1L
+                    })
             }
-        })
-        LpEngine(problem, objective,
-            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
-                rootCutHarvest = false)), SolveStatsSink("deferred-child-guidance"),
-            LpSolveContext(factory)).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
-            val token = Cancellation { expired }
-            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), token)
-            val queries = factory.floatAllowances.size
-            assertTrue(expired)
-            assertTrue(bound.isNaN())
-            assertTrue(queries > 0)
-
-            val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
-
-            assertEquals(queries, factory.floatAllowances.size)
-            assertTrue(sample.ints.all { it in 0L..1L } &&
-                listOf(0 to 1, 1 to 2, 0 to 2, 3 to 4, 5 to 6).all { (left, right) ->
-                    sample.ints[left] + sample.ints[right] >= 1L
-                })
         }
     }
 

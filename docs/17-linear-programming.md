@@ -381,7 +381,9 @@ Root rounding can copy finite returned child coordinates into a separate masked
 guide before bound checking. Unknown columns keep ordinary domain choices.
 A later rounding consultation can snapshot existing results from its current scoped
 owner before another numerical query. The read uses the fresh consultation token
-and requires matching model and exact-state identities.
+and requires matching retained guide, objective, root model and current exact-state
+identities. Invalidating the active search view preserves this read when the scoped
+owner still holds that root state. Numerical queries retain their active-view requirement.
 The private coordinate and availability buffers spend the existing guidance byte
 limit and root work before allocation. This guide carries no complete LP point or
 proof authority; every proposed source assignment remains fully pinned and checked.
