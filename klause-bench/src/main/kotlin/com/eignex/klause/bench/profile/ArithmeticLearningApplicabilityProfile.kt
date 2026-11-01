@@ -33,9 +33,11 @@ internal object ArithmeticLearningApplicabilityProfile {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
-        require(options.keys.all { it in setOf("suite", "max", "timeout-ms", "problems", "pairs") })
+        require(options.keys.all { it in setOf("suite", "max", "timeout-ms", "problems", "pairs", "after") })
         val suite = requireNotNull(options["suite"])
         val names = options["problems"]?.split(',')?.toSet()
+        val after = options["after"]
+        require(names == null || after == null)
         require(names == null || names.size in 1..8)
         val pairs = (options["pairs"] ?: "false").toBooleanStrict()
         require(!pairs || names != null)
@@ -45,7 +47,9 @@ internal object ArithmeticLearningApplicabilityProfile {
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         val catalog = Catalog.uncapped(suite).problems.filter { it.format == Format.MPS }
         require(names == null || names.all { name -> catalog.any { it.name == name } })
-        val sources = catalog.filter { names == null || it.name in names }.sortedBy { it.name }.take(max)
+        require(after == null || catalog.any { it.name == after })
+        val sources = catalog.filter { (names == null || it.name in names) && (after == null || it.name > after) }
+            .sortedBy { it.name }.take(max)
         out.resolve("applicability.jsonl").bufferedWriter().use { output ->
             sources.forEachIndexed { index, source ->
                 val directory = out.resolve(index.toString()).apply { mkdirs() }
@@ -53,6 +57,7 @@ internal object ArithmeticLearningApplicabilityProfile {
                     put("revision", Reports.readGitSha())
                     put("suite", suite)
                     put("problem", source.name)
+                    put("catalogAfter", after)
                     put("entryPoint", "in-process-finite-preparation")
                     put("cliRoutingEquivalence", "unverified")
                     put("searchExecuted", false)
@@ -132,9 +137,11 @@ internal object ArithmeticLearningApplicabilityProfile {
         val facts = factsType.declaredClasses.single { it.simpleName == "Companion" }.methods.single {
             it.name == "of" && it.parameterCount == 5
         }.invoke(companion, model, ProblemProfile.of(model, objective != null), LpConfig.AGGRESSIVE, objective, null)
-        for (name in listOf("IntegerColumnsOnly", "BinaryIntegers", "IntegerLinear", "CompactCardinalityEquality")) {
+        for (name in listOf("IntegerColumnsOnly", "BinaryIntegers", "IntegerLinear", "CompactCardinalityEquality",
+            "CompactIntegerNeighborhood", "IntegerNeighborhoodLimited")) {
             put(name.replaceFirstChar { it.lowercaseChar() }, factsType.getMethod("get$name").invoke(facts) as Boolean)
         }
+        put("integerNeighborhoodWork", factsType.getMethod("getIntegerNeighborhoodWork").invoke(facts) as Int)
         if (objective == null || annotated) {
             put("automaticSlots", buildJsonArray {})
             return@buildJsonObject

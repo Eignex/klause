@@ -218,6 +218,7 @@ internal class BacktrackWorkerConfig(
             val order = BacktrackCatalog.ranked(kind, facts)
             val arithmeticIndex = if (automaticIntegerLearning && kind == Kind.COP && facts.integerColumnsOnly &&
                 facts.binaryIntegers && facts.integerLinear && facts.compactCardinalityEquality &&
+                facts.compactIntegerNeighborhood &&
                 lpCeiling.resolved(LpTechnique.BOUNDING)) {
                 order.indexOfFirst { it.label == "conflictDriven" }
             } else -1

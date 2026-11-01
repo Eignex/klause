@@ -24,7 +24,7 @@ class PortfolioCompositionTest {
     fun `automatic integer learning should stay in single core CP pools`() {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
             binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
-            compactCardinalityEquality = true) { true }
+            compactCardinalityEquality = true, compactIntegerNeighborhood = true) { true }
         val scenarios = listOf(
             PortfolioScenario.sequential(Kind.COP, EngineMix.BACKTRACK) to 1,
             PortfolioScenario.parallel(2, Kind.COP, EngineMix.BACKTRACK) to 0,
@@ -42,7 +42,7 @@ class PortfolioCompositionTest {
     fun `explicit integer learning should override the automatic execution scope`() {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
             binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
-            compactCardinalityEquality = true) { true }
+            compactCardinalityEquality = true, compactIntegerNeighborhood = true) { true }
         for (enabled in listOf(false, true)) {
             val scenario = PortfolioScenario.parallel(2, Kind.COP, EngineMix.BACKTRACK).copy(
                 btEdit = { it.copy(integerRowLearning = enabled) },
@@ -59,7 +59,8 @@ class PortfolioCompositionTest {
         for (packing in listOf(false, true)) {
             val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
                 binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
-                compactCardinalityEquality = true, binaryPackingObjective = packing) { true }
+                compactCardinalityEquality = true, compactIntegerNeighborhood = true,
+                binaryPackingObjective = packing) { true }
 
             val arms = PortfolioComposition.compose(PortfolioScenario.sequential(Kind.COP), facts)
                 .filterIsInstance<BacktrackWorkerConfig>()
@@ -73,7 +74,7 @@ class PortfolioCompositionTest {
     fun `an explicit pool should retain its arithmetic settings`() {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
             binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
-            compactCardinalityEquality = true) { true }
+            compactCardinalityEquality = true, compactIntegerNeighborhood = true) { true }
         val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK).copy(
             btPool = listOf { BacktrackCatalog.byLabel("conflictDriven") },
         )
@@ -87,7 +88,7 @@ class PortfolioCompositionTest {
     fun `an annotation template should retain its arithmetic setting`() {
         val facts = ProblemFacts(ProblemFacts.assumed(Kind.COP).profile,
             binaryIntegers = true, integerLinear = true, integerColumnsOnly = true,
-            compactCardinalityEquality = true) { true }
+            compactCardinalityEquality = true, compactIntegerNeighborhood = true) { true }
         for (enabled in listOf(false, true)) {
             val scenario = PortfolioScenario.sequential(Kind.COP, engine = EngineMix.BACKTRACK).copy(
                 annotationArm = BacktrackParams(integerRowLearning = enabled),

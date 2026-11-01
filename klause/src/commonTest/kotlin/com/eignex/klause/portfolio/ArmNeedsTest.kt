@@ -85,6 +85,20 @@ class ArmNeedsTest {
     }
 
     @Test
+    fun `compatible compact rows should enable the ordinary arithmetic worker`() {
+        val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 1),
+            Linear(longArrayOf(-1, 1), intArrayOf(2, 3), LinearOp.LE, 0),
+        )).bake()
+        val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE)
+
+        val arms = BacktrackWorkerConfig.diverse(Kind.COP, 6, facts = facts, automaticIntegerLearning = true)
+
+        assertEquals(listOf("conflictDriven"),
+            arms.filter { it.recipe.build(1L, null).integerRowLearning }.map { it.label })
+    }
+
+    @Test
     fun `curated eligibility should identify the missing objective without changing explicit recipes`() {
         val facts = ProblemFacts.assumed(Kind.CSP)
         val required = setOf(ArmNeed.Objective)

@@ -311,7 +311,7 @@ kinds or unnameable atoms withhold a complete-incidence claim.
 learning. Direct backtrack parameters default it to false; the
 [portfolio policy](12-portfolio.md#model-specific-worker-recipes) selects it for one
 worker in single-core CP over binary integer linear models with a compact
-nontrivial cardinality equality. Mandatory
+nontrivial cardinality equality and a compatible compact source neighbor. Mandatory
 finite `Linear` inequalities and the explaining half of equalities provide integer
 rows. Mandatory `ExactLinear` rows provide the same source when every coordinate is
 integer and the complete compact projection preserves their word-sized constants,

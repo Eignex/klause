@@ -59,6 +59,9 @@ internal class ProblemFacts(
     val extensionalSupports: Boolean = false,
     val integerColumnsOnly: Boolean = false,
     val compactCardinalityEquality: Boolean = false,
+    val compactIntegerNeighborhood: Boolean = false,
+    val integerNeighborhoodLimited: Boolean = false,
+    val integerNeighborhoodWork: Int = 0,
     val construction: WorkerConstructionCost = WorkerConstructionCost(0, 0),
     private val observer: ((String, WorkerEligibility) -> Unit)? = null,
     private val relaxation: (LpEmphasis) -> Boolean,
@@ -99,17 +102,35 @@ internal class ProblemFacts(
             val binary = problem.binaryIntegers
             val binarySource = objective?.binaryIntegerSource
             val binaryView = binarySource != null
+            val integerColumnsOnly = problem.numIntVars > 0 && problem.numBoolVars == 0 && problem.numRealVars == 0
+            val compactEquality = problem.factors.any { factor ->
+                val form = factor.linearForm as? LinearForm.Conjunction
+                form?.rows?.any { it.isCompactCardinalityEquality() } == true
+            }
+            val integerLinear = problem.factors.any { it !is SymmetryHandling } && problem.factors.all {
+                if (it is SymmetryHandling || (binaryView && it is DifferenceSystem)) return@all true
+                if (binaryView && it.binaryChannelLiteral() != Lit.NONE) {
+                    val domain = problem.rootIntDomain(it.intVars.single())
+                    if (domain.min >= 0L && domain.max <= 1L) return@all true
+                }
+                val form = it.linearForm as? LinearForm.Conjunction ?: return@all false
+                form.rows.isNotEmpty() && form.rows.all { row ->
+                    row.isLongUnconditional && (row.isIntegerOnly || binaryView)
+                }
+            }
+            val neighborhood = if (profile.optimizing && binary && integerColumnsOnly && integerLinear &&
+                compactEquality) IntegerLearningNeighborhood.inspect(problem) else IntegerLearningNeighborhood.NONE
             return ProblemFacts(
                 profile,
                 construction = WorkerConstructionCost(problem.numBoolVars.toLong() + problem.numIntVars +
                     problem.numRealVars, problem.factors.size),
                 observer = observer,
                 binaryIntegers = binary,
-                integerColumnsOnly = problem.numIntVars > 0 && problem.numBoolVars == 0 && problem.numRealVars == 0,
-                compactCardinalityEquality = problem.factors.any { factor ->
-                    val form = factor.linearForm as? LinearForm.Conjunction
-                    form?.rows?.any { it.isCompactCardinalityEquality() } == true
-                },
+                integerColumnsOnly = integerColumnsOnly,
+                compactCardinalityEquality = compactEquality,
+                compactIntegerNeighborhood = neighborhood.compatible,
+                integerNeighborhoodLimited = neighborhood.limited,
+                integerNeighborhoodWork = neighborhood.work,
                 binaryPackingObjective = (binary && problem.hasPackingObjective(objective)) ||
                     binarySource?.let {
                         it.problem.binaryIntegers && it.problem.hasPackingObjective(it.objective)
@@ -119,17 +140,7 @@ internal class ProblemFacts(
                         it.problem.binaryIntegers && it.problem.hasBinaryEqualityObjective(it.objective)
                     } == true,
                 continuousObjective = objective?.realCoefficientValues?.any { it != 0.0 } == true,
-                integerLinear = problem.factors.any { it !is SymmetryHandling } && problem.factors.all {
-                    if (it is SymmetryHandling || (binaryView && it is DifferenceSystem)) return@all true
-                    if (binaryView && it.binaryChannelLiteral() != Lit.NONE) {
-                        val domain = problem.rootIntDomain(it.intVars.single())
-                        if (domain.min >= 0L && domain.max <= 1L) return@all true
-                    }
-                    val form = it.linearForm as? LinearForm.Conjunction ?: return@all false
-                    form.rows.isNotEmpty() && form.rows.all { row ->
-                        row.isLongUnconditional && (row.isIntegerOnly || binaryView)
-                    }
-                },
+                integerLinear = integerLinear,
                 booleanObjective = objective?.let {
                     CoreGuidedSearch.eligible(problem, it) &&
                         it.boolWeightValues.any { weight -> weight != 0L }

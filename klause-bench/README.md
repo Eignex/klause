@@ -1421,8 +1421,11 @@ so use ordinary lab comparisons with source validation for performance claims.
 
 Run `bench.profile.ArithmeticLearningApplicabilityProfile` through the same lab
 profile build with `suite=ID max=64 timeout-ms=10000` to inspect up to 64 MPS
-sources in filename order. It prepares bounded inputs and reads the production
+sources in filename order. `after=NAME` continues after an exact catalog name
+without changing the per-run bound. It prepares bounded inputs and reads the production
 selector's facts and configured integer-learning slots without starting search.
+Neighborhood probe work and a limited-probe flag distinguish budget exhaustion
+from a completed negative source-shape check.
 `applicability.jsonl` retains source hashes, preparation declines and policy facts.
 This is an in-process finite preparation view; confirm CLI applicability with actual
 ordinary session counters before claiming source or performance qualification.
