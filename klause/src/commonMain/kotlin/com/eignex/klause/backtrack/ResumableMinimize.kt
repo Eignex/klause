@@ -236,6 +236,10 @@ internal class ResumableMinimize(
             }
             lastExternalCutoff = bound
         }
+        if (::cp.isInitialized) session.explanationState.arithmeticLearningTrace?.observeCutoff(
+            bound.toBits(), session.decisionLevel,
+            if (::searchSession.isInitialized) searchSession.decisionLevel else -1,
+        )
         return bound
     }
 
@@ -803,6 +807,27 @@ internal class ResumableMinimize(
     }
 
     private fun terminal(result: MinimizeResult): StepEvent {
+        if (::cp.isInitialized) session.explanationState.arithmeticLearningTrace?.let { trace ->
+            val kind = when (result) {
+                is MinimizeResult.Optimal -> "optimal"
+                is MinimizeResult.BestFound -> "best-found"
+                is MinimizeResult.Infeasible -> "infeasible"
+                is MinimizeResult.Unknown -> "unknown"
+                is MinimizeResult.Unbounded -> "unbounded"
+            }
+            val reason = when (result) {
+                is MinimizeResult.Unknown -> result.reason.ordinal
+                is MinimizeResult.BestFound -> result.reason.ordinal
+                else -> -1
+            }
+            trace.boundary("minimize.terminal." + kind,
+                bestObj.toBits(), trace.observedCutoffBits ?: Double.NaN.toBits(),
+                session.decisionLevel.toLong(),
+                if (::searchSession.isInitialized) searchSession.decisionLevel.toLong() else -1L,
+                reason.toLong(),
+                if (externalShared) 1L else 0L, if (sawIndeterminateLeaf) 1L else 0L,
+                if (rootIsExhausted) 1L else 0L)
+        }
         val qualified = result.withSourceSemantics(problem.semantics)
         done = qualified
         if (!rebindable) {

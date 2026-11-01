@@ -163,6 +163,25 @@ class ArithmeticLearningTraceTest {
     }
 
     @Test
+    fun `terminal boundaries should survive detailed capture exhaustion within a fixed window`() {
+        val trace = ArithmeticLearningTrace(maxEvents = 1, maxWords = 1).apply { retainBoundaries = true }
+        val state = PropagationState(Problem(0, 0, emptyArray(), emptyArray()), Assumptions.None)
+        state.arithmeticLearningTrace = trace
+        trace.record("seed", 1)
+        trace.record("overflow", 2)
+
+        repeat(70) { state.arithmeticLearningTrace?.boundary("step", it.toLong()) }
+        state.arithmeticLearningTrace?.boundary("terminal", 70)
+
+        assertTrue(trace.truncated)
+        assertEquals(64, trace.boundaries.size)
+        assertEquals(7L, trace.discardedBoundaries)
+        assertContentEquals(longArrayOf(7), trace.boundaries.first().data)
+        assertEquals("terminal", trace.boundaries.last().kind)
+        assertContentEquals(longArrayOf(70), trace.boundaries.last().data)
+    }
+
+    @Test
     fun `empty events should consume the event allowance`() {
         val trace = ArithmeticLearningTrace(maxEvents = 2, maxWords = 3)
         val state = PropagationState(Problem(0, 0, emptyArray(), emptyArray()), Assumptions.None)

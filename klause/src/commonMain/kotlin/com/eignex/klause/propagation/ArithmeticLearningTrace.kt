@@ -9,6 +9,14 @@ internal class ArithmeticLearningTrace(
     class Event(val kind: String, val data: LongArray)
 
     val events = ArrayList<Event>()
+    var retainBoundaries = false
+    val attached: Boolean get() = accepting || retainBoundaries
+    val boundaries = ArrayList<Event>(64)
+    var discardedBoundaries = 0L
+        private set
+    var observedCutoffBits: Long? = null
+        private set
+
     var truncated = false
         private set
     var truncationCause: String? = null
@@ -36,6 +44,23 @@ internal class ArithmeticLearningTrace(
 
     init {
         require(maxEvents in 1..1024 && maxWords in 1..65536)
+    }
+
+    fun boundary(kind: String, vararg data: Long) {
+        if (!retainBoundaries) return
+        require(data.size <= 16)
+        if (boundaries.size == 64) {
+            boundaries.removeAt(0)
+            discardedBoundaries++
+        }
+        boundaries.add(Event(kind, data.copyOf()))
+    }
+
+    fun observeCutoff(bits: Long, nativeLevel: Int, sharedLevel: Int) {
+        if (!retainBoundaries) return
+        if (observedCutoffBits == bits) return
+        observedCutoffBits = bits
+        boundary("minimize.cutoff-read", bits, nativeLevel.toLong(), sharedLevel.toLong())
     }
 
     fun beginConflict(factorId: Int, level: Int, trail: Int) {

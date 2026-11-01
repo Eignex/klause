@@ -591,7 +591,10 @@ class CpSearchComponent(
         override val decisionLevels: IntArray get() = learned.decisionLevels
 
         override fun apply(session: SearchSession): SearchLearnedConflictResult {
-            this@CpSearchComponent.session.explanationState.arithmeticLearningTrace?.record(
+            val trace = this@CpSearchComponent.session.explanationState.arithmeticLearningTrace
+            trace?.boundary("analysis.apply-enter", learned.backjumpLevel.toLong(), decisionLevel.toLong(),
+                this@CpSearchComponent.session.decisionLevel.toLong(), session.decisionLevel.toLong())
+            trace?.record(
                 "analysis.mapped-target", learned.backjumpLevel.toLong(), decisionLevel.toLong(),
                 this@CpSearchComponent.session.decisionLevel.toLong())
             val result = this@CpSearchComponent.session.withAttribution(factorFamilies) {
@@ -613,13 +616,22 @@ class CpSearchComponent(
                 }
             }
             lastResult = result
+            trace?.boundary(if (result is PropagationResult.Implied) "analysis.native-implied" else "analysis.native-unsat",
+                this@CpSearchComponent.session.decisionLevel.toLong(), session.decisionLevel.toLong(),
+                if (this@CpSearchComponent.session.fixpointCancelled) 1L else 0L)
             return when (result) {
                 is PropagationResult.Implied -> {
                     // The clause stays in this component's own database. Copying it into the shared one
                     // would give the same clause two watch indexes and two reduction policies, and the
                     // shared analyzer reaches this component's reasoning through [reasonFor] instead.
-                    when (import(result, session)) {
-                        ComponentResult.Consistent -> when (session.propagate()) {
+                    when (import(result, session).also {
+                        trace?.boundary("analysis.import." + it.traceKind(),
+                            this@CpSearchComponent.session.decisionLevel.toLong(), session.decisionLevel.toLong())
+                    }) {
+                        ComponentResult.Consistent -> when (session.propagate().also {
+                            trace?.boundary("analysis.propagate." + it.traceKind(),
+                                this@CpSearchComponent.session.decisionLevel.toLong(), session.decisionLevel.toLong())
+                        }) {
                             ComponentResult.Consistent -> SearchLearnedConflictResult.Resume
                             is ComponentResult.Conflict -> SearchLearnedConflictResult.Chronological
                             ComponentResult.Indeterminate -> SearchLearnedConflictResult.Indeterminate
@@ -635,6 +647,10 @@ class CpSearchComponent(
                     cascadeConflictObserver?.invoke(result)
                     val next = mappedLearnedConstraint(
                         result.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint)
+                    trace?.boundary("analysis.cascade",
+                        next?.backjumpLevel?.toLong() ?: -1L,
+                        if (next?.isContradiction == true) 1L else 0L,
+                        this@CpSearchComponent.session.decisionLevel.toLong(), session.decisionLevel.toLong())
                     when {
                         next == null -> SearchLearnedConflictResult.Chronological
                         next.backjumpLevel == 0 && next.isContradiction -> SearchLearnedConflictResult.Exhausted
@@ -643,6 +659,12 @@ class CpSearchComponent(
                 }
             }
         }
+    }
+
+    private fun ComponentResult.traceKind(): String = when (this) {
+        ComponentResult.Consistent -> "consistent"
+        is ComponentResult.Conflict -> "conflict"
+        ComponentResult.Indeterminate -> "indeterminate"
     }
 
     private fun cpIntId(sourceIntId: Int): Int? {

@@ -32,6 +32,7 @@ import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.TableauCutSolver
+import com.eignex.klause.propagation.ArithmeticLearningTrace
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationResult
@@ -439,6 +440,33 @@ class ResumableMinimizeTest {
             assertEquals(4L, firstMaximum)
             assertEquals(0.0, result.objective)
             assertEquals(TerminationReason.SearchExhausted, result.reason)
+        }
+    }
+
+    @Test
+    fun `boundary capture should retain the exhausted external cutoff without a local incumbent`() {
+        val trace = ArithmeticLearningTrace().apply { retainBoundaries = true }
+        val selector = object : VariableSelector by SmallestDomain {
+            override fun fresh(): VariableSelector = this
+            override fun onSessionCreated(session: PropagationSession) {
+                session.explanationState.arithmeticLearningTrace = trace
+            }
+        }
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray()).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L))
+        val params = BacktrackParams(variableSelector = selector, lpPlan = LpPlan(bounding = false),
+            objectiveBoundSupplier = { 0.0 })
+
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
+            val result = assertIs<MinimizeResult.Unknown>(
+                search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {},
+            )
+
+            assertEquals(TerminationReason.SearchExhausted, result.reason)
+            val terminal = trace.boundaries.last()
+            assertEquals("minimize.terminal.unknown", terminal.kind)
+            assertEquals(0.0.toBits(), terminal.data[1])
+            assertEquals(TerminationReason.SearchExhausted.ordinal.toLong(), terminal.data[4])
         }
     }
 

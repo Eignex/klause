@@ -244,6 +244,7 @@ internal object PreparedArithmeticLearningProfile {
         private val maxEvents: Int = 128,
         private val maxWords: Int = 8192,
         captureFirstInteger: Boolean = false,
+        retainBoundaries: Boolean = false,
     ) {
         private val field = LivePropagationState.require(native).javaClass.getDeclaredField("arithmeticLearningTrace")
             .apply { isAccessible = true }
@@ -253,6 +254,8 @@ internal object PreparedArithmeticLearningProfile {
         init {
             trace.javaClass.getMethod("setCaptureFirstInteger", Boolean::class.javaPrimitiveType)
                 .invoke(trace, captureFirstInteger)
+            trace.javaClass.getMethod("setRetainBoundaries", Boolean::class.javaPrimitiveType)
+                .invoke(trace, retainBoundaries)
             field.set(LivePropagationState.require(native), trace)
         }
 
@@ -282,6 +285,19 @@ internal object PreparedArithmeticLearningProfile {
                 put(name, trace.javaClass.getMethod(getter).invoke(trace) as Long)
             }
             put("words", trace.javaClass.getMethod("getWords").invoke(trace) as Int)
+            put("boundaryLimit", 64)
+            put("boundaryWordLimit", 16)
+            put("discardedBoundaries", trace.javaClass.getMethod("getDiscardedBoundaries").invoke(trace) as Long)
+            put("boundaries", buildJsonArray {
+                for (event in trace.javaClass.getMethod("getBoundaries").invoke(trace) as List<*>) {
+                    requireNotNull(event)
+                    add(buildJsonObject {
+                        put("kind", event.javaClass.getMethod("getKind").invoke(event) as String)
+                        put("data", JsonArray((event.javaClass.getMethod("getData").invoke(event) as LongArray)
+                            .map(::JsonPrimitive)))
+                    })
+                }
+            })
             put("events", buildJsonArray {
                 for (event in trace.javaClass.getMethod("getEvents").invoke(trace) as List<*>) {
                     requireNotNull(event)
