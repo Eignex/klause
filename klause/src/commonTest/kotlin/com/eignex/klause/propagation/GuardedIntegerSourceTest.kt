@@ -27,6 +27,25 @@ import kotlin.test.assertTrue
 
 class GuardedIntegerSourceTest {
     @Test
+    fun `sources beyond the bounded view limit should retain clause fallback`() {
+        val state = PropagationState(Problem(0, 33, Array(33) { IntDomain(0, 1) }, arrayOf(
+            Linear(IntArray(33) { 1 }, IntArray(33) { it }, LinearOp.LE, 16),
+        )), Assumptions.None)
+
+        assertNull(GuardedIntegerSource(state).source(0, sourceWork = IntegerSourceWork(state, remaining = 0)))
+    }
+
+    @Test
+    fun `wide reified rows should retain fallback with source cancellation enabled`() {
+        val state = PropagationState(Problem(1, 17, Array(17) { IntDomain(0, 1) }, arrayOf(
+            ReifiedLinear(0, IntArray(17) { 1 }, IntArray(17) { it }, LinearOp.LE, 8),
+        )), Assumptions.None)
+        assertTrue(state.pinBool(0, true))
+
+        assertNull(GuardedIntegerSource(state).source(0, sourceWork = IntegerSourceWork(state)))
+    }
+
+    @Test
     fun `compact exact integer sources should derive a mapped consumed row`() {
         val native = PropagationSession(Problem(0, 3,
             arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(

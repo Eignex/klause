@@ -146,7 +146,7 @@ internal class ArithmeticLearningTrace(
         })
     }
 
-    fun row(kind: String, row: IntegerConflictRow, state: PropagationState, trail: Int? = null) {
+    fun row(kind: String, row: IntegerLearningInequality, state: PropagationState, trail: Int? = null) {
         if (!accepting || omitFocusedDetails()) return
         record(kind, row.bound, (trail ?: -1).toLong())
         if (!accepting) return

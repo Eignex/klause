@@ -25,11 +25,22 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
         return null
     }
 
-    fun source(factorId: Int, trail: Int = state.undo.size, forBoundReason: Boolean = false): IntegerSourceRow? {
+    fun source(
+        factorId: Int,
+        trail: Int = state.undo.size,
+        forBoundReason: Boolean = false,
+        sourceWork: IntegerSourceWork? = null,
+    ): IntegerSourceRow? {
+        fun acceptsSize(size: Int): Boolean {
+            if (size <= INTEGER_LEARNING_TERMS) return true
+            if (sourceWork == null || size > INTEGER_SOURCE_TERMS) return false
+            repeat(size * 4 + 8) { sourceWork.visit() }
+            return true
+        }
         if (factorId !in 0 until state.baseFactorCount) return decline("not-original", factorId)
         return when (val original = state.problem.factors[factorId]) {
             is ExactLinear -> {
-                if (original.size > INTEGER_LEARNING_TERMS) return decline("term-limit", factorId)
+                if (!acceptsSize(original.size)) return decline("term-limit", factorId)
                 if (original.variables.reals.isNotEmpty()) return decline("real-coordinates", factorId)
                 if (original.activator != LinearRow.ALWAYS || original.strict) {
                     return decline("exact-activation-or-strictness", factorId)
@@ -47,7 +58,7 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
                 IntegerSourceRow(source)
             }
             is Linear -> {
-                if (original.vars.size > INTEGER_LEARNING_TERMS) return decline("term-limit", factorId)
+                if (!acceptsSize(original.vars.size)) return decline("term-limit", factorId)
                 if (original.realVars.isNotEmpty()) return decline("real-coordinates", factorId)
                 val constants = original.integerConstants ?: return decline("wide-constants", factorId)
                 val source = state.factorAt(factorId) as? LinearPropagator

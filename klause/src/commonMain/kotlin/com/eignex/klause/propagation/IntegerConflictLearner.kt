@@ -11,7 +11,11 @@ private const val INTEGER_LEARNING_LEVELS = 64
 internal class IntegerConflictLearner(private val state: PropagationState) {
     private var previousSource: IntegerSourceRow? = null
     private var previousUseLo = false
-    private var previousRow: IntegerConflictRow? = null
+    private var previousRow: IntegerLearningInequality? = null
+    private val sourceWork = IntegerSourceWork(state)
+    private var previousWideRowSource: IntegerSourceRow? = null
+    private var previousWideUseLo = false
+    private var previousWideRow: WideIntegerSourceInequality? = null
 
     fun learn(
         factorId: Int,
@@ -21,6 +25,9 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         derive(factorId, currentLevel, fallback)
     } catch (_: CheckedLongOverflowException) {
         state.arithmeticLearningTrace?.record("integer.decline.overflow")
+        null
+    } catch (_: IntegerSourceWorkLimit) {
+        state.arithmeticLearningTrace?.record("integer.decline.source-work-limit")
         null
     }
 
@@ -66,25 +73,37 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             val event = reason(row, used) ?: return decline("no-qualified-endpoint")
             used.add(event.key)
             state.arithmeticLearningTrace?.row("integer.pivot-row", event.row, state, event.trail)
-            row = row.resolve(event.row, event.variable) ?: return decline("combination-shape-or-guard")
-            if (row.minimum(state) <= row.bound) return decline("combination-lost-conflict")
-            if (state.learned.integerRows?.any { it.row.subsumes(row) } == true) return decline("duplicate")
-            val asserts = row.assertsAt(state, trail)
+            val combined = row.resolve(event.row, event.variable, sourceWork)
+                ?: return decline("combination-shape-or-guard")
+            row = combined
+            if (combined.minimum(state) <= combined.bound) return decline("combination-lost-conflict")
+            if (state.learned.integerRows?.any { it.row.subsumes(combined) } == true) return decline("duplicate")
+            val asserts = combined.assertsAt(state, trail)
             state.arithmeticLearningTrace?.record("integer.assertion", target.toLong(), trail.toLong(),
                 if (asserts) 1 else 0)
             if (!asserts) return@repeat
-            val levels = row.variables.indices.map { index ->
-                val variable = row.variables[index]
-                val lower = row.coefficients[index] > 0L
+            val levels = combined.variables.indices.map { index ->
+                val variable = combined.variables[index]
+                val lower = combined.coefficients[index] > 0L
                 val domain = state.intDomains[variable]
                 state.boundEstablishmentLevel(variable, if (lower) domain.min else domain.max, lower) ?: 0
             }.plus(fallback.decisionLevels.toList()).distinct().sorted().toIntArray()
-            return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(row, target, levels.size, levels, fallback)
+            return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(combined, target, levels.size, levels, fallback)
         }
         return decline("step-limit-without-assertion")
     }
 
-    private fun normalizedSource(source: IntegerSourceRow, useLo: Boolean): IntegerConflictRow? {
+    private fun normalizedSource(source: IntegerSourceRow, useLo: Boolean): IntegerLearningInequality? {
+        if (source.linear.vars.size > INTEGER_LEARNING_TERMS) {
+            sourceWork.visit()
+            if (previousWideRowSource?.linear === source.linear && previousWideRowSource?.guard == source.guard &&
+                previousWideUseLo == useLo) return previousWideRow
+            val row = WideIntegerSourceInequality.create(source, useLo, sourceWork)
+            previousWideRowSource = source
+            previousWideUseLo = useLo
+            previousWideRow = row
+            return row
+        }
         val previous = previousSource
         if (previous != null && previous.linear === source.linear && previous.guard == source.guard &&
             previousUseLo == useLo) {
@@ -101,12 +120,12 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         factorId: Int,
         trail: Int = state.undo.size,
         forBoundReason: Boolean = false,
-    ): IntegerSourceRow? = GuardedIntegerSource(state).source(factorId, trail, forBoundReason)
+    ): IntegerSourceRow? = GuardedIntegerSource(state).source(factorId, trail, forBoundReason, sourceWork)
 
-    private fun reason(row: IntegerConflictRow, used: Set<Pair<Int, Int>>): BoundEvent? {
+    private fun reason(row: IntegerLearningInequality, used: Set<Pair<Int, Int>>): BoundEvent? {
         var latest: BoundEvent? = null
         for (index in row.variables.indices) {
-            state.checkFiniteWork()
+            row.visit(state)
             val variable = row.variables[index]
             val lower = row.coefficients[index] > 0L
             val factorId = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
@@ -160,5 +179,5 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         return latest
     }
 
-    private class BoundEvent(val row: IntegerConflictRow, val variable: Int, val trail: Int, val key: Pair<Int, Int>)
+    private class BoundEvent(val row: IntegerLearningInequality, val variable: Int, val trail: Int, val key: Pair<Int, Int>)
 }

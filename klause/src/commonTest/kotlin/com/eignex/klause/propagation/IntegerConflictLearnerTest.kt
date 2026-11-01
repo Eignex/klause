@@ -43,6 +43,53 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `wide original sources should learn a compact asserting inequality`() {
+        val leftVars = IntArray(20) { it }
+        val rightVars = intArrayOf(0, 1) + IntArray(17) { it + 3 }
+        val domains = arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 8)) + Array(17) { IntDomain(0, 1) }
+        val native = PropagationSession(Problem(0, 20, domains, arrayOf(
+            Linear(IntArray(20) { if (it == 0) 2 else if (it == 2) -1 else 1 }, leftVars, LinearOp.LE, 0),
+            Linear(IntArray(19) { if (it == 0) 2 else -1 }, rightVars, LinearOp.LE, 0),
+        )), pbLearning = false).apply { enableIntegerRowLearning() }
+        for (variable in 3..19) assertIs<PropagationResult.Implied>(native.pinIntAtMost(variable, 0))
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        assertContentEquals(intArrayOf(0, 2), learned.row.variables)
+        assertContentEquals(longArrayOf(4, -1), learned.row.coefficients)
+        assertEquals(0L, learned.row.bound)
+        assertEquals(learned.fallbackClause.backjumpLevel, learned.backjumpLevel)
+    }
+
+    @Test
+    fun `compact rows from wide sources should assert through mapped shared coordinates`() {
+        val leftVars = IntArray(20) { it }
+        val rightVars = intArrayOf(0, 1) + IntArray(17) { it + 3 }
+        val domains = arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 8)) + Array(17) { IntDomain(0, 1) }
+        val native = PropagationSession(Problem(0, 20, domains, arrayOf(
+            Linear(IntArray(20) { if (it == 0) 2 else if (it == 2) -1 else 1 }, leftVars, LinearOp.LE, 0),
+            Linear(IntArray(19) { if (it == 0) 2 else -1 }, rightVars, LinearOp.LE, 0),
+        )), pbLearning = false).apply { enableIntegerRowLearning() }
+        val cp = CpSearchComponent(native, IntArray(20) { it + 5 })
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        for (variable in 3..19) {
+            assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(variable + 5, 0)))
+        }
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(7, 7)))
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(5, 2)))
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+        assertEquals(1L, shared.intUpperBound(5))
+        assertTrue((native.learnedLifecycle()["learningIntegerConsumed"] ?: 0L) > 0L)
+    }
+
+    @Test
     fun `either equality conflict direction should retain the same asserting row`() {
         for (sign in listOf(-1, 1)) {
             val native = PropagationSession(Problem(0, 3,

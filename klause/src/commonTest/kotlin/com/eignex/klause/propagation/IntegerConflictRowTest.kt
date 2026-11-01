@@ -15,6 +15,98 @@ import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
     @Test
+    fun `wide original rows should cancel to a compact inequality in either source order`() {
+        for (reverse in listOf(false, true)) {
+            val state = PropagationState(Problem(0, 28, Array(28) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+            val work = IntegerSourceWork(state)
+            val leftVars = IntArray(20) { it }.also { if (reverse) it.reverse() }
+            val rightVars = (IntArray(12) { it } + IntArray(8) { it + 20 }).also { if (reverse) it.reverse() }
+            val left = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+                intArrayOf(), leftVars, LongArray(20) { 1 }, leftVars, LinearOp.LE, 4)), true, work))
+            val right = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+                intArrayOf(), rightVars, LongArray(20) { if (rightVars[it] < 12) -1 else 1 }, rightVars,
+                LinearOp.LE, 4)), true, work))
+
+            val row = requireNotNull(left.resolve(right, 0, work))
+
+            assertEquals((12..27).toList(), row.variables.toList())
+            assertTrue(row.coefficients.all { it == 1L })
+            assertEquals(8L, row.bound)
+        }
+    }
+
+    @Test
+    fun `wide source cancellation should withhold a result with seventeen remaining terms`() {
+        val state = PropagationState(Problem(0, 28, Array(28) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val work = IntegerSourceWork(state)
+        val leftVars = IntArray(19) { it }
+        val rightVars = IntArray(11) { it } + IntArray(9) { it + 19 }
+        val left = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+            intArrayOf(), leftVars, LongArray(19) { 1 }, leftVars, LinearOp.LE, 10)), true, work))
+        val right = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+            intArrayOf(), rightVars, LongArray(20) { if (rightVars[it] < 11) -1 else 1 }, rightVars,
+            LinearOp.LE, 10)), true, work))
+
+        assertNull(left.resolve(right, 0, work))
+    }
+
+    @Test
+    fun `wide source cancellation should not combine opposite guards`() {
+        val state = PropagationState(Problem(1, 28, Array(28) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val work = IntegerSourceWork(state)
+        val leftVars = IntArray(20) { it }
+        val rightVars = IntArray(12) { it } + IntArray(8) { it + 20 }
+        val left = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+            intArrayOf(), leftVars, LongArray(20) { 1 }, leftVars, LinearOp.LE, 10), Lit.make(0, true)), true, work))
+        val right = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+            intArrayOf(), rightVars, LongArray(20) { if (rightVars[it] < 12) -1 else 1 }, rightVars,
+            LinearOp.LE, 10), Lit.make(0, false)), true, work))
+
+        assertNull(left.resolve(right, 0, work))
+    }
+
+    @Test
+    fun `wide source cancellation should stop when its source allowance is exhausted`() {
+        val state = PropagationState(Problem(0, 28, Array(28) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val preparation = IntegerSourceWork(state)
+        val leftVars = IntArray(20) { it }
+        val rightVars = IntArray(12) { it } + IntArray(8) { it + 20 }
+        val left = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+            intArrayOf(), leftVars, LongArray(20) { 1 }, leftVars, LinearOp.LE, 10)), true, preparation))
+        val right = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+            intArrayOf(), rightVars, LongArray(20) { if (rightVars[it] < 12) -1 else 1 }, rightVars,
+            LinearOp.LE, 10)), true, preparation))
+        val exhausted = IntegerSourceWork(state, remaining = 0)
+
+        assertFailsWith<IntegerSourceWorkLimit> { left.resolve(right, 0, exhausted) }
+    }
+
+    @Test
+    fun `wide source cancellation should check combined bound overflow`() {
+        val state = PropagationState(Problem(0, 28, Array(28) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val work = IntegerSourceWork(state)
+        val leftVars = IntArray(20) { it }
+        val rightVars = IntArray(12) { it } + IntArray(8) { it + 20 }
+        val left = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+            intArrayOf(), leftVars, LongArray(20) { 1 }, leftVars, LinearOp.LE, Long.MAX_VALUE)), true, work))
+        val right = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+            intArrayOf(), rightVars, LongArray(20) { if (rightVars[it] < 12) -1 else 1 }, rightVars,
+            LinearOp.LE, Long.MAX_VALUE)), true, work))
+
+        assertFailsWith<CheckedLongOverflowException> { left.resolve(right, 0, work) }
+    }
+
+    @Test
+    fun `wide original rows with duplicate coordinates should withhold a source view`() {
+        val state = PropagationState(Problem(0, 20, Array(20) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val variables = IntArray(20) { it }.apply { this[19] = 0 }
+        val source = IntegerSourceRow(LinearPropagator(intArrayOf(), variables, LongArray(20) { 1 }, variables,
+            LinearOp.LE, 10))
+
+        assertNull(WideIntegerSourceInequality.create(source, true, IntegerSourceWork(state)))
+    }
+
+    @Test
     fun `subsumption should require a stronger bound and an implied guard`() {
         val guards = listOf(Lit.NONE, Lit.make(0, true), Lit.make(0, false), Lit.make(1, true))
         for (guard in guards) for (otherGuard in guards) for (bound in listOf(3L, 5L, 7L)) {

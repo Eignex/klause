@@ -10,12 +10,12 @@ import com.eignex.klause.util.subExact
 internal const val INTEGER_LEARNING_TERMS = 16
 
 internal class IntegerConflictRow private constructor(
-    val variables: IntArray,
-    val coefficients: LongArray,
-    val bound: Long,
-    val guard: Int = Lit.NONE,
-) {
-    fun coefficient(variable: Int): Long {
+    override val variables: IntArray,
+    override val coefficients: LongArray,
+    override val bound: Long,
+    override val guard: Int = Lit.NONE,
+) : IntegerLearningInequality {
+    override fun coefficient(variable: Int): Long {
         val index = variables.indexOf(variable)
         return if (index < 0) 0L else coefficients[index]
     }
@@ -23,38 +23,6 @@ internal class IntegerConflictRow private constructor(
     fun subsumes(other: IntegerConflictRow): Boolean =
         (guard == Lit.NONE || guard == other.guard) && bound <= other.bound &&
             variables.contentEquals(other.variables) && coefficients.contentEquals(other.coefficients)
-
-    fun minimum(state: PropagationState, trail: Int? = null): Long = activity(state, trail, maximum = false)
-
-    fun maximum(state: PropagationState): Long = activity(state, null, maximum = true)
-
-    private fun activity(state: PropagationState, trail: Int?, maximum: Boolean): Long {
-        var sum = 0L
-        for (i in variables.indices) {
-            state.checkFiniteWork()
-            val domain = domain(state, variables[i], trail)
-            val coefficient = coefficients[i]
-            val endpoint = if ((coefficient > 0L) != maximum) domain.min else domain.max
-            sum = addExact(sum, mulExact(coefficient, endpoint))
-        }
-        return sum
-    }
-
-    fun boundFor(state: PropagationState, variable: Int, trail: Int): Long? {
-        val pivot = variables.indexOf(variable)
-        if (pivot < 0) return null
-        var other = 0L
-        for (i in variables.indices) {
-            state.checkFiniteWork()
-            if (i == pivot) continue
-            val domain = domain(state, variables[i], trail)
-            val endpoint = if (coefficients[i] > 0L) domain.min else domain.max
-            other = addExact(other, mulExact(coefficients[i], endpoint))
-        }
-        val residual = subExact(bound, other)
-        val coefficient = coefficients[pivot]
-        return if (coefficient > 0L) floorDivide(residual, coefficient) else ceilDivide(residual, coefficient)
-    }
 
     fun assertsAt(state: PropagationState, trail: Int): Boolean {
         if (!state.integerGuardTrueAt(guard, trail)) return false
@@ -118,7 +86,7 @@ internal class IntegerConflictRow private constructor(
             return normalized(terms, bound, guard)
         }
 
-        private fun normalized(terms: Map<Int, Long>, bound: Long, guard: Int): IntegerConflictRow? {
+        internal fun normalized(terms: Map<Int, Long>, bound: Long, guard: Int): IntegerConflictRow? {
             if (terms.isEmpty() || terms.size > INTEGER_LEARNING_TERMS) return null
             var divisor = 0L
             for (coefficient in terms.values) {
@@ -134,9 +102,9 @@ internal class IntegerConflictRow private constructor(
         private fun domain(state: PropagationState, variable: Int, trail: Int?): IntDomain =
             if (trail == null) state.intDomains[variable] else state.domainAt(variable, trail)
 
-        private fun magnitude(value: Long): Long = if (value < 0L) subExact(0L, value) else value
+        internal fun magnitude(value: Long): Long = if (value < 0L) subExact(0L, value) else value
 
-        private fun gcd(a: Long, b: Long): Long {
+        internal fun gcd(a: Long, b: Long): Long {
             var left = a
             var right = b
             while (right != 0L) {
@@ -147,13 +115,13 @@ internal class IntegerConflictRow private constructor(
             return left
         }
 
-        private fun floorDivide(value: Long, divisor: Long): Long {
+        internal fun floorDivide(value: Long, divisor: Long): Long {
             if (divisor == -1L) return subExact(0L, value)
             val quotient = value / divisor
             return if (value % divisor != 0L && (value xor divisor) < 0L) subExact(quotient, 1L) else quotient
         }
 
-        private fun ceilDivide(value: Long, divisor: Long): Long {
+        internal fun ceilDivide(value: Long, divisor: Long): Long {
             if (divisor == -1L) return subExact(0L, value)
             val quotient = value / divisor
             return if (value % divisor != 0L && (value xor divisor) >= 0L) addExact(quotient, 1L) else quotient

@@ -358,11 +358,17 @@ remain clause reasons. Support filtering keeps its hole-aware semantics. Repeate
 cells retain their selected index guard, and a result alias supplies no arithmetic row.
 
 Opposite-sign nonnegative combinations use checked signed arithmetic and integer
-gcd normalization. One analysis retains only its most recent normalized source, keyed
-by projection identity, signed guard and inequality side. Reusing that immutable row
+gcd normalization. Narrow-source normalization retains only its most recent row in
+one analysis, keyed by projection identity, signed guard and inequality side. Reusing that immutable row
 still validates each endpoint's historical guard, raw requested bound and membership.
-The cached source is released with the analysis. Each combination must remain
-conflicting. A retained row must propagate against the session's historical domains at its first-UIP clause's native
+The cached source is released with the analysis. Unconditional original word rows
+can supply views of at most 32 terms for cancellation into a retained row of at most
+16 terms. Guarded sources keep their 16-term input limit. The wide-source path funds
+identity checks, duplicate-coordinate validation, historical activity and coefficient
+lookups from 4,096 native-work visits per analysis. It retains only the most recent
+wide projection and oriented view, and its cancellation accumulator holds at most
+16 nonzero result terms. Exhaustion retains clause fallback. Each combination must
+remain conflicting. A retained row must propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have
 been a member of its historical domain; a later carve cannot remove that earlier
