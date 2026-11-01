@@ -33,22 +33,53 @@ class LinearAuthorityPointCutsTest {
     private val source = SourceProofContext(scope, setOf(x), mapOf(
         "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE)),
     ), mapOf(x to BigFraction.ONE))
+    private val mixedReal = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+    private val mixedMaximum = SourceProofContext(
+        scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE)), setOf(x, mixedReal), mapOf(
+            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                mixedReal to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+            "lower" to SourcePremise(SourceInequality(mapOf(mixedReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(mixedReal to BigFraction.ONE), BigFraction.ofLong(2))),
+        ), mapOf(x to BigFraction.ONE),
+    )
+    private val nonseparating = SourceProofContext(mixedMaximum.scope, setOf(x, mixedReal), mapOf(
+        "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+            mixedReal to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+        "coupled" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE,
+            mixedReal to BigFraction.ONE), BigFraction.ofLong(5))),
+        "real lower" to SourcePremise(SourceInequality(mapOf(mixedReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        "integer lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+    ), mapOf(x to BigFraction.ONE))
 
     @Test
     fun `point policy preparation should include scoring in its containing recipe`() {
         val budget = SourceLpBudget()
         LinearAuthority(budget, retainLp = true).use { authority ->
-            authority.advanceWithPointCuts(source, Cancellation.Never)
+            authority.advanceWithPointCuts(mixedMaximum, Cancellation.Never)
 
             val observations = authority.cutObservations()
             assertTrue((observations["numericalCutSelectionWork"] ?: 0L) > 0L)
             assertEquals(budget.measuredPreparationWork,
-                observations["numericalCutLifecycleRECIPE_POINT_SELECTION_PreparationWork"])
+                (observations["numericalCutLifecycleRECIPE_CURRENT_PreparationWork"] ?: 0L) +
+                    (observations["numericalCutLifecycleRECIPE_POINT_SELECTION_PreparationWork"] ?: 0L))
         }
     }
 
     @Test
-    fun `a checked violated cut should strengthen the retained bound`() {
+    fun `closing the numerical owner should preserve final selection observations`() {
+        val authority = LinearAuthority(SourceLpBudget(), retainLp = true)
+        authority.advanceWithPointCuts(source, Cancellation.Never)
+        val before = authority.cutObservations().filterKeys { it.startsWith("numericalCutSelection") }
+        assertTrue(before.isNotEmpty())
+
+        authority.close()
+
+        assertEquals(before,
+            authority.cutObservations().filterKeys { it.startsWith("numericalCutSelection") })
+    }
+
+    @Test
+    fun `a checked current cut should settle its base without another selection round`() {
         val budget = SourceLpBudget()
         val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
         val result = LinearAuthority(budget, retainLp = true).use {
@@ -58,8 +89,8 @@ class LinearAuthorityPointCutsTest {
 
         assertEquals(SourceValue.Rational(BigFraction.ONE),
             (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
-        assertEquals(2, budget.operations)
-        assertEquals(listOf(false, true), capture.records.map { it.cuts.single().installed })
+        assertEquals(1, budget.operations)
+        assertEquals(listOf(true), capture.records.map { it.cuts.single().installed })
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
             .verify(assertNotNull(result.evidence)))
     }
@@ -82,19 +113,10 @@ class LinearAuthorityPointCutsTest {
 
     @Test
     fun `complementary mixed rounding should strengthen a bound left unchanged by the preferred side`() {
-        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val maximum = SourceProofContext(scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE)),
-            setOf(x, real), mapOf(
-                "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
-                "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
-            ), mapOf(x to BigFraction.ONE))
-
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
-            val current = authority.advance(maximum, Cancellation.Never, cuts = true)
-            val candidate = authority.advanceWithPointCuts(maximum, Cancellation.Never)
-            val restored = authority.advance(maximum, Cancellation.Never, cuts = true)
+            val current = authority.advance(mixedMaximum, Cancellation.Never, cuts = true)
+            val candidate = authority.advanceWithPointCuts(mixedMaximum, Cancellation.Never)
+            val restored = authority.advance(mixedMaximum, Cancellation.Never, cuts = true)
 
             assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
                 (assertNotNull(current.bound).claim as SourceClaim.Bound).value)
@@ -102,8 +124,42 @@ class LinearAuthorityPointCutsTest {
                 (assertNotNull(candidate.bound).claim as SourceClaim.Bound).value)
             assertEquals((assertNotNull(current.bound).claim as SourceClaim.Bound).value,
                 (assertNotNull(restored.bound).claim as SourceClaim.Bound).value)
-            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(maximum.withLinearAuthority())
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(mixedMaximum.withLinearAuthority())
                 .verify(assertNotNull(candidate.bound)))
+        }
+    }
+
+    @Test
+    fun `a nonseparating point should retain the ordinary checked recipe across queries`() {
+        val capture = LinearAuthorityCapture(2, 10_000L, 1_000_000L, Cancellation.Never)
+
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithPointCuts(nonseparating, Cancellation.Never)
+            val preparations = authority.preparations
+            val scoring = authority.cutObservations()["numericalCutSelectionWork"]
+
+            val result = authority.advanceWithPointCuts(nonseparating, Cancellation.Never)
+
+            assertEquals(listOf(true, true), capture.records.map { it.cuts.single().installed })
+            assertEquals(preparations, authority.preparations)
+            assertEquals(scoring, authority.cutObservations()["numericalCutSelectionWork"])
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(nonseparating.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `a changed source should clear the ordinary fallback`() {
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.advanceWithPointCuts(nonseparating, Cancellation.Never)
+
+            val result = authority.advanceWithPointCuts(mixedMaximum, Cancellation.Never)
+
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+                (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(mixedMaximum.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
         }
     }
 
@@ -121,6 +177,343 @@ class LinearAuthorityPointCutsTest {
             listOf(BigFraction.ONE), emptySet(), Cancellation.Never)
 
         assertEquals(setOf(0), selected)
+    }
+
+    @Test
+    fun `candidate cooldown should avoid repeated scoring work`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), emptySet(), Cancellation.Never)
+        val work = selection.observations["numericalCutSelectionWork"]
+
+        selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), emptySet(), Cancellation.Never)
+
+        assertEquals(work, selection.observations["numericalCutSelectionWork"])
+        assertEquals(1L, selection.observations["numericalCutSelectionCooldownQueries"])
+    }
+
+    @Test
+    fun `four completed unsuccessful scans should retire the candidate generation`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        repeat(25) {
+            selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), emptySet(), Cancellation.Never)
+        }
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ofLong(2)), emptySet(), Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+        assertEquals(4L, selection.observations["numericalCutSelectionVisited"])
+        assertEquals(1L, selection.observations["numericalCutSelectionRetiredFamilies"])
+    }
+
+    @Test
+    fun `a replacement candidate generation should receive its own selection lifetime`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        repeat(25) {
+            selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), emptySet(), Cancellation.Never)
+        }
+
+        val selected = selection.select(ArrayList(rows), listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ofLong(2)), emptySet(), Cancellation.Never)
+
+        assertEquals(setOf(0), selected)
+    }
+
+    @Test
+    fun `candidate retirement should preserve tight installed rows`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        repeat(25) {
+            selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ONE), setOf(0), Cancellation.Never)
+        }
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ONE), setOf(0), Cancellation.Never)
+
+        assertEquals(setOf(0), selected)
+        assertEquals(1L, selection.observations["numericalCutSelectionRetiredFamilies"])
+    }
+
+    @Test
+    fun `slack installed rows should expire at retirement even in a full pool`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumCuts = 1)
+        var installed = setOf(0)
+        repeat(25) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), installed, Cancellation.Never)
+        }
+        val work = selection.observations["numericalCutSelectionWork"]
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ofLong(2)), installed, Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+        assertEquals(1L, selection.observations["numericalCutSelectionRetiredInstalled"])
+        assertEquals(work, selection.observations["numericalCutSelectionWork"])
+    }
+
+    @Test
+    fun `adopted installed rows should age on consecutive usable points`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumCuts = 1)
+        var installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), emptySet(), Cancellation.Never, adoptCurrent = true)
+        repeat(3) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), installed, Cancellation.Never)
+        }
+        assertEquals(setOf(0), installed)
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), installed, Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+    }
+
+    @Test
+    fun `installed rows should keep aging after candidate retirement`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumCuts = 1)
+        var installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ONE), emptySet(), Cancellation.Never, adoptCurrent = true)
+        repeat(4) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ONE), installed, Cancellation.Never)
+        }
+        assertTrue(selection.candidatesRetired(rows))
+        repeat(3) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), installed, Cancellation.Never)
+        }
+        assertEquals(setOf(0), installed)
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), installed, Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+        assertEquals(1L, selection.observations["numericalCutSelectionRetiredFamilies"])
+    }
+
+    @Test
+    fun `continued aging should not reinstall retired candidates`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("x-upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("y-upper")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        var installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            List(2) { BigFraction.ONE }, emptySet(), Cancellation.Never, adoptCurrent = true)
+        repeat(4) {
+            installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+                listOf(BigFraction.ZERO, BigFraction.ONE), installed, Cancellation.Never)
+        }
+        assertEquals(setOf(1), installed)
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE), installed, Cancellation.Never)
+
+        assertEquals(setOf(1), selected)
+    }
+
+    @Test
+    fun `a fully selected family should age on consecutive usable points`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        var installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ofLong(2)), emptySet(), Cancellation.Never)
+        repeat(3) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), installed, Cancellation.Never)
+        }
+        assertEquals(setOf(0), installed)
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ZERO), installed, Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+    }
+
+    @Test
+    fun `a tight observation should interrupt installed row aging`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        var installed = setOf(0)
+        repeat(3) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+                listOf(BigFraction.ZERO), installed, Cancellation.Never)
+        }
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0),
+            listOf(BigFraction.ONE), installed, Cancellation.Never)
+
+        assertEquals(setOf(0), selected)
+        assertEquals(null, selection.observations["numericalCutSelectionRetiredInstalled"])
+    }
+
+    @Test
+    fun `an incomplete scoring scan should not age installed rows`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
+                BigFraction.ONE), SourceDerivation.Premise("sum")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.MINUS_ONE),
+                BigFraction.ONE), SourceDerivation.Premise("difference")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumSupport = 2)
+        var installed = setOf(0, 1)
+
+        repeat(25) {
+            installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+                List(2) { BigFraction.ZERO }, installed, Cancellation.Never)
+        }
+
+        assertEquals(setOf(0, 1), installed)
+        assertEquals(null, selection.observations["numericalCutSelectionRetiredInstalled"])
+        assertEquals(null, selection.observations["numericalCutSelectionRetiredFamilies"])
+    }
+
+    @Test
+    fun `adopting installed pure cuts should retain the current numerical query`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val context = SourceProofContext(scope, setOf(x, y, z), source.premises + mapOf(
+            "sum" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ONE, z to BigFraction.ONE),
+                BigFraction.ONE)),
+            "equal lower" to SourcePremise(SourceInequality(
+                mapOf(y to BigFraction.MINUS_ONE, z to BigFraction.ONE), BigFraction.ZERO)),
+            "equal upper" to SourcePremise(SourceInequality(
+                mapOf(y to BigFraction.ONE, z to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "nonnegative y" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+            "nonnegative z" to SourcePremise(SourceInequality(mapOf(z to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+        ), mapOf(x to BigFraction.ONE, y to BigFraction.MINUS_ONE, z to BigFraction.MINUS_ONE))
+        val capture = LinearAuthorityCapture(4, 10_000L, 1_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+
+            authority.advanceWithPointCuts(context, Cancellation.Never)
+
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionAdoptedInstalled"])
+            assertEquals(1, capture.records.size)
+        }
+    }
+
+    @Test
+    fun `installed pure cuts should age from the current checked recipe`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val triangle = listOf(y, z, w)
+        val premises = linkedMapOf("rounded" to SourcePremise(SourceInequality(
+            mapOf(x to BigFraction.ofLong(2)), BigFraction.ofLong(3))))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE),
+                BigFraction.ONE))
+        }
+        val root = SourceProofContext(mixedMaximum.scope, (triangle + x).toSet(), premises,
+            (triangle + x).associateWith { BigFraction.ONE })
+        val child = root.atScope(root.scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO))))
+        val capture = LinearAuthorityCapture(128, 100_000L, 10_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithPointCuts(root, Cancellation.Never)
+            repeat(32) { authority.advanceWithPointCuts(child, Cancellation.Never) }
+
+            val result = authority.advanceWithPointCuts(child, Cancellation.Never)
+
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
+            assertTrue(capture.records.last().cuts.none { it.installed })
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(child.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `retiring an installed source row should suspend it without replacing the numerical owner`() {
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf("rounded" to SourcePremise(SourceInequality(
+            mapOf(x to BigFraction.ofLong(2), y to BigFraction.ofLong(2)), BigFraction.ofLong(3))),
+            "nonnegative x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "nonnegative y" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE),
+                BigFraction.ONE))
+        }
+        val root = SourceProofContext(mixedMaximum.scope, (triangle + x + y).toSet(), premises,
+            (triangle + x + y).associateWith { BigFraction.ONE })
+        val child = root.atScope(root.scope.copy(condition = SourceCondition(upper = mapOf(
+            x to BigFraction.ZERO, y to BigFraction.ZERO))))
+        val capture = LinearAuthorityCapture(128, 100_000L, 10_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithPointCuts(root, Cancellation.Never)
+            repeat(32) { authority.advanceWithPointCuts(child, Cancellation.Never) }
+
+            val result = authority.advanceWithPointCuts(child, Cancellation.Never)
+
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
+            assertTrue(capture.records.last().cuts.none { it.installed })
+            assertEquals(1L, authority.preparations)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(child.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `an empty aged mask should retain its checked relaxation without reinstalling cuts`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val triangle = listOf(y, z, w)
+        val premises = mixedMaximum.premises.toMutableMap()
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE),
+                BigFraction.ONE))
+        }
+        val root = SourceProofContext(mixedMaximum.scope, mixedMaximum.coordinates + triangle, premises,
+            (triangle + x).associateWith { BigFraction.ONE })
+        val child = root.atScope(root.scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO))))
+        val capture = LinearAuthorityCapture(128, 100_000L, 10_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithPointCuts(root, Cancellation.Never)
+            repeat(32) { authority.advanceWithPointCuts(child, Cancellation.Never) }
+            val work = authority.cutObservations()["numericalCutSelectionWork"]
+
+            val result = authority.advanceWithPointCuts(child, Cancellation.Never)
+
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
+            assertTrue(capture.records.last().cuts.none { it.installed })
+            assertEquals(work, authority.cutObservations()["numericalCutSelectionWork"])
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(child.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
     }
 
     @Test
@@ -261,10 +654,14 @@ class LinearAuthorityPointCutsTest {
 
     @Test
     fun `selected guarded cuts should retract and reactivate across siblings`() {
-        val guarded = SourceProofContext(scope, setOf(x, y), mapOf(
+        val guarded = SourceProofContext(scope, setOf(x, y, mixedReal), mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
             "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(3))),
-            "guarded" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2)),
+            "real lower" to SourcePremise(SourceInequality(mapOf(mixedReal to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+            "real upper" to SourcePremise(SourceInequality(mapOf(mixedReal to BigFraction.ONE), BigFraction.ofLong(2))),
+            "guarded" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                mixedReal to BigFraction.MINUS_ONE),
                 BigFraction.ofLong(3)), emptyMap(), mapOf(y to BigFraction.ONE)),
         ), mapOf(x to BigFraction.MINUS_ONE))
         val active = guarded.atScope(scope.copy(condition = SourceCondition(
@@ -280,7 +677,7 @@ class LinearAuthorityPointCutsTest {
             }
         }
 
-        assertEquals(listOf(-1L, -3L, -1L).map { SourceValue.Rational(BigFraction.ofLong(it)) }, values)
+        assertEquals(listOf(-2L, -3L, -2L).map { SourceValue.Rational(BigFraction.ofLong(it)) }, values)
     }
 
     @Test
@@ -296,16 +693,16 @@ class LinearAuthorityPointCutsTest {
             }
         })
         LinearAuthority(budget, retainLp = true).use { authority ->
-            val paused = authority.advanceWithPointCuts(source, Cancellation.Never)
+            val paused = authority.advanceWithPointCuts(mixedMaximum, Cancellation.Never)
             assertTrue(paused.paused)
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(2).reciprocal()),
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
                 (assertNotNull(paused.bound).claim as SourceClaim.Bound).value)
 
             funding.grant(1_000_000L)
-            val completed = authority.advanceWithPointCuts(source, Cancellation.Never)
+            val completed = authority.advanceWithPointCuts(mixedMaximum, Cancellation.Never)
 
             assertFalse(completed.paused)
-            assertEquals(SourceValue.Rational(BigFraction.ONE),
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
                 (assertNotNull(completed.bound).claim as SourceClaim.Bound).value)
             assertEquals(2, budget.operations)
         }

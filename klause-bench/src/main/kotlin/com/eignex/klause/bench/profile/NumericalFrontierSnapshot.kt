@@ -37,6 +37,52 @@ internal class NumericalFrontierSnapshot(
     private val checked = IdentityHashMap<SourceEvidence, JsonObject>()
     private var remaining = 4096
 
+    fun certificateState(invocation: Any): JsonObject {
+        fun scalars(owner: Any, names: List<String>): JsonObject = buildJsonObject {
+            for (name in names) {
+                require(!stop())
+                val value = field(owner, name) ?: continue
+                when (value) {
+                    is Int -> put(name, value)
+                    is Long -> put(name, value)
+                    is Boolean -> put(name, value)
+                    else -> put(name, value.toString().also { require(it.length <= 4096) })
+                }
+            }
+        }
+        require(!stop())
+        val authority = checkNotNull(field(checkNotNull(field(invocation, "component")), "authority"))
+        val session = checkNotNull(field(checkNotNull(field(authority, "lp")), "session"))
+        val guide = checkNotNull(field(session, "completed")) { "no retained completed guidance" }
+        val metrics = checkNotNull(field(guide, "certificateMetrics")) { "no retained certificate metrics" }
+        return buildJsonObject {
+            put("diagnosticOnly", true)
+            put("independentProofCheck", false)
+            put("retainedGuidance", scalars(guide, listOf("phase", "paused", "termination", "optimalCandidate")))
+            (field(session, "authority") as SourceScope?)?.let { put("ownerScope", scope(it)) }
+            put("metrics", scalars(metrics, listOf("attempts", "pointChecks", "dualChecks", "rayChecks",
+                "pointSuccesses", "dualSuccesses", "raySuccesses", "vectorRestarts", "verificationRestarts",
+                "work", "allocation", "maxBits", "decline", "phase", "basisWork")))
+            field(metrics, "dualRejection")?.let {
+                put("dualRejection", scalars(it, listOf("column", "upper", "reduced")))
+            }
+            field(metrics, "basisDualRejection")?.let {
+                put("basisDualRejection", scalars(it, listOf("column", "upper", "reduced", "basic")))
+            }
+            field(metrics, "vectorRejection")?.let {
+                put("vectorRejection", scalars(it, listOf("commonDenominator", "limit")))
+            }
+            field(metrics, "entryRejection")?.let {
+                put("entryRejection", scalars(it, listOf("row", "value")))
+            }
+            field(metrics, "basisRepair")?.let {
+                put("basisRepair", scalars(it, listOf("peeledRows", "peeledColumns", "coreRows", "components",
+                    "largestComponent", "solvedComponents", "factorWork", "factorAllocation", "openBasicColumns",
+                    "decline", "restrictedComponents", "restrictedColumns", "largestRestrictedColumns")))
+            }
+        }
+    }
+
     fun cuts(invocation: Any): JsonObject {
         val authority = checkNotNull(field(checkNotNull(field(invocation, "component")), "authority"))
         val template = field(authority, "template")
@@ -270,6 +316,7 @@ internal class NumericalFrontierSnapshot(
                 Long::class.javaPrimitiveType, Long::class.javaPrimitiveType,
             ).newInstance(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
             val requestType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest")
+            val sharingType = Class.forName("com.eignex.klause.solver.pipeline.LinearIncumbentSharing")
             val request = if (fullFeedback) requestType.getField("Companion").get(null).let { companion ->
                 companion.javaClass.getMethod("getFull").invoke(companion)
             } else null
@@ -277,10 +324,12 @@ internal class NumericalFrontierSnapshot(
                 Function0::class.java, stateType, Boolean::class.javaPrimitiveType, authorityType,
                 Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, fundingType,
                 Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
-                Function1::class.java, Boolean::class.javaPrimitiveType, requestType, Boolean::class.javaPrimitiveType)
+                Function1::class.java, Boolean::class.javaPrimitiveType, requestType, Boolean::class.javaPrimitiveType,
+                Function0::class.java, Function0::class.java, Boolean::class.javaPrimitiveType, sharingType,
+                Function3::class.java)
                 .newInstance(context, params, { null }, state, history, null, frontier, false,
                     funding, frontier && params.sourceCuts, activeRows, supportBranching, null, latestFeedback,
-                    request, aggregateBranching)
+                    request, aggregateBranching, null, null, false, null, null)
         }
 
         fun run(

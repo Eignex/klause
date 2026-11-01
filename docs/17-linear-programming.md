@@ -403,6 +403,34 @@ definitions with independently chosen nearer continuous endpoints. Exact premise
 still authorize every row. The replacement shares the original generation's work
 limit and retains the source-row template; unavailable preparation leaves its prior
 candidates intact. Each immutable template attempts this preparation once.
+Point scoring waits seven completed point queries between scans of one immutable
+candidate generation. An adopted current recipe or fully installed checked family
+ages on each usable point without that discovery cooldown. Four completed scans
+without an addition retire that
+generation's unselected candidates from further scoring. Installed rows keep aging
+after discovery retires and expire when they have been slack in four usable scoring
+scans without an intervening tight observation. Tightness uses the model-facing pool's tolerance.
+Full pools remain eligible for aging; incomplete scans do not advance it. A
+replacement generation receives its own lifetime. Remaining installed cuts keep
+their ordinary source checks and scope retraction. Retirement only weakens the
+relaxation, retaining cut definitions and checked coverage. An empty selected mask
+stays distinct from the ordinary all-cut recipe and cannot reinstall expired rows.
+After discovery retires, installed-row scans omit objective projection and candidate
+comparison vectors. Their point projection, activity checks and age state still
+debit the scoring and containing source allowances.
+Retired unselected candidates
+are omitted from proof replay as well as scoring. Masked-query reuse distinguishes
+whether unselected candidates are checked; installed cuts retain fresh source
+verification under the current scope.
+Managed current masks and fully installed selected families retain retired row
+definitions as inactive numerical rows. Selected-layout retention does not authorize
+reusing point-directed definitions as the ordinary current recipe.
+Their free logical columns impose no restriction and carry zero certificate
+multiplier. This preserves a compatible numerical owner across retirement.
+Suspension maps source row IDs through equality packing; both sides of a packed
+equality must have matching activity. An incompatible mask declines retained
+guidance, keeping failed mapping and ordinary fallback costs in the containing
+allowance.
 Preparation visits at most 65,536 modeled row/support operations with
 4,096-bit input, denominator and intermediate scalar limits. Cut definitions and source-row ownership
 stay in the retained template, ahead of changing invocation-bound rows. Every
@@ -429,19 +457,42 @@ scalars at 256 bits and proof references at 16 KiB. Each attempt has 65,536 work
 units and 1 MiB of modeled allocation, with failed attempts charged to the same
 containing observer and cancellation token. These candidates require source
 verification before admission.
+Pair inspection skips source rows wider than the support cap while retaining
+bounded inferences from other rows. It withholds complete coverage and source-point
+satisfaction when a skipped row has not been checked.
 An immutable template can append up to 64 explicit proposals before the shared
 checked-candidate pass. Existing candidate IDs are preserved; appending produces
 a new template identity. Full owner and coordinate indices must belong to that
 template, and copying and indexing costs debit the containing source allowance.
 The proposal producer owns and funds derivation construction separately.
 `source-aggregate-cuts=true` enables a template policy for numerical frontier
-traversal when source separation is enabled. It projects a continuous coordinate by combining its
-source row with the first singleton source bound of opposite coefficient sign.
-It applies checked rounding to the residual, using the first source bound sides
-for the remaining continuous coordinates. The cached family retains at most 64
+traversal when source separation is enabled. A sparse index pairs source rows with
+opposite signs on a shared continuous coordinate. Each pair uses its first indexed
+pivot and positive exact weights to cancel that coordinate; singleton source bounds
+participate in the same recipe. At least one row has integer activity. Checked
+rounding uses the first source bound sides for remaining continuous coordinates.
+Rows wider than the support cap are skipped with incomplete coverage. The cached family retains at most 64
 proposals under 500,000 preparation work and 8 MiB modeled allocation, with
 per-attempt limits shared with explicit aggregation. Stopped or limited
 preparation reports its decline and leaves only completed proposals available.
+Point selection queries the current recipe before preparing optional aggregate
+pairs. A checked current incumbent or terminal bypasses discovery. A completed
+nonterminal point can prepare aggregates alongside point-directed row alternatives
+under 65,536 work and 1 MiB modeled allocation. Ordinary aggregate-only queries keep
+their 500,000-work and 8 MiB limits. An installed aggregate recipe with at most 64
+fully checked rows can enter aging without replacing its query.
+When both source endpoints are stated, aggregate rounding selects the endpoint
+nearest the point independently for each continuous coordinate. One-sided coordinates
+retain their stated side; unavailable finite distances retain the ordinary choice.
+Aggregate proposal retention requires the same finite normalized violation used
+by point selection, so satisfied proposals leave room for later separating pairs.
+Projection and declined proposals spend the containing generation allowance.
+Unavailable projections withhold complete eligibility coverage.
+Only proposals selected against that point enter a replacement mask. An
+unproductive attempt retains the current recipe and its checked bound; selected
+aggregates follow the same bounded scoring, aging and retirement as other rows.
+Masked queries retain their adopted current or completed point-prepared template.
+Candidate row IDs belong to that same checked template.
 Aggregation is disabled by default.
 
 ### Root preparation
@@ -513,7 +564,19 @@ reusing logical-column layout, peeling singleton equations and variables without
 fill, and solving admitted residual components with the rational basis factors.
 Factorization and complete verification share the certificate budget; an unresolved
 component retains its proposed entries. A dimension-limited component can instead
-match its open basic directions to an admitted subset of dual coordinates. Other
+propose an admitted subset of dual coordinates for its open basic directions.
+Repair targets the exact residuals whose signs require absent bound sides,
+even when the full open set fits the dimension cap. Admissible one-sided
+residuals need not be zero. With no such basic residual, an admitted full open
+subsystem remains available for other column residues. A repair adds open basic
+directions whose residuals require missing sides after an earlier subsystem solve,
+retaining prior equations in the expanded proposal. Every expansion adds a direction
+and shares the original dimension, work, allocation and scalar limits. Every untouched
+direction remains subject to the complete dual check after the proposal changes its multipliers.
+Row-scaled floating elimination selects those coordinates within 16,384 projected
+cells and the containing certificate budget. Nonfinite or weak projected pivots
+decline; the selected exact submatrix must still factor and solve under the
+ordinary rational limits. Other
 proposed multipliers stay fixed; finite column boxes account for their residual
 reduced costs. This proposal retains the dimension, fill, scalar and cumulative
 spending limits and must pass the complete exact dual check. Basis-derived bounds
@@ -523,7 +586,8 @@ independent continued-fraction entries under the same denominator and spending
 limits; approximation tolerances select proposals only. Every proposal must pass
 the complete exact reduced-cost and bound-side check. Diagnostics retain the
 missing side with its exact reduced cost, the refused common denominator, peeling
-counts and residual factor costs. Accepted bounds retain row multipliers for
+counts, the largest proposed restricted dimension and residual factor costs,
+including failed proposals. Accepted bounds retain row multipliers for
 source lifting and rechecking. Preparation, floating stops, certificate declines and completed checked
 bounds have separate outcomes and costs; factor fill and density describe the
 completed numerical solve. Sparse preparation alone does not authorize ordinary
@@ -1141,8 +1205,23 @@ cumulative work, allocation, operation and cancellation allowances; it rechecks
 source derivations and cannot publish deductions into the original traversal.
 
 `source-point-cuts=true` opts the retained frontier into point-based separation.
-The first relaxation uses its retained checked mask; a completed point can add
-one selection round at that node. The score combines normalized violation,
+Ordinary linear-source execution binds the same source-cut controls to its admitted
+numerical companions. The containing source request owns these settings and removes
+them from finite worker recipe options; they change neither companion admission
+nor lifetime.
+A new template first runs the ordinary checked cut recipe; a completed point can
+add one selection round at that node. A trial that admits no candidate retains
+the ordinary template, checked query and numerical owner for later queries of that
+template. Successful selection retains its checked mask instead.
+Integer-only templates and aggregate-only cut families with at most 64 fully checked
+installed cuts adopt that mask directly from the current recipe, without another
+LP query or a root miss.
+Their later completed points age installed rows under the same scoring limits.
+Complementary endpoint mode retains an adopted current template; its mask refers
+to the installed definitions. Integer-only templates also share endpoint modes
+because they add no continuous bound alternatives.
+The current baseline, candidate preparation and any replacement keep their
+separate containing costs. The score combines normalized violation,
 inverse square-root support and objective parallelism. The model-facing cut pool
 and source selector share the greedy parallelism filter. Floating scores guide
 selection; source inequalities and their derivations remain exact rationals.
@@ -1150,8 +1229,11 @@ Nonfinite projections supply no score. Each call visits at most 8,192 support
 entries with 65,536 modeled scoring work and 1 MiB modeled allocation, within the
 containing cumulative source allowance. A template retains at most 64 selected IDs.
 Changing its source layout clears those IDs; every query rechecks guards, pins and
-derivations. Unselected cut rows are omitted from masked queries, and changed row
-layouts invalidate numerical cursors through the ordinary compatibility checks.
+derivations. Unselected cut rows are omitted from masked queries unless they belong
+to an adopted current family or a fully installed selected family, whose inactive
+definitions retain its numerical layout. Changed row layouts invalidate numerical
+cursors through the ordinary compatibility checks. Changed activity invalidates completed guidance before
+reusing the owner and its basis.
 Completed base bounds survive a paused or declined separation round. Checked base
 incumbents and terminals bypass extra separation. The ordinary default activates
 all accepted source cuts.
