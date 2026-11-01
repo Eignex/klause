@@ -1099,8 +1099,14 @@ class Portfolio(
                 it in eligible && !busy[it] && !retired[it]
             }
             val probe = if (dedicated) null else eligible.filter { !probed[it] && !busy[it] && !retired[it] }
-                .minWithOrNull(compareBy<Int> { if (workers[it].auxiliaryProof) 1 else 0 }
-                    .thenBy { initialProbeRanks.getOrElse(it) { it } })
+                .let { candidates ->
+                    if (initialProbeRanks.isEmpty()) {
+                        candidates.minByOrNull { if (workers[it].auxiliaryProof) 1 else 0 }
+                    } else {
+                        candidates.minWithOrNull(compareBy<Int> { if (workers[it].auxiliaryProof) 1 else 0 }
+                            .thenBy { initialProbeRanks[it] })
+                    }
+                }
             val unprobed = eligible.any { !probed[it] && !retired[it] }
             val revisit = if (dedicated || earlyCore != null || improving || unprobed) {
                 null
