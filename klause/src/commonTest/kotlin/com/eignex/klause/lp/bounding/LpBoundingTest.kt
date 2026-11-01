@@ -22,8 +22,8 @@ import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
-import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.PersistentLpSolver
+import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
@@ -91,8 +91,8 @@ class LpBoundingTest {
             }
             val bounds = ArrayList<Double>()
             val hints = object : LpHintSink {
-                override fun clear() {}
-                override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {}
+                override fun clear() = Unit
+                override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) = Unit
                 override fun recordBound(relaxation: LpRelaxation, bound: Double) { bounds.add(bound) }
             }
             val problem = triangle(1)
