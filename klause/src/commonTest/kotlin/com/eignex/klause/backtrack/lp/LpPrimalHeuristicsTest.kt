@@ -279,6 +279,7 @@ class LpPrimalHeuristicsTest {
                 val token = Cancellation { expired }
                 val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), token)
                 val queries = factory.floatAllowances.size
+                val constructions = factory.calls.size
                 assertTrue(expired)
                 assertTrue(bound.isNaN())
                 assertTrue(queries > 0)
@@ -288,6 +289,7 @@ class LpPrimalHeuristicsTest {
                 val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
 
                 assertEquals(queries, factory.floatAllowances.size)
+                assertEquals(constructions, factory.calls.size)
                 assertTrue(sample.ints.all { it in 0L..1L } &&
                     listOf(0 to 1, 1 to 2, 0 to 2, 3 to 4, 5 to 6).all { (left, right) ->
                         sample.ints[left] + sample.ints[right] >= 1L
