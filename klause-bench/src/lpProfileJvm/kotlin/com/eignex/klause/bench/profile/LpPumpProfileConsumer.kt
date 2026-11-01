@@ -18,10 +18,8 @@ import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 
-internal class LpPumpProfileConsumer(
-    private val mode: String,
-    private val templateStats: LpStatsSink,
-) : AutoCloseable {
+internal class LpPumpProfileConsumer(private val mode: String, private val templateStats: LpStatsSink) :
+    AutoCloseable {
     private val sink = SolveStatsSink("pump-preparation-profile")
     private var engine: LpEngine? = null
     private var current: LpRelaxation? = null
@@ -79,10 +77,16 @@ internal class LpPumpProfileConsumer(
     ): LpRelaxation {
         rebound = false
         if (cold || engine?.problem !== problem || engine?.projections !== projections) close()
-        val owner = engine ?: LpEngine(problem, objective,
-            LpParams(lpPlan = LpPlan(bounding = true)), sink, projections = projections,
+        val owner = engine ?: LpEngine(
+            problem,
+            objective,
+            LpParams(lpPlan = LpPlan(bounding = true)),
+            sink,
+            projections = projections,
             containingWork = { ownerPreparationWork += it },
-            reusePrimalTemplates = false, reusePumpPreparation = false).also {
+            reusePrimalTemplates = false,
+            reusePumpPreparation = false,
+        ).also {
             engine = it
             contextsOpened++
         }
@@ -104,11 +108,13 @@ internal class LpPumpProfileConsumer(
             check(!root.isUnsatAtRoot) { "profile source propagation is inconsistent" }
             val accounting = LpPrimalAssembly(owner, cancellation)
             accounting.token.checkLpAssembly()
-            return buildPrimalSource(problem, objective, SessionDomains(root), accounting.token,
+            return buildPrimalSource(
+                problem, objective, SessionDomains(root), accounting.token,
                 onWork = accounting::chargeConstruction, selection = projections,
                 reuseCompleteTemplates = false,
                 reuseSourceTemplates = mode == "object" || mode == "index",
-                reuseTemplateIndexes = mode == "index", templateStats = templateStats).also {
+                reuseTemplateIndexes = mode == "index", templateStats = templateStats,
+            ).also {
                 current = it
                 freshBuilds++
             }
