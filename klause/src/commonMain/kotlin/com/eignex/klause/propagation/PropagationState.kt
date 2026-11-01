@@ -760,7 +760,7 @@ class PropagationState private constructor(
      */
     internal fun installObjectiveBoolBound(weights: LongArray): Boolean {
         if (objBoolWeights != null) return true
-        if (levelToDecisionVar.isNotEmpty()) return false
+        if (levelToDecisionVar.size != 0) return false
         var base = 0L
         val nb = minOf(problem.numBoolVars, weights.size)
         for (b in 0 until nb) {
