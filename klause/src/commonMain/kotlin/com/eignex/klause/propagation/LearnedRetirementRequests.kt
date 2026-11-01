@@ -3,7 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.util.SharingMemoryObservation
 
 internal enum class LearnedRetirementStatus {
-    Captured, Pending, Deferred, StaleSelection, Unsupported, ProtectedFloor,
+    Captured, AlreadyOwned, Pending, Deferred, StaleSelection, Unsupported, ProtectedFloor,
     Retired, AlreadyGone, Cancelled, ScopeReleased, Idle,
 }
 
@@ -25,49 +25,86 @@ internal data class LearnedRetirementResult(
     val payloadReleased: Boolean = false,
     val physicalReleased: Boolean = false,
     val acknowledged: Boolean = false,
+    val minimumWork: Long = 0L,
+    val minimumScratchBytes: Long = 0L,
+    val minimumRetainedBytes: Long = 0L,
 )
 
 internal class LearnedRetirementRequests {
-    private class Request(var index: Int, val handle: LearnedRetirementHandle) {
+    private class Request(var index: Int, val key: Long, val handle: LearnedRetirementHandle) {
         var previous: Request? = null
         var next: Request? = null
     }
+    private class IndexNode(val key: Long, val bit: Int, var left: IndexNode? = null,
+        var right: IndexNode? = null, val request: Request? = null)
+
     private var scope = LearnedRetirementScope()
     private var first: Request? = null
     private var last: Request? = null
     private var cursor: Request? = null
+    private var indexRoot: IndexNode? = null
+    private var indexNodes = 0
     private var count = 0
     private var pending = 0
+    private var terminalOwners = 0
     private var acknowledged = 0
     var generation = 0L
         private set
-    val hasContinuation: Boolean get() = pending > 0 || acknowledged > 0
+    val hasContinuation: Boolean get() = pending > 0 || terminalOwners > 0 || acknowledged > 0
     val hasRequests: Boolean get() = count > 0
     val remapWork: Long get() = count * 8L + 2L
-    val ownedBytes: Long get() = 53L + count * 47L
+    val ownedBytes: Long get() = 69L + count * 55L + indexNodes * 36L
 
     fun capture(
         index: Int,
         expectedGeneration: Long,
-        maxWork: Long,
-        maxScratchBytes: Long,
+        budget: ReclamationPreparation,
         maxRetainedBytes: Long,
-        cancelled: () -> Boolean,
-        charge: (Long) -> Unit,
         validate: (Int) -> LearnedRetirementStatus?,
+        keyOf: (Int) -> Long,
     ): LearnedRetirementResult {
-        val budget = ReclamationPreparation(maxWork, maxScratchBytes, cancelled, charge)
+        var requiredWork = 12L
+        var requiredScratch = 64L
         return try {
-            budget.visit(8L, 64L)
+            budget.visit(12L, 64L)
             if (!scope.active) return result(LearnedRetirementStatus.ScopeReleased, budget)
             if (expectedGeneration != generation) return result(LearnedRetirementStatus.StaleSelection, budget)
             val declined = validate(index)
             if (declined != null) return result(declined, budget)
-            if (ownedBytes + 47L > maxRetainedBytes) return result(LearnedRetirementStatus.Deferred, budget)
-            budget.visit(24L, 64L)
+            val key = keyOf(index)
+            var node = indexRoot
+            var parent: IndexNode? = null
+            var right = false
+            var differing = -1
+            while (node != null) {
+                requiredWork = budget.work + 4L
+                budget.visit(4L)
+                differing = Long.SIZE_BITS - 1 - (key xor node.key).countLeadingZeroBits()
+                if (node.bit < 0 && differing < 0) {
+                    return result(LearnedRetirementStatus.AlreadyOwned, budget, checkNotNull(node.request).handle)
+                }
+                if (differing > node.bit) break
+                parent = node
+                right = key ushr node.bit and 1L != 0L
+                node = if (right) node.right else node.left
+            }
+            val nodes = if (node == null) 1 else 2
+            val requiredRetained = ownedBytes + 55L + nodes * 36L
+            if (requiredRetained > maxRetainedBytes) return result(LearnedRetirementStatus.Deferred, budget).copy(
+                minimumRetainedBytes = requiredRetained)
+            requiredWork = budget.work + 48L
+            requiredScratch = 256L
+            budget.visit(48L, 192L)
             budget.visit(0L)
             val handle = LearnedRetirementHandle(scope)
-            val request = Request(index, handle)
+            val request = Request(index, key, handle)
+            val leaf = IndexNode(key, -1, request = request)
+            val replacement = if (node == null) leaf else if (key ushr differing and 1L != 0L) {
+                IndexNode(key, differing, node, leaf)
+            } else IndexNode(key, differing, leaf, node)
+            if (parent == null) indexRoot = replacement else if (right) parent.right = replacement
+            else parent.left = replacement
+            indexNodes += nodes
             request.previous = last
             last?.next = request
             if (first == null) first = request
@@ -76,7 +113,8 @@ internal class LearnedRetirementRequests {
             count++
             result(LearnedRetirementStatus.Captured, budget, handle)
         } catch (_: ReclamationPreparation.Deferred) {
-            result(LearnedRetirementStatus.Deferred, budget)
+            result(LearnedRetirementStatus.Deferred, budget).copy(
+                minimumWork = requiredWork, minimumScratchBytes = requiredScratch)
         }
     }
 
@@ -93,6 +131,7 @@ internal class LearnedRetirementRequests {
             if (!terminal(handle.storedStatus)) {
                 if (handle.storedStatus == LearnedRetirementStatus.Pending) pending--
                 handle.storedStatus = LearnedRetirementStatus.Cancelled
+                terminalOwners++
             }
         }
 
@@ -100,6 +139,7 @@ internal class LearnedRetirementRequests {
         change(handle, budget) {
             if (terminal(handle.storedStatus) && !handle.acknowledged) {
                 handle.acknowledged = true
+                terminalOwners--
                 acknowledged++
             }
         }
@@ -118,7 +158,7 @@ internal class LearnedRetirementRequests {
             result(handle.storedStatus, budget, handle)
         }
     } catch (_: ReclamationPreparation.Deferred) {
-        result(LearnedRetirementStatus.Deferred, budget, handle)
+        result(LearnedRetirementStatus.Deferred, budget, handle).copy(minimumWork = 16L, minimumScratchBytes = 64L)
     }
 
     fun advance(
@@ -133,6 +173,7 @@ internal class LearnedRetirementRequests {
             handle = request.handle
             cursor = request.next ?: first
             if (handle.acknowledged) {
+                removeIndex(request, budget)
                 remove(request)
                 return result(handle.storedStatus, budget, handle)
             }
@@ -150,10 +191,39 @@ internal class LearnedRetirementRequests {
                 handle.payloadReleased = retired.payloadReleased
                 handle.physicalReleased = retired.physicalReleased
                 pending--
+                terminalOwners++
             }
             result(retired.status, budget, handle)
         } catch (_: ReclamationPreparation.Deferred) {
             result(LearnedRetirementStatus.Deferred, budget, handle)
+        }
+    }
+
+    private fun removeIndex(request: Request, budget: ReclamationPreparation) {
+        var node = checkNotNull(indexRoot)
+        var parent: IndexNode? = null
+        var grandparent: IndexNode? = null
+        var right = false
+        var parentRight = false
+        while (node.bit >= 0) {
+            budget.visit(4L)
+            grandparent = parent
+            parentRight = right
+            parent = node
+            right = request.key ushr node.bit and 1L != 0L
+            node = checkNotNull(if (right) node.right else node.left)
+        }
+        check(node.request === request)
+        budget.visit(16L)
+        budget.visit(0L)
+        if (parent == null) {
+            indexRoot = null
+            indexNodes--
+        } else {
+            val sibling = if (right) parent.left else parent.right
+            if (grandparent == null) indexRoot = sibling else if (parentRight) grandparent.right = sibling
+            else grandparent.left = sibling
+            indexNodes -= 2
         }
     }
 
@@ -192,27 +262,42 @@ internal class LearnedRetirementRequests {
         first = null
         last = null
         cursor = null
+        indexRoot = null
+        indexNodes = 0
         count = 0
         pending = 0
+        terminalOwners = 0
         acknowledged = 0
         generation++
     }
 
     fun sharingMemory(sample: SharingMemoryObservation) {
-        sample.owned(this, 20L, true)
-        sample.ownedReferences(this, 4L, true)
+        sample.owned(this, 28L, true)
+        sample.ownedReferences(this, 5L, true)
         sample.owned(scope, 1L, true)
         var request = first
         while (request != null) {
             sample.step()
-            sample.owned(request, 4L, true)
+            sample.owned(request, 12L, true)
             sample.ownedReferences(request, 3L, true)
             sample.owned(request.handle, 3L, true)
             sample.ownedReferences(request.handle, 2L, true)
             request = request.next
         }
+        indexMemory(indexRoot, sample)
         sample.record(mapOf("selectedRetirementRequests" to count.toLong(),
-            "selectedRetirementPending" to pending.toLong(), "selectedRetirementOwnedBytes" to ownedBytes))
+            "selectedRetirementPending" to pending.toLong(),
+            "selectedRetirementTerminalOwners" to terminalOwners.toLong(),
+            "selectedRetirementOwnedBytes" to ownedBytes))
+    }
+
+    private fun indexMemory(node: IndexNode?, sample: SharingMemoryObservation) {
+        if (node == null) return
+        sample.step()
+        sample.owned(node, 12L, true)
+        sample.ownedReferences(node, 3L, true)
+        indexMemory(node.left, sample)
+        indexMemory(node.right, sample)
     }
 
     private fun result(status: LearnedRetirementStatus, budget: ReclamationPreparation,

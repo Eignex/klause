@@ -4,6 +4,7 @@ import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedLifecycle
 import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.OriginCounts
 
 /**
@@ -47,6 +48,7 @@ internal class LearnedClauseDb(
 
     internal var integerRows: LearnedIntegerRows? = null
     internal val boolReasons = IntArrayList(1)
+    internal val admissions = LongArrayList(1)
     internal val boolReasonAdmissionWork: Long
         get() = 1L + when {
             boolReasons.size == boolReasons.backingData.size -> boolReasons.size * 3L + 1L

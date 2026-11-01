@@ -59,7 +59,7 @@ private fun PropagationState.generalCapPolicy(
     }
     override fun lbd(index: Int): Int = learned.lbds[index]
     override fun prepare(index: Int): Boolean {
-        budget.visit(32L)
+        budget.visit(CAP_ROW_POLICY_WORK)
         protected = retainedReason(index)
         prepared = index
         return true

@@ -500,6 +500,7 @@ class PropagationState private constructor(
         },
     )
     internal val selectedRetirements = LearnedRetirementRequests()
+    internal var nextLearnedAdmissionKey = 0L
 
     // The native SAT lane does not use CP propagators or occurrence indices. Keep their tables
     // deferred so a clause-only state does not retain both representations of every factor.

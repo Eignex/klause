@@ -7,6 +7,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.OriginCounts
 import com.eignex.klause.util.SharingMemoryObservation
 
@@ -63,6 +64,7 @@ internal class NativeSatState(private val state: PropagationState) {
     private val learnedTier = IntArrayList()
     private val learnedUsed = IntArrayList()
     private val learnedBoolReasons = IntArrayList(1)
+    private val learnedAdmissions = LongArrayList(1)
     private val lifecycleStages = IntArrayList()
     private val learnedUnits = IntArrayList()
     private var unitsPending = false
@@ -303,6 +305,14 @@ internal class NativeSatState(private val state: PropagationState) {
             else -> 0L
         }
         learnedBoolReasons.add(0)
+        state.work += 3L + when {
+            learnedAdmissions.size.toLong() * Long.SIZE_BYTES == learnedAdmissions.allocatedBytes ->
+                learnedAdmissions.size * 3L + 1L
+            learnedAdmissions.size == 0 -> 1L
+            else -> 0L
+        }
+        check(state.nextLearnedAdmissionKey < Long.MAX_VALUE)
+        learnedAdmissions.add(state.nextLearnedAdmissionKey++)
         learnedOrigin.add(origin)
         learnedScanPos.add(0)
         learnedCount++
@@ -337,7 +347,13 @@ internal class NativeSatState(private val state: PropagationState) {
         val columns = listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedBoolReasons,
             learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
             capCandidates, state.learned.capCandidates, state.learned.boolReasons)
-        var metadata = 0L
+        var metadata = capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes
+        for (keys in listOf(learnedAdmissions, state.learned.admissions)) {
+            sample.step()
+            metadata += keys.allocatedBytes + Int.SIZE_BYTES
+            sample.owned(keys, keys.allocatedBytes + Int.SIZE_BYTES, protectedRows)
+            sample.ownedReferences(keys, 1L, protectedRows)
+        }
         for (column in columns) {
             sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
             sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
@@ -388,6 +404,7 @@ internal class NativeSatState(private val state: PropagationState) {
     fun lbdOf(i: Int): Int = learnedLbd[i]
     fun permanentOf(i: Int): Boolean = learnedPermanent[i] == 1
     fun originOf(i: Int): Int = learnedOrigin[i]
+    fun admissionKeyOf(i: Int): Long = learnedAdmissions[i]
     fun tierOf(i: Int): ClauseTier = ClauseTier.entries[learnedTier[i]]
     fun setTierOf(i: Int, tier: ClauseTier) {
         learnedTier[i] = tier.ordinal
@@ -443,13 +460,13 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         override fun visited() { capVisits++ }
         override fun prepare(index: Int): Boolean {
-            val price = 40L
-            if (budget.remainingWork < 32L) budget.visit(32L)
+            val price = CAP_ROW_POLICY_WORK + 8L
+            if (budget.remainingWork < CAP_ROW_POLICY_WORK) budget.visit(CAP_ROW_POLICY_WORK)
             if (price > budget.remainingWork) {
-                budget.visit(16L)
+                budget.visit(16L - CAP_ROW_INSPECTION_WORK)
                 return false
             }
-            protected = capProtected(index, budget, 32L)
+            protected = capProtected(index, budget, CAP_ROW_POLICY_WORK)
             prepared = index
             return true
         }
@@ -566,6 +583,7 @@ internal class NativeSatState(private val state: PropagationState) {
             if (lifecycleStages[index] and 1 == 0) retained[index] = true
         }
         budget.atomic(learnedLits.backingData.size.toLong(), learnedLits.backingData.size.toLong() * Int.SIZE_BYTES)
+        budget.atomic(learnedAdmissions.allocatedBytes / Long.SIZE_BYTES, learnedAdmissions.allocatedBytes)
         for (column in listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedUsed, learnedBoolReasons,
             lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos, capCandidates)) {
             budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
@@ -645,6 +663,8 @@ internal class NativeSatState(private val state: PropagationState) {
             learnedUsed[target] = learnedUsed[i]
             state.work++
             learnedBoolReasons[target] = learnedBoolReasons[i]
+            state.work++
+            learnedAdmissions[target] = learnedAdmissions[i]
             learnedOrigin[target] = learnedOrigin[i]
             learnedScanPos[target] = learnedScanPos[i]
             learnedWatchPos[2 * target] = learnedWatchPos[2 * i]
@@ -665,6 +685,9 @@ internal class NativeSatState(private val state: PropagationState) {
         learnedUsed.truncateTo(survivors)
         state.work += learnedBoolReasons.size.toLong() - survivors
         learnedBoolReasons.truncateTo(survivors)
+        state.work += 2L + survivors.coerceAtLeast(1) * 2L
+        learnedAdmissions.truncateTo(survivors)
+        learnedAdmissions.trim()
         learnedOrigin.truncateTo(survivors)
         learnedScanPos.truncateTo(survivors)
         learnedWatchPos.truncateTo(2 * survivors)

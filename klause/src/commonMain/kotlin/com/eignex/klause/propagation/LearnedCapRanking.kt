@@ -3,6 +3,9 @@ package com.eignex.klause.propagation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryObservation
 
+internal const val CAP_ROW_INSPECTION_WORK = 4L
+internal const val CAP_ROW_POLICY_WORK = 32L - CAP_ROW_INSPECTION_WORK
+
 internal interface LearnedCapPolicy {
     fun alive(index: Int): Boolean
     fun lbd(index: Int): Int
@@ -32,6 +35,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
     var passes = 0L
         private set
     val modeledBytes: Long get() = 100L
+    val primitiveBytes: Long get() = 68L
 
     fun reset() {
         read = 0
@@ -99,7 +103,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
 
     private fun collect(limit: Int, budget: ReclamationPreparation, policy: LearnedCapPolicy) {
         val index = candidates[read]
-        budget.visit(4L)
+        budget.visit(CAP_ROW_INSPECTION_WORK)
         budget.visit(0L)
         if (!policy.alive(index)) {
             read++

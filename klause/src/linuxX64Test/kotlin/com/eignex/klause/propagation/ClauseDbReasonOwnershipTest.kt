@@ -12,7 +12,9 @@ internal class ClauseDbReasonOwnershipTest {
     @Suppress("FunctionNaming") // Native platform tests follow the common test naming convention.
     internal fun `Boolean retirement should progress within small grants at production sizes`() {
         for ((cap, native) in listOf(4_000 to false, 4_000 to true, 20_000 to false, 20_000 to true)) {
-            val session = PropagationSession(Problem(2, 0, emptyArray(), emptyArray()), nativeSat = native)
+            val session = PropagationSession(Problem(4, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
             val clause = Clause(intArrayOf(0, 2))
             repeat(cap) { session.addLearnedClause(clause, 9) }
 

@@ -89,6 +89,7 @@ internal fun PropagationState.addLearnedClause(
     learned.stages.add(initialStage)
     work += learned.boolReasonAdmissionWork
     learned.boolReasons.add(0)
+    addLearnedAdmissionKey()
     learned.store.add(clause)
     if (clause.literals.size == 1) learned.units.add(newFid)
     learned.lbds.add(lbd)
@@ -133,6 +134,7 @@ internal fun PropagationState.addLearnedPb(
     learned.stages.add(0)
     work += learned.boolReasonAdmissionWork
     learned.boolReasons.add(0)
+    addLearnedAdmissionKey()
     learned.store.add(prop)
     learned.nonClauseCount++
     work++
@@ -160,6 +162,7 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     learned.stages.add(0)
     work += learned.boolReasonAdmissionWork
     learned.boolReasons.add(0)
+    addLearnedAdmissionKey()
     learned.store.add(propagator)
     learned.nonClauseCount++
     work++
@@ -319,6 +322,8 @@ internal fun PropagationState.forgetLearnedClauses(
             learned.stages[w] = learned.stages[i]
             work++
             learned.boolReasons[w] = learned.boolReasons[i]
+            work++
+            learned.admissions[w] = learned.admissions[i]
             learned.lbds[w] = learned.lbds[i]
             learned.permanent[w] = learned.permanent[i]
             learned.tier[w] = learned.tier[i]
@@ -456,7 +461,21 @@ internal fun PropagationState.forgetLearnedClauses(
         learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) column.trim()
     work += learned.boolReasons.size.toLong() * 2L
     learned.boolReasons.trim()
+    work += 2L + w.coerceAtLeast(1) * 2L
+    learned.admissions.truncateTo(w)
+    learned.admissions.trim()
     return true
+}
+
+private fun PropagationState.addLearnedAdmissionKey() {
+    val keys = learned.admissions
+    work += 3L + when {
+        keys.size.toLong() * Long.SIZE_BYTES == keys.allocatedBytes -> keys.size * 3L + 1L
+        keys.size == 0 -> 1L
+        else -> 0L
+    }
+    check(nextLearnedAdmissionKey < Long.MAX_VALUE)
+    keys.add(nextLearnedAdmissionKey++)
 }
 
 internal fun PropagationState.noteLearnedBoolReason(factor: Int, delta: Int) {

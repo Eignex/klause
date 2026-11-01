@@ -21,7 +21,9 @@ class ClauseDbReasonOwnershipTest(private val cap: Int, private val native: Bool
 
     @Test
     fun `Boolean retirement should progress within small grants at production sizes`() {
-        val session = PropagationSession(Problem(2, 0, emptyArray(), emptyArray()), nativeSat = native)
+        val session = PropagationSession(Problem(4, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = native)
+        assertEquals(native, session.usesNativeSat)
         val clause = Clause(intArrayOf(0, 2))
         repeat(cap) { session.addLearnedClause(clause, 9) }
 
