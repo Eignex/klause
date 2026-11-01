@@ -112,6 +112,45 @@ class LpBoundingTest {
     }
 
     @Test
+    fun `cut bound guidance uses the point from its final working model`() {
+        val problem = triangle(1)
+        val bounds = ArrayList<Double>()
+        var cutAdded = false
+        var pointModel: LpModel? = null
+        var pointObjective = Double.NaN
+        LpEngine(problem, sumObjective,
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true, probe = false,
+                rootCutHarvest = false, rootBudgetMillis = 0L)),
+            SolveStatsSink("cut-guidance")).use { engine ->
+            engine.lpHints = object : LpHintSink {
+                override fun clear() = Unit
+                override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+                    pointModel = relaxation.model
+                    pointObjective = relaxation.intColOf.sumOf { primal[it] }
+                    if (!cutAdded) {
+                        val cut = engine.dualSimplex(relaxation.model, Cancellation.Never).use { simplex ->
+                            assertNotNull(simplex.solve())
+                            simplex.gomoryCuts(8).first()
+                        }
+                        assertTrue(engine.cutPool.add(cut, relaxation))
+                        cutAdded = true
+                    }
+                }
+                override fun recordBound(relaxation: LpRelaxation, bound: Double) {
+                    assertSame(pointModel, relaxation.model)
+                    assertEquals(bound, pointObjective, 1e-6)
+                    bounds.add(bound)
+                }
+            }
+
+            assertFalse(engine.pruneNode(PropagationSession(problem), 10.0, -1, true))
+        }
+
+        assertTrue(cutAdded)
+        assertEquals(2.0, bounds.single(), 1e-6)
+    }
+
+    @Test
     fun `lp bounding should preserve the optimum`() {
         val problem = triangle()
         val off = BacktrackSolver(problem.bake()).minimize(sumObjective, BacktrackParams(randomSeed = 1L))

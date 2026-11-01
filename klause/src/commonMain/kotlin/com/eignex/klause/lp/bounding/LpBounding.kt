@@ -655,6 +655,7 @@ internal fun LpEngine.sparseSafePrune(
             }
         }
     }
+    if (boundRel.model !== relaxation.model) hints?.record(boundRel, boundRes.primal, boundRes.duals)
     // The exact basis-certificate backs the prune bound, the learnable objective-bound reason and the
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.

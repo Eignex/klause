@@ -254,11 +254,13 @@ An unfinished iterate need not be feasible; its existing checked dual bound can 
 supply progress. Missing bounds, infeasibility, negative or nonfinite gains, integral
 coordinates and mismatched splits supply no numeric sample. Boolean coordinates must
 lie within `[0, 1]`; both integer split neighbours must belong to the current domain.
-These advisory observations supply no additional certified bound or pruning authority. The bound and fractional
-coordinates must come from the same working model; changed cut models decline.
+These advisory observations supply no additional certified bound or pruning authority.
+The bound and fractional coordinates must come from the same working model.
+A cut re-solve that returns an iterate refreshes the point before its accepted bound
+reaches the history.
 When ordinary bounding needs no certificate, an existing floating optimum remains
 the fallback estimate. Switching between checked bounds and floating optima clears
-history, so their gains and class priors never mix.
+history, so the two estimate kinds never train the same gains.
 The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
 

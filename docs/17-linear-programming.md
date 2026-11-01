@@ -174,6 +174,9 @@ objective bounds and checked infeasibility outcomes to finite search hints. It r
 the bound obtained for ordinary pruning, including a dual bound from an unfinished
 iterate. Directional history accepts only compatible retained model and row scopes
 whose fractional coordinates came from that working model; it adds no certification request.
+A cut re-solve that returns an iterate replaces the advisory point before its
+accepted bound is recorded. The retained row scope still controls compatibility
+with earlier gains.
 When no certificate is needed, an existing floating optimum can supply the advisory
 estimate; the search keeps that estimate kind in its history scope.
 Unavailable callbacks identify admission gates and incomplete numerical outcomes;
