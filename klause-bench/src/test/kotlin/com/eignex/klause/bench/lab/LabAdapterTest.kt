@@ -68,6 +68,7 @@ class LabAdapterTest {
         "typo,true", "cpus,0", "memory-mib,2047", "repeats,0", "timeout-ms,0", "engines,no-such-engine",
         "debug,yes", "exact,yes", "measurement,arbitrary", "heap-mib,8192", "gc,arbitrary", "compile-timeout-sec,0",
         "max,no", "lp,invalid", "presolve,invalid", "param.,value", "complete-assignment,yes", "compiler-seed,3",
+        "source-staging,arbitrary",
     )
     fun `invalid controls fail validation`(key: String, value: String) {
         assertFailsWith<IllegalArgumentException> { LabSettings(mapOf(key to value)) }
@@ -107,9 +108,21 @@ class LabAdapterTest {
         assertEquals("3", baseline["solverSeed"])
         assertEquals("1", baseline["compilerSeed"])
         assertEquals("cli-inclusive-v1", baseline["deadlinePolicy"])
+        assertEquals("cache", baseline["sourceStaging"])
         assertEquals("2", controls(mapOf("cpus" to "2"))["cpus"])
         assertEquals("5000", controls(mapOf("timeout-ms" to "5000"))["solverBudgetMs"])
         assertEquals("true", controls(mapOf("exact" to "true"))["exact"])
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["cache", "temporary"])
+    fun `source staging choice remains explicit in comparison controls`(target: String) {
+        val settings = LabSettings(mapOf("source-staging" to target))
+        val case = BenchCase("case", settings.caseParameters("cp", 3), settings.resources())
+
+        val controls = KlauseLabSuite.comparisonControls(case)
+
+        assertEquals(target, controls["sourceStaging"])
     }
 
     @ParameterizedTest

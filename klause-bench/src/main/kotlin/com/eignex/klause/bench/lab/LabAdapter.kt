@@ -12,6 +12,7 @@ import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.source.SourceStaging
 import com.eignex.klause.bench.target.collectionOf
 import com.eignex.lab.bench.*
 import kotlinx.serialization.json.JsonObject
@@ -135,6 +136,7 @@ internal object KlauseLabSuite : BenchSuite {
             captureDirectory = context.outputDirectory.resolve("report").toFile(),
             completeAssignment = p["complete-assignment"]?.toBooleanStrict() ?: false,
             measureResources = p.getValue("measurement") != "none",
+            sourceStaging = SourceStaging.parse(p["source-staging"] ?: "cache"),
         )
         val budget = Budget(p.getValue("timeout-ms").toLong())
         val record = if (ref.format == Format.JSON_SCHEMA) {
@@ -203,6 +205,7 @@ internal object KlauseLabSuite : BenchSuite {
         }
         put("exact", p["exact"] ?: "false")
         put("deadlinePolicy", "cli-inclusive-v1")
+        put("sourceStaging", p["source-staging"] ?: "cache")
         case.attributes["labInputDigest"]?.let { put("inputDigest", it) }
     }
 

@@ -452,6 +452,22 @@ IO event extracts are written after all trials on the lab worker. They retain
 recording-threshold omissions and overlapping event scopes explicitly; absent
 events do not establish zero IO cost.
 
+Ordinary solves accept `source-staging=cache|temporary` for compressed input copies;
+the default is `cache`. Decoding, staging and cleanup spend the same source allowance
+for either choice. The comparison record retains the policy, actual staging root
+and CLI arguments. Identity preparation, checking and reporting remain in case/job
+costs outside the source invocation; comparing invocation times alone omits them.
+`lab/frozen.json` executes the ordinary adapter over `cases`, a JSON array of retained
+single-model `BenchCase` templates for DIMACS, WCNF or MPS. Each template retains its
+packed corpus path/hash and declares `sourcePlainSha256` in its attributes. Planning
+expands ordinary engine/seed/repeat controls from at most eight templates into at
+most 128 cases without catalog discovery; execution
+verifies both identities and retains failed results. Request source validation with
+`bench.sourceValidation`, and retain full-cost same-machine paired rows for staging
+qualification. The diagnostic prehash uses 8 KiB reads; ordinary identity hashing
+uses 64 KiB reads. Both read the full plain source before the invocation timer, but
+they do not have identical IO call sizes.
+
 The planner accepts `selections`, a JSON-encoded list of independent selector maps,
 merged without duplicate catalog identities. Paired experiments use lab `configs`,
 `grid` and `repeats`: `ref` selects a revision and `param.<key>` overrides an adapter

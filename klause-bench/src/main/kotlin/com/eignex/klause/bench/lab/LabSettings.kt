@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.lab
 
 import com.eignex.klause.bench.runner.MZN_RANDOM_SEED
+import com.eignex.klause.bench.source.SourceStaging
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.lab.bench.BenchResources
@@ -27,6 +28,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     val heap = (parameters["heap-mib"] ?: (memory - 1536).toString()).toLong()
     val gc = parameters["gc"] ?: "default"
     val comparisonSeries = parameters["comparison-series"] ?: "sdk-v1"
+    val sourceStaging = SourceStaging.parse(parameters["source-staging"] ?: "cache")
     val wallTimeout = (timeout * 2 + 20_999) / 1000 + 2 * compileTimeout + 120
 
     init {
@@ -83,6 +85,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
             "compile-timeout-sec" to compileTimeout.toString(),
             "compiler-seed" to compilerSeed.toString(),
             "comparison-series" to comparisonSeries,
+            "source-staging" to sourceStaging.key,
             "debug" to debug.toString(),
             "measurement" to measurement,
             "heap-mib" to heap.toString(),
@@ -120,6 +123,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
             "input-only", "selections", "engines", "solver-seeds", "repeats", "cpus", "memory-mib", "timeout-ms", "lp",
             "presolve", "exact", "debug", "measurement", "heap-mib", "gc", "compile-timeout-sec",
             "complete-assignment", "propagation-controls", "compiler-seed", "comparison-series",
+            "source-staging",
         )
         private val ENGINES = setOf(
             "default", "fixed", "backtrack", "bt", "cp", "localsearch", "ls", "local-search",
