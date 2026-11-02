@@ -53,6 +53,37 @@ class LpHintsTest {
     }
 
     @Test
+    fun `disabled guidance spends no optional observation work`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 2, cost = 1)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+        var work = 0L
+        var queries = 0
+        val hints = LpHints(1, 0, directionalGains = false, rootBasis = true, charge = { work += it })
+        val variable = VarRef.IntVar(0)
+        val domain = IntDomain(0, 2)
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(0.75), DoubleArray(0))
+        hints.recordBound(relaxation, 0.0)
+        hints.branch(variable, domain)
+        hints.commit(SearchDecision.IntAtMost(0, 0), 1)
+        hints.beginNode(1, 100.0)
+
+        hints.recordPoint(relaxation, doubleArrayOf(0.25), DoubleArray(0))
+        hints.recordFiniteBound(trail.state, 1L)
+        hints.finishNode(trail.state)
+        hints.prepareSelectedSide(variable, domain) { _, _ ->
+            queries++
+            listOf(LpDirectionalCost(1.0, 4.0))
+        }
+
+        assertEquals(0L, work)
+        assertEquals(0, queries)
+    }
+
+    @Test
     fun `finite child bounds train history without refreshing the LP point`() {
         for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
             val builder = LpBuilder()

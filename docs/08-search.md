@@ -286,7 +286,7 @@ floating conversion. This completion supplies no fresh LP point or new parent
 observation. Objective-bound pruning can supply progress; pure infeasibility cannot.
 Unsupported or overflowing bounds retain the missing-observation fallback.
 
-The `lp-default` and `lp-aggressive` optimization recipes enable the finite consumer; direct
+The `lp-default` optimization recipe enables the finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
 and branching must be enabled. The reduced-cost/fractionality scorer supplies its
@@ -304,8 +304,6 @@ estimate from its retained optimal basis. This attempt is limited to one column 
 one attempt per hint owner, including across slices, restarts and assumption reseeding.
 An unsupported or unfunded attempt consumes that opportunity and retains the existing
 child order. Reliable history takes precedence and consumes no basis opportunity.
-The LP recipes enable directional gains; direct parameters opt in through
-`lpDirectionalGains`.
 History preparation and ordering share the existing LP allowance.
 
 The larger predicted objective increase is tried first, after value and incumbent

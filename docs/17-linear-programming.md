@@ -207,6 +207,8 @@ When no certificate is needed, an existing floating optimum can supply the advis
 estimate; the search keeps that estimate kind in its history scope.
 Unavailable callbacks identify admission gates and incomplete numerical outcomes;
 they carry no optimum, bound or query authorization.
+Disabled directional guidance retains ordinary LP value and reduced-cost hints, but
+collects no gains and retains no directional model scope or refreshed point snapshot.
 The ordinary finite linear-bound check can retain its already computed integer
 lower bound for a pending child observation, including a node it prunes. Capture
 and delivery require remaining containing and cumulative LP work; actual work is

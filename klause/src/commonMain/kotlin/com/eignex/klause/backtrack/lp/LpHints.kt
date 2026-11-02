@@ -39,7 +39,7 @@ internal class LpHints(
 ) : LpHintSink {
     private data class SideAdvice(val variable: VarRef, val split: Long, val up: Boolean, val basis: Boolean)
 
-    private val collect = numIntVars.toLong() + numBoolVars <= 8192L
+    private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge)
     private var freshRecord = false
     private var pointRelaxation: LpRelaxation? = null
@@ -530,8 +530,8 @@ internal class LpHints(
      */
     override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
         recorded = true
-        freshRecord = true
-        pointRelaxation = relaxation
+        freshRecord = collect
+        pointRelaxation = if (collect) relaxation else null
         pointPrimal = null
         pendingSide = null
         activeSide = null
