@@ -42,6 +42,9 @@ internal object NativeLpSuite : BenchSuite {
         require(case.parameters["source-staging"] == "cache") {
             "Native and library adapters require cache source staging"
         }
+        require(case.parameters["harness-jfr"] != "true") {
+            "Harness JFR requires the ordinary JVM CLI adapter"
+        }
         require(case.parameters["measurement"] in setOf("none", "resources")) {
             "Native LP qualification supports ordinary timing and process resources"
         }

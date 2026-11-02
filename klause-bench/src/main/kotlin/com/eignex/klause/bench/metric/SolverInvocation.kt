@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.profile.SourcePreparationCapture
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincRunner
@@ -123,17 +124,20 @@ internal object SolverInvocation {
             rawOutput = "", command = "SOURCE_PREPARATION")
         fun checkActive() = checkSourceActive(nanoTime() - start, budget)
         val failure = runCatching {
-            CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it },
-                stagingDirectory = stagingDirectory, nanoTime = nanoTime) { plain ->
-                checkActive()
-                val cliStart = nanoTime()
-                preparationNanos = cliStart - start
-                val remaining = budget.timeoutMillis - (cliStart - start) / NANOS_PER_MILLI
-                if (remaining <= 0L) throw SourcePreparationTimeout()
-                try {
-                    result = solve(plain, Budget(remaining))
-                } finally {
-                    cliNanos = nanoTime() - cliStart
+            SourcePreparationCapture.span("source-preparation").use { preparation ->
+                CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it },
+                    stagingDirectory = stagingDirectory, nanoTime = nanoTime) { plain ->
+                    preparation.close()
+                    checkActive()
+                    val cliStart = nanoTime()
+                    preparationNanos = cliStart - start
+                    val remaining = budget.timeoutMillis - (cliStart - start) / NANOS_PER_MILLI
+                    if (remaining <= 0L) throw SourcePreparationTimeout()
+                    try {
+                        result = SourcePreparationCapture.measure("source-cli") { solve(plain, Budget(remaining)) }
+                    } finally {
+                        cliNanos = nanoTime() - cliStart
+                    }
                 }
             }
         }.exceptionOrNull()

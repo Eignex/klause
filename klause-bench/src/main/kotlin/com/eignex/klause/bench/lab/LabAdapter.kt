@@ -10,6 +10,8 @@ import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.sha256
+import com.eignex.klause.bench.profile.HarnessRecording
+import com.eignex.klause.bench.profile.SourcePreparationCapture
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.SourceStaging
@@ -112,7 +114,7 @@ internal object KlauseLabSuite : BenchSuite {
     }
 
     internal fun solveRecord(case: BenchCase, context: BenchContext): SolveRecord {
-        LabInputs.verify(case, context)
+        SourcePreparationCapture.measure("input-verification") { LabInputs.verify(case, context) }
         fun source(input: BenchInput) = ProblemSource.Prepared(LabInputs.path(input, context).toFile())
         val includes = case.inputs.filter { it.role == "include" }.map { source(it).file }
         val ref = ProblemRef(
@@ -206,6 +208,7 @@ internal object KlauseLabSuite : BenchSuite {
         put("exact", p["exact"] ?: "false")
         put("deadlinePolicy", "cli-inclusive-v1")
         put("sourceStaging", p["source-staging"] ?: "cache")
+        put("harnessJfr", p["harness-jfr"] ?: "false")
         case.attributes["labInputDigest"]?.let { put("inputDigest", it) }
     }
 
@@ -229,23 +232,14 @@ internal object KlauseLabSuite : BenchSuite {
         val input = context.outputDirectory.resolve("input.json")
         Files.writeString(input, BenchProtocol.json.encodeToString(BenchCase.serializer(), case))
         val environment = LabRuntime.environment(case, context)
+        val command = LabRuntime.harnessCommand(case, input, report)
+        Files.writeString(report.resolve("harness-command.json"), Reports.json.encodeToString(command))
         var record: SolveRecord? = null
         val error = runCatching {
             LabInputs.verify(case, context)
             val exit = LabRuntime.process(
                 context,
-                listOf(
-                    Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                    "-Xmx512m",
-                    "--enable-native-access=ALL-UNNAMED",
-                    "--add-modules=jdk.incubator.vector",
-                    "-cp",
-                    System.getProperty("java.class.path"),
-                    "com.eignex.klause.bench.lab.LabAdapterKt",
-                    "solve-record",
-                    input.toString(),
-                    report.toString(),
-                ),
+                command,
                 environment,
             )
             val file = report.resolve("solve-record.json")
@@ -260,6 +254,7 @@ internal object KlauseLabSuite : BenchSuite {
                 null
             }
         }.getOrElse { "CLI adapter failed: ${it.message}" }
+        if (case.parameters["harness-jfr"] == "true") HarnessRecording.extract(report)
         val metrics = record?.let(::metrics).orEmpty() + LabRuntime.resourceMetrics(report)
         val artifacts = context.artifacts() + listOf(
             "input.json",
