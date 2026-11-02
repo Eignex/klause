@@ -11,6 +11,7 @@ internal class PrivateRebuildParity private constructor(
     val newPins: Int,
     val rows: Int,
     val modeledBytes: Long,
+    val affine: PrivateRebuildAffine?,
 ) {
     companion object {
         private const val MAX_FACTORS = 32_768
@@ -41,7 +42,7 @@ internal class PrivateRebuildParity private constructor(
             if (!funded(size * 3L)) return null
             onWorkspace(tableBytes)
             val table = Cubes(size, funded, onDecline)
-            if (!table.collect(source)) return null
+            if (!table.collect(source, session)) return null
             val rowCount = table.countRows() ?: return null
             if (rowCount == 0) { onDecline("NoRows"); return null }
             val words = (source.numBoolVars + 63) ushr 6
@@ -52,16 +53,20 @@ internal class PrivateRebuildParity private constructor(
             val fixed = Array(source.numBoolVars) { session.boolValue(it) }
             val matrix = Matrix(rowCount, source.numBoolVars, words, fixed, funded)
             if (!table.populate(matrix)) return null
-            val pins = matrix.derive(onDecline) ?: return null
-            if (pins == 0) { onDecline("NoPins"); return null }
+            val pins = matrix.derive(onDecline, table.completeSource) ?: return null
+            if (pins == 0 && matrix.affine == null) { onDecline("NoPins"); return null }
             if (!funded(8L)) return null
-            return PrivateRebuildParity(source, fixed, pins, rowCount, bytes)
+            return PrivateRebuildParity(source, fixed, pins, rowCount, bytes, matrix.affine)
+        }
+
+        private fun pattern(key: Long, parity: Int): Int {
+            val binary = key and COLUMN_MASK.toLong() == COLUMN_MASK.toLong()
+            return if (binary) { if (parity == 0) 0x9 else 0x6 }
+            else if (parity == 0) EVEN_MASK else ODD_MASK
         }
 
         private fun complete(key: Long, mask: Int, parity: Int): Boolean {
-            val binary = key and COLUMN_MASK.toLong() == COLUMN_MASK.toLong()
-            val pattern = if (binary) { if (parity == 0) 0x9 else 0x6 }
-            else if (parity == 0) EVEN_MASK else ODD_MASK
+            val pattern = pattern(key, parity)
             return mask and pattern == pattern
         }
 
@@ -75,14 +80,28 @@ internal class PrivateRebuildParity private constructor(
             var entries = 0L
                 private set
 
-            fun collect(source: BakedProblem): Boolean {
+            var completeSource = true
+                private set
+
+            fun collect(source: BakedProblem, session: PropagationSession): Boolean {
                 entries = source.numBoolVars.toLong() + source.numFactors + 1L
                 for (factor in source.factors) {
                     if (!visit(2L)) return false
                     if (factor !is Clause) { onDecline("Scope"); return false }
                     val literals = factor.literals
                     entries += literals.size
-                    if (literals.size !in 2..3) continue
+                    if (factor.tautological) continue
+                    if (literals.size == 1) {
+                        if (!visit(3L)) return false
+                        val literal = literals[0]
+                        val variable = Lit.variable(literal)
+                        if (variable >= source.numBoolVars ||
+                            session.boolValue(variable)?.let { Lit.evaluate(literal, it) } != true) {
+                            completeSource = false
+                        }
+                        continue
+                    }
+                    if (literals.size !in 2..3) { completeSource = false; continue }
                     if (!visit(24L)) return false
                     var a = literals[0]
                     var b = literals[1]
@@ -93,7 +112,7 @@ internal class PrivateRebuildParity private constructor(
                     val left = Lit.variable(a)
                     val middle = Lit.variable(b)
                     val right = if (literals.size == 3) Lit.variable(c) else COLUMN_MASK
-                    if (left == middle || middle == right) continue
+                    if (left == middle || middle == right) { completeSource = false; continue }
                     if (middle >= source.numBoolVars || (literals.size == 3 && right >= source.numBoolVars)) {
                         onDecline("Scope")
                         return false
@@ -120,9 +139,14 @@ internal class PrivateRebuildParity private constructor(
             fun countRows(): Int? {
                 var count = 0
                 for (slot in keys.indices) {
-                    if (!visit(4L)) return null
+                    if (!visit(8L)) return null
                     if (keys[slot] == EMPTY) continue
-                    for (parity in 0..1) if (complete(keys[slot], masks[slot], parity)) count++
+                    var covered = 0
+                    for (parity in 0..1) if (complete(keys[slot], masks[slot], parity)) {
+                        count++
+                        covered = covered or pattern(keys[slot], parity)
+                    }
+                    if (masks[slot] and covered != masks[slot]) completeSource = false
                 }
                 return count
             }
@@ -150,6 +174,8 @@ internal class PrivateRebuildParity private constructor(
             private val rhs = IntArray(rows)
             private val pivotColumns = IntArray(rows)
             private var added = 0
+            var affine: PrivateRebuildAffine? = null
+                private set
 
             fun add(key: Long, parity: Int): Boolean {
                 if (!visit(13L)) return false
@@ -170,7 +196,7 @@ internal class PrivateRebuildParity private constructor(
                 return true
             }
 
-            fun derive(onDecline: (String) -> Unit): Int? {
+            fun derive(onDecline: (String) -> Unit, completeSource: Boolean): Int? {
                 var pivot = 0
                 for (column in 0 until columns) {
                     if (!visit(1L)) return null
@@ -194,7 +220,7 @@ internal class PrivateRebuildParity private constructor(
                     pivot++
                     if (pivot == masks.size) break
                 }
-                return pins(pivot, onDecline)
+                return pins(pivot, onDecline, completeSource)
             }
 
             private fun eliminate(pivot: Int, column: Int): Boolean {
@@ -211,7 +237,7 @@ internal class PrivateRebuildParity private constructor(
                 return true
             }
 
-            private fun pins(rank: Int, onDecline: (String) -> Unit): Int? {
+            private fun pins(rank: Int, onDecline: (String) -> Unit, completeSource: Boolean): Int? {
                 for (row in rank until masks.size) {
                     if (!visit(2L)) return null
                     if (rhs[row] != 0) { onDecline("RefutationDeferred"); return null }
@@ -241,6 +267,10 @@ internal class PrivateRebuildParity private constructor(
                     if (!visit(2L)) return null
                     fixed[column] = rhs[row] != 0
                     pins++
+                }
+                if (completeSource && rank > 0) {
+                    if (!visit(16L)) return null
+                    affine = PrivateRebuildAffine(fixed, coordinates, pivotColumns, rhs, dependencies, rank, free)
                 }
                 return pins
             }

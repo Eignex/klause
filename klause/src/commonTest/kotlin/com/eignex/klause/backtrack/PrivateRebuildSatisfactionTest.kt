@@ -51,6 +51,31 @@ class PrivateRebuildSatisfactionTest {
     }
 
     @Test
+    fun `free affine coordinates should reach a consuming worker and a checked source witness`() {
+        for (native in listOf(false, true)) {
+            val clauses = listOf(0, 3, 5, 6).map { mask ->
+                Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })
+            }.toTypedArray<Factor>()
+            val source = Problem(3, 0, emptyArray(), clauses).bake()
+
+            val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+                nativeSat = native, privateRebuildWork = 65_536L,
+            )))
+
+            assertTrue(clauses.all { factor ->
+                (factor as Clause).literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+            })
+            val learning = result.stats.search.learning
+            assertEquals(0L, learning["privateRebuildParityPins"])
+            assertEquals(1L, learning["privateRebuildAffineGenerationColumns"])
+            assertEquals(2L, learning["privateRebuildAffineGenerationFreeColumns"])
+            assertEquals(1L, learning["privateRebuildConsumers"])
+            assertEquals(1L, learning["privateRebuildSourceAccepted"])
+            assertEquals(1L, learning["privateRebuildRetired"])
+        }
+    }
+
+    @Test
     fun `parity discovery should remain in the complete private charged ledger`() {
         val clauses = (0..3).flatMap { excluded ->
             val columns = (0..3).filter { it != excluded }

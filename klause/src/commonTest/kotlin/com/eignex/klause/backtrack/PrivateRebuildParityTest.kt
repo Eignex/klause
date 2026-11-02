@@ -186,16 +186,75 @@ class PrivateRebuildParityTest {
     }
 
     @Test
-    fun `a parity row without forced coordinates should withhold a generation`() {
+    fun `a complete affine source should preserve every free assignment in a fresh namespace`() {
+        for (phase in 0..1) {
+            val clauses = (0..7).filter { it.countOneBits() % 2 != phase }.map { mask ->
+                Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })
+            }.toTypedArray<Factor>()
+            val source = Problem(3, 0, emptyArray(), clauses).bake()
+            val session = PropagationSession(source)
+
+            val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
+                Cancellation.Never, parity = captured))
+            val lifted = mutableSetOf<List<Boolean>>()
+            for (mask in 0..7) {
+                val point = BooleanArray(3) { mask and (1 shl it) != 0 }
+                if (generation.problem.factors.all { factor ->
+                        (factor as Clause).literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
+                    }) {
+                    val result = generation.reconstruct(Sample(point, longArrayOf()))
+                    lifted.add(List(3) { result.boolValue(it) })
+                }
+            }
+            val expected = (0..7).filter { it.countOneBits() % 2 == phase }.map { mask ->
+                List(3) { mask and (1 shl it) != 0 }
+            }.toSet()
+
+            assertEquals(expected, lifted)
+            assertEquals(0, captured.newPins)
+            assertEquals(1, generation.affineColumns)
+            assertEquals(2, generation.affineFreeColumns)
+            assertTrue(generation.problem !== source)
+            for (variable in 0..2) assertNull(session.boolValue(variable))
+        }
+    }
+
+    @Test
+    fun `an uncovered clause should prevent elimination of the source parity system`() {
+        val clauses = (0..3).flatMap { excluded ->
+            val columns = (0..3).filter { it != excluded }
+            listOf(1, 2, 4, 7).map { mask ->
+                Clause(IntArray(3) { Lit.make(columns[it], mask and (1 shl it) == 0) })
+            }
+        } + Clause(IntArray(4) { Lit.make(it, true) })
+        val session = PropagationSession(Problem(4, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake())
+
+        val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
+        val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never, parity = captured)
+
+        assertNull(captured.affine)
+        assertNull(generation)
+        for (variable in 0..3) assertNull(session.boolValue(variable))
+    }
+
+    @Test
+    fun `canonical clauses should be withheld from changed affine coordinates`() {
         val clauses = listOf(0, 3, 5, 6).map { mask ->
             Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })
         }.toTypedArray<Factor>()
         val session = PropagationSession(Problem(3, 0, emptyArray(), clauses).bake())
+        session.addLearnedClause(Clause((clauses[0] as Clause).literals.copyOf()), 3)
 
-        val captured = PrivateRebuildParity.capture(session, 1_048_576L, { true })
+        val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
+        val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
+            Cancellation.Never, parity = captured))
 
-        assertNull(captured)
-        for (variable in 0..2) assertNull(session.boolValue(variable))
+        assertTrue(generation.warmClauses.clauses.isEmpty())
+        val lifted = generation.reconstruct(Sample(BooleanArray(3), longArrayOf()))
+        assertTrue(clauses.all { factor ->
+            (factor as Clause).literals.any { Lit.evaluate(it, lifted.boolValue(Lit.variable(it))) }
+        })
     }
 
     @Test

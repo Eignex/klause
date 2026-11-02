@@ -252,7 +252,7 @@ contract. The diagnostic itself creates no replacement or publication authority.
 unconditional consistent root pauses its canonical traversal, simplifies a private
 copy with global pins and applies bounded source reductions with typed reconstruction.
 The new baked model has a fresh identity; mappings compose through the pinned,
-eliminated and baked objects. Column slots remain stable. A consumer opens after an actual elimination or newly proved parity pins. Assumptions, external components, arithmetic and LP-enabled
+eliminated and baked objects. Column slots remain stable. A consumer opens after an actual elimination, newly proved parity pins or a completely covered affine view. Assumptions, external components, arithmetic and LP-enabled
 workers retain their canonical traversal. Enumeration and optimization do not use
 this trial.
 
@@ -287,8 +287,9 @@ the complete parity class of exclusions entails the opposite parity equation.
 A preparation-only GF(2) matrix substitutes the canonical global pins and uses
 forward elimination followed by affine back substitution over its free coordinates.
 A pivot is globally forced only when its complete free-coordinate dependency
-cancels. Additional Boolean pins are emitted only after complete elimination. Incomplete clause groups, duplicate exclusions and partial
-matrix work grant no additional pins. A derived contradiction supplies no source
+cancels. Additional Boolean pins are emitted only after complete elimination.
+Incomplete clause groups, duplicate exclusions and partial matrix work grant no
+additional pins. A derived contradiction supplies no source
 refutation authority.
 
 The immutable source identity binds the captured pin snapshot. Its table,
@@ -300,6 +301,18 @@ as unit clauses and composes its reconstruction over the fixed source view.
 Canonical search state stays unchanged. A changed fixed view can open a consumer
 without an additional BVE pivot; its pins are counted separately from eliminated
 columns. Closing or declining releases the captured snapshot with its generation.
+
+When every source clause is covered by complete parity encodings, tautologies or
+canonical global unit facts, the rebuilt model can replace the encoded equations
+with their free-coordinate view. Source column slots remain stable; a private
+pivot slot is fixed to a placeholder and has no canonical literal authority.
+Reconstruction evaluates the owned affine basis from the private free-coordinate
+values, preserving every source solution rather than choosing a source constant.
+The complete coverage proof is required before dropping any encoded clause.
+Uncovered clauses retain the fixed-value path. Canonical learned clauses are
+withheld from the affine view because their pivot literals lack a supported
+projection. The containing grants cover the basis and reconstruction; every
+consumer point still reconstructs and checks the complete canonical source.
 
 A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker

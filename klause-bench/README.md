@@ -143,6 +143,10 @@ Private parity discovery reports `ParityDiscoveryWork`, `ParityDiscoveryNanos`,
 separate from canonical root propagation and later `PreparationWork`.
 `ParityGenerationPins` counts proved pins in a prepared private model;
 `Consumers` confirms that its worker opened.
+`ParityAffineColumns` and `ParityAffineFreeColumns` describe a fully covered
+captured affine basis. `AffineGenerationColumns` and `AffineGenerationFreeColumns`
+count its coordinates in a prepared model. These private pivot slots require
+affine reconstruction and cannot receive unprojected canonical learned clauses.
 `ParityWorkspaceBytes` is the maximum modeled table/matrix/snapshot workspace
 within one private coordinator, rather than RSS or cumulative allocation.
 `ParityDeclinedPartial`, `Memory`, `NoRows`, `NoPins` and

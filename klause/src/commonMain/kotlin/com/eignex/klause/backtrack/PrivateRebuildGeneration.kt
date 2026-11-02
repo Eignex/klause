@@ -34,6 +34,8 @@ internal class PrivateRebuildGeneration private constructor(
     val sourceFactors: Int,
     val equivalenceMerges: Int,
     val parityPins: Int,
+    val affineColumns: Int,
+    val affineFreeColumns: Int,
 ) {
     fun reconstruct(sample: Sample): Sample = mapping.reconstructFrom(problem, sample)
 
@@ -101,9 +103,15 @@ internal class PrivateRebuildGeneration private constructor(
                     return null
                 }
             }
-            val residual = ArrayList<Factor>(source.numFactors)
+            val affine = parity?.affine
+            if (affine != null) {
+                cancellation.charge(source.numBoolVars * 2L)
+                if (cancellation()) return null
+            }
+            val privateFixed = if (affine == null) fixed else Array(source.numBoolVars) { affine.privateValue(it) }
+            val residual = ArrayList<Factor>(if (affine == null) source.numFactors else source.numBoolVars)
             var reused = 0
-            for (factor in source.factors) {
+            if (affine == null) for (factor in source.factors) {
                 if (cancellation()) return null
                 val literals = (factor as Clause).literals
                 cancellation.charge(literals.size * 2L + 1L)
@@ -132,7 +140,7 @@ internal class PrivateRebuildGeneration private constructor(
             if (parity != null) {
                 cancellation.charge(source.numBoolVars * 16L)
                 if (cancellation()) return null
-                for (variable in fixed.indices) fixed[variable]?.let { value ->
+                for (variable in privateFixed.indices) privateFixed[variable]?.let { value ->
                     residual.add(Clause(intArrayOf(Lit.make(variable, value))))
                 }
             }
@@ -153,7 +161,8 @@ internal class PrivateRebuildGeneration private constructor(
                 return null
             }
             var mapping = SourceMapping(source, pinned, guarantees, lift = { sample ->
-                Sample(BooleanArray(fixed.size) { fixed[it] ?: sample.boolValue(it) }, longArrayOf())
+                affine?.reconstruct(sample) ?:
+                    Sample(BooleanArray(fixed.size) { fixed[it] ?: sample.boolValue(it) }, longArrayOf())
             })
             val neighborhood = admission?.let {
                 PrivateRebuildNeighborhood.prepare(pinned, it, cancellation) ?: return null
@@ -217,8 +226,14 @@ internal class PrivateRebuildGeneration private constructor(
             }
             mapping = mapping.then(SourceMapping(pinned, reduced, guarantees, rebuild))
             val warmStart = TimeSource.Monotonic.markNow()
-            val warm = PrivateRebuildWarmClauses.capture(session, rebuild, fixed, byteLimit - privateBytes,
-                (allowance - spent).coerceAtLeast(0L), cancellation) ?: return null
+            val warm = if (affine == null) {
+                PrivateRebuildWarmClauses.capture(session, rebuild, fixed, byteLimit - privateBytes,
+                    (allowance - spent).coerceAtLeast(0L), cancellation) ?: return null
+            } else {
+                cancellation.charge(8L)
+                if (cancellation()) return null
+                PrivateRebuildWarmClauses.empty()
+            }
             val warmNanos = warmStart.elapsedNow().inWholeNanoseconds
             val enriched = if (warm.clauses.isEmpty()) reduced else reduced.withFactors(reduced.factors + warm.clauses)
             mapping = mapping.then(SourceMapping(reduced, enriched, TransformationGuarantees.IDENTITY))
@@ -227,10 +242,11 @@ internal class PrivateRebuildGeneration private constructor(
             if (cancellation()) return null
             mapping = mapping.then(SourceMapping(enriched, baked, TransformationGuarantees.IDENTITY))
             return PrivateRebuildGeneration(baked, mapping, privateBytes + warm.modeledBytes, rebuild.steps.size,
-                maxOf(entries * 4L, source.numBoolVars * 12L + descriptorWork), passStopped, admission?.candidates ?: 0,
+                maxOf(entries * 4L, source.numBoolVars * 12L + descriptorWork, affine?.reconstructionWork ?: 0L),
+                passStopped, admission?.candidates ?: 0,
                 warm, warmNanos, bakeWork, descriptorWork, reused, neighborhood?.indexedFactors ?: 0,
                 neighborhood?.sourceFactors ?: 0, rebuild.steps.count { it is RebuildStep.CopyLiteral },
-                parity?.newPins ?: 0)
+                parity?.newPins ?: 0, affine?.rank ?: 0, affine?.freeColumns ?: 0)
         }
     }
 }

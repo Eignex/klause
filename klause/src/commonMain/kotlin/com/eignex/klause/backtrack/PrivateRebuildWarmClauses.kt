@@ -18,6 +18,9 @@ internal class PrivateRebuildWarmClauses private constructor(
     val normalizationWork: Long,
 ) {
     companion object {
+        fun empty(): PrivateRebuildWarmClauses =
+            PrivateRebuildWarmClauses(emptyArray(), 0L, 0L, 0L, 0, 0L, 0L)
+
         fun capture(
             session: PropagationSession,
             rebuild: SourceRebuilds,
