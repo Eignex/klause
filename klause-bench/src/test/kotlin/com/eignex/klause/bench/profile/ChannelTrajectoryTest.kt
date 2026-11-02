@@ -21,6 +21,8 @@ import kotlin.test.assertNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class ChannelTrajectoryTest {
     @Test
@@ -63,21 +65,19 @@ class ChannelTrajectoryTest {
         assertEquals("false", candidate.getValue("pairedDestination").jsonPrimitive.content)
     }
 
-    @Test
-    fun `an inconsistent searched predicate is not silently extended into a paired state`() {
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `an inconsistent searched predicate is not silently extended into a paired state`(maintained: Boolean) {
         val problem = Problem(1, 1, arrayOf(IntDomain(-1, 2)),
             arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.LE, 0)))
         val model = LocalSearchModel.open(problem)
-        val left = LocalSearchState(model, Random(0))
-        val right = LocalSearchState(model, Random(0), projection = left.projection)
+        val state = LocalSearchState(model, Random(0))
         val coordinates = VarRemap(intArrayOf(0), intArrayOf(0))
-        val maintained = TrajectoryView("maintained", left, coordinates,
-            synchronize = { left.assignment.setBool(0, left.assignment.intValue(0) <= 0L) })
-        val searched = TrajectoryView("searched", right, coordinates)
+        val view = TrajectoryView(if (maintained) "maintained" else "searched", state, coordinates,
+            synchronize = { if (maintained) state.assignment.setBool(0, state.assignment.intValue(0) <= 0L) })
 
         val source = Sample(booleanArrayOf(false), longArrayOf(-1))
 
-        assertEquals("source-round-trip", maintained.load(source))
-        assertNull(searched.load(source))
+        assertEquals(if (maintained) "source-round-trip" else null, view.load(source))
     }
 }
