@@ -321,31 +321,82 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `typed and parsed initial probe policies should execute curated integer optimization`() {
+    fun `typed initial probe policies should execute curated integer optimization`() {
         for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProbes("leader-half")),
-            ExecutionOptions.parse(listOf("portfolio-probes=leader-half")),
-            ExecutionOptions.parse(listOf("portfolio-probes=leader-half", "portfolio-lp-start=after-probes")),
             ExecutionOptions(ExecutionOption.portfolioProbes("lp-transfer")),
-            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer")),
-            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer", "portfolio-lp-start=after-probes")),
             ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-second")),
-            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second")),
-            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second", "portfolio-lp-start=after-probes")),
             ExecutionOptions(ExecutionOption.portfolioProbes("family-work")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-work")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("alns-work")))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                cancellation = Cancellation.after(1.seconds),
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        }
+    }
+
+    @Test
+    fun `parsed initial probe policies should execute curated integer optimization`() {
+        for (options in listOf(ExecutionOptions.parse(listOf("portfolio-probes=leader-half")),
+            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer")),
+            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second")),
             ExecutionOptions.parse(listOf("portfolio-probes=family-work")),
+            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work")),
+            ExecutionOptions.parse(listOf("portfolio-probes=alns-work")))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                cancellation = Cancellation.after(1.seconds),
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        }
+    }
+
+    @Test
+    fun `initial probe policies should compose with deferred LP starts`() {
+        for (options in listOf(ExecutionOptions.parse(listOf("portfolio-probes=leader-half", "portfolio-lp-start=after-probes")),
+            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer", "portfolio-lp-start=after-probes")),
+            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second", "portfolio-lp-start=after-probes")),
             ExecutionOptions.parse(listOf("portfolio-probes=family-work", "portfolio-lp-start=after-probes")),
-            ExecutionOptions(ExecutionOption.portfolioProbes("family-work"),
+            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work", "portfolio-lp-start=after-probes")),
+            ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-lp-start=after-probes")))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                cancellation = Cancellation.after(1.seconds),
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        }
+    }
+
+    @Test
+    fun `paid heuristic probes should compose with buffered publication`() {
+        for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProbes("family-work"),
                 ExecutionOption.portfolioPublications("segment")),
             ExecutionOptions.parse(listOf("portfolio-probes=family-work", "portfolio-publications=segment")),
-            ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-work")),
-            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work")),
-            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work", "portfolio-lp-start=after-probes")),
             ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-work"),
                 ExecutionOption.portfolioPublications("segment")),
             ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work", "portfolio-publications=segment")),
-            ExecutionOptions(ExecutionOption.portfolioProbes("alns-work")),
-            ExecutionOptions.parse(listOf("portfolio-probes=alns-work")),
-            ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-lp-start=after-probes")),
             ExecutionOptions(ExecutionOption.portfolioProbes("alns-work"),
                 ExecutionOption.portfolioPublications("segment")),
             ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-publications=segment")))) {

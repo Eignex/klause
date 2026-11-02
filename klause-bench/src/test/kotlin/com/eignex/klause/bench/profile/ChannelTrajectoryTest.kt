@@ -39,6 +39,7 @@ class ChannelTrajectoryTest {
         val decline = view.load(Sample(booleanArrayOf(), longArrayOf(11, 1)))
 
         assertNull(decline)
+        assertEquals(Sample(booleanArrayOf(), longArrayOf(0, 1)), state.assignment.snapshot())
     }
 
     @Test
@@ -79,5 +80,7 @@ class ChannelTrajectoryTest {
         val source = Sample(booleanArrayOf(false), longArrayOf(-1))
 
         assertEquals(if (maintained) "source-round-trip" else null, view.load(source))
+        assertEquals(-1L, state.assignment.intValue(0))
+        assertEquals(maintained, state.assignment.boolValue(0))
     }
 }
