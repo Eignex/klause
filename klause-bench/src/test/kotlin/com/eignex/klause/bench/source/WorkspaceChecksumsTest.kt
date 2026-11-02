@@ -80,6 +80,34 @@ class WorkspaceChecksumsTest {
     }
 
     @Test
+    fun `valid hex corruption of a cached digest requires byte verification`(@TempDir root: Path) {
+        val file = Files.writeString(root.resolve("input"), "original")
+        val cache = root.resolve("cache")
+        WorkspaceChecksums(root, cache).use { it.checksum(file) }
+        val receipt = Files.list(cache).use { files ->
+            files.filter { it.toString().endsWith(".bin") }.findFirst().orElseThrow()
+        }
+        val bytes = Files.readAllBytes(receipt)
+        val savedDigest = digest(file).toByteArray()
+        val offset = bytes.indices.first { start ->
+            start + savedDigest.size <= bytes.size &&
+                savedDigest.indices.all { index -> bytes[start + index] == savedDigest[index] }
+        }
+        bytes[offset] = if (bytes[offset] == '0'.code.toByte()) '1'.code.toByte() else '0'.code.toByte()
+        Files.write(receipt, bytes)
+        var reads = 0
+
+        WorkspaceChecksums(root, cache, hash = { source ->
+            reads++
+            digest(source)
+        }).use { checksums ->
+            assertEquals(digest(file), checksums.checksum(file))
+        }
+
+        assertEquals(1, reads)
+    }
+
+    @Test
     fun `unsupported filesystems read the bytes without storing receipts`(@TempDir root: Path) {
         val file = Files.writeString(root.resolve("input"), "original")
         val cache = root.resolve("cache")

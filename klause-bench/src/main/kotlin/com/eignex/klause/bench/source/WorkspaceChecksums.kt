@@ -112,8 +112,13 @@ internal class WorkspaceChecksums(
         return try {
             val file = requireNotNull(directory).resolve("$slot.bin")
             val bytes = Files.newInputStream(file).use { it.readNBytes(MAX_BYTES + 1) }
-            if (bytes.size > MAX_BYTES) return linkedMapOf()
-            DataInputStream(ByteArrayInputStream(bytes)).use { input ->
+            if (bytes.size !in CHECKSUM_BYTES..MAX_BYTES) return linkedMapOf()
+            val payload = bytes.copyOfRange(0, bytes.size - CHECKSUM_BYTES)
+            val checksum = bytes.copyOfRange(payload.size, bytes.size)
+            if (!MessageDigest.isEqual(checksum, MessageDigest.getInstance("SHA-256").digest(payload))) {
+                return linkedMapOf()
+            }
+            DataInputStream(ByteArrayInputStream(payload)).use { input ->
                 if (input.readInt() != FORMAT || input.readUTF() != identity) return linkedMapOf()
                 val count = input.readInt()
                 if (count !in 0..MAX_FILES) return linkedMapOf()
@@ -145,10 +150,11 @@ internal class WorkspaceChecksums(
                 output.writeUTF(entry.stamp.changed)
                 output.writeUTF(entry.stamp.key)
                 output.writeUTF(entry.digest)
-                if (buffer.size() > MAX_BYTES) return null
+                if (buffer.size() + CHECKSUM_BYTES > MAX_BYTES) return null
             }
         }
-        return buffer.toByteArray()
+        val payload = buffer.toByteArray()
+        return payload + MessageDigest.getInstance("SHA-256").digest(payload)
     }
 
     private data class Stamp(val bytes: Long, val modified: String, val changed: String, val key: String)
@@ -187,5 +193,6 @@ internal class WorkspaceChecksums(
         private const val SLOTS = 32
         private const val MAX_FILES = 4096
         private const val MAX_BYTES = 1024 * 1024
+        private const val CHECKSUM_BYTES = 32
     }
 }

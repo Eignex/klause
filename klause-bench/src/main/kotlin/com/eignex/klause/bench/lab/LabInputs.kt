@@ -178,7 +178,9 @@ internal object LabInputs {
                     ) { "Input checksum mismatch: ${input.path}" }
                 }
                 case.attributes["inputTree.$index"]?.let { expected ->
-                    val cache = System.getenv("LAB_WORKSPACE_CACHE")?.let { storage -> Path.of(storage, "compiler-inputs") }
+                    val cache = System.getenv("LAB_WORKSPACE_CACHE")?.let { storage ->
+                        Path.of(storage, "compiler-inputs")
+                    }
                     val compiler = cache != null && input.root == BenchInputRoot.SOURCE && input.role == "compiler"
                     val matches = Files.isDirectory(file) && if (compiler) {
                         CompilerInputReceipts(requireNotNull(cache)).matches(file, expected)
