@@ -847,7 +847,7 @@ internal object Suites {
     private val mznSmoke = suite("mzn-smoke", "Mandatory MiniZinc smoke models (CI parity)") {
         format = Format.MINIZINC
         license = "internal"
-        val base = "klause-mzn-lib/test-models"
+        val base = "klause-bench/smoke-corpus/minizinc-smoke"
         workspace("argmax", "$base/klause-test-argmax.mzn", Category.CSP, Expected.Sat)
         workspace("bin_packing", "$base/klause-test-bin_packing.mzn", Category.PACKING, Expected.Sat)
         workspace("connected", "$base/klause-test-connected.mzn", Category.CSP, Expected.Sat)

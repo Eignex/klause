@@ -47,7 +47,7 @@ class LabInputsTest {
 
         assertEquals("mzn-smoke", case.attributes["suite"])
         assertEquals(name, case.attributes["problem"])
-        assertEquals("klause-mzn-lib/test-models/klause-test-$name.mzn", model.path)
+        assertEquals("klause-bench/smoke-corpus/minizinc-smoke/klause-test-$name.mzn", model.path)
         assertEquals(BenchInputRoot.SOURCE, model.root)
         assertEquals(sha256, model.sha256)
     }
