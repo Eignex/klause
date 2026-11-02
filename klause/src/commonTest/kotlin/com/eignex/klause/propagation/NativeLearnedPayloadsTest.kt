@@ -69,6 +69,42 @@ class NativeLearnedPayloadsTest {
     }
 
     @Test
+    fun `releasing absent slots should preserve an empty queued page until funded unlink`() {
+        val payloads = NativeLearnedPayloads()
+        val bytes = payloads.primitiveBytes
+        val directory = payloads.directoryCapacity
+        repeat(64) { payloads.add(intArrayOf(0, 2)) }
+        for (index in 1..63) payloads.release(index)
+        payloads.release(0)
+        val queued = payloads.primitiveBytes
+
+        payloads.release(63)
+
+        assertEquals(0L, payloads.capacityBytes)
+        assertEquals(0L, payloads.referenceCapacity)
+        assertEquals(queued, payloads.primitiveBytes)
+        payloads.sweepDirectory(ReclamationPreparation(12L, 256L, { false }, {}))
+        assertEquals(bytes, payloads.primitiveBytes)
+        assertEquals(directory, payloads.directoryCapacity)
+    }
+
+    @Test
+    fun `absent-slot release should preserve a revived queued payload page`() {
+        val payloads = NativeLearnedPayloads()
+        repeat(192) { payloads.add(intArrayOf(0, 2)) }
+        val survivor = payloads[128]
+        for (index in 64..127) payloads.release(index)
+        payloads.move(128, 64)
+
+        payloads.release(127)
+        payloads.sweepDirectory(ReclamationPreparation(24L, 256L, { false }, {}))
+
+        assertSame(survivor, payloads[64])
+        assertEquals(0, payloads.length(127))
+        assertEquals(0, payloads.length(128))
+    }
+
+    @Test
     fun `directory observations should retain only the required payload and branch path`() {
         val payloads = NativeLearnedPayloads()
         repeat(128) { payloads.add(intArrayOf(0, 2)) }

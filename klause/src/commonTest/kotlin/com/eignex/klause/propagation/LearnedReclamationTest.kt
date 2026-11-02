@@ -282,6 +282,31 @@ class LearnedReclamationTest {
     }
 
     @Test
+    fun `native full compaction should release a live row beside already retired payload slots`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = true)
+        repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+        session.maintainCapWindow(1, 65_536L, 1_048_576L, { false }) { it == 0 }
+        assertEquals(1, session.activeLearnedClauseCount)
+        val generation = session.learnedRetirementGeneration
+
+        val published = session.compactLearnedClauses(1_000_000L, 1_048_576L, { false }) { _, _ -> false }
+
+        assertTrue(published)
+        assertEquals(0, session.learnedClauseCount)
+        assertEquals(0, session.activeLearnedClauseCount)
+        assertTrue(session.learnedRetirementGeneration > generation)
+        val observed = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        assertEquals(0L, observed.getValue("learnedPayloadBytes"))
+        session.pinBool(0, false)
+        assertNull(session.boolValue(1))
+        session.popLast()
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9)
+        session.pinBool(2, false)
+        assertEquals(true, session.boolValue(3))
+    }
+
+    @Test
     fun `candidate capacity should survive cancellation after funding and trim on retry`() {
         val candidates = IntArrayList(64)
         for (value in listOf(7, 2, 9)) candidates.add(value)
