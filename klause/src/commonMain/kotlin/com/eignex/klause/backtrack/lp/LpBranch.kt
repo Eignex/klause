@@ -10,7 +10,8 @@ import com.eignex.klause.solver.search.VarRef
  * the LP gives no fractional signal, or the residual problem is too wide to scan. Purely advisory — the
  * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound
  * branch, so search stays complete and correct regardless. Reliable passive history compares the
- * winner and runner-up without another LP query; missing history retains the score winner. `O(unassigned)` per call, capped.
+ * winner and runner-up without another LP query; missing history retains the score winner.
+ * `O(unassigned)` per call, capped.
  *
  * Lives in the search layer (not [LpEngine]'s home) because it reads the backtrack [VarRef] selector type
  * and the search-owned [LpHints]; the engine only records LP solutions into the hint sink.
