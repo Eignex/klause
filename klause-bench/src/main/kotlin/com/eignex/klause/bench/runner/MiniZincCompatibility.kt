@@ -86,14 +86,15 @@ internal object MiniZincCompatibility {
             ?: System.getenv("PATH").orEmpty().split(File.pathSeparator)
                 .map { File(it, "minizinc") }.firstOrNull { it.isFile && it.canExecute() }?.canonicalFile
             ?: error("MiniZinc compiler is unavailable")
-        val executableHash = hash(executable)
-        val query = MiniZincIdentityQuery(executableSha256 = executableHash)
+        val query = MiniZincIdentityQuery()
         val config = Json.parseToJsonElement(query.query(executable, "--config-dirs")).jsonObject
         val standard = File(config.getValue("mznStdlibDir").jsonPrimitive.content)
         require(standard.isDirectory) { "MiniZinc standard library is unavailable" }
         val root = CorpusFetcher.workspaceRoot()
+        val version = query.query(executable, "--version").trim()
+        val executableHash = hash(executable)
         MiniZincCompilerIdentity(
-            version = query.query(executable, "--version").trim(),
+            version = version,
             executable = executable.path,
             executableSha256 = executableHash,
             standardLibrary = standard.canonicalPath,
