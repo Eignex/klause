@@ -258,7 +258,7 @@ workers retain their canonical traversal. Enumeration and optimization do not us
 this trial.
 
 Source preparation retains unchanged immutable clauses by reference and copies
-shortened or complemented rows. Column counts stay identical, preserving the clauses' plain-Boolean
+shortened or substituted rows. Column counts stay identical, preserving the clauses' plain-Boolean
 classification. Each new baked model owns its projection, watches and search state;
 the shared factor input carries no mutable search state.
 
@@ -287,15 +287,14 @@ supply the pair. Only non-permanent global learning from the canonical worker
 qualifies. Discovery charges retained slot visits and skips logically retired entries
 before reading their literals. The capture binds its exact source object and owns its clauses; preparation
 rechecks that its columns remain unfixed. Global consequences remain valid after
-their canonical learned entries are reclaimed. Adding
-them to the pinned source preserves the premises of the source implication-graph
-pass. A complemented pair flips one column in the private source view before
-the equal-valued graph pass. The source mapping reverses that flip when lifting a
-witness; canonical learned literals receive the same flip before private projection.
-Equivalent and complemented columns retain Boolean slots and record `CopyLiteral`
-reconstruction; transitive binary deletion alone opens no consumer. Literal
-remapping reserves normalization work before the graph pass receives half the
-remaining allowance. Discovery visits recent learning first, scanning at most 128 eligible binaries and
+their canonical learned entries are reclaimed. The pinned source retains both
+owned premises. A signed substitution replaces their higher-numbered column with
+the retained column at the captured polarity and records `CopyLiteral` reconstruction.
+The premise objects must belong to that exact pinned source. Unchanged clauses
+retain their immutable buffers; affected clauses own normalized copies. Factor and
+literal visits, replacement construction and delta ownership consume the local
+pass allowance. An interrupted substitution publishes no changed view. Warm
+consequences follow the same signed reconstruction without changing canonical coordinates. Discovery visits recent learning first, scanning at most 128 eligible binaries and
 32,768 work units per root observation, inside the cumulative trial allowance.
 Reciprocal matching uses a temporary fixed-capacity key table and one source walk
 for the retained learned keys. Table initialization and probes consume discovery work.

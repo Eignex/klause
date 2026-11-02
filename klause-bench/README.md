@@ -76,7 +76,7 @@ worker. Zero is the default. `ProgressPins` excludes baked-root facts;
 baked root without a captured equivalence keeps its canonical traversal.
 `BinaryScanWork` and `BinaryScanNanos` retain bounded discovery costs;
 `BinaryRelations` counts captured reciprocal implications and `EquivalentColumns`
-counts actual source implication-graph merges. Discovery accepts only owned global
+counts actual signed source substitutions. Discovery accepts only owned global
 binary learning and checks at most 128 binaries within 32,768 work per observation.
 `BinaryHistoryWork` and `BinaryHistoryBytes` retain the fixed history's initialization
 and primitive storage. At most 32 relations are attempted in one worker. Its history
