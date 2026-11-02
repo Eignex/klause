@@ -272,7 +272,21 @@ internal object LinearAuthorityAggregateCuts {
         val hasInteger = coefficients.keys.any { it.kind == SourceCoordinate.Kind.Integer }
     }
 
-    private fun integerScale(values: Collection<BigFraction>, meter: AggregateMeter): BigFraction {
+    private fun integerScale(
+        values: Collection<BigFraction>, meter: AggregateMeter, observe: (String, Long) -> Unit,
+    ): BigFraction {
+        meter.reserve(values.size.toLong(), 64L)
+        var allIntegral = true
+        var containsUnit = false
+        for (value in values) {
+            if (value.den != BIG_ONE) allIntegral = false
+            if (value == BigFraction.ONE || value == BigFraction.MINUS_ONE) containsUnit = true
+        }
+        if (allIntegral && containsUnit) {
+            val scale = meter.number(BigFraction.ONE)
+            observe("AggregateUnitScaleNormalization", 1L)
+            return scale
+        }
         var denominator = BIG_ONE
         for (value in values) {
             meter.arithmetic(BigFraction.of(denominator, BIG_ONE), value)
@@ -562,7 +576,7 @@ internal object LinearAuthorityAggregateCuts {
                     stopAggregate("SourceIdentity")
                 }
                 for (value in row.coefficients.values) meter.number(value)
-                val scale = integerScale(row.coefficients.values, meter)
+                val scale = integerScale(row.coefficients.values, meter, observe)
                 val unitScale = scale == BigFraction.ONE
                 observe(if (unitScale) "AggregateIntegerRowUnitScale" else "AggregateIntegerRowScaled", 1L)
                 val normalized = if (unitScale) row.coefficients else {
@@ -922,7 +936,7 @@ internal object LinearAuthorityAggregateCuts {
                 observe("AggregateContinuousResidual", 1L)
                 return null
             }
-            val scale = integerScale(integerValues, meter)
+            val scale = integerScale(integerValues, meter, observe)
             val normalized = activity.mapValues { (_, value) -> meter.multiply(value, scale) }
             val scaledRhs = meter.multiply(rhs, scale)
             meter.reserve(terms.size.toLong() + normalized.size, terms.size * 128L + normalized.size * 64L)

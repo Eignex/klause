@@ -510,7 +510,10 @@ Completed batches retain their funded coordinate sets and endpoint maps without
 copying prior batches. Each lookup charges every batch probe, and batch publication
 reserves its object and list growth after the source scan completes. Failed scans
 or unfunded publication preserve only earlier complete batches.
-Unit-scale normalization reuses the private immutable coefficient snapshot. A funded
+Integral coefficients containing a unit entry establish unit scale through a funded
+scan, avoiding denominator and gcd temporaries. Other scales retain generic exact
+normalization. Unit-scale normalization reuses the private immutable coefficient
+snapshot. A funded
 coefficient scan recognizes a half recipe whose stated side choices round every
 coefficient to zero before allocating its proof and scalar accumulators. Other
 recipes retain their bound validation and exact proof construction. Both paths

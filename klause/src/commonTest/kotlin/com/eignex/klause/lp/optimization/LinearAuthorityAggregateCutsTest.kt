@@ -783,6 +783,65 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `an integral unit coefficient should preserve the checked rounded row for either sign`() {
+        for (sign in listOf(-1L, 1L)) {
+            val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+                "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(sign),
+                    y to BigFraction.ofLong(2)), BigFraction.ofLong(3))),
+                "side" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-sign)), BigFraction.ZERO)),
+            ))
+            val observations = mutableMapOf<String, Long>()
+
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.0, y to 1.5)).single()
+
+            assertEquals(SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE), cut.inequality)
+            assertEquals(setOf(0, 1), cut.owners)
+            assertEquals(1L, observations["AggregateUnitScaleNormalization"])
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+    }
+
+    @Test
+    fun `integral normalization without a unit coefficient should retain its common factor`() {
+        val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(4)), BigFraction.ofLong(5))),
+            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val observations = mutableMapOf<String, Long>()
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.0, y to 1.25)).single()
+
+        assertEquals(SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE), cut.inequality)
+        assertNull(observations["AggregateUnitScaleNormalization"])
+        assertEquals(1L, observations["AggregateIntegerRowScaled"])
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `cancelling unit scale normalization should withhold the unfinished row`() {
+        val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE,
+                y to BigFraction.ofLong(2)), BigFraction.ofLong(3))),
+            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, _ -> if (name == "AggregateUnitScaleNormalization") stopped = true },
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.0, y to 1.5))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+    }
+
+    @Test
     fun `integer pair recipes should combine pure rows without endpoint premises`() {
         val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
             "first" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
