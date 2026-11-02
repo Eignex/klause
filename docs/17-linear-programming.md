@@ -437,6 +437,11 @@ owner before another numerical query. The read uses the fresh consultation token
 and requires matching retained guide, objective, root model and current exact-state
 identities. Invalidating the active search view preserves this read when the scoped
 owner still holds that root state. Numerical queries retain their active-view requirement.
+While a component cursor is suspended, a fresh read can copy only children that
+have returned against their current exact state. The advancing cursor and its
+unfinished child supply no coordinates. The copy neither advances numerical work
+nor changes the cursor, basis or authority; its buffers remain private and spend
+the same guidance work and storage limits.
 After parent cancellation, a fresh read keeps only earlier returned children with
 optimal, WORK or PIVOTS stops. Cancelled or failed child coordinates stay unknown.
 This supplies no additional bound, certificate or complete-point authority.

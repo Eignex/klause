@@ -15,6 +15,60 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `advancing component cursors withhold returned guidance`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            factory = RecordingLpEngineFactory())).use { owner ->
+            var observed = false
+            owner.openSolve().use { cursor ->
+                val step = cursor.advance(shouldPause = {
+                    if (owner.lastMetrics.componentSolves < 2) false else {
+                        observed = true
+                        assertNull(owner.partialPrimalGuidance())
+                        true
+                    }
+                })
+
+                assertIs<LpSolveStep.Paused>(step)
+                assertTrue(observed)
+                assertNotNull(owner.partialPrimalGuidance())
+            }
+        }
+    }
+
+    @Test
+    fun `paused child guidance snapshots own their coordinate buffers`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            factory = RecordingLpEngineFactory())).use { owner ->
+            owner.openSolve().use { cursor ->
+                assertIs<LpSolveStep.Paused>(cursor.advance(shouldPause = { owner.lastMetrics.componentSolves >= 2 }))
+                val first = assertNotNull(owner.partialPrimalGuidance())
+                val coordinates = first.coordinates.toList()
+                val known = first.known.toList()
+                first.coordinates.fill(5.0)
+                first.known.fill(false)
+
+                val next = assertNotNull(owner.partialPrimalGuidance())
+
+                assertEquals(known, next.known.toList())
+                assertEquals(coordinates, next.coordinates.toList())
+                assertNull(owner.partialPrimalGuidance(Cancellation { true }))
+            }
+        }
+    }
+
+    @Test
     fun `completed component points supply fresh guidance without resolving`() {
         val builder = LpBuilder()
         repeat(3) { builder.addVar(0L, 5L, cost = 1L) }

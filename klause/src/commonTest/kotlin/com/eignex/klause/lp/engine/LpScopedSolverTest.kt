@@ -18,6 +18,52 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `paused component guidance reads returned children without advancing`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val factory = RecordingLpEngineFactory()
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(factory), componentSplit = true).use { owner ->
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+            assertTrue(owner.floatPaused)
+            val paid = owner.lastMetrics
+            val queries = factory.floatAllowances.size
+
+            val guidance = assertNotNull(owner.partialPrimalGuidance(Cancellation.Never))
+
+            assertEquals(listOf(true, false, false), guidance.known.toList())
+            assertEquals(0.5, guidance.coordinates[0])
+            assertEquals(paid, owner.lastMetrics)
+            assertEquals(queries, factory.floatAllowances.size)
+            assertTrue(owner.floatPaused)
+            assertNull(owner.lastResult)
+        }
+    }
+
+    @Test
+    fun `a bound edit retires paused component guidance`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(RecordingLpEngineFactory()),
+            componentSplit = true).use { owner ->
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+            assertNotNull(owner.partialPrimalGuidance(Cancellation.Never))
+
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 7L))
+
+            assertNull(owner.partialPrimalGuidance(Cancellation.Never))
+            assertFalse(owner.floatPaused)
+        }
+    }
+
+    @Test
     fun `reading child guidance does not construct a numerical owner`() {
         val builder = LpBuilder()
         val column = builder.addVar(0L, 5L, cost = 1L)
