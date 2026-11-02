@@ -98,4 +98,31 @@ class MutableIntObjectIndexTest {
         assertEquals("new", index[7])
         assertEquals("foreign", foreign[7])
     }
+
+    @Test
+    fun `lookup should fund each visited node before exposing its value`() {
+        val index = MutableIntObjectIndex<String>()
+        for (key in 0..63) index.put(key, key.toString())
+        var visits = 0L
+
+        assertFailsWith<IllegalStateException> {
+            index.lookup(63) { if (visits >= 2L) error("cancelled") else visits += it }
+        }
+
+        assertEquals(2L, visits)
+        assertEquals("63", index[63])
+        assertEquals(64, index.size)
+    }
+
+    @Test
+    fun `protected capacity should include shared branches once`() {
+        val index = MutableIntObjectIndex<String>()
+        for (key in listOf(0, 1, Int.MAX_VALUE)) index.put(key, key.toString())
+
+        val protected = index.protectedCapacity({}) { key, _ -> key < 2 }
+
+        assertEquals(24L, protected.first)
+        assertEquals(12L, protected.second)
+    }
+
 }

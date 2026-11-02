@@ -330,12 +330,19 @@ eviction; units, pending rechecks and current root reasons survive.
 Retired rows stop propagation and export and release their owned literal array.
 Admission, reference-array growth and release debit the containing work ledger.
 A short retirement slice suspends before publication and resumes with its stable handle.
-Policy columns, the reference-page directory and watch postings remain owned until
-funded full compaction reclaims them. Ownership reports include those capacities and report
+Policy columns and watch postings retain their separately funded cleanup. Payload
+page directories use a bounded compressed index whose lookups debit the active
+maintenance grant or the containing propagation ledger. A cached page avoids
+repeated lookups within one page. Empty page headers enter a separate funded
+unlink queue after their row arrays release; a revived header survives that queue.
+Directory cleanup does not remap live handles or consume the metadata row-release
+transaction. Ownership reports include unfinished directory nodes and report
 `learnedRetiredSlots` separately from active clause count. A page owns a disjoint pool
 of copied arrays. Its observation separates total and cumulative protected payload
-bytes under one stable pool identity; only required rows protect payload, while a
-required row protects the complete page reference allocation. Permanent-row checks read the policy
+bytes under one immutable allocation identity; only required rows protect payload, while a
+required row protects the complete page reference allocation. Directory protection
+includes the union of required branch paths; primitive and reference pools report
+their cumulative protected subsets without per-node ownership scratch. Permanent-row checks read the policy
 column directly. Reference-page and directory capacities are observed separately.
 Window calls, charged work, visits and permanent, active and retained counts remain
 available in the released session's lifecycle totals.

@@ -32,6 +32,11 @@ internal class MutableIntObjectIndex<V : Any> {
         return closest(key)?.takeIf { it.key == key }?.value
     }
 
+    fun lookup(key: Int, visit: (Long) -> Unit): V? {
+        lastWork = 0L
+        return closest(key, visit)?.takeIf { it.key == key }?.value
+    }
+
     fun put(key: Int, value: V): Long {
         require(key >= 0)
         lastWork = 0L
@@ -43,21 +48,23 @@ internal class MutableIntObjectIndex<V : Any> {
         return lastWork
     }
 
-    fun getOrPut(key: Int, default: () -> V): V {
+    fun getOrPut(key: Int, default: () -> V): V = getOrPutSlot(key, default).value
+
+    fun getOrPutSlot(key: Int, default: () -> V): Slot<V> {
         require(key >= 0)
         lastWork = 0L
         val found = closest(key)
-        if (found?.key == key) return found.value
-        return default().also { insert(key, it, found) }
+        if (found?.key == key) return found
+        return insert(key, default(), found)
     }
 
-    private fun insert(key: Int, value: V, representative: Leaf<V>?) {
+    private fun insert(key: Int, value: V, representative: Leaf<V>?): Leaf<V> {
         val leaf = Leaf(key, value, this)
         if (representative == null) {
             root = leaf
             size++
             lastWork += 8L
-            return
+            return leaf
         }
         val mask = 1 shl (31 - (key xor representative.key).countLeadingZeroBits())
         var node: Node<V> = representative
@@ -76,6 +83,7 @@ internal class MutableIntObjectIndex<V : Any> {
         replace(parent, node, branch)
         size++
         lastWork += 16L
+        return leaf
     }
 
     fun firstAtOrAfter(key: Long, visit: (Long) -> Unit): Slot<V>? {
@@ -107,10 +115,35 @@ internal class MutableIntObjectIndex<V : Any> {
         walk(root, visit, action)
     }
 
-    private fun closest(key: Int): Leaf<V>? {
+    fun protectedCapacity(visit: (Long) -> Unit, protected: (Int, V) -> Boolean): Pair<Long, Long> {
+        var bytes = 0L
+        var references = 0L
+        fun covered(node: Node<V>?): Boolean {
+            if (node == null) return false
+            visit(1L)
+            val retained = when (node) {
+                is Leaf -> protected(node.key, node.value)
+                is Branch -> {
+                    val zero = covered(node.zero)
+                    val one = covered(node.one)
+                    zero || one
+                }
+            }
+            if (retained) {
+                bytes += if (node is Leaf) 4L else 8L
+                references += 3L
+            }
+            return retained
+        }
+        covered(root)
+        return bytes to references
+    }
+
+    private fun closest(key: Int, visit: ((Long) -> Unit)? = null): Leaf<V>? {
         if (key < 0) return null
         var node = root
         while (node != null) {
+            visit?.invoke(1L)
             lastWork++
             when (node) {
                 is Leaf -> return node

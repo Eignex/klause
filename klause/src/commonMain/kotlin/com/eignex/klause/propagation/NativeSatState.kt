@@ -39,7 +39,7 @@ internal class NativeSatState(private val state: PropagationState) {
     }
 
     // Learned handles remain stable while each payload can release independently of other rows.
-    private val learnedPayloads = NativeLearnedPayloads()
+    private val learnedPayloads = NativeLearnedPayloads(state)
     private var learnedCount = 0
     private var peerImports = 0
     private var consumedPeerImports = 0
@@ -172,6 +172,7 @@ internal class NativeSatState(private val state: PropagationState) {
             retiredMetadataCount--
             budget.advanced()
         }
+        learnedPayloads.sweepDirectory(budget)
     }
 
     private fun enqueueRetiredMetadata(index: Int) {
@@ -489,7 +490,9 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         try {
             budget.visit(0L, 64L)
-            capRanking.advance(cap, permanentCount, budget, capPolicy(budget, canDrop, keep))
+            learnedPayloads.usingBudget(budget) {
+                capRanking.advance(cap, permanentCount, budget, capPolicy(budget, canDrop, keep))
+            }
         } catch (_: ReclamationPreparation.Deferred) {
             capPreparationDefers++
             // Heap steps and pending retirement keep their handles across roots.
@@ -548,7 +551,10 @@ internal class NativeSatState(private val state: PropagationState) {
         metadata[index, NativeLearnedMetadata.BOOL_REASONS] = count
     }
 
-    internal fun retireSelectedLearnedClause(index: Int, budget: ReclamationPreparation): LearnedRetirementResult {
+    internal fun retireSelectedLearnedClause(index: Int, budget: ReclamationPreparation): LearnedRetirementResult =
+        learnedPayloads.usingBudget(budget) { retireSelected(index, budget) }
+
+    private fun retireSelected(index: Int, budget: ReclamationPreparation): LearnedRetirementResult {
         if (!initialized || pendingConflict || bcpHead != state.boolPinOrder.size || state.runCancelled) {
             return LearnedRetirementResult(LearnedRetirementStatus.Deferred)
         }
@@ -627,6 +633,12 @@ internal class NativeSatState(private val state: PropagationState) {
     }
 
     internal fun prepareReclamation(
+        budget: ReclamationPreparation,
+        retained: BooleanArray,
+        keep: (Int, Int) -> Boolean,
+    ) = learnedPayloads.usingBudget(budget) { prepareRetained(budget, retained, keep) }
+
+    private fun prepareRetained(
         budget: ReclamationPreparation,
         retained: BooleanArray,
         keep: (Int, Int) -> Boolean,
