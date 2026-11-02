@@ -43,6 +43,38 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `the latest historical endpoint should yield a reusable cut within the source allowance`() {
+        val fixedVariables = IntArray(22) { it + 10 }
+        val reasons = Array(8) { index ->
+            Linear(intArrayOf(2, -1) + IntArray(22) { -1 },
+                intArrayOf(0, index + 2) + fixedVariables, LinearOp.LE, 0)
+        }
+        val seed = Linear(IntArray(32) { if (it == 0) 2 else if (it == 1) -1 else 1 },
+            IntArray(32) { it }, LinearOp.LE, 0)
+        val native = PropagationSession(Problem(0, 32, Array(32) {
+            when (it) {
+                0 -> IntDomain(0, 6)
+                1 -> IntDomain(0, 40)
+                in 2..9 -> IntDomain(0, 12)
+                else -> IntDomain(0, 0)
+            }
+        }, reasons + seed), pbLearning = false).apply { enableIntegerRowLearning() }
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(1, 7))
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(0, 2))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        native.popToLevel(learned.backjumpLevel)
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned.row, learned.lbd))
+
+        assertContentEquals(intArrayOf(0, 1) + IntArray(7) { it + 2 }, learned.row.variables)
+        assertContentEquals(longArrayOf(4, -1) + LongArray(7) { 1 }, learned.row.coefficients)
+        assertEquals(1L, native.intDomain(0).max)
+        native.popToLevel(0)
+        assertIs<PropagationResult.Implied>(native.pinIntAtMost(1, 11))
+        assertEquals(2L, native.intDomain(0).max)
+    }
+
+    @Test
     fun `successive wide reasons should preserve the historical fallback assertion`() {
         val variables = IntArray(18) { it }
         val state = PropagationState(Problem(0, 18, Array(18) {

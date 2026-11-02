@@ -352,6 +352,12 @@ Reified integer rows preserve the signed indicator selecting the inequality
 or equality side, including the strict integer complement of an inequality. Each
 resolved endpoint must name an unextended historical linear reason from the same
 source row, with its exact guard false-literal and historical guard truth.
+Endpoint markers are ordered by descending historical trail position, preserving
+coordinate order for ties. Only the newest fully qualified endpoint is selected;
+an unavailable source permits checking the next marker, while a failed arithmetic
+combination retains clause fallback. The bounded marker scan and ordering charge
+the same work and cancellation allowance as their row, without reconstructing
+unselected older supports.
 
 The raw requested bound, reconstructed at the deduction's trail position, must
 support the eliminated live endpoint; a hole-snapped stronger endpoint retains
