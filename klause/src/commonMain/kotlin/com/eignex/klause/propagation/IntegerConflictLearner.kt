@@ -55,9 +55,16 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val target = fallback.backjumpLevel
         val trail = state.integerLearningTrailAtLevel?.invoke(target) ?: return decline("assertion-unavailable")
         state.arithmeticLearningTrace?.record("integer.fallback-target", target.toLong(), trail.toLong())
-        val source = sourceFactor(factorId) ?: return decline("seed-source")
-        val allowWideSources = source.linear.vars.size > INTEGER_LEARNING_TERMS
-        var row = when (source.linear.op) {
+        val source = if (factorId in 0 until state.baseFactorCount) sourceFactor(factorId) else null
+        val retained = if (source == null) retainedAmoSource(factorId) else null
+        if (source == null && retained == null) return decline("seed-source")
+        val allowWideSources = source != null && source.linear.vars.size > INTEGER_LEARNING_TERMS
+        var retainedSources = if (retained == null) 0 else 1
+        if (retained != null) {
+            state.integerChainedSources++
+            state.arithmeticLearningTrace?.record("integer.retained-seed", factorId.toLong())
+        }
+        var row: IntegerLearningInequality = if (source == null) requireNotNull(retained) else when (source.linear.op) {
             LinearOp.LE -> normalizedSource(source, useLo = true)
             LinearOp.GE -> normalizedSource(source, useLo = false)
             LinearOp.EQ -> {
@@ -68,13 +75,17 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         } ?: return decline("seed-normalization")
         state.arithmeticLearningTrace?.row("integer.seed-row", row, state)
         if (row.minimum(state) <= row.bound) return decline("seed-not-conflicting")
-        val used = mutableSetOf<Pair<Int, Int>>()
+        val used = mutableSetOf<PivotKey>()
         var transientSteps = 0
         repeat(INTEGER_LEARNING_STEPS) {
             state.checkFiniteWork()
             val event = reason(row, used, allowWideSources) ?: return decline("no-qualified-endpoint")
             used.add(event.key)
-            state.arithmeticLearningTrace?.row("integer.pivot-row", event.row, state, event.trail)
+            if (event.key.retained) {
+                retainedSources++
+                state.integerChainedSources++
+                state.arithmeticLearningTrace?.row("integer.retained-parent-row", event.row, state)
+            } else state.arithmeticLearningTrace?.row("integer.pivot-row", event.row, state, event.trail)
             val combined = if (allowWideSources) {
                 row.resolveTransient(event.row, event.variable, sourceWork)
             } else row.resolve(event.row, event.variable, sourceWork)
@@ -96,8 +107,10 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 val domain = state.intDomains[variable]
                 state.boundEstablishmentLevel(variable, if (lower) domain.min else domain.max, lower) ?: 0
             }.plus(fallback.decisionLevels.toList()).distinct().sorted().toIntArray()
+            if (retainedSources > 0) state.integerChainedProduced++
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
-                combined.derivedThroughTransient(transientSteps), target, levels.size, levels, fallback)
+                combined.derivedThroughTransient(transientSteps).derivedFromRetainedSources(retainedSources),
+                target, levels.size, levels, fallback)
         }
         return decline("step-limit-without-assertion")
     }
@@ -135,7 +148,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
 
     private fun reason(
         row: IntegerLearningInequality,
-        used: Set<Pair<Int, Int>>,
+        used: Set<PivotKey>,
         allowWideSources: Boolean,
     ): BoundEvent? {
         var candidates: IntArray? = null
@@ -156,7 +169,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 state.arithmeticLearningTrace?.record("integer.endpoint-decline.marker-shape")
                 continue
             }
-            val key = variable to if (lower) marker[2] else marker[2].inv()
+            val key = PivotKey(variable, marker[2], lower, retained = false)
             if (key in used) continue
             val indices = candidates ?: IntArray(row.variables.size).also { candidates = it }
             var position = count
@@ -170,10 +183,58 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             indices[position] = index
             count++
         }
-        val indices = candidates ?: return null
+        val indices = candidates ?: return retainedReason(row, used)
         for (position in 0 until count) {
             row.visit(state)
             qualifiedReason(row, indices[position], allowWideSources)?.let { return it }
+        }
+        return retainedReason(row, used)
+    }
+
+    private fun retainedAmoSource(factorId: Int): IntegerConflictRow? {
+        sourceWork.visit()
+        if (state.incremental || factorId !in state.baseFactorCount until state.totalFactorCount) return null
+        val propagator = state.factorAt(factorId) as? LearnedIntegerPropagator ?: return null
+        sourceWork.visit()
+        val cache = state.learned.integerRows ?: return null
+        val slot = propagator.retentionSlot
+        if (slot !in cache.indices || cache[slot] !== propagator) return null
+        val row = propagator.row
+        if (row.guard != Lit.NONE || row.variables.size < 2) return null
+        var negative = 0L
+        val bounds = state.problem.intBounds
+        for (index in row.variables.indices) {
+            sourceWork.visit()
+            val coefficient = row.coefficients[index]
+            val variable = row.variables[index]
+            if ((coefficient != 1L && coefficient != -1L) || !bounds.hasLower(variable) ||
+                !bounds.hasUpper(variable) || bounds.lower(variable) != 0L || bounds.upper(variable) != 1L) return null
+            if (coefficient < 0L) negative++
+        }
+        return row.takeIf { it.bound == 1L - negative }
+    }
+
+    private fun retainedReason(row: IntegerLearningInequality, used: Set<PivotKey>): BoundEvent? {
+        for (index in row.variables.indices) {
+            sourceWork.visit()
+            val variable = row.variables[index]
+            val lower = row.coefficients[index] > 0L
+            val factorId = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
+            val key = PivotKey(variable, factorId, lower, retained = true)
+            if (key in used) continue
+            val parent = retainedAmoSource(factorId) ?: continue
+            var coefficient = 0L
+            for (parentIndex in parent.variables.indices) {
+                sourceWork.visit()
+                if (parent.variables[parentIndex] == variable) {
+                    coefficient = parent.coefficients[parentIndex]
+                    break
+                }
+            }
+            if (coefficient == 0L || (coefficient > 0L) == lower) continue
+            // The owned inequality is a source in this state; the reason id only selects it.
+            // No eager support is treated as a historical lazy endpoint.
+            return BoundEvent(parent, variable, state.undo.size, key)
         }
         return null
     }
@@ -227,13 +288,15 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 domain.min, domain.max, marker[2].toLong())
             return null
         }
-        return BoundEvent(sourceRow, variable, marker[2], variable to if (lower) marker[2] else marker[2].inv())
+        return BoundEvent(sourceRow, variable, marker[2], PivotKey(variable, marker[2], lower, retained = false))
     }
+
+    private data class PivotKey(val variable: Int, val source: Int, val lower: Boolean, val retained: Boolean)
 
     private class BoundEvent(
         val row: IntegerLearningInequality,
         val variable: Int,
         val trail: Int,
-        val key: Pair<Int, Int>,
+        val key: PivotKey,
     )
 }

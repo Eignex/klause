@@ -156,6 +156,7 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     learned.lifecycle.note(LearnedKind.Integer, LearnedStage.Constructed)
     learned.lifecycle.note(LearnedKind.Integer, LearnedStage.Admitted)
     if (row.transientSteps > 0) integerTransientAdmitted++
+    if (row.retainedSources > 0) integerChainedAdmitted++
     val propagator = LearnedIntegerPropagator(row)
     val factor = totalFactorCount
     learned.stages.add(0)
@@ -565,6 +566,7 @@ private fun PropagationState.noteLearnedStage(index: Int, stage: LearnedStage, b
     if (stage == LearnedStage.Consumed) {
         val propagator = learned.store[index]
         if (propagator is LearnedIntegerPropagator && propagator.row.transientSteps > 0) integerTransientConsumed++
+        if (propagator is LearnedIntegerPropagator && propagator.row.retainedSources > 0) integerChainedConsumed++
         factorAttribution?.consumed(propagator)
     }
 }

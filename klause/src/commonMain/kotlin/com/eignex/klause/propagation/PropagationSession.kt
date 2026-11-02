@@ -1402,8 +1402,17 @@ class PropagationSession private constructor(
             "learningIntegerTransientAdmitted" to it.integerTransientAdmitted,
             "learningIntegerTransientConsumed" to it.integerTransientConsumed,
         )
+        val chainedLifecycle = if (it.integerChainedSources == 0L && it.integerChainedAdmitted == 0L) {
+            emptyMap()
+        } else mapOf(
+            "learningIntegerChainedSources" to it.integerChainedSources,
+            "learningIntegerChainedProduced" to it.integerChainedProduced,
+            "learningIntegerChainedAdmitted" to it.integerChainedAdmitted,
+            "learningIntegerChainedConsumed" to it.integerChainedConsumed,
+        )
         if (it.integerRowLearning) {
-            counts + diagnostics + transientLifecycle + (attached?.integerCensus?.snapshot() ?: emptyMap()) +
+            counts + diagnostics + transientLifecycle + chainedLifecycle +
+                (attached?.integerCensus?.snapshot() ?: emptyMap()) +
                 ("learningIntegerSessions" to 1L)
         } else counts
     } ?: retiredLifecycle

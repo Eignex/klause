@@ -485,6 +485,18 @@ limit; a wide conflicting seed enables wide sources throughout that analysis. Th
 keeps wide-source preparation out of compact-seed analysis. Exhaustion retains
 clause fallback. Compact pairs keep their compact resolver. Temporary steps count
 inside the same 16-combination allowance, and each result must remain conflicting.
+An active owned unguarded at-most-one row over declared binary integer coordinates
+can also seed a conflict or supply an arithmetic parent when no original historical
+endpoint qualifies. This composes an already validated inequality in the same
+prepared state. A current bound's reason identity selects the parent; its eager
+support is not interpreted as a historical lazy marker. Original endpoint history,
+raw-bound and guard checks retain their authority. Parent lookup, coefficient
+qualification and selection spend the same source-reference allowance. Retired
+identities, guarded rows and other retained shapes supply no parent. Each variable,
+side and parent identity can be used once per analysis. The child retains derived
+coefficients and a bounded source-count origin, without parent identities; retirement
+and compaction cannot invalidate its arithmetic. Source selections, produced children,
+admission and first consumption have separate counters, including after retirement.
 Only a compact result is tested for admission. A retained row must propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have
