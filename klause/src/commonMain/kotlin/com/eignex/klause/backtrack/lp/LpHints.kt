@@ -63,6 +63,7 @@ internal class LpHints(
     private var externalExact: BigFraction? = null
 
     fun beginNode(depth: Int, bound: Double, incumbentVersion: Long = 0L, externalExact: BigFraction? = null) {
+        if (!collect) return
         if (scopeModel != null) charge(1L)
         cutoff = bound
         this.incumbentVersion = incumbentVersion
@@ -186,6 +187,7 @@ internal class LpHints(
     override fun recordInfeasible() = history.infeasible()
 
     override fun recordUnavailable(reason: LpHintUnavailable) {
+        if (!collect) return
         if (scopeModel != null) charge(1L)
         unavailable = reason
     }
@@ -223,6 +225,7 @@ internal class LpHints(
     }
 
     fun finishNode(state: LpExactState? = null) {
+        if (!collect) return
         history.finishNode(unavailable.name)
         if (scopeModel != null && state != null) {
             if (scopeModel !== state.baseModel && !rowExtension(state.baseModel)) {
@@ -470,6 +473,7 @@ internal class LpHints(
     private var recorded = false
 
     fun resetHistory() {
+        if (!collect) return
         if (scopeModel != null) {
             charge(scopeVariables.size.toLong() + scopeBooleans.size)
             history.clear()
