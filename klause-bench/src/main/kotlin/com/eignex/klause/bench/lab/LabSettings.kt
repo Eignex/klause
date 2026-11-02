@@ -35,6 +35,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     init {
         require(selections.isNotEmpty())
         require(!harnessJfr || !inputOnly) { "Harness JFR requires ordinary JVM CLI execution" }
+        require(sourceStaging != SourceStaging.CLI || !inputOnly) { "CLI delivery requires ordinary JVM execution" }
         require(comparisonSeries.matches(Regex("[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}")))
         if (propagationControls) {
             require(

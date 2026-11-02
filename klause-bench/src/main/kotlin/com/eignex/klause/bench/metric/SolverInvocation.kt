@@ -113,10 +113,13 @@ internal object SolverInvocation {
         budget: Budget,
         nanoTime: () -> Long = System::nanoTime,
         staging: SourceStaging = SourceStaging.CACHE,
+        decoderIdentity: ((() -> Unit) -> Map<String, String>) = { SourceDecoder.capture(it) },
         solve: (File, Budget) -> Result,
     ): Result {
         val start = nanoTime()
-        val stagingDirectory = staging.directory
+        val cliDecodesInput = CorpusFiles.isCompressed(file) && staging == SourceStaging.CLI
+        val stagingDirectory = if (staging == SourceStaging.CLI) null else staging.directory
+        var decoder = emptyMap<String, String>()
         var preparationNanos: Long? = null
         var cleanupNanos = 0L
         var cliNanos = 0L
@@ -125,8 +128,7 @@ internal object SolverInvocation {
         fun checkActive() = checkSourceActive(nanoTime() - start, budget)
         val failure = runCatching {
             SourcePreparationCapture.span("source-preparation").use { preparation ->
-                CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it },
-                    stagingDirectory = stagingDirectory, nanoTime = nanoTime) { plain ->
+                fun invokeSource(input: File): Result {
                     preparation.close()
                     checkActive()
                     val cliStart = nanoTime()
@@ -134,10 +136,20 @@ internal object SolverInvocation {
                     val remaining = budget.timeoutMillis - (cliStart - start) / NANOS_PER_MILLI
                     if (remaining <= 0L) throw SourcePreparationTimeout()
                     try {
-                        result = SourcePreparationCapture.measure("source-cli") { solve(plain, Budget(remaining)) }
+                        result = SourcePreparationCapture.measure("source-cli") { solve(input, Budget(remaining)) }
                     } finally {
                         cliNanos = nanoTime() - cliStart
                     }
+                    return result
+                }
+                if (cliDecodesInput) {
+                    checkActive()
+                    decoder = decoderIdentity(::checkActive)
+                    invokeSource(file)
+                } else {
+                    CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it },
+                        stagingDirectory = stagingDirectory ?: CorpusFiles.stagingRoot,
+                        nanoTime = nanoTime, block = ::invokeSource)
                 }
             }
         }.exceptionOrNull()
@@ -146,10 +158,18 @@ internal object SolverInvocation {
             result = result.copy(stats = result.stats + ("sourcePreparationBudgetExhausted" to "true"))
         }
         val totalNanos = nanoTime() - start
-        result = result.copy(stats = result.stats + mapOf(
+        val preparationMillis = (preparationNanos ?: (totalNanos - cleanupNanos)) / NANOS_PER_MILLI
+        val decoding = if (cliDecodesInput) emptyMap() else mapOf("sourceDecodeMs" to preparationMillis.toString())
+        result = result.copy(stats = (result.stats - "sourceDecodeMs") + decoder + decoding + mapOf(
             "sourceStaging" to if (CorpusFiles.isCompressed(file)) staging.key else "plain",
-            "sourceStagingDirectory" to if (CorpusFiles.isCompressed(file)) stagingDirectory.absolutePath else "",
-            "sourceDecodeMs" to ((preparationNanos ?: (totalNanos - cleanupNanos)) / NANOS_PER_MILLI).toString(),
+            "sourceStagingDirectory" to
+                if (CorpusFiles.isCompressed(file)) stagingDirectory?.absolutePath.orEmpty() else "",
+            "sourcePreparationMs" to preparationMillis.toString(),
+            "sourceDecodeLocation" to when {
+                cliDecodesInput -> "cli-frontend"
+                CorpusFiles.isCompressed(file) -> "harness"
+                else -> "none"
+            },
             "sourceCleanupMs" to (cleanupNanos / NANOS_PER_MILLI).toString(),
             "sourceCliMs" to (cliNanos / NANOS_PER_MILLI).toString(),
             "sourceInvocationMs" to (totalNanos / NANOS_PER_MILLI).toString(),
