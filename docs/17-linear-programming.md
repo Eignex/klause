@@ -316,7 +316,8 @@ its passes and comparisons to the same preparation allowance. Membership walks
 charge ordinary CP work and revisit retracted variables. At each source node,
 preparation can use its existing funded allowance before another LP query. A ready
 component guide defers additional node queries until the first incumbent, while
-inherited checked bounds and complete CP checks remain active. Those nodes supply
+inherited checked bounds, combinatorial node bounds and complete CP checks remain
+active. Only the simplex arm defers; other bounds keep their normal cascade. Those nodes supply
 no new directional observations; ordinary node LP policy resumes after an incumbent
 or guide expiry. Declined preparation keeps ordinary branching; guide replacement, restart, reseed and close discard the
 ordering. An attempt stopped before spending work can retry in a fresh consultation;

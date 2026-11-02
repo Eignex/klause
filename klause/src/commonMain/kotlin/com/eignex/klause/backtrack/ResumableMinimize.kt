@@ -1379,14 +1379,13 @@ internal class ResumableMinimize(
             // Persistent LP fixings may use only a cutoff that survives every later repair.
             val lpBound = if (rebindable) externalBound else effectiveBound
             lpHints?.beginNode(context.decisionLevel, lpBound)
-            if (incumbents.current() == null &&
+            val deferSimplex = incumbents.current() == null &&
                 lpEngine.prepareRootComponentOrder(session, params.cancellation) != null
-            ) {
-                lpHints?.finishNode()
+            if (deferSimplex) {
                 sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", "NODE_QUERY_DEFERRED", 0L)
-                return SearchNodeDisposition.Expand
             }
-            val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1, singleObj?.ascending ?: true)
+            val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1,
+                singleObj?.ascending ?: true, deferSimplex = deferSimplex)
             lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState)
             if (!pruned) {
                 return SearchNodeDisposition.Expand
