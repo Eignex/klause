@@ -80,7 +80,7 @@ class LpHintsTest {
         }
 
         val existing = listOf(SearchDecision.IntAtMost(0, 0L), SearchDecision.IntAtLeast(0, 1L))
-        assertEquals(existing, hints.orderSelectedAlternatives(variable, domain, existing) { _, _ ->
+        assertEquals(existing, hints.selectRootAlternatives(variable, domain, existing) { _, _ ->
             queries++
             listOf(LpDirectionalCost(1.0, 4.0))
         })
@@ -427,7 +427,7 @@ class LpHintsTest {
     }
 
     @Test
-    fun `root basis gains describe the actual complementary children`() {
+    fun `root basis gains choose complementary cuts around the current LP point`() {
         for (boolean in listOf(false, true)) for (split in if (boolean) listOf(0L) else listOf(-1L, 0L, 1L)) {
             for (upFirst in listOf(false, true)) for (allowBasis in listOf(false, true)) {
                 val builder = LpBuilder()
@@ -448,16 +448,23 @@ class LpHintsTest {
                 val existing = if (upFirst) listOf(upper, lower) else listOf(lower, upper)
                 var queries = 0
 
-                val ordered = hints.orderSelectedAlternatives(variable, domain, existing, allowBasis) { _, _ ->
+                val ordered = hints.selectRootAlternatives(variable, domain, existing, allowBasis) { _, _ ->
                     queries++
                     listOf(LpDirectionalCost(1.0, 4.0))
                 }
 
-                val expected = if (!allowBasis) existing else
-                    if (split < 0L) listOf(lower, upper) else listOf(upper, lower)
+                val floorLower = if (boolean) SearchDecision.Bool(1) else SearchDecision.IntAtMost(0, 0L)
+                val floorUpper = if (boolean) SearchDecision.Bool(0) else SearchDecision.IntAtLeast(0, 1L)
+                val expected = if (!allowBasis) existing else listOf(floorUpper, floorLower)
                 assertEquals(expected, ordered)
                 assertEquals(1, queries)
                 assertEquals(1, events.count { it == "BASIS_PARTITION_PREPARED" })
+                assertEquals(if (allowBasis && split != 0L) 1 else 0,
+                    events.count { it == "BASIS_PARTITION_CHANGED" })
+                assertEquals(if (allowBasis && (split != 0L || !upFirst)) 1 else 0,
+                    events.count { it == "BASIS_ROOT_CHOICE_CHANGED" })
+                assertEquals(if (allowBasis && split == 0L && upFirst) 1 else 0,
+                    events.count { it == "BASIS_ROOT_CHOICE_AGREED" })
                 assertEquals(if (allowBasis) 1 else 0, events.count { it == "BASIS_SIDE_CONSUMED" })
                 assertEquals(if (allowBasis) 0 else 1, events.count { it == "BASIS_SIDE_WITHHELD" })
             }
@@ -490,16 +497,16 @@ class LpHintsTest {
                 listOf(LpDirectionalCost(1.0, 4.0))
             }
 
-            assertEquals(invalid, hints.orderSelectedAlternatives(variable, domain, invalid, estimate = estimate))
+            assertEquals(invalid, hints.selectRootAlternatives(variable, domain, invalid, estimate = estimate))
             assertEquals(0, queries)
-            assertTrue(work - before <= 24L)
-            assertEquals(existing.reversed(), hints.orderSelectedAlternatives(variable, domain, existing,
+            assertTrue(work - before <= 32L)
+            assertEquals(existing.reversed(), hints.selectRootAlternatives(variable, domain, existing,
                 estimate = estimate))
             hints.resetHistory()
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
             hints.branch(variable, domain)
-            assertEquals(existing, hints.orderSelectedAlternatives(variable, domain, existing, estimate = estimate))
+            assertEquals(existing, hints.selectRootAlternatives(variable, domain, existing, estimate = estimate))
             assertEquals(1, queries)
         }
     }
@@ -524,13 +531,13 @@ class LpHintsTest {
             listOf(LpDirectionalCost(1.0, 4.0))
         }
 
-        val unchanged = hints.orderSelectedAlternatives(variable, domain, existing,
+        val unchanged = hints.selectRootAlternatives(variable, domain, existing,
             reserve = { requested = it; false }, estimate = estimate)
 
         assertEquals(existing, unchanged)
-        assertEquals(24L, requested)
+        assertEquals(32L, requested)
         assertEquals(0, queries)
-        assertEquals(existing.reversed(), hints.orderSelectedAlternatives(variable, domain, existing,
+        assertEquals(existing.reversed(), hints.selectRootAlternatives(variable, domain, existing,
             estimate = estimate))
         assertEquals(1, queries)
     }

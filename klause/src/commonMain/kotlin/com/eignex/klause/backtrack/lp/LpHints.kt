@@ -311,10 +311,10 @@ internal class LpHints(
         return if (history.mayHaveScores) history.prediction(variable, value) else null
     }
 
-    val rootSideReady: Boolean get() = collect && rootBasis && freshRecord && history.isRootNode &&
+    val rootChoiceReady: Boolean get() = collect && rootBasis && freshRecord && history.isRootNode &&
         !rootBasisAttempted && activeSide == null
 
-    fun orderSelectedAlternatives(
+    fun selectRootAlternatives(
         variable: VarRef,
         domain: IntDomain?,
         alternatives: List<SearchDecision>,
@@ -325,9 +325,9 @@ internal class LpHints(
         },
         estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>?,
     ): List<SearchDecision> {
-        if (!rootSideReady) return orderAlternatives(variable, alternatives, allowBasis)
+        if (!rootChoiceReady) return orderAlternatives(variable, alternatives, allowBasis)
         if (alternatives.size != 2) return alternatives
-        if (!reserve(24L)) return alternatives
+        if (!reserve(32L)) return alternatives
         val first = alternatives[0]
         val second = alternatives[1]
         val split = when (variable) {
@@ -350,10 +350,28 @@ internal class LpHints(
             }
         }
         observe("BASIS_PARTITION_PREPARED")
-        prepareSide(variable, domain, allowBasis = true, rootOnly = true, actualSplit = split, estimate = estimate)
-        activeSide = pendingSide
+        prepareSide(variable, domain, allowBasis = true, rootOnly = true, estimate = estimate)
+        val advice = pendingSide
+        activeSide = advice
         pendingSide = null
-        return orderAlternatives(variable, alternatives, allowBasis)
+        val changedPartition: Boolean
+        val proposed: List<SearchDecision>
+        if (advice?.basis == true && variable is VarRef.IntVar && split != advice.split) {
+            val lower = SearchDecision.IntAtMost(variable.varId, advice.split)
+            val upper = SearchDecision.IntAtLeast(variable.varId, advice.split + 1L)
+            changedPartition = true
+            proposed = if (first is SearchDecision.IntAtMost) listOf(lower, upper) else listOf(upper, lower)
+        } else {
+            changedPartition = false
+            proposed = alternatives
+        }
+        val ordered = orderAlternatives(variable, proposed, allowBasis)
+        if (advice?.basis != true) return ordered
+        if (!allowBasis) return alternatives
+        if (changedPartition) observe("BASIS_PARTITION_CHANGED")
+        observe(if (changedPartition || ordered[0] != alternatives[0]) "BASIS_ROOT_CHOICE_CHANGED"
+            else "BASIS_ROOT_CHOICE_AGREED")
+        return ordered
     }
 
     fun prepareSelectedSide(
@@ -367,7 +385,6 @@ internal class LpHints(
         domain: IntDomain?,
         allowBasis: Boolean = true,
         rootOnly: Boolean = false,
-        actualSplit: Long? = null,
         estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>?,
     ): Boolean {
         pendingSide = null
@@ -375,9 +392,7 @@ internal class LpHints(
         if (!collect || !directionalGains || !freshRecord || variable == null) return false
         val value = value(variable, domain)
         if (!fractional(variable, value)) return false
-        val prediction = if (actualSplit == null || actualSplit == floor(value).toLong()) {
-            directionalPrediction(variable, value)
-        } else null
+        val prediction = directionalPrediction(variable, value)
         if (prediction != null) {
             return prediction.score > 1e-9 &&
                 rememberSide(variable, value, prediction.down, prediction.up, basis = false)
@@ -400,28 +415,18 @@ internal class LpHints(
             return false
         }
         val fraction = value - floor(value)
-        val downDistance = if (actualSplit == null) fraction else maxOf(0.0, value - actualSplit.toDouble())
-        val upDistance = if (actualSplit == null) 1.0 - fraction else
-            maxOf(0.0, (actualSplit + 1L).toDouble() - value)
-        val down = cost.down * downDistance
-        val up = cost.up * upDistance
+        val down = cost.down * fraction
+        val up = cost.up * (1.0 - fraction)
         val score = minOf(down, up) + maxOf(down, up) / 6.0
         if (!score.isFinite() || score <= 1e-9) return false
         observe("BASIS_ESTIMATED")
-        return rememberSide(variable, value, down, up, basis = true, split = actualSplit ?: floor(value).toLong())
+        return rememberSide(variable, value, down, up, basis = true)
     }
 
-    private fun rememberSide(
-        variable: VarRef,
-        value: Double,
-        down: Double,
-        up: Double,
-        basis: Boolean,
-        split: Long = floor(value).toLong(),
-    ): Boolean {
+    private fun rememberSide(variable: VarRef, value: Double, down: Double, up: Double, basis: Boolean): Boolean {
         charge(8L)
         if (down == up) return false
-        pendingSide = SideAdvice(variable, split, up > down, basis)
+        pendingSide = SideAdvice(variable, floor(value).toLong(), up > down, basis)
         return true
     }
 

@@ -317,14 +317,18 @@ History preparation and ordering share the existing LP allowance.
 
 The larger predicted objective increase is tried first, after value and incumbent
 guidance. Passive history requires the estimated Boolean or integer floor/ceil
-partition. A root basis estimate scales its source-coordinate unit costs by each
-actual child bound's distance from the LP point. A child bound already satisfied by
-that point has zero estimated movement. Partition inspection and conversion reserve 24 work units
-from the existing LP allowance before the query. Guidance swaps those alternatives
-without adding, removing or replacing a decision. Tied gains, insufficient allowance,
-pruned alternatives and incompatible partitions retain the existing heuristics. Preferences expire at the next node, point replacement or history reset.
+partition and only swaps its existing children. After validating two complementary
+children, a usable root basis estimate can choose integer cuts at the current LP
+point's floor and ceiling. Both neighbours must belong to the current domain, so
+the replacement cuts remain nonempty and partition that domain completely. The
+basis costs are scaled by movement to these adjacent cuts. This preparation reserves
+32 work units from the existing LP allowance before the query, including bounded
+construction of the two cuts. Boolean branches keep their existing literals.
+Tied gains, insufficient allowance, pruned alternatives and incompatible partitions
+retain the existing heuristics. Preferences expire at the next node, point replacement or history reset.
 History and basis side consumption, changed order and unavailable advice are recorded
-separately. Child-order fallback distinguishes a changed variable, an incomplete pair
+separately. Root observations distinguish a changed partition from an agreed or
+changed complete root choice. Child-order fallback distinguishes a changed variable, an incomplete pair
 and a different partition. Variable proposal preparation is separate from actual selection, with
 changed and agreed baseline choices counted at selection. Accepted row-extension
 compatibility checks have their own outcome.
