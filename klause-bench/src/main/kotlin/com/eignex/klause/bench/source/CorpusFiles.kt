@@ -60,6 +60,7 @@ internal object CorpusFiles {
         checkActive: () -> Unit = {},
         onCleanup: (Long) -> Unit = {},
         stagingDirectory: File = stagingRoot,
+        nanoTime: () -> Long = System::nanoTime,
         block: (File) -> T,
     ): T {
         fun checkStaging() {
@@ -70,11 +71,11 @@ internal object CorpusFiles {
         if (!isCompressed(file)) return block(file)
         stagingDirectory.mkdirs()
         checkStaging()
-        val dir = Files.createTempDirectory(stagingDirectory.toPath(), "plain-").toFile()
-        var failure: Throwable? = null
-        try {
+        val directory = StagedDirectory(Files.createTempDirectory(stagingDirectory.toPath(), "plain-").toFile(),
+            nanoTime, onCleanup)
+        directory.use {
             checkStaging()
-            val plain = File(dir, plainPath(file.name))
+            val plain = File(it.file, plainPath(file.name))
             open(file).use { input ->
                 plain.outputStream().use { output ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
@@ -89,18 +90,20 @@ internal object CorpusFiles {
             }
             checkStaging()
             return block(plain)
-        } catch (caught: Throwable) {
-            failure = caught
-            throw caught
-        } finally {
-            val cleanupStart = System.nanoTime()
+        }
+    }
+
+    private class StagedDirectory(
+        val file: File,
+        val nanoTime: () -> Long,
+        val onCleanup: (Long) -> Unit,
+    ) : AutoCloseable {
+        override fun close() {
+            val cleanupStart = nanoTime()
             try {
-                check(dir.deleteRecursively()) { "Cannot remove staged source: $dir" }
-            } catch (cleanup: Throwable) {
-                if (failure == null) throw cleanup
-                failure.addSuppressed(cleanup)
+                check(file.deleteRecursively()) { "Cannot remove staged source: $file" }
             } finally {
-                onCleanup(System.nanoTime() - cleanupStart)
+                onCleanup(nanoTime() - cleanupStart)
             }
         }
     }
