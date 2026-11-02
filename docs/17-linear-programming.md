@@ -544,7 +544,13 @@ An unproductive half-scaled aggregate can score single substitutions to a stated
 upper side on odd integer coordinates. Exact RHS changes and supporting strictness
 determine each rounded endpoint; finite normalized violation chooses at most one
 additional proof. That proof rebuilds its positive combination with the selected
-source side and is checked before admission. The singleton index, side scoring,
+source side and is checked before admission. If that substitution supplies no
+separating cut, a funded scan can select several stated upper sides together when
+the point is nearer those endpoints. Lower sides retain ties and unavailable
+finite distances. At least two selected upper sides permit one additional exact
+half-rounding proof; an interrupted scan publishes no choice. Each rounded odd
+coefficient cites its selected singleton premise, and the complete proof requires
+source verification before admission. The singleton index, side scoring,
 exact arithmetic and nested proofs share the same generation allowance. A nonseparating seed or continuation tries these alternatives before
 following one opposite-sign continuous incidence path through
 at most four distinct original source rows. For the next residual coordinate,

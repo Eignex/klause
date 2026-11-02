@@ -1398,6 +1398,133 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `integer point sides should combine upper complements into a checked separating cut`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val source = SourceProofContext(scope,
+            setOf(x, y, z, real), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                    z to BigFraction.ofLong(2), real to BigFraction.ONE), BigFraction.ofLong(2))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "x upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE)),
+                "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "y upper" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE)),
+            ))
+        val point = mapOf(x to 0.75, y to 0.75, z to 0.25, real to -0.75)
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            maximumCandidates = 1, limits = limits, point = point).single()
+
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ofLong(2), y to BigFraction.ofLong(2),
+            z to BigFraction.ONE), BigFraction.ofLong(3)), cut.inequality)
+        assertEquals(setOf(0, 1, 3, 5), cut.owners)
+        assertEquals(CutFamily.AGGREGATION_MIR, cut.family)
+        assertEquals(1L, observations["AggregateHalfPointEligible"])
+        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `integer point sides should withhold an interrupted multi-coordinate choice`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val source = SourceProofContext(scope,
+            setOf(x, y, z, real), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                    z to BigFraction.ofLong(2), real to BigFraction.ONE), BigFraction.ofLong(2))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "x upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE)),
+                "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "y upper" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE)),
+            ))
+        val point = mapOf(x to 0.75, y to 0.75, z to 0.25, real to -0.75)
+        val observations = mutableMapOf<String, Long>()
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, count ->
+                observations[name] = (observations[name] ?: 0L) + count
+                if (name == "AggregateHalfPointScans") stopped = true
+            }, point = point)
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+        assertNull(observations["AggregateHalfPointComplete"])
+        assertNull(observations["AggregateHalfPointAttempts"])
+    }
+
+    @Test
+    fun `integer point sides should share the generation work and allocation`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val source = SourceProofContext(scope,
+            setOf(x, y, z, real), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                    z to BigFraction.ofLong(2), real to BigFraction.ONE), BigFraction.ofLong(2))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "x upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE)),
+                "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "y upper" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE)),
+            ))
+        val point = mapOf(x to 0.75, y to 0.75, z to 0.25, real to -0.75)
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+        var work = 0L
+        var allocation = 0L
+        var beforeWork = 0L
+        var beforeAllocation = 0L
+        val complete = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count ->
+                if (name == "AggregateWork") work += count
+                if (name == "AggregateAllocation") allocation += count
+                if (name == "AggregateHalfPointAttempts") {
+                    beforeWork = work
+                    beforeAllocation = allocation
+                }
+            }, point = point)
+        assertEquals(1, complete.size)
+        assertTrue(beforeWork > 0L && beforeAllocation > 0L)
+
+        for (limited in listOf(limits.copy(work = beforeWork), limits.copy(allocation = beforeAllocation))) {
+            val observations = mutableMapOf<String, Long>()
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                limits = limited, point = point)
+
+            assertTrue(cuts.isEmpty())
+            assertTrue((observations["AggregateWork"] ?: 0L) <= limited.work)
+            assertTrue((observations["AggregateAllocation"] ?: 0L) <= limited.allocation)
+        }
+    }
+
+    @Test
+    fun `integer point sides should require each selected upper endpoint as a source premise`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val source = SourceProofContext(scope.copy(condition = SourceCondition(upper = mapOf(y to BigFraction.ONE))),
+            setOf(x, y, z, real), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                    z to BigFraction.ofLong(2), real to BigFraction.ONE), BigFraction.ofLong(2))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "x upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE)),
+                "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ))
+        val point = mapOf(x to 0.75, y to 0.75, z to 0.25, real to -0.75)
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never, point = point)
+
+        assertTrue(cuts.isEmpty())
+    }
+
+    @Test
     fun `half aggregation should strengthen the checked numerical bound`() {
         val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
             setOf(x, y, real), linkedMapOf(
