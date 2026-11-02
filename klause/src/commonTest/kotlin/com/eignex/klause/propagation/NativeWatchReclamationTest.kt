@@ -154,7 +154,8 @@ class NativeWatchReclamationTest {
     @Test
     fun `appended retirements should resume metadata cleanup while retaining a live reason`() {
         val base = Clause(intArrayOf(8, 10))
-        val session = PropagationSession(Problem(6, 0, emptyArray(), arrayOf(base, Clause(intArrayOf(1)))), nativeSat = true)
+        val session = PropagationSession(Problem(6, 0, emptyArray(),
+            arrayOf(base, Clause(intArrayOf(1)))), nativeSat = true)
         repeat(16) { session.addLearnedClause(base, 2, permanent = true) }
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
         val reason = assertNotNull(session.boolReasonClause(1)).toList()

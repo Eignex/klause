@@ -88,4 +88,18 @@ class NativeLearnedMetadataTest {
         assertEquals(metadata.primitiveBytes, protected.getValue("protectedPrimitiveBytes"))
     }
 
+    @Test
+    fun `an unused startup reservation should release before any row is admitted`() {
+        val metadata = NativeLearnedMetadata()
+        val before = metadata.primitiveBytes
+
+        metadata.releaseEmptyReservation()
+
+        assertTrue(metadata.primitiveBytes < before)
+        assertEquals(0, metadata.size)
+        metadata.add(2, true, 4, 9L)
+        assertEquals(2, metadata[0, NativeLearnedMetadata.LBD])
+        assertEquals(9L, metadata.admission(0))
+    }
+
 }

@@ -155,6 +155,11 @@ internal class NativeSatState(private val state: PropagationState) {
     private var metadataSweepingRetirements = -1
 
     internal fun sweepRetiredMetadata(budget: ReclamationPreparation) {
+        if (metadata.hasEmptyReservation) {
+            budget.visit(12L, 16L)
+            budget.visit(0L)
+            metadata.releaseEmptyReservation()
+        }
         if (retiredCount == 0) return
         if (metadataSweepingRetirements < 0) {
             if (metadataSweptRetirements == retiredCount) return

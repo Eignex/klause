@@ -11,14 +11,15 @@ internal class NativeLearnedMetadata {
         val capacity: Int get() = admissions.size
     }
 
-    private var pages = arrayOfNulls<Page>(1).also { it[0] = Page(1) }
+    private var pages = arrayOfNulls<Page>(1).also { it[0] = Page(INITIAL_CAPACITY) }
     private var pageCount = 1
-    private var allocatedBytes = ROW_BYTES
+    private var allocatedBytes = INITIAL_CAPACITY * ROW_BYTES
     private var allocationIdentity = Any()
     var size = 0
         private set
     val primitiveBytes: Long get() = 16L + allocatedBytes + pageCount * Int.SIZE_BYTES
-    val preparationWork: Long get() = 32L
+    val preparationWork: Long get() = INITIAL_CAPACITY * ROW_BYTES / Int.SIZE_BYTES * 2L + 10L
+    val hasEmptyReservation: Boolean get() = size == 0 && pageCount > 0
     val admissionWork: Long
         get() {
             val index = size ushr PAGE_SHIFT
@@ -85,6 +86,11 @@ internal class NativeLearnedMetadata {
         page.values[slot * COLUMNS + ORIGIN] = origin
         page.admissions[slot] = admission
         size++
+    }
+
+    fun releaseEmptyReservation() {
+        check(size == 0)
+        releasePage(0)
     }
 
     fun release(index: Int) {
@@ -188,6 +194,7 @@ internal class NativeLearnedMetadata {
         const val SCAN = 6
         const val WATCH_FIRST = 7
         const val WATCH_SECOND = 8
+        private const val INITIAL_CAPACITY = 8
         private const val COLUMNS = 9
         private const val RETIRED = 4
         private const val PAGE_SHIFT = 4
