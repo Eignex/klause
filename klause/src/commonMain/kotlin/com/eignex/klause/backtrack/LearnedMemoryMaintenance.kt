@@ -6,6 +6,9 @@ import com.eignex.klause.solver.result.SearchStatsSink
 internal class LearnedMemoryMaintenance {
     private data class Position(
         val owner: Any,
+        val limitBytes: Long,
+        val workGrant: Long,
+        val scratchGrant: Long,
         val count: Int,
         val revision: Long,
         val level: Int,
@@ -28,7 +31,8 @@ internal class LearnedMemoryMaintenance {
         stats: SearchStatsSink?,
     ) {
         val limit = params.learnedMemoryBytes ?: return
-        fun position() = Position(session.sharingIdentity, session.learnedClauseCount, session.learnedClauseRevision,
+        fun position() = Position(session.sharingIdentity, limit, params.learnedMemoryWork,
+            params.learnedMemoryScratchBytes, session.learnedClauseCount, session.learnedClauseRevision,
             session.decisionLevel, session.explanationState.undoTop, session.explanationState.atoms.intVar.size,
             session.ownershipWork, session.retainedSharingSize?.invoke() ?: 0L,
             session.sharedLearningPosition?.invoke(),
@@ -36,8 +40,8 @@ internal class LearnedMemoryMaintenance {
         if (observed == position()) return
         val result = session.reclaimLearnedMemory(limit, params.learnedMemoryWork, params.learnedMemoryScratchBytes,
             { inprocessing?.releaseRetainedBuffers() ?: false }, inprocessing?.retainsPublication == true)
-        // This is an attempt cursor, not a valid snapshot: even cancelled scans must yield to search progress.
-        observed = position()
+        // Cancelled observation yields to search; funded physical cleanup retains its next opportunity.
+        observed = if (result.continuationPending) null else position()
         stats?.noteInprocessing("learnedMemory${result.status.name}", 1L)
         stats?.noteInprocessing("learnedMemoryWork", result.work)
         if (result.protectedLimitExceeded) stats?.noteInprocessing("learnedMemoryProtectedLimit", 1L)

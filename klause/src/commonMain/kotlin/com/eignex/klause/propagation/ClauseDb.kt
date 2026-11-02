@@ -101,7 +101,18 @@ internal fun PropagationState.addLearnedClause(
     refPayloadStore.add(null)
     val watchers = clause.initialBoolWatchers
     val blockers = clause.initialBoolWatcherBlockers
-    for (i in watchers.indices) installLitWatch(watchers[i], newFid, blockers?.getOrNull(i) ?: NO_BLOCKER)
+    if (watchers.size == 2 && watchers[0] != watchers[1] &&
+        watchers.all { Lit.variable(it) < problem.numBoolVars }) {
+        val first = watches.byLit[watchers[0]]
+        val second = watches.byLit[watchers[1]]
+        work += watches.pos.putPair(newFid, watchers[0], first.size, watchers[1], second.size)
+        first.add(newFid)
+        second.add(newFid)
+        watches.blockersByLit[watchers[0]].add(blockers?.getOrNull(0) ?: NO_BLOCKER)
+        watches.blockersByLit[watchers[1]].add(blockers?.getOrNull(1) ?: NO_BLOCKER)
+    } else {
+        for (i in watchers.indices) installLitWatch(watchers[i], newFid, blockers?.getOrNull(i) ?: NO_BLOCKER)
+    }
     return newFid
 }
 
@@ -274,7 +285,7 @@ internal fun PropagationState.forgetLearnedClauses(
     val budget = ReclamationPreparation(maxWork, maxScratchBytes, cancelled) { work += it }
     val retained = try {
         nativeEngine?.sweepRetiredWatches(budget)
-        sweepRetiredGeneralWatches(budget)
+        sweepRetiredGeneralWatchMemory(budget)
         prepareReclamation(budget, keep)
     } catch (_: ReclamationPreparation.Deferred) {
         return false
@@ -408,14 +419,14 @@ internal fun PropagationState.forgetLearnedClauses(
     }
 
     // Renumbering learned fids and shifting list positions invalidates every back pointer.
-    work += watches.pos.size.toLong() * watches.pos.size
-    watches.pos = com.eignex.klause.util.MutableLongIntMap()
+    work++
+    watches.pos = BoolWatchPositionIndex(baseFactorCount)
     for (lit in watches.byLit.indices) {
         work++
         val list = watches.byLit[lit]
         for (i in 0 until list.size) {
             work++
-            watches.pos.put(packWatch(list[i], lit), i)
+            work += watches.pos.put(packWatch(list[i], lit), i)
         }
     }
 
