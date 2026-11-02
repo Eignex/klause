@@ -597,7 +597,9 @@ kernel-owned through optional buffer release. Abandoned inactive captures retain
 small cancellation owner until cancellation is funded or their scope is released.
 Caller metadata and kernel requests share a finite retained allowance bounded by
 the configured memory scratch envelope and any learned-memory soft limit. Existing
-candidate literal buffers remain part of the pass memory observation.
+candidate literal buffers remain part of the pass memory observation. The pass
+observes its lifetime controller even without a request; active capture and protected
+continuation handles protect its scalar and reference ownership.
 Learned replacements retain their imported origin. Physical compaction protects live and
 historical reasons and removes obsolete watches; attaching a shortened binary installs
 both implication directions and evaluates facts already assigned at the root. There

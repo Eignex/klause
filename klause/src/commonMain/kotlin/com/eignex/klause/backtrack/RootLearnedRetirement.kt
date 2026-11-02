@@ -39,10 +39,10 @@ internal class RootLearnedRetirement {
     }
 
     fun retainedMemory(sample: SharingMemoryObservation, owner: Any) {
-        if (captured == null && protectedAnchor == null) return
-        sample.ownedReferences(owner, 1L, true)
-        sample.owned(this, 12L, true)
-        sample.ownedReferences(this, 2L, true)
+        val protected = captured != null || protectedAnchor != null
+        sample.ownedReferences(owner, 1L, protected)
+        sample.owned(this, 12L, protected)
+        sample.ownedReferences(this, 2L, protected)
     }
 
     fun capture(
