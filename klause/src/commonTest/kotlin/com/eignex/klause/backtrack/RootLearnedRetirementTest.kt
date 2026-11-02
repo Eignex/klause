@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.LearnedRetirementStatus
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -143,13 +144,17 @@ class RootLearnedRetirementTest {
             }
             retirement.markSelected()
             retirement.rootPublished()
-            val limited = params.copy(inprocessingRootWork = 81L)
-            spending.run(session, limited, null) { budget ->
-                retirement.prepare(session, limited, budget)
-                retirement.advance(session, limited, budget)
+            val interrupted = params.copy(cancellation = Cancellation { !session.isLearnedClause(0) })
+            spending.run(session, interrupted, null) { budget ->
+                retirement.prepare(session, interrupted, budget)
+                retirement.advance(session, interrupted, budget)
             }
             assertFalse(session.isLearnedClause(0))
             assertTrue(session.hasLearnedRetirementContinuation)
+
+            val terminal = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+            assertEquals(0L, terminal["selectedRetirementPending"])
+            assertEquals(1L, terminal["selectedRetirementTerminalOwners"])
 
             retirement.abandon()
             repeat(3) {
