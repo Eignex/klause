@@ -31,7 +31,7 @@ import kotlin.test.assertTrue
 class ResumableMinimizeDirectionalTest {
     @Test
     fun `finite search consumes observed child advice across cooperative slices`() {
-        val blocks = 3
+        val blocks = 4
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
@@ -67,7 +67,7 @@ class ResumableMinimizeDirectionalTest {
             }) },
         )
 
-        val objective = LinearObjective(intCoefficients = LongArray(variables) { if (it % 3 == 0) 1L else 2L })
+        val objective = LinearObjective(intCoefficients = LongArray(variables) { 2L + it % 3 })
         ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
             var slices = 0
             while (slices++ < 128 && !search.isDone) {
