@@ -7,6 +7,7 @@ import com.eignex.klause.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.backtrack.lp.orderRootValues
 import com.eignex.klause.backtrack.lp.pickRootComponent
+import com.eignex.klause.backtrack.lp.prepareRootComponentOrder
 import com.eignex.klause.backtrack.selector.IndomainBest
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
@@ -1378,6 +1379,13 @@ internal class ResumableMinimize(
             // Persistent LP fixings may use only a cutoff that survives every later repair.
             val lpBound = if (rebindable) externalBound else effectiveBound
             lpHints?.beginNode(context.decisionLevel, lpBound)
+            if (incumbents.current() == null &&
+                lpEngine.prepareRootComponentOrder(session, params.cancellation) != null
+            ) {
+                lpHints?.finishNode()
+                sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", "NODE_QUERY_DEFERRED", 0L)
+                return SearchNodeDisposition.Expand
+            }
             val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1, singleObj?.ascending ?: true)
             lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState)
             if (!pruned) {

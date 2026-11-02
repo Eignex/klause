@@ -193,6 +193,34 @@ internal object FiniteCutoffKnapsackFixture {
 
 class ResumableMinimizeTest {
     @Test
+    fun `retained component traversal defers node lp until the first incumbent`() {
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 4), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 4), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(3, 5), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 5), LinearOp.GE, 1),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(6) { 1L })
+        val samples = ArrayList<Sample>()
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
+            phaseSaving = false, targetPhasing = false, solutionPhasing = false,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true, rootCutHarvest = false))
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
+            search.runSlice(Cancellation { samples.isNotEmpty() }, Long.MAX_VALUE, -1L) { samples += it.sample }
+            assertEquals(4L, samples.single().ints.sum())
+            assertEquals(0.0, search.stats.lp.nodePasses.sum)
+            assertTrue((search.stats.lp.phases["PRIMAL_COMPONENT_ORDER_ROOT"]
+                ?.outcomes?.get("NODE_QUERY_DEFERRED") ?: 0L) > 0L)
+
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { samples += it.sample }
+
+            assertTrue(search.stats.lp.nodePasses.sum > 0.0)
+        }
+    }
+
+    @Test
     fun `retained guides complete one declared component before starting another`() {
         val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
             Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.GE, 1),
