@@ -202,14 +202,14 @@ class ResumableMinimizeTest {
             Linear(intArrayOf(1, 1), intArrayOf(3, 5), LinearOp.GE, 1),
             Linear(intArrayOf(1, 1), intArrayOf(1, 5), LinearOp.GE, 1),
         )).bake()
-        val objective = LinearObjective(intCoefficients = LongArray(6) { 1L })
+        val objective = LinearObjective(intCoefficients = longArrayOf(2, 2, 2, 2, 3, 3))
         val samples = ArrayList<Sample>()
         val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
             phaseSaving = false, targetPhasing = false, solutionPhasing = false,
             lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true, rootCutHarvest = false))
         BacktrackSolver(problem).resumable(objective, params).use { search ->
             search.runSlice(Cancellation { samples.isNotEmpty() }, Long.MAX_VALUE, -1L) { samples += it.sample }
-            assertEquals(4L, samples.single().ints.sum())
+            assertEquals(10.0, objective.evaluate(samples.single()))
             assertEquals(0.0, search.stats.lp.nodePasses.sum)
             assertTrue((search.stats.lp.phases["PRIMAL_COMPONENT_ORDER_ROOT"]
                 ?.outcomes?.get("NODE_QUERY_DEFERRED") ?: 0L) > 0L)
