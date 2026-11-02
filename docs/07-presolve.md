@@ -105,6 +105,9 @@ consumers. When that pivot uses a native reified or comparison-clause
 consumer, it tries the smallest incident rewrite payload first. Consumer admission
 checks walk the maintained occurrence index and charge the phase allowance. It
 also reuses existing exact binary cost channels within mixed integer objectives.
+The coefficient-safety scan records whether an admitted non-alias pivot reads
+native reified or comparison-clause consumers. Ordering reuses that classification
+without retaining another occurrence view or rescanning the candidate's consumers.
 
 `AffinePivotOrder.REWRITE_COST` retains Markowitz ordering between definitions and
 tries the smallest rewrite payload among an equality's unit pivots first. It sums

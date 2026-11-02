@@ -492,7 +492,10 @@ internal object AffineSingletons {
         val termVars: IntArray,
         val termCoeffs: LongArray,
         val isAlias: Boolean,
+        val usesStructuredConsumers: Boolean,
     )
+
+    internal enum class FoldCheck { DECLINED, ORDINARY, STRUCTURED }
 
     internal fun findAffineCandidate(
         ws: FactorOcc,
@@ -565,9 +568,8 @@ internal object AffineSingletons {
             candidateInFactor(ws, di, eliminated, objectiveIntVars, capWide, pivotable, cancellation) ?: return null
         } else null
         if (rankStructuredOnly && fallback != null) {
-            val rank = requiresStructuredConsumers(ws, fallback, cancellation)
             if (cancellation()) return null
-            if (!rank) return fallback
+            if (!fallback.usesStructuredConsumers) return fallback
         }
         cancellation.charge(AFFINE_WORK_WEIGHT * f.vars.size)
         if (row.bound == Long.MIN_VALUE) return null
@@ -647,12 +649,17 @@ internal object AffineSingletons {
             // rewrite a row that has already absorbed [FOLD_ABSORB_CAP] folds (bounding the accumulating-row
             // pathology), and additionally cap total fill-in at the tighter [WIDE_FILL_IN] in underdetermined
             // models.
+            var usesStructuredConsumers = false
             if (!isAlias) {
                 if (ws.anyOtherLinearAtAbsorbCap(di, x)) continue
                 if (capWide && (ws.degreeOf(x) - 1).toLong() * termVars.size > WIDE_FILL_IN) continue
                 // Leave x un-eliminated if folding it would overflow 64-bit arithmetic in some row it
                 // rewrites — sound (x stays, solved directly) and avoids a wrong wrapped coefficient.
-                if (ws.foldOverflowsLong(di, x, termVars, termCoeffs, constTerm, cancellation)) continue
+                when (ws.checkFold(di, x, termVars, termCoeffs, constTerm, cancellation)) {
+                    FoldCheck.DECLINED -> continue
+                    FoldCheck.STRUCTURED -> usesStructuredConsumers = true
+                    FoldCheck.ORDINARY -> Unit
+                }
             }
             // A single-partner affine `x = a·y + b` can also be projected out of non-linear globals
             // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
@@ -663,27 +670,10 @@ internal object AffineSingletons {
                 ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0].toInt(), constTerm.toInt(),
                     termVars[0], cancellation)
             if (isAlias || ws.otherOccurrencesAllLinear(di, x) || singlePartnerSubstitutable) {
-                return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
+                return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias, usesStructuredConsumers)
             }
         }
         return null
-    }
-
-    private fun requiresStructuredConsumers(
-        ws: FactorOcc,
-        candidate: AffineCandidate,
-        cancellation: Cancellation,
-    ): Boolean {
-        if (candidate.isAlias) return false
-        for (k in 0 until ws.degreeOf(candidate.x)) {
-            cancellation.charge(AFFINE_WORK_WEIGHT)
-            if (cancellation()) return false
-            val id = ws.occurrenceAt(candidate.x, k)
-            if (id == candidate.defIdx) continue
-            val factor = ws.factorAt(id)
-            if (factor is ReifiedLinear || factor is ComparisonClause) return true
-        }
-        return false
     }
 
     /** Whether any variable in [touchedVars] heads a unit-pivot or residue candidate, testing only the
@@ -794,17 +784,16 @@ internal object AffineSingletons {
         /** The [k]-th promoted stable id (`0 until promotedCount()`). */
         fun promotedAt(k: Int): Int
 
-        /** Whether folding the pivot `x = constTerm + Σ termCoeffs·termVars` into any Linear row that
-         *  mentions [x] (other than [defIdx]) would overflow 64-bit arithmetic. When it would, the
-         *  candidate is skipped and `x` is left un-eliminated (sound) rather than wrapping a coefficient. */
-        fun foldOverflowsLong(
+        /** Checks coefficient safety and classifies the pivot's consumers in one occurrence scan.
+         *  Overflow or cancellation declines the pivot, leaving [x] un-eliminated. */
+        fun checkFold(
             defIdx: Int,
             x: Int,
             termVars: IntArray,
             termCoeffs: LongArray,
             constTerm: Long,
             cancellation: Cancellation = Cancellation.Never,
-        ): Boolean
+        ): FoldCheck
 
         /** Whether renaming [x] to [replacement] would coalesce an integer linear row past [Long]. */
         fun aliasOverflowsLong(defIdx: Int, x: Int, replacement: Int): Boolean
@@ -899,23 +888,28 @@ internal object AffineSingletons {
             return true
         }
 
-        override fun foldOverflowsLong(
+        override fun checkFold(
             defIdx: Int,
             x: Int,
             termVars: IntArray,
             termCoeffs: LongArray,
             constTerm: Long,
             cancellation: Cancellation,
-        ): Boolean {
+        ): FoldCheck {
             var polled = 0
+            var structured = false
             val termsSmall = termsFitHalfLong(constTerm, termCoeffs)
             for (k in occ.offsets[x] until occ.offsets[x + 1]) {
                 // A high-degree pivot's overflow check walks every row it mentions; poll so one candidate's
                 // check cannot outrun the budget. Treat a bail as "would overflow" — skipping the fold is sound.
-                if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
+                if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return FoldCheck.DECLINED
                 cancellation.charge(AFFINE_WORK_WEIGHT)
                 val id = occ.flat[k]
-                val f = affineFoldRow(factors[id], rewriteStructured)
+                val factor = factors[id]
+                if (id != defIdx && rewriteStructured && (factor is ReifiedLinear || factor is ComparisonClause)) {
+                    structured = true
+                }
+                val f = affineFoldRow(factor, rewriteStructured)
                 if (id != defIdx && f != null && foldRowOverflowsLong(
                         f,
                         x,
@@ -925,10 +919,10 @@ internal object AffineSingletons {
                         termsSmall,
                     )
                 ) {
-                    return true
+                    return FoldCheck.DECLINED
                 }
             }
-            return false
+            return if (structured) FoldCheck.STRUCTURED else FoldCheck.ORDINARY
         }
 
         override fun aliasOverflowsLong(defIdx: Int, x: Int, replacement: Int): Boolean {
@@ -1106,24 +1100,29 @@ internal object AffineSingletons {
             return true
         }
 
-        override fun foldOverflowsLong(
+        override fun checkFold(
             defIdx: Int,
             x: Int,
             termVars: IntArray,
             termCoeffs: LongArray,
             constTerm: Long,
             cancellation: Cancellation,
-        ): Boolean {
+        ): FoldCheck {
             val occ = intOcc[x]
             var polled = 0
+            var structured = false
             val termsSmall = termsFitHalfLong(constTerm, termCoeffs)
             for (k in 0 until occ.size) {
                 // A high-degree pivot's overflow check walks every row it mentions; poll so one candidate's
                 // check cannot outrun the budget. Treat a bail as "would overflow" — skipping the fold is sound.
-                if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
+                if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return FoldCheck.DECLINED
                 cancellation.charge(AFFINE_WORK_WEIGHT)
                 val id = occ[k]
-                val f = affineFoldRow(slots[id], rewriteStructured)
+                val factor = slots[id]
+                if (id != defIdx && rewriteStructured && (factor is ReifiedLinear || factor is ComparisonClause)) {
+                    structured = true
+                }
+                val f = affineFoldRow(factor, rewriteStructured)
                 if (id != defIdx && f != null && foldRowOverflowsLong(
                         f,
                         x,
@@ -1133,10 +1132,10 @@ internal object AffineSingletons {
                         termsSmall,
                     )
                 ) {
-                    return true
+                    return FoldCheck.DECLINED
                 }
             }
-            return false
+            return if (structured) FoldCheck.STRUCTURED else FoldCheck.ORDINARY
         }
 
         override fun aliasOverflowsLong(defIdx: Int, x: Int, replacement: Int): Boolean {
