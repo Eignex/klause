@@ -26,11 +26,12 @@ import kotlin.test.assertTrue
 class PrivateRebuildGenerationTest {
     @Test
     fun `mixed private rows should retain local source parity propagation`() {
-        for (phase in 0..1) for (native in listOf(false, true)) {
-            val rows = listOf(intArrayOf(0, 1, 3, 0), intArrayOf(2, 3, 4, phase))
-            val clauses = rows.flatMap { row ->
-                (0..7).filter { it.countOneBits() % 2 != row[3] }.map { mask ->
-                    Clause(IntArray(3) { Lit.make(row[it], mask and (1 shl it) == 0) })
+        for (width in 2..3) for (phase in 0..1) for (native in listOf(false, true)) {
+            val columns = if (width == 2) intArrayOf(3, 4) else intArrayOf(2, 3, 4)
+            val rows = listOf(intArrayOf(0, 1, 3) to 0, columns to phase)
+            val clauses = rows.flatMap { (variables, target) ->
+                (0 until (1 shl variables.size)).filter { it.countOneBits() % 2 != target }.map { mask ->
+                    Clause(IntArray(variables.size) { Lit.make(variables[it], mask and (1 shl it) == 0) })
                 }
             } + Clause(intArrayOf(Lit.make(5, true), Lit.make(6, true)))
             val source = Problem(7, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
