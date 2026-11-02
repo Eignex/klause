@@ -369,6 +369,42 @@ internal class LpEngine(
         return true
     }
 
+    internal fun refreshRootPrimalTargets(session: PropagationSession, cancellation: Cancellation): Boolean {
+        requireOpen()
+        val started = TimeSource.Monotonic.markNow()
+        val before = totalSolveWork()
+        var outcome = "INELIGIBLE"
+        try {
+            if (session.problem !== problem || session.decisionLevel != 0 || problem.numRealVars != 0 ||
+                !params.lpPlan.componentOwnership || !params.lpPlan.probe || !params.lpPlan.branching ||
+                params.lpPlan.lbTreeSearch || rootPrimalTargets != null || rootRoundingWarmStart != null
+            ) return false
+            outcome = "CANCELLED"
+            if (cancellation()) return false
+            outcome = "NO_ALLOWANCE"
+            if (retainedRootRemainingWork() <= 1L) return false
+            outcome = "NO_VIEW"
+            val relaxer = lpRelaxer ?: return false
+            val relaxation = nodeRelaxation(relaxer, session, lpGlobalCuts) ?: return false
+            outcome = "CANCELLED"
+            if (cancellation()) return false
+            outcome = "STALE_OWNER"
+            if (!ownsRootPrimalModel(relaxation.model)) return false
+            retainRootPrimalOwner(relaxation)
+            return try {
+                retainRootPartialPrimalGuidance(relaxation, cancellation)
+                retainRootPrimalTargets(cancellation).also {
+                    outcome = if (it) "RETAINED" else "DECLINED"
+                }
+            } finally {
+                rootRoundingWarmStart = null
+            }
+        } finally {
+            sink.lp.observePrimalPhase("PRIMAL_RESTART_GUIDANCE", outcome,
+                started.elapsedNow().inWholeNanoseconds, totalSolveWork() - before)
+        }
+    }
+
     internal fun ownsRootPrimalModel(model: LpModel): Boolean = retainedRootEnabled &&
         cpAdapter.currentModel === model && model.exactState != null &&
         propagator.state === model.exactState && model.exactState.depth == 0

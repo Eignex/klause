@@ -346,6 +346,7 @@ internal class ResumableMinimize(
     private var firstRun = true
     private var rootRoundingPending = false
     private var rootRoundingAttempted = false
+    private var restartRootTargetsPending = false
     private var treeBudgetExhausted = false
     private val inprocessing = Inprocessing.from(params, sink.search)
     private val learnedMemory = LearnedMemoryMaintenance()
@@ -699,6 +700,7 @@ internal class ResumableMinimize(
         firstRun = true
         rootRoundingPending = false
         rootLayoutPending = false
+        restartRootTargetsPending = false
         lpEngine.discardRootLayoutPreparation()
         lpEngine.rootRoundingWarmStart = null
         lpEngine.rootRoundingInterrupted = false
@@ -1332,6 +1334,8 @@ internal class ResumableMinimize(
 
         override fun onRestart() {
             lpHints?.resetHistory()
+            restartRootTargetsPending = incumbents.current() == null &&
+                lpEngine.rootPrimalTargets?.components?.offered == true
             lpEngine.clearRootPrimalTargets()
         }
 
@@ -1379,6 +1383,10 @@ internal class ResumableMinimize(
             // Persistent LP fixings may use only a cutoff that survives every later repair.
             val lpBound = if (rebindable) externalBound else effectiveBound
             lpHints?.beginNode(context.decisionLevel, lpBound)
+            if (restartRootTargetsPending && context.decisionLevel == 0 && incumbents.current() == null) {
+                restartRootTargetsPending = false
+                lpEngine.refreshRootPrimalTargets(session, params.cancellation)
+            }
             val deferSimplex = incumbents.current() == null &&
                 lpEngine.prepareRootComponentOrder(session, params.cancellation) != null
             if (deferSimplex) {

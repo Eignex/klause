@@ -130,7 +130,10 @@ undetermined columns at a time. Its preparation precedes additional node LP quer
 under the same funded allowance. A ready guide lets CP seek its first incumbent
 before those queries resume; inherited checked bounds remain available.
 The same frame stack handles conflicts and retraction; all source constraints stay
-active and every component still belongs to complete source checking.
+active and every component still belongs to complete source checking. A restart
+expires the guide. At its restored root, a traversal that consumed component
+ordering may request fresh preferences from the current LP owner; the request
+rechecks the root model and state, charges its transport and renews no allowance.
 
 Numerical frontier traversal orders alternatives by inherited checked objective
 bounds, visiting unbounded alternatives first. It keeps both children of every
