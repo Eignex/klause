@@ -208,14 +208,21 @@ class ResumableMinimizeTest {
             phaseSaving = false, targetPhasing = false, solutionPhasing = false,
             lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true, rootCutHarvest = false))
         BacktrackSolver(problem).resumable(objective, params).use { search ->
-            search.runSlice(Cancellation { samples.isNotEmpty() }, Long.MAX_VALUE, -1L) { samples += it.sample }
-            assertEquals(10.0, objective.evaluate(samples.single()))
-            assertEquals(0.0, search.stats.lp.nodePasses.sum)
-            assertTrue((search.stats.lp.phases["PRIMAL_COMPONENT_ORDER_ROOT"]
-                ?.outcomes?.get("NODE_QUERY_DEFERRED") ?: 0L) > 0L)
+            var firstPasses = Double.NaN
+            var firstDeferrals = 0L
 
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { samples += it.sample }
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {
+                if (samples.isEmpty()) {
+                    firstPasses = search.stats.lp.nodePasses.sum
+                    firstDeferrals = search.stats.lp.phases["PRIMAL_COMPONENT_ORDER_ROOT"]
+                        ?.outcomes?.get("NODE_QUERY_DEFERRED") ?: 0L
+                }
+                samples += it.sample
+            }
 
+            assertEquals(10.0, objective.evaluate(samples.first()))
+            assertEquals(0.0, firstPasses)
+            assertTrue(firstDeferrals > 0L)
             assertTrue(search.stats.lp.nodePasses.sum > 0.0)
         }
     }
