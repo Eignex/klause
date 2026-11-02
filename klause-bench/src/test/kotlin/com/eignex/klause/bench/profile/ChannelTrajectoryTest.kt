@@ -68,9 +68,8 @@ class ChannelTrajectoryTest {
 
     @ParameterizedTest
     @ValueSource(booleans = [true, false])
-    fun `an inconsistent searched predicate is not silently extended into a paired state`(maintained: Boolean) {
-        val problem = Problem(1, 1, arrayOf(IntDomain(-1, 2)),
-            arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.LE, 0)))
+    fun `source loading should reject synchronization that changes a supplied predicate`(maintained: Boolean) {
+        val problem = Problem(1, 1, arrayOf(IntDomain(-1, 2)), emptyArray())
         val model = LocalSearchModel.open(problem)
         val state = LocalSearchState(model, Random(0))
         val coordinates = VarRemap(intArrayOf(0), intArrayOf(0))
