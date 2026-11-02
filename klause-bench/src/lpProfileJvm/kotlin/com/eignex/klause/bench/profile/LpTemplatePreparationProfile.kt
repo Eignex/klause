@@ -25,6 +25,7 @@ import com.eignex.klause.util.WorkMeter
 import com.sun.management.OperatingSystemMXBean
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -40,8 +41,10 @@ internal object LpTemplatePreparationProfile {
     fun main(args: Array<String>) {
         require(args.size in 4..5)
         val route = args.getOrElse(4) { "standalone" }.also {
-            require(it in listOf("standalone", "retained", "primal", "pump"))
+            require(it in listOf("standalone", "retained", "primal", "pump", "pump-primal"))
         }
+        val floatingPrimal = route == "pump-primal"
+        val pumpRoute = route == "pump" || floatingPrimal
         val file = if (args[0].startsWith("selection=")) {
             val line = File(args[0].removePrefix("selection=")).readLines().single { it.isNotBlank() }
             val selected = Json.parseToJsonElement(line).jsonObject
@@ -82,11 +85,12 @@ internal object LpTemplatePreparationProfile {
         val compilation = ManagementFactory.getCompilationMXBean()?.takeIf { it.isCompilationTimeMonitoringSupported }
         val modes = listOf("disabled", "object", "index", "candidate")
         val changes = listOf("cold", "unchanged", "bound", "objective", "row", "cancel") +
-            if (route == "pump") listOf("affine", "namespace", "finite") else emptyList()
+            if (pumpRoute) listOf("affine", "namespace", "finite") else emptyList()
         out.resolve("runs.jsonl").bufferedWriter().use { writer ->
             repeat(repeats + 1) { round ->
                 for (change in changes) {
                     val signatures = HashMap<String, List<String>>()
+                    val floatingSignatures = HashMap<String, List<LpFloatingProfileResult>>()
                     for (offset in modes.indices) {
                         val mode = modes[(round + offset) % modes.size]
                         val startBytes = readAllocatedBytes()
@@ -169,12 +173,13 @@ internal object LpTemplatePreparationProfile {
                         var cancelledCallerWork = 0L
                         var maxCancelledCallerWork = 0L
                         val results = ArrayList<String>()
-                        val pump = if (route == "pump") LpPumpProfileConsumer(mode, sink) else null
+                        val floatingResults = ArrayList<LpFloatingProfileResult>()
+                        val pump = if (pumpRoute) LpPumpProfileConsumer(mode, sink, floatingPrimal) else null
                         try {
                             repeat(steps) consumers@{ step ->
                                 check(!stop())
                                 val view = (if (step % 2 == 1) changedSource else source)
-                                    .let { if (route == "pump") it else it.withFactors(it.factors.copyOf()) }
+                                    .let { if (pumpRoute) it else it.withFactors(it.factors.copyOf()) }
                                 val cost = if (step % 2 == 1) changedObjective else objective
                                 val opening = System.nanoTime()
                                 val openingBytes = readAllocatedBytes()
@@ -201,7 +206,7 @@ internal object LpTemplatePreparationProfile {
                                     }
                                     object : Cancellation {
                                         override fun isCancelled(): Boolean =
-                                            route !in listOf("primal", "pump") || stop() || consumerWork >= 48L
+                                            (route != "primal" && !pumpRoute) || stop() || consumerWork >= 48L
                                         override fun workMeter(): WorkMeter = consumerMeter
                                     }
                                 } else {
@@ -222,6 +227,7 @@ internal object LpTemplatePreparationProfile {
                                     )
                                 }
                                 var envelopeConstant = 0L
+                                var floatingResult: LpFloatingProfileResult? = null
                                 val result = try {
                                     if (route == "retained") {
                                         LpScopedSolver(
@@ -286,14 +292,20 @@ internal object LpTemplatePreparationProfile {
                                         envelopeConstant = relaxation.objectiveConstant
                                         finishAssembly()
                                         val solving = System.nanoTime()
-                                        val exact = requireNotNull(
-                                            relaxation.authoritativeWithTemplates(token) {
-                                                consumer?.observeBoundTemplates(it)
-                                            },
-                                        )
-                                        solveAndCertify(exact, cancellation = token).also {
-                                            pump?.completedConsumer()
+                                        if (floatingPrimal) {
+                                            floatingResult = checkNotNull(pump).consumePrimal(token)
                                             solveNs += System.nanoTime() - solving
+                                            null
+                                        } else {
+                                            val exact = requireNotNull(
+                                                relaxation.authoritativeWithTemplates(token) {
+                                                    consumer?.observeBoundTemplates(it)
+                                                },
+                                            )
+                                            solveAndCertify(exact, cancellation = token).also {
+                                                pump?.completedConsumer()
+                                                solveNs += System.nanoTime() - solving
+                                            }
                                         }
                                     }
                                 } catch (_: LpAssemblyCancelled) {
@@ -310,6 +322,9 @@ internal object LpTemplatePreparationProfile {
                                     cancelledCallerWork += consumerWork
                                     maxCancelledCallerWork = maxOf(maxCancelledCallerWork, consumerWork)
                                     results.add("cancelled")
+                                    if (floatingPrimal) {
+                                        floatingResults.add(LpFloatingProfileResult("CANCELLED", null))
+                                    }
                                     return@consumers
                                 } finally {
                                     retainedUnits = maxOf(
@@ -323,10 +338,17 @@ internal object LpTemplatePreparationProfile {
                                     assemblyEndBytes,
                                     readAllocatedBytes(),
                                 )
-                                results.add(
-                                    "${result.verdict}:${result.lowerBound}:${result.witness?.objective}" +
-                                        if (pump != null) ":constant=$envelopeConstant" else "",
-                                )
+                                val point = floatingResult
+                                if (point != null) {
+                                    floatingResults.add(point)
+                                    results.add(point.toString())
+                                } else {
+                                    checkNotNull(result)
+                                    results.add(
+                                        "${result.verdict}:${result.lowerBound}:${result.witness?.objective}" +
+                                            if (pump != null) ":constant=$envelopeConstant" else "",
+                                    )
+                                }
                                 if (step == 0) coldNs = System.nanoTime() - start
                             }
                         } finally {
@@ -361,6 +383,7 @@ internal object LpTemplatePreparationProfile {
                             null
                         }
                         signatures[mode] = results
+                        if (floatingPrimal) floatingSignatures[mode] = floatingResults
                         val preparation = phases["TEMPLATE_PREPARATION_NODE"]
                         val assembly = phases["TEMPLATE_ASSEMBLY_NODE"]
                         val record = buildJsonObject {
@@ -368,13 +391,38 @@ internal object LpTemplatePreparationProfile {
                             put("route", route)
                             put(
                                 "cancelWorkLimit",
-                                if (route in listOf("primal", "pump") && change == "cancel") 48L else null,
+                                if ((route == "primal" || pumpRoute) && change == "cancel") 48L else null,
                             )
                             put("freshRootBuilds", pump?.freshBuilds)
                             put("rootContextsOpened", pump?.contextsOpened)
                             put("rootContextsRetired", pump?.contextsRetired)
                             put("freshRootPropagationWork", pump?.propagationWork)
                             put("ownerPreparationWork", pump?.ownerPreparationWork)
+                            put("ownerTotalWork", if (floatingPrimal) pump?.ownerTotalWork else null)
+                            put("numericalWork", if (floatingPrimal) pump?.numericalWork else null)
+                            put("numericalPreparationOps", if (floatingPrimal) pump?.numericalPreparationOps else null)
+                            put("numericalOwnersOpened", if (floatingPrimal) pump?.numericalOwnersOpened else null)
+                            put("numericalOwnersRetired", if (floatingPrimal) pump?.numericalOwnersRetired else null)
+                            put("floatingNumericalCalls", if (floatingPrimal) pump?.floatingNumericalCalls else null)
+                            put("floatingPrimalCalls", if (floatingPrimal) pump?.floatingPrimalCalls else null)
+                            put("floatingDualFallbackCalls",
+                                if (floatingPrimal) pump?.floatingDualFallbackCalls else null)
+                            put("floatingOptimalIterates", if (floatingPrimal) pump?.floatingOptimalIterates else null)
+                            put("logicalSolveBudgetMillis",
+                                if (floatingPrimal) LpPumpProfileConsumer.FLOATING_SOLVE_BUDGET_MILLIS else null)
+                            put("floatingObjectiveRelativeTolerance",
+                                if (floatingPrimal) LpFloatingProfileResult.OBJECTIVE_RELATIVE_TOLERANCE else null)
+                            if (floatingPrimal) {
+                                put("floatingOutcomes", buildJsonObject {
+                                    for ((outcome, count) in checkNotNull(pump).floatingOutcomes()) put(outcome, count)
+                                })
+                                put("floatingResults", buildJsonArray {
+                                    for (point in floatingResults) add(buildJsonObject {
+                                        put("outcome", point.outcome)
+                                        put("objective", point.objective)
+                                    })
+                                })
+                            }
                             put("cancelledOwnerPreparationWork", pump?.cancelledOwnerPreparationWork)
                             put("maxCancelledOwnerPreparationWork", pump?.maxCancelledOwnerPreparationWork)
                             put("cancelledCallerWork", cancelledCallerWork)
@@ -403,7 +451,12 @@ internal object LpTemplatePreparationProfile {
                             put("privateCancelled", pumpPreparation?.outcomes?.get("CANCELLED"))
                             put("privatePreparationNs", pumpPreparation?.nanos)
                             put("privatePreparationWork", pumpPreparation?.work)
-                            put("numericalConsumer", "fresh exact LP import, solve, certification and owner retirement")
+                            put("numericalConsumer", if (floatingPrimal) {
+                                "fresh production floating primal owner with cumulative LP work and retirement"
+                            } else "fresh exact LP import, solve, certification and owner retirement")
+                            put("handoffScope", if (floatingPrimal) {
+                                "fixed uninterrupted pump root; cross-pause continuation handoff not exercised"
+                            } else null)
                             put("wholeModelsReused", wholeModelsReused)
                             put("wholeModelsPublished", wholeModelsPublished)
                             put("sourceSha256", hash)
@@ -421,10 +474,12 @@ internal object LpTemplatePreparationProfile {
                             put("finishedAtEpochMillis", endEpochMillis)
                             put("coldSetupAndConsumerNs", coldNs)
                             put("assemblyIncludingPreparationNs", assemblyNs)
-                            put("solveAndCertificationNs", solveNs)
+                            put("solveAndCertificationNs", if (floatingPrimal) null else solveNs)
+                            put("floatingSolveAndRetirementNs", if (floatingPrimal) solveNs else null)
                             put("totalThreadBytes", allocatedBytes)
                             put("assemblyThreadBytes", measuredAssemblyBytes)
-                            put("importSolveRetirementThreadBytes", measuredImportBytes)
+                            put("importSolveRetirementThreadBytes", if (floatingPrimal) null else measuredImportBytes)
+                            put("floatingSolveRetirementThreadBytes", if (floatingPrimal) measuredImportBytes else null)
                             put("otherThreadBytes", otherBytes)
                             put("totalWork", if (pump == null) work else null)
                             put("preparationNs", preparation?.nanos ?: 0L)
@@ -462,7 +517,16 @@ internal object LpTemplatePreparationProfile {
                         writer.flush()
                         println(record)
                     }
-                    check(signatures.values.distinct().size == 1) { "consumer results differ across reuse modes" }
+                    if (floatingPrimal) {
+                        val expected = floatingSignatures.getValue("disabled")
+                        check(floatingSignatures.values.all { points ->
+                            points.size == expected.size && points.zip(expected).all { (point, reference) ->
+                                point.matches(reference)
+                            }
+                        }) { "floating consumer results differ across reuse modes" }
+                    } else {
+                        check(signatures.values.distinct().size == 1) { "consumer results differ across reuse modes" }
+                    }
                 }
             }
         }

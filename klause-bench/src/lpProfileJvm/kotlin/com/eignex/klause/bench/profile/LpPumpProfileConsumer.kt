@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.SessionDomains
@@ -18,14 +19,18 @@ import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
 
-internal class LpPumpProfileConsumer(private val mode: String, private val templateStats: LpStatsSink) :
-    AutoCloseable {
+internal class LpPumpProfileConsumer(
+    private val mode: String,
+    private val templateStats: LpStatsSink,
+    private val floatingPrimal: Boolean = false,
+) : AutoCloseable {
     private val sink = SolveStatsSink("pump-preparation-profile")
     private var engine: LpEngine? = null
     private var current: LpRelaxation? = null
     private var prepared: LpPumpPreparation? = null
     private var admissionAttempted = false
     private var rebound = false
+    private val floatingOutcomes = LinkedHashMap<String, Long>()
     var contextsOpened = 0L
         private set
     var contextsRetired = 0L
@@ -34,13 +39,30 @@ internal class LpPumpProfileConsumer(private val mode: String, private val templ
         private set
     var propagationWork = 0L
         private set
-    var ownerPreparationWork = 0L
+    var ownerTotalWork = 0L
         private set
+    var numericalWork = 0L
+        private set
+    var numericalPreparationOps = 0L
+        private set
+    val ownerPreparationWork: Long get() = ownerTotalWork - numericalWork
     var cancelledOwnerPreparationWork = 0L
         private set
     var maxCancelledOwnerPreparationWork = 0L
         private set
     var privateCompletedConsumers = 0L
+        private set
+    var numericalOwnersOpened = 0L
+        private set
+    var numericalOwnersRetired = 0L
+        private set
+    var floatingNumericalCalls = 0L
+        private set
+    var floatingPrimalCalls = 0L
+        private set
+    var floatingDualFallbackCalls = 0L
+        private set
+    var floatingOptimalIterates = 0L
         private set
 
     fun build(
@@ -80,10 +102,11 @@ internal class LpPumpProfileConsumer(private val mode: String, private val templ
         val owner = engine ?: LpEngine(
             problem,
             objective,
-            LpParams(lpPlan = LpPlan(bounding = true)),
+            LpParams(lpPlan = LpPlan(bounding = true),
+                solveBudgetMillis = if (floatingPrimal) FLOATING_SOLVE_BUDGET_MILLIS else null),
             sink,
             projections = projections,
-            containingWork = { ownerPreparationWork += it },
+            containingWork = { ownerTotalWork += it },
             reusePrimalTemplates = false,
             reusePumpPreparation = false,
         ).also {
@@ -127,6 +150,68 @@ internal class LpPumpProfileConsumer(private val mode: String, private val templ
         if (rebound) privateCompletedConsumers++
     }
 
+    fun consumePrimal(cancellation: Cancellation): LpFloatingProfileResult {
+        check(floatingPrimal)
+        val primal = consumeFloating(cancellation, primal = true)
+        observeFloating("PRIMAL", primal)
+        val result = if (primal.outcome == LpFloatingProfileResult.OPTIMAL) primal else {
+            consumeFloating(cancellation, primal = false).also { observeFloating("DUAL_FALLBACK", it) }
+        }
+        if (result.outcome == LpFloatingProfileResult.OPTIMAL) completedConsumer()
+        return result
+    }
+
+    private fun consumeFloating(cancellation: Cancellation, primal: Boolean): LpFloatingProfileResult {
+        val owner = checkNotNull(engine)
+        val relaxation = checkNotNull(current)
+        owner.requireOpen()
+        if (cancellation()) return LpFloatingProfileResult("CANCELLED", null)
+        if (owner.lpWorkAllowanceSpent() || owner.workSpentExceeds(owner.params.lpPlan.rootMaxWork)) {
+            return LpFloatingProfileResult("CURRENT_ALLOWANCE_SPENT", null)
+        }
+        val simplex = newTableauCutSolver(relaxation.model, cancellation,
+            workLimit = owner.rootPrimalWorkBudget(),
+            factory = owner.solveContext.engineFactory, pricing = owner.pricingOptions)
+        numericalOwnersOpened++
+        try {
+            floatingNumericalCalls++
+            val result = if (primal) {
+                floatingPrimalCalls++
+                simplex.solvePrimal()
+            } else {
+                floatingDualFallbackCalls++
+                simplex.solve()
+            }
+            check(result == null || result.objective.isFinite() && result.primal.all { it.isFinite() })
+            if (result?.optimal == true) floatingOptimalIterates++
+            val outcome = if (result?.optimal == true) LpFloatingProfileResult.OPTIMAL else {
+                "NO_OPTIMAL_FLOAT_ITERATE_" + (simplex.lastTermination?.name ?: "OTHER")
+            }
+            return LpFloatingProfileResult(outcome,
+                result?.objective?.plus(relaxation.objectiveConstant.toDouble()))
+        } finally {
+            numericalPreparationOps += simplex.lastMetrics.preparationOps
+            val before = owner.totalSolveWork()
+            try {
+                owner.observeRootSolve(simplex)
+            } finally {
+                numericalWork += owner.totalSolveWork() - before
+                try {
+                    simplex.close()
+                } finally {
+                    numericalOwnersRetired++
+                }
+            }
+        }
+    }
+
+    private fun observeFloating(method: String, point: LpFloatingProfileResult) {
+        val key = method + "_" + point.outcome
+        floatingOutcomes[key] = (floatingOutcomes[key] ?: 0L) + 1L
+    }
+
+    fun floatingOutcomes(): Map<String, Long> = floatingOutcomes
+
     fun phases() = sink.snapshot().lp.phases
 
     override fun close() {
@@ -142,5 +227,9 @@ internal class LpPumpProfileConsumer(private val mode: String, private val templ
                 contextsRetired++
             }
         }
+    }
+
+    companion object {
+        const val FLOATING_SOLVE_BUDGET_MILLIS = 10_000L
     }
 }

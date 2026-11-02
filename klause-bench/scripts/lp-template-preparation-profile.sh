@@ -4,6 +4,11 @@ set -euo pipefail
 : "${OUT:?lab output directory is required}"
 : "${JAVA_HOME:?lab JDK root is required}"
 source_name="${1:?source fixture is required}"
+route="${4:-standalone}"
+case "$route" in
+  standalone|retained|primal|pump|pump-primal) ;;
+  *) echo 'unknown LP preparation profile route' >&2; exit 2 ;;
+esac
 mkdir -p "$OUT"
 case "$source_name" in
   cover-2x3|cover-3x3)
@@ -40,7 +45,7 @@ profile_status=0
   "-XX:StartFlightRecording=filename=$OUT/profile.jfr,settings=profile,dumponexit=true" \
   -cp "$LAB_WORKTREE/klause/build/lp-profile/jvm/classes:$LAB_WORKTREE/klause/build/lp-profile/jvm/lib/*" \
   com.eignex.klause.bench.profile.LpTemplatePreparationProfile "$source_argument" "$source_hash" \
-  "${2:-3}" "${3:-32}" "${4:-standalone}" || profile_status=$?
+  "${2:-3}" "${3:-32}" "$route" || profile_status=$?
 printf '%s\n' "$profile_status" > "$OUT/numerical.exit"
 analysis_status=0
 JAVA_TOOL_OPTIONS='-Xmx512m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC' \

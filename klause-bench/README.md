@@ -860,7 +860,7 @@ Lifecycle repeats range from one to five and default to three. Available modes a
 `consumers`; the default is `lifecycle`. Sources outside the basis manifest require
 both their original SHA-256 and full HiGHS revision.
 
-`scripts/lp-template-preparation-profile.sh <source> [repeats] [steps] [standalone|retained|primal|pump]`
+`scripts/lp-template-preparation-profile.sh <source> [repeats] [steps] [route]`
 accepts `cover-2x3`, `cover-3x3`, `miplib3-p0033` and `miplib3-p0201`. Submit it
 through the lab with `:klause:stageLpProfileJvm`, a 180-second runtime cap and
 compatible Linux x86_64 placement. MIPLIB sources also require
@@ -874,7 +874,16 @@ primal construction factory. The `pump` route compares disabled, object, index a
 private objective binding with fresh root propagation and exact numerical consumers;
 it also covers affine constants, namespace changes and raw/finite transitions.
 The primal and pump routes use a 48-unit construction allowance for interrupted
-consumers. Thread and process CPU, compilation counters and timestamped activity
+consumers. `pump-primal` uses the same four preparation modes and scopes with
+fresh production floating primal owners, without exact import or certification.
+Non-optimal primal results use a fresh dual fallback owner under the same allowance.
+Its owners share each root context's cumulative LP allowance sized by a 10-second
+logical solve budget; the profile retains its containing deadline. Numerical work
+and owner preparation operations are reported separately from source preparation.
+Floating outcomes and objectives are compared with the recorded relative tolerance.
+The route measures a fixed uninterrupted pump root; cross-pause handoff and
+original-source qualification require separate runs.
+Thread and process CPU, compilation counters and timestamped activity
 records support cost attribution. These profiles check internal LP consistency.
 See the lab
 [run guide](https://github.com/Eignex/eignex-lab/blob/main/docs/runs.md) for
