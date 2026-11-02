@@ -237,17 +237,22 @@ class LinearAuthorityPointCutsTest {
 
     @Test
     fun `adding another checked cut should retain the numerical owner`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val context = SourceProofContext(mixedMaximum.scope.copy(
             objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
-            mixedMaximum.coordinates + setOf(y, other), mixedMaximum.premises + mapOf(
-                "other mixed" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+            mixedMaximum.coordinates + setOf(y, z, w, other), mixedMaximum.premises + mapOf(
+                "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    y to BigFraction.ofLong(2), mixedReal to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "other mixed" to SourcePremise(SourceInequality(mapOf(z to BigFraction.ofLong(2),
+                    w to BigFraction.ofLong(2),
                     other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
                 "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
                     BigFraction.ZERO)),
                 "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE),
                     BigFraction.ofLong(2))),
-            ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+            ), listOf(x, y, z, w).associateWith { BigFraction.ONE })
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             val first = authority.advanceWithPointCuts(context, Cancellation.Never)
             assertEquals(SourceValue.Rational(BigFraction.ofLong(9) * BigFraction.ofLong(2).reciprocal()),
@@ -266,17 +271,22 @@ class LinearAuthorityPointCutsTest {
 
     @Test
     fun `retained unselected definitions should not replace the ordinary current recipe`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val context = SourceProofContext(mixedMaximum.scope.copy(
             objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
-            mixedMaximum.coordinates + setOf(y, other), mixedMaximum.premises + mapOf(
-                "other mixed" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+            mixedMaximum.coordinates + setOf(y, z, w, other), mixedMaximum.premises + mapOf(
+                "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    y to BigFraction.ofLong(2), mixedReal to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "other mixed" to SourcePremise(SourceInequality(mapOf(z to BigFraction.ofLong(2),
+                    w to BigFraction.ofLong(2),
                     other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
                 "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
                     BigFraction.ZERO)),
                 "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE),
                     BigFraction.ofLong(2))),
-            ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+            ), listOf(x, y, z, w).associateWith { BigFraction.ONE })
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
             authority.advanceWithPointCuts(context, Cancellation.Never)
 
