@@ -47,7 +47,7 @@ internal class PrivateRebuildParity private constructor(
             val words = (source.numBoolVars + 63) ushr 6
             val bytes = tableBytes + rowCount * (words * 16L + 128L) + source.numBoolVars * 16L
             if (table.entries * 512L + bytes > byteLimit) { onDecline("Memory"); return null }
-            if (!funded(source.numBoolVars * 3L + rowCount * (words + 2L))) return null
+            if (!funded(source.numBoolVars * 3L + rowCount * (words + 3L))) return null
             onWorkspace(bytes)
             val fixed = Array(source.numBoolVars) { session.boolValue(it) }
             val matrix = Matrix(rowCount, source.numBoolVars, words, fixed, funded)
@@ -142,6 +142,7 @@ internal class PrivateRebuildParity private constructor(
         ) {
             private val masks = Array(rows) { LongArray(words) }
             private val rhs = IntArray(rows)
+            private val pivotColumns = IntArray(rows)
             private var added = 0
 
             fun add(key: Long, parity: Int): Boolean {
@@ -180,18 +181,20 @@ internal class PrivateRebuildParity private constructor(
                     val parity = rhs[pivot]
                     rhs[pivot] = rhs[selected]
                     rhs[selected] = parity
+                    if (!visit(1L)) return null
+                    pivotColumns[pivot] = column
                     if (!eliminate(pivot, column)) return null
                     pivot++
                     if (pivot == masks.size) break
                 }
-                return pins(onDecline)
+                return pins(pivot, onDecline)
             }
 
             private fun eliminate(pivot: Int, column: Int): Boolean {
-                for (row in masks.indices) {
+                for (row in pivot + 1 until masks.size) {
                     if (!visit(2L)) return false
-                    if (row == pivot || !has(row, column)) continue
-                    for (word in 0 until words) {
+                    if (!has(row, column)) continue
+                    for (word in (column ushr 6) until words) {
                         if (!visit(3L)) return false
                         masks[row][word] = masks[row][word] xor masks[pivot][word]
                     }
@@ -201,27 +204,70 @@ internal class PrivateRebuildParity private constructor(
                 return true
             }
 
-            private fun pins(onDecline: (String) -> Unit): Int? {
+            private fun pins(rank: Int, onDecline: (String) -> Unit): Int? {
+                for (row in rank until masks.size) {
+                    if (!visit(2L)) return null
+                    if (rhs[row] != 0) { onDecline("RefutationDeferred"); return null }
+                }
+                if (!visit(columns * 3L)) return null
+                val coordinates = IntArray(columns)
+                var free = 0
+                var pivot = 0
+                for (column in 0 until columns) {
+                    coordinates[column] = if (pivot < rank && pivotColumns[pivot] == column) pivot++
+                    else if (fixed[column] == null) -(++free) else Int.MIN_VALUE
+                }
+                val freeWords = (free + 63) ushr 6
+                if (!visit(rank * (freeWords + 1L))) return null
+                val dependencies = Array(rank) { LongArray(freeWords) }
                 var pins = 0
-                for (row in masks.indices) {
+                for (row in rank - 1 downTo 0) {
                     if (!visit(2L)) return null
-                    var count = 0
-                    var column = -1
-                    for (word in 0 until words) {
+                    val column = pivotColumns[row]
+                    if (!expand(row, column, coordinates, dependencies)) return null
+                    var forced = true
+                    for (word in 0 until freeWords) {
                         if (!visit(2L)) return null
-                        val bits = masks[row][word]
-                        count += bits.countOneBits()
-                        if (bits != 0L) column = word * 64 + bits.countTrailingZeroBits()
-                        if (count > 1) break
+                        if (dependencies[row][word] != 0L) forced = false
                     }
-                    if (count == 0 && rhs[row] != 0) { onDecline("RefutationDeferred"); return null }
-                    if (count != 1) continue
+                    if (!forced) continue
                     if (!visit(2L)) return null
-                    val value = rhs[row] != 0
-                    if (fixed[column] == null) { fixed[column] = value; pins++ }
-                    else if (fixed[column] != value) { onDecline("RefutationDeferred"); return null }
+                    fixed[column] = rhs[row] != 0
+                    pins++
                 }
                 return pins
+            }
+
+            private fun expand(
+                row: Int,
+                pivot: Int,
+                coordinates: IntArray,
+                dependencies: Array<LongArray>,
+            ): Boolean {
+                for (word in (pivot ushr 6) until words) {
+                    if (!visit(2L)) return false
+                    var bits = masks[row][word]
+                    if (word == (pivot ushr 6)) bits = bits and (1L shl (pivot and 63)).inv()
+                    while (bits != 0L) {
+                        if (!visit(5L)) return false
+                        val column = word * 64 + bits.countTrailingZeroBits()
+                        bits = bits and (bits - 1)
+                        val coordinate = coordinates[column]
+                        if (coordinate < 0) {
+                            val free = -coordinate - 1
+                            dependencies[row][free ushr 6] = dependencies[row][free ushr 6] xor
+                                (1L shl (free and 63))
+                        } else {
+                            for (index in dependencies[row].indices) {
+                                if (!visit(3L)) return false
+                                dependencies[row][index] = dependencies[row][index] xor dependencies[coordinate][index]
+                            }
+                            if (!visit(1L)) return false
+                            rhs[row] = rhs[row] xor rhs[coordinate]
+                        }
+                    }
+                }
+                return true
             }
 
             private fun has(row: Int, column: Int): Boolean =

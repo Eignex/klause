@@ -284,9 +284,10 @@ an exhaustive elimination pass.
 A bounded source scan can recognize a three-column parity equation from its
 complete four-clause Boolean encoding. Each clause excludes one assignment;
 the complete parity class of exclusions entails the opposite parity equation.
-A preparation-only GF(2) matrix substitutes the canonical global pins and reduces
-these equations, emitting additional globally forced Boolean values only after
-complete elimination. Incomplete clause groups, duplicate exclusions and partial
+A preparation-only GF(2) matrix substitutes the canonical global pins and uses
+forward elimination followed by affine back substitution over its free coordinates.
+A pivot is globally forced only when its complete free-coordinate dependency
+cancels. Additional Boolean pins are emitted only after complete elimination. Incomplete clause groups, duplicate exclusions and partial
 matrix work grant no additional pins. A derived contradiction supplies no source
 refutation authority.
 

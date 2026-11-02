@@ -81,6 +81,56 @@ class PrivateRebuildParityTest {
     }
 
     @Test
+    fun `multiple free coordinates should cancel only in globally forced pins`() {
+        val rows = listOf(intArrayOf(0, 2, 3, 0), intArrayOf(1, 2, 4, 1), intArrayOf(0, 1, 5, 1),
+            intArrayOf(3, 4, 6, 0), intArrayOf(5, 6, 7, 1))
+        val clauses = rows.flatMap { row ->
+            (0..7).filter { it.countOneBits() % 2 != row[3] }.map { mask ->
+                Clause(IntArray(3) { Lit.make(row[it], mask and (1 shl it) == 0) })
+            }
+        }.toTypedArray<Factor>()
+        val session = PropagationSession(Problem(8, 0, emptyArray(), clauses).bake())
+
+        val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
+
+        assertEquals(1, captured.newPins)
+        assertEquals(true, captured.fixed[7])
+        for (variable in 0..6) assertNull(captured.fixed[variable])
+        var points = 0
+        for (mask in 0..255) {
+            val point = BooleanArray(8) { mask and (1 shl it) != 0 }
+            if (clauses.all { factor ->
+                    (factor as Clause).literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
+                }) {
+                points++
+                assertTrue(point[7])
+            }
+        }
+        assertEquals(8, points)
+        for (variable in 0..7) assertNull(session.boolValue(variable))
+    }
+
+    @Test
+    fun `free coordinates above one dependency word should prevent false pins`() {
+        val rows = listOf(intArrayOf(0, 70, 71), intArrayOf(1, 70, 71)) + (2..5).map { excluded ->
+            (2..5).filter { it != excluded }.toIntArray()
+        }
+        val clauses = rows.flatMap { row ->
+            listOf(1, 2, 4, 7).map { mask ->
+                Clause(IntArray(3) { Lit.make(row[it], mask and (1 shl it) == 0) })
+            }
+        }.toTypedArray<Factor>()
+        val session = PropagationSession(Problem(72, 0, emptyArray(), clauses).bake())
+
+        val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
+
+        assertEquals(4, captured.newPins)
+        for (variable in 2..5) assertEquals(false, captured.fixed[variable])
+        for (variable in listOf(0, 1, 70, 71)) assertNull(captured.fixed[variable])
+        for (variable in 0..71) assertNull(session.boolValue(variable))
+    }
+
+    @Test
     fun `a parity row without forced coordinates should withhold a generation`() {
         val clauses = listOf(0, 3, 5, 6).map { mask ->
             Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })
