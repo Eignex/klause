@@ -39,6 +39,15 @@ Linear repairs offer nearest-clamped targets in term order. Inequality repairs a
 targets rounded through domain holes toward the requested truth, and reified repairs
 keep body targets consistent with the retained or flipped indicator.
 
+### Weighted Boolean repairs
+
+Word-sized weighted Boolean rows combine every positive and negative occurrence
+of a variable before predicting its flip. Repair offers do not increase the row distance,
+and slack moves preserve the row's satisfaction. Structured swaps pair equal and
+opposite aggregate changes across distinct variables, including mixed literal
+polarities. Each call offers at most 32 pairs and reuses the invariant's cached
+signed coefficients.
+
 ### Comparison clauses
 
 Comparison-clause scores substitute a target into every matching literal and keep

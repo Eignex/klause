@@ -25,8 +25,14 @@ internal object AffinePivotOrders {
         AffinePivotOrder.MARKOWITZ ->
             MarkowitzOrder(ws, eliminated, objectiveIntVars, capWide, pivotable, cancellation)
 
+        AffinePivotOrder.STRUCTURED ->
+            MarkowitzOrder(ws, eliminated, objectiveIntVars, capWide, pivotable, cancellation,
+                minimizeRewrite = true, rankStructuredOnly = true)
+
         AffinePivotOrder.REWRITE_COST ->
             MarkowitzOrder(ws, eliminated, objectiveIntVars, capWide, pivotable, cancellation, minimizeRewrite = true)
+
+        AffinePivotOrder.AUTOMATIC -> error("Automatic affine order requires a query context")
     }
 
     private class StableIdOrder(
@@ -72,6 +78,7 @@ internal object AffinePivotOrders {
         private val pivotable: ((Linear, Int) -> Boolean)?,
         private val cancellation: Cancellation,
         private val minimizeRewrite: Boolean = false,
+        private val rankStructuredOnly: Boolean = false,
     ) : AffineSingletons.PivotOrder {
         private val heap = PivotHeap()
         private var seeded = false
@@ -100,6 +107,7 @@ internal object AffinePivotOrders {
                     pivotable,
                     cancellation,
                     minimizeRewrite,
+                    rankStructuredOnly,
                 )
                 if (cand == null) {
                     rejected++

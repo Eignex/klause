@@ -109,6 +109,12 @@ applies configuration and tabu filters, scoring and acceptance. An optional inte
 tally counts offered, pin-rejected, trimmed, admitted and committed compounds for
 diagnostic consumers; it draws no random values and changes no candidate.
 
+Value-driven channeling moves coordinate an integer change with sibling indicator
+flips and counter-shifts. The driving coordinate is claimed directly; storage for
+additional claims is allocated only when a sibling claims another integer.
+The first claim wins, preventing conflicting sibling shifts. Indicator flips retain
+their final parity when carried through binary integer channels.
+
 Internal objective proposal controls can select term or cone-leaf integer hotspots
 independently of adjacent or geometric leaf steps. They require every cone to be
 maintained by the live network and its exact term form to match the canonical

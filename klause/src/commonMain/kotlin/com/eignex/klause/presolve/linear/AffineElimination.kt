@@ -18,6 +18,7 @@ import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.RebuildStep
+import com.eignex.klause.presolve.SeparableObjectiveView
 import com.eignex.klause.presolve.SharedIntOccurrence
 import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.SourceRebuilds
@@ -76,7 +77,7 @@ internal object AffineSingletons {
         capWide: Boolean = false,
         incrementalTouchedVars: IntArray? = null,
         maxFactors: Int = AFFINE_MAX_FACTORS,
-        pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+        pivotOrder: AffinePivotOrder = AffinePivotOrder.AUTOMATIC,
         objective: LinearObjective? = null,
         preserveStructure: Boolean = false,
     ): PassDelta {
@@ -121,7 +122,7 @@ internal object AffineSingletons {
         objectiveIntVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
         maxFactors: Int = AFFINE_MAX_FACTORS,
-        pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+        pivotOrder: AffinePivotOrder = AffinePivotOrder.AUTOMATIC,
         objective: LinearObjective? = null,
         preserveStructure: Boolean = false,
     ): SourceDelta {
@@ -164,6 +165,7 @@ internal object AffineSingletons {
         if (problem.numIntVars == 0) return null
         // The entry scan alone can dominate optional preparation on very large models.
         if (problem.factors.size > maxFactors) return null
+        val policy = pivotOrder.forQuery(problem, objective != null)
         val objectiveRewrite = objective?.takeUnless { problem.semantics.isApproximate }
             ?.let { AffineObjective(it, cancellation) }
         if (objectiveRewrite?.interrupted == true) return null
@@ -179,6 +181,13 @@ internal object AffineSingletons {
             val protected = protectedStructureColumns(problem, cancellation) ?: return null
             for (variable in protected) objVars.add(variable)
         }
+        val retainBinaryCostInputs = if (pivotOrder == AffinePivotOrder.AUTOMATIC &&
+            policy == AffinePivotOrder.STRUCTURED && domains != null && problem is BakedProblem && objective != null
+        ) {
+            val view = SeparableObjectiveView.create(problem, objective, cancellation)
+            if (cancellation()) return null
+            view != null
+        } else false
         val eliminated = BooleanArray(problem.numIntVars)
         // Once `x` is gone only its range survives, as the bound rows on its terms, so a pivot with interior
         // holes could be rebuilt onto a value the model excludes. A source declaration has nowhere to carry
@@ -190,6 +199,11 @@ internal object AffineSingletons {
             domains == null -> { x: Int, _: Int ->
                 ranges.isClosed(x) && !ranges.isBinary(x) && (problem.intDomainOrNull(x)?.holeCount ?: 0L) == 0L
             }
+
+            retainBinaryCostInputs ->
+                { x: Int, partners: Int ->
+                    !ranges.isBinary(x) && (partners == 1 || domains[x].holeCount == 0L)
+                }
 
             domains.any { it.holeCount > 0L } -> { x: Int, partners: Int ->
                 partners == 1 || domains[x].holeCount == 0L
@@ -215,7 +229,7 @@ internal object AffineSingletons {
         // unchanged since the previous run reached its fixpoint), so the scan need only test the factors
         // those variables appear in — O(delta) instead of O(factors) on the common fruitless re-run.
         if (sharedIntOcc != null) {
-            val seed = SeedOcc(problem.factors, sharedIntOcc, pivotOrder == AffinePivotOrder.REWRITE_COST)
+            val seed = SeedOcc(problem.factors, sharedIntOcc, policy.allowsStructuredRewrites)
             val hasCandidate = if (incrementalTouchedVars != null) {
                 anyTouchedVarHeadsCandidate(
                     seed,
@@ -238,7 +252,7 @@ internal object AffineSingletons {
         // The session-maintained index matches the pristine input factor order, so the first candidate
         // search reads it instead of rebuilding an O(factors) index; each fold then patches only the
         // occurrence entries of the rewritten factors rather than re-indexing the whole set.
-        val ws = WorkingSet(problem.factors, eliminated.size, sharedIntOcc, pivotOrder == AffinePivotOrder.REWRITE_COST)
+        val ws = WorkingSet(problem.factors, eliminated.size, sharedIntOcc, policy.allowsStructuredRewrites)
         // Each elimination rewrites only the factors mentioning the pivot and appends bound rows, so the
         // per-elimination cost is O(occurrences of x) rather than O(factors). The candidate scan still
         // walks the live factors in order (the elimination order is selection-order-sensitive), but the
@@ -249,7 +263,7 @@ internal object AffineSingletons {
         // the order as much as on the set: folding the cheap pivots first shrinks the graph, so folds that
         // would have been expensive become cheap or stop existing. The gates below (fill-in budget, absorb
         // cap) can only refuse a fold; they cannot defer one.
-        val order = AffinePivotOrders.new(pivotOrder, ws, eliminated, objVars, capWide, pivotable, cancellation)
+        val order = AffinePivotOrders.new(policy, ws, eliminated, objVars, capWide, pivotable, cancellation)
         // Cumulative substitution fill-in (Σ pivot-degree · substituted-terms). A dense chain of wide
         // folds is superlinear and can dominate presolve on large models where it barely simplifies;
         // once the budget is spent the loop stops, leaving the remaining affine-defined variables to be
@@ -541,6 +555,7 @@ internal object AffineSingletons {
         pivotable: ((Linear, Int) -> Boolean)?,
         cancellation: Cancellation = Cancellation.Never,
         minimizeRewrite: Boolean = false,
+        rankStructuredOnly: Boolean = false,
     ): AffineCandidate? {
         val f = ws.factorAt(di)?.equivalentLinear() ?: return null
         if (f.op != LinearOp.EQ || f.vars.size < 2) return null
@@ -549,6 +564,11 @@ internal object AffineSingletons {
             cancellation.charge(AFFINE_WORK_WEIGHT)
             candidateInFactor(ws, di, eliminated, objectiveIntVars, capWide, pivotable, cancellation) ?: return null
         } else null
+        if (rankStructuredOnly && fallback != null) {
+            val rank = requiresStructuredConsumers(ws, fallback, cancellation)
+            if (cancellation()) return null
+            if (!rank) return fallback
+        }
         cancellation.charge(AFFINE_WORK_WEIGHT * f.vars.size)
         if (row.bound == Long.MIN_VALUE) return null
         var preferred = 0
@@ -647,6 +667,23 @@ internal object AffineSingletons {
             }
         }
         return null
+    }
+
+    private fun requiresStructuredConsumers(
+        ws: FactorOcc,
+        candidate: AffineCandidate,
+        cancellation: Cancellation,
+    ): Boolean {
+        if (candidate.isAlias) return false
+        for (k in 0 until ws.degreeOf(candidate.x)) {
+            cancellation.charge(AFFINE_WORK_WEIGHT)
+            if (cancellation()) return false
+            val id = ws.occurrenceAt(candidate.x, k)
+            if (id == candidate.defIdx) continue
+            val factor = ws.factorAt(id)
+            if (factor is ReifiedLinear || factor is ComparisonClause) return true
+        }
+        return false
     }
 
     /** Whether any variable in [touchedVars] heads a unit-pivot or residue candidate, testing only the

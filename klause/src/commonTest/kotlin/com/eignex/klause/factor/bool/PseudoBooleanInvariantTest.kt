@@ -23,6 +23,97 @@ import kotlin.test.assertTrue
 class PseudoBooleanInvariantTest {
 
     @Test
+    fun `structured swaps should preserve weighted sums across literal polarities`() {
+        for (firstPositive in listOf(false, true)) for (secondPositive in listOf(false, true)) {
+            val factor = PseudoBoolean(longArrayOf(2, 2, 3, 5, 7), intArrayOf(
+                Lit.make(0, firstPositive), Lit.make(1, secondPositive),
+                Lit.make(2, true), Lit.make(3, true), Lit.make(4, true),
+            ), PbOp.EQ, 7)
+            val problem = Problem(5, 0, emptyArray(), listOf(factor))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+            state.assignment.setBool(0, firstPositive)
+            state.assignment.setBool(1, !secondPositive)
+            state.assignment.setBool(2, false)
+            state.assignment.setBool(3, true)
+            state.assignment.setBool(4, false)
+            state.recompute()
+            val sink = MoveSink()
+
+            state.factors[0].proposeStructuredMoves(state, 0, sink)
+            state.apply(sink.list.single())
+
+            assertEquals(listOf(!firstPositive, secondPositive, false, true, false),
+                (0..4).map { state.assignment.boolValue(it) })
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `structured swaps should combine repeated literal contributions`() {
+        for (complementary in listOf(false, true)) {
+            val weights = if (complementary) longArrayOf(4, 1, 4, 3, 7) else longArrayOf(2, 3, 2, 5, 7)
+            val factor = PseudoBoolean(weights, intArrayOf(
+                Lit.make(0, true), Lit.make(0, !complementary), Lit.make(1, true),
+                Lit.make(2, true), Lit.make(3, true),
+            ), PbOp.EQ, if (complementary) 4L else 5L)
+            val problem = Problem(4, 0, emptyArray(), listOf(factor))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+            for (v in 0..3) state.assignment.setBool(v, v == 0)
+            state.recompute()
+            val sink = MoveSink()
+
+            state.factors[0].proposeStructuredMoves(state, 0, sink)
+            state.apply(sink.list.single())
+
+            assertEquals(listOf(false, false, true, false), (0..3).map { state.assignment.boolValue(it) })
+            assertEquals(0L, state.cost)
+        }
+    }
+
+    @Test
+    fun `repair offers should use aggregate complementary contributions`() {
+        for (op in listOf(PbOp.LE, PbOp.GE, PbOp.EQ)) {
+            val factor = PseudoBoolean(longArrayOf(4, 1, 3, 7), intArrayOf(
+                Lit.make(0, true), Lit.make(0, false), Lit.make(1, true), Lit.make(2, true),
+            ), op, if (op == PbOp.LE) 3L else 6L)
+            val problem = Problem(3, 0, emptyArray(), listOf(factor))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+            state.assignment.setBool(0, op != PbOp.LE)
+            state.assignment.setBool(1, op == PbOp.LE)
+            state.assignment.setBool(2, false)
+            state.recompute()
+            val sink = MoveSink()
+
+            state.factors[0].proposeRepairMoves(state, 0, sink)
+
+            val proposed = sink.list.filterIsInstance<Move.BoolFlip>().map { it.varId }.toSet()
+            assertEquals(if (op == PbOp.GE) setOf(1, 2) else setOf(1), proposed)
+            assertTrue(sink.list.all { state.netDelta(it) <= 0L })
+        }
+    }
+
+    @Test
+    fun `slack offers should preserve rows with complementary occurrences`() {
+        for (op in listOf(PbOp.LE, PbOp.GE)) {
+            val factor = PseudoBoolean(longArrayOf(4, 1, 3, 7), intArrayOf(
+                Lit.make(0, true), Lit.make(0, false), Lit.make(1, true), Lit.make(2, true),
+            ), op, if (op == PbOp.LE) 2L else 3L)
+            val problem = Problem(3, 0, emptyArray(), listOf(factor))
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+            state.assignment.setBool(0, op == PbOp.GE)
+            state.assignment.setBool(1, false)
+            state.assignment.setBool(2, false)
+            state.recompute()
+            val sink = MoveSink()
+
+            state.factors[0].proposeStructuredMoves(state, 0, sink)
+
+            assertEquals(op == PbOp.LE, sink.list.isEmpty())
+            assertTrue(sink.list.all { state.netDelta(it) == 0L })
+        }
+    }
+
+    @Test
     fun `wide repeated and complementary literals should retain exact move costs`() {
         val wide = parseBigInt("18446744073709551616")
         val weights = arrayOf(wide, -wide, bigIntOf(3))

@@ -984,6 +984,9 @@ internal class LpEngine(
     }
 
     internal fun linearBoundDominates(session: PropagationSession, cutoff: BigFraction): Boolean {
+        // Modular Boolean penalties can underestimate an overflowing sum; exact cutoffs need a checked scan.
+        val integral = linearLowerBound(objective, session, useIncrementalBooleanBound = false)
+        if (integral != Long.MIN_VALUE) return BigFraction.ofLong(integral) >= cutoff
         var lower = BigFraction.ofLong(objective.constant)
         for (b in 0 until minOf(session.problem.numBoolVars, objective.boolWeightValues.size)) {
             val weight = objective.boolWeightValues[b]

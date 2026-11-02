@@ -77,6 +77,7 @@ internal object BinaryColumnSubstitution {
      * [objectiveIntVars] are held back unless [objective] admits an exact Boolean view.
      * [bakeConfig] is threaded into the rebuild so the root-bake probing
      * policy is re-derived over the rewritten factor set.
+     * [requireMixedObjectiveSubstitution] withholds mixed cost projection unless a cost column is eliminated.
      */
     fun substitute(
         problem: BakedProblem,
@@ -84,6 +85,7 @@ internal object BinaryColumnSubstitution {
         bakeConfig: BakeConfig,
         objective: LinearObjective? = null,
         allowMixedObjective: Boolean = false,
+        requireMixedObjectiveSubstitution: Boolean = false,
     ): Substitution? {
         val view = objective?.let { BinaryObjectiveView.create(problem, it, allowMixedObjective) }
         val protected = when {
@@ -96,7 +98,8 @@ internal object BinaryColumnSubstitution {
                 }
             }
         }
-        return substituteColumns(problem, protected, bakeConfig, view)
+        return substituteColumns(problem, protected, bakeConfig, view,
+            objective?.takeIf { requireMixedObjectiveSubstitution && view?.hasNonbinaryCost == true })
     }
 
     private fun substituteColumns(
@@ -104,13 +107,29 @@ internal object BinaryColumnSubstitution {
         objectiveIntVars: Set<Int>,
         bakeConfig: BakeConfig,
         view: BinaryObjectiveView?,
+        requiredMixedObjective: LinearObjective? = null,
     ): Substitution? {
         val numInts = problem.numIntVars
         val factors = view?.factors?.toTypedArray() ?: problem.factors
         val numBools = view?.numBoolVars ?: problem.numBoolVars
         val seeds = if (view == null) PropagationResult.Implied.EMPTY else problem.rootDeductions
+        fun unprojected(): Substitution? {
+            val token = problem.cancellation
+            val units = PresolveEntrySize(token.presolveBudget()).units(problem, token)
+            token.charge(PresolvePass.SUBSTITUTE_BINARY_COLUMNS.baseWorkWeight * units)
+            if (token()) return null
+            val protected = buildSet {
+                addAll(objectiveIntVars)
+                checkNotNull(requiredMixedObjective).intCoefficientValues.forEachIndexed { v, coefficient ->
+                    if (v % 256 == 0 && token()) return null
+                    if (coefficient != 0L) add(v)
+                }
+            }
+            return substituteColumns(problem, protected, bakeConfig, null)
+        }
         fun viewOnly(): Substitution? {
-            if (view == null) return null
+            // Additional objective protection cannot create an eligible integer column.
+            if (view == null || requiredMixedObjective != null) return null
             val rebuilt = PresolveShared.rebuildProblem(
                 problem, view.factors, bakeConfig = bakeConfig, numBoolVars = numBools, seedDeductions = seeds,
             )
@@ -142,6 +161,10 @@ internal object BinaryColumnSubstitution {
             columns.add(v)
         }
         if (columns.isEmpty()) return viewOnly()
+        if (requiredMixedObjective != null && (0 until columns.size).none {
+            if (it % 256 == 0 && problem.cancellation()) return null
+            requiredMixedObjective.intCoefficientValues.getOrElse(columns[it]) { 0L } != 0L
+        }) return unprojected()
 
         val out = ArrayList<Factor>(factors.size)
         for (i in factors.indices) {

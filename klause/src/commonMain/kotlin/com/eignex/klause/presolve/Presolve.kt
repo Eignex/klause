@@ -86,7 +86,7 @@ object Presolve {
         sharedIntOcc: SharedIntOccurrence? = null,
         capWide: Boolean = false,
         incrementalTouchedVars: IntArray? = null,
-        pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+        pivotOrder: AffinePivotOrder = AffinePivotOrder.AUTOMATIC,
         objective: LinearObjective? = null,
     ): PassDelta = AffineSingletons.eliminateAffineSingletons(
         problem,

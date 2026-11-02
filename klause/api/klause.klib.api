@@ -517,9 +517,11 @@ final enum class com.eignex.klause.portfolio/PortfolioPhase : kotlin/Enum<com.ei
 }
 
 final enum class com.eignex.klause.presolve/AffinePivotOrder : kotlin/Enum<com.eignex.klause.presolve/AffinePivotOrder> { // com.eignex.klause.presolve/AffinePivotOrder|null[0]
+    enum entry AUTOMATIC // com.eignex.klause.presolve/AffinePivotOrder.AUTOMATIC|null[0]
     enum entry MARKOWITZ // com.eignex.klause.presolve/AffinePivotOrder.MARKOWITZ|null[0]
     enum entry REWRITE_COST // com.eignex.klause.presolve/AffinePivotOrder.REWRITE_COST|null[0]
     enum entry STABLE_ID // com.eignex.klause.presolve/AffinePivotOrder.STABLE_ID|null[0]
+    enum entry STRUCTURED // com.eignex.klause.presolve/AffinePivotOrder.STRUCTURED|null[0]
 
     final val entries // com.eignex.klause.presolve/AffinePivotOrder.entries|#static{}entries[0]
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.presolve/AffinePivotOrder> // com.eignex.klause.presolve/AffinePivotOrder.entries.<get-entries>|<get-entries>#static(){}[0]

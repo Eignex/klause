@@ -37,34 +37,36 @@ import kotlin.test.assertTrue
 class AffineEliminationTest {
     @Test
     fun `unit affine views should retain native comparison disjunctions and source reconstruction`() {
-        for (finite in listOf(false, true)) for (scale in listOf(-1, 1)) for (op in LinearOp.entries) {
-            val source = Problem(0, 3, Array(3) { IntDomain(-4, 4) }, listOf(
-                Linear(intArrayOf(1, -scale), intArrayOf(0, 1), LinearOp.EQ, 2),
-                ComparisonClause(intArrayOf(0, 0, 2), arrayOf(op, LinearOp.EQ, LinearOp.EQ),
-                    longArrayOf(2, 0, 1)),
-            ))
-            val reduced: Problem
-            val reconstruct: (Sample) -> Sample
-            if (finite) {
-                val baked = source.bake()
-                val delta = AffineSingletons.eliminateAffineSingletons(baked, objectiveIntVars = setOf(1, 2),
-                    pivotOrder = AffinePivotOrder.REWRITE_COST)
-                reduced = baked.withPassDelta(delta, BakeConfig.NONE)
-                reconstruct = assertNotNull(delta.reconstruct)
-            } else {
-                val delta = AffineSingletons.eliminateSourceAffineSingletons(source, objectiveIntVars = setOf(1, 2),
-                    pivotOrder = AffinePivotOrder.REWRITE_COST)
-                reduced = assertNotNull(source.withSourcePassDelta(delta))
-                reconstruct = assertNotNull(delta.rebuild.asSampleLift())
-            }
+        for (order in listOf(AffinePivotOrder.STRUCTURED, AffinePivotOrder.REWRITE_COST)) {
+            for (finite in listOf(false, true)) for (scale in listOf(-1, 1)) for (op in LinearOp.entries) {
+                val source = Problem(0, 3, Array(3) { IntDomain(-4, 4) }, listOf(
+                    Linear(intArrayOf(1, -scale), intArrayOf(0, 1), LinearOp.EQ, 2),
+                    ComparisonClause(intArrayOf(0, 0, 2), arrayOf(op, LinearOp.EQ, LinearOp.EQ),
+                        longArrayOf(2, 0, 1)),
+                ))
+                val reduced: Problem
+                val reconstruct: (Sample) -> Sample
+                if (finite) {
+                    val baked = source.bake()
+                    val delta = AffineSingletons.eliminateAffineSingletons(baked, objectiveIntVars = setOf(1, 2),
+                        pivotOrder = order)
+                    reduced = baked.withPassDelta(delta, BakeConfig.NONE)
+                    reconstruct = assertNotNull(delta.reconstruct)
+                } else {
+                    val delta = AffineSingletons.eliminateSourceAffineSingletons(source, objectiveIntVars = setOf(1, 2),
+                        pivotOrder = order)
+                    reduced = assertNotNull(source.withSourcePassDelta(delta))
+                    reconstruct = assertNotNull(delta.rebuild.asSampleLift())
+                }
 
-            assertEquals(1, reduced.factors.count { it is ComparisonClause })
-            for (y in listOf(-2L, 0L, 2L)) for (z in listOf(0L, 1L)) {
-                val point = Sample(BooleanArray(0), longArrayOf(0, y, z))
-                val lifted = reconstruct(point)
+                assertEquals(1, reduced.factors.count { it is ComparisonClause })
+                for (y in listOf(-2L, 0L, 2L)) for (z in listOf(0L, 1L)) {
+                    val point = Sample(BooleanArray(0), longArrayOf(0, y, z))
+                    val lifted = reconstruct(point)
 
-                assertEquals(scale * y + 2, lifted.ints[0])
-                assertEquals(isFeasible(source, lifted), isFeasible(reduced, point), "$finite $scale $op $y $z")
+                    assertEquals(scale * y + 2, lifted.ints[0])
+                    assertEquals(isFeasible(source, lifted), isFeasible(reduced, point), "$finite $scale $op $y $z")
+                }
             }
         }
     }
@@ -86,40 +88,42 @@ class AffineEliminationTest {
 
     @Test
     fun `rewriting an asserted definition through a channel should preserve both channel branches`() {
-        for (finite in listOf(false, true)) for (op in LinearOp.entries) {
-            val source = Problem(1, 3, Array(3) { IntDomain(0, 4) }, listOf(
-                Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
-                ReifiedLinear(0, intArrayOf(2, -1), intArrayOf(0, 1), op, 2),
-            ))
-            val reduced: Problem
-            val reconstruct: (Sample) -> Sample
-            if (finite) {
-                val baked = source.bake()
-                val delta = AffineSingletons.eliminateAffineSingletons(baked, objectiveIntVars = setOf(1, 2),
-                    pivotOrder = AffinePivotOrder.REWRITE_COST)
-                assertFalse(delta.isEmpty)
-                reduced = baked.withPassDelta(delta, BakeConfig.NONE)
-                reconstruct = assertNotNull(delta.reconstruct)
-            } else {
-                val delta = AffineSingletons.eliminateSourceAffineSingletons(source, objectiveIntVars = setOf(1, 2),
-                    pivotOrder = AffinePivotOrder.REWRITE_COST)
-                assertFalse(delta.isEmpty)
-                reduced = assertNotNull(source.withSourcePassDelta(delta))
-                reconstruct = assertNotNull(delta.rebuild.asSampleLift())
-            }
-
-            for ((a, b) in listOf(0L to 0L, 0L to 1L, 1L to 1L)) for (truth in listOf(false, true)) {
-                val sum = a + 2 * b
-                val holds = when (op) {
-                    LinearOp.LE -> sum <= 2
-                    LinearOp.EQ -> sum == 2L
-                    LinearOp.GE -> sum >= 2
-                    LinearOp.NE -> sum != 2L
+        for (order in listOf(AffinePivotOrder.STRUCTURED, AffinePivotOrder.REWRITE_COST)) {
+            for (finite in listOf(false, true)) for (op in LinearOp.entries) {
+                val source = Problem(1, 3, Array(3) { IntDomain(0, 4) }, listOf(
+                    Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                    ReifiedLinear(0, intArrayOf(2, -1), intArrayOf(0, 1), op, 2),
+                ))
+                val reduced: Problem
+                val reconstruct: (Sample) -> Sample
+                if (finite) {
+                    val baked = source.bake()
+                    val delta = AffineSingletons.eliminateAffineSingletons(baked, objectiveIntVars = setOf(1, 2),
+                        pivotOrder = order)
+                    assertFalse(delta.isEmpty)
+                    reduced = baked.withPassDelta(delta, BakeConfig.NONE)
+                    reconstruct = assertNotNull(delta.reconstruct)
+                } else {
+                    val delta = AffineSingletons.eliminateSourceAffineSingletons(source, objectiveIntVars = setOf(1, 2),
+                        pivotOrder = order)
+                    assertFalse(delta.isEmpty)
+                    reduced = assertNotNull(source.withSourcePassDelta(delta))
+                    reconstruct = assertNotNull(delta.rebuild.asSampleLift())
                 }
-                val point = Sample(booleanArrayOf(truth), longArrayOf(0, a, b))
 
-                assertEquals(holds == truth, isFeasible(reduced, point))
-                if (holds == truth) assertTrue(isFeasible(source, reconstruct(point)))
+                for ((a, b) in listOf(0L to 0L, 0L to 1L, 1L to 1L)) for (truth in listOf(false, true)) {
+                    val sum = a + 2 * b
+                    val holds = when (op) {
+                        LinearOp.LE -> sum <= 2
+                        LinearOp.EQ -> sum == 2L
+                        LinearOp.GE -> sum >= 2
+                        LinearOp.NE -> sum != 2L
+                    }
+                    val point = Sample(booleanArrayOf(truth), longArrayOf(0, a, b))
+
+                    assertEquals(holds == truth, isFeasible(reduced, point))
+                    if (holds == truth) assertTrue(isFeasible(source, reconstruct(point)))
+                }
             }
         }
     }

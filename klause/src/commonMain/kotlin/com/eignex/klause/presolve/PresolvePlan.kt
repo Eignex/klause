@@ -77,7 +77,7 @@ class PresolveConfig(
     private val probeBudgetPerVarOverride: Int? = null,
     private val probeTotalBudgetOverride: Int? = null,
     /** The pivot order used by affine elimination. */
-    val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+    val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.AUTOMATIC,
     /** Fractional complexity reduction below which a round ends iteration. */
     val abortFraction: Double = 0.001,
     /** Maximum rounds per source or finite pass schedule. */

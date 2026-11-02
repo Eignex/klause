@@ -83,24 +83,26 @@ class AffinePivotOrderTest {
         val hint = DefinitionHint.Comparison(0, longArrayOf(1),
             arrayOf(DefinitionHint.Operand.Variable(0)), 2, LinearOp.GE)
         val objective = LinearObjective(boolWeights = longArrayOf(7), intCoefficients = longArrayOf(0, 1, 1))
-        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, listOf(hint)),
-            ExecutionOperation.OPTIMIZE, FiniteEngine.LOCAL_SEARCH, objective))
-        val shape = invocation.finiteShape()
-        val prepared = FinitePipeline.prepare(FinitePipelineRequest(
-            shape.problem, FiniteEngine.LOCAL_SEARCH, shape.linearObjective,
-            PresolveConfig.parse("off,+affine").withAffinePivotOrder(AffinePivotOrder.REWRITE_COST),
-            explicitPresolveConfig = true, preparedPlan = shape.preparedPlan,
-        ))
-        val view = assertNotNull(invocation.heuristicHints(prepared.problem, prepared.objective,
-            prepared.sourceMapping, Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
-            assertNotNull(prepared.executionPlan).capabilities))
-        val assignment = Assignment(prepared.problem.numBoolVars, prepared.problem.numIntVars)
-        assignment.setInt(2, 1)
+        for (order in listOf(AffinePivotOrder.STRUCTURED, AffinePivotOrder.REWRITE_COST)) {
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, listOf(hint)),
+                ExecutionOperation.OPTIMIZE, FiniteEngine.LOCAL_SEARCH, objective))
+            val shape = invocation.finiteShape()
+            val prepared = FinitePipeline.prepare(FinitePipelineRequest(
+                shape.problem, FiniteEngine.LOCAL_SEARCH, shape.linearObjective,
+                PresolveConfig.parse("off,+affine").withAffinePivotOrder(order),
+                explicitPresolveConfig = true, preparedPlan = shape.preparedPlan,
+            ))
+            val view = assertNotNull(invocation.heuristicHints(prepared.problem, prepared.objective,
+                prepared.sourceMapping, Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
+                assertNotNull(prepared.executionPlan).capabilities))
+            val assignment = Assignment(prepared.problem.numBoolVars, prepared.problem.numIntVars)
+            assignment.setInt(2, 1)
 
-        assertNotNull(view.sweep).sweep(assignment, prepared.problem.finiteIntDomains())
+            assertNotNull(view.sweep).sweep(assignment, prepared.problem.finiteIntDomains())
 
-        assertFalse(assignment.boolValue(0))
-        assertEquals(8.0, assertNotNull(view.objective).deltaIfApplied(assignment, Move.IntSet(1, 1)))
+            assertFalse(assignment.boolValue(0))
+            assertEquals(8.0, assertNotNull(view.objective).deltaIfApplied(assignment, Move.IntSet(1, 1)))
+        }
     }
 
     @Test
@@ -176,15 +178,70 @@ class AffinePivotOrderTest {
             ))
         val config = PresolveConfig.parse("off,+affine")
         val byFirst = Presolver.runSource(source, config.withAffinePivotOrder(AffinePivotOrder.MARKOWITZ))
+        val byStructured = Presolver.runSource(source, config.withAffinePivotOrder(AffinePivotOrder.STRUCTURED))
         val byCost = Presolver.runSource(source, config.withAffinePivotOrder(AffinePivotOrder.REWRITE_COST))
 
         val firstRows = CpToLpRelaxation(byFirst.problem, null).build(RootDomains(byFirst.problem)).model.m
+        val structuredRows = CpToLpRelaxation(byStructured.problem, null)
+            .build(RootDomains(byStructured.problem)).model.m
         val costRows = CpToLpRelaxation(byCost.problem, null).build(RootDomains(byCost.problem)).model.m
         val lifted = assertNotNull(byCost.rebuild.asSampleLift())(Sample(BooleanArray(0), longArrayOf(1, 0, 3, 0)))
 
         assertEquals(3, firstRows)
+        assertEquals(firstRows, structuredRows)
         assertEquals(1, costRows)
         assertEquals(-2L, lifted.ints[1])
+    }
+
+    @Test
+    fun `automatic optimization should avoid the larger rewrite through native channels`() {
+        val source = Problem(2, 3,
+            arrayOf(IntDomain(0, 4), IntDomain(-4, 4), IntDomain(0, 4)), listOf(
+                Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.LE, 4),
+            ))
+
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
+            objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 1)))
+        val rebuilt = assertNotNull(delta.rebuild.asSampleLift())(
+            Sample(booleanArrayOf(true, true), longArrayOf(3, 0, 1)))
+
+        assertEquals(2L, rebuilt.ints[1])
+    }
+
+    @Test
+    fun `automatic mixed costs should reconstruct a binary channel fold`() {
+        val source = Problem(1, 3,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 4), IntDomain(0, 4)), listOf(
+                Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+            ))
+
+        val delta = AffineSingletons.eliminateAffineSingletons(source.bake(),
+            objective = LinearObjective(boolWeights = longArrayOf(3), intCoefficients = longArrayOf(0, 1, 1)))
+        val rebuilt = assertNotNull(delta.reconstruct)(Sample(booleanArrayOf(true), longArrayOf(0, 1, 2)))
+
+        assertEquals(1L, rebuilt.ints[0])
+    }
+
+    @Test
+    fun `automatic ordering should retain native channels outside discrete optimization`() {
+        for (realCount in 0..1) {
+            val source = Problem(3, 3, Array(3) { IntDomain(0, 4) }, listOf(
+                Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.GE, 2),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(2), LinearOp.GE, 2),
+            ), numRealVars = realCount, realLower = DoubleArray(realCount) { 0.0 },
+                realUpper = DoubleArray(realCount) { 1.0 })
+
+            val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
+                objective = if (realCount == 0) null else LinearObjective(boolWeights = longArrayOf(1, 1, 1)))
+
+            assertTrue(delta.isEmpty)
+        }
     }
 
     @Test

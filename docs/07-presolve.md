@@ -87,6 +87,25 @@ default round cap; an explicit zero round cap still suppresses those schedules.
 
 ### Rewrite representation controls
 
+`AffinePivotOrder.AUTOMATIC` is the default query policy. For exact optimization
+without continuous variables it uses `STRUCTURED` ordering. When a finite cost
+can be expanded into per-variable terms, it preserves binary integer inputs left
+by binary substitution to keep that definition available to search. This bounded
+cost-view discovery charges the preparation allowance and retains no view. Other
+queries use `MARKOWITZ`. Explicit pivot policies retain their own consumer admission.
+Automatic mixed binary cost projection requires eliminating a projected cost
+column. If only unrelated columns can leave the integer lane, substitution retains
+the integer cost representation and still processes those unrelated columns.
+An empty mixed admission scan returns unchanged: additional objective protection
+cannot create an eligible column.
+
+`AffinePivotOrder.STRUCTURED` keeps Markowitz ordering between definitions. It
+retains the first admitted declaration-order pivot for aliases and ordinary
+consumers. When that pivot uses a native reified or comparison-clause
+consumer, it tries the smallest incident rewrite payload first. Consumer admission
+checks walk the maintained occurrence index and charge the phase allowance. It
+also reuses existing exact binary cost channels within mixed integer objectives.
+
 `AffinePivotOrder.REWRITE_COST` retains Markowitz ordering between definitions and
 tries the smallest rewrite payload among an equality's unit pivots first. It sums
 the current incident factors' `structuralKeyWeight`,
@@ -97,7 +116,7 @@ objective and reconstruction checks apply to the preferred pivot; a rejected piv
 falls back to the first admitted declaration-order pivot. An equality without an
 admitted pivot performs no payload scoring. This opt-in estimate
 describes construction size; active downstream search still determines total cost.
-The same policy can fold an asserted integer definition through word-sized
+Both structured policies can fold an asserted integer definition through word-sized
 `ReifiedLinear` consumers. The replacement retains the channel's Boolean output
 and comparison in both directions; conditional equalities never supply asserted
 pivots. Coefficient checks, the per-row absorption cap and carried domain bounds
@@ -808,8 +827,8 @@ exactly. A fresh positive channel retains the source coefficient when signed reu
 or a constant shift exceeds the objective's storage width. Mixed
 integer readers retain their columns and channels. Substituted values are
 reconstructed from their literals, preserving original costs and source coordinates.
-The rewrite-cost policy also projects binary costs within a mixed integer
-objective when existing signed channels carry them exactly. It retains nonbinary
+`STRUCTURED` and `REWRITE_COST` also project binary costs within a mixed integer
+objective when existing signed channels carry them exactly. Both retain nonbinary
 costs and any binary cost whose channel reuse would overflow, protecting their
 integer columns from substitution. This mixed view adds no Boolean channels and
 does not carry the pure binary-objective LP admission marker.

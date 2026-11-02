@@ -155,6 +155,16 @@ separate; see [MPS semantics](05-arithmetic-formats.md).
 Consumers decide when to request certified bounds, fixings, conflicts or witnesses
 and how to apply and retract them. Their policy stays outside the engine.
 
+The trivial objective bound caches Boolean contributions only with no retained
+decisions. Its baseline contains permanent root facts; later pins and backtracks
+update a reversible penalty. Before installation is safe, each read scans the
+current assignment. A propagator's effective reason level does not establish that
+the search is at its root.
+Exact-cutoff comparisons first scan Boolean and integer contributions with checked
+integer arithmetic and compare a representable total as an exact rational.
+Overflow or the unavailable-bound sentinel uses complete rational accumulation.
+This scan bypasses the modular Boolean penalty cache to preserve exact pruning.
+
 Finite tuple-packing substitution exposes placement selectors as ordinary Boolean
 columns. Per-Table choice rows and shared occupied-value capacities use the core
 cardinality projection, independently of scalar Table hull admission. Native source
