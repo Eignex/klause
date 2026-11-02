@@ -5,15 +5,19 @@ import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchCli
 import com.eignex.lab.bench.BenchContext
 import com.eignex.lab.bench.BenchDescriptor
+import com.eignex.lab.bench.BenchInput
+import com.eignex.lab.bench.BenchInputRoot
 import com.eignex.lab.bench.BenchProtocol
 import com.eignex.lab.bench.BenchRequest
+import com.eignex.lab.bench.BenchResources
 import com.eignex.lab.bench.BenchResult
 import com.eignex.lab.bench.BenchStatus
 import com.eignex.lab.bench.BenchSuite
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** Selective corpus IO diagnostics using the lab's verified input plan. */
+/** Corpus IO diagnostics using frozen, hash-verified lab inputs. */
 fun main(args: Array<String>) {
     val protocolOutput = System.out
     System.setOut(System.err)
@@ -24,9 +28,23 @@ fun main(args: Array<String>) {
 internal object CorpusStagingSuite : BenchSuite {
     override fun describe() = BenchDescriptor("corpus-staging", "Source IO diagnostics without solver execution")
 
-    override fun plan(request: BenchRequest): List<BenchCase> = KlauseLabSuite.plan(
-        request.copy(parameters = request.parameters + ("input-only" to "true")),
-    ).map { it.copy(attributes = it.attributes + ("recordSchema" to "corpus-staging-v1")) }
+    override fun plan(request: BenchRequest): List<BenchCase> {
+        require(request.parameters.keys == setOf("inputs", "timeout-ms"))
+        val budget = request.parameters.getValue("timeout-ms").toLong().also { require(it in 1..10_000) }
+        val inputs = BenchProtocol.json.decodeFromString<List<FrozenStagingInput>>(request.parameters.getValue("inputs"))
+        require(inputs.size in 1..8 && inputs.map { it.path }.distinct().size == inputs.size)
+        return inputs.map { input ->
+            require(input.suite.isNotBlank() && input.problem.isNotBlank() && input.path.endsWith(".zst"))
+            require(input.plainSha256.matches(Regex("[a-f0-9]{64}")))
+            BenchCase("${input.suite}/${input.problem}/staging",
+                parameters = mapOf("timeout-ms" to budget.toString(), "plain-sha256" to input.plainSha256),
+                resources = BenchResources(1, 4096, 280),
+                inputs = listOf(BenchInput(input.path, BenchInputRoot.CORPUS, "model", input.packedSha256)),
+                attributes = mapOf("suite" to input.suite, "problem" to input.problem, "format" to input.format,
+                    "comparisonKey" to "${input.suite}/${input.problem}", "pairKey" to "${input.suite}/${input.problem}",
+                    "budgetMs" to budget.toString(), "recordSchema" to "corpus-staging-v1"))
+        }
+    }
 
     override fun run(case: BenchCase, context: BenchContext): BenchResult {
         val out = context.outputDirectory.resolve("report").toFile().apply { mkdirs() }
@@ -35,7 +53,7 @@ internal object CorpusStagingSuite : BenchSuite {
             LabInputs.verify(case, context)
             val model = case.inputs.single { it.role == "model" }
             CorpusStagingProfile.capture(LabInputs.path(model, context).toFile(), out,
-                case.parameters.getValue("timeout-ms").toLong())
+                case.parameters.getValue("timeout-ms").toLong(), expectedHash = case.parameters.getValue("plain-sha256"))
         }.exceptionOrNull()
         return BenchResult(case.id, if (failure == null) BenchStatus.SUCCESS else BenchStatus.FAILED,
             artifacts = context.artifacts(),
@@ -47,3 +65,13 @@ internal object CorpusStagingSuite : BenchSuite {
             }, message = failure?.toString())
     }
 }
+
+@Serializable
+internal data class FrozenStagingInput(
+    val suite: String,
+    val problem: String,
+    val format: String,
+    val path: String,
+    val packedSha256: String,
+    val plainSha256: String,
+)

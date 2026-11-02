@@ -423,10 +423,13 @@ child JFR captures diagnose source costs. The profile runs no solver and makes n
 throughput or useful-solve-time claim. Use ordinary same-machine paired lab rows
 at the same whole-source allowance for qualification, retaining setup, failures
 and cleanup along with declared cache conditions.
-`lab/staging.json` uses the same diagnostic with the ordinary planner's selective,
-hash-verified corpus inputs. Submit standard catalog selections and `timeout-ms`;
-each accepted row retains all modes on its one worker attempt. This manifest omits
-MiniZinc provisioning and supports compressed file-backed sources only.
+`lab/staging.json` uses the same diagnostic with frozen lab-published inputs.
+Submit `timeout-ms` (at most 10,000) and `inputs`, a JSON array of `suite`, `problem`,
+`format`, `path`, `packedSha256` and `plainSha256` objects copied from retained source
+records. The planner declares those exact corpus paths and hashes; it performs no
+catalog discovery. Each accepted row retains all modes on its one worker attempt.
+This manifest omits MiniZinc provisioning and supports compressed file-backed
+sources only.
 IO event extracts are written after all trials on the lab worker. They retain
 recording-threshold omissions and overlapping event scopes explicitly; absent
 events do not establish zero IO cost.
