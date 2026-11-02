@@ -645,13 +645,23 @@ decisions and discard implied-result payloads, retaining the same undo and cance
 paths. A proved bound enters as a session-local clause over its semantic atom and
 publishes through the original integer coordinate.
 Permanent source replacements supply the same bounded priorities; their clauses and
-ownership remain protected. A priority supplies no deduction without an actual probe conflict.
+ownership remain protected. A priority supplies no consequence without completed propagation.
 The learned cursor advances without replaying an exhausted unchanged neighborhood;
 compaction invalidates its indices. Preparation and retained literal storage share the
 probe class allowance and memory observation. Funded probing precedes cheap root
 simplification so proved facts can refresh binaries in the same safe-root opportunity. Each attempt has a propagation-work ceiling within
 the invocation token. A completed root conflict proves the complementary unit, which is attached and
-propagated through ordinary search. Completed root facts are published to shared
+propagated through ordinary search. A completed consistent pure-Boolean probe can retain
+one newly implied Boolean literal as a binary clause conditional on its probe literal.
+Capture is prepaid before propagation and reads only the final trail entry. After
+rollback, a funded lookup skips a matching direct binary reason and the bounded
+history prevents repeated admissions. At most 64 binaries enter per search scope;
+the 64-key history and pending pair share the probe class and retained-memory
+grants. Unfunded admission resumes at a fresh safe root without another probe.
+Optional buffer release drops unadmitted pairs and history while preserving the
+admission count; reseeding resets that count. Admitted binaries use ordinary
+learned ownership, forgetting and required attachment completion.
+Completed root facts are published to shared
 components before traversal resumes. Successful and interrupted probes retract to the
 complete root; interruption supplies no deduction. Speculative retractions preserve
 the saved search phases while retaining ordinary unassignment notifications for
