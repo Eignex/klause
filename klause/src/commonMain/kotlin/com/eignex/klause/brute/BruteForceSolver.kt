@@ -186,16 +186,16 @@ class BruteForceSolver(override val problem: BakedProblem) :
         state: LocalSearchState,
         budget: StepBudget,
     ): Sequence<Sample> = sequence {
-        if (depth == perms.size) {
-            if (!budget.consume()) return@sequence
-            state.recompute()
-            if (state.cost == 0L) yield(state.assignment.snapshot().withSourceSemantics(problem.semantics))
-            return@sequence
-        }
         for (idx in perms[depth]) {
             if (!budget.hasRemaining()) return@sequence
             applyChunkIndex(chunks[depth], idx, state)
-            yieldAll(walkChunks(perms, depth + 1, state, budget))
+            if (depth == perms.lastIndex) {
+                if (!budget.consume()) return@sequence
+                state.recompute()
+                if (state.cost == 0L) yield(state.assignment.snapshot().withSourceSemantics(problem.semantics))
+            } else {
+                yieldAll(walkChunks(perms, depth + 1, state, budget))
+            }
         }
     }
 

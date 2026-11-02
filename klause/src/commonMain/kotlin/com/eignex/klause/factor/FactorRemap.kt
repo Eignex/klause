@@ -1,13 +1,16 @@
 package com.eignex.klause.factor
 
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 internal fun IntArray.litVars(vararg extra: Int): IntArray {
-    val seen = LinkedHashSet<Int>()
-    for (v in extra) seen.add(v)
-    for (lit in this) seen.add(Lit.variable(lit))
-    val out = IntArray(seen.size)
-    var i = 0
-    for (v in seen) out[i++] = v
-    return out
+    val seen = IntHashSet()
+    val out = IntArrayList()
+    for (v in extra) if (seen.add(v)) out.add(v)
+    for (lit in this) {
+        val v = Lit.variable(lit)
+        if (seen.add(v)) out.add(v)
+    }
+    return out.toIntArray()
 }

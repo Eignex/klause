@@ -34,7 +34,18 @@ internal fun Factor.propagatorProjection(
     }.create(this, preparation)
 }
 
-internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPreparation?): Propagator = when (this) {
+internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPreparation?): Propagator =
+    if (this is Linear) {
+        when (val c = constants) {
+            is RealConstants -> NoPropagator
+            is WideConstants -> WideLinearPropagator(intVars, vars, c.coefficients.toTypedArray(), op, c.bound)
+            is IntegerConstants -> LinearPropagator(boolVars, intVars, c.coeffs, vars, op, c.bound)
+        }
+    } else {
+        remainingPropagatorProjection(preparation)
+    }
+
+private fun Factor.remainingPropagatorProjection(preparation: FactorProjectionPreparation?): Propagator = when (this) {
     is AllDifferentTuples -> AllDifferentTuplesPropagator(this)
 
     is AllDifferent -> AllDifferentPropagator(
@@ -104,12 +115,6 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
     is ExactLinear -> propagationView()
 
     is LinearIndicator -> propagationView()
-
-    is Linear -> when (val c = constants) {
-        is RealConstants -> NoPropagator
-        is WideConstants -> WideLinearPropagator(intVars, vars, c.coefficients.toTypedArray(), op, c.bound)
-        is IntegerConstants -> LinearPropagator(boolVars, intVars, c.coeffs, vars, op, c.bound)
-    }
 
     is Mdd -> MddPropagator(
         boolVars,

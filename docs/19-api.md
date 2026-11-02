@@ -64,6 +64,8 @@ offer for continuous or open models.
 A capped walk without a witness returns `Unknown`; infeasibility requires exhausting
 the assignment space. Optimization certifies the optimum when the entire space is
 visited, including when its size exactly equals the assignment budget.
+The final chunk checks assignments directly within its permutation iterator; only
+feasible assignments retain owned snapshots, without a coroutine per candidate.
 
 ### Source setup
 

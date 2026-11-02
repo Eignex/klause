@@ -9,6 +9,16 @@ import kotlin.test.assertTrue
 
 class TranscendentalArithmeticTest {
     @Test
+    fun `nonnegative interval multiplication should retain exact endpoint bounds and work charges`() {
+        val arithmetic = TranscendentalArithmetic()
+
+        val result = arithmetic.multiply(RationalEnclosure(q(3), q(5)), RationalEnclosure(q(7), q(11)))
+
+        assertEquals(RationalEnclosure(q(21), q(55)), result)
+        assertEquals(4L, arithmetic.work)
+    }
+
+    @Test
     fun `special values should have point enclosures`() {
         val arithmetic = TranscendentalArithmetic()
         val zero = RationalEnclosure.point(q(0))

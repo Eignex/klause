@@ -69,6 +69,9 @@ internal class TranscendentalArithmetic(
             multiply(left.lower, right.lower), multiply(left.lower, right.upper),
             multiply(left.upper, right.lower), multiply(left.upper, right.upper),
         )
+        if (left.lower.signum() >= 0 && right.lower.signum() >= 0) {
+            return RationalEnclosure(products[0], products[3])
+        }
         return RationalEnclosure(products.reduce { a, b -> minimum(a, b) }, products.reduce { a, b -> maximum(a, b) })
     }
 

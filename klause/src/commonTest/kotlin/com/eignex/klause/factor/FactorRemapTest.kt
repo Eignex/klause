@@ -39,9 +39,18 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.bigIntOf
 import com.eignex.klause.util.parseBigInt
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 class FactorRemapTest {
+    @Test
+    fun `literal variables should retain first occurrence order after extra variables`() {
+        val literals = intArrayOf(Lit.make(7, false), Lit.make(2, true), Lit.make(7, true), Lit.make(0, false))
+
+        val actual = literals.litVars(4, 4, 2)
+
+        assertContentEquals(intArrayOf(4, 2, 7, 0), actual)
+    }
 
     private val intMap = IntArray(64) { it + 100 }
     private val boolMap = IntArray(64) { it + 50 }
