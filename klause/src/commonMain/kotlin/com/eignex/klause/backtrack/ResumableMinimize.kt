@@ -1175,6 +1175,7 @@ internal class ResumableMinimize(
             lpEngine.rootRoundingWarmStart = null
             return null
         }
+        if (handoffRootTargets(rootToken)) return null
         fun accept(proposal: Sample): Sample? {
             val started = TimeSource.Monotonic.markNow()
             var outcome = "FAILED"
@@ -1212,6 +1213,23 @@ internal class ResumableMinimize(
             accept = ::accept)
         if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
         return null
+    }
+
+    private fun handoffRootTargets(rootToken: Cancellation): Boolean {
+        val plan = lpEngine.params.lpPlan
+        if (!pausable || decisionLimit <= 0L || problem.numRealVars != 0 ||
+            !plan.branching || plan.lbTreeSearch || !lpEngine.retainedRootEnabled
+        ) return false
+        val pending = lpEngine.rootRoundingWarmStart ?: return false
+        if (pending.primal == null) {
+            lpEngine.retainRootPartialPrimalGuidance(pending.relaxation, rootToken)
+        }
+        if (!lpEngine.retainRootPrimalTargets(rootToken)) return false
+        rootRoundingPending = false
+        lpEngine.rootRoundingInterrupted = false
+        lpEngine.rootRoundingWarmStart = null
+        sink.lp.observePrimalPhase("PRIMAL_CP_GUIDANCE", "SEARCH_HANDOFF", 0L)
+        return true
     }
 
     private fun canResumeRootRounding(): Boolean {

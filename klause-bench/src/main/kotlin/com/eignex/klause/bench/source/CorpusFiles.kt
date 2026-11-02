@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.source
 
+import com.eignex.klause.bench.profile.SourcePreparationCapture
 import com.github.luben.zstd.ZstdInputStreamNoFinalizer
 import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 import java.io.File
@@ -104,7 +105,9 @@ internal object CorpusFiles {
         override fun close() {
             val cleanupStart = nanoTime()
             try {
-                check(file.deleteRecursively()) { "Cannot remove staged source: $file" }
+                SourcePreparationCapture.measure("source-cleanup") {
+                    check(file.deleteRecursively()) { "Cannot remove staged source: $file" }
+                }
             } finally {
                 onCleanup(nanoTime() - cleanupStart)
             }

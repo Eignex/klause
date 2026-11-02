@@ -121,6 +121,10 @@ starts neither numerical consultation nor tree traversal. Incumbent revalidation
 precedes that work. The search and its preparation wrapper report an unfinished root
 layout as pending private preparation. Construction completion, cancellation and retirement follow the
 [LP ownership contract](17-linear-programming.md#root-preparation).
+Eligible retained LP root coordinates can pass directly to the ordinary finite
+traversal as value preferences. Its existing backtracking completes the assignment,
+and complete source checks retain publication authority. This transfer carries no
+LP point, bound or proof authority into a leaf.
 
 Numerical frontier traversal orders alternatives by inherited checked objective
 bounds, visiting unbounded alternatives first. It keeps both children of every

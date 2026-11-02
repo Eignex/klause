@@ -307,6 +307,14 @@ completion marker until a fresh consultation transfers its coordinates to ordina
 value ordering, without repeating propagation. Cancellation during source admission
 keeps the completed pins and their direction for another admission attempt.
 Retention renews no root, worker or invocation allowance.
+A pausable discrete worker with a decision allowance can transfer eligible retained
+coordinates directly to its ordinary complete traversal before private pinning.
+The transfer releases the private rounding state and supplies value preferences;
+the existing traversal owns backtracking and complete source checks. Masked child
+coordinates can transfer without completing the numerical parent or the missing
+coordinates. LP branching opt-outs, LP tree mode and workers with no decision
+allowance retain the primal completion path. The handoff keeps the same storage,
+work, guide identity and root-state guards as a completed rounding attempt.
 Continuation observations distinguish a pending interruption from a cancelled run,
 spent root or LP work, and a call without an eligible interruption. They record the
 existing decision without polling another token or changing its checks.

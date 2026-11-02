@@ -9,6 +9,19 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 internal object LabRuntime {
+    fun harnessCommand(case: BenchCase, input: Path, report: Path): List<String> = buildList {
+        add(Path.of(System.getProperty("java.home"), "bin", "java").toString())
+        add("-Xmx512m")
+        add("--enable-native-access=ALL-UNNAMED")
+        add("--add-modules=jdk.incubator.vector")
+        if (case.parameters["harness-jfr"] == "true") {
+            add("-Dklause.bench.source-events=true")
+            add("-XX:StartFlightRecording=filename=$report/harness.jfr,settings=profile,maxsize=128m,dumponexit=true")
+        }
+        addAll(listOf("-cp", System.getProperty("java.class.path"),
+            "com.eignex.klause.bench.lab.LabAdapterKt", "solve-record", input.toString(), report.toString()))
+    }
+
     fun environment(case: BenchCase, context: BenchContext): Map<String, String> {
         val p = case.parameters
         val runtime = buildList {
