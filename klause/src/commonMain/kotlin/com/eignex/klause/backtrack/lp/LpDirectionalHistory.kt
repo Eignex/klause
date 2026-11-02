@@ -42,6 +42,8 @@ internal class LpDirectionalHistory(
         }
     }
 
+    val hasObservations: Boolean get() = gains.isNotEmpty()
+
     val mayHaveScores: Boolean get() = reliableStamp >= 0L && stamp - reliableStamp <= maxAge
 
     fun clear(report: Boolean = true) {
