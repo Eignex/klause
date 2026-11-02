@@ -46,8 +46,18 @@ internal object JfrCaptureSummary : BenchSuite {
         }
         val summary = samples.summary(case.parameters.getValue("source"), case.parameters.getValue("sha256"))
         Files.writeString(context.outputDirectory.resolve("summary.json"), summary.toString())
+        val events = case.parameters["events"]?.toBooleanStrict() ?: false
+        if (events) HarnessRecording.extract(context.outputDirectory, capture,
+            "retained capture: ${case.parameters.getValue("source")}; original recording scope applies")
+        val error = context.outputDirectory.resolve("harness-analysis-error.txt")
+        val artifacts = listOf("capture.jfr", "summary.json") +
+            if (events) listOf("harness-events.jsonl", "harness-analysis.json", "harness-analysis-error.txt")
+            else emptyList()
         return BenchResult(case.id,
-            artifacts = listOf(BenchArtifact("capture.jfr"), BenchArtifact("summary.json")),
+            status = if (events && Files.exists(error)) BenchStatus.FAILED else BenchStatus.SUCCESS,
+            artifacts = artifacts
+                .filter { Files.isRegularFile(context.outputDirectory.resolve(it)) }
+                .map { BenchArtifact(it) },
             details = summary)
     }
 
@@ -120,7 +130,9 @@ internal object JfrCaptureSummary : BenchSuite {
     private const val STACK_DEPTH = 32
 
     private fun validate(parameters: Map<String, String>) {
-        require(parameters.keys == setOf("source", "sha256", "gzip-base64"))
+        val required = setOf("source", "sha256", "gzip-base64")
+        require(parameters.keys == required || parameters.keys == required + "events")
+        parameters["events"]?.toBooleanStrict()
         require(parameters.getValue("source").let { it.isNotBlank() && it.length <= 1024 })
         require(parameters.getValue("sha256").matches(Regex("[a-f0-9]{64}")))
         require(parameters.getValue("gzip-base64").length in 1..2_097_152)

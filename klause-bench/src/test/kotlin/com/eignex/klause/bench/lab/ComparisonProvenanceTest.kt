@@ -6,9 +6,38 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.nio.file.Files
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
+import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 
 class ComparisonProvenanceTest {
+    @Test
+    fun `cached harness classes retain exact identities and recheck changed files`() {
+        val root = Files.createTempDirectory("cached-comparison-")
+        try {
+            val classes = Files.createDirectory(root.resolve("classes"))
+            val file = classes.resolve("com/eignex/klause/bench/Fixture.class")
+            Files.createDirectories(file.parent)
+            Files.writeString(file, "original")
+            val library = Files.writeString(root.resolve("library.jar"), "library").toFile()
+            val classpath = listOf(classes.toFile(), library)
+            val cache = root.resolve("cache")
+            val fresh = ComparisonProvenance.capture(classes.toFile(), classpath, null)
+            assertEquals(fresh, ComparisonProvenance.capture(classes.toFile(), classpath, cache))
+            assertEquals(fresh, ComparisonProvenance.capture(classes.toFile(), classpath, cache))
+            val modified = Files.getLastModifiedTime(file)
+
+            Files.writeString(file, "modified")
+            Files.setLastModifiedTime(file, modified)
+
+            val changed = ComparisonProvenance.capture(classes.toFile(), classpath, cache)
+            assertNotEquals(fresh, changed)
+            assertEquals(ComparisonProvenance.capture(classes.toFile(), classpath, null), changed)
+        } finally {
+            root.toFile().deleteRecursively()
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["harness", "library", "solver"])
     fun `comparison identities separate harness and library changes from solver revisions`(kind: String) {

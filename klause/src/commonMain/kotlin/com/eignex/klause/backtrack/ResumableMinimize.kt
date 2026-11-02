@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.lp.lpBranchPick
 import com.eignex.klause.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.backtrack.lp.orderRootValues
+import com.eignex.klause.backtrack.lp.pickRootComponent
 import com.eignex.klause.backtrack.selector.IndomainBest
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
@@ -1333,7 +1334,15 @@ internal class ResumableMinimize(
             lpEngine.clearRootPrimalTargets()
         }
 
-        override fun pick(session: PropagationSession): VarRef? = lpEngine.lpBranchPick(session, lpHints)
+        override fun pick(session: PropagationSession): VarRef? {
+            if (incumbents.current() == null) {
+                lpEngine.pickRootComponent(session, params.cancellation)?.let {
+                    lpHints?.selected(null)
+                    return it
+                }
+            }
+            return lpEngine.lpBranchPick(session, lpHints)
+        }
 
         override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> {
             val rooted = lpEngine.orderRootValues(variable, values)

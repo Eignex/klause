@@ -63,10 +63,11 @@ class LabAdapterTest {
         assertContains(failure.message.orEmpty(), "bench.sourceValidation")
     }
 
-    @Test
-    fun `input only plans reject harness capture without execution`() {
+    @ParameterizedTest
+    @CsvSource("harness-jfr,true", "source-staging,cli")
+    fun `input only plans reject execution controls`(key: String, value: String) {
         assertFailsWith<IllegalArgumentException> {
-            LabSettings(mapOf("input-only" to "true", "harness-jfr" to "true"))
+            LabSettings(mapOf("input-only" to "true", key to value))
         }
     }
 
@@ -123,7 +124,7 @@ class LabAdapterTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["cache", "temporary"])
+    @ValueSource(strings = ["cache", "temporary", "cli"])
     fun `source staging choice remains explicit in comparison controls`(target: String) {
         val settings = LabSettings(mapOf("source-staging" to target))
         val case = BenchCase("case", settings.caseParameters("cp", 3), settings.resources())

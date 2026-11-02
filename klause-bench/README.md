@@ -197,6 +197,15 @@ on the lab worker, limiting method aggregation to 32 frames per sample and 100,0
 distinct methods. Capture truncation and the analysis depth limit are reported
 separately. Large captures must not be passed through profile arguments:
 the generated shell command is subject to the operating system's argument-size limit.
+Optional `events=true` also extracts the selected phase, IO, GC, CPU, compilation,
+contention and sampled-stack events into `harness-events.jsonl` on the worker,
+retaining the original recording scope in its header. Event timestamps establish
+order; file order need not be chronological. Recording thresholds and retention
+settings still apply. Event-type IDs, active settings and recording-loss/shutdown
+events are retained when present, so missing events need not be mistaken for disabled capture.
+The raw hash-checked capture and sampled summary survive
+event-extraction failure, with an error artifact and failed analysis result.
+Decoding and both analysis passes spend the containing case/job allowance; no solver runs.
 
 `param.ls-phase-times=true` also reports `lsObjectiveScoring.*`. `plain` and
 `functional` count the selected objective views; `maintained` counts index-preparation
@@ -469,6 +478,22 @@ uses 64 KiB reads. Both read the full plain source before the invocation timer, 
 they do not have identical IO call sizes.
 Native CLI and public-library adapters require cache staging.
 
+`source-staging=cli` passes the original compressed path to the JVM CLI's existing
+streaming decoder. Use `lab/compressed.json` for frozen-source comparisons; it declares
+the required `zstd` executable without adding a tool dependency to ordinary frozen runs.
+The decoder executable path and SHA-256 are retained; capturing that identity spends
+the source preparation allowance. Source hashing before invocation remains unchanged.
+`sourcePreparationMs` measures harness preparation for every delivery policy. In CLI
+delivery, decompression and decoder retirement belong to `sourceCliMs` and
+`sourceInvocationMs`; `sourceDecodeMs` is unavailable, rather than zero, and
+`sourceDecodeLocation=cli-frontend` identifies the scope. `sourceCleanupMs` measures
+only harness temporary-file cleanup. Frontend loading includes decompression and
+parsing and is not an additional disjoint cost. The CLI deadline starts before loading;
+its existing subprocess watchdog and descendant cleanup still apply. This control
+does not establish cooperative cancellation within a blocked CLI input read.
+Compare full invocation and case/job costs at the same allowance and retain the
+original-source checks, runtime/decoder identities and declared cache conditions.
+
 `harness-jfr=true` records the ordinary JVM CLI adapter's separate 512 MiB harness
 JVM into `report/harness.jfr`; the default is false. CLI `measurement` remains a
 separate control. The retained harness command and comparison controls identify
@@ -556,9 +581,10 @@ they do not execute search or validate a source outcome.
 
 ## Corpus and build identity
 
-Compressed file inputs are staged with the existing corpus decoder before CLI
-launch. `sourceDecodeMs` is deducted from the CLI deadline, and
-`sourceInvocationMs` includes decoding, invocation and staged-file retirement.
+Compressed file inputs are staged with the corpus decoder by default.
+`sourcePreparationMs` is deducted from the CLI deadline, and
+`sourceInvocationMs` includes preparation, invocation and staged-file retirement.
+CLI delivery streams compressed input during the invocation instead.
 `elapsedMs` and process witness times retain their subprocess scope. A spent
 preparation allowance supplies no solver verdict. Plain source digests and frozen
 compressed input identities remain available for independent checking.
@@ -575,7 +601,12 @@ See [MiniZinc setup](../klause-mzn-lib/README.md) for direct MiniZinc runs and t
 To reuse installed-build hashes across repeated bench processes, run
 `provenance out=/absolute/path/provenance.json` with the installed launcher and set
 `KLAUSE_BENCH_PROVENANCE` to that path. Regenerate it after rebuilding or restoring
-an installation. Without it, each process captures its own installed-build hashes.
+an installation. Ordinary lab processes also reuse per-file hashes in the existing
+private `LAB_WORKSPACE_CACHE`. Every use traverses its current input/provenance
+inventory and checks filesystem identity, inode, change time, modification time
+and size. Unsupported filesystems and unavailable receipts fall back to reading
+the bytes. The checksum cache uses at most 64 MiB including bounded replacement
+files; it adds no corpus, solver-result or MiniZinc identity-query cache.
 
 ## Weighted objective qualification
 
@@ -1306,9 +1337,11 @@ Staging checks the containing deadline and thread interruption between bounded
 read/write chunks and before invoking the CLI. It closes streams and removes
 partial files on cancellation, exhausted preparation, decoding failure and CLI
 failure. Cleanup runs even after the deadline and its cost remains charged.
-`sourceDecodeMs`, `sourceCliMs`, `sourceCleanupMs` and `sourceInvocationMs` retain
+`sourcePreparationMs`, `sourceCliMs`, `sourceCleanupMs` and `sourceInvocationMs` retain
 preparation, the invocation callback, retirement and the whole source scope on
 successful and failed attempts. `elapsedMs` remains the subprocess measurement.
+Staged inputs also retain preparation as `sourceDecodeMs`; CLI delivery leaves
+that separate decode measurement unavailable.
 An exhausted preparation records no solver verdict and zero CLI time. Plain inputs
 retain the same source ledger without decompression or temporary files. Staging cooperates between
 IO calls; a blocked filesystem call can delay observation of cancellation.

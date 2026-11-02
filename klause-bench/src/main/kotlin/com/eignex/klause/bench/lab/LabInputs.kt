@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.WorkspaceChecksums
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchContext
 import com.eignex.lab.bench.BenchInput
@@ -166,23 +167,28 @@ internal object LabInputs {
         return root.resolve(input.path).toRealPath().also { require(it.startsWith(root)) { "Input escapes its root" } }
     }
 
-    fun verify(case: BenchCase, context: BenchContext) {
-        case.inputs.forEachIndexed { index, input ->
-            val file = path(input, context)
-            input.sha256?.let {
-                require(
-                    Files.isRegularFile(file) && hash(file) == it,
-                ) { "Input checksum mismatch: ${input.path}" }
-            }
-            case.attributes["inputTree.$index"]?.let { expected ->
-                val cache = System.getenv("LAB_WORKSPACE_CACHE")?.let { storage -> Path.of(storage, "compiler-inputs") }
-                val compiler = cache != null && input.root == BenchInputRoot.SOURCE && input.role == "compiler"
-                val matches = Files.isDirectory(file) && if (compiler) {
-                    CompilerInputReceipts(requireNotNull(cache)).matches(file, expected)
-                } else {
-                    treeHash(file) == expected
+    fun verify(case: BenchCase, context: BenchContext, cacheDirectory: Path? = WorkspaceChecksums.directory()) {
+        val root = context.worktree ?: context.corpusDirectory ?: context.outputDirectory
+        WorkspaceChecksums(root, cacheDirectory).use { checksums ->
+            case.inputs.forEachIndexed { index, input ->
+                val file = path(input, context)
+                input.sha256?.let {
+                    require(
+                        Files.isRegularFile(file) && checksums.canonicalChecksum(file) == it,
+                    ) { "Input checksum mismatch: ${input.path}" }
                 }
-                require(matches) { "Input tree changed: ${input.path}" }
+                case.attributes["inputTree.$index"]?.let { expected ->
+                    val cache = System.getenv("LAB_WORKSPACE_CACHE")?.let { storage ->
+                        Path.of(storage, "compiler-inputs")
+                    }
+                    val compiler = cache != null && input.root == BenchInputRoot.SOURCE && input.role == "compiler"
+                    val matches = Files.isDirectory(file) && if (compiler) {
+                        CompilerInputReceipts(requireNotNull(cache)).matches(file, expected)
+                    } else {
+                        treeHash(file, cacheDirectory) == expected
+                    }
+                    require(matches) { "Input tree changed: ${input.path}" }
+                }
             }
         }
     }
@@ -209,19 +215,24 @@ internal object LabInputs {
         }
     }
 
-    internal fun treeHash(directory: Path): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        Files.walk(directory).use { files ->
-            files.filter(Files::isRegularFile).sorted().forEach { file ->
-                require(file.toRealPath().startsWith(directory.toRealPath())) { "Input tree contains an escaping link" }
-                digest.update(directory.relativize(file).toString().replace('\\', '/').toByteArray())
-                digest.update(0.toByte())
-                digest.update(hash(file).toByteArray())
-                digest.update(0.toByte())
+    internal fun treeHash(directory: Path): String = treeHash(directory, WorkspaceChecksums.directory())
+
+    internal fun treeHash(directory: Path, cacheDirectory: Path?): String =
+        WorkspaceChecksums(directory, cacheDirectory).use { checksums ->
+            val canonical = directory.toRealPath()
+            val digest = MessageDigest.getInstance("SHA-256")
+            Files.walk(directory).use { files ->
+                files.filter(Files::isRegularFile).sorted().forEach { file ->
+                    val actual = file.toRealPath()
+                    require(actual.startsWith(canonical)) { "Input tree contains an escaping link" }
+                    digest.update(directory.relativize(file).toString().replace('\\', '/').toByteArray())
+                    digest.update(0.toByte())
+                    digest.update(checksums.canonicalChecksum(actual).toByteArray())
+                    digest.update(0.toByte())
+                }
             }
+            HexFormat.of().formatHex(digest.digest())
         }
-        return HexFormat.of().formatHex(digest.digest())
-    }
 
     private fun hash(path: Path): String {
         val digest = MessageDigest.getInstance("SHA-256")
