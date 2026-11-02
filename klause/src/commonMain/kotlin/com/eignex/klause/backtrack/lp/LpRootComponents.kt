@@ -20,6 +20,7 @@ internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellatio
         val work = rootComponentPreparationWork(targets, bytes)
         val started = TimeSource.Monotonic.markNow()
         var outcome = "ALLOWANCE_DECLINED"
+        var preparationWork = 0L
         if (work > 0L) {
             val meter = LpProjectionMeter(work, bytes, cancellation)
             try {
@@ -31,10 +32,12 @@ internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellatio
             } catch (_: LpProjectionStop) {
                 outcome = "PREPARATION_STOPPED"
             } finally {
-                noteNodeOverhead(meter.work)
+                preparationWork = meter.work
+                noteNodeOverhead(preparationWork)
             }
         }
-        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", outcome, started.elapsedNow().inWholeNanoseconds)
+        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", outcome,
+            started.elapsedNow().inWholeNanoseconds, preparationWork)
     }
     if (rootPrimalTargets !== targets) return null
     val order = targets.components ?: return null
@@ -84,7 +87,7 @@ internal fun rootComponentOrder(problem: Problem, meter: LpProjectionMeter): Roo
     var coupled = 0
     for (index in 0 until groups) if (sizes[index] > 1) coupled++
     if (coupled < 2) return null
-    val offsets = IntArray(n + 1)
+    val offsets = IntArray(groups + 1)
     for (index in 0 until groups) offsets[index + 1] = offsets[index] + sizes[index]
     val writes = offsets.copyOf()
     val members = IntArray(n)
