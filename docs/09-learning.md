@@ -384,6 +384,10 @@ width, and retains at most 32 terms in an unconditional temporary row. Temporary
 rows normalize by integer gcd and floor division and exist only inside the current
 analysis; they cannot enter the learned store or supply retained numeric reasons.
 Further historical endpoints may cancel them to a retained row of at most 16 terms.
+That row records its temporary-step origin. Its actual admission and first native
+consumption have separate lifecycle counts; temporary construction alone supplies
+neither event. The origin follows the immutable row through compaction and the
+session snapshots its counters at retirement.
 A guarded temporary result wider than 16 terms declines. The 4,096 source-reference
 visits fund all temporary-row visits and cancellation entries. A compact conflicting seed retains its 16-term reason-source
 limit; a wide conflicting seed enables wide sources throughout that analysis. This

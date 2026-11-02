@@ -361,6 +361,8 @@ class PropagationState private constructor(
     val intMaxReason: IntArray = prepared?.intMaxReason ?: (IntArray(problem.numIntVars) { -1 })
 
     internal var integerRowLearning = false
+    internal var integerTransientAdmitted = 0L
+    internal var integerTransientConsumed = 0L
     internal var factorAttribution: FactorAttribution? = null
     internal var historicalTableReasons = false
     internal var reasonPreflight = false

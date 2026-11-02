@@ -1275,7 +1275,13 @@ class PropagationSession private constructor(
                 }
             }
         } ?: emptyMap()
-        if (it.integerRowLearning) counts + diagnostics + ("learningIntegerSessions" to 1L) else counts
+        val transientLifecycle = if (it.integerTransientAdmitted == 0L) emptyMap() else mapOf(
+            "learningIntegerTransientAdmitted" to it.integerTransientAdmitted,
+            "learningIntegerTransientConsumed" to it.integerTransientConsumed,
+        )
+        if (it.integerRowLearning) {
+            counts + diagnostics + transientLifecycle + ("learningIntegerSessions" to 1L)
+        } else counts
     } ?: retiredLifecycle
 
     internal fun configureAttribution(

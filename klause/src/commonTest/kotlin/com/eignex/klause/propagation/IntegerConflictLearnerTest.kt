@@ -108,6 +108,8 @@ class IntegerConflictLearnerTest {
         assertTrue((native.learnedLifecycle()["learningIntegerConsumed"] ?: 0L) > 0L)
         assertEquals(1L, native.learnedLifecycle()["learningIntegerTransientCombinations"])
         assertEquals(17L, native.learnedLifecycle()["learningIntegerTransientMaxTerms"])
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerTransientAdmitted"])
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerTransientConsumed"])
         val before = native.learnedLifecycle()
         native.releaseRetainedState()
         assertEquals(before, native.learnedLifecycle())

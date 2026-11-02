@@ -14,11 +14,15 @@ internal class IntegerConflictRow private constructor(
     override val coefficients: LongArray,
     override val bound: Long,
     override val guard: Int = Lit.NONE,
+    val transientSteps: Int = 0,
 ) : IntegerLearningInequality {
     override fun coefficient(variable: Int): Long {
         val index = variables.indexOf(variable)
         return if (index < 0) 0L else coefficients[index]
     }
+
+    fun derivedThroughTransient(steps: Int): IntegerConflictRow = if (steps == 0) this else
+        IntegerConflictRow(variables, coefficients, bound, guard, steps)
 
     fun subsumes(other: IntegerConflictRow): Boolean =
         (guard == Lit.NONE || guard == other.guard) && bound <= other.bound &&

@@ -138,6 +138,7 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     check(intEvents.on)
     learned.lifecycle.note(LearnedKind.Integer, LearnedStage.Constructed)
     learned.lifecycle.note(LearnedKind.Integer, LearnedStage.Admitted)
+    if (row.transientSteps > 0) integerTransientAdmitted++
     val propagator = LearnedIntegerPropagator(row)
     val factor = totalFactorCount
     learned.stages.add(0)
@@ -485,7 +486,11 @@ private fun PropagationState.noteLearnedStage(index: Int, stage: LearnedStage, b
     if (learned.stages[index] and bit != 0) return
     learned.stages[index] = learned.stages[index] or bit
     learned.lifecycle.note(learnedKind(index), stage)
-    if (stage == LearnedStage.Consumed) factorAttribution?.consumed(learned.store[index])
+    if (stage == LearnedStage.Consumed) {
+        val propagator = learned.store[index]
+        if (propagator is LearnedIntegerPropagator && propagator.row.transientSteps > 0) integerTransientConsumed++
+        factorAttribution?.consumed(propagator)
+    }
 }
 
 internal fun PropagationState.referencedLearned(count: Int): BooleanArray {

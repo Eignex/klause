@@ -69,6 +69,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         state.arithmeticLearningTrace?.row("integer.seed-row", row, state)
         if (row.minimum(state) <= row.bound) return decline("seed-not-conflicting")
         val used = mutableSetOf<Pair<Int, Int>>()
+        var transientSteps = 0
         repeat(INTEGER_LEARNING_STEPS) {
             state.checkFiniteWork()
             val event = reason(row, used, allowWideSources) ?: return decline("no-qualified-endpoint")
@@ -80,7 +81,10 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             combined ?: return decline("combination-shape-or-guard")
             row = combined
             if (combined.minimum(state) <= combined.bound) return decline("combination-lost-conflict")
-            if (combined !is IntegerConflictRow) return@repeat
+            if (combined !is IntegerConflictRow) {
+                transientSteps++
+                return@repeat
+            }
             if (state.learned.integerRows?.any { it.row.subsumes(combined) } == true) return decline("duplicate")
             val asserts = combined.assertsAt(state, trail)
             state.arithmeticLearningTrace?.record("integer.assertion", target.toLong(), trail.toLong(),
@@ -92,7 +96,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 val domain = state.intDomains[variable]
                 state.boundEstablishmentLevel(variable, if (lower) domain.min else domain.max, lower) ?: 0
             }.plus(fallback.decisionLevels.toList()).distinct().sorted().toIntArray()
-            return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(combined, target, levels.size, levels, fallback)
+            return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
+                combined.derivedThroughTransient(transientSteps), target, levels.size, levels, fallback)
         }
         return decline("step-limit-without-assertion")
     }
