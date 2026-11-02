@@ -112,6 +112,7 @@ class PropagationSession private constructor(
     private var retiredPropagationNanos = 0L
     private var retiredPropagationCount = 0L
     private var retiredLifecycle: Map<String, Long> = emptyMap()
+    private var integerDeclineAttribution: ArithmeticLearningTrace? = null
 
     internal fun releaseRetainedState() {
         val owner = retainedState ?: return
@@ -120,6 +121,7 @@ class PropagationSession private constructor(
         retiredPropagationCount = owner.propagations
         retiredLifecycle = learnedLifecycle()
         retainedState = null
+        integerDeclineAttribution = null
         levelStates = emptyArray()
         levelTop = 0
         sharedLearningMemory = null
@@ -974,6 +976,7 @@ class PropagationSession private constructor(
     fun enableIntegerRowLearning() {
         check(!state.incremental)
         state.integerRowLearning = true
+        configureIntegerDeclineAttribution(state.factorAttribution != null)
         state.integerLearningTrailAtLevel = { level ->
             if (level in 0 until levelTop) levelStates[level]?.undoSize else null
         }
@@ -1257,7 +1260,18 @@ class PropagationSession private constructor(
         val counts = it.learned.lifecycle.snapshot() +
             (it.nativeEngine?.capWindowStatistics() ?: it.learned.capWindowStatistics()) +
             (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap())
-        if (it.integerRowLearning) counts + ("learningIntegerSessions" to 1L) else counts
+        val attached = integerDeclineAttribution?.takeIf { trace -> it.arithmeticLearningTrace === trace }
+        val diagnostics = attached?.let { trace ->
+            buildMap {
+                put("learningIntegerDiagnostics", 1L)
+                put("learningIntegerDiagnosticTruncated", if (trace.declineCensusTruncated) 1L else 0L)
+                put("learningIntegerDiagnosticSaturated", if (trace.declineCensusSaturated) 1L else 0L)
+                for ((kind, count) in trace.declineCensus) {
+                    put("learningIntegerDiagnostic_" + kind.replace('.', '_').replace('-', '_'), count)
+                }
+            }
+        } ?: emptyMap()
+        if (it.integerRowLearning) counts + diagnostics + ("learningIntegerSessions" to 1L) else counts
     } ?: retiredLifecycle
 
     internal fun configureAttribution(
@@ -1267,9 +1281,25 @@ class PropagationSession private constructor(
         reasonPreflight: Boolean = false,
     ) {
         state.factorAttribution = if (enabled) state.factorAttribution ?: FactorAttribution() else null
+        configureIntegerDeclineAttribution(enabled)
         state.historicalTableReasons = historicalTables
         state.propagationSchedule = if (costAware) state.propagationSchedule ?: PropagationSchedule() else null
         state.reasonPreflight = reasonPreflight
+    }
+
+    private fun configureIntegerDeclineAttribution(enabled: Boolean) {
+        if (enabled && state.integerRowLearning) {
+            if (state.arithmeticLearningTrace == null) {
+                val trace = ArithmeticLearningTrace(maxEvents = 1, maxWords = 1).apply { collectDeclines = true }
+                state.arithmeticLearningTrace = trace
+                integerDeclineAttribution = trace
+            }
+        } else {
+            integerDeclineAttribution?.let { trace ->
+                if (state.arithmeticLearningTrace === trace) state.arithmeticLearningTrace = null
+            }
+            integerDeclineAttribution = null
+        }
     }
 
     internal inline fun <T> withAttribution(families: Int, action: () -> T): T {

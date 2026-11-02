@@ -126,6 +126,15 @@ lane retains packed propagation and credits its clause family without constructi
 general propagator projections. Its fire counter counts BCP calls rather than
 general factor invocations. Disabling attribution retains no diagnostic maps.
 
+With integer-row learning enabled, attribution also reports a session-local decline
+census in the learned lifecycle, including after retirement. At most 63 category
+names of at most 96 characters are retained; further categories enter an overflow
+bucket, and saturation is explicit. A one-event, one-word recorder bounds payload
+capture while the census continues. Disabling attribution releases its recorder;
+an independently attached arithmetic trace retains its own lifetime. These counts
+describe attempted learning on the actual prepared model, without source authority
+or evidence of benefit.
+
 The controls preserve propagation order, containing cancellation, historical trail
 boundaries and reason authority. Eager support observations occur at reason delivery;
 their construction cost is included in factor propagation. Lazy reconstruction and

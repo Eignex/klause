@@ -22,6 +22,51 @@ import kotlin.test.assertTrue
 
 class ArithmeticLearningTraceTest {
     @Test
+    fun `integer attribution should report bounded declines after retirement`() {
+        val session = PropagationSession(Problem(0, 0, emptyArray(), emptyArray()), attribution = true)
+        session.enableIntegerRowLearning()
+        val trace = requireNotNull(session.explanationState.arithmeticLearningTrace)
+
+        repeat(80) { trace.record("integer.decline.reason-$it") }
+        val before = session.learnedLifecycle()
+        session.releaseRetainedState()
+
+        assertEquals(1L, before["learningIntegerDiagnostics"])
+        assertEquals(1L, before["learningIntegerDiagnosticTruncated"])
+        assertEquals(17L, before["learningIntegerDiagnostic_other"])
+        assertEquals(80L, before.filterKeys { it.startsWith("learningIntegerDiagnostic_") }.values.sum())
+        assertEquals(before, session.learnedLifecycle())
+    }
+
+    @Test
+    fun `disabling attribution should release its integer census`() {
+        val session = PropagationSession(Problem(0, 0, emptyArray(), emptyArray()))
+        session.enableIntegerRowLearning()
+        assertNull(session.explanationState.arithmeticLearningTrace)
+        session.configureAttribution(enabled = true, historicalTables = false)
+        requireNotNull(session.explanationState.arithmeticLearningTrace).record("integer.decline.seed-source")
+
+        session.configureAttribution(enabled = false, historicalTables = false)
+
+        assertNull(session.explanationState.arithmeticLearningTrace)
+        assertFalse(session.learnedLifecycle().containsKey("learningIntegerDiagnostics"))
+    }
+
+    @Test
+    fun `disabling attribution should preserve an independently attached trace`() {
+        val session = PropagationSession(Problem(0, 0, emptyArray(), emptyArray()), attribution = true)
+        session.enableIntegerRowLearning()
+        val trace = ArithmeticLearningTrace()
+        session.explanationState.arithmeticLearningTrace = trace
+
+        session.configureAttribution(enabled = false, historicalTables = false)
+        trace.record("observation")
+
+        assertEquals(trace, session.explanationState.arithmeticLearningTrace)
+        assertEquals("observation", trace.events.single().kind)
+    }
+
+    @Test
     fun `decline census should survive discarded and truncated windows`() {
         val state = PropagationState(Problem(0, 0, emptyArray(), emptyArray()), Assumptions.None)
         val trace = ArithmeticLearningTrace(maxEvents = 1, maxWords = 4).apply {
