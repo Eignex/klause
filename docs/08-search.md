@@ -275,17 +275,13 @@ variable; directional guidance only orders its two existing children.
 Two recent samples in each direction supply that variable's predicted child gains,
 using each direction's mean cost per unit of fractional movement. The balanced
 `min + max / 6` score admits finite positive predictions without comparing variables.
-Missing or unreliable history permits one bounded current-basis estimate for the
-selected structural column. A matching retained optimal basis supplies both objective
-costs, multiplied by the corresponding fractional movements. These estimates remain
-current-node advice, separate from observed gains and proof authority. Branch ordering
-admits observed gains; basis estimates are recorded without changing child order.
+Missing or unreliable history retains the existing order without querying the retained
+basis. History preparation and ordering share the existing LP allowance.
 
 The larger predicted objective increase is tried first, after value and incumbent
 guidance, only when both existing alternatives match the estimated Boolean or integer
 floor/ceil partition. Guidance swaps those alternatives without adding, removing or
-replacing a decision. Tied gains, unsupported engines, stale or unfinished bases,
-insufficient allowance, pruned alternatives and changed partitions retain the existing
+replacing a decision. Tied gains, insufficient allowance, pruned alternatives and changed partitions retain the existing
 heuristics. Preferences expire at the next node, point replacement or history reset.
 History and basis side consumption, changed order and unavailable advice are recorded
 separately. The readiness check and all analysis spend the existing LP work allowance. Ancestor

@@ -169,6 +169,7 @@ internal class LpHints(
     fun prepareSide(
         variable: VarRef?,
         domain: IntDomain?,
+        allowBasis: Boolean = true,
         estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>?,
     ): Boolean {
         pendingSide = null
@@ -181,6 +182,7 @@ internal class LpHints(
             return prediction.score > 1e-9 &&
                 rememberSide(variable, value, prediction.down, prediction.up, basis = false)
         }
+        if (!allowBasis) return false
         val relaxation = pointRelaxation ?: return false
         val column = relaxation.column(variable)
         if (column < 0) return false

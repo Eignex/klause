@@ -35,7 +35,8 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
             best = VarRef.IntVar(i)
         }
     }
-    hints.prepareSide(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) }, ::directionalCosts)
+    hints.prepareSide(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
+        allowBasis = false, estimate = ::directionalCosts)
     return best
 }
 

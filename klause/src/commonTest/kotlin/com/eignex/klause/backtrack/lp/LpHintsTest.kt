@@ -83,6 +83,28 @@ class LpHintsTest {
     }
 
     @Test
+    fun `history only preparation never queries the basis without reliable gains`() {
+        for (allowBasis in listOf(false, true)) {
+            val builder = LpBuilder()
+            builder.addVar(0, 2)
+            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0),
+                BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+            val hints = LpHints(1, 0, directionalGains = true)
+            val variable = VarRef.IntVar(0)
+            hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+            var queries = 0
+
+            val prepared = hints.prepareSide(variable, IntDomain(0, 2), allowBasis) { _, _ ->
+                queries++
+                listOf(LpDirectionalCost(1.0, 4.0))
+            }
+
+            assertEquals(allowBasis, prepared)
+            assertEquals(if (allowBasis) 1 else 0, queries)
+        }
+    }
+
+    @Test
     fun `basis side advice puts the larger predicted child gain first when allowed`() {
         for (boolean in listOf(false, true)) for (allowBasis in listOf(false, true)) {
             for (id in 0..1) for (upCostly in listOf(false, true)) for (upFirst in listOf(false, true)) {
@@ -559,7 +581,7 @@ class LpHintsTest {
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
             hints.recordBound(relaxation, 10.0)
-            hints.prepareSide(variable, IntDomain(0, 10)) { _, _ -> null }
+            hints.prepareSide(variable, IntDomain(0, 10), allowBasis) { _, _ -> null }
             hints.branch(variable, IntDomain(0, 10))
             val existing = listOf(SearchDecision.IntAtMost(0, 2L), SearchDecision.IntAtLeast(0, 3L))
 

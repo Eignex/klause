@@ -85,6 +85,7 @@ class ResumableMinimizeDirectionalTest {
             assertTrue((observations["SIDE_CONSUMED"] ?: 0L) > 0L, diagnostic)
             assertTrue((observations["HISTORY_SIDE_CONSUMED"] ?: 0L) > 0L, diagnostic)
             assertEquals(0L, observations["BASIS_SIDE_CONSUMED"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["BASIS_ATTEMPT"] ?: 0L, diagnostic)
         }
     }
 
