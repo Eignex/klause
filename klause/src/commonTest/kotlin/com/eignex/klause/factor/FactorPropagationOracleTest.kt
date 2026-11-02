@@ -10,6 +10,23 @@ import kotlin.test.assertEquals
 class FactorPropagationOracleTest {
 
     @Test
+    fun `source assignments should carry across integer coordinates in declaration order`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(1, 2), IntDomain(4, 5)),
+            factors = emptyList(),
+        )
+
+        val witnesses = FactorPropagationOracle.sourceAssignments(problem).toList()
+
+        assertEquals(
+            listOf(1L to 4L, 2L to 4L, 1L to 5L, 2L to 5L),
+            witnesses.map { it.intValue(0) to it.intValue(1) },
+        )
+    }
+
+    @Test
     fun `relevant witnesses should retain independent source assignments`() {
         val problem = Problem(
             numBoolVars = 1,

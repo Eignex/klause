@@ -152,29 +152,39 @@ class CliModeMpsTest {
             deleteOnExit()
         }
 
-        for (exact in listOf(false, true)) {
-            val policy = if (exact) arrayOf("--exact") else emptyArray()
-            val flags = arrayOf("-s", "-e", "cp", "-p", "1", "-t", "10000",
-                "--param", "presolve-work-limit=4096")
-            val kept = capture { assertEquals(0, runCli(flags + policy + mps.absolutePath)) }
-            val declined = capture {
-                assertEquals(
-                    0,
-                    runCli(
-                        flags + arrayOf("--param", "open-bound-proof=false") +
-                            policy + mps.absolutePath,
-                    ),
-                )
-            }
+        val oldBudget = System.getProperty(CliKnobs.presolveBudgetMs)
+        try {
+            System.setProperty(CliKnobs.presolveBudgetMs, "1")
+            for (exact in listOf(false, true)) {
+                val policy = if (exact) arrayOf("--exact") else emptyArray()
+                val flags = arrayOf("-s", "-e", "cp", "-p", "1", "-t", "10000",
+                    "--param", "presolve-work-limit=4096")
+                val kept = capture { assertEquals(0, runCli(flags + policy + mps.absolutePath)) }
+                val declined = capture {
+                    assertEquals(
+                        0,
+                        runCli(
+                            flags + arrayOf("--param", "open-bound-proof=false") +
+                                policy + mps.absolutePath,
+                        ),
+                    )
+                }
 
-            assertTrue("s OPTIMUM FOUND" in kept.lines(), kept)
-            assertTrue("o -5" in kept.lines(), kept)
-            assertTrue("v x=5" in kept.lines(), kept)
-            assertTrue("c frontendRoutingOutcome=native-formula" in declined.lines(), declined)
-            assertTrue("c reportedBackend=numerical-mip" in declined.lines(), declined)
-            assertTrue("s OPTIMUM FOUND" in declined, declined)
-            assertTrue("v x=5" in declined, declined)
-            assertFalse("cancelled" in declined, declined)
+                assertTrue("s OPTIMUM FOUND" in kept.lines(), kept)
+                assertTrue("o -5" in kept.lines(), kept)
+                assertTrue("v x=5" in kept.lines(), kept)
+                assertTrue("c frontendRoutingOutcome=native-formula" in declined.lines(), declined)
+                assertTrue("c reportedBackend=numerical-mip" in declined.lines(), declined)
+                assertTrue("s OPTIMUM FOUND" in declined, declined)
+                assertTrue("v x=5" in declined, declined)
+                assertFalse("cancelled" in declined, declined)
+            }
+        } finally {
+            if (oldBudget == null) {
+                System.clearProperty(CliKnobs.presolveBudgetMs)
+            } else {
+                System.setProperty(CliKnobs.presolveBudgetMs, oldBudget)
+            }
         }
     }
 

@@ -97,22 +97,29 @@ object FactorPropagationOracle {
         }
         repeat(problem.numBoolVars) { include(2L) }
         domains.forEach { include(it.valueCount) }
-        val radices = LongArray(domains.size) { domains[it].valueCount }
+        val radices = IntArray(problem.numBoolVars + domains.size) { variable ->
+            if (variable < problem.numBoolVars) 2 else domains[variable - problem.numBoolVars].valueCount.toInt()
+        }
         val spans = Array(domains.size) { domains[it].values }
         return sequence {
             // The cursor owns mutable coordinates; retained witnesses snapshot before advance.
             val assignment = Assignment(problem.numBoolVars, problem.numIntVars)
-            for (ordinal in 0 until space.toInt()) {
-                var remaining = ordinal.toLong()
-                for (v in 0 until problem.numBoolVars) {
-                    assignment.setBool(v, remaining % 2L == 1L)
-                    remaining /= 2L
-                }
-                for (v in 0 until problem.numIntVars) {
-                    assignment.setInt(v, spans[v].valueAt((remaining % radices[v]).toInt()))
-                    remaining /= radices[v]
-                }
+            val digits = IntArray(radices.size)
+            for (v in domains.indices) assignment.setInt(v, spans[v].valueAt(0))
+            repeat(space.toInt()) {
                 yield(assignment)
+                for (v in digits.indices) {
+                    val next = digits[v] + 1
+                    val digit = if (next < radices[v]) next else 0
+                    digits[v] = digit
+                    if (v < problem.numBoolVars) {
+                        assignment.setBool(v, digit != 0)
+                    } else {
+                        val variable = v - problem.numBoolVars
+                        assignment.setInt(variable, spans[variable].valueAt(digit))
+                    }
+                    if (digit != 0) break
+                }
             }
         }
     }
