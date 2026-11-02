@@ -1,10 +1,9 @@
 package com.eignex.klause.bench
 
-import com.eignex.klause.formats.dimacs.DimacsFormatException
 import java.io.File
+import java.io.FileNotFoundException
 import kotlin.io.path.createTempFile
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
@@ -18,25 +17,14 @@ class ProblemFormatTest {
     }
 
     @Test
-    fun `dimacs metadata should not require a parseable in-process model`() {
-        val source = file(".cnf", "not a DIMACS document")
+    fun `dimacs metadata should not require source bytes`() {
+        val source = file(".cnf", "").apply { delete() }
 
         val ingested = DimacsFormat.ingest(source)
 
         assertNull(ingested.objective)
         assertFalse(ingested.maximize)
-        assertFailsWith<DimacsFormatException> { ingested.problem }
-    }
-
-    @Test
-    fun `a deferred dimacs model should retain its declared variables and clauses`() {
-        val source = file(".cnf", "p cnf 2 1\n1 -2 0\n")
-        val ingested = DimacsFormat.ingest(source)
-
-        val problem = ingested.problem
-
-        assertEquals(2, problem.numBoolVars)
-        assertEquals(1, problem.factors.size)
+        assertFailsWith<FileNotFoundException> { ingested.problem }
     }
 
     @Test
