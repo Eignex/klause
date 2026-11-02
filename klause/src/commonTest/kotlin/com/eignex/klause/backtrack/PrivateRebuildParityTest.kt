@@ -160,7 +160,7 @@ class PrivateRebuildParityTest {
     fun `an incomplete or duplicated binary encoding should grant no parity row`() {
         for (duplicate in listOf(false, true)) {
             val clauses = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))) +
-                if (duplicate) listOf(Clause(intArrayOf(Lit.pos(1), Lit.pos(0)))) else emptyList()
+                if (duplicate) listOf(Clause(intArrayOf(Lit.make(1, true), Lit.make(0, true)))) else emptyList()
             val session = PropagationSession(Problem(3, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake())
 
             val captured = PrivateRebuildParity.capture(session, 1_048_576L, { true })
