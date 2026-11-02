@@ -1,0 +1,198 @@
+package com.eignex.klause.bench.source
+
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.io.IOException
+import java.nio.channels.FileChannel
+import java.nio.channels.OverlappingFileLockException
+import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+import java.nio.file.StandardOpenOption.CREATE
+import java.nio.file.StandardOpenOption.WRITE
+import java.security.MessageDigest
+import java.util.HexFormat
+import java.util.concurrent.ConcurrentHashMap
+
+internal class WorkspaceChecksums(
+    root: Path,
+    private val directory: Path? = directory(),
+    private val hash: (Path) -> String = ::fileHash,
+    reliable: (Path) -> Boolean = {
+        Files.getFileStore(it).type().lowercase() in setOf("apfs", "ext4", "xfs", "btrfs", "overlay", "tmpfs", "zfs")
+    },
+    private val open: (Path) -> FileChannel = { FileChannel.open(it, CREATE, WRITE, NOFOLLOW_LINKS) },
+    private val write: (Path, ByteArray) -> Unit = { path, bytes ->
+        Files.write(path, bytes)
+        Unit
+    },
+) : AutoCloseable {
+    private val identity = root.toRealPath().toString()
+    private val device = try {
+        if (directory != null && reliable(root)) device(root) else null
+    } catch (_: IOException) {
+        null
+    } catch (_: UnsupportedOperationException) {
+        null
+    }
+    private val slot = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()))
+        .take(2).toInt(16) % SLOTS
+    private val entries = if (device == null) linkedMapOf() else read()
+    private var dirty = false
+
+    fun checksum(file: Path): String = canonicalChecksum(file.toRealPath())
+
+    fun canonicalChecksum(canonical: Path): String {
+        val before = if (device == null) null else stamp(canonical)
+        val name = canonical.toString()
+        entries[name]?.takeIf { before != null && it.stamp == before }?.let { return it.digest }
+        val digest = hash(canonical)
+        if (before != null) {
+            require(stamp(canonical) == before) { "Input changed during checksum capture: $canonical" }
+            if (entries.size >= MAX_FILES && name !in entries) entries.remove(entries.keys.first())
+            entries[name] = Entry(before, digest)
+            dirty = true
+        }
+        return digest
+    }
+
+    override fun close() {
+        if (!dirty || directory == null) return
+        try {
+            val bytes = encode() ?: return
+            Files.createDirectories(directory)
+            val key = directory.toRealPath().resolve("$slot.lock")
+            if (!writers.add(key)) return
+            try {
+                open(key).use { channel ->
+                    val owner = try {
+                        channel.tryLock()
+                    } catch (_: OverlappingFileLockException) {
+                        null
+                    }
+                    owner?.use {
+                        val pending = key.resolveSibling("$slot.pending")
+                        try {
+                            write(pending, bytes)
+                            Files.move(pending, key.resolveSibling("$slot.bin"), ATOMIC_MOVE, REPLACE_EXISTING)
+                        } finally {
+                            Files.deleteIfExists(pending)
+                        }
+                    }
+                }
+            } finally {
+                writers.remove(key)
+            }
+        } catch (_: IOException) {
+            // Cache availability cannot establish an input identity or prevent byte verification.
+        }
+    }
+
+    private fun stamp(file: Path): Stamp? {
+        return try {
+            val attributes = Files.readAttributes(
+                file,
+                "unix:dev,size,lastModifiedTime,ctime,fileKey,isRegularFile",
+                NOFOLLOW_LINKS,
+            )
+            if (attributes["isRegularFile"] != true || attributes["dev"] != device) return null
+            val changed = attributes["ctime"]?.toString() ?: return null
+            val key = attributes["fileKey"]?.toString() ?: return null
+            Stamp(attributes["size"] as Long, attributes["lastModifiedTime"].toString(), changed, key)
+        } catch (_: UnsupportedOperationException) {
+            null
+        }
+    }
+
+    private fun read(): LinkedHashMap<String, Entry> {
+        return try {
+            val file = requireNotNull(directory).resolve("$slot.bin")
+            val bytes = Files.newInputStream(file).use { it.readNBytes(MAX_BYTES + 1) }
+            if (bytes.size !in CHECKSUM_BYTES..MAX_BYTES) return linkedMapOf()
+            val payload = bytes.copyOfRange(0, bytes.size - CHECKSUM_BYTES)
+            val checksum = bytes.copyOfRange(payload.size, bytes.size)
+            if (!MessageDigest.isEqual(checksum, MessageDigest.getInstance("SHA-256").digest(payload))) {
+                return linkedMapOf()
+            }
+            DataInputStream(ByteArrayInputStream(payload)).use { input ->
+                if (input.readInt() != FORMAT || input.readUTF() != identity) return linkedMapOf()
+                val count = input.readInt()
+                if (count !in 0..MAX_FILES) return linkedMapOf()
+                val saved = linkedMapOf<String, Entry>()
+                repeat(count) {
+                    val path = input.readUTF()
+                    val stamp = Stamp(input.readLong(), input.readUTF(), input.readUTF(), input.readUTF())
+                    val digest = input.readUTF()
+                    if (stamp.bytes < 0 || !digest.matches(SHA256)) return linkedMapOf()
+                    saved[path] = Entry(stamp, digest)
+                }
+                if (input.read() == -1) saved else linkedMapOf()
+            }
+        } catch (_: IOException) {
+            linkedMapOf()
+        }
+    }
+
+    private fun encode(): ByteArray? {
+        val buffer = ByteArrayOutputStream()
+        DataOutputStream(buffer).use { output ->
+            output.writeInt(FORMAT)
+            output.writeUTF(identity)
+            output.writeInt(entries.size)
+            for ((path, entry) in entries) {
+                output.writeUTF(path)
+                output.writeLong(entry.stamp.bytes)
+                output.writeUTF(entry.stamp.modified)
+                output.writeUTF(entry.stamp.changed)
+                output.writeUTF(entry.stamp.key)
+                output.writeUTF(entry.digest)
+                if (buffer.size() + CHECKSUM_BYTES > MAX_BYTES) return null
+            }
+        }
+        val payload = buffer.toByteArray()
+        return payload + MessageDigest.getInstance("SHA-256").digest(payload)
+    }
+
+    private data class Stamp(val bytes: Long, val modified: String, val changed: String, val key: String)
+    private data class Entry(val stamp: Stamp, val digest: String)
+
+    companion object {
+        fun directory(environment: Map<String, String> = System.getenv()): Path? =
+            environment["LAB_WORKSPACE_CACHE"]?.let { Path.of(it, "checksums-v1") }
+
+        private fun device(path: Path): Any? = try {
+            Files.getAttribute(path, "unix:dev", NOFOLLOW_LINKS)
+        } catch (_: IOException) {
+            null
+        } catch (_: UnsupportedOperationException) {
+            null
+        }
+
+        private fun fileHash(file: Path): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            Files.newInputStream(file).use { input ->
+                val buffer = ByteArray(65536)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                }
+            }
+            return HexFormat.of().formatHex(digest.digest())
+        }
+
+        // Closing any descriptor can release this process's POSIX record locks. Reserve before
+        // opening, including the interval between unlocking and closing the owning descriptor.
+        private val writers = ConcurrentHashMap.newKeySet<Path>()
+        private val SHA256 = Regex("[a-f0-9]{64}")
+        private const val FORMAT = 0x57435331
+        private const val SLOTS = 32
+        private const val MAX_FILES = 4096
+        private const val MAX_BYTES = 1024 * 1024
+        private const val CHECKSUM_BYTES = 32
+    }
+}

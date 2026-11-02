@@ -336,14 +336,25 @@ internal class LpEngine(
         val targetBytes = targets?.let {
             ROOT_PRIMAL_TARGET_HEADER_BYTES + (it.intColumns.size.toLong() + it.booleanColumns.size) * Int.SIZE_BYTES +
                 (if (it.coordinates === rounding?.primal) 0L else it.coordinates.size.toLong() * Double.SIZE_BYTES) +
-                (if (it.knownColumns === rounding?.knownColumns) 0L else it.knownColumns?.size?.toLong() ?: 0L)
+                (if (it.knownColumns === rounding?.knownColumns) 0L else it.knownColumns?.size?.toLong() ?: 0L) +
+                (it.components?.retainedBytes ?: 0L)
         } ?: 0L
         return roundingBytes + maskBytes + targetBytes + additionalBytes <= ROOT_PRIMAL_GUIDANCE_BYTES
     }
 
-    internal fun retainRootPrimalTargets(cancellation: Cancellation) {
-        val guide = rootRoundingWarmStart ?: return
-        val coordinates = guide.primal ?: return
+    internal fun rootComponentPreparationAllowed(targets: RootPrimalTargets, bytes: Long, minimumWork: Long): Boolean =
+        rootPrimalTargets === targets && rootGuidanceFits(bytes) && !lpWorkAllowanceSpent(minimumWork) &&
+            retainedRootCumulativeWork() >= minimumWork &&
+            SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalSolveOps) >= minimumWork
+
+    internal fun rootComponentPreparationWork(targets: RootPrimalTargets, bytes: Long): Long =
+        if (rootPrimalTargets !== targets || !rootGuidanceFits(bytes) || lpWorkAllowanceSpent(1L)) 0L
+        else minOf(retainedRootRemainingWork(),
+            SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalSolveOps))
+
+    internal fun retainRootPrimalTargets(cancellation: Cancellation): Boolean {
+        val guide = rootRoundingWarmStart ?: return false
+        val coordinates = guide.primal ?: return false
         val mapBytes = (guide.relaxation.intColOf.size.toLong() + guide.relaxation.boolColOf.size) * Int.SIZE_BYTES
         if (!params.lpPlan.branching || problem.numRealVars != 0 || guide.objective !== objective ||
             coordinates.size != guide.relaxation.model.n ||
@@ -351,12 +362,13 @@ internal class LpEngine(
             !retainedRootPrimalStateMatches(guide.relaxation) || cancellation() ||
             !rootGuidanceFits(ROOT_PRIMAL_TARGET_HEADER_BYTES + mapBytes) || lpWorkAllowanceSpent(1L) ||
             retainedRootRemainingWork() <= 1L
-        ) return
+        ) return false
         noteNodeOverhead(1L)
         // Transfer the private buffers; pinning state and basis remain owned by the rounding attempt.
         rootPrimalTargets = RootPrimalTargets(guide.relaxation.intColOf, guide.relaxation.boolColOf,
             coordinates, guide.knownColumns)
         sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "RETAINED", 0L)
+        return true
     }
 
     internal fun ownsRootPrimalModel(model: LpModel): Boolean = retainedRootEnabled &&

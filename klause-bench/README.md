@@ -197,6 +197,15 @@ on the lab worker, limiting method aggregation to 32 frames per sample and 100,0
 distinct methods. Capture truncation and the analysis depth limit are reported
 separately. Large captures must not be passed through profile arguments:
 the generated shell command is subject to the operating system's argument-size limit.
+Optional `events=true` also extracts the selected phase, IO, GC, CPU, compilation,
+contention and sampled-stack events into `harness-events.jsonl` on the worker,
+retaining the original recording scope in its header. Event timestamps establish
+order; file order need not be chronological. Recording thresholds and retention
+settings still apply. Event-type IDs, active settings and recording-loss/shutdown
+events are retained when present, so missing events need not be mistaken for disabled capture.
+The raw hash-checked capture and sampled summary survive
+event-extraction failure, with an error artifact and failed analysis result.
+Decoding and both analysis passes spend the containing case/job allowance; no solver runs.
 
 `param.ls-phase-times=true` also reports `lsObjectiveScoring.*`. `plain` and
 `functional` count the selected objective views; `maintained` counts index-preparation
@@ -469,6 +478,25 @@ uses 64 KiB reads. Both read the full plain source before the invocation timer, 
 they do not have identical IO call sizes.
 Native CLI and public-library adapters require cache staging.
 
+`harness-jfr=true` records the ordinary JVM CLI adapter's separate 512 MiB harness
+JVM into `report/harness.jfr`; the default is false. CLI `measurement` remains a
+separate control. The retained harness command and comparison controls identify
+the choice. Phase events cover input verification, preflight, model resolution,
+objective loading, source hashing, build provenance, source preparation, the CLI
+callback and cleanup. Pre-invocation phases stay outside the source allowance and
+inside the case/job ceilings. Recording work inside an invocation spends its
+unchanged allowance. An aborted preparation phase can include cleanup; nested
+phases and JVM events overlap and must not be added as disjoint costs.
+After harness exit, the outer adapter extracts selected phase, IO, GC, CPU,
+compilation, contention and sampled-stack events into `harness-events.jsonl` on
+the lab worker. Raw capture survives extraction failure with an error artifact.
+Profile thresholds, sampling, 32-frame extracts and the 128 MiB rolling recording
+limit can omit observations. IO call durations include scheduling and GC and do
+not identify device wait. Extraction and recording startup/dump costs remain in
+the containing case/job cost. Pair with `harness-jfr=false` at the same source,
+resource and allowance controls; an instrumented timing does not qualify a speedup.
+Native and public-library adapters reject this capture option.
+
 The planner accepts `selections`, a JSON-encoded list of independent selector maps,
 merged without duplicate catalog identities. Paired experiments use lab `configs`,
 `grid` and `repeats`: `ref` selects a revision and `param.<key>` overrides an adapter
@@ -556,7 +584,12 @@ See [MiniZinc setup](../klause-mzn-lib/README.md) for direct MiniZinc runs and t
 To reuse installed-build hashes across repeated bench processes, run
 `provenance out=/absolute/path/provenance.json` with the installed launcher and set
 `KLAUSE_BENCH_PROVENANCE` to that path. Regenerate it after rebuilding or restoring
-an installation. Without it, each process captures its own installed-build hashes.
+an installation. Ordinary lab processes also reuse per-file hashes in the existing
+private `LAB_WORKSPACE_CACHE`. Every use traverses its current input/provenance
+inventory and checks filesystem identity, inode, change time, modification time
+and size. Unsupported filesystems and unavailable receipts fall back to reading
+the bytes. The checksum cache uses at most 64 MiB including bounded replacement
+files; it adds no corpus, solver-result or MiniZinc identity-query cache.
 
 ## Weighted objective qualification
 

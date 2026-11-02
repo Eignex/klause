@@ -2,6 +2,7 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.profile.SourcePreparationCapture
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincCompatibility
@@ -86,12 +87,15 @@ internal object SolveMetric {
      *  raw solver output beside it, and return the record. A problem that fails to load gets a record too, its reason
      *  under `stats.unsupported` when klause declines the model and under `stats.loadError` otherwise. */
     fun solveOne(ref: ProblemRef, budget: Budget, settings: SolverInvocation.Settings, outDir: File): SolveRecord {
-        SolverInvocation.klauseCliDefect()?.let { error("the klause dist cannot solve: $it") }
+        SourcePreparationCapture.measure("cli-preflight") { SolverInvocation.klauseCliDefect() }
+            ?.let { error("the klause dist cannot solve: $it") }
         outDir.mkdirs()
         val timestamp = Instant.now().toString()
         val sha = Reports.readGitSha()
         val name = Reports.fileStem(ref.name)
-        val (rec, raw) = runCatching { Runners.resolve(ref, settings.exact) }.fold(
+        val (rec, raw) = runCatching {
+            SourcePreparationCapture.measure("model-resolve") { Runners.resolve(ref, settings.exact) }
+        }.fold(
             { entry ->
                 if (ref.format == Format.MINIZINC) {
                     settings.captureDirectory?.let { directory ->
@@ -181,14 +185,14 @@ internal object SolveMetric {
             SolverInvocation::run,
         modelOutput: (ProblemRef, String) -> String = MiniZincRunner()::modelOutput,
     ): Pair<SolveRecord, String?> {
-        val optimize = entry.objective != null
+        val optimize = SourcePreparationCapture.measure("model-objective") { entry.objective != null }
         val kind = if (optimize) "optimize" else "satisfy"
         var sourceHashes: Map<String, String> = emptyMap()
         var provenance: BuildProvenance? = null
         var compiler: MiniZincCompilerIdentity? = null
         return runCatching {
-            sourceHashes = SolveEvidence.sourceHashes(entry.ref)
-            provenance = installedBuild()
+            sourceHashes = SourcePreparationCapture.measure("source-hash") { SolveEvidence.sourceHashes(entry.ref) }
+            provenance = SourcePreparationCapture.measure("build-provenance") { installedBuild() }
             compiler = if (entry.ref.format == Format.MINIZINC) MiniZincCompatibility.compiler else null
             val r = invoke(entry, settings, budget, optimize)
             // A float model Klause solves on a grid is marked, so a reader knows its claims are approximations.

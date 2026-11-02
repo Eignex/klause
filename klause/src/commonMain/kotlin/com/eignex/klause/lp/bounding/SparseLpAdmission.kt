@@ -33,7 +33,7 @@ internal const val SPARSE_LP_MAX_FACTOR_WORK = 8_000_000L
 internal const val SPARSE_LP_CHECKING_ALLOCATION = 16L * 1024L * 1024L
 private const val MAX_DIMENSION = 65_536L
 private const val MAX_ENTRIES = 1_000_000L
-private const val MAX_PREPARATION_WORK = 8_000_000L
+internal const val SPARSE_LP_MAX_PREPARATION_WORK = 8_000_000L
 
 internal class SparseLpAdmission(val metrics: Map<String, Long>, val sourceLayout: LpRelaxation? = null) {
     val admitted: Boolean get() = metrics["Admitted"] == 1L
@@ -54,7 +54,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     var entries = 0L
     var inspected = 0L
     var assemblyWork = 0L
-    val preparationAllowance = minOf(MAX_PREPARATION_WORK, workAllowance.coerceAtLeast(0L))
+    val preparationAllowance = minOf(SPARSE_LP_MAX_PREPARATION_WORK, workAllowance.coerceAtLeast(0L))
     fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
         "PreparationWork" to maxOf(inspected, assemblyWork)))
     if ((problem as? BakedProblem)?.factorProjections?.builtInRelaxation == false) return decline("Projection")
@@ -188,7 +188,7 @@ internal fun estimateSparseLpAdmission(
     val decline = when {
         scalarBits > 128 -> "ScalarWidth"
         storage > SPARSE_LP_MAX_ALLOCATION -> "Storage"
-        preparationWork > MAX_PREPARATION_WORK -> "PreparationWork"
+        preparationWork > SPARSE_LP_MAX_PREPARATION_WORK -> "PreparationWork"
         else -> null
     }
     return SparseLpAdmission(buildMap {

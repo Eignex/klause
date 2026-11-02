@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.lp.lpBranchPick
 import com.eignex.klause.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.backtrack.lp.orderRootValues
+import com.eignex.klause.backtrack.lp.pickRootComponent
 import com.eignex.klause.backtrack.selector.IndomainBest
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
@@ -1178,6 +1179,7 @@ internal class ResumableMinimize(
             lpEngine.rootRoundingWarmStart = null
             return null
         }
+        if (handoffRootTargets(rootToken)) return null
         fun accept(proposal: Sample): Sample? {
             val started = TimeSource.Monotonic.markNow()
             var outcome = "FAILED"
@@ -1215,6 +1217,23 @@ internal class ResumableMinimize(
             accept = ::accept)
         if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
         return null
+    }
+
+    private fun handoffRootTargets(rootToken: Cancellation): Boolean {
+        val plan = lpEngine.params.lpPlan
+        if (!pausable || decisionLimit <= 0L || problem.numRealVars != 0 ||
+            !plan.branching || plan.lbTreeSearch || !lpEngine.retainedRootEnabled
+        ) return false
+        val pending = lpEngine.rootRoundingWarmStart ?: return false
+        if (pending.primal == null) {
+            lpEngine.retainRootPartialPrimalGuidance(pending.relaxation, rootToken)
+        }
+        if (!lpEngine.retainRootPrimalTargets(rootToken)) return false
+        rootRoundingPending = false
+        lpEngine.rootRoundingInterrupted = false
+        lpEngine.rootRoundingWarmStart = null
+        sink.lp.observePrimalPhase("PRIMAL_CP_GUIDANCE", "SEARCH_HANDOFF", 0L)
+        return true
     }
 
     private fun canResumeRootRounding(): Boolean {
@@ -1321,7 +1340,14 @@ internal class ResumableMinimize(
             lpEngine.clearRootPrimalTargets()
         }
 
-        override fun pick(session: PropagationSession): VarRef? = lpEngine.lpBranchPick(session, lpHints)
+        override fun pick(session: PropagationSession): VarRef? {
+            if (incumbents.current() == null) {
+                lpEngine.pickRootComponent(session, params.cancellation)?.let {
+                    return it
+                }
+            }
+            return lpEngine.lpBranchPick(session, lpHints)
+        }
 
         override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> {
             val rooted = lpEngine.orderRootValues(variable, values)
