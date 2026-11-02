@@ -367,6 +367,8 @@ class PropagationState private constructor(
     internal var integerRowLearning = false
     internal var integerTransientAdmitted = 0L
     internal var integerTransientConsumed = 0L
+    internal var integerCardinalityAdmitted = 0L
+    internal var integerCardinalityConsumed = 0L
     internal var factorAttribution: FactorAttribution? = null
     internal var historicalTableReasons = false
     internal var reasonPreflight = false

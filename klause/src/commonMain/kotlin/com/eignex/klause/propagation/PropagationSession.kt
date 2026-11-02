@@ -1395,8 +1395,13 @@ class PropagationSession private constructor(
             "learningIntegerTransientAdmitted" to it.integerTransientAdmitted,
             "learningIntegerTransientConsumed" to it.integerTransientConsumed,
         )
+        val cardinalityLifecycle = if (it.integerCardinalityAdmitted == 0L) emptyMap() else mapOf(
+            "learningIntegerCardinalityAdmitted" to it.integerCardinalityAdmitted,
+            "learningIntegerCardinalityConsumed" to it.integerCardinalityConsumed,
+        )
         if (it.integerRowLearning) {
-            counts + diagnostics + transientLifecycle + (attached?.integerCensus?.snapshot() ?: emptyMap()) +
+            counts + diagnostics + transientLifecycle + cardinalityLifecycle +
+                (attached?.integerCensus?.snapshot() ?: emptyMap()) +
                 ("learningIntegerSessions" to 1L)
         } else counts
     } ?: retiredLifecycle

@@ -223,6 +223,16 @@ Clauses attributed to another origin retain it and are not re-exported. PB and
 integer rows are not clause-portable. Shared component clauses remain session-local; source
 refutations import only into conditions that imply their recorded support.
 
+A native integer row with unit coefficients over closed binary model bounds uses
+cardinality propagation. Negative terms are complemented against those bounds;
+when the true-term count reaches its limit, all remaining terms are forced false.
+Above root, those pins share one immutable eager reason whose driving endpoints
+precede every pin in that sweep. Nonbinary or weighted rows retain general linear propagation, and
+conflicts retain the linear explanation owner. Qualification probes debit native
+work; watcher subscriptions, signed guards, original coordinates and retirement
+are shared with other integer rows. Admission and first consumption of this kernel
+have separate lifecycle counters.
+
 Retraction removes assignments, not admitted deductions. Learned units and objects
 whose implications retract are examined again after undo. Pending attachments survive
 earlier conflicts and cancellation. Suspension retains stores and pending attachment; cancellation
