@@ -209,7 +209,7 @@ class ResumableMinimizeTest {
         BacktrackSolver(problem).resumable(objective, params).use { search ->
             var firstRefreshes: Long? = null
 
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {
+            search.runSlice(Cancellation { firstRefreshes != null }, Long.MAX_VALUE, -1L) {
                 if (firstRefreshes == null) {
                     firstRefreshes = search.stats.lp.phases["PRIMAL_RESTART_GUIDANCE_ROOT"]
                         ?.outcomes?.get("RETAINED") ?: 0L
