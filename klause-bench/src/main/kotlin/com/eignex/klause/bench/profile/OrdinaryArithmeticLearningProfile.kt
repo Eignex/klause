@@ -58,7 +58,8 @@ internal object OrdinaryArithmeticLearningProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
             it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
-                "attribution", "recipe", "seed", "worker-seed", "route", "samples", "models", "learning-placement")
+                "attribution", "recipe", "seed", "worker-seed", "route", "samples", "models", "learning-placement",
+                "shared-node-limit")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -75,6 +76,10 @@ internal object OrdinaryArithmeticLearningProfile {
         val attribution = (options["attribution"] ?: "false").toBooleanStrict()
         val route = options["route"] ?: "single"
         require(route in setOf("single", "portfolio"))
+        require(options["shared-node-limit"] == null || route == "portfolio")
+        val sharedNodeLimit = (options["shared-node-limit"] ?: nodes.toString()).let { value ->
+            if (value == "unlimited") null else value.toLong().also { require(it in 1..100_000L) }
+        }
         val learningPlacement = options["learning-placement"] ?: "automatic"
         require(learningPlacement in setOf("automatic", "observed"))
         require(learningPlacement == "automatic" || route == "portfolio")
@@ -248,7 +253,7 @@ internal object OrdinaryArithmeticLearningProfile {
                         })
                         val scenario = PortfolioScenario.sequential(Kind.COP, EngineMix.BACKTRACK, seed).copy(
                             lpCeiling = if (lp == "auto") LpConfig.AGGRESSIVE else LpConfig.OFF,
-                            nodeBudget = NodeBudget(nodes),
+                            nodeBudget = sharedNodeLimit?.let(::NodeBudget),
                             btEdit = { originalParams ->
                                 val selected = if (learningPlacement == "observed") {
                                     originalParams.randomSeed == workerSeed
@@ -331,6 +336,7 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("targetRecipe", targetRecipe)
                     put("ignoredSessionAttachments", if (tracing) ignoredSessionAttachments else null)
                     put("maxDecisions", nodes)
+                    put("sharedNodeLimit", if (route == "portfolio") sharedNodeLimit else null)
                     put("timeoutMs", timeout)
                     put("traceMode", traceMode)
                     put("sampleRecording", if (samples) "$label.jfr" else null)
