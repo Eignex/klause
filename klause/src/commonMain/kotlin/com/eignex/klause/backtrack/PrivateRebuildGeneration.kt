@@ -14,6 +14,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.WorkMeter
 import kotlin.time.TimeSource
 
@@ -39,6 +40,7 @@ internal class PrivateRebuildGeneration private constructor(
     val parityReducedRows: Int,
     val parityReducedLiterals: Long,
     val parityCoveredClauses: Int,
+    val preferredFreeColumns: IntArray,
 ) {
     fun reconstruct(sample: Sample): Sample = mapping.reconstructFrom(problem, sample)
 
@@ -171,6 +173,9 @@ internal class PrivateRebuildGeneration private constructor(
             if (rowView) {
                 residual.addAll(checkNotNull(basis).materializeRows(cancellation) ?: return null)
             }
+            val preferred = if (rowView) {
+                checkNotNull(basis).preferredFreeCoordinates(cancellation) ?: return null
+            } else EmptyIntArray
             if (parity != null) {
                 cancellation.charge(source.numBoolVars * 16L)
                 if (cancellation()) return null
@@ -282,7 +287,7 @@ internal class PrivateRebuildGeneration private constructor(
                 neighborhood?.sourceFactors ?: 0, rebuild.steps.count { it is RebuildStep.CopyLiteral },
                 parity?.newPins ?: 0, affine?.rank ?: 0, affine?.freeColumns ?: 0,
                 if (rowView) checkNotNull(basis).rank else 0, rowLiterals ?: 0L,
-                if (rowView) checkNotNull(parity).coveredClauses else 0)
+                if (rowView) checkNotNull(parity).coveredClauses else 0, preferred)
         }
     }
 }

@@ -234,7 +234,7 @@ internal class PrivateRebuildParity private constructor(
 
             fun derive(onDecline: (String) -> Unit): Int? {
                 var pivot = 0
-                for (column in 0 until columns) {
+                for (column in columns - 1 downTo 0) {
                     if (!visit(1L)) return null
                     var selected = pivot
                     while (selected < masks.size) {
@@ -263,7 +263,7 @@ internal class PrivateRebuildParity private constructor(
                 for (row in pivot + 1 until masks.size) {
                     if (!visit(2L)) return false
                     if (!has(row, column)) continue
-                    for (word in (column ushr 6) until words) {
+                    for (word in 0..(column ushr 6)) {
                         if (!visit(3L)) return false
                         masks[row][word] = masks[row][word] xor masks[pivot][word]
                     }
@@ -279,12 +279,13 @@ internal class PrivateRebuildParity private constructor(
                     if (rhs[row] != 0) { onDecline("RefutationDeferred"); return null }
                 }
                 if (!visit(columns * 3L)) return null
-                val coordinates = IntArray(columns)
+                if (!visit(rank.toLong())) return null
+                val coordinates = IntArray(columns) { -1 }
+                for (row in 0 until rank) coordinates[pivotColumns[row]] = row
                 var free = 0
-                var pivot = 0
                 for (column in 0 until columns) {
-                    coordinates[column] = if (pivot < rank && pivotColumns[pivot] == column) pivot++
-                    else if (fixed[column] == null) -(++free) else Int.MIN_VALUE
+                    if (coordinates[column] >= 0) continue
+                    coordinates[column] = if (fixed[column] == null) -(++free) else Int.MIN_VALUE
                 }
                 val freeWords = (free + 63) ushr 6
                 if (!visit(rank * (freeWords + 1L))) return null
@@ -317,7 +318,7 @@ internal class PrivateRebuildParity private constructor(
                 coordinates: IntArray,
                 dependencies: Array<LongArray>,
             ): Boolean {
-                for (word in (pivot ushr 6) until words) {
+                for (word in 0..(pivot ushr 6)) {
                     if (!visit(2L)) return false
                     var bits = masks[row][word]
                     if (word == (pivot ushr 6)) bits = bits and (1L shl (pivot and 63)).inv()

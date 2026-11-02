@@ -299,6 +299,7 @@ internal class PrivateRebuildSatisfaction(
         note("ParityReducedRows", prepared.parityReducedRows.toLong())
         note("ParityReducedLiterals", prepared.parityReducedLiterals)
         note("ParityCoveredClauses", prepared.parityCoveredClauses.toLong())
+        note("ParityPreferredFreeColumns", prepared.preferredFreeColumns.size.toLong())
         note("AdmittedColumns", prepared.admittedColumns.toLong())
         note("ModeledPrivateBytes", prepared.modeledBytes + attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong())
         note("WarmClausesRetained", session.learnedClauseCount.toLong())
@@ -328,6 +329,8 @@ internal class PrivateRebuildSatisfaction(
         val privateParams = sharedParams.copy(
             privateRebuildWork = 0L, clauseExchange = null, cutExchange = null, pooledIncumbents = null,
             cancellation = containing or Cancellation { trialSpent() >= params.privateRebuildWork },
+            variableSelector = if (prepared.preferredFreeColumns.isEmpty()) sharedParams.variableSelector
+            else PrivateRebuildFreeSelector(prepared.preferredFreeColumns),
             onEvent = null, branchObserver = null, maxDecisions = params.maxDecisions.coerceAtMost(
                 (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L) / PROPAGATION_WORK_PER_NODE,
             ),

@@ -166,11 +166,11 @@ class PrivateRebuildSatisfactionTest {
     }
 
     @Test
-    fun `private consumer should publish a checked canonical witness and release its generation`() {
+    fun `root pins should open a checked private consumer and release its generation`() {
         for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(
                 Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
-                Clause(intArrayOf(4, 6)), Clause(intArrayOf(5, 7)),
+                Clause(intArrayOf(2, 4)), Clause(intArrayOf(3, 6)), Clause(intArrayOf(5, 7)),
             )).bake()
             var opens = 0
             var closes = 0
