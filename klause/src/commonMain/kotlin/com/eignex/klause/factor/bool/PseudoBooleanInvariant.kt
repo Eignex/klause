@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.internals.nonReifiedBoolUpdateBreakMakeLoop
 import com.eignex.klause.factor.bool.internals.pbDegree
 import com.eignex.klause.factor.bool.internals.pbDistance
 import com.eignex.klause.factor.bool.internals.pbHolds
+import com.eignex.klause.factor.bool.internals.signedFlipDelta
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
@@ -71,11 +72,8 @@ internal class PseudoBooleanInvariant(
         val sum = state.longPayload[factorId]
         if (pbHolds(sum, op, bound)) return
         val curDist = pbDistance(sum, op, bound)
-        for (i in literals.indices) {
-            val lit = literals[i]
-            val v = Lit.variable(lit)
-            val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
-            val change = if (isTrue) -weights[i] else weights[i]
+        for (v in boolVars) {
+            val change = signedFlipDelta(state, signedByVar, v, current = true)
             if (pbDistance(sum + change, op, bound) <= curDist) sink.addChannelingBoolFlip(state, v)
         }
     }
@@ -83,28 +81,27 @@ internal class PseudoBooleanInvariant(
     override fun proposeStructuredMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         if (literals.size < 2) return
         val sum = state.longPayload[factorId]
-        val trueByWeight = MutableLongObjectMap<IntArrayList>()
-        val falseByWeight = MutableLongObjectMap<IntArrayList>()
-        for (i in literals.indices) {
-            val lit = literals[i]
-            val v = Lit.variable(lit)
-            val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
-            val effW = if (Lit.isPositive(lit)) weights[i] else -weights[i]
-            val bucket = if (isTrue) trueByWeight else falseByWeight
-            bucket.getOrPut(effW) { IntArrayList() }.add(v)
+        val decreasingByWeight = MutableLongObjectMap<IntArrayList>()
+        val increasingByWeight = MutableLongObjectMap<IntArrayList>()
+        for (v in boolVars) {
+            val change = signedFlipDelta(state, signedByVar, v, current = true)
+            val decreasing = change < 0L || (change == 0L && state.assignment.boolValue(v))
+            val bucket = if (decreasing) decreasingByWeight else increasingByWeight
+            // The word kernel's activity-width check bounds every aggregate flip magnitude.
+            val weight = if (change < 0L) -change else change
+            bucket.getOrPut(weight) { IntArrayList() }.add(v)
         }
         var proposed = 0
-        trueByWeight.forEach { w, trueVars ->
+        decreasingByWeight.forEach { w, decreasingVars ->
             if (proposed < PAIR_PROPOSAL_CAP) {
-                val falseVars = falseByWeight[w]
-                if (falseVars != null) {
-                    for (i in 0 until trueVars.size) {
-                        for (j in 0 until falseVars.size) {
-                            if (trueVars[i] == falseVars[j]) continue
+                val increasingVars = increasingByWeight[w]
+                if (increasingVars != null) {
+                    for (i in 0 until decreasingVars.size) {
+                        for (j in 0 until increasingVars.size) {
                             sink.addCompound(
                                 listOf(
-                                    BoolFlip(trueVars[i]),
-                                    BoolFlip(falseVars[j]),
+                                    BoolFlip(decreasingVars[i]),
+                                    BoolFlip(increasingVars[j]),
                                 ),
                             )
                             proposed++
@@ -120,11 +117,8 @@ internal class PseudoBooleanInvariant(
             PbOp.EQ -> 0L
         }
         if (slack > 0L) {
-            for (i in literals.indices) {
-                val lit = literals[i]
-                val v = Lit.variable(lit)
-                val isTrue = Lit.evaluate(lit, state.assignment.boolValue(v))
-                val change = if (isTrue) -weights[i] else weights[i]
+            for (v in boolVars) {
+                val change = signedFlipDelta(state, signedByVar, v, current = true)
                 val newSum = sum + change
                 if (op == PbOp.LE && newSum <= bound) {
                     sink.addBoolFlip(v)

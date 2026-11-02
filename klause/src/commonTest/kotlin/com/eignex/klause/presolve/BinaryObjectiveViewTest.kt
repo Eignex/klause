@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
@@ -11,6 +12,9 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.localsearch.LocalSearchModel
+import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.portfolio.Kind
@@ -34,6 +38,7 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -116,6 +121,40 @@ class BinaryObjectiveViewTest {
             assertEquals(2L, rebuilt.ints[1])
             assertEquals(original.evaluateExact(rebuilt), objective.evaluateExact(sample))
         }
+    }
+
+    @Test
+    fun `mixed binary projection should retain feasible improving weighted swaps`() {
+        val domains = Array(6) { if (it == 5) IntDomain(0, 10) else IntDomain(0, 1) }
+        val source = Problem(1, 6, domains, listOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+            Linear(longArrayOf(2, -2, 3, 5, 7), intArrayOf(0, 1, 2, 3, 4), LinearOp.EQ, 5),
+        ))
+        val original = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0, 0, 1))
+        val prepared = PresolvePipeline.run(source, original, PresolveConfig.parse("off,+binary-columns"), false)
+        val objective = checkNotNull(prepared.objective)
+        val point = (0 until (1 shl prepared.problem.numBoolVars)).asSequence().map { mask ->
+            Sample(BooleanArray(prepared.problem.numBoolVars) { mask and (1 shl it) != 0 },
+                LongArray(prepared.problem.numIntVars))
+        }.single { prepared.reconstruct(it).ints.toList() == listOf(1L, 1L, 0L, 1L, 0L, 0L) }
+        val state = LocalSearchState(LocalSearchModel.open(prepared.problem), Random(0))
+        for (v in 0 until point.numBoolVars) state.assignment.setBool(v, point.boolValue(v))
+        for (v in 0 until point.numIntVars) state.assignment.setInt(v, point.intValue(v))
+        state.recompute()
+        assertEquals(0L, state.cost)
+        assertEquals(1L, objective.evaluateLong(state.assignment))
+        val factorId = prepared.problem.factors.indexOfFirst { it is PseudoBoolean }
+        assertTrue(factorId >= 0)
+        val sink = MoveSink()
+
+        state.factors[factorId].proposeStructuredMoves(state, factorId, sink)
+        state.apply(sink.list.single())
+        val restored = prepared.reconstruct(state.assignment.snapshot())
+
+        assertEquals(0L, state.cost)
+        assertEquals(listOf(0L, 0L, 0L, 1L, 0L, 0L), restored.ints.toList())
+        assertEquals(0L, original.evaluateLong(restored))
+        assertEquals(original.evaluateLong(restored), objective.evaluateLong(state.assignment))
     }
 
     @Test
