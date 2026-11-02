@@ -147,4 +147,48 @@ class GeneralWatchReclamationTest {
         assertEquals(true, session.boolValue(1))
     }
 
+    @Test
+    fun `an empty watch position index should release its retained capacity`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = false)
+        val baseline = session.explanationState.watches.pos.primitiveCapacityBytes
+        repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+        session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
+        val generation = session.learnedRetirementGeneration
+
+        repeat(128) {
+            val work = session.work
+            session.compactLearnedClauses(256L, 256L, { false }) { _, _ -> true }
+            assertTrue(session.work - work <= 256L)
+        }
+
+        assertEquals(0, session.explanationState.watches.pos.size)
+        assertEquals(baseline, session.explanationState.watches.pos.primitiveCapacityBytes)
+        assertEquals(generation, session.learnedRetirementGeneration)
+    }
+
+    @Test
+    fun `a larger grant should retry posting trims deferred by a completed scan`() {
+        val clause = Clause(intArrayOf(0, 2))
+        val session = PropagationSession(Problem(6, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = false)
+        repeat(1000) { session.addLearnedClause(clause, 2, permanent = true) }
+        repeat(64) { session.addLearnedClause(clause, 9) }
+        session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
+        repeat(160) { session.compactLearnedClauses(256L, 256L, { false }) { _, _ -> true } }
+        val state = session.explanationState
+        val before = state.watches.byLit[0].backingData.size
+        val generation = session.learnedRetirementGeneration
+
+        repeat(16) {
+            val work = session.work
+            session.compactLearnedClauses(8192L, 4096L, { false }) { _, _ -> true }
+            assertTrue(session.work - work <= 8192L)
+        }
+
+        assertTrue(state.watches.byLit[0].backingData.size < before)
+        assertEquals(1000, state.watches.byLit[0].backingData.size)
+        assertEquals(1000, state.watches.blockersByLit[0].backingData.size)
+        assertEquals(generation, session.learnedRetirementGeneration)
+    }
+
 }

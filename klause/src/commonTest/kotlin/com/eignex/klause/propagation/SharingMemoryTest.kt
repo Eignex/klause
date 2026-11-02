@@ -236,7 +236,7 @@ class SharingMemoryTest {
             val columns = listOf(state.learned.units, state.learned.pendingAttach, state.learned.capCandidates)
             var dependencies = columns.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES } +
                 state.watches.pos.primitiveCapacityBytes + state.learned.capRanking.primitiveBytes +
-                state.learned.store.primitiveBytes + 36L
+                state.learned.store.primitiveBytes + 52L
             for (literal in listOf(0, 2)) {
                 dependencies += (state.watches.byLit[literal].backingData.size.toLong() +
                     state.watches.blockersByLit[literal].backingData.size) * Int.SIZE_BYTES
@@ -249,7 +249,7 @@ class SharingMemoryTest {
                     sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, true)
                 }
                 state.learned.capRanking.sharingMemory(sample, true)
-                sample.owned(state.learned, 36L, true)
+                sample.owned(state.learned, 52L, true)
                 state.learned.store.sharingMemory(sample, true) { true }
                 sample.ownedReferences(state.refPayloadStore, state.refPayloadStore.size.toLong(), true)
                 sample.owned(state.watches.pos, state.watches.pos.primitiveCapacityBytes, true)

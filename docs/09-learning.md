@@ -267,7 +267,10 @@ learned handles. Retired Boolean and bound-atom postings are removed independent
 Boolean back-pointer deletion and swap-pop publication share one funded transaction.
 Watcher movement rewinds the current scan prefix. Small posting arrays trim within
 the same work and scratch limits. Posting and blocker arrays trim in separate funded
-transactions, so their combined copy need not fit one grant.
+transactions, so their combined copy need not fit one grant. An empty Boolean
+back-pointer index drops excess capacity in its own funded transaction. Deferred
+array trims retain their minimum grant requirements and retry when a later grant
+can fund them, independently of further logical retirements.
 Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,
 queues and event indexes, with a conservative envelope for indivisible publication.
 Cancellation or an oversized envelope defers without mutation; accepted publication

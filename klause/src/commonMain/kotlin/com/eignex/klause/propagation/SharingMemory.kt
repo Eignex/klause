@@ -178,8 +178,8 @@ private fun PropagationState.learnedSharingMemory(
     val columns = listOf(learned.units, learned.pendingAttach, learned.capCandidates)
     val protectedRows = protected.size > 0
     learned.capRanking.sharingMemory(sample, protectedRows)
-    var metadata = learned.capRanking.primitiveBytes + learned.store.primitiveBytes + 36L
-    sample.owned(learned, 36L, protectedRows)
+    var metadata = learned.capRanking.primitiveBytes + learned.store.primitiveBytes + 52L
+    sample.owned(learned, 52L, protectedRows)
     learned.store.sharingMemory(sample, protectedRows) { index ->
         learned.store[index, GeneralLearnedRows.PERMANENT] == 1 || sample.contains(protected, index)
     }

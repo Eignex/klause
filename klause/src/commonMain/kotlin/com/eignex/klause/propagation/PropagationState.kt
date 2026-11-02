@@ -483,6 +483,7 @@ class PropagationState private constructor(
             override fun add(index: Int, element: Any?) { refPayloadStore.add(index, element) }
             override fun removeAt(index: Int): Any? = refPayloadStore.removeAt(index)
             override fun set(index: Int, element: Any?): Any? {
+                if (index !in 0 until size) throw IndexOutOfBoundsException("factor payload $index outside $size")
                 if (element is SnapshottablePayload) {
                     snapshottableIndices.add(
                         index,

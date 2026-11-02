@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.util.EmptyIntArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -62,4 +63,15 @@ class GeneralLearnedRowsTest {
         assertEquals(16, rows[1, GeneralLearnedRows.STAGES])
         assertEquals(42L, rows.admission(1))
     }
+    @Test
+    fun `unadmitted payload slots should reject reads and writes`() {
+        val rows = GeneralLearnedRows()
+        val clause = ClausePropagator(intArrayOf(0, 1), EmptyIntArray, intArrayOf(0, 2))
+        rows.add(clause, 16, 2, false, -1, 1L)
+
+        assertFailsWith<IndexOutOfBoundsException> { rows.payload(1) }
+        assertFailsWith<IndexOutOfBoundsException> { rows.setPayload(1, intArrayOf(0, 1)) }
+        assertEquals(null, rows.payload(0))
+    }
+
 }

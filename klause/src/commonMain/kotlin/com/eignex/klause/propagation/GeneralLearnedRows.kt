@@ -72,9 +72,13 @@ internal class GeneralLearnedRows : AbstractList<LearnedPropagator>() {
             if (propagator === RetiredLearnedPropagator) null else propagator
     }
 
-    fun payload(index: Int): Any? = pages.getOrNull(index ushr PAGE_SHIFT)?.payloads?.getOrNull(index and PAGE_MASK)
+    fun payload(index: Int): Any? {
+        if (index !in 0 until size) throw IndexOutOfBoundsException("learned payload $index outside $size")
+        return pages.getOrNull(index ushr PAGE_SHIFT)?.payloads?.getOrNull(index and PAGE_MASK)
+    }
 
     fun setPayload(index: Int, value: Any?): Any? {
+        if (index !in 0 until size) throw IndexOutOfBoundsException("learned payload $index outside $size")
         val page = checkNotNull(pages[index ushr PAGE_SHIFT])
         val slot = index and PAGE_MASK
         val old = page.payloads[slot]
