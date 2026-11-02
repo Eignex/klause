@@ -35,7 +35,8 @@ internal class NativeMetadataContinuationTest {
                     val work = session.work
                     session.compactLearnedClauses(40L, 256L, { false }) { _, _ -> true }
                     assertTrue(session.work - work <= 40L)
-                    assertEquals(63L - released, session.learnedLifecycle().getValue("learnedMetadataPendingRows"))
+                    assertEquals((62L - released * 2L).coerceAtLeast(0L),
+                        session.learnedLifecycle().getValue("learnedMetadataPendingRows"))
                 }
                 val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 

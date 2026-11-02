@@ -162,7 +162,7 @@ internal class NativeSatState(private val state: PropagationState) {
             budget.advanced()
         }
         while (retiredMetadataHead >= 0) {
-            budget.visit(32L, 16L)
+            budget.visit(20L, 16L)
             budget.visit(0L)
             val index = retiredMetadataHead
             val next = metadata[index, NativeLearnedMetadata.SCAN]
@@ -175,6 +175,7 @@ internal class NativeSatState(private val state: PropagationState) {
     }
 
     private fun enqueueRetiredMetadata(index: Int) {
+        // Payload unlink, retirement counters and queue publication fit the 24-work row transaction.
         // Retired clauses do not resume literal scans, so the same slot links their release queue.
         metadata[index, NativeLearnedMetadata.SCAN] = -1
         if (retiredMetadataTail < 0) retiredMetadataHead = index
@@ -384,7 +385,7 @@ internal class NativeSatState(private val state: PropagationState) {
         state.learned.capRanking.sharingMemory(sample, protectedRows)
         val columns = listOf(learnedUnits, rechecks, capCandidates,
             state.learned.capCandidates)
-        var metadataBytes = 92L + capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
+        var metadataBytes = 64L + capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
             learnedPayloads.primitiveBytes + metadata.primitiveBytes
         metadata.sharingMemory(sample, protectedRows) { index ->
             metadata[index, NativeLearnedMetadata.PERMANENT] == 1 || sample.contains(protected, index)
@@ -430,6 +431,7 @@ internal class NativeSatState(private val state: PropagationState) {
             "learnedPayloadReferenceCapacity" to learnedPayloads.referenceCapacity,
             "learnedPayloadDirectoryCapacity" to learnedPayloads.directoryCapacity,
             "learnedMetadataCapacityBytes" to metadataBytes,
+            "learnedCleanupCursorCapacityBytes" to 28L,
             "learnedCapIndexStateBytes" to capRanking.modeledBytes + state.learned.capRanking.modeledBytes,
             "sessionWatchEntries" to watchPostings,
             "sessionWatchCapacityBytes" to watchBytes +
@@ -518,7 +520,7 @@ internal class NativeSatState(private val state: PropagationState) {
             if (!mayDrop(index)) return false
             val pinned = if (index == prepared) protected else capProtected(index, budget, 0L)
             if (pinned) return false
-            budget.visit(32L)
+            budget.visit(24L)
             budget.visit(0L)
             learnedPayloads.release(index)
             metadata[index, NativeLearnedMetadata.STAGES] = metadata[index, NativeLearnedMetadata.STAGES] or RETIRED
@@ -559,7 +561,7 @@ internal class NativeSatState(private val state: PropagationState) {
             metadata[index, NativeLearnedMetadata.BOOL_REASONS] > 0 ||
             metadata[index, NativeLearnedMetadata.STAGES] and 2 != 0
         ) return LearnedRetirementResult(LearnedRetirementStatus.ProtectedFloor)
-        budget.visit(48L)
+        budget.visit(40L)
         budget.visit(0L)
         learnedPayloads.release(index)
         metadata[index, NativeLearnedMetadata.STAGES] = metadata[index, NativeLearnedMetadata.STAGES] or RETIRED
