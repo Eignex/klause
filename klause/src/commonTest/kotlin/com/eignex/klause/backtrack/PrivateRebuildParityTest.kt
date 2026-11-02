@@ -71,7 +71,9 @@ class PrivateRebuildParityTest {
                         (factor as Clause).literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
                     }) {
                     points++
-                    assertTrue(captured.fixed.indices.all { captured.fixed[it] == null || captured.fixed[it] == point[it] })
+                    assertTrue(captured.fixed.indices.all {
+                        captured.fixed[it] == null || captured.fixed[it] == point[it]
+                    })
                 }
             }
             assertEquals(2, points)

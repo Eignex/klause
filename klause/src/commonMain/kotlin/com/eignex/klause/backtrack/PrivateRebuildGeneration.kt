@@ -75,8 +75,8 @@ internal class PrivateRebuildGeneration private constructor(
             // This admission model covers simultaneous primitive buffers and reference slots,
             // including admission, the BVE database, source copies, reconstruction and a fresh native worker.
             // Object headers, the retained canonical worker and allocator overhead are separate.
-            val bytes = entries * 512L + (if (learnedBinary == null) 0L else PrivateRebuildBinaryLearning.SCRATCH_BYTES) +
-                (parity?.modeledBytes ?: 0L)
+            val binaryBytes = if (learnedBinary == null) 0L else PrivateRebuildBinaryLearning.SCRATCH_BYTES
+            val bytes = entries * 512L + binaryBytes + (parity?.modeledBytes ?: 0L)
             if (bytes > byteLimit) {
                 onDecline("Memory")
                 return null
@@ -211,7 +211,8 @@ internal class PrivateRebuildGeneration private constructor(
             if (cancellation()) return null
             val reduced = when {
                 delta != null -> delta.materialize(cancellation) ?: return null
-                equivalences != null -> pinned.withSourcePassDelta(equivalences).takeUnless { cancellation() } ?: return null
+                equivalences != null -> pinned.withSourcePassDelta(equivalences)
+                    .takeUnless { cancellation() } ?: return null
                 else -> pinned
             }
             mapping = mapping.then(SourceMapping(pinned, reduced, guarantees, rebuild))
@@ -228,7 +229,8 @@ internal class PrivateRebuildGeneration private constructor(
             return PrivateRebuildGeneration(baked, mapping, privateBytes + warm.modeledBytes, rebuild.steps.size,
                 maxOf(entries * 4L, source.numBoolVars * 12L + descriptorWork), passStopped, admission?.candidates ?: 0,
                 warm, warmNanos, bakeWork, descriptorWork, reused, neighborhood?.indexedFactors ?: 0,
-                neighborhood?.sourceFactors ?: 0, rebuild.steps.count { it is RebuildStep.CopyLiteral }, parity?.newPins ?: 0)
+                neighborhood?.sourceFactors ?: 0, rebuild.steps.count { it is RebuildStep.CopyLiteral },
+                parity?.newPins ?: 0)
         }
     }
 }
