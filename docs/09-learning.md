@@ -262,6 +262,7 @@ whole slice repeatedly before search advances.
 An interrupted optional observation waits for ownership change before retrying; direct
 reclamation attempts remain retryable. Retired storage cleanup precedes observation
 and resumes while its funded cursor advances, even when ownership sampling is partial.
+Changed work, scratch or byte-limit settings renew the maintenance opportunity.
 An incomplete sample supplies no byte-limit or protected-floor total. Cancellation
 withholds further maintenance until ownership changes.
 `learned-memory-work` and `learned-memory-scratch-bytes` bound preparation and scratch.
@@ -525,6 +526,9 @@ Current or historical reasons can retain additional rows above the soft cap.
 Native post-undo replay protects its queued clause handles and learned units without
 freezing unrelated retirement. Incomplete trail propagation, conflicts and root
 publication still defer the window.
+An empty General integer-row cache detaches its obsolete event overflow index in a
+funded transaction. A surviving cache trims its reference array when the copy fits
+the work and scratch grant.
 General retirement replaces its payload with an inert stable-ID slot and releases
 its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
 aliases. Stable paged rows own policy, admission, propagator and mutable-payload
