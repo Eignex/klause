@@ -481,6 +481,9 @@ participate in the same recipe. At least one row has integer activity. Checked
 rounding uses the first source bound sides for remaining continuous coordinates.
 Each source row's coefficient snapshot is shared across its generation's pair
 attempts; each weighted combination owns a separate accumulator.
+Incidence indexing funds each lookup key and reference/list growth, reserving bucket
+storage when the bucket is created. Reused buckets retain their source-ordered lists.
+An interrupted index publishes no proposals.
 Rows wider than the support cap are skipped with incomplete coverage. The cached family retains at most 64
 proposals under 500,000 preparation work and 8 MiB modeled allocation, with
 per-attempt limits shared with explicit aggregation. Stopped or limited

@@ -105,11 +105,17 @@ internal object LinearAuthorityAggregateCuts {
                 for ((id, coefficient) in coefficients) {
                     meter.reserve(1L)
                     if (id.kind != SourceCoordinate.Kind.Real) continue
-                    meter.reserve(1L, 160L)
-                    incidence.getOrPut(id to (coefficient > BigFraction.ZERO)) { ArrayList() }.add(row)
+                    meter.reserve(1L, 64L)
+                    val side = id to (coefficient > BigFraction.ZERO)
+                    val bucket = incidence[side] ?: run {
+                        meter.reserve(1L, 160L)
+                        ArrayList<ProbeRow>().also { incidence[side] = it }
+                    }
+                    bucket.add(row)
+                    observe("AggregateIncidenceReferences", 1L)
                     if (coefficients.size == 1) {
                         meter.reserve(1L, 96L)
-                        bounds.getOrPut(id to (coefficient > BigFraction.ZERO)) { term }
+                        bounds.getOrPut(side) { term }
                     }
                 }
             }
