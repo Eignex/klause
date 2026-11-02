@@ -26,7 +26,8 @@ class CorpusSelectionTest {
                 CorpusSelection.applySelection(layout.discover(root), selection),
                 CorpusSelection.applySelection(layout.discover(paths), selection),
             )
-            assertEquals(layout.named(root, listOf("beta-1", "alpha-1")), layout.named(paths, listOf("beta-1", "alpha-1")))
+            val names = listOf("beta-1", "alpha-1")
+            assertEquals(layout.named(root, names), layout.named(paths, names))
         } finally {
             root.deleteRecursively()
         }

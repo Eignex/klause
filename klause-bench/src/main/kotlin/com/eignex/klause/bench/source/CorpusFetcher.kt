@@ -95,7 +95,11 @@ internal object CorpusFetcher {
     fun listing(collection: ExternalCollection): File = indexed(collection)?.root ?: ensure(collection)
 
     fun selectivePaths(collection: ExternalCollection): List<String>? =
-        if (collection.fetch is FetchMethod.SelectiveZip && indexed(collection) == null) selectiveZip(collection)?.paths else null
+        if (collection.fetch is FetchMethod.SelectiveZip && indexed(collection) == null) {
+            selectiveZip(collection)?.paths
+        } else {
+            null
+        }
 
     private fun selectiveZip(collection: ExternalCollection): CorpusZipCollection? {
         val method = collection.fetch as? FetchMethod.SelectiveZip ?: return null

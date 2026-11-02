@@ -211,7 +211,11 @@ internal object CorpusSelection {
         format: Format,
     ): List<ProblemRef> {
         val paths = CorpusFetcher.selectivePaths(collection)
-        val root = if (paths == null) CorpusFetcher.listing(collection) else File(CorpusFetcher.cacheRoot, collection.id)
+        val root = if (paths == null) {
+            CorpusFetcher.listing(collection)
+        } else {
+            File(CorpusFetcher.cacheRoot, collection.id)
+        }
         val discovered = if (paths == null) layout.named(root, names) else layout.named(paths, names)
         return references(collection, root, discovered, category, format, null)
     }
