@@ -1169,8 +1169,19 @@ selector's facts and configured integer-learning slots without starting search.
 Neighborhood probe work and a limited-probe flag distinguish budget exhaustion
 from a completed negative source-shape check.
 `applicability.jsonl` retains source hashes, preparation declines and policy facts.
-This is an in-process finite preparation view; confirm CLI applicability with actual
-ordinary session counters before claiming source or performance qualification.
+The default `preparation=finite` uses the in-process finite model.
+`preparation=source` captures original MPS declarations and runs the shared
+source pipeline with `dry-run-presolve`, stopping before search-worker construction.
+It bounds declared and working source columns at 4,096 and keeps the same source
+size and preparation-token limits. `recipe=lp-default` supplies the existing single
+LP-default controls; the default `recipe=automatic` uses automatic controls.
+These records identify their preparation path; confirm actual CLI worker admission
+and use before claiming source or performance qualification.
+Source mode uses library preparation allowances; match the CLI's separate presolve
+allowance when comparing preparation paths.
+For one retained input, use `problems=NAME sourceGzip64=BASE64 sha256=HEX`.
+The compressed input has a 96 KiB encoded bound and a 1 MiB decoded bound; its
+verified source bytes bypass corpus acquisition.
 Optional `problems=NAME,...` selects up to eight exact MPS names. `pairs=true`
 counts coefficient cancellation between unconditional unit-magnitude row directions,
 with 65,536 input terms and 1,048,576 pair visits. Completeness and unsupported
