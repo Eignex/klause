@@ -28,6 +28,7 @@ class GeneralIntegerReclamationTest {
         val floor = Clause(intArrayOf(8, 10))
         repeat(4000) { session.addLearnedClause(floor, 2, permanent = true) }
         val state = session.explanationState
+        assertNull(state.learned.integerRows)
         assertNotNull(state.intEvents.overflow)
         val generation = session.learnedRetirementGeneration
 

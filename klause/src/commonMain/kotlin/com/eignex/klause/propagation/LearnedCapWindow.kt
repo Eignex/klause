@@ -89,7 +89,11 @@ private fun PropagationState.generalCapPolicy(
         learned.retire(index, kind)
         factorAttribution?.retire(prop)
         if (prop is ClausePropagator) forgetDeferredClause(prop.literals)
-        if (prop is LearnedIntegerPropagator) checkNotNull(learned.integerRows).unlink(prop)
+        if (prop is LearnedIntegerPropagator) {
+            val rows = checkNotNull(learned.integerRows)
+            rows.unlink(prop)
+            if (rows.isEmpty()) learned.integerRows = null
+        }
         learned.store[index] = RetiredLearnedPropagator
         learned.store.setPayload(index, null)
         return true

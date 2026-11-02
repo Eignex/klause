@@ -320,7 +320,11 @@ internal fun PropagationState.forgetLearnedClauses(
     }
     work += learned.store.truncateTo(newCount)
     val refBase = problem.numFactors
-    learned.integerRows?.let { rows -> work += rows.trimmingWork; rows.trim() }
+    learned.integerRows?.let { rows ->
+        work += rows.trimmingWork + 1L
+        rows.trim()
+        if (rows.isEmpty()) learned.integerRows = null
+    }
 
     for (lit in watches.byLit.indices) {
         work++

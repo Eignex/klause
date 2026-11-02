@@ -357,7 +357,7 @@ without scanning other rows. The cache keeps its first 64 references together an
 uses bounded reference pages for its tail. Growth and trimming charge copied directory
 slots and the partial page; an empty tail releases its directory without copying
 retired references. Cache capacity, directory slots and position fields remain part of
-modeled ownership; removing the last row releases the cache backing array. Full
+modeled ownership; removing the last row releases the cache owner and its arrays. Full
 compaction rebuilds cache positions and remaps integer-event subscriptions even
 when no integer rows remain. The candidate cursor survives admissions and is
 rebuilt when full compaction renumbers the store. Lifecycle totals identify the

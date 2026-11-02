@@ -2,13 +2,13 @@ package com.eignex.klause.propagation
 
 internal fun PropagationState.sweepRetiredGeneralIntegerRows(budget: ReclamationPreparation) {
     if (incremental || nativeEngine != null) return
-    val rows = learned.integerRows ?: return
-    if (rows.size == 0 && intEvents.overflow != null) {
+    if (learned.integerRows.isNullOrEmpty() && intEvents.overflow != null) {
         budget.visit(16L)
         budget.visit(0L)
         intEvents.overflow = null
         budget.advanced()
     }
+    val rows = learned.integerRows ?: return
     val scratch = rows.trimmingScratchBytes
     if (rows.trimmingWork > 0L && budget.supports(rows.trimmingWork, scratch)) {
         budget.visit(rows.trimmingWork, scratch)
