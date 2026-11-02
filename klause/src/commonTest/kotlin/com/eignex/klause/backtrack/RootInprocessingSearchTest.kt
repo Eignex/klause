@@ -48,7 +48,12 @@ class RootInprocessingSearchTest {
     @Test
     fun `ordinary search should consume root probes without a restart schedule`() {
         for (native in listOf(false, true)) {
-            val configured = params(native).copy(lubyRestartBase = null, inprocessingInterval = 1L,
+            var observedNative: Boolean? = null
+            val exchange = object : ClauseExchange {
+                override fun onSearchStart(session: PropagationSession) { observedNative = session.usesNativeSat }
+                override fun onRestart(session: PropagationSession) = Unit
+            }
+            val configured = params(native, exchange).copy(lubyRestartBase = null, inprocessingInterval = 1L,
                 inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L,
                 rootRebuildCaptureVisits = 1024)
 
@@ -59,6 +64,11 @@ class RootInprocessingSearchTest {
             assertTrue(result.stats.search.learning.getValue("inprocessWorkTriggers") > 0L)
             assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
             assertTrue(result.stats.search.learning.getValue("inprocessRootRebuildComplete") > 0L)
+            assertEquals(native, observedNative)
+            assertEquals(if (native) 1L else 0L,
+                result.stats.search.learning["propagationNativeSatSessions"] ?: 0L)
+            assertEquals(if (native) 0L else 1L,
+                result.stats.search.learning["propagationGeneralSessions"] ?: 0L)
         }
     }
 
@@ -74,6 +84,10 @@ class RootInprocessingSearchTest {
             assertIs<SolveResult.Sat>(result)
             assertEquals(0.0, result.stats.search.restarts.sum)
             assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
+            assertEquals(if (native) 1L else 0L,
+                result.stats.search.learning["propagationNativeSatSessions"] ?: 0L)
+            assertEquals(if (native) 0L else 1L,
+                result.stats.search.learning["propagationGeneralSessions"] ?: 0L)
         }
     }
 
@@ -83,7 +97,7 @@ class RootInprocessingSearchTest {
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
             Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
         ))
-        val configured = BacktrackParams(nativeSat = false, variableSelector = InputOrder,
+        val configured = BacktrackParams(nativeSat = true, variableSelector = InputOrder,
             valueSelector = IndomainMax, rootProbeBatch = 4, inprocessingInterval = 1L,
             inprocessingWork = 4096L, inprocessingProbeWork = 512L)
 
@@ -91,6 +105,8 @@ class RootInprocessingSearchTest {
 
         assertIs<SolveResult.Sat>(result)
         assertTrue(result.stats.search.learning.getValue("inprocessProbeEndpointUnits") > 0L)
+        assertEquals(1L, result.stats.search.learning.getValue("propagationGeneralSessions"))
+        assertEquals(0L, result.stats.search.learning["propagationNativeSatSessions"] ?: 0L)
     }
 
     @Test
