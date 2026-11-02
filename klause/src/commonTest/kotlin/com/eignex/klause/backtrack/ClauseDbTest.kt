@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.ClauseTier
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.SearchEvent
@@ -17,6 +18,79 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ClauseDbTest {
+
+    @Test
+    fun `retired slots should not consume full cap survivor quotas`() {
+        for (native in listOf(false, true)) for (tiered in listOf(false, true)) {
+            val session = PropagationSession(chainProblem().bake(), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            for (lbd in listOf(3, 7, 8, 9, 10)) session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), lbd)
+            val capture = session.queueLearnedRetirement(0, session.learnedRetirementGeneration,
+                256L, 256L, 1024L) { false }
+            session.authorizeLearnedRetirement(assertNotNull(capture.handle), true, 256L, 256L) { false }
+            session.advanceLearnedRetirements(256L, 256L, { false }, publicationPending = false)
+
+            forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 3, tieredLearnedDb = tiered))
+
+            assertEquals(listOf(7, 8, 9), List(session.learnedClauseCount) { session.learnedClauseLbd(it) })
+        }
+    }
+
+    @Test
+    fun `full cap sweep events should count only newly retired rows`() {
+        for (native in listOf(false, true)) for (tiered in listOf(false, true)) {
+            val session = PropagationSession(chainProblem().bake(), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            for (lbd in listOf(3, 7, 8, 9, 10)) session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), lbd)
+            val capture = session.queueLearnedRetirement(0, session.learnedRetirementGeneration,
+                256L, 256L, 1024L) { false }
+            session.authorizeLearnedRetirement(assertNotNull(capture.handle), true, 256L, 256L) { false }
+            session.advanceLearnedRetirements(256L, 256L, { false }, publicationPending = false)
+            val events = ArrayList<SearchEvent>()
+
+            forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 3, tieredLearnedDb = tiered,
+                onEvent = { events.add(it) }))
+
+            assertEquals(listOf(SearchEvent.LearnedDbSweep(kept = 3, dropped = 1)), events)
+        }
+    }
+
+    @Test
+    fun `retired slot cleanup should preserve tier policy below the active limit`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(chainProblem().bake(), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            for (lbd in listOf(3, 7, 8, 9)) session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), lbd)
+            val capture = session.queueLearnedRetirement(0, session.learnedRetirementGeneration,
+                256L, 256L, 1024L) { false }
+            session.authorizeLearnedRetirement(assertNotNull(capture.handle), true, 256L, 256L) { false }
+            session.advanceLearnedRetirements(256L, 256L, { false }, publicationPending = false)
+            forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 3, tieredLearnedDb = true))
+
+            assertEquals(List(3) { ClauseTier.UNSET },
+                List(session.learnedClauseCount) { session.learnedClauseTier(it) })
+        }
+    }
+
+    @Test
+    fun `retired slot cleanup should respect the containing work grant`() {
+        for (native in listOf(false, true)) for (grant in listOf(0L, 1L, 10L)) {
+            val session = PropagationSession(chainProblem().bake(), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            for (lbd in listOf(3, 7, 8, 9)) session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), lbd)
+            val capture = session.queueLearnedRetirement(0, session.learnedRetirementGeneration,
+                256L, 256L, 1024L) { false }
+            session.authorizeLearnedRetirement(assertNotNull(capture.handle), true, 256L, 256L) { false }
+            session.advanceLearnedRetirements(256L, 256L, { false }, publicationPending = false)
+            val before = session.work
+
+            forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 3, tieredLearnedDb = true,
+                learnedMemoryWork = grant))
+
+            assertEquals(4, session.learnedClauseCount)
+            assertTrue(session.work - before <= grant)
+        }
+    }
 
     @Test
     fun `small cap grants should retain lower LBD and glue priorities`() {

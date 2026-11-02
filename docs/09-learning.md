@@ -474,7 +474,11 @@ diagnostic invocation; an incomplete trace cannot establish exhaustive applicabi
 
 Native forgetting runs at restart boundaries only with a configured cap. Permanent
 and glue clauses (default LBD at most 2) survive; remaining space favors lower LBD.
-The SAT preset enables capped tiered retention:
+Cap eligibility and survivor quotas use active constraints; stable retired slots do not
+consume the quota or count as newly retired in a sweep event. Below the active cap,
+retired-slot cleanup uses the containing work and scratch grant without aging tier policy.
+An unfunded cleanup remains retryable at later restarts. The SAT preset enables
+capped tiered retention:
 
 | Tier | Initial classification | Lifetime |
 |---|---|---|

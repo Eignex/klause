@@ -1117,10 +1117,24 @@ class PropagationSession private constructor(
     /** Request a bounded learned-store compaction, preserving permanent, live and historical reasons.
      * Cancelled or unfunded preparation leaves the generation intact. */
     fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
-        val before = learnedClauseCount
-        state.forgetLearnedClauses(cancelled = { cancelRequested }, keep = keep)
-        if (learnedClauseCount != before) learnedClauseRevision++
+        compactLearnedClauses(65_536L, 1_048_576L, { false }, keep)
     }
+
+    internal fun compactLearnedClauses(
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+        keep: (learnedIndex: Int, lbd: Int) -> Boolean,
+    ): Boolean {
+        val before = learnedClauseCount
+        val published = state.forgetLearnedClauses(maxWork, maxScratchBytes,
+            cancelled = { cancelRequested || cancelled() }, keep = keep)
+        if (learnedClauseCount != before) learnedClauseRevision++
+        return published
+    }
+
+    internal fun isLearnedConstraintActive(index: Int): Boolean =
+        state.nativeEngine?.let { !it.retiredOf(index) } ?: !state.learned.retiredOf(index)
 
     internal val activeLearnedClauseCount: Int
         get() = retainedState?.let { it.nativeEngine?.activeCount ?: it.learned.activeCount } ?: 0

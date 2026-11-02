@@ -20,10 +20,16 @@ internal fun forgetIfOverCap(
 ) {
     if (protectedPublication) return
     val cap = params.maxLearnedClauses ?: return
-    val learnedSize = session.learnedClauseCount
-    if (learnedSize <= cap) return
+    val learnedSize = session.activeLearnedClauseCount
+    if (learnedSize <= cap) {
+        if (session.learnedClauseCount > cap) {
+            session.compactLearnedClauses(params.learnedMemoryWork, params.learnedMemoryScratchBytes,
+                { params.cancellation() }) { _, _ -> true }
+        }
+        return
+    }
     val startWork = session.work
-    val prepared = prepareCapReduction(session, params, learnedSize, params.tieredLearnedDb)
+    val prepared = prepareCapReduction(session, params, session.learnedClauseCount, params.tieredLearnedDb)
     if (prepared == null) {
         forgetWindow(session, params, cap, startWork)
         return
@@ -39,7 +45,7 @@ internal fun forgetIfOverCap(
     session.forgetLearnedClauses { index, lbd ->
         lbd <= glueThreshold || session.learnedClausePermanent(index) || prepared.kept[index]
     }
-    val dropped = learnedSize - session.learnedClauseCount
+    val dropped = learnedSize - session.activeLearnedClauseCount
     if (dropped > 0) params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropped, dropped = dropped))
 }
 
@@ -55,9 +61,9 @@ private fun forgetTiered(
     if (!prepared.publishTiers()) return
     if (prepared.count > residual) {
         session.forgetLearnedClauses { index, _ -> prepared.kept[index] }
-        val retired = learnedSize - session.learnedClauseCount
+        val retired = learnedSize - session.activeLearnedClauseCount
         if (retired > 0) {
-            params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = session.learnedClauseCount, dropped = retired))
+            params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = session.activeLearnedClauseCount, dropped = retired))
         }
     }
 }
@@ -137,6 +143,7 @@ private class CapReductionPreparation(
     fun scan(tiered: Boolean): Boolean {
         for (index in candidates.indices) {
             if (!step()) return false
+            if (!session.isLearnedConstraintActive(index)) continue
             val lbd = session.learnedClauseLbd(index)
             if (!tiered) {
                 if (lbd > params.lbdGlueThreshold && !session.learnedClausePermanent(index)) add(index, lbd)
@@ -199,9 +206,10 @@ private class CapReductionPreparation(
 
     fun publishTiers(): Boolean {
         if (!step()) return false
-        session.chargeSharingWork(tiers.size.toLong() * 2L)
+        session.chargeSharingWork(tiers.size.toLong() * 3L)
         if (params.cancellation() || session.cancelRequested) return false
         for (index in tiers.indices) {
+            if (!session.isLearnedConstraintActive(index)) continue
             session.setLearnedClauseTier(index, ClauseTier.entries[tiers[index]])
             session.clearLearnedClauseUsed(index)
         }
