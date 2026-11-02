@@ -40,7 +40,7 @@ internal class PrivateRebuildParity private constructor(
             if (tableBytes > byteLimit) { onDecline("Memory"); return null }
             if (!funded(size * 3L)) return null
             onWorkspace(tableBytes)
-            val table = Cubes(size, funded)
+            val table = Cubes(size, funded, onDecline)
             if (!table.collect(source)) return null
             val rowCount = table.countRows() ?: return null
             if (rowCount == 0) { onDecline("NoRows"); return null }
@@ -63,7 +63,11 @@ internal class PrivateRebuildParity private constructor(
             return mask and pattern == pattern
         }
 
-        private class Cubes(size: Int, private val visit: (Long) -> Boolean) {
+        private class Cubes(
+            size: Int,
+            private val visit: (Long) -> Boolean,
+            private val onDecline: (String) -> Unit,
+        ) {
             private val keys = LongArray(size) { EMPTY }
             private val masks = IntArray(size)
             var entries = 0L
@@ -73,8 +77,8 @@ internal class PrivateRebuildParity private constructor(
                 entries = source.numBoolVars.toLong() + source.numFactors + 1L
                 for (factor in source.factors) {
                     if (!visit(2L)) return false
-                    val clause = factor as? Clause ?: return false
-                    val literals = clause.literals
+                    if (factor !is Clause) { onDecline("Scope"); return false }
+                    val literals = factor.literals
                     entries += literals.size
                     if (literals.size != 3) continue
                     if (!visit(24L)) return false
@@ -88,7 +92,7 @@ internal class PrivateRebuildParity private constructor(
                     val middle = Lit.variable(b)
                     val right = Lit.variable(c)
                     if (left == middle || middle == right) continue
-                    if (right >= source.numBoolVars) return false
+                    if (right >= source.numBoolVars) { onDecline("Scope"); return false }
                     val key = (left.toLong() shl (COLUMN_BITS * 2)) or
                         (middle.toLong() shl COLUMN_BITS) or right.toLong()
                     val forbidden = (if (Lit.isPositive(a)) 0 else 1) or

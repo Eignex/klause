@@ -41,6 +41,7 @@ internal class PrivateRebuildSatisfaction(
     private var pendingBinary: PrivateRebuildBinaryLearning? = null
     private var pendingParity: PrivateRebuildParity? = null
     private var parityAttempted = false
+    private var parityRootMark = -1
     private var parityUnavailable = false
     private var parityPeakBytes = 0L
     private val observations = LinkedHashMap<String, Long>()
@@ -137,6 +138,9 @@ internal class PrivateRebuildSatisfaction(
 
     private fun captureParity(session: PropagationSession): Boolean {
         if (parityUnavailable || params.privateRebuildWork - trialSpent() < 2L) return false
+        val mark = session.explanationState.undoTop
+        if (mark == parityRootMark) return false
+        parityRootMark = mark
         var spent = 0L
         val allowance = (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L)
         val start = TimeSource.Monotonic.markNow()
