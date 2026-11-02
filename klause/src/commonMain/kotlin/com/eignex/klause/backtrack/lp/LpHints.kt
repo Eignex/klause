@@ -206,7 +206,7 @@ internal class LpHints(
             return
         }
         observe("FINITE_BOUND_PREPARED")
-        val accepted = history.observeChild(value.toDouble())
+        val accepted = history.observeChild(value.toDouble(), retain = false)
         if (accepted) {
             charge(1L)
             observe("FINITE_BOUND_RECORDED")

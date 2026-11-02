@@ -76,7 +76,7 @@ internal class LpDirectionalHistory(
         observeChild(value)
     }
 
-    fun observeChild(value: Double): Boolean {
+    fun observeChild(value: Double, retain: Boolean = true): Boolean {
         val child = pending ?: return false
         charge(7L)
         pending = null
@@ -86,6 +86,10 @@ internal class LpDirectionalHistory(
             observe("UNUSABLE")
             observeDirection("UNUSABLE", child)
             return false
+        }
+        if (!retain) {
+            observe(if (child.up) "UP" else "DOWN")
+            return true
         }
         val history = gains.getOrPut(child.parent.variable, ::Gains)
         update(if (child.up) history.up else history.down, normalized)
