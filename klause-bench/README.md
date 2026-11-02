@@ -436,6 +436,11 @@ catalog discovery. Each accepted row retains all modes on its one worker attempt
 An optional `order` request selects `forward` or `reverse`; both retain the same
 source comparison identity. Child samples and JVM launcher output use separate
 files.
+`staging-target=cache|temporary` selects the corpus cache or JVM temporary directory
+for diagnostic staging. Cross this control with both mode orders in paired rows.
+Parent identity preparation uses the cache for either target; its cost and filesystem
+remain separate from the trial destination. Trial samples retain the selected path,
+and filesystem identities describe the actual source, control and staging stores.
 This manifest omits MiniZinc provisioning and supports compressed file-backed
 sources only.
 IO event extracts are written after all trials on the lab worker. They retain
