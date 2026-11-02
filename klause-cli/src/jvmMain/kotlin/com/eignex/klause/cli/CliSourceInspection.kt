@@ -64,7 +64,8 @@ object CliSourceInspection {
             after = { original, preparation ->
                 check(captured == null)
                 captured = Prepared(original, preparation, loaded.maximize, source.variables.size,
-                    source.variables.count { it.integer }, common.presolveBudget?.allowance, common.presolveBudget?.spent())
+                    source.variables.count { it.integer }, common.presolveBudget?.allowance,
+                    common.presolveBudget?.spent())
             },
         )
         SolveCore.solve(loaded, common, session.output(common).sourceQualified(common.sourceSemantics, "c"), observer)
