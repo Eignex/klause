@@ -133,7 +133,9 @@ bucket, and saturation is explicit. A one-event, one-word recorder bounds payloa
 capture while the census continues. Disabling attribution releases its recorder;
 an independently attached arithmetic trace retains its own lifetime. These counts
 describe attempted learning on the actual prepared model, without source authority
-or evidence of benefit.
+or evidence of benefit. Temporary-row diagnostics report their construction count,
+largest width and largest normalized coefficient magnitude, including after
+retirement; these observations do not count as learned-row admission or consumption.
 
 The controls preserve propagation order, containing cancellation, historical trail
 boundaries and reason authority. Eager support observations occur at reason delivery;
@@ -376,11 +378,19 @@ can supply views of at most 32 terms for cancellation into a retained row of at 
 identity checks, duplicate-coordinate validation, historical activity and coefficient
 lookups from 4,096 source-reference visits per analysis. Each visit charges native
 work; historical domain reconstruction retains its own work and cancellation checks. It retains only the most recent
-wide projection and oriented view, and its cancellation accumulator holds at most
-16 nonzero result terms. A compact conflicting seed retains its 16-term reason-source
+wide projection and oriented view. Cancellation accumulates at most 64 coordinates
+from its two bounded inputs, combines every repeated coordinate before testing
+width, and retains at most 32 terms in an unconditional temporary row. Temporary
+rows normalize by integer gcd and floor division and exist only inside the current
+analysis; they cannot enter the learned store or supply retained numeric reasons.
+Further historical endpoints may cancel them to a retained row of at most 16 terms.
+A guarded temporary result wider than 16 terms declines. The 4,096 source-reference
+visits fund all temporary-row visits and cancellation entries. A compact conflicting seed retains its 16-term reason-source
 limit; a wide conflicting seed enables wide sources throughout that analysis. This
 keeps wide-source preparation out of compact-seed analysis. Exhaustion retains
-clause fallback. Each combination must remain conflicting. A retained row must propagate against the session's historical domains at its first-UIP clause's native
+clause fallback. Compact pairs keep their compact resolver. Temporary steps count
+inside the same 16-combination allowance, and each result must remain conflicting.
+Only a compact result is tested for admission. A retained row must propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have
 been a member of its historical domain; a later carve cannot remove that earlier

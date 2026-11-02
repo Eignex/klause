@@ -43,6 +43,78 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `successive wide reasons should preserve the historical fallback assertion`() {
+        val variables = IntArray(18) { it }
+        val state = PropagationState(Problem(0, 18, Array(18) {
+            when (it) {
+                1 -> IntDomain(0, 12)
+                2 -> IntDomain(0, 40)
+                else -> IntDomain(0, 6)
+            }
+        }, arrayOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 3), LinearOp.LE, 0),
+            Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            Linear(IntArray(18) { if (it == 0) 2 else if (it == 2) -1 else 1 }, variables, LinearOp.LE, 0),
+        )), Assumptions.None)
+        state.undoLogging = true
+        state.integerRowLearning = true
+        assertTrue(state.setIntMaxAsDecision(2, 7))
+        val target = state.undo.size
+        state.integerLearningTrailAtLevel = { level -> if (level == 1) target else null }
+        assertTrue(state.setIntMinAsDecision(0, 2))
+        state.currentFactor = 0
+        assertTrue(state.factorAt(0).propagate(state, 0))
+        state.currentFactor = 1
+        assertTrue(state.factorAt(1).propagate(state, 1))
+        state.currentFactor = 2
+        assertFalse(state.factorAt(2).propagate(state, 2))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(state.conflictAnalyzer.analyze(2))
+
+        assertContentEquals(intArrayOf(0, 2) + IntArray(14) { it + 4 }, learned.row.variables)
+        assertContentEquals(longArrayOf(5, -1) + LongArray(14) { 1 }, learned.row.coefficients)
+        assertEquals(0L, learned.row.bound)
+        assertEquals(learned.fallbackClause.backjumpLevel, learned.backjumpLevel)
+        assertTrue(learned.row.assertsAt(state, target))
+    }
+
+    @Test
+    fun `a compact consequence after successive wide steps should assert in shared coordinates`() {
+        val variables = IntArray(18) { it }
+        val problem = Problem(0, 18, Array(18) {
+            when (it) {
+                1 -> IntDomain(0, 12)
+                2 -> IntDomain(0, 40)
+                else -> IntDomain(0, 6)
+            }
+        }, arrayOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 3), LinearOp.LE, 0),
+            Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            Linear(IntArray(18) { if (it == 0) 2 else if (it == 2) -1 else 1 }, variables, LinearOp.LE, 0),
+        ))
+        val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+            .apply { enableIntegerRowLearning() }
+        val cp = CpSearchComponent(native, IntArray(18) { it + 5 })
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(7, 7)))
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(5, 2)))
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+        assertEquals(1L, shared.intUpperBound(5))
+        assertTrue((native.learnedLifecycle()["learningIntegerConsumed"] ?: 0L) > 0L)
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerTransientCombinations"])
+        assertEquals(17L, native.learnedLifecycle()["learningIntegerTransientMaxTerms"])
+        val before = native.learnedLifecycle()
+        native.releaseRetainedState()
+        assertEquals(before, native.learnedLifecycle())
+    }
+
+
+    @Test
     fun `a compact conflict should preserve its compact pivot when a later wide reason is active`() {
         val latestVariables = intArrayOf(2, 3) + IntArray(15) { it + 4 }
         val state = PropagationState(Problem(0, 19, Array(19) {

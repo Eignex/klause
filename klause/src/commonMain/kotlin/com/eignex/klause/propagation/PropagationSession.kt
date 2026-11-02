@@ -1264,6 +1264,10 @@ class PropagationSession private constructor(
         val diagnostics = attached?.let { trace ->
             buildMap {
                 put("learningIntegerDiagnostics", 1L)
+                put("learningIntegerTransientCombinations", trace.transientCombinations)
+                put("learningIntegerTransientMaxTerms", trace.transientMaxTerms.toLong())
+                put("learningIntegerTransientMaxCoefficient", trace.transientMaxCoefficient)
+                put("learningIntegerTransientSaturated", if (trace.transientSaturated) 1L else 0L)
                 put("learningIntegerDiagnosticTruncated", if (trace.declineCensusTruncated) 1L else 0L)
                 put("learningIntegerDiagnosticSaturated", if (trace.declineCensusSaturated) 1L else 0L)
                 for ((kind, count) in trace.declineCensus) {

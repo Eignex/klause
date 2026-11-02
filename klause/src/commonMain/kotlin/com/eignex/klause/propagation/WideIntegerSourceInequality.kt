@@ -12,6 +12,10 @@ internal class IntegerSourceWork(
     private val state: PropagationState,
     private var remaining: Int = INTEGER_SOURCE_VISITS,
 ) {
+    fun recordTransient(row: IntegerLearningInequality) {
+        state.arithmeticLearningTrace?.recordTransient(row)
+    }
+
     fun visit() {
         if (remaining-- <= 0) throw IntegerSourceWorkLimit()
         state.checkFiniteWork()
@@ -67,19 +71,24 @@ internal fun IntegerLearningInequality.resolve(
     other: IntegerLearningInequality,
     variable: Int,
     work: IntegerSourceWork,
-): IntegerConflictRow? {
+): IntegerConflictRow? = combine(other, variable, work, allowTransient = false) as? IntegerConflictRow
+
+internal fun IntegerLearningInequality.resolveTransient(
+    other: IntegerLearningInequality,
+    variable: Int,
+    work: IntegerSourceWork,
+): IntegerLearningInequality? = combine(other, variable, work, allowTransient = true)
+
+private fun IntegerLearningInequality.combine(
+    other: IntegerLearningInequality,
+    variable: Int,
+    work: IntegerSourceWork,
+    allowTransient: Boolean,
+): IntegerLearningInequality? {
     if (this is IntegerConflictRow && other is IntegerConflictRow) return resolve(other, variable)
     if (guard != Lit.NONE && other.guard != Lit.NONE && guard != other.guard) return null
-    fun coefficient(row: IntegerLearningInequality, ref: Int): Long {
-        var value = 0L
-        for (index in row.variables.indices) {
-            work.visit()
-            if (row.variables[index] == ref) value = addExact(value, row.coefficients[index])
-        }
-        return value
-    }
-    val a = coefficient(this, variable)
-    val b = coefficient(other, variable)
+    val a = coefficient(variable)
+    val b = other.coefficient(variable)
     if (a == 0L || b == 0L || (a > 0L) == (b > 0L)) return null
     val divisor = IntegerConflictRow.gcd(IntegerConflictRow.magnitude(a), IntegerConflictRow.magnitude(b))
     val left = IntegerConflictRow.magnitude(b) / divisor
@@ -87,26 +96,19 @@ internal fun IntegerLearningInequality.resolve(
     val terms = mutableMapOf<Int, Long>()
     for (side in 0..1) {
         val row = if (side == 0) this else other
+        val multiplier = if (side == 0) left else right
         for (index in row.variables.indices) {
             work.visit()
             val ref = row.variables[index]
-            if (side == 1) {
-                var seen = false
-                for (previous in variables) {
-                    work.visit()
-                    if (previous == ref) {
-                        seen = true
-                        break
-                    }
-                }
-                if (seen) continue
-            }
-            val next = addExact(mulExact(coefficient(this, ref), left), mulExact(coefficient(other, ref), right))
-            if (next == 0L) continue
-            if (terms.size >= INTEGER_LEARNING_TERMS) return null
-            terms[ref] = next
+            val next = addExact(terms[ref] ?: 0L, mulExact(row.coefficients[index], multiplier))
+            if (next == 0L) terms.remove(ref) else terms[ref] = next
         }
     }
-    return IntegerConflictRow.normalized(terms, addExact(mulExact(bound, left), mulExact(other.bound, right)),
-        if (guard != Lit.NONE) guard else other.guard)
+    val limit = if (allowTransient) INTEGER_SOURCE_TERMS else INTEGER_LEARNING_TERMS
+    if (terms.isEmpty() || terms.size > limit) return null
+    val resultBound = addExact(mulExact(bound, left), mulExact(other.bound, right))
+    val resultGuard = if (guard != Lit.NONE) guard else other.guard
+    if (terms.size <= INTEGER_LEARNING_TERMS) return IntegerConflictRow.normalized(terms, resultBound, resultGuard)
+    if (resultGuard != Lit.NONE) return null
+    return TransientIntegerRow.normalized(terms, resultBound, work)?.also(work::recordTransient)
 }

@@ -35,6 +35,24 @@ internal class ArithmeticLearningTrace(
         for (index in declineNames.indices) put(declineNames[index], declineTotals[index])
         if (declineTotals.last() != 0L) put("other", declineTotals.last())
     }
+    var transientCombinations = 0L
+        private set
+    var transientMaxTerms = 0
+        private set
+    var transientMaxCoefficient = 0L
+        private set
+    var transientSaturated = false
+        private set
+    fun recordTransient(row: IntegerLearningInequality) {
+        if (!collectDeclines) return
+        if (transientCombinations == Long.MAX_VALUE) transientSaturated = true else transientCombinations++
+        transientMaxTerms = maxOf(transientMaxTerms, row.variables.size)
+        for (coefficient in row.coefficients) {
+            transientMaxCoefficient = maxOf(transientMaxCoefficient, IntegerConflictRow.magnitude(coefficient))
+        }
+        record("integer.transient", row.variables.size.toLong())
+    }
+
     var focusedIntegerId: Int? = null
         private set
     var discardedWindows = 0L

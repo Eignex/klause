@@ -10,10 +10,65 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
+    @Test
+    fun `successive wide cancellations should normalize to a compact integer consequence`() {
+        for (reverse in listOf(false, true)) {
+            val state = PropagationState(Problem(0, 18, Array(18) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+            val work = IntegerSourceWork(state)
+            val variables = IntArray(18) { it }.also { if (reverse) it.reverse() }
+            val source = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+                intArrayOf(), variables, LongArray(18) { 2 }, variables, LinearOp.LE, 5)), true, work))
+            val first = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+                longArrayOf(-2), intArrayOf(0), LinearOp.LE, 0), true))
+            val second = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(1),
+                longArrayOf(-1), intArrayOf(1), LinearOp.LE, 0), true))
+
+            val intermediate = requireNotNull(source.resolveTransient(first, 0, work))
+            val result = assertIs<IntegerConflictRow>(intermediate.resolveTransient(second, 1, work))
+
+            assertEquals(17, intermediate.variables.size)
+            assertFalse(intermediate is IntegerConflictRow)
+            assertEquals((2..17).toList(), result.variables.toList())
+            assertTrue(result.coefficients.all { it == 1L })
+            assertEquals(2L, result.bound)
+        }
+    }
+
+    @Test
+    fun `transient cancellation should reject more than thirty two final coordinates`() {
+        val state = PropagationState(Problem(0, 63, Array(63) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val work = IntegerSourceWork(state)
+        val leftVariables = IntArray(32) { it }
+        val rightVariables = intArrayOf(0) + IntArray(31) { it + 32 }
+        val left = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+            intArrayOf(), leftVariables, LongArray(32) { 1 }, leftVariables, LinearOp.LE, 0)), true, work))
+        val right = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+            intArrayOf(), rightVariables, LongArray(32) { if (it == 0) -1 else 1 }, rightVariables,
+            LinearOp.LE, 0)), true, work))
+
+        assertNull(left.resolveTransient(right, 0, work))
+    }
+
+    @Test
+    fun `transient cancellation should withhold a wide guarded consequence`() {
+        val state = PropagationState(Problem(1, 18, Array(18) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
+        val work = IntegerSourceWork(state)
+        val variables = IntArray(18) { it }
+        val guard = Lit.make(0, true)
+        val source = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
+            intArrayOf(), variables, LongArray(18) { 1 }, variables, LinearOp.LE, 5), guard), true, work))
+        val pivot = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(-1), intArrayOf(0), LinearOp.LE, 0), true, guard))
+
+        assertNull(source.resolveTransient(pivot, 0, work))
+    }
+
+
     @Test
     fun `wide original rows should cancel to a compact inequality in either source order`() {
         for (reverse in listOf(false, true)) {
@@ -76,9 +131,13 @@ class IntegerConflictRowTest {
         val right = requireNotNull(WideIntegerSourceInequality.create(IntegerSourceRow(LinearPropagator(
             intArrayOf(), rightVars, LongArray(20) { if (rightVars[it] < 12) -1 else 1 }, rightVars,
             LinearOp.LE, 10)), true, preparation))
-        val exhausted = IntegerSourceWork(state, remaining = 0)
+        for (transient in listOf(false, true)) {
+            val exhausted = IntegerSourceWork(state, remaining = 0)
 
-        assertFailsWith<IntegerSourceWorkLimit> { left.resolve(right, 0, exhausted) }
+            assertFailsWith<IntegerSourceWorkLimit> {
+                if (transient) left.resolveTransient(right, 0, exhausted) else left.resolve(right, 0, exhausted)
+            }
+        }
     }
 
     @Test
