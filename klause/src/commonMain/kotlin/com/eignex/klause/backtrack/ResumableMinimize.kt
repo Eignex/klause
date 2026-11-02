@@ -137,6 +137,7 @@ internal class ResumableMinimize(
     preparationBudget: SliceBudget? = null,
     private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack"),
     private val deferredInstallation: Boolean = false,
+    private val rootBasisGuidance: Boolean = true,
 ) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
@@ -327,7 +328,7 @@ internal class ResumableMinimize(
         if (params.lpPlan.branching) {
             LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
                 sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
-                rootBasis = params.lpDirectionalRootBasis)
+                rootBasis = rootBasisGuidance)
         } else null
 
     private lateinit var cp: CpSearchComponent
@@ -613,6 +614,7 @@ internal class ResumableMinimize(
             ownsWorkDebt = ownsWorkDebt,
             initialCandidate = sample,
             problem = root,
+            rootBasisGuidance = rootBasisGuidance,
         )
         try {
             if (freshParams.cancellation()) throw CancellationException("objective replacement cancelled")
@@ -1287,7 +1289,7 @@ internal class ResumableMinimize(
             lpHints?.order(variable, values) ?: values
 
         override fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> =
-            lpHints?.orderAlternatives(variable, alternatives, allowBasis = params.lpDirectionalRootBasis)
+            lpHints?.orderAlternatives(variable, alternatives, allowBasis = rootBasisGuidance)
                 ?: alternatives
     }
 
