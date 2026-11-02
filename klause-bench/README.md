@@ -1232,15 +1232,15 @@ Neighborhood probe work and a limited-probe flag distinguish budget exhaustion
 from a completed negative source-shape check.
 `applicability.jsonl` retains source hashes, preparation declines and policy facts.
 The default `preparation=finite` uses the in-process finite model.
-`preparation=source` captures original MPS declarations and runs the shared
-source pipeline with `dry-run-presolve`, stopping before search-worker construction.
+`preparation=source` calls the JVM CLI mode loader and dry-run solve path, stopping
+before search-worker construction. It retains the containing deadline across input
+work and the CLI shared routing/presolve work ledger and elapsed phase allowance.
+`presolveWorkAllowance` and `presolveWorkSpent` retain that ledger.
 It bounds declared and working source columns at 4,096 and keeps the same source
 size and preparation-token limits. `recipe=lp-default` supplies the existing single
 LP-default controls; the default `recipe=automatic` uses automatic controls.
 These records identify their preparation path; confirm actual CLI worker admission
 and use before claiming source or performance qualification.
-Source mode uses library preparation allowances; match the CLI's separate presolve
-allowance when comparing preparation paths.
 For one retained input, use `problems=NAME sourceGzip64=BASE64 sha256=HEX`.
 The compressed input has a 96 KiB encoded bound and a 1 MiB decoded bound; its
 verified source bytes bypass corpus acquisition.

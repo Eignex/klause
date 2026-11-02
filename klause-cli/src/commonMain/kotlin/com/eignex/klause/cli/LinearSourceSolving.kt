@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.LinearSourceConclusion
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
@@ -24,6 +25,7 @@ internal fun solveLinearSource(
     common: CommonOptions,
     output: OutputProtocol,
     publication: ArithmeticPublication,
+    onPrepared: ((Problem, FinitePipelinePreparation) -> Unit)? = null,
 ) {
     output.begin(solvable.optimize, solvable.maximize)
     var points = 0L
@@ -49,6 +51,7 @@ internal fun solveLinearSource(
     if (result is SourceExecutionResult.Finite) {
         when (val outcome = result.result.outcome) {
             FiniteSolveOutcome.PreparedOnly -> {
+                onPrepared?.invoke(controls.invocation.finiteShape().finiteProblem, result.result.preparation)
                 printFiniteLinearSourcePreparation(result.result.preparation.problem)
                 printPresolveDiagnostics(result.result.preparation.presolve)
                 return

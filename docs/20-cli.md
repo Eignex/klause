@@ -12,6 +12,12 @@ or newer; native executables need no JVM. Build commands live in the
 [repository README](../README.md#build), and runtime numerical options in
 [numerical dependencies](18-exact-arithmetic.md#runtime-support).
 
+The JVM source-inspection entry point captures completed finite MPS preparation
+through the same mode loader and dry-run solve path. It retains the caller's
+containing deadline and the CLI's shared routing and presolve allowance. Its observer
+requires a preparation-only finite request before execution and returns no search
+outcome or source verdict.
+
 ## Formats and dispatch
 
 | Format name | Extensions | Output |
