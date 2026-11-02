@@ -167,7 +167,8 @@ internal class LpPrimalContinuation private constructor(
                 root.model.n + root.model.m + root.circuitArcs.size
             var validationWork = 1L + problem.numFactors + problem.numIntVars * 2L + problem.numBoolVars
             var units = 64L + LpPrimalTemplates.minimumUnits(problem, root) +
-                problem.numIntVars * 3L + problem.numBoolVars + root.hullFactorIds.size +
+                problem.numIntVars * 19L + problem.numBoolVars + root.hullFactorIds.size +
+                root.model.n * 8L + root.circuitArcs.size * 8L +
                 root.gatedRows.size * 3L + root.realUpperRows.size * 32L +
                 (root.primalDefinition?.storageUnits ?: 0L)
             if (units > LpEmissionTemplates.MAX_UNITS ||
@@ -188,7 +189,7 @@ internal class LpPrimalContinuation private constructor(
                     val domain = if (part == 0) roots[variable] else live[variable]
                     val count = if (domain.holeCount == 0L) 0L else domain.valueCount
                     if (count > LpEmissionTemplates.MAX_UNITS) return null
-                    units += 8L + count * 3L
+                    units += count * 3L
                     validationWork += count * 3L
                     if (units > LpEmissionTemplates.MAX_UNITS ||
                         !LpPumpPreparation.hasAffordableShape(engine, root,
@@ -213,14 +214,14 @@ internal class LpPrimalContinuation private constructor(
             for (column in 0 until root.model.n) {
                 token.charge(1L)
                 token.checkLpAssembly()
-                units += 8L + (root.colReq[column]?.size ?: 0) +
+                units += (root.colReq[column]?.size ?: 0) +
                     (root.colPresence[column]?.storageUnits ?: 0L) * 32L
                 if (units > LpEmissionTemplates.MAX_UNITS) return null
             }
             for (arcs in root.circuitArcs) {
                 token.charge(1L)
                 token.checkLpAssembly()
-                units += 8L + arcs.tails.size + arcs.heads.size + arcs.cols.size
+                units += arcs.tails.size.toLong() + arcs.heads.size + arcs.cols.size
                 if (units > LpEmissionTemplates.MAX_UNITS) return null
             }
             token.checkLpAssembly()

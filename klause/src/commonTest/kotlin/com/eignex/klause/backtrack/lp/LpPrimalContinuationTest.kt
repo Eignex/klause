@@ -12,6 +12,8 @@ import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.LpEmissionTemplates
+import com.eignex.klause.lp.relaxation.LpPrimalTemplates
 import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.buildPrimalSource
@@ -233,15 +235,21 @@ class LpPrimalContinuationTest {
 
     @Test
     fun `oversized completed buffers should withhold continued provenance before copying domains`() {
-        for (largeMatrix in listOf(false, true)) {
+        for (oversized in listOf("matrix", "premises", "fixed-metadata")) {
             val original = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
                 .build(domains)
             val base = original.model
-            val rows = if (largeMatrix) 16_384 else base.m
+            val fixedUnits = 64L + LpPrimalTemplates.minimumUnits(problem, original) +
+                problem.numIntVars * 3L + problem.numBoolVars + original.hullFactorIds.size
+            val rows = when (oversized) {
+                "matrix" -> 16_384
+                "fixed-metadata" -> base.m + ((LpEmissionTemplates.MAX_UNITS - fixedUnits) / 16L).toInt()
+                else -> base.m
+            }
             val model = LpModel(
                 n = base.n,
                 m = rows,
-                csc = if (largeMatrix) Csc(
+                csc = if (oversized == "matrix") Csc(
                     IntArray(base.n + 1) { it * rows },
                     IntArray(base.n * rows) { it % rows },
                     LongArray(base.n * rows) { -1L },
@@ -255,7 +263,7 @@ class LpPrimalContinuationTest {
                 sense = base.sense,
                 tag = base.tag,
                 rowPremises = Array(rows) {
-                    if (!largeMatrix && it == 0) {
+                    if (oversized == "premises" && it == 0) {
                         LpRowPremises(IntArray(65_536), BooleanArray(65_536), LongArray(65_536))
                     } else null
                 },

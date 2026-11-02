@@ -252,8 +252,9 @@ values preserve interior holes; changed representations receive bounded, paid
 value comparison. Wide uncarved intervals need no enumeration. The storage
 ceiling includes the retained compact matrix, fixed mapping buffers, row premises,
 auxiliary column definitions,
-arc metadata and complete domain values. Inspection of nested metadata spends
-the current allowance and stops at the ceiling. Oversized definitions keep
+arc metadata and complete domain values. Fixed domain, column and arc storage is
+reserved before nested inspection or domain-reference copies. Inspection of nested
+metadata spends the current allowance and stops at the ceiling. Oversized definitions keep
 ordinary reconstruction. Canonical continuations detach build-specific source
 maps and shared preparation metadata before retention. The guard bounds
 validation work, retires on refusal or cancellation, and keeps no predecessor.
