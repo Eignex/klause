@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
+import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
@@ -11,15 +12,17 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
-import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -40,22 +43,19 @@ class ResumableMinimizeDirectionalTest {
         val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
         var completionAttempt = false
         val params = BacktrackParams(
-            variableSelector = InputOrder,
+            variableSelector = object : VariableSelector {
+                override fun fresh() = this
+                override fun pick(session: PropagationSession, rng: Random): VarRef? {
+                    completionAttempt = true
+                    return InputOrder.pick(session, rng)
+                }
+            },
             valueSelector = IndomainMin,
             randomSeed = 3L,
             maxDecisions = 1000L,
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L),
             lpDirectionalGains = true,
-            branchObserver = object : SearchBranchAttemptObserver {
-                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
-                    completionAttempt = when (decision) {
-                        is SearchDecision.IntAtMost -> decision.variable % 3 != 0
-                        is SearchDecision.IntAtLeast -> decision.variable % 3 != 0
-                        else -> false
-                    }
-                }
-            },
             componentFactory = { listOf(object : SearchComponent {
                 override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
                     if (!completionAttempt) return ComponentResult.Consistent
