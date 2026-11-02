@@ -529,8 +529,12 @@ resumably before whole-store preparation under
 the same grant. Sixteen-entry posting pages release at tail boundaries, and an empty
 posting list releases its directory. Posting mutations rewind an affected scan prefix;
 no learned handle or reason is remapped by this scan. A completed pass is reused until
-another learned retirement requires a scan. Policy columns and full generation
-remapping retain their separate funding requirements.
+another learned retirement requires a scan. Native policy and admission metadata occupy
+sixteen-row pages. A separate resumable pass releases retired slots and drops empty
+pages without remapping live handles; a protected row retains its page allocation.
+Appended rows enter the current scan or a later retirement epoch. Ownership observations
+retain unfinished pages and use a disjoint metadata pool rather than per-row scratch.
+Full generation remapping retains its separate funding requirement.
 Tier classification publishes within each funded row transaction. Arithmetic reason
 snapshots and native/general full physical compaction require their complete funding.
 

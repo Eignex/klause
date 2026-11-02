@@ -274,6 +274,7 @@ internal fun PropagationState.forgetLearnedClauses(
     val budget = ReclamationPreparation(maxWork, maxScratchBytes, cancelled) { work += it }
     val retained = try {
         nativeEngine?.sweepRetiredWatches(budget)
+        nativeEngine?.sweepRetiredMetadata(budget)
         sweepRetiredGeneralWatches(budget)
         prepareReclamation(budget, keep)
     } catch (_: ReclamationPreparation.Deferred) {
