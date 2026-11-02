@@ -3,6 +3,8 @@ package com.eignex.klause.simplex.basis
 import com.eignex.klause.util.SparseSlices
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
+import kotlin.math.abs
+import kotlin.math.sqrt
 
 // Dense values with unique sparse support. Explicit zeros stay stored until clear; arrays never escape.
 internal class IndexedVector(val size: Int) {
@@ -23,7 +25,27 @@ internal class IndexedVector(val size: Int) {
     fun dot(indices: IntArray, indexOffset: Int, source: DoubleArray, valueOffset: Int, count: Int): Double =
         koblas.sparseKernels.dot(indices, indexOffset, source, valueOffset, count, values)
 
-    fun nrm2(): Double = koblas.sparseKernels.nrm2(indices, 0, count, values)
+    fun nrm2(): Double {
+        if (count >= SCALAR_NORM_LIMIT) return koblas.sparseKernels.nrm2(indices, 0, count, values)
+        var squares = 0.0
+        for (k in 0 until count) {
+            val value = values[indices[k]]
+            squares += value * value
+        }
+        if (squares.isFinite() && squares >= MIN_NORMAL_SQUARE_SUM) return sqrt(squares)
+        var scale = 0.0
+        for (k in 0 until count) {
+            val magnitude = abs(values[indices[k]])
+            if (magnitude > scale) scale = magnitude
+        }
+        if (scale == 0.0 || scale.isInfinite()) return sqrt(squares)
+        var scaledSquares = 0.0
+        for (k in 0 until count) {
+            val value = values[indices[k]] / scale
+            scaledSquares += value * value
+        }
+        return scale * sqrt(scaledSquares)
+    }
 
     inline fun forEachStored(block: (Int, Double) -> Unit) {
         for (k in 0 until count) {
@@ -80,3 +102,6 @@ internal class IndexedVector(val size: Int) {
 
     fun toDoubleArray(): DoubleArray = gather(DoubleArray(size))
 }
+
+private const val SCALAR_NORM_LIMIT = 64
+private const val MIN_NORMAL_SQUARE_SUM = 2.2250738585072014e-308

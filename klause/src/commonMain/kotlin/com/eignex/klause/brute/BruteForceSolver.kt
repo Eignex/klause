@@ -1,5 +1,6 @@
 package com.eignex.klause.brute
 
+import com.eignex.klause.ir.IntSpan
 import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.BakedProblem
@@ -203,7 +204,8 @@ class BruteForceSolver(override val problem: BakedProblem) :
      *  assignment. Mixed-radix: each dim consumes its radix from the running quotient. */
     private fun applyChunkIndex(chunk: Chunk, idx: Long, state: LocalSearchState) {
         var remaining = idx
-        for (dim in chunk.dims) {
+        for (at in chunk.dims.indices) {
+            val dim = chunk.dims[at]
             val digit = (remaining % dim.radix).toInt()
             remaining /= dim.radix
             when (dim.kind) {
@@ -213,7 +215,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
                 // holey domains (e.g. {0,2}) must enumerate real members, never the hole.
                 DimKind.INT -> state.assignment.setInt(
                     dim.varId,
-                    problem.rootIntDomain(dim.varId).values.valueAt(digit),
+                    (dim.values ?: problem.rootIntDomain(dim.varId).values).valueAt(digit),
                 )
             }
         }
@@ -226,7 +228,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
     }
 
     private enum class DimKind { BOOL, INT }
-    private data class Dim(val kind: DimKind, val varId: Int, val radix: Long)
+    private data class Dim(val kind: DimKind, val varId: Int, val radix: Long, val values: IntSpan? = null)
     private data class Chunk(val dims: List<Dim>, val totalSize: Long)
 
     /** Factory and shared constants for [BruteForceSolver]. */
@@ -271,7 +273,8 @@ class BruteForceSolver(override val problem: BakedProblem) :
             val dims = ArrayList<Dim>(problem.numBoolVars + problem.numIntVars)
             for (b in 0 until problem.numBoolVars) dims.add(Dim(DimKind.BOOL, b, 2L))
             for (i in 0 until problem.numIntVars) {
-                dims.add(Dim(DimKind.INT, i, problem.rootIntDomain(i).valueCount))
+                val domain = problem.rootIntDomain(i)
+                dims.add(Dim(DimKind.INT, i, domain.valueCount, domain.spanOrNull()))
             }
             val chunks = ArrayList<Chunk>()
 

@@ -991,6 +991,11 @@ owns sparse and small dense elimination, DFS reach, Forrest-Tomlin updates, logi
 repair, indexed forward/transpose solves and rational factors. Each owner has fixed
 dimension, both permutations and three-valued update results.
 
+Indexed norms over fewer than 64 stored entries use storage-order scalar squares,
+with scaled recomputation for overflow and subnormal sums. Larger supports use the
+selected kernel backend. Norm evaluation retains IEEE classification and the
+caller's existing work charge.
+
 Basis scatter checks slice windows and disjoint input buffers before traversal,
 then combines index access and checked multiply/add in one pass. Slice arrays
 carry no cached validation: initial support is copied from validated CSC, while

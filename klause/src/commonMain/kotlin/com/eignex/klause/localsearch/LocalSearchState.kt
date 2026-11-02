@@ -468,7 +468,7 @@ class LocalSearchState private constructor(
     // The passes of [recompute] are separate methods: each loops over every factor or variable, and one body
     // holding them all is compiled again on-stack for each loop it enters.
     internal fun clearViolationState() {
-        for (i in 0 until problem.numFactors) violated.remove(i)
+        violated.clear()
         cost = 0L
         for (v in cachedBoolBreakCount.indices) {
             cachedBoolBreakCount[v] = 0

@@ -35,6 +35,8 @@ candidate's `deltaIf*` result must equal the exact degree change the move would
 cause; committed moves reconcile cost and violated membership from the exact
 post-move degrees. The immutable invariant projection is shared; mutable payloads,
 the assignment, weights and random state belong to each `LocalSearchState`.
+Full recomputation clears active violated membership directly before rebuilding
+factor payloads and degrees; absent factors need no removal scan.
 
 Regular retains its forward and backward accept-distance layers in the state's
 factor payload. Committed moves, probe restoration and reinitialization overwrite

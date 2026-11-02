@@ -66,6 +66,8 @@ the assignment space. Optimization certifies the optimum when the entire space i
 visited, including when its size exactly equals the assignment budget.
 The final chunk checks assignments directly within its permutation iterator; only
 feasible assignments retain owned snapshots, without a coroutine per candidate.
+Integer dimensions retain read-only enumerable domain views without copying their
+values. Chunk decoding uses indexed traversal without a per-assignment iterator.
 
 ### Source setup
 

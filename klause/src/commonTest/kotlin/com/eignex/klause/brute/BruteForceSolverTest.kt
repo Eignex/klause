@@ -1,5 +1,6 @@
 package com.eignex.klause.brute
 
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.propagation.bake
@@ -14,6 +15,15 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class BruteForceSolverTest {
+    @Test
+    fun `zero budget should decline an unenumerable domain without walking it`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, Int.MAX_VALUE.toLong())), emptyArray()).bake()
+
+        val result = BruteForceSolver(problem).solve(BruteForceParams(maxSteps = 0))
+
+        assertIs<SolveResult.Unknown>(result)
+    }
+
     @Test
     fun `minimize should distinguish a full assignment budget from a truncated walk`() {
         val solver = BruteForceSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
