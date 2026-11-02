@@ -5,6 +5,7 @@ import com.eignex.lab.bench.BenchProtocol
 import com.eignex.lab.bench.BenchRequest
 import kotlinx.serialization.encodeToString
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,18 +37,26 @@ class CorpusStagingAdapterTest {
         }
     }
 
-    @Test
-    fun `reversed controls retain the same frozen source comparison identity`() {
+    @ParameterizedTest
+    @CsvSource("forward, cache, 8", "reverse, cache, 64", "forward, temporary, 64", "reverse, temporary, 8")
+    fun `staging controls retain the same frozen source comparison identity`(
+        order: String,
+        target: String,
+        bufferKiB: Int,
+    ) {
         val input = FrozenStagingInput("offline", "tiny", "DIMACS", "offline/tiny.cnf.zst",
             "1".repeat(64), "2".repeat(64))
         val parameters = mapOf("inputs" to BenchProtocol.json.encodeToString(listOf(input)), "timeout-ms" to "10000")
 
-        val forward = CorpusStagingSuite.plan(BenchRequest(parameters + ("order" to "forward"))).single()
-        val reverse = CorpusStagingSuite.plan(BenchRequest(parameters + ("order" to "reverse"))).single()
+        val baseline = CorpusStagingSuite.plan(BenchRequest(parameters)).single()
+        val control = CorpusStagingSuite.plan(BenchRequest(parameters +
+            mapOf("order" to order, "staging-target" to target, "staging-buffer-kib" to bufferKiB.toString()))).single()
 
-        assertEquals(forward.inputs, reverse.inputs)
-        assertEquals(forward.attributes["comparisonKey"], reverse.attributes["comparisonKey"])
-        assertEquals("forward", forward.parameters["order"])
-        assertEquals("reverse", reverse.parameters["order"])
+        assertEquals(baseline.inputs, control.inputs)
+        assertEquals(baseline.attributes["comparisonKey"], control.attributes["comparisonKey"])
+        assertEquals(baseline.parameters["timeout-ms"], control.parameters["timeout-ms"])
+        assertEquals(order, control.parameters["order"])
+        assertEquals(target, control.parameters["staging-target"])
+        assertEquals(bufferKiB.toString(), control.parameters["staging-buffer-kib"])
     }
 }

@@ -180,7 +180,9 @@ private fun PropagationState.learnedSharingMemory(
         learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)
     val protectedRows = protected.size > 0
     learned.capRanking.sharingMemory(sample, protectedRows)
-    var metadata = learned.capRanking.primitiveBytes + learned.admissions.allocatedBytes + Int.SIZE_BYTES
+    var metadata = learned.capRanking.primitiveBytes + learned.admissions.allocatedBytes + Int.SIZE_BYTES +
+        4L * Int.SIZE_BYTES
+    sample.owned(learned, 4L * Int.SIZE_BYTES, protectedRows)
     sample.owned(learned.admissions, learned.admissions.allocatedBytes + Int.SIZE_BYTES, protectedRows)
     sample.ownedReferences(learned.admissions, 1L, protectedRows)
     for (column in columns) {

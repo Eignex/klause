@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.VariableSelector
@@ -15,6 +16,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
@@ -27,10 +30,12 @@ import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveCursor
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.engine.ResumableLpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
@@ -45,7 +50,9 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.PreparingSearchComponent
+import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
@@ -186,6 +193,159 @@ internal object FiniteCutoffKnapsackFixture {
 
 class ResumableMinimizeTest {
     @Test
+    fun `ordinary search backtracks from root value targets without another node lp query`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(2, 2, 3))
+        for (branching in listOf(false, true)) {
+            val attempts = mutableListOf<SearchDecision>()
+            val offers = mutableListOf<Double>()
+            val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
+                phaseSaving = false, targetPhasing = false, solutionPhasing = false,
+                lpPlan = LpPlan(bounding = true, probe = true, branching = branching,
+                    componentOwnership = true, rootCutHarvest = false, boundMaxDepth = -1),
+                branchObserver = object : SearchBranchAttemptObserver {
+                    override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                        attempts.add(decision)
+                    }
+                })
+
+            BacktrackSolver(problem).resumable(objective, params).use { search ->
+                search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { offers.add(it.objective) }
+
+                val expected = if (branching) SearchDecision.IntAtMost(0, 0L)
+                    else SearchDecision.IntAtLeast(0, 1L)
+                assertEquals(expected, attempts.first())
+                assertEquals(listOf(5.0, 4.0), offers)
+                val guidance = search.stats.lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]?.outcomes
+                assertEquals(if (branching) 1L else null, guidance?.get("VALUE_ORDER_OFFERED"))
+                assertEquals(0.0, search.stats.lp.nodePasses.sum)
+                if (branching) {
+                    assertNull(search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"])
+                    assertEquals(1L, search.stats.lp.phases["PRIMAL_CP_GUIDANCE_ROOT"]
+                        ?.outcomes?.get("SEARCH_HANDOFF"))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `returned child targets reach complete search without another root query`() {
+        val problem = Problem(0, 7, Array(7) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(3, 4), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(5, 6), LinearOp.GE, 1),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1, 2, 1, 2))
+        var queries = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate {
+                    private var charged = 0L
+                    override val lastMetrics: LpSolveMetrics get() =
+                        delegate.lastMetrics.copy(workOps = delegate.lastMetrics.workOps + charged)
+
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(LpFloatAllowance(allowance?.work ?: 0L, 1)).also {
+                            if (++queries == 3) charged = 5_000L * LP_WORK_PER_NODE
+                        }
+                }
+            }
+        }
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false, boundMaxDepth = -1))
+        val offered = ArrayList<Sample>()
+        val stopAtWitness = Cancellation { offered.isNotEmpty() }
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+            search.runSlice(stopAtWitness, Long.MAX_VALUE, 5_000L) { offered += it.sample }
+            assertTrue(offered.isEmpty())
+            assertEquals(3, queries)
+
+            search.runSlice(stopAtWitness, Long.MAX_VALUE, 100_000L) { offered += it.sample }
+
+            val sample = offered.single()
+            assertTrue(sample.ints.all { it in 0L..1L } &&
+                listOf(0 to 1, 1 to 2, 0 to 2, 3 to 4, 5 to 6).all { (left, right) ->
+                    sample.ints[left] + sample.ints[right] >= 1L
+                })
+            assertEquals(3, queries)
+            assertEquals(0.0, search.stats.lp.nodePasses.sum)
+            assertNull(search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"])
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_CP_GUIDANCE_ROOT"]
+                ?.outcomes?.get("SEARCH_HANDOFF"))
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]
+                ?.outcomes?.get("VALUE_ORDER_OFFERED"))
+        }
+    }
+
+    @Test
+    fun `paused root queries finish before the worker starts discrete traversal`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        var constructions = 0
+        var queries = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                constructions++
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate, ResumableLpSolver {
+                    private var pausedWork = 0L
+                    override val currentWork: Long get() = pausedWork + delegate.lastMetrics.workOps
+                    override val lastMetrics: LpSolveMetrics get() =
+                        delegate.lastMetrics.copy(workOps = currentWork)
+                    override fun openSolve(
+                        allowance: LpFloatAllowance?, retainFundingStop: Boolean,
+                    ): LpSolveCursor<FloatLpResult?> = LpSolveCursor {
+                        queries++
+                        repeat(2) {
+                            pausedWork += 5_000L * LP_WORK_PER_NODE
+                            pauseAt(pausedWork)
+                        }
+                        delegate.resolveBounds(allowance)
+                    }
+                }
+            }
+        }
+        val params = BacktrackParams(maxDecisions = 0L,
+            lpConfig = LpConfig.parse("default,+sparse-trial"),
+            lpPlan = LpPlan(rootCutHarvest = false))
+        val offered = ArrayList<Sample>()
+        val stopAtWitness = Cancellation { offered.isNotEmpty() }
+        val accept: (MinimizeResult.WithSample) -> Unit = {
+            assertEquals(1, queries)
+            assertEquals(1, constructions)
+            offered += it.sample
+        }
+
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+            search.runSlice(stopAtWitness, Long.MAX_VALUE, 5_000L, accept)
+            search.runSlice(stopAtWitness, Long.MAX_VALUE, 100_000L, accept)
+            search.runSlice(stopAtWitness, Long.MAX_VALUE, 100_000L, accept)
+        }
+
+        assertEquals(listOf(1L, 0L), offered.single().ints.toList())
+        assertEquals(1, queries)
+        assertEquals(1, constructions)
+    }
+
+    @Test
     fun `sliced root rounding should resume only while its LP allowance remains`() {
         val charged = 5_000L * LP_WORK_PER_NODE
         for (allowance in listOf(charged, 2L * charged)) {
@@ -233,6 +393,8 @@ class ResumableMinimizeTest {
 
             BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
                 search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5_000L) { offered += it.sample }
+                val outcome = if (allowance > charged) "PENDING" else "ROOT_WORK_SPENT"
+                assertEquals(1L, search.stats.lp.phases.getValue("PRIMAL_CONTINUATION_ROOT").outcomes[outcome])
                 search.runSlice(Cancellation.Never, Long.MAX_VALUE, 100_000L) { offered += it.sample }
             }
 
@@ -744,6 +906,21 @@ class ResumableMinimizeTest {
         )
 
         assertIs<MinimizeResult.Unknown>(result)
+    }
+
+    @Test
+    fun `one-shot root layout cancellation publishes an unknown terminal`() {
+        val fixture = FiniteCutoffKnapsackFixture
+        var cancelled = false
+        val params = fixture.params.copy(
+            cancellation = Cancellation { cancelled },
+            clauseExchange = onSearchStart { cancelled = true },
+            lpPlan = fixture.params.lpPlan.copy(componentOwnership = true),
+        )
+
+        val results = BacktrackSolver(fixture.problem).improvements(fixture.objective, params).toList()
+
+        assertIs<MinimizeResult.Unknown>(results.single())
     }
 
     @Test

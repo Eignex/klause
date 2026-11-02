@@ -2,6 +2,7 @@ package com.eignex.klause.util
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -98,4 +99,52 @@ class MutableLongIntMapTest {
         assertEquals(1000, m.size)
         for (k in 0L until 1000L) assertEquals(k.toInt(), m.getOrDefault(k * 7L, -1))
     }
+    @Test
+    fun `funded removal should preserve an updated mapping across collisions`() {
+        for (removed in 0L until 50L) {
+            val map = MutableLongIntMap(4)
+            for (key in 0L until 50L) map.put(key, key.toInt())
+            val updated = (removed + 1L) % 50L
+
+            assertTrue(map.removeAndUpdate(removed, updated, 123, {}, {}))
+
+            assertEquals(49, map.size)
+            assertFalse(map.containsKey(removed))
+            for (key in 0L until 50L) if (key != removed) {
+                assertEquals(if (key == updated) 123 else key.toInt(), map.getOrDefault(key, -1))
+            }
+        }
+    }
+
+    @Test
+    fun `interrupted funded removal should preserve all mappings`() {
+        for (stopAt in listOf(1L, 20L, 40L, Long.MAX_VALUE)) {
+            val map = MutableLongIntMap(4)
+            for (key in 0L until 50L) map.put(key, key.toInt())
+            var work = 0L
+
+            assertFailsWith<IllegalStateException> {
+                map.removeAndUpdate(0L, 49L, 123, {
+                    work += it
+                    if (work >= stopAt) error("interrupted")
+                }, { error("interrupted") })
+            }
+
+            assertEquals(50, map.size)
+            for (key in 0L until 50L) assertEquals(key.toInt(), map.getOrDefault(key, -1))
+        }
+    }
+
+    @Test
+    fun `an absent update key should leave the removal uncommitted`() {
+        val map = MutableLongIntMap()
+        map.put(1L, 10)
+
+        val committed = map.removeAndUpdate(1L, 2L, 20, {}, {})
+
+        assertFalse(committed)
+        assertEquals(1, map.size)
+        assertEquals(10, map.getOrDefault(1L, -1))
+    }
+
 }

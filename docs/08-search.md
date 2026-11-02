@@ -115,6 +115,17 @@ accepted peers receive no duplicate delivery. Retraction discards queued deliver
 with their abandoned trail state, and pending recipient cursors remain protected
 modeled ownership.
 
+Minimization retains its first-run position while a private LP root layout prepares
+across slices. Paid construction stays in the worker's cumulative work, and a pause
+starts neither numerical consultation nor tree traversal. Incumbent revalidation
+precedes that work. The search and its preparation wrapper report an unfinished root
+layout as pending private preparation. Construction completion, cancellation and retirement follow the
+[LP ownership contract](17-linear-programming.md#root-preparation).
+Eligible retained LP root coordinates can pass directly to the ordinary finite
+traversal as value preferences. Its existing backtracking completes the assignment,
+and complete source checks retain publication authority. This transfer carries no
+LP point, bound or proof authority into a leaf.
+
 Numerical frontier traversal orders alternatives by inherited checked objective
 bounds, visiting unbounded alternatives first. It keeps both children of every
 split, including unresolved leaves. Improved checked incumbents reawaken those

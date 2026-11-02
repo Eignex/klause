@@ -30,6 +30,10 @@ internal class LearnedClauseDb(
     internal var permanentArithmeticCount = 0
     internal var nonClauseCount = 0
     internal var retiredCount = 0
+    internal var watchCleanupLiteral = 0
+    internal var watchCleanupIndex = 0
+    internal var sweptRetirements = 0
+    internal var sweepingRetirements = -1
     internal var capCalls = 0L
     internal var capWork = 0L
     internal var capVisits = 0L
@@ -108,6 +112,10 @@ internal class LearnedClauseDb(
         permanentArithmeticCount = 0
         nonClauseCount = 0
         retiredCount = 0
+        watchCleanupLiteral = 0
+        watchCleanupIndex = 0
+        sweptRetirements = 0
+        sweepingRetirements = -1
         capCandidates.clear()
         capRanking.reset()
     }

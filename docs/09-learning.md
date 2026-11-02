@@ -294,6 +294,11 @@ whole slice repeatedly before search advances.
 An interrupted optional scan waits for ownership change before retrying; direct
 reclamation attempts remain retryable.
 `learned-memory-work` and `learned-memory-scratch-bytes` bound preparation and scratch.
+General watch cleanup resumes across bounded maintenance slices without renumbering
+learned handles. Retired Boolean and bound-atom postings are removed independently;
+Boolean back-pointer deletion and swap-pop publication share one funded transaction.
+Watcher movement rewinds the current scan prefix. Small posting arrays trim within
+the same work and scratch limits; larger allocations wait for full compaction.
 Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,
 queues and event indexes, with a conservative envelope for indivisible publication.
 Cancellation or an oversized envelope defers without mutation; accepted publication

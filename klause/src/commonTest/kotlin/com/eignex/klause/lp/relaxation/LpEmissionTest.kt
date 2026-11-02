@@ -7,7 +7,11 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.RelaxationProjection
+import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.engine.authoritativeModel
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,6 +21,54 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpEmissionTest {
+    @Test
+    fun `interrupted emission should charge materialized construction`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 10) }, arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 5),
+        ))
+        var cancelled = false
+        val projections = FactorProjectionProviders(
+            relaxation = RelaxationProjectionProvider {
+                RelaxationProjection(RelaxationCapability.SOUND) { _, builder ->
+                    builder.linearRow(LinearOp.GE, intArrayOf(0), longArrayOf(1), 0)
+                    cancelled = true
+                    builder.linearRow(LinearOp.GE, intArrayOf(1), longArrayOf(1), 0)
+                }
+            },
+        ).prepare(problem)
+        val cache = LpEmissionCache(CpToLpRelaxation(problem, null, projections = projections))
+        var work = 0L
+
+        assertFailsWith<LpAssemblyCancelled> {
+            cache.prepare(RootDomains(problem), 0, Cancellation { cancelled }) { work += it }
+        }
+
+        assertEquals(3L, work)
+    }
+
+    @Test
+    fun `restored cached emissions should add no construction charge`() {
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8),
+        ))
+        val root = problem.finiteIntDomain(0)
+        var live = root
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = live
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        val cache = LpEmissionCache(CpToLpRelaxation(problem, null))
+        cache.refresh(domains, 0)
+        live = root.withMinAtLeast(2)
+        cache.refresh(domains, 1)
+        live = root
+        var work = 0L
+
+        cache.prepare(domains, 0, onWork = { work += it }).commit()
+
+        assertEquals(0L, work)
+    }
+
     @Test
     fun `emission cache should restore the enclosing emission on nested retracts`() {
         val problem = Problem(
