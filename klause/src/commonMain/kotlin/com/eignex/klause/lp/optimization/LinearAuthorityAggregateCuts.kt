@@ -310,7 +310,8 @@ internal object LinearAuthorityAggregateCuts {
                 return null
             }
             meter.arithmetic(rhs, BigFraction.ONE)
-            val rounded = meter.number(if (strictSources > 0) BigFraction.of(rhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
+            val rounded = meter.number(if (strictSources > 0)
+                BigFraction.of(rhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
                 else BigFraction.of(rhs.negated().ceilInteger(), BIG_ONE).negated())
             meter.reserve(1L)
             val proof = SourceDerivation.IntegerRounding(SourceDerivation.Combination(proofTerms))
