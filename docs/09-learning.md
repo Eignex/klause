@@ -266,7 +266,8 @@ General watch cleanup resumes across bounded maintenance slices without renumber
 learned handles. Retired Boolean and bound-atom postings are removed independently;
 Boolean back-pointer deletion and swap-pop publication share one funded transaction.
 Watcher movement rewinds the current scan prefix. Small posting arrays trim within
-the same work and scratch limits; larger allocations wait for full compaction.
+the same work and scratch limits. Posting and blocker arrays trim in separate funded
+transactions, so their combined copy need not fit one grant.
 Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,
 queues and event indexes, with a conservative envelope for indivisible publication.
 Cancellation or an oversized envelope defers without mutation; accepted publication
@@ -520,8 +521,11 @@ freezing unrelated retirement. Incomplete trail propagation, conflicts and root
 publication still defer the window.
 General retirement replaces its payload with an inert stable-ID slot and releases
 its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
-aliases. Stale watches skip that slot; their allocated capacity and policy columns
-remain owned until compaction. Selection and subsequent retired-slot compaction share
+aliases. Stable paged rows own policy, admission, propagator and mutable-payload
+references together. An intrusive queue resumes metadata release without scanning
+permanent rows; retained import/use counters survive released metadata. Empty pages
+release their primitive and reference allocations without renumbering live handles.
+Stale watches skip retired slots, and their capacity remains owned until its funded cleanup. Selection and subsequent retired-slot compaction share
 one work grant; compaction keeps every active row and receives only its remainder.
 Root simplification transfers its fresh residual literal array into the learned store;
 other admissions copy borrowed literal arrays. Native learned-watch cleanup scans

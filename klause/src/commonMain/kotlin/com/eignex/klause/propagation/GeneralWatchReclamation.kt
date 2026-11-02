@@ -65,15 +65,17 @@ private fun PropagationState.removeRetiredWatch(
 }
 
 private fun trimWatchPosting(posting: IntArrayList, blockers: IntArrayList?, budget: ReclamationPreparation) {
+    trimPostingArray(posting, budget)
+    if (blockers != null) trimPostingArray(blockers, budget)
+}
+
+private fun trimPostingArray(posting: IntArrayList, budget: ReclamationPreparation) {
     val size = posting.size.coerceAtLeast(1).toLong()
-    var copies = if (posting.backingData.size > size) 1L else 0L
-    if (blockers != null && blockers.backingData.size > size) copies++
-    if (copies == 0L) return
-    val scratch = copies * size * Int.SIZE_BYTES
-    val work = 4L + copies * (size * 2L + 1L)
+    if (posting.backingData.size <= size) return
+    val work = 5L + size * 2L
+    val scratch = size * Int.SIZE_BYTES
     if (!budget.supports(work, scratch)) return
     budget.visit(work, scratch)
     budget.visit(0L)
     posting.trim()
-    blockers?.trim()
 }

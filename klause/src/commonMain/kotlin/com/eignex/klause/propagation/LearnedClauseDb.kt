@@ -4,7 +4,6 @@ import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedLifecycle
 import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.OriginCounts
 
 /**
@@ -22,7 +21,6 @@ internal class LearnedClauseDb(
     var binaryClauseCount: Int,
 ) {
     val lifecycle = LearnedLifecycle()
-    val stages = IntArrayList()
     val pendingAttach = IntArrayList()
     internal val capCandidates = IntArrayList(1)
     internal val capRanking = LearnedCapRanking(capCandidates)
@@ -43,54 +41,33 @@ internal class LearnedClauseDb(
     val units = IntArrayList()
     var unitsPending = false
 
-    /** Learned constraints accumulated during search (LCG-style nogoods produced by [ConflictAnalyzer]).
-     *  Their factor ids live in `[problem.numFactors, totalFactorCount)` — treat them like any other
-     *  [Propagator] via `factorAt`; they participate in propagation through the per-literal watcher index
-     *  just like static factors. Survives `restore` (learned constraints are facts about the original
-     *  problem, not trail state); pruned by `forgetLearnedClauses`. */
-    var store = ArrayList<LearnedPropagator>()
-
+    private val rowStore = lazy(LazyThreadSafetyMode.NONE) { GeneralLearnedRows() }
+    val store: GeneralLearnedRows get() = rowStore.value
+    val initializedStore: GeneralLearnedRows? get() = if (rowStore.isInitialized()) store else null
     internal var integerRows: LearnedIntegerRows? = null
-    internal val boolReasons = IntArrayList(1)
-    internal val admissions = LongArrayList(1)
-    internal val boolReasonAdmissionWork: Long
-        get() = 1L + when {
-            boolReasons.size == boolReasons.backingData.size -> boolReasons.size * 3L + 1L
-            boolReasons.size == 0 -> 1L
-            else -> 0L
-        }
-
-    /** LBD (literal block distance) per learned clause, parallel to [store]: lower = more re-usable.
-     *  Forgetting policies key on it (G. Audemard, L. Simon, "Predicting Learnt Clauses Quality in
-     *  Modern SAT Solvers", IJCAI 2009, https://www.ijcai.org/Proceedings/09/Papers/074.pdf). */
-    val lbds = IntArrayList()
-
-    /** 1 for clauses that must survive every forgetting pass, parallel to [store].
-     *  Solution-blocking nogoods are the main client: dropping one re-opens an already reported
-     *  leaf and the search can revisit it forever. */
-    val permanent = IntArrayList()
-
-    /** Three-tier database tier per learned clause, parallel to [store], stored as
-     *  [ClauseTier] ordinals. [ClauseTier.UNSET] until the reduction policy first classifies it by
-     *  LBD; the policy then promotes/demotes clauses between tiers based on reuse, so the tier is
-     *  persistent state rather than a pure function of LBD. */
-    val tier = IntArrayList()
-
-    /** The origin an imported clause came from, parallel to [store]; [OWN_ORIGIN] for one learned here. */
-    val origins = IntArrayList()
+    internal var retiredMetadataHead = -1
+    internal var retiredMetadataTail = -1
+    internal var releasedPeerImports = 0
+    internal var releasedConsumedPeerImports = 0
+    internal var releasedConsumed = 0
 
     /** Uses of imported clauses, by origin. */
     val importUses = OriginCounts()
 
     /** Number of learned clauses. */
-    val size: Int get() = store.size
+    val size: Int get() = initializedStore?.size ?: 0
 
     internal val activeCount: Int get() = size - retiredCount
 
-    internal fun retiredOf(index: Int): Boolean = stages[index] and RETIRED != 0
-    internal fun usedOf(index: Int): Boolean = stages[index] and RECENT_USED != 0
-    internal fun markUsed(index: Int) { stages[index] = stages[index] or RECENT_USED }
-    internal fun clearUsed(index: Int) { stages[index] = stages[index] and RECENT_USED.inv() }
+    internal fun retiredOf(index: Int): Boolean = store[index, GeneralLearnedRows.STAGES] and RETIRED != 0
+    internal fun usedOf(index: Int): Boolean = store[index, GeneralLearnedRows.STAGES] and RECENT_USED != 0
+    internal fun markUsed(index: Int) {
+        store[index, GeneralLearnedRows.STAGES] = store[index, GeneralLearnedRows.STAGES] or RECENT_USED
+    }
+    internal fun clearUsed(index: Int) {
+        if (retiredOf(index)) return
+        store[index, GeneralLearnedRows.STAGES] = store[index, GeneralLearnedRows.STAGES] and RECENT_USED.inv()
+    }
 
     internal fun trackCapObject(index: Int, isPermanent: Boolean, kind: LearnedKind = LearnedKind.Clause): Long {
         var work = 1L
@@ -112,6 +89,11 @@ internal class LearnedClauseDb(
         permanentArithmeticCount = 0
         nonClauseCount = 0
         retiredCount = 0
+        retiredMetadataHead = -1
+        retiredMetadataTail = -1
+        releasedPeerImports = 0
+        releasedConsumedPeerImports = 0
+        releasedConsumed = 0
         watchCleanupLiteral = 0
         watchCleanupIndex = 0
         sweptRetirements = 0
@@ -121,11 +103,29 @@ internal class LearnedClauseDb(
     }
 
     internal fun retire(index: Int, kind: LearnedKind) {
-        check(permanent[index] == 0 && !retiredOf(index))
-        stages[index] = stages[index] or RETIRED
+        check(store[index, GeneralLearnedRows.PERMANENT] == 0 && !retiredOf(index))
+        store[index, GeneralLearnedRows.STAGES] = store[index, GeneralLearnedRows.STAGES] or RETIRED
         retiredCount++
+        enqueueRetiredMetadata(index)
         if (kind != LearnedKind.Clause) nonClauseCount--
         lifecycle.note(kind, LearnedStage.Retired)
+    }
+
+    internal fun enqueueRetiredMetadata(index: Int) {
+        store[index, GeneralLearnedRows.NEXT_RETIRED] = -1
+        if (retiredMetadataTail < 0) retiredMetadataHead = index
+        else store[retiredMetadataTail, GeneralLearnedRows.NEXT_RETIRED] = index
+        retiredMetadataTail = index
+    }
+
+    internal fun releaseRetiredMetadata(index: Int) {
+        val peer = store[index, GeneralLearnedRows.ORIGIN] >= 0
+        if (peer) releasedPeerImports++
+        if (store[index, GeneralLearnedRows.STAGES] and 2 != 0) {
+            releasedConsumed++
+            if (peer) releasedConsumedPeerImports++
+        }
+        store.release(index)
     }
 
     internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) emptyMap() else mapOf(

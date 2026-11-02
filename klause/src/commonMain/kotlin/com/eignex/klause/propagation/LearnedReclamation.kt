@@ -63,14 +63,14 @@ internal fun PropagationState.prepareReclamation(
     budget.atomic(baseFactorCount.toLong())
     budget.atomic(count.toLong() * 16L)
     if (selectedRetirements.hasRequests) budget.atomic(selectedRetirements.remapWork)
-    budget.atomic(learned.admissions.allocatedBytes / Long.SIZE_BYTES, learned.admissions.allocatedBytes)
     val retained = BooleanArray(count)
     collectLearnedReferences(retained) { budget.visit() }
     budget.atomic(boolReason.size.toLong() + intMinReason.size + intMaxReason.size + undo.size * 3L)
     nativeEngine?.prepareReclamation(budget, retained, keep)?.let { return retained }
     for (i in 0 until count) {
         budget.visit()
-        retained[i] = retained[i] || (!learned.retiredOf(i) && (learned.permanent[i] == 1 || keep(i, learned.lbds[i])))
+        retained[i] = retained[i] || (!learned.retiredOf(i) &&
+            (learned.store[i, GeneralLearnedRows.PERMANENT] == 1 || keep(i, learned.store[i, GeneralLearnedRows.LBD])))
     }
     if (factorAttribution != null) budget.atomic(count.toLong() * count)
     budget.atomic(propQueue.size.toLong() * 3L + atoms.dirtyFactors.size * 3L + learned.pendingAttach.size,
@@ -96,8 +96,8 @@ internal fun PropagationState.prepareReclamation(
             }
         }
     }
-    for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier, learned.boolReasons,
-        learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) {
+    learned.store.prepareRemap(budget)
+    for (column in listOf(learned.units, learned.pendingAttach, learned.capCandidates)) {
         budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
     }
     arithmeticLearningTrace?.let { trace ->
@@ -129,5 +129,5 @@ internal fun PropagationState.ownLearned(sample: com.eignex.klause.util.SharingM
             longs(prop.row.coefficients)
         }
     }
-    ints(refPayloadStore[baseFactorCount + index] as? IntArray)
+    ints(learned.store.payload(index) as? IntArray)
 }

@@ -121,4 +121,30 @@ class GeneralWatchReclamationTest {
         assertEquals(true, session.boolValue(2))
     }
 
+    @Test
+    fun `large surviving postings should trim independently within default grants`() {
+        val base = Clause(intArrayOf(0, 2))
+        val session = PropagationSession(Problem(4, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = false)
+        repeat(20_000) { session.addLearnedClause(base, 2, permanent = true) }
+        repeat(1024) { session.addLearnedClause(base, 9) }
+        repeat(8) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false } }
+        val watches = session.explanationState.watches
+        val before = watches.byLit[0].backingData.size
+
+        repeat(32) {
+            val work = session.work
+            session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true }
+            assertTrue(session.work - work <= 65_536L)
+        }
+
+        assertEquals(20_000, session.activeLearnedClauseCount)
+        assertEquals(20_000, watches.byLit[0].size)
+        assertTrue(watches.byLit[0].backingData.size < before)
+        assertEquals(20_000, watches.byLit[0].backingData.size)
+        assertEquals(20_000, watches.blockersByLit[0].backingData.size)
+        session.pinBool(0, false)
+        assertEquals(true, session.boolValue(1))
+    }
+
 }

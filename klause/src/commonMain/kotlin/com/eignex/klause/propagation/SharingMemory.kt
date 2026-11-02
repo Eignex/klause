@@ -107,7 +107,7 @@ private fun PropagationState.protectedLearnedMemory(
     for (i in 0 until learned.pendingAttach.size) {
         sample.step()
         val fid = learned.pendingAttach[i]
-        if (learned.stages[fid - baseFactorCount] and 2 == 0) protect(fid)
+        if (learned.store[fid - baseFactorCount, GeneralLearnedRows.STAGES] and 2 == 0) protect(fid)
     }
     sample.record(mapOf("reasonProtectedObjects" to protected.size.toLong()))
     return protected
@@ -140,13 +140,13 @@ private fun PropagationState.learnedSharingMemory(
     fun addLong(value: LongArray) {
         if (sample.retain(longs, value)) payload += value.size.toLong() * Long.SIZE_BYTES
     }
-    var peerImports = 0L
-    var consumedPeerImports = 0L
-    var consumed = 0L
+    var peerImports = learned.releasedPeerImports.toLong()
+    var consumedPeerImports = learned.releasedConsumedPeerImports.toLong()
+    var consumed = learned.releasedConsumed.toLong()
     var protectedInteger = false
     for (i in 0 until learned.size) {
         sample.step()
-        if (learned.permanent[i] == 1) sample.retain(protected, i)
+        if (learned.store[i, GeneralLearnedRows.PERMANENT] == 1) sample.retain(protected, i)
         val retained = sample.contains(protected, i)
         ownLearned(sample, i, retained)
         val propagator = learned.store[i]
@@ -168,27 +168,25 @@ private fun PropagationState.learnedSharingMemory(
                 addLong(propagator.row.coefficients)
             }
         }
-        add(refPayloadStore[baseFactorCount + i] as? IntArray)
-        val peer = learned.origins[i] >= 0
-        val used = learned.stages[i] and 2 != 0
+        add(learned.store.payload(i) as? IntArray)
+        val peer = learned.store[i, GeneralLearnedRows.ORIGIN] >= 0
+        val used = learned.store[i, GeneralLearnedRows.STAGES] and 2 != 0
         if (peer) peerImports++
         if (peer && used) consumedPeerImports++
         if (used) consumed++
     }
-    val columns = listOf(learned.stages, learned.lbds, learned.permanent, learned.tier, learned.boolReasons,
-        learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)
+    val columns = listOf(learned.units, learned.pendingAttach, learned.capCandidates)
     val protectedRows = protected.size > 0
     learned.capRanking.sharingMemory(sample, protectedRows)
-    var metadata = learned.capRanking.primitiveBytes + learned.admissions.allocatedBytes + Int.SIZE_BYTES +
-        4L * Int.SIZE_BYTES
-    sample.owned(learned, 4L * Int.SIZE_BYTES, protectedRows)
-    sample.owned(learned.admissions, learned.admissions.allocatedBytes + Int.SIZE_BYTES, protectedRows)
-    sample.ownedReferences(learned.admissions, 1L, protectedRows)
+    var metadata = learned.capRanking.primitiveBytes + learned.store.primitiveBytes + 36L
+    sample.owned(learned, 36L, protectedRows)
+    learned.store.sharingMemory(sample, protectedRows) { index ->
+        learned.store[index, GeneralLearnedRows.PERMANENT] == 1 || sample.contains(protected, index)
+    }
     for (column in columns) {
         sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
         sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
     }
-    sample.ownedReferences(learned.store, learned.size.toLong(), protectedRows)
     sample.ownedReferences(refPayloadStore, refPayloadStore.size.toLong(), baseFactorCount > 0 || protectedRows)
     learned.integerRows?.sharingMemory(sample, protectedInteger)
     var watchers = watches.pos.primitiveCapacityBytes
@@ -260,7 +258,7 @@ private fun PropagationState.learnedSharingMemory(
         "learnedPayloadBytes" to payload,
         "learnedMetadataCapacityBytes" to metadata,
         "learnedCapIndexStateBytes" to learned.capRanking.modeledBytes,
-        "learnedReferenceSlots" to learned.size.toLong() * 2L + (learned.integerRows?.capacity ?: 0),
+        "learnedReferenceSlots" to learned.store.referenceCapacity + (learned.integerRows?.capacity ?: 0),
         "learnedIntegerRowCacheCapacityBytes" to (learned.integerRows?.capacity?.toLong() ?: 0L) * Long.SIZE_BYTES,
         "learnedIntegerRowIndexBytes" to (learned.integerRows?.size?.toLong() ?: 0L) * Int.SIZE_BYTES,
         "sessionWatchCapacityBytes" to watchers,

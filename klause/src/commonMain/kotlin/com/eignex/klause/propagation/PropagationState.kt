@@ -449,8 +449,7 @@ class PropagationState private constructor(
     // Per-factor mutable scratch. Its drift across snapshot / restore is intentional: advisory
     // watch state self-corrects on each fire, avoiding snapshot copies of level-aware state.
 
-    /** Backing list for [refPayload]; mutable so [addLearnedClause] can grow it
-     *  alongside the learned-clause registry without copying the full array. */
+    /** Base and incremental factor payload references; General learned rows own their payload slots. */
     private class PayloadOwner(var values: ArrayList<Any?>)
     private val payloadOwner: PayloadOwner by lazy(LazyThreadSafetyMode.NONE) {
         PayloadOwner(prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply {
@@ -470,11 +469,17 @@ class PropagationState private constructor(
     internal val snapshottableIndices: IntHashSet = IntHashSet()
 
     /** Per-factor mutable payload slots (reference-typed). Writes route through this view so
-     *  [snapshottableIndices] stays in sync; reads and structural ops delegate to [refPayloadStore]. */
+     *  [snapshottableIndices] stays in sync. General learned payloads share their paged row owner;
+     *  base and incremental slots delegate to [refPayloadStore]. */
     val refPayload: MutableList<Any?> by lazy(LazyThreadSafetyMode.NONE) {
         object : AbstractMutableList<Any?>() {
-            override val size: Int get() = refPayloadStore.size
-            override fun get(index: Int): Any? = refPayloadStore[index]
+            override val size: Int
+                get() = if (!incremental && nativeEngine == null) baseFactorCount + learned.size
+                else refPayloadStore.size
+            override fun get(index: Int): Any? =
+                if (!incremental && index >= baseFactorCount && nativeEngine == null) {
+                    learned.store.payload(index - baseFactorCount)
+                } else refPayloadStore[index]
             override fun add(index: Int, element: Any?) { refPayloadStore.add(index, element) }
             override fun removeAt(index: Int): Any? = refPayloadStore.removeAt(index)
             override fun set(index: Int, element: Any?): Any? {
@@ -485,7 +490,9 @@ class PropagationState private constructor(
                 } else {
                     snapshottableIndices.remove(index)
                 }
-                return refPayloadStore.set(index, element)
+                return if (!incremental && index >= baseFactorCount && nativeEngine == null) {
+                    learned.store.setPayload(index - baseFactorCount, element)
+                } else refPayloadStore.set(index, element)
             }
         }
     }
@@ -515,7 +522,7 @@ class PropagationState private constructor(
     }
 
     /** Constraints learned during conflict analysis; see [LearnedClauseDb]. */
-    internal val learnedClauses: List<LearnedPropagator> get() = learned.store
+    internal val learnedClauses: List<LearnedPropagator> get() = learned.initializedStore ?: emptyList()
 
     /** True iff any binary clause is known — the gate for binary-resolution minimization. */
     val hasBinaryClauses: Boolean get() = learned.binaryClauseCount > 0
@@ -829,6 +836,7 @@ class PropagationState private constructor(
     internal var nativeConflictReason: IntArray? = null
 
     init {
+        if (nativeEngine == null && !incremental) work += learned.store.preparationWork
         // The native lane uses arena watches and skips general base-factor registration.
         if (prepared == null && nativeEngine == null) {
             for (fid in 0 until problem.numFactors) registerFactor(fid, projection.propagators[fid])
@@ -1244,7 +1252,8 @@ class PropagationState private constructor(
         seedQueue(allFactors, factorCount, initialFactor, initialFactors)
         for (i in 0 until learned.pendingAttach.size) {
             val fid = learned.pendingAttach[i]
-            learned.stages[fid - baseFactorCount] = learned.stages[fid - baseFactorCount] and 4.inv()
+            learned.store[fid - baseFactorCount, GeneralLearnedRows.STAGES] =
+                learned.store[fid - baseFactorCount, GeneralLearnedRows.STAGES] and 4.inv()
             propEnq(fid)
         }
         learned.pendingAttach.clear()

@@ -45,8 +45,9 @@ private fun PropagationState.generalCapPolicy(
     private var prepared = -1
     private var protected = false
     private fun retainedReason(index: Int): Boolean {
-        if (learned.stages[index] and 16 != 0) {
-            return learned.boolReasons[index] > 0 || learned.stages[index] and 4 != 0
+        if (learned.store[index, GeneralLearnedRows.STAGES] and 16 != 0) {
+            return learned.store[index, GeneralLearnedRows.BOOL_REASONS] > 0 ||
+                learned.store[index, GeneralLearnedRows.STAGES] and 4 != 0
         }
         val snapshot = references ?: run {
             budget.visit(learned.size.toLong(), learned.size.toLong())
@@ -57,7 +58,7 @@ private fun PropagationState.generalCapPolicy(
         }
         return snapshot[index]
     }
-    override fun lbd(index: Int): Int = learned.lbds[index]
+    override fun lbd(index: Int): Int = learned.store[index, GeneralLearnedRows.LBD]
     override fun prepare(index: Int): Boolean {
         budget.visit(CAP_ROW_POLICY_WORK)
         protected = retainedReason(index)
@@ -68,18 +69,18 @@ private fun PropagationState.generalCapPolicy(
         val retained = retain(index)
         val prop = learned.store[index]
         return retained || protected || (prop is ClausePropagator && prop.literals.size <= 1) ||
-            learned.stages[index] and 1 == 0
+            learned.store[index, GeneralLearnedRows.STAGES] and 1 == 0
     }
     override fun visited() { learned.capVisits++ }
     override fun retire(index: Int): Boolean {
         val prop = learned.store[index]
         val pinned = if (prepared == index) protected else retainedReason(index)
         if (!mayDrop(index) || pinned || (prop is ClausePropagator && prop.literals.size <= 1) ||
-            learned.stages[index] and 1 == 0
+            learned.store[index, GeneralLearnedRows.STAGES] and 1 == 0
         ) {
             return false
         }
-        budget.visit(if (prop is LearnedIntegerPropagator) 16L else 8L)
+        budget.visit(if (prop is LearnedIntegerPropagator) 40L else 32L)
         budget.visit(0L)
         val kind = learnedKind(index)
         learned.retire(index, kind)
@@ -87,7 +88,7 @@ private fun PropagationState.generalCapPolicy(
         if (prop is ClausePropagator) forgetDeferredClause(prop.literals)
         if (prop is LearnedIntegerPropagator) checkNotNull(learned.integerRows).unlink(prop)
         learned.store[index] = RetiredLearnedPropagator
-        refPayloadStore[baseFactorCount + index] = null
+        learned.store.setPayload(index, null)
         return true
     }
 }

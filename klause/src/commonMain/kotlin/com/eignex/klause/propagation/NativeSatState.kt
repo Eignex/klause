@@ -382,17 +382,17 @@ internal class NativeSatState(private val state: PropagationState) {
         capRanking.sharingMemory(sample, protectedRows)
         state.learned.capRanking.sharingMemory(sample, protectedRows)
         val columns = listOf(learnedUnits, rechecks, capCandidates,
-            state.learned.capCandidates, state.learned.boolReasons)
-        var metadataBytes = 12L + capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
+            state.learned.capCandidates)
+        var metadataBytes = 48L + capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
             learnedPayloads.primitiveBytes + metadata.primitiveBytes
         metadata.sharingMemory(sample, protectedRows) { index ->
             metadata[index, NativeLearnedMetadata.PERMANENT] == 1 || sample.contains(protected, index)
         }
-        val keys = state.learned.admissions
-        sample.step()
-        metadataBytes += keys.allocatedBytes + Int.SIZE_BYTES
-        sample.owned(keys, keys.allocatedBytes + Int.SIZE_BYTES, protectedRows)
-        sample.ownedReferences(keys, 1L, protectedRows)
+        sample.owned(state.learned, 36L, protectedRows)
+        state.learned.initializedStore?.let { rows ->
+            metadataBytes += rows.primitiveBytes
+            rows.sharingMemory(sample, protectedRows) { false }
+        }
         for (column in columns) {
             sample.step(); metadataBytes += column.backingData.size.toLong() * Int.SIZE_BYTES
             sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
