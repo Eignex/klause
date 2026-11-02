@@ -37,7 +37,10 @@ internal class SharingMemoryObservation(
     private var sharedBytes = 0L
 
     private class Owner(val identity: Any, val bytes: Long, val slots: Long, var protectedAmount: Long,
-        var shared: Boolean, val next: Owner?)
+        var shared: Boolean) {
+        var left: Owner? = null
+        var right: Owner? = null
+    }
 
     fun owned(identity: Any, bytes: Long, protected: Boolean = false, shared: Boolean = false) =
         own(identity, bytes, 0L, if (protected) bytes else 0L, shared)
@@ -55,7 +58,11 @@ internal class SharingMemoryObservation(
         require(protectedAmount >= 0L && protectedAmount <= if (slots == 0L) bytes else slots)
         if (bytes == 0L && slots == 0L) return
         step()
+        val hash = identityHash(identity)
         var owner = owners
+        var parent: Owner? = null
+        var right = false
+        var bit = 0
         while (owner != null) {
             step()
             if (owner.identity === identity && (owner.slots == 0L) == (slots == 0L)) {
@@ -69,11 +76,16 @@ internal class SharingMemoryObservation(
                 }
                 return
             }
-            owner = owner.next
+            parent = owner
+            right = bit < Int.SIZE_BITS && hash and (1 shl bit) != 0
+            if (bit < Int.SIZE_BITS) bit++
+            owner = if (right) owner.right else owner.left
         }
         if (scratchEntries >= maxScratchEntries) throw Stopped()
+        step()
         scratchEntries++
-        owners = Owner(identity, bytes, slots, protectedAmount, shared, owners)
+        val added = Owner(identity, bytes, slots, protectedAmount, shared)
+        if (parent == null) owners = added else if (right) parent.right = added else parent.left = added
         ownedBytes += bytes
         ownedSlots += slots
         if (slots == 0L) protectedBytes += protectedAmount else protectedSlots += protectedAmount

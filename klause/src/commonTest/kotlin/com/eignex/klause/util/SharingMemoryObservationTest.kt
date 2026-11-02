@@ -4,6 +4,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SharingMemoryObservationTest {
     @Test
@@ -78,5 +80,78 @@ class SharingMemoryObservationTest {
         sample.ownedPool(pool, 100L, 40L)
 
         assertFailsWith<IllegalArgumentException> { sample.ownedPool(pool, 120L, 40L) }
+    }
+    @Test
+    fun `many distinct owners and protection upgrades should fit the default observation grant`() {
+        val owners = Array(384) { Any() }
+        val sample = SharingMemoryObservation(SharingMemoryObservation.DEFAULT_WORK,
+            SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES, { false }, {})
+
+        val memory = sample.snapshot {
+            for (owner in owners) sample.owned(owner, 8L)
+            for (owner in owners.reversed()) sample.owned(owner, 8L, protected = true)
+        }
+
+        val values = assertNotNull(memory.completeValues)
+        assertEquals(384L * 8L, values["ownedPrimitiveBytes"])
+        assertEquals(384L * 8L, values["protectedPrimitiveBytes"])
+        assertTrue(memory.work <= SharingMemoryObservation.DEFAULT_WORK)
+        assertEquals(384, memory.scratchEntries)
+    }
+
+    @Test
+    fun `primitive and reference regions of one owner should retain separate protection`() {
+        val owner = Any()
+        val sample = SharingMemoryObservation(1024L, 128, { false }, {})
+
+        val memory = sample.snapshot {
+            sample.owned(owner, 16L)
+            sample.ownedReferences(owner, 3L, protected = true)
+            sample.owned(owner, 16L, protected = true)
+            sample.ownedReferences(owner, 3L)
+        }
+
+        val values = assertNotNull(memory.completeValues)
+        assertEquals(16L, values["ownedPrimitiveBytes"])
+        assertEquals(16L, values["protectedPrimitiveBytes"])
+        assertEquals(3L, values["ownedReferenceSlots"])
+        assertEquals(3L, values["protectedReferenceSlots"])
+    }
+
+    @Test
+    fun `owner observation should bypass user equality and hash code`() {
+        val owners = List(4) {
+            object {
+                override fun equals(other: Any?): Boolean = error("User equality")
+                override fun hashCode(): Int = error("User hash code")
+            }
+        }
+        val sample = SharingMemoryObservation(1024L, 128, { false }, {})
+
+        val memory = sample.snapshot {
+            for (owner in owners) sample.owned(owner, 8L)
+            for (owner in owners) sample.owned(owner, 8L, protected = true)
+        }
+
+        val values = assertNotNull(memory.completeValues)
+        assertEquals(32L, values["ownedPrimitiveBytes"])
+        assertEquals(32L, values["protectedPrimitiveBytes"])
+    }
+
+    @Test
+    fun `an unfunded distinct owner should leave the observation partial`() {
+        val owner = Any()
+        val other = Any()
+        val sample = SharingMemoryObservation(1024L, 1, { false }, {})
+
+        val memory = sample.snapshot {
+            sample.owned(owner, 8L)
+            sample.owned(owner, 8L, protected = true)
+            sample.owned(other, 16L)
+        }
+
+        assertEquals(SharingMemoryStatus.PARTIAL, memory.status)
+        assertEquals(1, memory.scratchEntries)
+        assertNull(memory.completeValues)
     }
 }
