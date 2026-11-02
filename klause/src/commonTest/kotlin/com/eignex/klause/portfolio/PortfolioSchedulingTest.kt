@@ -406,15 +406,20 @@ class PortfolioSchedulingTest {
 
     @Test
     fun `plateaued local search should cede the run to backtrack however many local search arms there are`() {
+        val clock = TestTimeSource()
         val slices = IntArray(5)
         val workers = List(5) { arm ->
-            trackingWorker("arm$arm", arm, ScriptedSearch({ arm == 0 && it == 0 }) { slices[arm]++ })
+            trackingWorker("arm$arm", arm, ScriptedSearch({ arm == 0 && it == 0 }) {
+                slices[arm]++
+                clock += 1.milliseconds
+            })
                 .also { if (arm > 0) it.family = ArmFamily.LocalSearch }
         }
-        var polls = 0
 
-        Portfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 2_000 }) }
+        Portfolio.thompson(workers).also { it.runTimeSource = clock }
+            .use { it.minimize(Cancellation { slices.sum() >= 2_000 }) }
 
+        assertEquals(2_000, slices.sum())
         assertTrue(slices[0] > slices.sum() / 2, "backtrack ran ${slices[0]} of ${slices.sum()} slices")
     }
 
