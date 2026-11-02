@@ -134,7 +134,7 @@ finite witness admission permits source tolerance. Tolerance-only acceptance can
 authorize this exact handoff.
 
 With completion enabled, a checked pooled center starts joint repair in a small
-connected integer neighborhood without a root relaxation. The all-pinned
+integer neighborhood without a root relaxation. The all-pinned
 rounded-root bootstrap is reserved for a center without that checked handoff.
 Continuous columns stay free, source
 cutoff checks remain exact, and later proposals retain their captured conditions.
@@ -143,15 +143,18 @@ repair query enters companion discovery publication and original-source rechecki
 If that first proposal pauses, it receives continuation after owed complete-worker
 coverage until the proposal finishes or the companion's existing allowance retires
 it. This trial grants no incumbent reward and does not renew work, allocation or
-active time. Completion-enabled companion repair uses adaptive connected neighborhood
+active time. Completion-enabled companion repair uses adaptive neighborhood
 widths after the small first proposal, within the same integer selection, proposal
 and funding ceilings. Later proposals use ordinary worker selection.
 
 The numerical companion can retain one completed root relaxation point for checked
 handoff repair. A private snapshot belongs to the same captured source context and
 survives numerical search retirement until its invocation slot closes. It ranks
-integer neighborhood seeds by their distance from the checked center; continuous
-columns stay free. Retention, scalar conversion and ranking spend the producing or
+integer coordinates by their distance from the checked center. Guided proposals
+free the strongest disagreements within the selected width and rotate through
+that ranking; agreeing integers stay pinned. The existing two-integer first trial
+and thirty-two-integer ceiling apply. Continuous columns stay free.
+Retention, scalar conversion and ranking spend the producing or
 consuming companion's existing work and allocation. Missing, cancelled, foreign or
 oversized guidance keeps ordinary neighborhood selection. No extra root query is
 opened to obtain guidance. `numericalRepairGuidancePublished` counts retained points;
@@ -510,7 +513,8 @@ and original-source feasibility plus adjusted objective agreement. Source scope,
 semantics and coordinate frame identify retained attempts; failed attempts cannot
 renew their allowance.
 
-Enabled repair's first checked center frees at most two connected integers.
+Enabled repair's first checked center frees at most two integers, using shared
+root disagreements when available and connectivity otherwise.
 An available dimension-compatible incumbent requests continuation through root and center
 preparation and the first proposal, behind owed complete-worker coverage and within
 the existing active cap. Availability grants no import authority; the source checks

@@ -42,6 +42,36 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `shared guidance should free a coupled improving pair before an agreeing row neighbor`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 2), LinearOp.EQ, 0),
+            ))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(1, 0, 1))
+        val guidance = LinearRepairGuidance()
+        LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true, repairGuidance = guidance).use {
+            it.run { _, _ -> }
+        }
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 1, maxFlips = 1),
+            external = { seed }, repairGuidance = guidance).use { repair ->
+            repair.search(adaptive = false).use { search ->
+                var done = false
+                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+
+                val result = assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                assertEquals(0L, result.sample.intValue(0))
+                assertEquals(0L, result.sample.intValue(2))
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairSharedGuidanceQueries"))
+            }
+        }
+    }
+
+    @Test
     fun `shared root guidance should improve the useful disconnected integer on the first query`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
             factors = emptyArray())

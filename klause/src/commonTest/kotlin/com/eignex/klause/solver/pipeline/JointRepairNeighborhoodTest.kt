@@ -33,7 +33,29 @@ class JointRepairNeighborhoodTest {
         repair.guide(assertNotNull(guidance.find(source)), centers, budget, Cancellation.Never)
         val condition = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
 
-        assertEquals(mapOf(0 to BigFraction.ZERO, 3 to BigFraction.ZERO), condition.lower)
+        assertEquals(mapOf(3 to BigFraction.ZERO), condition.lower)
+    }
+
+    @Test
+    fun `shared guidance should keep agreeing integers pinned across neighborhood widths`() {
+        val columns = (0..39).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("shared-widths", "exact")),
+            columns.toSet(), emptyMap())
+        val funding = SourceLpFunding(1_000_000, 1_000_000).also { it.grant(1_000_000) }
+        val budget = SourceLpBudget(funding = funding)
+        val guidance = LinearRepairGuidance()
+        guidance.remember(source, columns.associateWith { if (it.id == 39) 0.0 else 1.0 },
+            budget, Cancellation.Never)
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 40, 0, Cancellation.Never))
+        val centers = List(40) { BigFraction.ZERO }
+        repair.guide(assertNotNull(guidance.find(source)), centers, budget, Cancellation.Never)
+
+        for (width in listOf(2, 20, 40)) {
+            val condition = repair.propose(centers, booleanArrayOf(), width, 1, BigFraction.ONE, null)
+
+            assertEquals((minOf(width, 32)..39).associateWith { BigFraction.ZERO }, condition.lower)
+            assertEquals(condition.lower, condition.upper)
+        }
     }
 
     @Test

@@ -19,12 +19,14 @@ internal class JointRepairNeighborhood private constructor(
         BooleanArray(integers).also { mask -> indices.forEach { mask[it] = true } }
     }
     private var seeds = inputs?.toList() ?: (0 until integers).toList()
+    private var guidedSeeds: List<Int>? = null
     var selectedIntegers: Long = 0
         private set
     var visitedEntries: Long = 0
         private set
 
     fun guide(point: Map<SourceCoordinate, Double>) {
+        guidedSeeds = null
         seeds = seeds.sortedByDescending { id ->
             val value = point[SourceCoordinate(SourceCoordinate.Kind.Integer, id)]
             if (value == null || !value.isFinite()) 0.0 else abs(value - round(value))
@@ -33,6 +35,7 @@ internal class JointRepairNeighborhood private constructor(
 
     fun guide(hint: LinearRepairGuidance.Hint, centers: List<BigFraction>,
         budget: SourceLpBudget, token: Cancellation): Boolean {
+        guidedSeeds = null
         if (token() || centers.size < integers || centers.size > LinearRepairGuidance.MAX_COLUMNS) return false
         val funding = budget.funding ?: return false
         val work = 1L + 16L * seeds.size
@@ -56,7 +59,10 @@ internal class JointRepairNeighborhood private constructor(
         }
         val ranked = seeds.sortedByDescending { distances.getValue(it) }
         if (token()) return false
+        val disagreements = ranked.filter { distances.getValue(it) > 0.0 }
+        if (disagreements.isEmpty()) return false
         seeds = ranked
+        guidedSeeds = disagreements
         return true
     }
 
@@ -64,9 +70,14 @@ internal class JointRepairNeighborhood private constructor(
         centers: List<BigFraction>, bools: BooleanArray, count: Int, round: Long,
         radius: BigFraction, cutoff: BigFraction?,
     ): ExactNeighborhoodCondition {
-        val freed = if (round == 0L || seeds.isEmpty()) emptySet() else {
+        val width = minOf(inputs?.size ?: integers, maxOf(2, count), MAX_FREE_INTEGERS)
+        val guided = guidedSeeds
+        val freed = if (round == 0L || seeds.isEmpty()) emptySet() else if (guided != null) {
+            val start = ((round - 1) % guided.size).toInt()
+            (0 until minOf(width, guided.size)).map { guided[(start + it) % guided.size] }.toSet()
+        } else {
             val seed = seeds[((round - 1) % seeds.size).toInt()]
-            connected(seed, minOf(inputs?.size ?: integers, maxOf(2, count), MAX_FREE_INTEGERS))
+            connected(seed, width)
         }
         selectedIntegers += freed.size
         val pins = (inputs?.asIterable() ?: (0 until integers)).filter { it !in freed }.associateWith { centers[it] }
