@@ -400,6 +400,10 @@ internal class LpHints(
             observe("BASIS_SIDE_WITHHELD")
             return alternatives
         }
+        if (!advice.basis) {
+            observe("HISTORY_SIDE_WITHHELD")
+            return alternatives
+        }
         observe(if (advice.basis) "BASIS_SIDE_CONSUMED" else "HISTORY_SIDE_CONSUMED")
         observe("SIDE_CONSUMED")
         val changed = firstUp != advice.up
