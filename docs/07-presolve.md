@@ -250,10 +250,9 @@ contract. The diagnostic itself creates no replacement or publication authority.
 
 `privateRebuildWork` funds bounded private Boolean satisfaction trials. An
 unconditional consistent root pauses its canonical traversal, simplifies a private
-copy with the root's global pins and runs source BVE with typed reconstruction.
+copy with global pins and applies bounded source reductions with typed reconstruction.
 The new baked model has a fresh identity; mappings compose through the pinned,
-eliminated and baked objects. Column slots remain stable. Only an actual elimination
-opens a consumer. Assumptions, external components, arithmetic and LP-enabled
+eliminated and baked objects. Column slots remain stable. A consumer opens after an actual elimination or newly proved parity pins. Assumptions, external components, arithmetic and LP-enabled
 workers retain their canonical traversal. Enumeration and optimization do not use
 this trial.
 
@@ -281,6 +280,25 @@ model. BVE restricts this trial to the initially admitted columns, so an unrelat
 declined pivot cannot consume its resolution allowance. Later opportunities among
 protected columns wait for a fresh root view. This selection is a heuristic, not
 an exhaustive elimination pass.
+
+A bounded source scan can recognize a three-column parity equation from its
+complete four-clause Boolean encoding. Each clause excludes one assignment;
+the complete parity class of exclusions entails the opposite parity equation.
+A preparation-only GF(2) matrix substitutes the canonical global pins and reduces
+these equations, emitting additional globally forced Boolean values only after
+complete elimination. Incomplete clause groups, duplicate exclusions and partial
+matrix work grant no additional pins. A derived contradiction supplies no source
+refutation authority.
+
+The immutable source identity binds the captured pin snapshot. Its table,
+matrix and snapshot allocation, initialization, probes, elimination and publication
+consume the private work and modeled-memory grants. Complete absence of encoded
+rows parks the immutable-source scan; a completed miss for new pins may retry
+after canonical global pins grow. The private model installs the proved values
+as unit clauses and composes its reconstruction over the fixed source view.
+Canonical search state stays unchanged. A changed fixed view can open a consumer
+without an additional BVE pivot; its pins are counted separately from eliminated
+columns. Closing or declining releases the captured snapshot with its generation.
 
 A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker

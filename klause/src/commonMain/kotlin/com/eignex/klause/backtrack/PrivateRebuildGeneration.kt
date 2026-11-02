@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SourceMapping
+import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationSession
@@ -32,6 +33,7 @@ internal class PrivateRebuildGeneration private constructor(
     val indexedFactors: Int,
     val sourceFactors: Int,
     val equivalenceMerges: Int,
+    val parityPins: Int,
 ) {
     fun reconstruct(sample: Sample): Sample = mapping.reconstructFrom(problem, sample)
 
@@ -44,6 +46,7 @@ internal class PrivateRebuildGeneration private constructor(
             cancellation: Cancellation,
             onDecline: (String) -> Unit = {},
             learnedBinary: PrivateRebuildBinaryLearning? = null,
+            parity: PrivateRebuildParity? = null,
             passWork: () -> Long = { Long.MAX_VALUE },
         ): PrivateRebuildGeneration? {
             if (!session.canSimplifyRoot || cancellation()) return null
@@ -51,6 +54,10 @@ internal class PrivateRebuildGeneration private constructor(
             if (source.numIntVars != 0 || source.numRealVars != 0) return null
             if (learnedBinary != null && learnedBinary.source !== source) {
                 onDecline("BinarySourceIdentity")
+                return null
+            }
+            if (parity != null && (parity.source !== source || learnedBinary != null)) {
+                onDecline("ParitySourceIdentity")
                 return null
             }
             var entries = source.numBoolVars.toLong() + source.numFactors + 1L
@@ -64,17 +71,28 @@ internal class PrivateRebuildGeneration private constructor(
                 entries += factor.literals.size
             }
             entries += learnedBinary?.clauses?.sumOf { it.literals.size + 1L } ?: 0L
+            if (parity != null) entries += source.numBoolVars * 2L
             // This admission model covers simultaneous primitive buffers and reference slots,
             // including admission, the BVE database, source copies, reconstruction and a fresh native worker.
             // Object headers, the retained canonical worker and allocator overhead are separate.
-            val bytes = entries * 512L + if (learnedBinary == null) 0L else PrivateRebuildBinaryLearning.SCRATCH_BYTES
+            val bytes = entries * 512L + (if (learnedBinary == null) 0L else PrivateRebuildBinaryLearning.SCRATCH_BYTES) +
+                (parity?.modeledBytes ?: 0L)
             if (bytes > byteLimit) {
                 onDecline("Memory")
                 return null
             }
-            cancellation.charge(source.numBoolVars.toLong())
+            cancellation.charge(source.numBoolVars * if (parity == null) 1L else 3L)
             if (cancellation()) return null
             val fixed = Array(source.numBoolVars) { session.boolValue(it) }
+            if (parity != null) for (variable in fixed.indices) {
+                val value = session.boolValue(variable)
+                val derived = parity.fixed[variable]
+                if (value != null && derived != null && value != derived) {
+                    onDecline("ParityRootChanged")
+                    return null
+                }
+                fixed[variable] = value ?: derived
+            }
             if (learnedBinary != null) {
                 cancellation.charge(2L)
                 if (cancellation()) return null
@@ -111,6 +129,13 @@ internal class PrivateRebuildGeneration private constructor(
                     residual.add(Clause(remaining))
                 }
             }
+            if (parity != null) {
+                cancellation.charge(source.numBoolVars * 16L)
+                if (cancellation()) return null
+                for (variable in fixed.indices) fixed[variable]?.let { value ->
+                    residual.add(Clause(intArrayOf(Lit.make(variable, value))))
+                }
+            }
             if (learnedBinary != null) {
                 cancellation.charge(learnedBinary.clauses.size * 3L)
                 if (cancellation()) return null
@@ -120,7 +145,7 @@ internal class PrivateRebuildGeneration private constructor(
                 source.numBoolVars, 0, emptyArray(), residual.toTypedArray(),
                 settings = source.settings, semantics = source.semantics,
             )
-            val admission = if (learnedBinary == null) {
+            val admission = if (learnedBinary == null && parity == null) {
                 PrivateRebuildAdmission.analyze(pinned, cancellation) ?: return null
             } else null
             if (admission?.candidates == 0) {
@@ -147,16 +172,16 @@ internal class PrivateRebuildGeneration private constructor(
             // A local pass boundary retains complete pivots; the containing call still controls
             // publication, opening and checks, and can decline the entire generation.
             val delta = neighborhood?.eliminate(passToken)
-            val equivalences = if (delta == null) {
+            val equivalences = if (delta == null && parity == null) {
                 PrivateRebuildAlias.reduce(pinned, checkNotNull(learnedBinary).clauses, passToken)
             } else null
-            val rebuild = delta?.rebuild ?: checkNotNull(equivalences).rebuild
+            val rebuild = delta?.rebuild ?: equivalences?.rebuild ?: SourceRebuilds(emptyList())
             if (cancellation()) return null
             if (delta?.infeasible == true || equivalences?.infeasible == true) {
                 onDecline("Refutation")
                 return null
             }
-            if (rebuild.steps.isEmpty()) {
+            if (rebuild.steps.isEmpty() && parity == null) {
                 onDecline(if (spent >= allowance) "PassStoppedEmpty" else "PassCompleteEmpty")
                 return null
             }
@@ -184,8 +209,11 @@ internal class PrivateRebuildGeneration private constructor(
             }
             cancellation.charge(entries + descriptorWork)
             if (cancellation()) return null
-            val reduced = if (delta != null) delta.materialize(cancellation) ?: return null
-            else pinned.withSourcePassDelta(checkNotNull(equivalences)).takeUnless { cancellation() } ?: return null
+            val reduced = when {
+                delta != null -> delta.materialize(cancellation) ?: return null
+                equivalences != null -> pinned.withSourcePassDelta(equivalences).takeUnless { cancellation() } ?: return null
+                else -> pinned
+            }
             mapping = mapping.then(SourceMapping(pinned, reduced, guarantees, rebuild))
             val warmStart = TimeSource.Monotonic.markNow()
             val warm = PrivateRebuildWarmClauses.capture(session, rebuild, fixed, byteLimit - privateBytes,
@@ -200,7 +228,7 @@ internal class PrivateRebuildGeneration private constructor(
             return PrivateRebuildGeneration(baked, mapping, privateBytes + warm.modeledBytes, rebuild.steps.size,
                 maxOf(entries * 4L, source.numBoolVars * 12L + descriptorWork), passStopped, admission?.candidates ?: 0,
                 warm, warmNanos, bakeWork, descriptorWork, reused, neighborhood?.indexedFactors ?: 0,
-                neighborhood?.sourceFactors ?: 0, rebuild.steps.count { it is RebuildStep.CopyLiteral })
+                neighborhood?.sourceFactors ?: 0, rebuild.steps.count { it is RebuildStep.CopyLiteral }, parity?.newPins ?: 0)
         }
     }
 }

@@ -39,6 +39,11 @@ internal class PrivateRebuildSatisfaction(
     private var attemptedBinaryPairs = longArrayOf()
     private var attemptedBinaryCount = 0
     private var pendingBinary: PrivateRebuildBinaryLearning? = null
+    private var pendingParity: PrivateRebuildParity? = null
+    private var parityAttempted = false
+    private var parityUnavailable = false
+    private var parityPeakBytes = 0L
+    private val observations = LinkedHashMap<String, Long>()
     private var rootCancellation: Cancellation = Cancellation.Never
     private val canonical = ResumableSatisfaction(solver, sharedParams, ownsWorkDebt = false, atRoot = ::atRoot)
     private var generation: PrivateRebuildGeneration? = null
@@ -50,7 +55,6 @@ internal class PrivateRebuildSatisfaction(
     private var closed = false
     private var candidate: Sample? = null
     private var checkedFactors = 0
-    private val observations = LinkedHashMap<String, Long>()
     private var retainedStats = SolveStats.EMPTY
 
     override val isDone: Boolean get() = done != null
@@ -71,6 +75,10 @@ internal class PrivateRebuildSatisfaction(
 
     private fun atRoot(session: PropagationSession): Boolean {
         if (!session.canSimplifyRoot) return false
+        if (!parityAttempted) {
+            parityAttempted = true
+            if (captureParity(session)) return true
+        }
         val mark = session.explanationState.undoTop
         val scanWork = solver.problem.numBoolVars.toLong()
         if (mark != rootMark) {
@@ -84,6 +92,7 @@ internal class PrivateRebuildSatisfaction(
             if (pins > rootPins) {
                 note("ProgressPins", (pins - rootPins).toLong())
                 rootPins = pins
+                if (captureParity(session)) return true
                 root = session
                 return true
             }
@@ -123,6 +132,38 @@ internal class PrivateRebuildSatisfaction(
         pendingBinary = captured
         root = session
         note("BinaryRelations")
+        return true
+    }
+
+    private fun captureParity(session: PropagationSession): Boolean {
+        if (parityUnavailable || params.privateRebuildWork - trialSpent() < 2L) return false
+        var spent = 0L
+        val allowance = (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L)
+        val start = TimeSource.Monotonic.markNow()
+        val captured = PrivateRebuildParity.capture(session,
+            params.learnedMemoryScratchBytes - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(),
+            visit = { work ->
+                if (work > allowance - spent || session.cancelRequested || lifetime() || rootCancellation()) false
+                else { spent += work; charge(work); true }
+            },
+            onDecline = { reason ->
+                note("ParityDeclined$reason")
+                if (reason == "NoRows" || reason == "Memory" || reason == "Scope") parityUnavailable = true
+            },
+            onWorkspace = { bytes ->
+                if (bytes > parityPeakBytes) {
+                    note("ParityWorkspaceBytes", bytes - parityPeakBytes)
+                    parityPeakBytes = bytes
+                }
+            },
+        )
+        note("ParityDiscoveryWork", spent)
+        note("ParityDiscoveryNanos", start.elapsedNow().inWholeNanoseconds)
+        if (captured == null || rootCancellation()) return false
+        pendingParity = captured
+        root = session
+        note("ParityRows", captured.rows.toLong())
+        note("ParityPins", captured.newPins.toLong())
         return true
     }
 
@@ -226,9 +267,11 @@ internal class PrivateRebuildSatisfaction(
         val start = TimeSource.Monotonic.markNow()
         val binary = pendingBinary
         pendingBinary = null
+        val parity = pendingParity
+        pendingParity = null
         val prepared = PrivateRebuildGeneration.prepare(session,
             params.learnedMemoryScratchBytes - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(), token,
-            onDecline = { note("Declined$it") }, learnedBinary = binary) {
+            onDecline = { note("Declined$it") }, learnedBinary = binary, parity = parity) {
             (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L) / 2L
         }
         note("PreparationNanos", start.elapsedNow().inWholeNanoseconds)
@@ -242,6 +285,7 @@ internal class PrivateRebuildSatisfaction(
         if (prepared.passStopped) note("PassStopped")
         note("Eliminated", prepared.eliminated.toLong())
         note("EquivalentColumns", prepared.equivalenceMerges.toLong())
+        note("ParityGenerationPins", prepared.parityPins.toLong())
         note("AdmittedColumns", prepared.admittedColumns.toLong())
         note("ModeledPrivateBytes", prepared.modeledBytes + attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong())
         note("WarmClausesRetained", session.learnedClauseCount.toLong())
@@ -353,6 +397,7 @@ internal class PrivateRebuildSatisfaction(
                 root = null
                 generation = null
                 pendingBinary = null
+                pendingParity = null
                 attemptedBinaryPairs = longArrayOf()
                 note("ChargedWork", trialSpent())
                 retainedStats = stats
