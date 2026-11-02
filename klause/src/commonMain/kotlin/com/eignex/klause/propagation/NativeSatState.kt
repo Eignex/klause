@@ -467,7 +467,7 @@ internal class NativeSatState(private val state: PropagationState) {
             if (!mayDrop(index)) return false
             val pinned = if (index == prepared) protected else capProtected(index, budget, 0L)
             if (pinned) return false
-            budget.visit(16L)
+            budget.visit(24L)
             budget.visit(0L)
             learnedPayloads.release(index)
             lifecycleStages[index] = lifecycleStages[index] or RETIRED
@@ -505,7 +505,7 @@ internal class NativeSatState(private val state: PropagationState) {
         if (learnedPermanent[index] == 1 || literalCountOf(index) <= 1 || learnedBoolReasons[index] > 0 ||
             lifecycleStages[index] and 2 != 0
         ) return LearnedRetirementResult(LearnedRetirementStatus.ProtectedFloor)
-        budget.visit(32L)
+        budget.visit(40L)
         budget.visit(0L)
         learnedPayloads.release(index)
         lifecycleStages[index] = lifecycleStages[index] or RETIRED
@@ -608,7 +608,7 @@ internal class NativeSatState(private val state: PropagationState) {
         for (i in 0 until learnedCount) if (remap[i] < 0) {
             state.work++
             if (!retiredOf(i)) state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
-            state.work += 16L
+            state.work += 24L
             learnedPayloads.release(i)
         }
         state.remapReasons(state.boolReason, remap, baseCount)

@@ -25,6 +25,19 @@ class NativeSatStateTest {
     private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
 
     @Test
+    fun `native payload growth should preserve the last learned implication`() {
+        for (count in listOf(1, 2, 3, 63, 64, 65, 66)) {
+            val session = session(8, or(6, true, 7, true))
+            repeat(count - 1) { session.addLearnedClause(Clause(or(2, true, 3, true)), 9) }
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+
+            session.pinBool(0, false)
+
+            assertEquals(true, session.boolValue(1), "count=$count")
+        }
+    }
+
+    @Test
     fun `empty native payload pages should release reference capacity without remapping`() {
         val session = session(4, or(2, true, 3, true))
         repeat(129) { index ->

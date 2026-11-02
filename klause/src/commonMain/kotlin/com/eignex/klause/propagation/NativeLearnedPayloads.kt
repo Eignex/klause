@@ -3,10 +3,17 @@ package com.eignex.klause.propagation
 import com.eignex.klause.util.SharingMemoryObservation
 
 internal class NativeLearnedPayloads {
-    private class Page {
-        val rows = arrayOfNulls<IntArray>(PAGE_SIZE)
+    private class Page(capacity: Int) {
+        var rows = arrayOfNulls<IntArray>(capacity)
         var words = 0L
         var live = 0
+
+        fun growthWork(required: Int): Long = if (required <= rows.size) 0L else
+            capacityFor(required) * 2L + rows.size + 4L
+
+        fun growTo(required: Int) {
+            if (required > rows.size) rows = rows.copyOf(capacityFor(required))
+        }
     }
 
     private var directory = arrayOfNulls<Page>(1)
@@ -14,23 +21,34 @@ internal class NativeLearnedPayloads {
         private set
     private var words = 0L
     private var pageCount = 0
+    private var referenceSlots = 0L
     val capacityBytes: Long get() = words * Int.SIZE_BYTES
-    val referenceCapacity: Long get() = pageCount.toLong() * PAGE_SIZE
+    val referenceCapacity: Long get() = referenceSlots
     val directoryCapacity: Long get() = directory.size.toLong()
-    val primitiveBytes: Long get() = 16L + pageCount * 12L
+    val primitiveBytes: Long get() = 24L + pageCount * 12L
 
     fun admissionWork(literals: Int): Long {
-        val page = size ushr PAGE_SHIFT
-        val growth = if (page >= directory.size) directory.size * 3L + 1L else 0L
-        return literals * 2L + 12L + growth +
-            if (directory.getOrNull(page) == null) PAGE_SIZE * 2L + 8L else 0L
+        val index = size ushr PAGE_SHIFT
+        val required = (size and PAGE_MASK) + 1
+        val page = directory.getOrNull(index)
+        val growth = if (index >= directory.size) directory.size * 3L + 1L else 0L
+        val allocation = page?.growthWork(required) ?: (capacityFor(required) * 2L + 8L)
+        return literals * 2L + 12L + growth + allocation
     }
 
     fun add(literals: IntArray) {
         val index = size ushr PAGE_SHIFT
+        val slot = size and PAGE_MASK
         if (index >= directory.size) directory = directory.copyOf(maxOf(directory.size * 2, index + 1))
-        val page = directory[index] ?: Page().also { directory[index] = it; pageCount++ }
-        page.rows[size and PAGE_MASK] = literals.copyOf()
+        val page = directory[index] ?: Page(capacityFor(slot + 1)).also {
+            directory[index] = it
+            pageCount++
+            referenceSlots += it.rows.size
+        }
+        val capacity = page.rows.size
+        page.growTo(slot + 1)
+        referenceSlots += page.rows.size - capacity
+        page.rows[slot] = literals.copyOf()
         page.words += literals.size
         page.live++
         words += literals.size
@@ -40,7 +58,8 @@ internal class NativeLearnedPayloads {
     operator fun get(index: Int): IntArray = checkNotNull(checkNotNull(directory[index ushr PAGE_SHIFT])
         .rows[index and PAGE_MASK])
 
-    fun length(index: Int): Int = directory.getOrNull(index ushr PAGE_SHIFT)?.rows?.get(index and PAGE_MASK)?.size ?: 0
+    fun length(index: Int): Int =
+        directory.getOrNull(index ushr PAGE_SHIFT)?.rows?.getOrNull(index and PAGE_MASK)?.size ?: 0
 
     fun release(index: Int) {
         val pageIndex = index ushr PAGE_SHIFT
@@ -53,6 +72,7 @@ internal class NativeLearnedPayloads {
         page.live--
         if (page.live == 0) {
             directory[pageIndex] = null
+            referenceSlots -= page.rows.size
             pageCount--
         }
     }
@@ -64,13 +84,18 @@ internal class NativeLearnedPayloads {
         val sourceSlot = source and PAGE_MASK
         val literals = sourcePage.rows[sourceSlot] ?: return 2L
         val targetIndex = target ushr PAGE_SHIFT
-        var work = 24L
-        val targetPage = directory[targetIndex] ?: Page().also {
+        val targetSlot = target and PAGE_MASK
+        var work = 32L
+        val targetPage = directory[targetIndex] ?: Page(capacityFor(targetSlot + 1)).also {
             directory[targetIndex] = it
             pageCount++
-            work += PAGE_SIZE * 2L + 8L
+            referenceSlots += it.rows.size
+            work += it.rows.size * 2L + 8L
         }
-        val targetSlot = target and PAGE_MASK
+        work += targetPage.growthWork(targetSlot + 1)
+        val capacity = targetPage.rows.size
+        targetPage.growTo(targetSlot + 1)
+        referenceSlots += targetPage.rows.size - capacity
         check(targetPage.rows[targetSlot] == null)
         targetPage.rows[targetSlot] = literals
         sourcePage.rows[sourceSlot] = null
@@ -81,6 +106,7 @@ internal class NativeLearnedPayloads {
             sourcePage.live--
             if (sourcePage.live == 0) {
                 directory[sourceIndex] = null
+                referenceSlots -= sourcePage.rows.size
                 pageCount--
             }
         }
@@ -88,17 +114,29 @@ internal class NativeLearnedPayloads {
     }
 
     fun trimTo(count: Int): Long {
+        var work = 1L
         val retained = pageSlots(count)
         size = count
-        if (directory.size == retained) return 1L
-        directory = directory.copyOf(retained)
-        return 2L + retained * 2L
+        if (count > 0) {
+            val page = directory[retained - 1]
+            val required = ((count - 1) and PAGE_MASK) + 1
+            if (page != null && page.rows.size > required) {
+                referenceSlots -= page.rows.size - required
+                page.rows = page.rows.copyOf(required)
+                work += required * 2L + 4L
+            }
+        }
+        if (directory.size != retained) {
+            directory = directory.copyOf(retained)
+            work += 2L + retained * 2L
+        }
+        return work
     }
 
     fun prepareRemap(budget: ReclamationPreparation) {
         val pages = pageSlots(size).toLong()
         budget.atomic(directory.size * 2L + size + pages * PAGE_SIZE * 2L,
-            (directory.size * 2L + pages * PAGE_SIZE) * Long.SIZE_BYTES + pages * 20L)
+            (directory.size * 2L + pages * PAGE_SIZE * 2L) * Long.SIZE_BYTES + pages * 20L)
     }
 
     fun sharingMemory(sample: SharingMemoryObservation, protectedRows: Boolean, protected: (Int) -> Boolean) {
@@ -120,9 +158,9 @@ internal class NativeLearnedPayloads {
             // Admission copies every array; the page owns one disjoint payload and reference pool.
             sample.ownedPool(page, 12L + page.words * Int.SIZE_BYTES,
                 if (retained) 12L + protectedWords * Int.SIZE_BYTES else 0L)
-            sample.ownedReferences(page, PAGE_SIZE + 1L, retained)
+            sample.ownedReferences(page, page.rows.size + 1L, retained)
         }
-        sample.owned(this, 16L, protectedRows)
+        sample.owned(this, 24L, protectedRows)
         sample.ownedReferences(this, 1L, protectedRows)
         sample.ownedReferences(directory, directoryCapacity, protectedRows)
     }
@@ -133,5 +171,6 @@ internal class NativeLearnedPayloads {
         const val PAGE_SHIFT = 6
         const val PAGE_SIZE = 1 shl PAGE_SHIFT
         const val PAGE_MASK = PAGE_SIZE - 1
+        fun capacityFor(count: Int): Int = 1 shl (Int.SIZE_BITS - (count - 1).countLeadingZeroBits())
     }
 }
