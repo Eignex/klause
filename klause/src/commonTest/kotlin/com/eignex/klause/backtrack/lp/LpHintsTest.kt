@@ -83,9 +83,9 @@ class LpHintsTest {
     }
 
     @Test
-    fun `basis side advice puts the larger predicted child gain first`() {
-        for (boolean in listOf(false, true)) for (id in 0..1) {
-            for (upCostly in listOf(false, true)) for (upFirst in listOf(false, true)) {
+    fun `basis side advice puts the larger predicted child gain first when allowed`() {
+        for (boolean in listOf(false, true)) for (allowBasis in listOf(false, true)) {
+            for (id in 0..1) for (upCostly in listOf(false, true)) for (upFirst in listOf(false, true)) {
                 val builder = LpBuilder()
                 repeat(2) { builder.addVar(0, 2) }
                 val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
@@ -101,9 +101,11 @@ class LpHintsTest {
                 val upper = if (boolean) SearchDecision.Bool(2 * id) else SearchDecision.IntAtLeast(id, 1L)
                 val existing = if (upFirst) listOf(upper, lower) else listOf(lower, upper)
 
-                val ordered = hints.orderAlternatives(variable, existing)
+                val ordered = hints.orderAlternatives(variable, existing, allowBasis)
 
-                assertEquals(if (upCostly) listOf(upper, lower) else listOf(lower, upper), ordered)
+                val expected = if (!allowBasis) existing else
+                    if (upCostly) listOf(upper, lower) else listOf(lower, upper)
+                assertEquals(expected, ordered)
             }
         }
     }
@@ -534,7 +536,7 @@ class LpHintsTest {
     fun `only reliable history supplies child priority`() {
         for ((samples, gain, accepted) in listOf(
             Triple(1, 1.0, false), Triple(1, 8.0, false), Triple(1, 16.0, false), Triple(2, 1.0, true),
-        )) {
+        )) for (allowBasis in listOf(false, true)) {
             val builder = LpBuilder()
             builder.addVar(0, 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -561,7 +563,7 @@ class LpHintsTest {
             hints.branch(variable, IntDomain(0, 10))
             val existing = listOf(SearchDecision.IntAtMost(0, 2L), SearchDecision.IntAtLeast(0, 3L))
 
-            val ordered = hints.orderAlternatives(variable, existing)
+            val ordered = hints.orderAlternatives(variable, existing, allowBasis)
 
             assertEquals(if (accepted) existing.reversed() else existing, ordered, "samples=$samples gain=$gain")
         }

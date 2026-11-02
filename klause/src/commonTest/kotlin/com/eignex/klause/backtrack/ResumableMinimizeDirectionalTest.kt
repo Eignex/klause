@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
 
 class ResumableMinimizeDirectionalTest {
     @Test
-    fun `finite search consumes directional child advice across cooperative slices`() {
+    fun `finite search consumes observed child advice across cooperative slices`() {
         val blocks = 2
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
@@ -64,6 +64,8 @@ class ResumableMinimizeDirectionalTest {
             assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["SIDE_CONSUMED"] ?: 0L) > 0L, diagnostic)
+            assertTrue((observations["HISTORY_SIDE_CONSUMED"] ?: 0L) > 0L, diagnostic)
+            assertEquals(0L, observations["BASIS_SIDE_CONSUMED"] ?: 0L, diagnostic)
         }
     }
 

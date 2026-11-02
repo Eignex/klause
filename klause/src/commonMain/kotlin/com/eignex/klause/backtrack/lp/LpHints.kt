@@ -212,7 +212,11 @@ internal class LpHints(
         return true
     }
 
-    fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> {
+    fun orderAlternatives(
+        variable: VarRef,
+        alternatives: List<SearchDecision>,
+        allowBasis: Boolean = true,
+    ): List<SearchDecision> {
         val advice = activeSide ?: return alternatives
         activeSide = null
         charge(12L)
@@ -226,6 +230,10 @@ internal class LpHints(
             !(firstDown && alternatives[1].matchesSide(advice, up = true))
         ) {
             observe("SIDE_FALLBACK")
+            return alternatives
+        }
+        if (advice.basis && !allowBasis) {
+            observe("BASIS_SIDE_WITHHELD")
             return alternatives
         }
         observe(if (advice.basis) "BASIS_SIDE_CONSUMED" else "HISTORY_SIDE_CONSUMED")

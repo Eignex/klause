@@ -278,7 +278,8 @@ using each direction's mean cost per unit of fractional movement. The balanced
 Missing or unreliable history permits one bounded current-basis estimate for the
 selected structural column. A matching retained optimal basis supplies both objective
 costs, multiplied by the corresponding fractional movements. These estimates remain
-current-node advice, separate from observed gains and proof authority.
+current-node advice, separate from observed gains and proof authority. Branch ordering
+admits observed gains; basis estimates are recorded without changing child order.
 
 The larger predicted objective increase is tried first, after value and incumbent
 guidance, only when both existing alternatives match the estimated Boolean or integer
