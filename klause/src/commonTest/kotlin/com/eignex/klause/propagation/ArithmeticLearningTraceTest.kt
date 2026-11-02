@@ -23,7 +23,8 @@ import kotlin.test.assertTrue
 class ArithmeticLearningTraceTest {
     @Test
     fun `integer attribution should report bounded declines after retirement`() {
-        val session = PropagationSession(Problem(0, 0, emptyArray(), emptyArray()), attribution = true)
+        val session = PropagationSession(PropagationProblem(Problem(0, 0, emptyArray(), emptyArray())),
+            attribution = true)
         session.enableIntegerRowLearning()
         val trace = requireNotNull(session.explanationState.arithmeticLearningTrace)
 
@@ -54,7 +55,8 @@ class ArithmeticLearningTraceTest {
 
     @Test
     fun `disabling attribution should preserve an independently attached trace`() {
-        val session = PropagationSession(Problem(0, 0, emptyArray(), emptyArray()), attribution = true)
+        val session = PropagationSession(PropagationProblem(Problem(0, 0, emptyArray(), emptyArray())),
+            attribution = true)
         session.enableIntegerRowLearning()
         val trace = ArithmeticLearningTrace()
         session.explanationState.arithmeticLearningTrace = trace
