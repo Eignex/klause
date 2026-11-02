@@ -10,6 +10,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
 import kotlin.random.Random
 import kotlin.test.assertEquals
@@ -76,7 +77,10 @@ object FactorPropagationOracle {
         }
     }
 
-    fun sourceAssignments(problem: Problem): Sequence<Sample> {
+    fun sourceAssignments(problem: Problem): Sequence<Sample> =
+        sourceAssignmentValues(problem).map { it.snapshot() }
+
+    private fun sourceAssignmentValues(problem: Problem): Sequence<Assignment> {
         require(problem !is BakedProblem) { "Pass the original source Problem, before root domains are folded." }
         require(problem.numRealVars == 0) { "The oracle requires a finite Boolean/integer assignment space." }
         require((0 until problem.numIntVars).all { problem.intBounds.hasLower(it) && problem.intBounds.hasUpper(it) }) {
@@ -95,19 +99,21 @@ object FactorPropagationOracle {
         domains.forEach { include(it.valueCount) }
         val radices = LongArray(domains.size) { domains[it].valueCount }
         val spans = Array(domains.size) { domains[it].values }
-        return (0 until space.toInt()).asSequence().map { ordinal ->
-            var remaining = ordinal.toLong()
-            val bools = BooleanArray(problem.numBoolVars) {
-                val value = remaining % 2L == 1L
-                remaining /= 2L
-                value
+        return sequence {
+            // The cursor owns mutable coordinates; retained witnesses snapshot before advance.
+            val assignment = Assignment(problem.numBoolVars, problem.numIntVars)
+            for (ordinal in 0 until space.toInt()) {
+                var remaining = ordinal.toLong()
+                for (v in 0 until problem.numBoolVars) {
+                    assignment.setBool(v, remaining % 2L == 1L)
+                    remaining /= 2L
+                }
+                for (v in 0 until problem.numIntVars) {
+                    assignment.setInt(v, spans[v].valueAt((remaining % radices[v]).toInt()))
+                    remaining /= radices[v]
+                }
+                yield(assignment)
             }
-            val ints = LongArray(problem.numIntVars) { v ->
-                val value = spans[v].valueAt((remaining % radices[v]).toInt())
-                remaining /= radices[v]
-                value
-            }
-            Sample.fromOwned(bools, ints)
         }
     }
 
@@ -189,21 +195,28 @@ object FactorPropagationOracle {
         state.recompute()
     }
 
+    private fun load(state: LocalSearchState, assignment: Assignment) {
+        for (v in 0 until assignment.numBoolVars) state.assignment.setBool(v, assignment.boolValue(v))
+        for (v in 0 until assignment.numIntVars) state.assignment.setInt(v, assignment.intValue(v))
+        state.recompute()
+    }
+
     internal fun enumerateSat(
         problem: Problem,
         label: String,
         satisfies: ((Sample) -> Boolean)?,
-        relevant: (Sample) -> Boolean = { true },
+        relevant: (Assignment) -> Boolean = { true },
     ): List<Sample> {
         val samples = ArrayList<Sample>()
-        val assignments = sourceAssignments(problem)
+        val assignments = sourceAssignmentValues(problem)
         val state = declaredState(problem)
-        for (sample in assignments) {
-            if (!relevant(sample)) continue
-            load(state, sample)
+        for (assignment in assignments) {
+            if (!relevant(assignment)) continue
+            load(state, assignment)
             if (satisfies == null) {
-                if (state.cost == 0L) samples.add(sample)
+                if (state.cost == 0L) samples.add(assignment.snapshot())
             } else {
+                val sample = assignment.snapshot()
                 val accepted = satisfies(sample)
                 assertEquals(
                     accepted,

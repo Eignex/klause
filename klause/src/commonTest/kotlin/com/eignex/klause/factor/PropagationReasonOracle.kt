@@ -9,7 +9,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.reasonOf
-import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.Assignment
 import kotlin.test.fail
 
 object PropagationReasonOracle {
@@ -36,13 +36,13 @@ object PropagationReasonOracle {
             FactorPropagationOracle.sourceAssignments(problem)
             return
         }
-        val implications = ArrayList<Pair<(Sample) -> Boolean, () -> String>>()
+        val implications = ArrayList<Pair<(Assignment) -> Boolean, () -> String>>()
         for (b in 0 until problem.numBoolVars) {
             val value = state.boolValues[b] ?: continue
             if (boolsBefore[b] != null) continue
             val reason = state.reasonOf(state.boolAntecedents[b])?.copyOf()
             implications.add(
-                { s: Sample ->
+                { s: Assignment ->
                     s.boolValue(b) == value || reason?.any { lit -> litTrueUnder(problem, state, lit, s) } == true
                 } to {
                     "$label: pinning b$b=$value rests on ${reason?.map { describe(state, problem, it) }}, " +
@@ -57,19 +57,19 @@ object PropagationReasonOracle {
                 val (recorded, holds) = when {
                     k < after.min -> {
                         if (k != before[v].min) continue
-                        state.intMinAntecedents[v] to { s: Sample -> s.intValue(v) >= after.min }
+                        state.intMinAntecedents[v] to { s: Assignment -> s.intValue(v) >= after.min }
                     }
 
                     k > after.max -> {
                         if (k != before[v].max) continue
-                        state.intMaxAntecedents[v] to { s: Sample -> s.intValue(v) <= after.max }
+                        state.intMaxAntecedents[v] to { s: Assignment -> s.intValue(v) <= after.max }
                     }
 
-                    else -> state.holeReasonFor(v, k) to { s: Sample -> s.intValue(v) != k }
+                    else -> state.holeReasonFor(v, k) to { s: Assignment -> s.intValue(v) != k }
                 }
                 val reason = state.reasonOf(recorded)?.copyOf()
                 implications.add(
-                    { s: Sample ->
+                    { s: Assignment ->
                         holds(s) || reason?.any { lit -> litTrueUnder(problem, state, lit, s) } == true
                     } to {
                         "$label: removing $k from x$v rests on ${reason?.map { describe(state, problem, it) }}, " +
@@ -83,7 +83,10 @@ object PropagationReasonOracle {
             implications.any { !it.first(sample) }
         }
         for (sample in solutions) {
-            val rejected = implications.first { !it.first(sample) }
+            val assignment = Assignment(problem.numBoolVars, problem.numIntVars)
+            for (v in 0 until sample.numBoolVars) assignment.setBool(v, sample.boolValue(v))
+            for (v in 0 until sample.numIntVars) assignment.setInt(v, sample.intValue(v))
+            val rejected = implications.first { !it.first(assignment) }
             fail("${rejected.second()} by a source solution (ints=${sample.ints.toList()}, " +
                 "bools=${sample.bools.toList()})")
         }
@@ -91,7 +94,7 @@ object PropagationReasonOracle {
 
     private fun values(d: IntDomain): List<Long> = (d.min..d.max).filter { it in d }
 
-    private fun litTrueUnder(problem: Problem, state: PropagationState, lit: Int, s: Sample): Boolean =
+    private fun litTrueUnder(problem: Problem, state: PropagationState, lit: Int, s: Assignment): Boolean =
         ConflictReasonOracle.litTrueUnder(problem, state, lit, s)
 
     private fun describe(state: PropagationState, problem: Problem, lit: Int): String {
