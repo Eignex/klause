@@ -20,6 +20,7 @@ internal class LearnedClauseDb(
      *  pass — never correctness. */
     var binaryClauseCount: Int,
     initializeRows: Boolean = true,
+    rowOwner: PropagationState? = null,
 ) {
     val lifecycle = LearnedLifecycle()
     val pendingAttach = IntArrayList()
@@ -44,13 +45,12 @@ internal class LearnedClauseDb(
     val units = IntArrayList()
     var unitsPending = false
 
-    private val rowStore = if (initializeRows) lazyOf(GeneralLearnedRows())
-        else lazy(LazyThreadSafetyMode.NONE) { GeneralLearnedRows() }
+    private val rowStore = if (initializeRows) lazyOf(GeneralLearnedRows(rowOwner))
+        else lazy(LazyThreadSafetyMode.NONE) { GeneralLearnedRows(rowOwner) }
     val store: GeneralLearnedRows get() = rowStore.value
     val initializedStore: GeneralLearnedRows? get() = if (rowStore.isInitialized()) store else null
     internal var integerRows: LearnedIntegerRows? = null
-    internal var retiredMetadataHead = -1
-    internal var retiredMetadataTail = -1
+    internal val retiredMetadataHead: Int get() = initializedStore?.retiredHeadIndex ?: -1
     internal var releasedPeerImports = 0
     internal var releasedConsumedPeerImports = 0
     internal var releasedConsumed = 0
@@ -88,13 +88,11 @@ internal class LearnedClauseDb(
         return work
     }
 
-    internal fun resetCapIndex() {
+    internal fun resetCapIndex(): Long {
         permanentClauseCount = 0
         permanentArithmeticCount = 0
         nonClauseCount = 0
         retiredCount = 0
-        retiredMetadataHead = -1
-        retiredMetadataTail = -1
         releasedPeerImports = 0
         releasedConsumedPeerImports = 0
         releasedConsumed = 0
@@ -106,6 +104,7 @@ internal class LearnedClauseDb(
         deferredWatchTrimScratch = 0L
         capCandidates.clear()
         capRanking.reset()
+        return initializedStore?.resetRetirements() ?: 0L
     }
 
     internal fun retire(index: Int, kind: LearnedKind) {
@@ -117,21 +116,16 @@ internal class LearnedClauseDb(
         lifecycle.note(kind, LearnedStage.Retired)
     }
 
-    internal fun enqueueRetiredMetadata(index: Int) {
-        store[index, GeneralLearnedRows.NEXT_RETIRED] = -1
-        if (retiredMetadataTail < 0) retiredMetadataHead = index
-        else store[retiredMetadataTail, GeneralLearnedRows.NEXT_RETIRED] = index
-        retiredMetadataTail = index
-    }
+    internal fun enqueueRetiredMetadata(index: Int) = store.enqueueRetired(index)
 
-    internal fun releaseRetiredMetadata(index: Int) {
-        val peer = store[index, GeneralLearnedRows.ORIGIN] >= 0
+    internal fun releaseRetiredMetadata() {
+        val peer = store.retiredValue(GeneralLearnedRows.ORIGIN) >= 0
         if (peer) releasedPeerImports++
-        if (store[index, GeneralLearnedRows.STAGES] and 2 != 0) {
+        if (store.retiredValue(GeneralLearnedRows.STAGES) and 2 != 0) {
             releasedConsumed++
             if (peer) releasedConsumedPeerImports++
         }
-        store.release(index)
+        store.releaseRetired()
     }
 
     internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) emptyMap() else mapOf(

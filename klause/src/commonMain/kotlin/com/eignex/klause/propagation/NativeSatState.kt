@@ -58,7 +58,7 @@ internal class NativeSatState(private val state: PropagationState) {
     // Per-learned-clause policy columns, parallel to the learned index — the native mirror of
     // LearnedClauseDb's forgetting/three-tier metadata. Recent use shares lifecycle storage;
     // permanent clauses survive every forget.
-    private val metadata = NativeLearnedMetadata()
+    private val metadata = NativeLearnedMetadata(state)
     private val learnedUnits = IntArrayList()
     private var unitsPending = false
     private val rechecks = IntArrayList()
@@ -110,7 +110,7 @@ internal class NativeSatState(private val state: PropagationState) {
     private var pendingConflict = false
 
     init {
-        state.work += metadata.preparationWork
+        state.preparationIndexWork += metadata.preparationWork
         state.preparationIndexWork += learnedPayloads.preparationWork
         for (h in 0 until baseCount) {
             val len = arena.length(h)
@@ -151,8 +151,6 @@ internal class NativeSatState(private val state: PropagationState) {
     private var sweptRetirements = 0
     private var sweepingRetirements = -1
 
-    private var retiredMetadataHead = -1
-    private var retiredMetadataTail = -1
     private var retiredMetadataCount = 0
 
     internal fun sweepRetiredMetadata(budget: ReclamationPreparation) {
@@ -162,27 +160,20 @@ internal class NativeSatState(private val state: PropagationState) {
             metadata.releaseEmptyReservation()
             budget.advanced()
         }
-        while (retiredMetadataHead >= 0) {
+        while (metadata.hasRetiredRows) {
             budget.visit(20L, 16L)
             budget.visit(0L)
-            val index = retiredMetadataHead
-            val next = metadata[index, NativeLearnedMetadata.SCAN]
-            metadata.release(index)
-            retiredMetadataHead = next
-            if (next < 0) retiredMetadataTail = -1
+            metadata.releaseRetired()
             retiredMetadataCount--
             budget.advanced()
         }
+        metadata.sweepDirectory(budget)
         learnedPayloads.sweepDirectory(budget)
+        trimLearnedCandidates(capCandidates, budget)
     }
 
     private fun enqueueRetiredMetadata(index: Int) {
-        // Payload unlink, retirement counters and queue publication fit the 24-work row transaction.
-        // Retired clauses do not resume literal scans, so the same slot links their release queue.
-        metadata[index, NativeLearnedMetadata.SCAN] = -1
-        if (retiredMetadataTail < 0) retiredMetadataHead = index
-        else metadata[retiredMetadataTail, NativeLearnedMetadata.SCAN] = index
-        retiredMetadataTail = index
+        metadata.enqueueRetired(index)
         retiredMetadataCount++
     }
 
@@ -205,7 +196,10 @@ internal class NativeSatState(private val state: PropagationState) {
         if (lit == watchCleanupLiteral && idx < watchCleanupIndex) watchCleanupIndex = idx
     }
 
-    internal fun sweepRetiredWatches(budget: ReclamationPreparation) {
+    internal fun sweepRetiredWatches(budget: ReclamationPreparation) =
+        metadata.usingBudget(budget) { sweepWatches(budget) }
+
+    private fun sweepWatches(budget: ReclamationPreparation) {
         if (retiredCount == 0) return
         if (sweepingRetirements < 0) {
             if (sweptRetirements == retiredCount) return
@@ -375,7 +369,10 @@ internal class NativeSatState(private val state: PropagationState) {
 
     // Learned-clause policy accessors: the native mirror of the LearnedClauseDb columns.
 
-    internal fun sharingMemory(sample: SharingMemoryObservation, protected: SharingMemoryObservation.Seen<Int>) {
+    internal fun sharingMemory(sample: SharingMemoryObservation, protected: SharingMemoryObservation.Seen<Int>) =
+        metadata.usingObservation(sample) { observeSharingMemory(sample, protected) }
+
+    private fun observeSharingMemory(sample: SharingMemoryObservation, protected: SharingMemoryObservation.Seen<Int>) {
         repeat(3) { sample.step() }
         for (i in recheckHead until rechecks.size) {
             sample.step()
@@ -387,7 +384,7 @@ internal class NativeSatState(private val state: PropagationState) {
         state.learned.capRanking.sharingMemory(sample, protectedRows)
         val columns = listOf(learnedUnits, rechecks, capCandidates,
             state.learned.capCandidates)
-        var metadataBytes = 64L + capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
+        var metadataBytes = 56L + capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
             learnedPayloads.primitiveBytes + metadata.primitiveBytes
         metadata.sharingMemory(sample, protectedRows) { index ->
             metadata[index, NativeLearnedMetadata.PERMANENT] == 1 || sample.contains(protected, index)
@@ -412,9 +409,9 @@ internal class NativeSatState(private val state: PropagationState) {
         sample.ownedReferences(watchEntries, watchEntries.size.toLong(), true)
         var watchBytes = 0L
         var watchPostings = 0L
-        sample.ownedPool(this, 40L, (if (protectedRows) 12L else 0L) +
+        sample.ownedPool(this, 32L, (if (protectedRows) 12L else 0L) +
             (if (sweepingRetirements >= 0) 16L else 0L) +
-            (if (retiredMetadataHead >= 0) 12L else 0L))
+            (if (metadata.hasRetiredRows) 4L else 0L))
         for (entries in watchEntries) {
             sample.step()
             if (entries == null) continue
@@ -468,6 +465,9 @@ internal class NativeSatState(private val state: PropagationState) {
         metadata[i, NativeLearnedMetadata.STAGES] = metadata[i, NativeLearnedMetadata.STAGES] and RECENT_USED.inv()
     }
 
+    internal fun <T> withOwnershipBudget(budget: ReclamationPreparation, operation: () -> T): T =
+        metadata.usingBudget(budget) { learnedPayloads.usingBudget(budget, operation) }
+
     internal fun maintainCapWindow(
         cap: Int,
         maxWork: Long,
@@ -491,7 +491,7 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         try {
             budget.visit(0L, 64L)
-            learnedPayloads.usingBudget(budget) {
+            withOwnershipBudget(budget) {
                 capRanking.advance(cap, permanentCount, budget, capPolicy(budget, canDrop, keep))
             }
         } catch (_: ReclamationPreparation.Deferred) {
@@ -553,7 +553,7 @@ internal class NativeSatState(private val state: PropagationState) {
     }
 
     internal fun retireSelectedLearnedClause(index: Int, budget: ReclamationPreparation): LearnedRetirementResult =
-        learnedPayloads.usingBudget(budget) { retireSelected(index, budget) }
+        withOwnershipBudget(budget) { retireSelected(index, budget) }
 
     private fun retireSelected(index: Int, budget: ReclamationPreparation): LearnedRetirementResult {
         if (!initialized || pendingConflict || bcpHead != state.boolPinOrder.size || state.runCancelled) {
@@ -637,7 +637,7 @@ internal class NativeSatState(private val state: PropagationState) {
         budget: ReclamationPreparation,
         retained: BooleanArray,
         keep: (Int, Int) -> Boolean,
-    ) = learnedPayloads.usingBudget(budget) { prepareRetained(budget, retained, keep) }
+    ) = withOwnershipBudget(budget) { prepareRetained(budget, retained, keep) }
 
     private fun prepareRetained(
         budget: ReclamationPreparation,
@@ -726,8 +726,7 @@ internal class NativeSatState(private val state: PropagationState) {
         consumedPeerImports = 0
         consumed = 0
         retiredCount = 0
-        retiredMetadataHead = -1
-        retiredMetadataTail = -1
+        state.work += metadata.resetRetirements()
         retiredMetadataCount = 0
         capCandidates.clear()
         capRanking.reset()
@@ -761,7 +760,10 @@ internal class NativeSatState(private val state: PropagationState) {
             state.work++
             if (!retiredOf(i) && clauseLen(baseCount + i) == 1) learnedUnits.add(baseCount + i)
         }
-        for (column in listOf(learnedUnits, rechecks, capCandidates)) column.trim()
+        for (column in listOf(learnedUnits, rechecks, capCandidates)) {
+            state.work += column.learnedTrimmingWork
+            column.trim()
+        }
     }
 
     private fun pinUnit(h: Int, unitIdx: Int): Boolean {

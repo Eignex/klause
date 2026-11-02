@@ -9,14 +9,11 @@ internal fun PropagationState.sweepRetiredGeneralMetadata(budget: ReclamationPre
         rows.releaseEmptyReservation()
         budget.advanced()
     }
-    while (learned.retiredMetadataHead >= 0) {
+    while (rows.hasRetiredRows) {
         budget.visit(32L, 16L)
         budget.visit(0L)
-        val index = learned.retiredMetadataHead
-        val next = rows[index, GeneralLearnedRows.NEXT_RETIRED]
-        learned.releaseRetiredMetadata(index)
-        learned.retiredMetadataHead = next
-        if (next < 0) learned.retiredMetadataTail = -1
+        learned.releaseRetiredMetadata()
         budget.advanced()
     }
+    rows.sweepDirectory(budget)
 }

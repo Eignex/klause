@@ -564,11 +564,17 @@ before testing newly appended retirements. Unfinished cursors, postings and inde
 nodes remain in owned primitive and reference totals.
 General retirement replaces its payload with an inert stable-ID slot and releases
 its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
-aliases. Stable paged rows own policy, admission, propagator and mutable-payload
-references together. Their fixed startup reservation belongs to state preparation;
-admissions charge subsequent growth. An intrusive queue resumes metadata release without scanning
-permanent rows; retained import/use counters survive released metadata. Empty pages
-release their primitive and reference allocations without renumbering live handles.
+aliases. General and Native metadata share a paged owner with at most sixteen rows
+per page. General pages include propagator and mutable-payload references. The first
+page belongs directly to its owner; later pages use a bounded sparse index. Fixed
+startup ownership belongs to state preparation, and admissions fund subsequent
+growth and index insertion. Lookups debit the active maintenance or observation
+grant, or the containing propagation ledger; a cached page avoids repeated lookups.
+A page queue and per-page retirement masks resume row release without scanning
+permanent rows or looking up another page. Retained import/use counters survive
+released metadata. Empty arrays release within their row transaction; empty headers
+and index branches wait for separately funded unlinking. Revived pages survive
+unlinking without renumbering live handles.
 Stale watches skip retired slots, and their capacity remains owned until its funded cleanup. Selection and subsequent retired-slot compaction share
 one work grant; compaction keeps every active row and receives only its remainder.
 Root simplification transfers its fresh residual literal array into the learned store;
@@ -577,17 +583,16 @@ resumably before whole-store preparation under
 the same grant. Sixteen-entry posting pages release at tail boundaries, and an empty
 posting list releases its directory. Posting mutations rewind an affected scan prefix;
 no learned handle or reason is remapped by this scan. A completed pass is reused until
-another learned retirement requires a scan. Native policy and admission metadata occupy
-pages with at most sixteen rows. A small startup reservation and later page growth
-retain their preparation/admission work; pressure can drop an unused reservation.
-Capacity changes replace the disjoint
-pool allocation identity. An intrusive queue releases retired slots and drops empty
-pages without remapping live handles; a protected row retains its page allocation.
-A retired row uses its inactive literal-scan slot as the queue link. Queue publication
-and release are funded transactions. Metadata release precedes watch scanning, so
-permanent postings cannot delay its progress. Appended retirements extend the queue.
-Ownership observations retain unfinished pages and use a disjoint metadata pool rather than per-row scratch.
-Full generation remapping retains its separate funding requirement.
+another learned retirement requires a scan. Metadata release precedes watch scanning,
+so permanent postings cannot delay its progress. Appended retirements extend the page
+queue. Candidate-array trimming receives a separate funded copy transaction and
+retains spare capacity when its work or scratch does not fit.
+Capacity changes replace the disjoint metadata pool identity. A protected row retains
+its complete page allocation; sparse-index protection includes the union of its
+required branch paths. Primitive and reference pools report cumulative protected
+subsets without per-node ownership scratch. Unfinished headers remain owned until
+unlinking. Full generation remapping funds traversal, row copies, queue reset and
+trimming before handles change.
 Tier classification publishes within each funded row transaction. Arithmetic reason
 snapshots and native/general full physical compaction require their complete funding.
 

@@ -6,6 +6,12 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryObservation
 
 internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
+    val rows = learned.initializedStore
+    if (nativeEngine == null && rows != null) rows.usingObservation(sample) { observeSharingMemory(sample) }
+    else observeSharingMemory(sample)
+}
+
+private fun PropagationState.observeSharingMemory(sample: SharingMemoryObservation) {
     selectedRetirements.sharingMemory(sample)
     sample.owned(this, Long.SIZE_BYTES * 2L, true)
     val protected = protectedLearnedMemory(sample)
@@ -178,8 +184,8 @@ private fun PropagationState.learnedSharingMemory(
     val columns = listOf(learned.units, learned.pendingAttach, learned.capCandidates)
     val protectedRows = protected.size > 0
     learned.capRanking.sharingMemory(sample, protectedRows)
-    var metadata = learned.capRanking.primitiveBytes + learned.store.primitiveBytes + 52L
-    sample.owned(learned, 52L, protectedRows)
+    var metadata = learned.capRanking.primitiveBytes + learned.store.primitiveBytes + 44L
+    sample.owned(learned, 44L, protectedRows)
     learned.store.sharingMemory(sample, protectedRows) { index ->
         learned.store[index, GeneralLearnedRows.PERMANENT] == 1 || sample.contains(protected, index)
     }

@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
+import com.eignex.klause.util.IntArrayList
 
 internal enum class ReclamationStatus { WITHIN_LIMIT, RECLAIMED, PROTECTED_FLOOR, DEFERRED, CANCELLED }
 
@@ -58,16 +59,38 @@ internal class ReclamationPreparation(
     private companion object { const val ATOMIC_PRICE = 32L }
 }
 
+internal fun <T> PropagationState.withLearnedOwnershipBudget(budget: ReclamationPreparation, operation: () -> T): T {
+    nativeEngine?.let { return it.withOwnershipBudget(budget, operation) }
+    val rows = learned.initializedStore
+    return if (rows != null) rows.usingBudget(budget, operation) else operation()
+}
+
 internal fun PropagationState.sweepRetiredLearnedMemory(budget: ReclamationPreparation) {
+    val rows = learned.initializedStore
+    if (nativeEngine == null && rows != null) rows.usingBudget(budget) { sweepRetiredOwners(budget) }
+    else sweepRetiredOwners(budget)
+}
+
+private fun PropagationState.sweepRetiredOwners(budget: ReclamationPreparation) {
     nativeEngine?.sweepRetiredMetadata(budget)
     nativeEngine?.sweepRetiredWatches(budget)
     sweepRetiredGeneralIntegerRows(budget)
     sweepRetiredGeneralMetadata(budget)
+    if (nativeEngine == null) trimLearnedCandidates(learned.capCandidates, budget)
     if (!incremental && nativeEngine == null) initializedWatches?.pos?.releaseReservations(budget)
     sweepRetiredGeneralWatches(budget)
 }
 
 internal fun PropagationState.prepareReclamation(
+    budget: ReclamationPreparation,
+    keep: (Int, Int) -> Boolean,
+): BooleanArray {
+    val rows = learned.initializedStore
+    return if (nativeEngine == null && rows != null) rows.usingBudget(budget) { prepareOwnedRows(budget, keep) }
+    else prepareOwnedRows(budget, keep)
+}
+
+private fun PropagationState.prepareOwnedRows(
     budget: ReclamationPreparation,
     keep: (Int, Int) -> Boolean,
 ): BooleanArray {
@@ -141,4 +164,18 @@ internal fun PropagationState.ownLearned(sample: com.eignex.klause.util.SharingM
         }
     }
     ints(learned.store.payload(index) as? IntArray)
+}
+
+internal val IntArrayList.learnedTrimmingWork: Long
+    get() = if (backingData.size > size.coerceAtLeast(1)) 5L + size.coerceAtLeast(1) * 2L else 0L
+
+internal fun trimLearnedCandidates(candidates: IntArrayList, budget: ReclamationPreparation) {
+    val count = candidates.size.coerceAtLeast(1).toLong()
+    val work = candidates.learnedTrimmingWork
+    val scratch = count * Int.SIZE_BYTES
+    if (work == 0L || !budget.supports(work, scratch)) return
+    budget.visit(work, scratch)
+    budget.visit(0L)
+    candidates.trim()
+    budget.advanced()
 }

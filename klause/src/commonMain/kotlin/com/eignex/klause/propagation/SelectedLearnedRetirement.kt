@@ -23,6 +23,13 @@ internal fun PropagationState.retireSelectedLearnedClause(
     budget: ReclamationPreparation,
 ): LearnedRetirementResult {
     nativeEngine?.let { return it.retireSelectedLearnedClause(index, budget) }
+    return learned.store.usingBudget(budget) { retireSelectedGeneralClause(index, budget) }
+}
+
+private fun PropagationState.retireSelectedGeneralClause(
+    index: Int,
+    budget: ReclamationPreparation,
+): LearnedRetirementResult {
     if (incremental || pendingFiniteMutation != null || rootFixpointPending || runCancelled) {
         return LearnedRetirementResult(LearnedRetirementStatus.Deferred)
     }

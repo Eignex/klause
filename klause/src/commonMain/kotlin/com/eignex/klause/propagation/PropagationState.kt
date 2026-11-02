@@ -511,6 +511,7 @@ class PropagationState private constructor(
             n
         },
         initializeRows = !usesNativeSat && !incremental,
+        rowOwner = this,
     )
     internal val selectedRetirements = LearnedRetirementRequests()
     internal var nextLearnedAdmissionKey = 0L

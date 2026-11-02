@@ -26,8 +26,10 @@ internal fun PropagationState.maintainGeneralCapWindow(
     val retiredBefore = learned.retiredCount
     try {
         budget.visit(0L, 64L)
-        learned.capRanking.advance(cap, learned.permanentClauseCount + learned.permanentArithmeticCount, budget,
-            generalCapPolicy(budget, canDrop, keep))
+        learned.store.usingBudget(budget) {
+            learned.capRanking.advance(cap, learned.permanentClauseCount + learned.permanentArithmeticCount, budget,
+                generalCapPolicy(budget, canDrop, keep))
+        }
     } catch (_: ReclamationPreparation.Deferred) {
         learned.capPreparationDefers++
         // Completed row transactions retain their handles; each resumed row rechecks its current owners.

@@ -1165,9 +1165,11 @@ class PropagationSession private constructor(
         if (decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot || inprocessingRootPending) {
             return LearnedRetirementResult(LearnedRetirementStatus.Deferred)
         }
-        return owner.selectedRetirements.capture(index, expectedGeneration,
-            selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled), maxRetainedBytes,
-            owner::validateSelectedLearnedRetirement, owner::learnedAdmissionKey)
+        val budget = selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled)
+        return owner.withLearnedOwnershipBudget(budget) {
+            owner.selectedRetirements.capture(index, expectedGeneration, budget, maxRetainedBytes,
+                owner::validateSelectedLearnedRetirement, owner::learnedAdmissionKey)
+        }
     }
 
     internal fun authorizeLearnedRetirement(

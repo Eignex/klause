@@ -291,7 +291,7 @@ internal fun PropagationState.forgetLearnedClauses(
 
     learned.units.clear()
     learned.integerRows?.let { rows -> work += rows.size.toLong() + 2L; rows.reset() }
-    learned.resetCapIndex()
+    work += learned.resetCapIndex()
     var w = 0
     for (i in 0 until n) {
         work++
@@ -416,7 +416,10 @@ internal fun PropagationState.forgetLearnedClauses(
         undo.minReason[i] = remappedReason(undo.minReason[i], remap, refBase)
         undo.maxReason[i] = remappedReason(undo.maxReason[i], remap, refBase)
     }
-    for (column in listOf(learned.units, learned.pendingAttach, learned.capCandidates)) column.trim()
+    for (column in listOf(learned.units, learned.pendingAttach, learned.capCandidates)) {
+        work += column.learnedTrimmingWork
+        column.trim()
+    }
     return true
 }
 
