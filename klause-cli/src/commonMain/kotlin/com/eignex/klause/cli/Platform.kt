@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.readText
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 // Platform seams for the CLI: the complete list of what differs between the JVM
@@ -58,6 +59,8 @@ private val timeOrigin = TimeSource.Monotonic.markNow()
 
 /** Monotonic clock for deadlines — only ever compared against itself. */
 internal fun nowMillis(): Long = timeOrigin.elapsedNow().inWholeMilliseconds
+
+internal fun deadlineMarkAt(millis: Long): TimeSource.Monotonic.ValueTimeMark = timeOrigin + millis.milliseconds
 
 internal fun fileName(path: String): String = path.substringAfterLast('/').substringAfterLast('\\')
 

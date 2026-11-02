@@ -31,6 +31,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 /*
  * CLI modes supply format detection, input loading, mode-specific flags and output
@@ -45,7 +46,7 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun CommonOptions.routingCancellation(): Cancellation {
     routingToken?.let { return it }
     if (!takeOpenBoundProof()) return Cancellation { true }.also { routingToken = it }
-    val solveStop = Cancellation { deadlineAtMs?.let { nowMillis() >= it } == true }
+    val solveStop = Cancellation { deadlineHasPassed() }
     val budget = sharedPresolveBudget()
     val phaseStop = presolveTimeCancellation or solveStop
     val token = budget?.let { routingSlice(it, phaseStop) } ?: phaseStop
@@ -55,7 +56,7 @@ internal fun CommonOptions.routingCancellation(): Cancellation {
 
 // Required admission observes the containing stop while retaining the shared routing work ledger.
 internal fun CommonOptions.routingPreparationCancellation(): RoutingPreparationScope = RoutingPreparationScope(
-    { deadlineAtMs?.let { nowMillis() >= it } == true },
+    { deadlineHasPassed() },
     routingCancellation().workMeter(),
 )
 
@@ -166,6 +167,13 @@ internal class CommonOptions {
      *  ([CliMode.load]) and the solve phase ([SolveCore]) so the two phases don't each spend a
      *  fresh full budget (which would let `-t` overshoot ~2×). Null when no `-t` is given. */
     var deadlineAtMs: Long? = null
+        set(value) {
+            field = value
+            deadlineMark = value?.let(::deadlineMarkAt)
+        }
+    private var deadlineMark: TimeSource.Monotonic.ValueTimeMark? = null
+
+    internal fun deadlineHasPassed(): Boolean = deadlineMark?.hasPassedNow() == true
 
     /** Null also represents an explicitly disabled cap, so initialization is tracked separately. */
     internal var presolveAllowanceInitialized = false
