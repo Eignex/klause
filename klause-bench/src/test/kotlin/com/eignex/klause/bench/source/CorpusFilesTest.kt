@@ -6,17 +6,19 @@ import java.io.InterruptedIOException
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class CorpusFilesTest {
     @ParameterizedTest
-    @ValueSource(booleans = [false, true])
-    fun `staging cancellation removes partial output before returning`(interrupt: Boolean) {
+    @CsvSource("false, 8192", "true, 8192", "false, 65536", "true, 65536")
+    fun `staging cancellation removes partial output before returning`(interrupt: Boolean, bufferBytes: Int) {
         val root = Files.createTempDirectory("corpusfiles").toFile()
         try {
             val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeBytes(ByteArray(32 * 1024)) })
@@ -32,7 +34,8 @@ class CorpusFilesTest {
                         if (interrupt) Thread.currentThread().interrupt()
                         else throw InterruptedIOException("cancelled")
                     }
-                }, onCleanup = { cleanupNanos = it }, stagingDirectory = staging) { error("cancelled source") }
+                }, onCleanup = { cleanupNanos = it }, stagingDirectory = staging,
+                    bufferBytes = bufferBytes) { error("cancelled source") }
             }
 
             assertTrue(partial != null)
@@ -43,6 +46,23 @@ class CorpusFilesTest {
             assertTrue(packed.isFile)
         } finally {
             Thread.interrupted()
+            root.deleteRecursively()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [8192, 65536])
+    fun `bounded staging chunks preserve all source bytes`(bufferBytes: Int) {
+        val root = Files.createTempDirectory("corpusfiles").toFile()
+        try {
+            val body = ByteArray(130_003) { (it % 251).toByte() }
+            val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeBytes(body) })
+
+            val observed = CorpusFiles.withPlainFile(packed, stagingDirectory = File(root, "staging"),
+                bufferBytes = bufferBytes) { it.readBytes() }
+
+            assertContentEquals(body, observed)
+        } finally {
             root.deleteRecursively()
         }
     }
