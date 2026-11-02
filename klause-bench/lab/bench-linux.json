@@ -28,6 +28,7 @@
     ".git",
     "klause-bench/lab",
     "klause-bench/scripts",
+    "klause-bench/sets",
     "klause-bench/smoke-corpus",
     "klause-bench/build/install",
     "klause-bench/build/lab-runtime",
