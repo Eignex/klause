@@ -75,10 +75,12 @@ class ResumableMinimizeDirectionalTest {
 
     @Test
     fun `fallback selected variable consumes current basis child advice`() {
-        val factors = Array<Factor>(3) { edge ->
-            Linear(longArrayOf(1L, 1L), intArrayOf(edge, (edge + 1) % 3), LinearOp.GE, 1L)
-        }
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, factors).bake()
+        val factors = arrayOf<Factor>(
+            Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 4L),
+            Linear(longArrayOf(1L, 1L), intArrayOf(1, 2), LinearOp.GE, 4L),
+            Linear(longArrayOf(1L, 2L), intArrayOf(0, 2), LinearOp.GE, 4L),
+        )
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 4) }, factors).bake()
         var fallbackPick: VarRef? = null
         val attempts = ArrayList<SearchDecision>()
         val selector = object : VariableSelector {
@@ -94,6 +96,9 @@ class ResumableMinimizeDirectionalTest {
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L),
             lpDirectionalGains = true,
+            componentFactory = { listOf(object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
+            }) },
             branchObserver = object : SearchBranchAttemptObserver {
                 override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                     attempts.add(decision)
@@ -101,15 +106,17 @@ class ResumableMinimizeDirectionalTest {
                 }
             },
         )
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 2L))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
 
         ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
             search.runSlice(Cancellation { attempts.isNotEmpty() }, 1000L, 100_000L) {}
 
-            assertEquals(VarRef.IntVar(0), fallbackPick)
-            assertEquals(1, attempts.size)
-            val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
-            assertTrue((observations["BASIS_SIDE_CONSUMED"] ?: 0L) > 0L, observations.toString())
+            val observations = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes.orEmpty()
+            val diagnostic = "fallback=$fallbackPick; attempts=$attempts; $observations; " +
+                "solves=${search.stats.lp.solves.sum}"
+            assertEquals(VarRef.IntVar(0), fallbackPick, diagnostic)
+            assertEquals(1, attempts.size, diagnostic)
+            assertTrue((observations["BASIS_SIDE_CONSUMED"] ?: 0L) > 0L, diagnostic)
         }
     }
 
