@@ -124,7 +124,10 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 val domain = state.intDomains[variable]
                 state.boundEstablishmentLevel(variable, if (lower) domain.min else domain.max, lower) ?: 0
             }.plus(fallback.decisionLevels.toList()).distinct().sorted().toIntArray()
-            if (retainedSources > 0) state.integerChainedProduced++
+            if (retainedSources > 0) {
+                state.integerChainedProduced++
+                if (transientSteps > 0) state.integerChainedTransientProduced++
+            }
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
                 combined.derivedThroughTransient(transientSteps).derivedFromRetainedSources(retainedSources),
                 target, levels.size, levels, fallback)

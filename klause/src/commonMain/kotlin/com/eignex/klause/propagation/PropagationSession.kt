@@ -1409,6 +1409,9 @@ class PropagationSession private constructor(
             "learningIntegerChainedProduced" to it.integerChainedProduced,
             "learningIntegerChainedAdmitted" to it.integerChainedAdmitted,
             "learningIntegerChainedConsumed" to it.integerChainedConsumed,
+            "learningIntegerChainedTransientProduced" to it.integerChainedTransientProduced,
+            "learningIntegerChainedTransientAdmitted" to it.integerChainedTransientAdmitted,
+            "learningIntegerChainedTransientConsumed" to it.integerChainedTransientConsumed,
         )
         if (it.integerRowLearning) {
             counts + diagnostics + transientLifecycle + chainedLifecycle +

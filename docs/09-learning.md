@@ -512,7 +512,10 @@ After selecting an owned source, an unconditional derivation may use the same
 sources keep that compact seed's 16-term input limit; source-reference visits,
 scratch coordinates and combination counts retain their containing allowances.
 Guarded temporary results wider than 16 terms still decline. No temporary result
-enters the store or supplies a propagation reason.
+enters the store or supplies a propagation reason. Separate joint-origin counters
+identify production, admission and first consumption of the same child with both
+a retained source and a temporary step. These use its existing origin fields and
+remain available after retirement.
 Only a compact result is tested for admission. A retained row must propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have
