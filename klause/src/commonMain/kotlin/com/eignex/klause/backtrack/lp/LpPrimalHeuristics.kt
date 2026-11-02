@@ -87,7 +87,9 @@ internal fun LpEngine.lpRoundingProbe(
             if (ownsRootPrimalModel(relaxation.model)) {
                 retainRootPrimalGuidance(relaxation, result, cancellation)
             } else retainRoundingPrimalGuidance(relaxation, result, objective)
-            result.primal
+            rootRoundingWarmStart?.takeIf {
+                it.objective === objective && it.relaxation === relaxation && it.knownColumns == null
+            }?.primal ?: result.primal
         }
         val reals = if (toleranceReals && problem.numRealVars > 0 && knownColumns == null) {
             relaxation.floatReals(primal, problem)
