@@ -209,6 +209,10 @@ the captured plan and ledger. CLI routing holds a scoped view of the shared pres
 meter and releases it before native execution; see
 [presolve](07-presolve.md#phase-allowance-and-telemetry).
 
+CLI routing retains the invocation deadline as a mark on its monotonic clock.
+Polling compares that mark directly; setting or clearing the deadline updates
+retained routing scopes without renewing its origin or the work ledger.
+
 ### Units and boundaries
 
 | Allowance | Unit and owner | Stop surface |
