@@ -1,5 +1,7 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.util.EmptyIntArray
+
 /**
  * A constraint learned during search and stored in the [LearnedClauseDb]: a [Propagator] that also
  * exposes its variable footprint, which conflict-factor extraction ([PropagationState.extractConflictFactors])
@@ -18,4 +20,9 @@ internal interface LearnedPropagator : Propagator {
 
     /** Integer variable ids this learned constraint watches. */
     val intVars: IntArray
+}
+
+internal object RetiredLearnedPropagator : LearnedPropagator {
+    override val boolVars: IntArray get() = EmptyIntArray
+    override val intVars: IntArray get() = EmptyIntArray
 }

@@ -209,6 +209,9 @@ internal class CpSatisfactionTraversal(
         resources.own(AutoCloseable { it.releaseRetainedState() })
         it.conflictStats = sink?.ca
         sink?.search?.let { search ->
+            search.noteInprocessing(
+                if (it.session.usesNativeSat) "propagationNativeSatSessions" else "propagationGeneralSessions", 1L,
+            )
             search.propagationWork = { it.session.work }
             search.learning = { it.session.learnedLifecycle() }
             search.valueOrdering = { it.session.valueOrdering.snapshot() }
