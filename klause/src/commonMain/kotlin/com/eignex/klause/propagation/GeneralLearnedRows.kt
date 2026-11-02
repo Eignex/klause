@@ -21,7 +21,6 @@ internal class GeneralLearnedRows : AbstractList<LearnedPropagator>() {
         private set
     val primitiveBytes: Long get() = 16L + allocatedBytes + pageCount * Int.SIZE_BYTES
     val referenceCapacity: Long get() = 2L + pages.size + pageCount * 4L + allocatedBytes / ROW_BYTES * 2L
-    val preparationWork: Long get() = INITIAL_CAPACITY * ROW_WORK * 2L + 10L
     val hasEmptyReservation: Boolean get() = size == 0 && pageCount > 0
     val admissionWork: Long
         get() {
@@ -198,7 +197,8 @@ internal class GeneralLearnedRows : AbstractList<LearnedPropagator>() {
 
     fun prepareRemap(budget: ReclamationPreparation) {
         val count = pageSlots(size).toLong()
-        budget.atomic(size * (COLUMNS * 2L + 12L) + count * PAGE_BYTES / Int.SIZE_BYTES * 2L + pages.size * 8L,
+        // Geometric page growth, row moves and tail copies use at most 128 work per slot.
+        budget.atomic(size * 4L + pages.size * 2L,
             count * (PAGE_BYTES + PAGE_SIZE * Long.SIZE_BYTES * 2L) * 4L + pages.size * Long.SIZE_BYTES)
     }
 

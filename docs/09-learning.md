@@ -525,7 +525,8 @@ publication still defer the window.
 General retirement replaces its payload with an inert stable-ID slot and releases
 its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
 aliases. Stable paged rows own policy, admission, propagator and mutable-payload
-references together. An intrusive queue resumes metadata release without scanning
+references together. Their fixed startup reservation belongs to state preparation;
+admissions charge subsequent growth. An intrusive queue resumes metadata release without scanning
 permanent rows; retained import/use counters survive released metadata. Empty pages
 release their primitive and reference allocations without renumbering live handles.
 Stale watches skip retired slots, and their capacity remains owned until its funded cleanup. Selection and subsequent retired-slot compaction share

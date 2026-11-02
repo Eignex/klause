@@ -506,6 +506,7 @@ class PropagationState private constructor(
             for (f in problem.factors) if (f is Clause && f.literals.size == 2) n++
             n
         },
+        initializeRows = !usesNativeSat && !incremental,
     )
     internal val selectedRetirements = LearnedRetirementRequests()
     internal var nextLearnedAdmissionKey = 0L
@@ -837,7 +838,6 @@ class PropagationState private constructor(
     internal var nativeConflictReason: IntArray? = null
 
     init {
-        if (nativeEngine == null && !incremental) work += learned.store.preparationWork
         // The native lane uses arena watches and skips general base-factor registration.
         if (prepared == null && nativeEngine == null) {
             for (fid in 0 until problem.numFactors) registerFactor(fid, projection.propagators[fid])

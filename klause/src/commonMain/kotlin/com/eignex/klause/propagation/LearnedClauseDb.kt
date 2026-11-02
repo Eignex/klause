@@ -19,6 +19,7 @@ internal class LearnedClauseDb(
      *  Over-approximates after forgetting (never decremented), which only costs a harmless no-op
      *  pass — never correctness. */
     var binaryClauseCount: Int,
+    initializeRows: Boolean = true,
 ) {
     val lifecycle = LearnedLifecycle()
     val pendingAttach = IntArrayList()
@@ -43,7 +44,8 @@ internal class LearnedClauseDb(
     val units = IntArrayList()
     var unitsPending = false
 
-    private val rowStore = lazy(LazyThreadSafetyMode.NONE) { GeneralLearnedRows() }
+    private val rowStore = if (initializeRows) lazyOf(GeneralLearnedRows())
+        else lazy(LazyThreadSafetyMode.NONE) { GeneralLearnedRows() }
     val store: GeneralLearnedRows get() = rowStore.value
     val initializedStore: GeneralLearnedRows? get() = if (rowStore.isInitialized()) store else null
     internal var integerRows: LearnedIntegerRows? = null
