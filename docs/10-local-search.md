@@ -36,6 +36,10 @@ cause; committed moves reconcile cost and violated membership from the exact
 post-move degrees. The immutable invariant projection is shared; mutable payloads,
 the assignment, weights and random state belong to each `LocalSearchState`.
 
+Regular retains its forward and backward accept-distance layers in the state's
+factor payload. Committed moves, probe restoration and reinitialization overwrite
+those owned layers; single-symbol candidate deltas read them without mutation.
+
 Unguarded unit-integer `Distinct` maintains multiplicities of exact offset values.
 A source move updates every operand reading that coordinate, including aliases;
 probes restore the counts and discard zero-count keys. Its excess grade matches

@@ -30,7 +30,7 @@ internal class RegularInvariant(
     }
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
-        val st = buildState(state)
+        val st = buildState(state, factorId)
         state.refPayload[factorId] = st
         state.factorDegree[factorId] = compressViolation(st.distance.toLong(), state.violationSoftCap)
     }
@@ -54,7 +54,7 @@ internal class RegularInvariant(
         // Apply runs once per accepted move, so it can afford a full forward/backward rebuild (O(n·Q·Σ)); that
         // keeps the per-candidate delta at O(Q·Σ).
         val before = state.factorDegree[factorId]
-        val rebuilt = buildState(state)
+        val rebuilt = buildState(state, factorId)
         state.refPayload[factorId] = rebuilt
         return compressViolation(rebuilt.distance.toLong(), state.violationSoftCap) - before
     }
@@ -66,11 +66,15 @@ internal class RegularInvariant(
         state.violationSoftCap,
     )
 
-    private fun buildState(state: LocalSearchState): RegularLsState {
+    private fun buildState(state: LocalSearchState, factorId: Int): RegularLsState {
+        val retained = state.refPayload[factorId] as? RegularLsState
         val getSym = { i: Int -> state.assignment.intValue(seq[i]) }
-        val forward = regularForwardLayers(seq.size, numStates, alphabetSize, transitions, q0, getSym)
-        val backward = regularBackwardLayers(seq.size, numStates, alphabetSize, transitions, acceptingSet, getSym)
-        return RegularLsState(forward, backward, acceptingDistance(forward))
+        val forward = regularForwardLayers(seq.size, numStates, alphabetSize, transitions, q0, getSym,
+            retained?.forward)
+        val backward = regularBackwardLayers(seq.size, numStates, alphabetSize, transitions, acceptingSet, getSym,
+            retained?.backward)
+        val distance = acceptingDistance(forward)
+        return retained?.also { it.distance = distance } ?: RegularLsState(forward, backward, distance)
     }
 
     /** Accept distance with [intVar] set to [newValue]. A single-position variable recombines its DP
@@ -383,9 +387,11 @@ internal fun regularForwardLayers(
     transitions: LongArray,
     q0: Int,
     getSym: (Int) -> Long,
+    retained: Array<IntArray>? = null,
 ): Array<IntArray> {
     val inf = n + 1
-    val fwd = Array(n + 1) { IntArray(numStates + 1) { inf } }
+    val fwd = retained ?: Array(n + 1) { IntArray(numStates + 1) }
+    for (layer in fwd) layer.fill(inf)
     if (q0 in 1..numStates) fwd[0][q0] = 0
     for (i in 0 until n) {
         val cur = getSym(i)
@@ -412,9 +418,11 @@ internal fun regularBackwardLayers(
     transitions: LongArray,
     acceptingSet: IntHashSet,
     getSym: (Int) -> Long,
+    retained: Array<IntArray>? = null,
 ): Array<IntArray> {
     val inf = n + 1
-    val bwd = Array(n + 1) { IntArray(numStates + 1) { inf } }
+    val bwd = retained ?: Array(n + 1) { IntArray(numStates + 1) }
+    for (layer in bwd) layer.fill(inf)
     for (q in 1..numStates) if (q in acceptingSet) bwd[n][q] = 0
     for (i in n - 1 downTo 0) {
         val cur = getSym(i)

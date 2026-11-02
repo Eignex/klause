@@ -556,6 +556,9 @@ emission; omitted rows only weaken the relaxation. A factor rewrite reselects
 providers before the compact CP view is built, and a selected finite relaxation is
 never source-completion authority.
 
+Linear rows classify their integer or real lane before global-family capability
+dispatch. Those capabilities govern propagation, scoring and relaxation selection.
+
 ### Branching and global deductions
 
 Branching receives each conflict's full variable and factor attribution, including
@@ -565,6 +568,8 @@ new deductions to propagation-aware selectors. Phase saving captures values befo
 retraction, so propagated as well as decided polarities survive backjumps and
 restarts. Dom/wdeg failure weights belong to the solve and survive restarts; fresh
 selectors isolate solves that share a projection.
+LinUCB constructs its private posterior on its first scoring or reward update;
+each fresh selector retains its own unlearned model.
 Each fresh finite selector receives its native-session attachment before search
 and LP branch proposals; the attachment can precede root initialization.
 

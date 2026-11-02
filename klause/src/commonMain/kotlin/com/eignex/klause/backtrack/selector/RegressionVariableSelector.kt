@@ -44,7 +44,7 @@ class RegressionVariableSelector private constructor(
     private val scoreCap: Int,
 ) : VariableSelector {
 
-    private val bandit: RegressionContextualBandit<*> = newBandit()
+    private val bandit: RegressionContextualBandit<*> by lazy(LazyThreadSafetyMode.NONE, newBandit)
 
     /** A fresh selector with the same config and a new, unlearned bandit — so reuse across solves
      *  starts each search from the documented per-session state, never a prior problem's model. */

@@ -110,6 +110,13 @@ private val symmetryRestriction = redundantRows.copy(
 // Filtering describes the implemented kind of deductions, not a promise of consistency at every size.
 // SOUND declares a relaxation family; its engine still applies domain, resource and feature gates.
 internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities? = when (this) {
+    is Linear -> if (constants is RealConstants) realArithmetic else boundRelaxation
+    is ExactLinear -> if (variables.reals.isNotEmpty()) realArithmetic else boundRelaxation
+    is LinearIndicator -> if (variables.reals.isNotEmpty()) realArithmetic else filteringRelaxation
+    else -> remainingBuiltInExecutionCapabilities()
+}
+
+private fun Factor.remainingBuiltInExecutionCapabilities(): FactorExecutionCapabilities? = when (this) {
     is Table -> if (hi == null) domainRelaxation else finiteDomains
     is Element, is Mdd, is Regular, is GlobalCardinality, is NValue, is SymmetricAllDifferent -> domainRelaxation
     is AllDifferent -> if (boundsConsistent && presents.isEmpty() && exceptSet.isEmpty()) {
@@ -127,9 +134,6 @@ internal fun Factor.builtInExecutionCapabilities(): FactorExecutionCapabilities?
     is AffineAbs, is ArrayMinMax, is Product, is Increasing, is ReifiedLinear -> boundRelaxation
     is Distinct -> if (variables.reals.isEmpty()) finiteFiltering else
         realArithmetic.copy(relaxation = RelaxationCapability.NONE)
-    is ExactLinear -> if (variables.reals.isNotEmpty()) realArithmetic else boundRelaxation
-    is LinearIndicator -> if (variables.reals.isNotEmpty()) realArithmetic else filteringRelaxation
-    is Linear -> if (constants is RealConstants) realArithmetic else boundRelaxation
     is Clause, is Cardinality, is PseudoBoolean, is ReifiedCardinality, is ReifiedPseudoBoolean,
     is Circuit, is Cumulative, is Diffn,
     -> filteringRelaxation
