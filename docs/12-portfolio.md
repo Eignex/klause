@@ -355,8 +355,10 @@ and shared observers use one allowance and one scratch-entry cap; `accountingWor
 reports that work in the containing propagation allowance. `uses` drains the existing origin-use counter once,
 sharing that observation with contribution rewards: it counts consumption once per
 reduction window, rather than exports or checks. The retained peer-import and
-consumed-peer-import counts describe distinct live objects, so repeated window
-uses do not imply additional imports.
+consumed-peer-import counts describe retained objects, including logically retired
+slots awaiting compaction, so repeated window uses do not imply additional imports.
+Native totals update at admission, first consumption and physical removal; ownership
+snapshots read these totals without traversing the policy columns.
 
 Learned-store observations include native arena capacity or general clause/PB/row
 payload, policy columns, session watch/queue capacity, pending attachments and

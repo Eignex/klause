@@ -42,6 +42,9 @@ internal class NativeSatState(private val state: PropagationState) {
     // Learned handles remain stable while each payload can release independently of other rows.
     private val learnedPayloads = NativeLearnedPayloads()
     private var learnedCount = 0
+    private var peerImports = 0
+    private var consumedPeerImports = 0
+    private var consumed = 0
     private var permanentCount = 0
     private var retiredCount = 0
     private val capCandidates = IntArrayList(1)
@@ -342,6 +345,8 @@ internal class NativeSatState(private val state: PropagationState) {
         check(state.nextLearnedAdmissionKey < Long.MAX_VALUE)
         learnedAdmissions.add(state.nextLearnedAdmissionKey++)
         learnedOrigin.add(origin)
+        state.work += 2L
+        if (origin >= 0) peerImports++
         learnedScanPos.add(0)
         learnedCount++
         learnedWatchPos.add(0)
@@ -352,17 +357,7 @@ internal class NativeSatState(private val state: PropagationState) {
     // Learned-clause policy accessors: the native mirror of the LearnedClauseDb columns.
 
     internal fun sharingMemory(sample: SharingMemoryObservation, protected: SharingMemoryObservation.Seen<Int>) {
-        var peerImports = 0L
-        var consumedPeerImports = 0L
-        var consumed = 0L
-        for (i in 0 until learnedCount) {
-            sample.step()
-            val peer = learnedOrigin[i] >= 0
-            val used = lifecycleStages[i] and 1 != 0
-            if (peer) peerImports++
-            if (peer && used) consumedPeerImports++
-            if (used) consumed++
-        }
+        repeat(3) { sample.step() }
         for (i in recheckHead until rechecks.size) {
             sample.step()
             val index = rechecks[i] - baseCount
@@ -374,7 +369,7 @@ internal class NativeSatState(private val state: PropagationState) {
         val columns = listOf(learnedLbd, learnedPermanent, learnedTier, learnedBoolReasons,
             lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
             capCandidates, state.learned.capCandidates, state.learned.boolReasons)
-        var metadata = capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
+        var metadata = 12L + capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
             learnedPayloads.primitiveBytes
         for (keys in listOf(learnedAdmissions, state.learned.admissions)) {
             sample.step()
@@ -397,7 +392,8 @@ internal class NativeSatState(private val state: PropagationState) {
         sample.ownedReferences(watchEntries, watchEntries.size.toLong(), true)
         var watchBytes = 0L
         var watchPostings = 0L
-        sample.owned(this, 16L, sweepingRetirements >= 0)
+        sample.ownedPool(this, 28L, (if (protectedRows) 12L else 0L) +
+            (if (sweepingRetirements >= 0) 16L else 0L))
         for (entries in watchEntries) {
             sample.step()
             if (entries == null) continue
@@ -424,9 +420,9 @@ internal class NativeSatState(private val state: PropagationState) {
             "rootRetiredSourceCapacityBytes" to (retiredRootSources?.allocatedBytes ?: 0L),
             "pendingAttachments" to (rechecks.size - recheckHead).toLong(),
             "importUseCapacityBytes" to importUses.allocatedBytes,
-            "retainedPeerImports" to peerImports,
-            "retainedConsumedPeerImports" to consumedPeerImports,
-            "retainedConsumed" to consumed,
+            "retainedPeerImports" to peerImports.toLong(),
+            "retainedConsumedPeerImports" to consumedPeerImports.toLong(),
+            "retainedConsumed" to consumed.toLong(),
         ))
         retiredRootSources?.let { sample.owned(it, it.allocatedBytes, true) }
         sample.owned(importUses, importUses.allocatedBytes)
@@ -593,6 +589,9 @@ internal class NativeSatState(private val state: PropagationState) {
         state.factorAttribution?.used(1 shl FactorFamily.Clause.ordinal)
         if (lifecycleStages[i] and 1 == 0) {
             lifecycleStages[i] = lifecycleStages[i] or 1
+            state.work += 3L
+            consumed++
+            if (learnedOrigin[i] >= 0) consumedPeerImports++
             state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Consumed)
             state.factorAttribution?.note(1 shl FactorFamily.Clause.ordinal, FactorAttribution.Metric.Consumed)
         }
@@ -643,7 +642,13 @@ internal class NativeSatState(private val state: PropagationState) {
         state.selectedRetirements.remap(remap)
 
         for (i in 0 until learnedCount) if (remap[i] < 0) {
-            state.work++
+            state.work += 8L
+            val peer = learnedOrigin[i] >= 0
+            if (peer) peerImports--
+            if (lifecycleStages[i] and 1 != 0) {
+                consumed--
+                if (peer) consumedPeerImports--
+            }
             if (!retiredOf(i)) state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
             state.work += 24L
             learnedPayloads.release(i)

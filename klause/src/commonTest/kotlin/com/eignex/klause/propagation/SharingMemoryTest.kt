@@ -48,17 +48,47 @@ class SharingMemoryTest {
     }
 
     @Test
-    fun `twenty thousand permanent native rows should fit a production maintenance allowance`() {
+    fun `twenty thousand permanent native rows should fit the default observation allowance`() {
         val session = PropagationSession(Problem(4, 0, emptyArray(),
             arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = true)
         assertTrue(session.usesNativeSat)
         repeat(20_000) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 2, permanent = true) }
         val expected = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
-        val sample = session.sharingMemory(maxWork = 65_536L)
+        val sample = session.sharingMemory()
 
         assertEquals(expected, sample.completeValues)
         assertEquals(20_000L, expected.getValue("learnedObjects"))
+    }
+
+    @Test
+    fun `native retained counts should include retired rows until compaction`() {
+        val session = PropagationSession(Problem(8, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(12, 14)))), nativeSat = true)
+        assertTrue(session.usesNativeSat)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9, origin = 0)
+        session.addLearnedClause(Clause(intArrayOf(8, 10)), 9, origin = 1)
+        session.pinBool(0, false)
+        session.popToLevel(0)
+        session.pinBool(0, false)
+        session.popToLevel(0)
+        session.pinBool(2, false)
+        session.popToLevel(0)
+        session.addLearnedClause(Clause(intArrayOf(8, 10)), 9)
+        session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { it == 2 }
+        assertEquals(1, session.activeLearnedClauseCount)
+        val retired = assertNotNull(session.sharingMemory().completeValues)
+
+        assertTrue(session.compactLearnedClauses(1_000_000L, 1_048_576L, { false }) { _, _ -> true })
+        val compacted = assertNotNull(session.sharingMemory().completeValues)
+
+        assertEquals(2L, retired.getValue("retainedPeerImports"))
+        assertEquals(2L, retired.getValue("retainedConsumed"))
+        assertEquals(1L, retired.getValue("retainedConsumedPeerImports"))
+        assertEquals(1L, compacted.getValue("retainedPeerImports"))
+        assertEquals(0L, compacted.getValue("retainedConsumed"))
+        assertEquals(0L, compacted.getValue("retainedConsumedPeerImports"))
     }
 
     @Test
