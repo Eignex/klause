@@ -368,8 +368,10 @@ identity checks, duplicate-coordinate validation, historical activity and coeffi
 lookups from 4,096 source-reference visits per analysis. Each visit charges native
 work; historical domain reconstruction retains its own work and cancellation checks. It retains only the most recent
 wide projection and oriented view, and its cancellation accumulator holds at most
-16 nonzero result terms. Exhaustion retains clause fallback. Each combination must
-remain conflicting. A retained row must propagate against the session's historical domains at its first-UIP clause's native
+16 nonzero result terms. A compact conflicting seed retains its 16-term reason-source
+limit; a wide conflicting seed enables wide sources throughout that analysis. This
+keeps wide-source preparation out of compact-seed analysis. Exhaustion retains
+clause fallback. Each combination must remain conflicting. A retained row must propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have
 been a member of its historical domain; a later carve cannot remove that earlier

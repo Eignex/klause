@@ -43,6 +43,50 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `a compact conflict should preserve its compact pivot when a later wide reason is active`() {
+        val latestVariables = intArrayOf(2, 3) + IntArray(15) { it + 4 }
+        val state = PropagationState(Problem(0, 19, Array(19) {
+            when (it) {
+                0 -> IntDomain(0, 6)
+                1 -> IntDomain(0, 12)
+                2, 3 -> IntDomain(0, 24)
+                else -> IntDomain(0, 0)
+            }
+        }, arrayOf(
+            Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+            Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1) + IntArray(15) { 1 }, latestVariables, LinearOp.LE, 0),
+        )), Assumptions.None)
+        state.undoLogging = true
+        state.integerRowLearning = true
+        assertTrue(state.setIntMaxAsDecision(2, 7))
+        val firstTarget = state.undo.size
+        assertTrue(state.setIntMaxAsDecision(3, 6))
+        val secondTarget = state.undo.size
+        state.integerLearningTrailAtLevel = { level ->
+            when (level) {
+                1 -> firstTarget
+                2 -> secondTarget
+                else -> null
+            }
+        }
+        assertTrue(state.setIntMinAsDecision(0, 2))
+        state.currentFactor = 1
+        assertTrue(state.factorAt(1).propagate(state, 1))
+        state.currentFactor = 2
+        assertTrue(state.factorAt(2).propagate(state, 2))
+        state.currentFactor = 0
+        assertFalse(state.factorAt(0).propagate(state, 0))
+
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(state.conflictAnalyzer.analyze(0))
+
+        assertContentEquals(intArrayOf(0, 2), learned.row.variables)
+        assertContentEquals(longArrayOf(4, -1), learned.row.coefficients)
+        assertEquals(0L, learned.row.bound)
+        assertEquals(learned.fallbackClause.backjumpLevel, learned.backjumpLevel)
+    }
+
+    @Test
     fun `wide original sources should learn a compact asserting inequality`() {
         val leftVars = IntArray(20) { it }
         val rightVars = intArrayOf(0, 1) + IntArray(17) { it + 3 }

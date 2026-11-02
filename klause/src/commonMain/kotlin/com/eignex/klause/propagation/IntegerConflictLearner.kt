@@ -56,6 +56,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val trail = state.integerLearningTrailAtLevel?.invoke(target) ?: return decline("assertion-unavailable")
         state.arithmeticLearningTrace?.record("integer.fallback-target", target.toLong(), trail.toLong())
         val source = sourceFactor(factorId) ?: return decline("seed-source")
+        val allowWideSources = source.linear.vars.size > INTEGER_LEARNING_TERMS
         var row = when (source.linear.op) {
             LinearOp.LE -> normalizedSource(source, useLo = true)
             LinearOp.GE -> normalizedSource(source, useLo = false)
@@ -70,7 +71,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val used = mutableSetOf<Pair<Int, Int>>()
         repeat(INTEGER_LEARNING_STEPS) {
             state.checkFiniteWork()
-            val event = reason(row, used) ?: return decline("no-qualified-endpoint")
+            val event = reason(row, used, allowWideSources) ?: return decline("no-qualified-endpoint")
             used.add(event.key)
             state.arithmeticLearningTrace?.row("integer.pivot-row", event.row, state, event.trail)
             val combined = row.resolve(event.row, event.variable, sourceWork)
@@ -120,9 +121,15 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         factorId: Int,
         trail: Int = state.undo.size,
         forBoundReason: Boolean = false,
-    ): IntegerSourceRow? = GuardedIntegerSource(state).source(factorId, trail, forBoundReason, sourceWork)
+        allowWideSources: Boolean = true,
+    ): IntegerSourceRow? = GuardedIntegerSource(state).source(factorId, trail, forBoundReason,
+        if (allowWideSources) sourceWork else null)
 
-    private fun reason(row: IntegerLearningInequality, used: Set<Pair<Int, Int>>): BoundEvent? {
+    private fun reason(
+        row: IntegerLearningInequality,
+        used: Set<Pair<Int, Int>>,
+        allowWideSources: Boolean,
+    ): BoundEvent? {
         var latest: BoundEvent? = null
         for (index in row.variables.indices) {
             row.visit(state)
@@ -142,7 +149,9 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
             val key = variable to if (lower) marker[2] else marker[2].inv()
             if (key in used || (latest != null && marker[2] <= latest.trail)) continue
-            val source = sourceFactor(factorId, marker[2], forBoundReason = true)
+            val source = sourceFactor(
+                factorId, marker[2], forBoundReason = true, allowWideSources = allowWideSources,
+            )
             if (source == null) {
                 state.arithmeticLearningTrace?.record("integer.endpoint-decline.source", factorId.toLong())
                 continue
