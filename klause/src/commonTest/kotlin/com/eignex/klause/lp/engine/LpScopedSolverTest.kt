@@ -18,6 +18,127 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `reading paused dual proposals does not construct a numerical owner`() {
+        val factory = RecordingLpEngineFactory()
+        LpScopedSolver(LpExactState(lowerBoundModel()), context = LpSolveContext(factory)).use { owner ->
+
+            val proposal = owner.pausedDualProposal(Cancellation.Never)
+
+            assertNull(proposal)
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
+
+    @Test
+    fun `paused row multipliers admit exact checking without completing the query`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            var proposal: DoubleArray? = null
+            repeat(8) {
+                if (proposal == null) {
+                    assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+                    proposal = owner.pausedDualProposal(Cancellation.Never)
+                }
+            }
+            val first = assertNotNull(proposal)
+            val paid = owner.lastMetrics
+
+            val checked = certifyLpBoundOnly(assertNotNull(owner.state.ownerWorkingModel()), first,
+                ReconstructionLimits())
+
+            val bound = assertNotNull(checked.bound)
+            assertTrue(bound.value > BigFraction.ZERO)
+            assertTrue(bound.value <= BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal())
+            assertEquals(paid, owner.lastMetrics)
+            assertTrue(owner.floatPaused)
+            assertNull(owner.lastResult)
+        }
+    }
+
+    @Test
+    fun `paused dual proposals own their row buffers`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            var proposal: DoubleArray? = null
+            repeat(8) {
+                if (proposal == null) {
+                    assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+                    proposal = owner.pausedDualProposal(Cancellation.Never)
+                }
+            }
+            val first = assertNotNull(proposal)
+            val expected = first.toList()
+            first.fill(0.0)
+
+            val next = assertNotNull(owner.pausedDualProposal(Cancellation.Never))
+
+            assertEquals(expected, next.toList())
+        }
+    }
+
+    @Test
+    fun `changed bounds retire paused dual proposals`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            var proposal: DoubleArray? = null
+            repeat(8) {
+                if (proposal == null) {
+                    assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+                    proposal = owner.pausedDualProposal(Cancellation.Never)
+                }
+            }
+            assertNotNull(proposal)
+
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 7L))
+
+            assertNull(owner.pausedDualProposal(Cancellation.Never))
+            assertFalse(owner.floatPaused)
+        }
+    }
+
+    @Test
+    fun `cancelled paused dual reads withhold copied values`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            var proposal: DoubleArray? = null
+            repeat(8) {
+                if (proposal == null) {
+                    assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+                    proposal = owner.pausedDualProposal(Cancellation.Never)
+                }
+            }
+            assertNotNull(proposal)
+            for (stopAt in listOf(1, 4)) {
+                var polls = 0
+
+                val declined = owner.pausedDualProposal(Cancellation { ++polls >= stopAt })
+
+                assertNull(declined)
+            }
+        }
+    }
+
+    @Test
     fun `paused component guidance reads returned children without advancing`() {
         val builder = LpBuilder()
         repeat(3) {

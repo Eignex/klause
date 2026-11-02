@@ -502,6 +502,21 @@ internal class RevisedSimplex(
     override val lastSingularRefactorizations: Int get() = observations.singularRefactorizations
     override val lastSmallPivotBails: Int get() = observations.smallPivotBails
     override val lastMetrics: LpSolveMetrics get() = observations.snapshot(work.ops)
+    override fun pausedDualProposal(cancellation: Cancellation): DoubleArray? {
+        if (activeSolve?.isAdvancing != false || cancellation()) return null
+        val proposal = DoubleArray(m)
+        var nonzero = false
+        // Row multipliers can lag the basis; exact checking against the original model supplies authority.
+        for (row in 0 until m) {
+            if (row % 256 == 0 && cancellation()) return null
+            val value = numerical.sourceDual(row, dualValues[row])
+            if (!value.isFinite()) return null
+            proposal[row] = value
+            if (value != 0.0) nonzero = true
+        }
+        return proposal.takeIf { nonzero && !cancellation() }
+    }
+
     override val trialProgress: Map<String, Long> get() {
         val samples = progressTrace?.samples ?: return emptyMap()
         return buildMap {

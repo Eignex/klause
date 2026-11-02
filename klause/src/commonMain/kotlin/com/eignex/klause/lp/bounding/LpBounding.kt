@@ -1504,6 +1504,15 @@ private fun LpEngine.retainedRootLpRelaxationBound(
                 if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial +
                     ("RootPauses" to ((sink.lp.sparseTrial["RootPauses"] ?: 0L) + 1L))
                 observeNodePause()
+                if (sparseTrialActive && ownsRootPrimalModel(relaxation.model)) {
+                    observeStage("AT_PAUSED_CERTIFICATION")
+                    val lower = retainedRootLowerBound(relaxation.model, null, cancellation, pausedProposal = true)
+                    val bound = if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
+                    if (!bound.isNaN()) {
+                        observeStage("PAUSED_BOUND")
+                        return bound
+                    }
+                }
                 continue
             }
             // Scoped preparation has already charged its scaling-construction reservation.
@@ -1586,24 +1595,30 @@ private fun LpEngine.retainedRootLowerBound(
     result: FloatLpResult?,
     cancellation: Cancellation,
     component: ComponentLpSolverCapability? = null,
+    pausedProposal: Boolean = false,
 ): Double? {
-    if (result == null && component == null) return null
+    if (result == null && component == null && !pausedProposal) return null
     val projectionWork = model.extent() * LpNodeOverhead.EXACT
-    if (retainedRootRemainingWork() <= projectionWork || cancellation()) return null
+    val snapshotWork = if (pausedProposal) 8L * model.m else 0L
+    if (retainedRootRemainingWork() <= projectionWork + snapshotWork || cancellation()) return null
     // Source-range and objective projection scans share the existing whole-model overhead charge.
-    model.alsoCharged(this)
-    val remaining = retainedRootRemainingWork()
+    if (!pausedProposal) model.alsoCharged(this)
     val defaults = ReconstructionLimits()
     val storage = if (sparseTrialActive) sink.lp.sparseTrial["CheckingReservedBytes"] ?: 0L else
         SPARSE_LP_CHECKING_ALLOCATION
     val allocation = minOf(defaults.maxAllocation, storage)
     val candidateBytes = if (result == null) model.m.toLong() * Double.SIZE_BYTES else 0L
     if (candidateBytes > allocation) return null
-    val duals = result?.duals ?: run {
-        if (component == null) return null
-        component.partialBoundDuals(cancellation) ?: return null
-    }
-    if (cancellation()) return null
+    val proposal = if (pausedProposal) {
+        noteNodeOverhead(snapshotWork)
+        val copied = propagator.pausedDualProposal(cancellation) ?: return null
+        if (cancellation()) return null
+        model.alsoCharged(this)
+        copied
+    } else null
+    val remaining = retainedRootRemainingWork()
+    val duals = result?.duals ?: proposal ?: component?.partialBoundDuals(cancellation) ?: return null
+    if (duals.size != model.m || cancellation()) return null
     val checked = checkRetainedRootBound(
         model,
         duals,
