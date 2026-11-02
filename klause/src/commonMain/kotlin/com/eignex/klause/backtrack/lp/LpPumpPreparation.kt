@@ -86,10 +86,13 @@ internal class LpPumpPreparation private constructor(
         fun hasAffordableShape(engine: LpEngine, root: LpRelaxation, setupWork: Long = 0L): Boolean {
             if (setupWork !in 0L..LpEmissionTemplates.MAX_UNITS) return false
             val model = root.model
+            val definition = root.primalDefinition
+            if (definition != null && !definition.matches(engine.problem, engine.projections, model)) return false
             val bindingWork = 1L + engine.problem.numIntVars + engine.problem.numBoolVars +
                 model.n * 3L + model.numVars
             val construction = (model.n.toLong() + model.m + model.csc.rowIdx.size) * LpNodeOverhead.BUILD
-            val inspection = bindingWork + engine.problem.numFactors + 1L + setupWork
+            val sourceWork = definition?.paidWork ?: engine.problem.numFactors.toLong()
+            val inspection = bindingWork + sourceWork + 1L + setupWork
             return engine.projections?.builtInRelaxation == true && engine.projections.nativePropagation &&
                 engine.problem.numRealVars == 0 && model.exactState == null && model.doubleView == null &&
                 model.n > 0 && inspection <= LpEmissionTemplates.MAX_UNITS && inspection < construction
@@ -110,7 +113,7 @@ internal class LpPumpPreparation private constructor(
                 token.charge(1L)
                 token.checkLpAssembly()
                 var eligible = hasAffordableShape(engine, root, setupWork)
-                if (eligible) {
+                if (eligible && root.primalDefinition == null) {
                     for (factor in engine.problem.factors) {
                         token.charge(1L)
                         token.checkLpAssembly()

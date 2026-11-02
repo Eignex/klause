@@ -139,6 +139,7 @@ internal class LpPumpProfileConsumer(
                 reuseCompleteTemplates = false,
                 reuseSourceTemplates = mode == "object" || mode == "index",
                 reuseTemplateIndexes = mode == "index", templateStats = templateStats,
+                retainPrivateDefinition = mode == "candidate",
             ).also {
                 current = it
                 freshBuilds++

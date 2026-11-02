@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
@@ -19,6 +20,7 @@ internal fun buildPrimalSource(
     reuseSourceTemplates: Boolean = true,
     reuseTemplateIndexes: Boolean = true,
     templateStats: LpStatsSink? = null,
+    retainPrivateDefinition: Boolean = false,
     onDefinition: (String) -> Unit = {},
 ): LpRelaxation {
     selection?.requireSource(problem)
@@ -38,7 +40,8 @@ internal fun buildPrimalSource(
     var paidUnits = 0L
     val relaxation = CpToLpRelaxation(problem, objective, projections = selection,
         preparationCancellation = cancellation, reuseSourceTemplates = reuseSourceTemplates,
-        reuseTemplateIndexes = reuseTemplateIndexes, templateStats = templateStats, retainImportedDefinitions = reuse)
+        reuseTemplateIndexes = reuseTemplateIndexes, templateStats = templateStats, retainImportedDefinitions = reuse,
+        primalDefinitionFactory = if (retainPrivateDefinition) NativePrimalDefinitionFactory else null)
         .buildWithWork(domains, cancellation) {
             paidUnits += it
             onWork(it)
@@ -48,4 +51,57 @@ internal fun buildPrimalSource(
     }
     cancellation.checkLpAssembly()
     return relaxation
+}
+
+internal sealed interface LpPrimalDefinitionFactory {
+    fun capture(
+        problem: Problem,
+        selection: PreparedFactorProjections?,
+        model: LpModel,
+        cancellation: Cancellation,
+    ): LpPrimalDefinition?
+}
+
+internal sealed interface LpPrimalDefinition {
+    val paidWork: Long get() = CAPTURE_WORK
+    val storageUnits: Long get() = STORAGE_UNITS
+
+    fun matches(problem: Problem, selection: PreparedFactorProjections?, model: LpModel): Boolean
+
+    companion object {
+        const val CAPTURE_WORK = 24L
+        const val STORAGE_UNITS = 64L
+    }
+}
+
+private object NativePrimalDefinitionFactory : LpPrimalDefinitionFactory {
+    override fun capture(
+        problem: Problem,
+        selection: PreparedFactorProjections?,
+        model: LpModel,
+        cancellation: Cancellation,
+    ): LpPrimalDefinition? {
+        val construction = model.n.toLong() + model.m + model.csc.rowIdx.size
+        if (problem.numRealVars != 0 || selection?.builtInRelaxation != true || !selection.nativePropagation ||
+            model.n == 0 || model.doubleView != null || model.exactState != null ||
+            construction <= LpPrimalDefinition.CAPTURE_WORK
+        ) return null
+        // Reserve both immutable objects and their eventual reference release before publication.
+        cancellation.charge(LpPrimalDefinition.CAPTURE_WORK)
+        cancellation.checkLpAssembly()
+        return NativePrimalDefinition(problem, selection, model).also { cancellation.checkLpAssembly() }
+    }
+}
+
+// The default primal factory applies objectives only to column costs; source lifetime remains the caller's duty.
+private class NativePrimalDefinition(
+    private val problem: Problem,
+    selection: PreparedFactorProjections,
+    private val model: LpModel,
+) : LpPrimalDefinition {
+    private val scope = LpEmissionScope(selection.lpEmissionNamespace, problem)
+
+    override fun matches(problem: Problem, selection: PreparedFactorProjections?, model: LpModel): Boolean =
+        this.problem === problem && this.model === model && selection?.builtInRelaxation == true &&
+            selection.nativePropagation && scope.matches(selection.lpEmissionNamespace, problem)
 }

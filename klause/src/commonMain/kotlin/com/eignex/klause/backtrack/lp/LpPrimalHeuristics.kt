@@ -445,6 +445,7 @@ private fun LpEngine.buildPrimalRelaxation(
         val relaxation = buildPrimalSource(problem, objective, SessionDomains(session), token,
             onWork = accounting::chargeConstruction, selection = projections,
             reuseCompleteTemplates = reusePrimalTemplates,
+            retainPrivateDefinition = reusePumpPreparation,
             reuseSourceTemplates = reusePrimalTemplates, onDefinition = { definition = it })
         outcome = definition
         relaxation

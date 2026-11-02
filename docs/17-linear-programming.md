@@ -211,15 +211,22 @@ remain in their ordinary solve phases.
 
 A private feasibility-pump scope can reuse its completed root layout for subsequent
 objectives. Its problem and selected built-in propagation and relaxation mechanisms
-stay fixed; proposal pinning runs in separate sessions. Admission accepts the
-audited linear and Boolean source cohort, charging its factor inspection. It compares bounded
-objective-binding and admission work with the completed layout's construction extent. A cheaper
-binding retains only the current immutable model view, with no predecessor chain or
-shared numerical basis. Nonzero objective coordinates must already exist in that
-layout; new costs and checked affine shifts receive private arrays. Build-specific
-source maps are detached. Exact-state, IEEE, continuous and unsupported selections
-keep ordinary construction. Cancellation withholds a view before publication or a
-numerical owner opens; an unrepresentable objective uses the funded ordinary path.
+stay fixed; proposal pinning runs in separate sessions. The default primal factory
+can attach an immutable witness that its native rows are independent of the objective.
+The witness binds the exact source, model, selected namespace and semantics. Its
+bounded capture and reserved release spend the current allowance, and only layouts
+whose construction extent exceeds that fee retain it. Admission includes the paid
+capture fee once, alongside objective-binding and setup work, when comparing with
+completed construction. Unmarked models instead require the audited linear and
+Boolean source cohort and pay its factor inspection. A cheaper binding retains only
+the current immutable model view, with no predecessor chain or shared numerical
+basis. Nonzero objective coordinates must already exist in that layout; new costs and checked affine shifts receive private arrays. Build-specific
+source maps are detached. An unchanged-model handoff may explicitly retain the
+witness; model replacement, remapping and shared preparation publication drop it.
+The witness supplies no domain-lifetime guarantee: continued definitions still
+require the complete source and domain guard. Exact-state, IEEE, continuous and
+unsupported selections keep ordinary construction. Cancellation withholds a view
+before publication or a numerical owner opens; an unrepresentable objective uses the funded ordinary path.
 Admission and rebinding spend the current containing and LP allowance. Their costs
 and actual numerical consumption have separate observations from shared-source reuse;
 optimal floating iterates provide no certificate or source-acceptance authority.
@@ -239,10 +246,12 @@ Guidance from other producers has no canonical provenance and supplies no handof
 Provenance retains no propagation session, basis, iterate or cancellation token.
 Its capture, validation, prior discarded handoff work and reserved retirement
 join the current handoff setup, capture and lookup costs in admission's comparison
-without being charged twice. All spend the current containing and LP allowance. Native source-cohort inspection stays at
-the actual private consumer. Capture detaches build-specific source maps and
-preparation metadata. A declined handoff keeps ordinary construction; cancellation
-withholds the next numerical owner. Each consumer opens a fresh numerical owner,
+without being charged twice. All spend the current containing and LP allowance.
+Factory-witness checks or unmarked source-cohort inspection run at the actual
+private consumer. Capture detaches build-specific source maps and shared
+preparation metadata; retained witness storage counts against the guard's ceiling.
+A declined handoff keeps ordinary construction; cancellation withholds the next
+numerical owner. Each consumer opens a fresh numerical owner,
 and proposals still require the caller's complete source verification.
 
 Template construction polls and charges the containing token, including failed

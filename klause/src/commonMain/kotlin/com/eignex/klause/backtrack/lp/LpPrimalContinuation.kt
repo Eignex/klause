@@ -164,7 +164,8 @@ internal class LpPrimalContinuation private constructor(
             val selection = engine.projections ?: return null
             val captureWork = 2L + problem.numFactors + problem.numIntVars * 5L + problem.numBoolVars
             var validationWork = 1L + problem.numFactors + problem.numIntVars * 2L + problem.numBoolVars
-            var units = 64L + problem.numFactors + problem.numIntVars * 3L + problem.numBoolVars
+            var units = 64L + problem.numFactors + problem.numIntVars * 3L + problem.numBoolVars +
+                (root.primalDefinition?.storageUnits ?: 0L)
             if (units > LpEmissionTemplates.MAX_UNITS ||
                 !LpPumpPreparation.hasAffordableShape(engine, root, setupWork + captureWork + validationWork)
             ) return null

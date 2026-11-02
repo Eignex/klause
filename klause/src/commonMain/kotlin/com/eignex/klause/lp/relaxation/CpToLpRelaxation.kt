@@ -163,6 +163,7 @@ internal class LpRelaxation(
     val realUpperRows: Map<Int, Int> = emptyMap(),
     val preparationTemplates: LpPreparationTemplates? = null,
     val reusedPrimalDefinition: Boolean = false,
+    val primalDefinition: LpPrimalDefinition? = null,
 ) {
     fun column(variable: CpIntId): LpColumnId? =
         intColOf[variable.index].takeIf { it >= 0 }?.let(::LpColumnId)
@@ -294,8 +295,12 @@ internal fun LpRelaxation.withModel(
     remap: LpLayoutRemap? = null,
     reboundObjectiveConstant: Long = objectiveConstant,
     reusedPrimalDefinition: Boolean = false,
+    primalDefinition: LpPrimalDefinition? = null,
 ): LpRelaxation {
     require(remap == null || remap.retainedColumns.size == model.n) { "column removal requires source metadata" }
+    require(primalDefinition == null || (reboundModel === model && remap == null)) {
+        "preparation metadata requires the unchanged model"
+    }
     val gates = remap?.let { gatedRows.indices.filter { index -> it.row(gatedRows[index]) >= 0 } }
     return LpRelaxation(
         model = reboundModel,
@@ -330,6 +335,7 @@ internal fun LpRelaxation.withModel(
             remap.row(row).takeIf { it >= 0 }?.let { it to variable }
         }.toMap(),
         reusedPrimalDefinition = reusedPrimalDefinition,
+        primalDefinition = primalDefinition,
     )
 }
 
@@ -692,6 +698,7 @@ internal class CpToLpRelaxation(
     private val reuseTemplateIndexes: Boolean = true,
     private val reuseTemplateMetadata: Boolean = false,
     private val retainImportedDefinitions: Boolean = false,
+    private val primalDefinitionFactory: LpPrimalDefinitionFactory? = null,
     private val onTemplateWork: (Long) -> Unit = {},
 ) {
     private val elementIndexes = elementIndexes?.toSet()
@@ -1607,6 +1614,7 @@ internal class CpToLpRelaxation(
                 gatedWhenTrue = BooleanArray(gatedWhenTrueList.size) { gatedWhenTrueList[it] == 1 },
                 realUpperRows = realUpperRows.toMap(),
                 preparationTemplates = preparationTemplates,
+                primalDefinition = primalDefinitionFactory?.capture(problem, projections, model, cancellation),
             ).also { templateStats?.observeTemplateUse(templateRows, templateBounds) }
         }
 

@@ -5,18 +5,23 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.LpPrimalDefinition
 import com.eignex.klause.lp.relaxation.RootDomains
+import com.eignex.klause.lp.relaxation.buildPrimalSource
+import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -24,9 +29,9 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class LpPumpPreparationTest {
-    private val problem = Problem(1, 3, Array(3) { IntDomain(0, 10) }, listOf(
-        Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6),
-    ))
+    private val problem = Problem(1, 3, Array(3) { IntDomain(0, 10) }, (1..6).map {
+        Linear(intArrayOf(1, it, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6)
+    })
     private val selected = FactorProjectionProviders.Default.prepare(problem)
     private val objective = LinearObjective(boolWeights = longArrayOf(1), intCoefficients = longArrayOf(1, 1, 1))
 
@@ -153,6 +158,117 @@ class LpPumpPreparationTest {
             assertNull(prepared)
             assertEquals(1L, sink.snapshot().lp.phases.getValue("PRIMAL_LP_PUMP_PREPARATION_ROOT")
                 .outcomes["DECLINED"])
+        }
+    }
+
+    @Test
+    fun `factory definitions should rebind native global rows like fresh construction`() {
+        val view = problem.withFactors(problem.factors + AllDifferent(intArrayOf(0, 1, 2)))
+        val selection = FactorProjectionProviders.Default.prepare(view)
+        val root = buildPrimalSource(view, objective, RootDomains(view), Cancellation.Never, {}, selection,
+            reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+        val changed = LinearObjective(boolWeights = longArrayOf(-2),
+            intCoefficients = longArrayOf(2, 2, 2), constant = 7)
+        LpEngine(view, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("factory-native-rows"),
+            projections = selection).use { engine ->
+            val prepared = assertNotNull(LpPumpPreparation.create(engine, root, Cancellation.Never))
+
+            val rebound = assertNotNull(prepared.rebind(changed, Cancellation.Never))
+            val fresh = buildPrimalSource(view, changed, RootDomains(view), Cancellation.Never, {}, selection,
+                reuseCompleteTemplates = false, reuseSourceTemplates = false)
+
+            assertEquals(solveAndCertify(fresh.model).lowerBound, solveAndCertify(rebound.model).lowerBound)
+            assertEquals(fresh.objectiveConstant, rebound.objectiveConstant)
+        }
+    }
+
+    @Test
+    fun `factory definitions should refuse a remapped source namespace`() {
+        val root = buildPrimalSource(problem, objective, RootDomains(problem), Cancellation.Never, {}, selected,
+            reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+        val remapped = selected.projected(problem, IntArray(problem.numFactors) { it },
+            VarRemap(intArrayOf(0), IntArray(problem.numIntVars) { it }))
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("factory-namespace"),
+            projections = remapped).use { engine ->
+            val prepared = LpPumpPreparation.create(engine, root, Cancellation.Never)
+
+            assertNull(prepared)
+        }
+    }
+
+    @Test
+    fun `factory definitions should refuse another problem view`() {
+        val root = buildPrimalSource(problem, objective, RootDomains(problem), Cancellation.Never, {}, selected,
+            reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+        val view = Problem(1, 3, Array(3) { IntDomain(1, 10) }, problem.factors)
+        LpEngine(view, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("factory-source-view"),
+            projections = selected.forEngineView(view)).use { engine ->
+            val prepared = LpPumpPreparation.create(engine, root, Cancellation.Never)
+
+            assertNull(prepared)
+        }
+    }
+
+    @Test
+    fun `cancellation at factory capture should withhold the completed definition`() {
+        var cancelled = false
+        var captureWork = 0L
+        val meter = WorkMeter {
+            if (it == LpPrimalDefinition.CAPTURE_WORK) {
+                captureWork += it
+                cancelled = true
+            }
+        }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = cancelled
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        assertFailsWith<LpAssemblyCancelled> {
+            buildPrimalSource(problem, objective, RootDomains(problem), token, {}, selected,
+                reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+        }
+
+        assertEquals(LpPrimalDefinition.CAPTURE_WORK, captureWork)
+        assertNull(selected.borrowLpPrimal(objective, RootDomains(problem), Cancellation.Never))
+    }
+
+    @Test
+    fun `same model handoff should preserve factory admission for global rows`() {
+        val view = problem.withFactors(problem.factors + AllDifferent(intArrayOf(0, 1, 2)))
+        val selection = FactorProjectionProviders.Default.prepare(view)
+        val root = buildPrimalSource(view, objective, RootDomains(view), Cancellation.Never, {}, selection,
+            reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+        LpEngine(view, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("factory-handoff"),
+            projections = selection).use { engine ->
+            val detached = root.withModel(root.model, sources = null, primalDefinition = root.primalDefinition)
+
+            assertNotNull(LpPumpPreparation.create(engine, detached, Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `transformed models should require fresh factory admission for global rows`() {
+        val view = problem.withFactors(problem.factors + AllDifferent(intArrayOf(0, 1, 2)))
+        val selection = FactorProjectionProviders.Default.prepare(view)
+        val root = buildPrimalSource(view, objective, RootDomains(view), Cancellation.Never, {}, selection,
+            reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+        LpEngine(view, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("factory-transform"),
+            projections = selection).use { engine ->
+            val changed = root.withModel(root.model.withRowObjective(intArrayOf(0), longArrayOf(2)))
+
+            assertNull(LpPumpPreparation.create(engine, changed, Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `model replacement should refuse an explicitly retained factory definition`() {
+        val root = buildPrimalSource(problem, objective, RootDomains(problem), Cancellation.Never, {}, selected,
+            reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+        val changed = root.model.withRowObjective(intArrayOf(0), longArrayOf(2))
+
+        assertFailsWith<IllegalArgumentException> {
+            root.withModel(changed, primalDefinition = root.primalDefinition)
         }
     }
 

@@ -50,7 +50,7 @@ internal class LpPrimalHandoff private constructor(
                 outcome = "DECLINED"
                 return
             }
-            val detached = root.withModel(root.model, sources = null)
+            val detached = root.withModel(root.model, sources = null, primalDefinition = root.primalDefinition)
             token.checkLpAssembly()
             definition = detached
             outcome = "CAPTURED"

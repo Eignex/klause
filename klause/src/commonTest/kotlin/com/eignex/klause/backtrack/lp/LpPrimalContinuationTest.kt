@@ -11,6 +11,7 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.lp.relaxation.RootDomains
+import com.eignex.klause.lp.relaxation.buildPrimalSource
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
@@ -25,7 +26,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpPrimalContinuationTest {
-    private val problem = Problem(1, 3, Array(3) { IntDomain(0, 10) }, (1..6).map {
+    private val problem = Problem(1, 3, Array(3) { IntDomain(0, 10) }, (1..12).map {
         Linear(intArrayOf(1, it, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6)
     })
     private val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
@@ -59,6 +60,25 @@ class LpPrimalContinuationTest {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(live)
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("changed-hole"),
+            projections = selected, reusePumpPreparation = true).use { engine ->
+            assertNotNull(LpPrimalContinuation.capture(engine, root, live, Cancellation.Never, 4L) {}).use { guard ->
+                domain = IntDomain(0, 10).excludeValue(5)
+
+                assertFalse(guard.matches(engine, root, live, Cancellation.Never) {})
+                assertEquals(0L, guard.paidWorkFor(engine))
+            }
+        }
+    }
+
+    @Test
+    fun `factory definitions should retain complete live domain validation`() {
+        var domain = IntDomain(0, 10).excludeValue(4)
+        val live = object : RelaxationDomains by domains {
+            override fun intDomain(varId: Int) = if (varId == 0) domain else domains.intDomain(varId)
+        }
+        val root = buildPrimalSource(problem, objective, live, Cancellation.Never, {}, selected,
+            reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("factory-changed-hole"),
             projections = selected, reusePumpPreparation = true).use { engine ->
             assertNotNull(LpPrimalContinuation.capture(engine, root, live, Cancellation.Never, 4L) {}).use { guard ->
                 domain = IntDomain(0, 10).excludeValue(5)
