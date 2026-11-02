@@ -485,6 +485,11 @@ limit; a wide conflicting seed enables wide sources throughout that analysis. Th
 keeps wide-source preparation out of compact-seed analysis. Exhaustion retains
 clause fallback. Compact pairs keep their compact resolver. Temporary steps count
 inside the same 16-combination allowance, and each result must remain conflicting.
+Opt-in arithmetic diagnostics count analyses with a live integer-row store, their
+level-limit declines, owned bound endpoints visited during source selection, selections that prefer an original endpoint while such an owner is
+present, and retained-parent qualification or rejection causes. An observed owner
+is not a qualified arithmetic parent. These counters retain no parent payloads and
+use the same bounded name census as other source diagnostics.
 An active owned unguarded at-most-one row over declared binary integer coordinates
 can also seed a conflict or supply an arithmetic parent when no original historical
 endpoint qualifies. This composes an already validated inequality in the same

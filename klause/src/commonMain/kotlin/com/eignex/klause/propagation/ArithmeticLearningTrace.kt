@@ -103,7 +103,7 @@ internal class ArithmeticLearningTrace(
     private fun countDecline(kind: String) {
         if (!collectDeclines) return
         if (!kind.startsWith("integer.decline.") && !kind.startsWith("integer.source-decline.") &&
-            !kind.startsWith("integer.endpoint-decline.")) return
+            !kind.startsWith("integer.endpoint-decline.") && !kind.startsWith("integer.retained.")) return
         val existing = if (kind.length <= DECLINE_CENSUS_NAME_LENGTH) declineIndices[kind] else null
         val index = existing ?: if (kind.length <= DECLINE_CENSUS_NAME_LENGTH &&
             declineNames.size < DECLINE_CENSUS_KINDS - 1) {

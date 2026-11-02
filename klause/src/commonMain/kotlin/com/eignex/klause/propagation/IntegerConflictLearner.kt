@@ -31,6 +31,11 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         null
     }
 
+    private fun retainedDecline(cause: String): Nothing? {
+        state.arithmeticLearningTrace?.record("integer.retained.reject.$cause")
+        return null
+    }
+
     private fun decline(cause: String): Nothing? {
         state.arithmeticLearningTrace?.record("integer.decline.$cause")
         return null
@@ -41,10 +46,19 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         currentLevel: Int,
         fallback: ConflictAnalyzer.AnalysisResult.Learned,
     ): ConflictAnalyzer.AnalysisResult.LearnedIntegerRow? {
+        val observingStore = state.arithmeticLearningTrace?.collectDeclines == true &&
+            (state.learned.integerRows?.isNotEmpty() == true)
+        if (observingStore) state.arithmeticLearningTrace?.record("integer.retained.analysis-with-store")
         if (currentLevel !in 1..INTEGER_LEARNING_LEVELS) {
+            if (observingStore) state.arithmeticLearningTrace?.record("integer.retained.analysis-level-limit")
             state.arithmeticLearningTrace?.record("integer.level-limit", currentLevel.toLong(), factorId.toLong(),
                 state.baseFactorCount.toLong(), fallback.backjumpLevel.toLong(),
                 if (fallback.asserting) 1L else 0L, fallback.literals.size.toLong())
+            if (state.arithmeticLearningTrace?.collectDeclines == true &&
+                factorId in state.baseFactorCount until state.totalFactorCount &&
+                state.factorAt(factorId) is LearnedIntegerPropagator) {
+                state.arithmeticLearningTrace?.record("integer.retained.seed-level-limit")
+            }
             val originalSeed = factorId in 0 until state.baseFactorCount
             return decline(if (originalSeed) "level-limit-original" else "level-limit-learned")
         }
@@ -153,11 +167,18 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
     ): BoundEvent? {
         var candidates: IntArray? = null
         var count = 0
+        var ownedEndpoint = false
         for (index in row.variables.indices) {
             row.visit(state)
             val variable = row.variables[index]
             val lower = row.coefficients[index] > 0L
             val factorId = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
+            if (state.arithmeticLearningTrace?.collectDeclines == true &&
+                factorId in state.baseFactorCount until state.totalFactorCount &&
+                state.factorAt(factorId) is LearnedIntegerPropagator) {
+                ownedEndpoint = true
+                state.arithmeticLearningTrace?.record("integer.retained.endpoint")
+            }
             val marker = if (lower) state.intMinAntecedents[variable] else state.intMaxAntecedents[variable]
             state.arithmeticLearningTrace?.marker(variable, lower, marker)
             if (!isLazyReason(marker)) {
@@ -186,21 +207,27 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val indices = candidates ?: return retainedReason(row, used)
         for (position in 0 until count) {
             row.visit(state)
-            qualifiedReason(row, indices[position], allowWideSources)?.let { return it }
+            qualifiedReason(row, indices[position], allowWideSources)?.let {
+                if (ownedEndpoint) state.arithmeticLearningTrace?.record("integer.retained.original-preferred")
+                return it
+            }
         }
         return retainedReason(row, used)
     }
 
     private fun retainedAmoSource(factorId: Int): IntegerConflictRow? {
         sourceWork.visit()
-        if (state.incremental || factorId !in state.baseFactorCount until state.totalFactorCount) return null
-        val propagator = state.factorAt(factorId) as? LearnedIntegerPropagator ?: return null
+        if (state.incremental) return retainedDecline("incremental")
+        if (factorId !in state.baseFactorCount until state.totalFactorCount) return retainedDecline("not-learned")
+        val propagator = state.factorAt(factorId) as? LearnedIntegerPropagator
+            ?: return retainedDecline("not-owned")
         sourceWork.visit()
-        val cache = state.learned.integerRows ?: return null
+        val cache = state.learned.integerRows ?: return retainedDecline("no-store")
         val slot = propagator.retentionSlot
-        if (slot !in cache.indices || cache[slot] !== propagator) return null
+        if (slot !in cache.indices || cache[slot] !== propagator) return retainedDecline("identity")
         val row = propagator.row
-        if (row.guard != Lit.NONE || row.variables.size < 2) return null
+        if (row.guard != Lit.NONE) return retainedDecline("guard")
+        if (row.variables.size < 2) return retainedDecline("width")
         var negative = 0L
         val bounds = state.problem.intBounds
         for (index in row.variables.indices) {
@@ -208,10 +235,14 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             val coefficient = row.coefficients[index]
             val variable = row.variables[index]
             if ((coefficient != 1L && coefficient != -1L) || !bounds.hasLower(variable) ||
-                !bounds.hasUpper(variable) || bounds.lower(variable) != 0L || bounds.upper(variable) != 1L) return null
+                !bounds.hasUpper(variable) || bounds.lower(variable) != 0L || bounds.upper(variable) != 1L) {
+                return retainedDecline("declared-unit-binary")
+            }
             if (coefficient < 0L) negative++
         }
-        return row.takeIf { it.bound == 1L - negative }
+        if (row.bound != 1L - negative) return retainedDecline("cardinality")
+        state.arithmeticLearningTrace?.record("integer.retained.qualified")
+        return row
     }
 
     private fun retainedReason(row: IntegerLearningInequality, used: Set<PivotKey>): BoundEvent? {
@@ -231,7 +262,10 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                     break
                 }
             }
-            if (coefficient == 0L || (coefficient > 0L) == lower) continue
+            if (coefficient == 0L || (coefficient > 0L) == lower) {
+                state.arithmeticLearningTrace?.record("integer.retained.reject.pivot-sign")
+                continue
+            }
             // The owned inequality is a source in this state; the reason id only selects it.
             // No eager support is treated as a historical lazy endpoint.
             return BoundEvent(parent, variable, state.undo.size, key)

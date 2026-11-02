@@ -86,7 +86,10 @@ class IntegerConflictLearnerTest {
             Linear(intArrayOf(1, -1), intArrayOf(5, 0), LinearOp.LE, 0),
             Linear(intArrayOf(1, -1), intArrayOf(5, 4), LinearOp.LE, 0),
             Linear(intArrayOf(1, -1), intArrayOf(4, 1), LinearOp.LE, 0),
-        )), pbLearning = false).apply { enableIntegerRowLearning() }
+        )), pbLearning = false).apply {
+            enableIntegerRowLearning()
+            configureAttribution(true, false)
+        }
         native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
             mapOf(0 to 1L, 1 to 1L, 2 to -1L), 0L, Lit.NONE)), 1)
 
@@ -99,6 +102,9 @@ class IntegerConflictLearnerTest {
         assertEquals(1, learned.row.retainedSources)
         assertEquals(1L, native.learnedLifecycle()["learningIntegerChainedProduced"])
         assertEquals(0L, native.learnedLifecycle()["learningIntegerChainedAdmitted"])
+        val census = requireNotNull(native.explanationState.arithmeticLearningTrace).declineCensus
+        assertTrue(requireNotNull(census["integer.retained.endpoint"]) > 0L)
+        assertTrue(requireNotNull(census["integer.retained.qualified"]) > 0L)
     }
 
     @Test
@@ -109,7 +115,10 @@ class IntegerConflictLearnerTest {
                 Linear(intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.LE, 0),
                 Linear(intArrayOf(1, -1), intArrayOf(4, 0), LinearOp.LE, 0),
                 Linear(intArrayOf(1, -1), intArrayOf(4, 1), LinearOp.LE, 0),
-            )), pbLearning = false).apply { enableIntegerRowLearning() }
+            )), pbLearning = false).apply {
+                enableIntegerRowLearning()
+                configureAttribution(true, false)
+            }
             val guard = Lit.make(0, positive)
             native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
                 mapOf(0 to 1L, 1 to 1L, 2 to -1L), 0L, guard)), 1)
@@ -120,6 +129,8 @@ class IntegerConflictLearnerTest {
             val fallback = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
             assertTrue(fallback.literals.contains(guard xor 1))
             assertEquals(null, native.learnedLifecycle()["learningIntegerChainedSources"])
+            val census = requireNotNull(native.explanationState.arithmeticLearningTrace).declineCensus
+            assertTrue(requireNotNull(census["integer.retained.reject.guard"]) > 0L)
         }
     }
 
@@ -131,7 +142,10 @@ class IntegerConflictLearnerTest {
             Linear(intArrayOf(1, -1), intArrayOf(4, 0), LinearOp.LE, 0),
             Linear(intArrayOf(1, -1), intArrayOf(4, 1), LinearOp.LE, 0),
             Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 1),
-        )), pbLearning = false).apply { enableIntegerRowLearning() }
+        )), pbLearning = false).apply {
+            enableIntegerRowLearning()
+            configureAttribution(true, false)
+        }
         native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
             mapOf(0 to 1L, 1 to 1L, 2 to -1L), 0L, Lit.NONE)), 1)
         assertEquals(1L, native.intDomain(0).max)
@@ -141,6 +155,8 @@ class IntegerConflictLearnerTest {
 
         assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
         assertEquals(null, native.learnedLifecycle()["learningIntegerChainedSources"])
+        val census = requireNotNull(native.explanationState.arithmeticLearningTrace).declineCensus
+        assertTrue(requireNotNull(census["integer.retained.reject.declared-unit-binary"]) > 0L)
     }
 
     @Test
@@ -151,7 +167,10 @@ class IntegerConflictLearnerTest {
             Linear(intArrayOf(1, -1), intArrayOf(4, 0), LinearOp.LE, 0),
             Linear(intArrayOf(1, -1), intArrayOf(4, 1), LinearOp.LE, 0),
             Linear(intArrayOf(1, -1), intArrayOf(4, 2), LinearOp.LE, 0),
-        )), pbLearning = false).apply { enableIntegerRowLearning() }
+        )), pbLearning = false).apply {
+            enableIntegerRowLearning()
+            configureAttribution(true, false)
+        }
         native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
             mapOf(0 to 1L, 1 to 1L, 2 to 1L), 2L, Lit.NONE)), 1)
 
@@ -159,6 +178,8 @@ class IntegerConflictLearnerTest {
 
         assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
         assertEquals(null, native.learnedLifecycle()["learningIntegerChainedSources"])
+        val census = requireNotNull(native.explanationState.arithmeticLearningTrace).declineCensus
+        assertTrue(requireNotNull(census["integer.retained.reject.cardinality"]) > 0L)
     }
 
     @Test
