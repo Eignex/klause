@@ -131,6 +131,61 @@ class PrivateRebuildParityTest {
     }
 
     @Test
+    fun `binary and ternary parity rows should combine across both signs`() {
+        for (phase in 0..1) {
+            val clauses = (0..3).filter { it.countOneBits() % 2 != phase }.map { mask ->
+                Clause(IntArray(2) { Lit.make(1 - it, mask and (1 shl (1 - it)) == 0) })
+            } + listOf(1, 2, 4, 7).map { mask ->
+                Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })
+            }
+            val session = PropagationSession(Problem(3, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake())
+
+            val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
+                Cancellation.Never, parity = captured))
+            val point = generation.reconstruct(Sample(booleanArrayOf(false, phase != 0, false), longArrayOf()))
+
+            assertEquals(1, captured.newPins)
+            assertEquals(phase != 0, captured.fixed[2])
+            assertNull(captured.fixed[0])
+            assertNull(captured.fixed[1])
+            assertTrue(clauses.all { clause ->
+                clause.literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+            })
+            for (variable in 0..2) assertNull(session.boolValue(variable))
+        }
+    }
+
+    @Test
+    fun `an incomplete or duplicated binary encoding should grant no parity row`() {
+        for (duplicate in listOf(false, true)) {
+            val clauses = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))) +
+                if (duplicate) listOf(Clause(intArrayOf(Lit.pos(1), Lit.pos(0)))) else emptyList()
+            val session = PropagationSession(Problem(3, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake())
+
+            val captured = PrivateRebuildParity.capture(session, 1_048_576L, { true })
+
+            assertNull(captured)
+            for (variable in 0..2) assertNull(session.boolValue(variable))
+        }
+    }
+
+    @Test
+    fun `opposite complete binary parities should defer source refutation`() {
+        val clauses = (0..3).map { mask ->
+            Clause(IntArray(2) { Lit.make(it, mask and (1 shl it) == 0) })
+        }.toTypedArray<Factor>()
+        val session = PropagationSession(Problem(3, 0, emptyArray(), clauses).bake())
+        val declines = mutableListOf<String>()
+
+        val captured = PrivateRebuildParity.capture(session, 1_048_576L, { true }, onDecline = declines::add)
+
+        assertNull(captured)
+        assertEquals(listOf("RefutationDeferred"), declines)
+        for (variable in 0..2) assertNull(session.boolValue(variable))
+    }
+
+    @Test
     fun `a parity row without forced coordinates should withhold a generation`() {
         val clauses = listOf(0, 3, 5, 6).map { mask ->
             Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })

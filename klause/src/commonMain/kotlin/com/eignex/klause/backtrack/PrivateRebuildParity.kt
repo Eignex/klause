@@ -58,8 +58,10 @@ internal class PrivateRebuildParity private constructor(
             return PrivateRebuildParity(source, fixed, pins, rowCount, bytes)
         }
 
-        private fun complete(mask: Int, parity: Int): Boolean {
-            val pattern = if (parity == 0) EVEN_MASK else ODD_MASK
+        private fun complete(key: Long, mask: Int, parity: Int): Boolean {
+            val binary = key and COLUMN_MASK.toLong() == COLUMN_MASK.toLong()
+            val pattern = if (binary) { if (parity == 0) 0x9 else 0x6 }
+            else if (parity == 0) EVEN_MASK else ODD_MASK
             return mask and pattern == pattern
         }
 
@@ -80,23 +82,27 @@ internal class PrivateRebuildParity private constructor(
                     if (factor !is Clause) { onDecline("Scope"); return false }
                     val literals = factor.literals
                     entries += literals.size
-                    if (literals.size != 3) continue
+                    if (literals.size !in 2..3) continue
                     if (!visit(24L)) return false
                     var a = literals[0]
                     var b = literals[1]
-                    var c = literals[2]
+                    var c = if (literals.size == 3) literals[2] else Int.MAX_VALUE
                     if (a > b) { val swap = a; a = b; b = swap }
                     if (b > c) { val swap = b; b = c; c = swap }
                     if (a > b) { val swap = a; a = b; b = swap }
                     val left = Lit.variable(a)
                     val middle = Lit.variable(b)
-                    val right = Lit.variable(c)
+                    val right = if (literals.size == 3) Lit.variable(c) else COLUMN_MASK
                     if (left == middle || middle == right) continue
-                    if (right >= source.numBoolVars) { onDecline("Scope"); return false }
+                    if (middle >= source.numBoolVars || (literals.size == 3 && right >= source.numBoolVars)) {
+                        onDecline("Scope")
+                        return false
+                    }
                     val key = (left.toLong() shl (COLUMN_BITS * 2)) or
                         (middle.toLong() shl COLUMN_BITS) or right.toLong()
                     val forbidden = (if (Lit.isPositive(a)) 0 else 1) or
-                        (if (Lit.isPositive(b)) 0 else 2) or (if (Lit.isPositive(c)) 0 else 4)
+                        (if (Lit.isPositive(b)) 0 else 2) or
+                        (if (literals.size == 2 || Lit.isPositive(c)) 0 else 4)
                     var slot = (((key xor (key ushr 33)) * -7046029254386353131L) ushr
                         (64 - keys.size.countTrailingZeroBits())).toInt()
                     while (true) {
@@ -116,7 +122,7 @@ internal class PrivateRebuildParity private constructor(
                 for (slot in keys.indices) {
                     if (!visit(4L)) return null
                     if (keys[slot] == EMPTY) continue
-                    for (parity in 0..1) if (complete(masks[slot], parity)) count++
+                    for (parity in 0..1) if (complete(keys[slot], masks[slot], parity)) count++
                 }
                 return count
             }
@@ -125,7 +131,7 @@ internal class PrivateRebuildParity private constructor(
                 for (slot in keys.indices) {
                     if (!visit(4L)) return false
                     if (keys[slot] == EMPTY) continue
-                    for (parity in 0..1) if (complete(masks[slot], parity)) {
+                    for (parity in 0..1) if (complete(keys[slot], masks[slot], parity)) {
                         if (!matrix.add(keys[slot], parity xor 1)) return false
                     }
                 }
@@ -151,7 +157,8 @@ internal class PrivateRebuildParity private constructor(
                 rhs[row] = parity
                 return column(row, (key ushr (COLUMN_BITS * 2)).toInt()) &&
                     column(row, ((key ushr COLUMN_BITS) and COLUMN_MASK.toLong()).toInt()) &&
-                    column(row, (key and COLUMN_MASK.toLong()).toInt())
+                    (key and COLUMN_MASK.toLong() == COLUMN_MASK.toLong() ||
+                        column(row, (key and COLUMN_MASK.toLong()).toInt()))
             }
 
             private fun column(row: Int, column: Int): Boolean {

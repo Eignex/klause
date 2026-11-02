@@ -281,8 +281,8 @@ declined pivot cannot consume its resolution allowance. Later opportunities amon
 protected columns wait for a fresh root view. This selection is a heuristic, not
 an exhaustive elimination pass.
 
-A bounded source scan can recognize a three-column parity equation from its
-complete four-clause Boolean encoding. Each clause excludes one assignment;
+A bounded source scan can recognize two- and three-column parity equations from
+their complete two- and four-clause Boolean encodings. Each clause excludes one assignment;
 the complete parity class of exclusions entails the opposite parity equation.
 A preparation-only GF(2) matrix substitutes the canonical global pins and uses
 forward elimination followed by affine back substitution over its free coordinates.
