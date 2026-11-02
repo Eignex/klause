@@ -282,8 +282,9 @@ shared read-only across portfolio workers.
 
 Propagation is two-watched-literal unit propagation over a trail pointer, without
 per-factor dispatch or integer order literals, reading a per-session truth byte per
-variable. Learned clauses own copied literal arrays with a wrapping replacement-scan
-cursor per clause. Reductions compact their handle and reference columns without
+variable. Learned clauses own copied literal arrays in fixed-size reference pages,
+with a wrapping replacement-scan cursor per clause. Empty pages release their arrays
+without changing live clause handles. Reductions compact their handle and reference columns without
 copying surviving literal arrays. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
 
@@ -297,11 +298,13 @@ eviction; units, pending rechecks and current root reasons survive.
 Retired rows stop propagation and export and release their owned literal array.
 Admission, reference-array growth and release debit the containing work ledger.
 A short retirement slice suspends before publication and resumes with its stable handle.
-Policy columns, payload reference slots and watch postings remain owned until funded
-full compaction reclaims them. Ownership reports include those capacities and report
-`learnedRetiredSlots` separately from active clause count. Ownership observes each
-copied array by identity with its row protection; upgrading protection preserves the
-owned-byte total. Reference capacity is observed separately.
+Policy columns, the reference-page directory and watch postings remain owned until
+funded full compaction reclaims them. Ownership reports include those capacities and report
+`learnedRetiredSlots` separately from active clause count. A page owns a disjoint pool
+of copied arrays. Its observation separates total and cumulative protected payload
+bytes under one stable pool identity; only required rows protect payload, while a
+required row protects the complete page reference allocation. Permanent-row checks read the policy
+column directly. Reference-page and directory capacities are observed separately.
 Window calls, charged work, visits and permanent, active and retained counts remain
 available in the released session's lifecycle totals.
 

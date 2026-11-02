@@ -25,6 +25,40 @@ class NativeSatStateTest {
     private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
 
     @Test
+    fun `empty native payload pages should release reference capacity without remapping`() {
+        val session = session(4, or(2, true, 3, true))
+        repeat(129) { index ->
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = index == 64 || index == 128)
+        }
+        val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        repeat(64) {
+            val start = session.work
+            session.maintainCapWindow(2, 256L, 64L, { false }) { false }
+            assertTrue(session.work - start <= 256L)
+        }
+        val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(129, session.learnedClauseCount)
+        assertEquals(2, session.activeLearnedClauseCount)
+        assertTrue(after.getValue("learnedPayloadReferenceCapacity") <
+            before.getValue("learnedPayloadReferenceCapacity"))
+    }
+
+    @Test
+    fun `native compaction should preserve a survivor across released payload pages`() {
+        val session = session(4, or(2, true, 3, true))
+        repeat(65) { index -> session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = index == 64) }
+        repeat(32) { session.maintainCapWindow(1, 256L, 64L, { false }) { false } }
+        assertTrue(session.explanationState.forgetLearnedClauses(1_000_000L, 1_048_576L) { _, _ -> true })
+
+        session.pinBool(0, false)
+
+        assertEquals(true, session.boolValue(1))
+        assertEquals(1, session.learnedClauseCount)
+    }
+
+    @Test
     fun `native retirement should release a large payload within small grants`() {
         val session = session(2050, or(2048, true, 2049, true))
         session.addLearnedClause(Clause(IntArray(2048) { Lit.make(it, true) }), 9)
@@ -40,7 +74,10 @@ class NativeSatStateTest {
         assertEquals(8192L, before.getValue("learnedPayloadBytes"))
         assertEquals(0L, after.getValue("learnedPayloadBytes"))
         assertEquals(0L, after.getValue("learnedArenaCapacityBytes"))
-        assertEquals(8192L, before.getValue("ownedPrimitiveBytes") - after.getValue("ownedPrimitiveBytes"))
+        assertEquals(8192L + before.getValue("learnedMetadataCapacityBytes") -
+            after.getValue("learnedMetadataCapacityBytes"),
+            before.getValue("ownedPrimitiveBytes") - after.getValue("ownedPrimitiveBytes"))
+        assertEquals(0L, after.getValue("learnedPayloadReferenceCapacity"))
         assertEquals(before.getValue("sessionWatchCapacityBytes"), after.getValue("sessionWatchCapacityBytes"))
         assertEquals(1, session.learnedClauseCount)
         assertEquals(0, session.activeLearnedClauseCount)

@@ -325,7 +325,6 @@ internal class NativeSatState(private val state: PropagationState) {
             sample.step()
             val peer = learnedOrigin[i] >= 0
             val used = lifecycleStages[i] and 1 != 0
-            if (learnedPermanent[i] == 1) sample.retain(protected, i)
             if (peer) peerImports++
             if (peer && used) consumedPeerImports++
             if (used) consumed++
@@ -335,13 +334,14 @@ internal class NativeSatState(private val state: PropagationState) {
             val index = rechecks[i] - baseCount
             if (lifecycleStages[index] and 1 == 0) sample.retain(protected, index)
         }
-        val protectedRows = protected.size > 0
+        val protectedRows = protected.size > 0 || permanentCount > 0
         capRanking.sharingMemory(sample, protectedRows)
         state.learned.capRanking.sharingMemory(sample, protectedRows)
         val columns = listOf(learnedLbd, learnedPermanent, learnedTier, learnedBoolReasons,
             lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
             capCandidates, state.learned.capCandidates, state.learned.boolReasons)
-        var metadata = capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes + 12L
+        var metadata = capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
+            learnedPayloads.primitiveBytes
         for (keys in listOf(learnedAdmissions, state.learned.admissions)) {
             sample.step()
             metadata += keys.allocatedBytes + Int.SIZE_BYTES
@@ -352,7 +352,9 @@ internal class NativeSatState(private val state: PropagationState) {
             sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
             sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
         }
-        learnedPayloads.sharingMemory(sample, protected, protectedRows)
+        learnedPayloads.sharingMemory(sample, protectedRows) { index ->
+            learnedPermanent[index] == 1 || sample.contains(protected, index)
+        }
         sample.owned(arena.lits, arena.lits.size.toLong() * Int.SIZE_BYTES, true, shared = true)
         sample.owned(arena.starts, arena.starts.size.toLong() * Int.SIZE_BYTES, true, shared = true)
         sample.owned(watchSizes, watchSizes.size.toLong() * Int.SIZE_BYTES, true)
@@ -367,7 +369,8 @@ internal class NativeSatState(private val state: PropagationState) {
             for (i in 0 until watchSizes[literal]) {
                 sample.step()
                 val handle = entries[i].toInt()
-                if (!retained) retained = handle < baseCount || sample.contains(protected, handle - baseCount)
+                if (!retained) retained = handle < baseCount || learnedPermanent[handle - baseCount] == 1 ||
+                    sample.contains(protected, handle - baseCount)
             }
             sample.owned(entries, entries.size.toLong() * Long.SIZE_BYTES, retained)
         }
@@ -377,6 +380,7 @@ internal class NativeSatState(private val state: PropagationState) {
             "learnedPayloadBytes" to learnedPayloads.capacityBytes,
             "learnedArenaCapacityBytes" to learnedPayloads.capacityBytes,
             "learnedPayloadReferenceCapacity" to learnedPayloads.referenceCapacity,
+            "learnedPayloadDirectoryCapacity" to learnedPayloads.directoryCapacity,
             "learnedMetadataCapacityBytes" to metadata,
             "learnedCapIndexStateBytes" to capRanking.modeledBytes + state.learned.capRanking.modeledBytes,
             "sessionWatchCapacityBytes" to watchBytes +
@@ -463,7 +467,7 @@ internal class NativeSatState(private val state: PropagationState) {
             if (!mayDrop(index)) return false
             val pinned = if (index == prepared) protected else capProtected(index, budget, 0L)
             if (pinned) return false
-            budget.visit(8L)
+            budget.visit(16L)
             budget.visit(0L)
             learnedPayloads.release(index)
             lifecycleStages[index] = lifecycleStages[index] or RETIRED
@@ -501,7 +505,7 @@ internal class NativeSatState(private val state: PropagationState) {
         if (learnedPermanent[index] == 1 || literalCountOf(index) <= 1 || learnedBoolReasons[index] > 0 ||
             lifecycleStages[index] and 2 != 0
         ) return LearnedRetirementResult(LearnedRetirementStatus.ProtectedFloor)
-        budget.visit(24L)
+        budget.visit(32L)
         budget.visit(0L)
         learnedPayloads.release(index)
         lifecycleStages[index] = lifecycleStages[index] or RETIRED
@@ -604,7 +608,7 @@ internal class NativeSatState(private val state: PropagationState) {
         for (i in 0 until learnedCount) if (remap[i] < 0) {
             state.work++
             if (!retiredOf(i)) state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
-            state.work += 8L
+            state.work += 16L
             learnedPayloads.release(i)
         }
         state.remapReasons(state.boolReason, remap, baseCount)
@@ -642,8 +646,7 @@ internal class NativeSatState(private val state: PropagationState) {
             state.work++
             val target = remap[i]
             if (target < 0) continue
-            state.work += 2L
-            learnedPayloads.move(i, target)
+            state.work += learnedPayloads.move(i, target)
             lifecycleStages[target] = lifecycleStages[i]
             learnedLbd[target] = learnedLbd[i]
             learnedPermanent[target] = learnedPermanent[i]
@@ -664,8 +667,7 @@ internal class NativeSatState(private val state: PropagationState) {
             }
         }
         lifecycleStages.truncateTo(survivors)
-        state.work += 2L + survivors.coerceAtLeast(1) * 2L
-        learnedPayloads.trimTo(survivors)
+        state.work += learnedPayloads.trimTo(survivors)
         learnedLbd.truncateTo(survivors)
         learnedPermanent.truncateTo(survivors)
         learnedTier.truncateTo(survivors)
