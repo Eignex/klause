@@ -1273,10 +1273,7 @@ internal class ResumableMinimize(
     private inner class LpGuidedBranching : BacktrackBranching {
         override fun onBranch(variable: VarRef) {
             val domain = (variable as? VarRef.IntVar)?.let { session.intDomain(it.varId) }
-            lpHints?.let { hints ->
-                hints.prepareSide(variable, domain, lpEngine::directionalCosts)
-                hints.branch(variable, domain)
-            }
+            lpHints?.branch(variable, domain)
         }
 
         override fun onCommit(decision: SearchDecision, depth: Int) { lpHints?.commit(decision, depth) }

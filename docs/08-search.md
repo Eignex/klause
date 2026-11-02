@@ -270,9 +270,8 @@ subtraction, preserving small gains when the constant exceeds floating precision
 The `lp-default` and `lp-aggressive` optimization recipes enable the finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
-and branching must be enabled. The reduced-cost/fractionality scorer or the configured
-fallback selector chooses the variable. Directional advice is prepared for that actual
-choice after selection; it only orders the two existing children.
+and branching must be enabled. The reduced-cost/fractionality scorer selects the
+variable; directional guidance only orders its two existing children.
 Two recent samples in each direction supply that variable's predicted child gains,
 using each direction's mean cost per unit of fractional movement. The balanced
 `min + max / 6` score admits finite positive predictions without comparing variables.
@@ -281,7 +280,7 @@ selected structural column. A matching retained optimal basis supplies both obje
 costs, multiplied by the corresponding fractional movements. These estimates remain
 current-node advice, separate from observed gains and proof authority.
 
-The smaller predicted objective increase is tried first, after value and incumbent
+The larger predicted objective increase is tried first, after value and incumbent
 guidance, only when both existing alternatives match the estimated Boolean or integer
 floor/ceil partition. Guidance swaps those alternatives without adding, removing or
 replacing a decision. Tied gains, unsupported engines, stale or unfinished bases,

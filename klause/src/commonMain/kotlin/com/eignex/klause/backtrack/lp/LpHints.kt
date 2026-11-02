@@ -208,7 +208,7 @@ internal class LpHints(
     private fun rememberSide(variable: VarRef, value: Double, down: Double, up: Double, basis: Boolean): Boolean {
         charge(8L)
         if (down == up) return false
-        pendingSide = SideAdvice(variable, floor(value).toLong(), up < down, basis)
+        pendingSide = SideAdvice(variable, floor(value).toLong(), up > down, basis)
         return true
     }
 

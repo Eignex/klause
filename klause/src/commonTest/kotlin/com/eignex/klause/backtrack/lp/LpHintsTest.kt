@@ -83,9 +83,9 @@ class LpHintsTest {
     }
 
     @Test
-    fun `basis side advice puts the cheaper existing child first`() {
+    fun `basis side advice puts the larger predicted child gain first`() {
         for (boolean in listOf(false, true)) for (id in 0..1) {
-            for (upCheap in listOf(false, true)) for (upFirst in listOf(false, true)) {
+            for (upCostly in listOf(false, true)) for (upFirst in listOf(false, true)) {
                 val builder = LpBuilder()
                 repeat(2) { builder.addVar(0, 2) }
                 val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
@@ -93,7 +93,7 @@ class LpHintsTest {
                     if (boolean) intArrayOf(0, 1) else IntArray(0))
                 val hints = LpHints(if (boolean) 0 else 2, if (boolean) 2 else 0, directionalGains = true)
                 val variable = if (boolean) VarRef.Bool(id) else VarRef.IntVar(id)
-                val cost = if (upCheap) LpDirectionalCost(4.0, 1.0) else LpDirectionalCost(1.0, 4.0)
+                val cost = if (upCostly) LpDirectionalCost(1.0, 4.0) else LpDirectionalCost(4.0, 1.0)
                 hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
                 hints.prepareSide(variable, IntDomain(0, 2)) { _, _ -> listOf(cost) }
                 hints.branch(variable, if (boolean) null else IntDomain(0, 2))
@@ -103,7 +103,7 @@ class LpHintsTest {
 
                 val ordered = hints.orderAlternatives(variable, existing)
 
-                assertEquals(if (upCheap) listOf(upper, lower) else listOf(lower, upper), ordered)
+                assertEquals(if (upCostly) listOf(upper, lower) else listOf(lower, upper), ordered)
             }
         }
     }
@@ -118,7 +118,7 @@ class LpHintsTest {
             val hints = LpHints(2, 0, directionalGains = true)
             val variable = VarRef.IntVar(0)
             hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-            hints.prepareSide(variable, IntDomain(0, 2)) { _, _ -> listOf(LpDirectionalCost(4.0, 1.0)) }
+            hints.prepareSide(variable, IntDomain(0, 2)) { _, _ -> listOf(LpDirectionalCost(1.0, 4.0)) }
             hints.branch(variable, IntDomain(0, 2))
             when (change) {
                 "node" -> hints.beginNode(1, 100.0)
@@ -146,7 +146,7 @@ class LpHintsTest {
             val hints = LpHints(2, 0, directionalGains = true)
             val variable = VarRef.IntVar(if (change == "variable") 1 else 0)
             hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-            hints.prepareSide(VarRef.IntVar(0), IntDomain(0, 2)) { _, _ -> listOf(LpDirectionalCost(4.0, 1.0)) }
+            hints.prepareSide(VarRef.IntVar(0), IntDomain(0, 2)) { _, _ -> listOf(LpDirectionalCost(1.0, 4.0)) }
             hints.branch(variable, if (change == "domain") IntDomain(0, 2).excludeValue(1) else IntDomain(0, 2))
             val split = if (change == "split") 1L else 0L
             val lower = SearchDecision.IntAtMost(variable.varId, split)
@@ -229,7 +229,7 @@ class LpHintsTest {
             if (change == "clear") hints.clear()
             hints.prepareSide(variable, IntDomain(0, 2)) { _, _ -> listOf(LpDirectionalCost(4.0, 4.0)) }
             hints.branch(variable, IntDomain(0, 2))
-            val existing = listOf(SearchDecision.IntAtLeast(0, 1L), SearchDecision.IntAtMost(0, 0L))
+            val existing = listOf(SearchDecision.IntAtMost(0, 0L), SearchDecision.IntAtLeast(0, 1L))
 
             val ordered = hints.orderAlternatives(variable, existing)
 
@@ -274,7 +274,7 @@ class LpHintsTest {
     @Test
     fun `basis advice reads only its selected column and rejects unusable costs`() {
         for ((cost, accepted) in listOf(
-            LpDirectionalCost(4.0, 1.0) to true,
+            LpDirectionalCost(1.0, 4.0) to true,
             LpDirectionalCost(3.0, 1.0) to false,
             LpDirectionalCost(0.0, 0.0) to false,
             LpDirectionalCost(-1.0, 6.0) to false,
@@ -319,7 +319,7 @@ class LpHintsTest {
             val available = hints.prepareSide(VarRef.IntVar(0),
                 if (decline == "domain") IntDomain(1, 2) else IntDomain(0, 2)) { _, _ ->
                 estimates++
-                listOf(LpDirectionalCost(4.0, 1.0))
+                listOf(LpDirectionalCost(1.0, 4.0))
             }
 
             assertTrue(!available, decline)
@@ -559,7 +559,7 @@ class LpHintsTest {
             hints.recordBound(relaxation, 10.0)
             hints.prepareSide(variable, IntDomain(0, 10)) { _, _ -> null }
             hints.branch(variable, IntDomain(0, 10))
-            val existing = listOf(SearchDecision.IntAtLeast(0, 3L), SearchDecision.IntAtMost(0, 2L))
+            val existing = listOf(SearchDecision.IntAtMost(0, 2L), SearchDecision.IntAtLeast(0, 3L))
 
             val ordered = hints.orderAlternatives(variable, existing)
 

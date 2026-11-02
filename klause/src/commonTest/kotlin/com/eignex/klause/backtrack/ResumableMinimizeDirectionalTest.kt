@@ -2,7 +2,6 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
-import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
@@ -12,17 +11,12 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.ComponentCheck
-import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
-import com.eignex.klause.solver.search.SearchDecision
-import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -70,53 +64,6 @@ class ResumableMinimizeDirectionalTest {
             assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["SIDE_CONSUMED"] ?: 0L) > 0L, diagnostic)
-        }
-    }
-
-    @Test
-    fun `fallback selected variable consumes current basis child advice`() {
-        val factors = arrayOf<Factor>(
-            Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 4L),
-            Linear(longArrayOf(1L, 1L), intArrayOf(1, 2), LinearOp.GE, 4L),
-            Linear(longArrayOf(1L, 2L), intArrayOf(0, 2), LinearOp.GE, 4L),
-        )
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 4) }, factors).bake()
-        var fallbackPick: VarRef? = null
-        val attempts = ArrayList<SearchDecision>()
-        val selector = object : VariableSelector {
-            override fun fresh() = this
-            override fun pick(session: PropagationSession, rng: Random): VarRef? =
-                InputOrder.pick(session, rng).also { if (fallbackPick == null) fallbackPick = it }
-        }
-        val params = BacktrackParams(
-            variableSelector = selector,
-            valueSelector = IndomainMin,
-            randomSeed = 3L,
-            maxDecisions = 1L,
-            lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
-                boundMaxOpsPerNode = 0L),
-            lpDirectionalGains = true,
-            componentFactory = { listOf(object : SearchComponent {
-                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
-            }) },
-            branchObserver = object : SearchBranchAttemptObserver {
-                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
-                    attempts.add(decision)
-                    context.requestCancellationPoll()
-                }
-            },
-        )
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
-
-        ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
-            search.runSlice(Cancellation { attempts.isNotEmpty() }, 1000L, 100_000L) {}
-
-            val observations = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes.orEmpty()
-            val diagnostic = "fallback=$fallbackPick; attempts=$attempts; $observations; " +
-                "solves=${search.stats.lp.solves.sum}"
-            assertEquals(VarRef.IntVar(0), fallbackPick, diagnostic)
-            assertEquals(1, attempts.size, diagnostic)
-            assertTrue((observations["BASIS_SIDE_CONSUMED"] ?: 0L) > 0L, diagnostic)
         }
     }
 
