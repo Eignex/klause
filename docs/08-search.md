@@ -435,6 +435,8 @@ slice has expired.
 A completed fixpoint can share Boolean- and root-grounded native subproofs with search
 peers through a bounded memo of at most 4,096 entries. No memo survives a callback,
 suspension or retraction.
+Empty conjunctions and memoized single literals need no graph-traversal scratch.
+A retained literal still consumes one native visit and must hold at publication.
 
 #### Arithmetic kernels
 

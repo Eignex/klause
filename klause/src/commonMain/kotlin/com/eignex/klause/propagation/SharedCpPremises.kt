@@ -86,6 +86,16 @@ private fun PropagationState.sharedPremise(
     rootLevel: Int,
     memo: MutableIntObjectMap<SearchAtomPremise>? = null,
 ): SearchAtomPremise {
+    if (asserted.isEmpty()) return SearchAtomPremise.All(emptyList())
+    if (asserted.size == 1) {
+        val literal = asserted[0]
+        val retained = memo?.get(literal)
+        if (retained != null) {
+            work++
+            if (runCancelled || litTruth(literal) != true) return SearchAtomPremise.Unavailable
+            return SearchAtomPremise.All(listOf(retained))
+        }
+    }
     val proofs = MutableIntObjectMap<SearchAtomPremise>()
     val visiting = IntHashSet()
     val pending = ArrayDeque<NativePremiseFrame>()
