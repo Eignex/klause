@@ -54,6 +54,20 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `deferring node simplex preserves combinatorial objective pruning`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(1, 2)), emptyList())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val session = PropagationSession(problem)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink("deferred-simplex-objective-bound")).use { engine ->
+
+            val pruned = engine.pruneNode(session, 1.0, -1, true, deferSimplex = true)
+
+            assertTrue(pruned)
+        }
+    }
+
+    @Test
     fun `numerical root preparation finishes before the bounded root query`() {
         val sink = SolveStatsSink("paid-numerical-root-preparation")
         LpEngine(boundedProblem().bake(), LinearObjective(intCoefficients = LongArray(3) { 2L }),

@@ -126,7 +126,9 @@ traversal as value preferences. Its existing backtracking completes the assignme
 and complete source checks retain publication authority. This transfer carries no
 LP point, bound or proof authority into a leaf. Before its first incumbent, a retained
 integer guide can keep decisions within one declared factor component of the
-undetermined columns at a time.
+undetermined columns at a time. Its preparation precedes additional node LP queries
+under the same funded allowance. A ready guide lets CP seek its first incumbent
+before those queries resume; inherited checked bounds remain available.
 The same frame stack handles conflicts and retraction; all source constraints stay
 active and every component still belongs to complete source checking.
 

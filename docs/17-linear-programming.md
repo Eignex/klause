@@ -313,8 +313,13 @@ work also reduces the graph's remaining preparation ceiling. Within each compone
 known fractional coordinates precede integral and unknown coordinates, with source
 order breaking ties. The stable primitive sort reuses graph scratch and charges
 its passes and comparisons to the same preparation allowance. Membership walks
-charge ordinary CP work and revisit retracted variables. Declined preparation
-keeps ordinary branching; guide replacement, restart, reseed and close discard the
+charge ordinary CP work and revisit retracted variables. At each source node,
+preparation can use its existing funded allowance before another LP query. A ready
+component guide defers additional node queries until the first incumbent, while
+inherited checked bounds, combinatorial node bounds and complete CP checks remain
+active. Only the simplex arm defers; other bounds keep their normal cascade. Those nodes supply
+no new directional observations; ordinary node LP policy resumes after an incumbent
+or guide expiry. Declined preparation keeps ordinary branching; guide replacement, restart, reseed and close discard the
 ordering. An attempt stopped before spending work can retry in a fresh consultation;
 a paid decline retains its charge. These choices supply no directional-history, bound or proof authority.
 Continuation observations distinguish a pending interruption from a cancelled run,

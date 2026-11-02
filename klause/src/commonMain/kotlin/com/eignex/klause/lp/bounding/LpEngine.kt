@@ -1298,10 +1298,12 @@ internal class LpEngine(
         effectiveBound: Double,
         objectiveVar: Int,
         objectiveAscending: Boolean,
+        deferSimplex: Boolean = false,
     ): Boolean {
         requireOpen()
         lpBackjump = null
         for (b in bounds) {
+            if (deferSimplex && b is LpSimplexBound) continue
             if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) return true
         }
         return false

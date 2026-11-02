@@ -14,7 +14,10 @@ import com.eignex.klause.util.argsortBy
 import kotlin.math.floor
 import kotlin.time.TimeSource
 
-internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellation: Cancellation): VarRef? {
+internal fun LpEngine.prepareRootComponentOrder(
+    session: PropagationSession,
+    cancellation: Cancellation,
+): RootComponentOrder? {
     val targets = rootPrimalTargets ?: return null
     if (problem.numBoolVars != 0 || problem.numRealVars != 0 || params.lpPlan.lbTreeSearch) return null
     if (!targets.componentOrderAttempted) {
@@ -46,8 +49,13 @@ internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellatio
         sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", outcome,
             started.elapsedNow().inWholeNanoseconds, preparationWork)
     }
-    if (rootPrimalTargets !== targets) return null
-    val order = targets.components ?: return null
+    if (rootPrimalTargets !== targets || cancellation()) return null
+    return targets.components
+}
+
+internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellation: Cancellation): VarRef? {
+    val targets = rootPrimalTargets ?: return null
+    val order = prepareRootComponentOrder(session, cancellation) ?: return null
     val variable = firstRootComponentVariable(order, session, cancellation) ?: return null
     if (rootPrimalTargets !== targets || cancellation()) return null
     if (!order.offered) {
