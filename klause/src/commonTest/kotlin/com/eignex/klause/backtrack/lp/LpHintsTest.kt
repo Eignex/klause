@@ -49,6 +49,40 @@ class LpHintsTest {
     }
 
     @Test
+    fun `reused shallow history fits its observation allowance`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+        val observations = ArrayList<String>()
+        var remaining = Long.MAX_VALUE
+        val hints = LpHints(1, 0, directionalGains = true, observe = observations::add, charge = { work ->
+            assertTrue(work <= remaining, "unfunded work=$work remaining=$remaining")
+            remaining -= work
+        })
+        val variable = VarRef.IntVar(0)
+        val domain = IntDomain(0, 10)
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+        hints.recordBound(relaxation, 10.0)
+        hints.branch(variable, domain)
+        hints.resetHistory()
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+        hints.recordBound(relaxation, 10.0)
+        remaining = 20L
+
+        hints.branch(variable, domain)
+        hints.commit(SearchDecision.IntAtMost(0, 2), 1)
+        hints.beginNode(1, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.0), DoubleArray(0))
+        hints.recordBound(relaxation, 11.0)
+
+        assertEquals(1, observations.count { it == "DOWN" })
+    }
+
+    @Test
     fun `basis side advice puts the cheaper existing child first`() {
         for (boolean in listOf(false, true)) for (id in 0..1) {
             for (upCheap in listOf(false, true)) for (upFirst in listOf(false, true)) {

@@ -287,7 +287,9 @@ replacing a decision. Tied gains, unsupported engines, stale or unfinished bases
 insufficient allowance, pruned alternatives and changed partitions retain the existing
 heuristics. Preferences expire at the next node, point replacement or history reset.
 History and basis side consumption, changed order and unavailable advice are recorded
-separately. The readiness check and all analysis spend the existing LP work allowance.
+separately. The readiness check and all analysis spend the existing LP work allowance. Ancestor
+observations use a bounded depth-indexed buffer. Initial buffer preparation and visited
+slot ranges are funded before allocation or clearing, including across scope resets.
 Committed observation attempts retain their branch direction. Missing immediate-child
 bound estimates distinguish LP admission gates, suspended or absent results and
 unavailable bounds. Scope changes, depth changes and replaced alternatives report discarded

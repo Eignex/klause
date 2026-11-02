@@ -98,7 +98,7 @@ internal class LpHints(
             scopeIncumbentVersion != incumbentVersion || scopeExternalExact != externalExact
         ) {
             if (scopeModel != null) observe("INCOMPATIBLE")
-            charge(history.retainedEntries.toLong() + 2L * relaxation.colVarId.size)
+            charge(2L * relaxation.colVarId.size)
             history.clear(report = scopeModel != null)
             scopeModel = state.baseModel
             scopeRows = state.rows
@@ -147,14 +147,12 @@ internal class LpHints(
         }
         pendingSide = null
         if (collect && scopeModel != null) {
-            charge(129L)
             history.branch(variable, if (boundRecorded) value(variable, domain) else Double.NaN)
         }
     }
 
     fun commit(decision: SearchDecision, depth: Int) {
         if (collect && scopeModel != null) {
-            charge(129L)
             history.commit(decision, depth)
         }
     }
@@ -304,7 +302,7 @@ internal class LpHints(
 
     fun resetHistory() {
         if (scopeModel != null) {
-            charge(history.retainedEntries.toLong() + scopeVariables.size + scopeBooleans.size)
+            charge(scopeVariables.size.toLong() + scopeBooleans.size)
             history.clear()
         }
         scopeModel = null

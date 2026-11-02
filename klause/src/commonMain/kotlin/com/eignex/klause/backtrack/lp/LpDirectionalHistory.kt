@@ -24,7 +24,8 @@ internal class LpDirectionalHistory(
     private class Pending(val parent: Parent, val up: Boolean, val distance: Double, val depth: Int)
 
     private val gains = HashMap<VarRef, Gains>()
-    private val parents = HashMap<Int, Parent>()
+    private var parents: Array<Parent?>? = null
+    private var parentLimit = 0
     private var pending: Pending? = null
     private var stamp = 0L
     private var reliableStamp = -1L
@@ -41,15 +42,15 @@ internal class LpDirectionalHistory(
         }
     }
 
-    val retainedEntries: Int get() = gains.size + parents.size
-
     val mayHaveScores: Boolean get() = reliableStamp >= 0L && stamp - reliableStamp <= maxAge
 
     fun clear(report: Boolean = true) {
         if (report) pending?.let { observeDirection("LOST_SCOPE", it) }
+        charge(gains.size.toLong() + parentLimit + 1L)
         gains.clear()
         reliableStamp = -1L
-        parents.clear()
+        parents?.fill(null, 0, parentLimit)
+        parentLimit = 0
         pending = null
         objective = Double.NaN
         if (report) observe("RESET")
@@ -73,19 +74,25 @@ internal class LpDirectionalHistory(
     }
 
     fun branch(variable: VarRef, value: Double) {
-        parents.keys.removeAll { it >= depth }
-        if (depth >= MAX_DEPTH || !objective.isFinite() || !value.isFinite()) return
+        discardParentsFrom(depth)
+        if (depth !in 0 until MAX_DEPTH || !objective.isFinite() || !value.isFinite()) return
         if (variable is VarRef.Bool && (value < 0.0 || value > 1.0)) return
         val fraction = value - floor(value)
         if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return
-        parents[depth] = Parent(objective, variable, value)
+        val slots = parents ?: run {
+            charge(MAX_DEPTH.toLong())
+            arrayOfNulls<Parent>(MAX_DEPTH).also { parents = it }
+        }
+        charge(1L)
+        slots[depth] = Parent(objective, variable, value)
+        parentLimit = depth + 1
     }
 
     fun commit(decision: SearchDecision, level: Int) {
-        parents.keys.removeAll { it >= level }
+        discardParentsFrom(level)
         pending?.let { observeDirection("LOST_REPLACED", it) }
         pending = null
-        val parent = parents[level - 1] ?: return
+        val parent = parents?.getOrNull(level - 1) ?: return
         val floor = floor(parent.value)
         val up = when (decision) {
             is SearchDecision.Bool -> {
@@ -106,8 +113,16 @@ internal class LpDirectionalHistory(
         }
         val distance = if (up) floor + 1.0 - parent.value else parent.value - floor
         if (distance <= DISTANCE_TOL || distance >= 1.0 - DISTANCE_TOL) return
+        charge(1L)
         pending = Pending(parent, up, distance, level)
         observeDirection("COMMIT", checkNotNull(pending))
+    }
+
+    private fun discardParentsFrom(level: Int) {
+        val limit = level.coerceIn(0, parentLimit)
+        charge((parentLimit - limit).toLong() + 1L)
+        parents?.fill(null, limit, parentLimit)
+        parentLimit = limit
     }
 
     fun infeasible() {
