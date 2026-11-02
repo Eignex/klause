@@ -1,14 +1,11 @@
 package com.eignex.klause.factor
 
-import com.eignex.klause.brute.BruteForceParams
-import com.eignex.klause.brute.BruteForceSolver
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.reasonOf
@@ -32,7 +29,7 @@ object PropagationReasonOracle {
             ConflictReasonOracle.assertEntailed(problem, state, 0, label)
             return
         }
-        val solutions = BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
+        val solutions = FactorPropagationOracle.enumerateSat(problem, label, null)
         for (b in 0 until problem.numBoolVars) {
             val value = state.boolValues[b] ?: continue
             if (boolsBefore[b] != null) continue
