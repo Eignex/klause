@@ -3,6 +3,24 @@ plugins {
     kotlin("plugin.serialization")
 }
 
+kover {
+    currentProject {
+        instrumentation {
+            disabledForAll.set(true)
+        }
+    }
+}
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    doFirst {
+        val testTask = this as org.gradle.api.tasks.testing.Test
+        val arguments = testTask.allJvmArgs + testTask.jvmArgumentProviders.flatMap { it.asArguments() }
+        val plainJvm = arguments.none { it.startsWith("-javaagent:") || it.startsWith("-agentpath:") }
+        check(plainJvm) { "Ordinary JVM timing requires no instrumentation agents" }
+        logger.lifecycle("Ordinary JVM timing: no instrumentation agents = " + plainJvm)
+    }
+}
+
 tasks.withType<org.gradle.api.tasks.testing.AbstractTestTask>().configureEach {
     testLogging.events = testLogging.events + org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED
     testLogging.showStandardStreams = true

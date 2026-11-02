@@ -4,6 +4,24 @@ plugins {
     id("com.eignex.cli") version "1.3.5"
 }
 
+kover {
+    currentProject {
+        instrumentation {
+            disabledForAll.set(true)
+        }
+    }
+}
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    doFirst {
+        val testTask = this as org.gradle.api.tasks.testing.Test
+        val arguments = testTask.allJvmArgs + testTask.jvmArgumentProviders.flatMap { it.asArguments() }
+        val plainJvm = arguments.none { it.startsWith("-javaagent:") || it.startsWith("-agentpath:") }
+        check(plainJvm) { "Ordinary JVM timing requires no instrumentation agents" }
+        logger.lifecycle("Ordinary JVM timing: no instrumentation agents = " + plainJvm)
+    }
+}
+
 // Build identity, mirrored by the MiniZinc solver configuration checked below. These feed the
 // generated BuildInfo that `--version` reports.
 val cliAppName = "Klause"
