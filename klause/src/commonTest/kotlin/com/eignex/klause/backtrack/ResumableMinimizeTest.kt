@@ -218,6 +218,7 @@ class ResumableMinimizeTest {
             search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
 
             assertEquals(listOf(0, 2), attempts.take(2))
+            assertTrue(assertNotNull(search.stats.lp.phases["PRIMAL_COMPONENT_ORDER_ROOT"]).work > 0L)
             val sample = offered.single()
             assertTrue(sample.ints[0] + sample.ints[2] + sample.ints[4] >= 1L)
             assertTrue(sample.ints[1] + sample.ints[3] + sample.ints[5] >= 1L)
