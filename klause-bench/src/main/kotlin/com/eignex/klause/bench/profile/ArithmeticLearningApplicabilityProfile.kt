@@ -60,7 +60,7 @@ internal object ArithmeticLearningApplicabilityProfile {
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         val frozenBytes = frozen?.let {
             trajectorySourceBytes(suite, requireNotNull(names).single(), requireNotNull(options["sha256"]),
-                sourceGzip64 = it, maxBytes = 1_048_576)
+                source64 = null, sourceGzip64 = it, maxBytes = 1_048_576)
         }
         val catalog = if (frozenBytes == null) {
             Catalog.uncapped(suite).problems.filter { it.format == Format.MPS }
