@@ -74,8 +74,8 @@ internal class PrivateRebuildAffine(
             if (cancellation()) return null
             val width = 1 + dependencies[row].sumOf { it.countOneBits() }
             if (width > 64) return null
-            // The factor and its shared projection build their distinct-coordinate coefficient lookup.
-            cancellation.charge(width * width * 2L + width * 16L + 16L)
+            // The factor builds its distinct-coordinate set; the projection retains unit coefficients.
+            cancellation.charge(width * width.toLong() + width * 16L + 16L)
             if (cancellation()) return null
             val literals = IntArray(width)
             literals[0] = Lit.make(pivots[row], true)

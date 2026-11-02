@@ -13,7 +13,8 @@ internal class XorPropagator(
     literals: IntArray,
     private val targetParity: Int,
 ) : InterruptiblePropagator {
-    private val parityByVar: CoeffLookup = buildParityByVar(boolVars, literals)
+    private val parityByVar: CoeffLookup? = if (boolVars.size == literals.size) null
+    else buildParityByVar(boolVars, literals)
     private val negativeParity = literals.count { !Lit.isPositive(it) } and 1
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
@@ -24,7 +25,7 @@ internal class XorPropagator(
         var effective = -1
         for (variable in boolVars) {
             state.checkFiniteWork()
-            if (parityByVar.coeffOf(variable) == 0) continue
+            if (parityByVar?.coeffOf(variable) == 0) continue
             val value = state.boolValues[variable]
             if (value == null) {
                 if (effective >= 0) return true
