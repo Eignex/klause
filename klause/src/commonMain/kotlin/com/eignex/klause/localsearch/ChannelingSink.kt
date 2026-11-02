@@ -10,26 +10,28 @@ import com.eignex.klause.util.IntHashSet
  * Accumulator that [Invariant.contributeChanneling] appends to while [LocalSearchState] synthesizes a
  * value-driven channeling move. Seeded with the driving `IntSet(intVar, newValue)` (already pinned),
  * it collects the coordinated sibling updates — indicator flips, sum counter-shifts — into the parts
- * of one [Move.Compound]. The pin set guards against two sibling factors proposing conflicting shifts
+ * of one [Move.Compound]. Coordinate claims guard against two sibling factors proposing conflicting shifts
  * of the same int variable; the first to claim it wins.
  */
 class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
     private val parts = ArrayList<Move>(INITIAL_PARTS)
-    private val pinned = IntHashSet()
+    private val drivingIntVar = intVar
+    private var additionalPins: IntHashSet? = null
     private var indicatorFlips: IntHashSet? = null
 
     init {
-        pinned.add(intVar)
         parts += Move.IntSet(intVar, newValue)
     }
 
     /** True iff [intVar] is already claimed by the driving move or an earlier contribution, so a
      *  contributor must not propose another change to it. */
-    fun isPinned(intVar: Int): Boolean = intVar in pinned
+    fun isPinned(intVar: Int): Boolean = intVar == drivingIntVar || additionalPins?.contains(intVar) == true
 
     /** Claim [intVar] so no later contributor shifts it again. */
     fun pin(intVar: Int) {
-        pinned.add(intVar)
+        if (intVar == drivingIntVar) return
+        val pins = additionalPins ?: IntHashSet().also { additionalPins = it }
+        pins.add(intVar)
     }
 
     /** Append [move] as a part of the synthesized compound. */
