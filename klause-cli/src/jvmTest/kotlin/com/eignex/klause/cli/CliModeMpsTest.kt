@@ -35,7 +35,8 @@ class CliModeMpsTest {
         }
 
         var code = -1
-        val out = capture { code = runCli(arrayOf(mps.absolutePath)) }
+        val out = capture { code = runCli(arrayOf("-s", "-v", mps.absolutePath)) }
+        println(out)
 
         assertEquals(0, code, out)
         assertTrue("o 1.5" in out, out)
@@ -60,10 +61,11 @@ class CliModeMpsTest {
             deleteOnExit()
         }
         val out = capture {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1",
+            assertEquals(0, runCli(arrayOf("-s", "-v", "-e", "cp", "-p", "1",
                 "--param", "presolve-work-limit=4096",
                 "--param", "source-lp-work-limit=65536", mps.absolutePath)))
         }
+        println(out)
 
         assertTrue("s OPTIMUM FOUND" in out.lines(), out)
         assertTrue("o 0.333333333333333314829616256247390992939472198486328125" in out.lines(), out)
