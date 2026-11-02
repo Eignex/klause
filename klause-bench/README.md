@@ -277,6 +277,12 @@ installed-build identity and available witnesses. Inspect the JSON record even
 when the bench process exits successfully. Independent source validation runs in
 the lab; the bench records `validationPolicy=reported-result-v1`.
 
+Failed MiniZinc identity queries retain `compilerDiscovery` evidence separately
+from an accepted `compilerIdentity`. `solve.log` retains query lifecycle receipts,
+including the option, executable hash, startup/wait/cleanup times, exit and cancellation.
+Process CPU time is best effort and stays null when unavailable. Startup spends the
+existing ten-second query allowance; the containing case/job deadline still applies.
+
 Subprocess stderr is drained in fixed-size chunks. Records retain at most 16 Ki
 characters of normalized stderr, with `stderrComplete` true only for an untruncated
 stream that reached EOF without a forced kill or drain failure. Refusal and crash

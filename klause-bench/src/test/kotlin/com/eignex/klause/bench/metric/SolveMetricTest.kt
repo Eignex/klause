@@ -6,6 +6,8 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.corpus
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.runner.MiniZincIdentityEvidence
+import com.eignex.klause.bench.runner.MiniZincIdentityFailure
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import kotlinx.serialization.json.Json
@@ -84,6 +86,28 @@ class SolveMetricTest {
             mapOf("loadError" to "minizinc compile failed (exit 1) for x.mzn: Error: include error / more"),
             stats(failure),
         )
+    }
+
+    @Test
+    fun `failed compiler discovery retains evidence without accepting an identity or excluding the source`() {
+        val evidence = MiniZincIdentityEvidence(
+            phase = "--config-dirs",
+            command = listOf("minizinc", "--config-dirs"),
+            startedAt = "now",
+            outcome = "timed-out",
+            elapsedNs = 123,
+            timeoutNs = 100,
+            exitCode = 137,
+        )
+
+        val record = SolveMetric.loadFailureRecord(
+            ref, SolverInvocation.Settings(), Budget(), "now", null,
+            MiniZincIdentityFailure(evidence), sourceHashes = mapOf("model" to "captured"),
+        )
+
+        assertEquals(evidence, record.compilerDiscovery)
+        assertNull(record.compilerIdentity)
+        assertEquals(setOf("loadError"), record.stats.keys)
     }
 
     @Test

@@ -86,7 +86,7 @@ internal class MiniZincIdentityQuery(
                     startupNs = startupNs,
                     pid = runCatching { child.pid() }.getOrNull(),
                 ))
-                val remaining = timeoutNs - startupNs
+                val remaining = timeoutNs - (clock() - began)
                 val waitStart = clock()
                 try {
                     outcome = if (remaining <= 0 || !child.waitFor(remaining, TimeUnit.NANOSECONDS)) {
