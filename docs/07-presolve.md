@@ -777,6 +777,7 @@ value symmetry. Both lanes hold unread integer and Boolean columns fixed, includ
 columns retained only for reconstruction. Value-orbit discovery ignores unread
 domains, and value pins and precedence chains use only columns with live factor
 readers. Value orbits intersecting an active objective column's domain stay fixed.
+Domain-incidence scans reuse one scratch list; stored signatures own their arrays.
 Active-column scans charge and poll the pass token; an interrupted scan
 posts no break. Both passes stay off for solution-set-sensitive queries.
 

@@ -366,12 +366,13 @@ internal object SymmetryBreaking {
         // orbit (a swap within it maps every domain to itself). The incident variable ids, in
         // ascending order, are the signature words.
         val incidence = HashMap<RefineKey, MutableList<Long>>()
+        val sig = LongArrayList()
         for (value in lo..hi) {
             // Bail on a fired presolve budget — the scan and the per-candidate keying below are the
             // value-symmetry phase's cost; returning what is grouped so far only forgoes value pins.
             if (cancellation()) return null
             cancellation.charge(active.size.toLong())
-            val sig = LongArrayList()
+            sig.clear()
             for (x in active) if (columns.contains(x, value)) sig.add(x.toLong())
             if (!sig.isEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value)
         }

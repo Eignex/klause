@@ -331,6 +331,26 @@ class SymmetryBreakingTest {
     }
 
     @Test
+    fun `disjoint live value ranges should form separate precedence chains`() {
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(2, 3), IntDomain(2, 3)),
+            listOf(AllDifferent(intArrayOf(0, 1)), AllDifferent(intArrayOf(2, 3))),
+        ).bake()
+
+        for (delta in listOf(Presolve.breakSymmetries(problem), Presolve.breakValuePrecedence(problem))) {
+            val chains = delta.addedFactors.filterIsInstance<ValuePrecede>()
+
+            assertEquals(setOf(0L to 1L, 2L to 3L), chains.map { it.s to it.t }.toSet())
+            assertTrue(chains.all {
+                val columns = if (it.s == 0L) intArrayOf(0, 1) else intArrayOf(2, 3)
+                it.xs.contentEquals(columns)
+            })
+        }
+    }
+
+    @Test
     fun `unread domains should neither split value orbits nor enter precedence chains`() {
         val problem = Problem(
             0,
