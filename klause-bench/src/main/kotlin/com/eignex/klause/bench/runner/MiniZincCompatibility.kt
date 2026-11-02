@@ -13,7 +13,6 @@ import kotlinx.serialization.json.put
 import java.io.File
 import java.security.MessageDigest
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 internal const val MZN_COMPATIBILITY_POLICY = "minizinc-compile-compatibility-v3"
 
@@ -87,19 +86,27 @@ internal object MiniZincCompatibility {
             ?: System.getenv("PATH").orEmpty().split(File.pathSeparator)
                 .map { File(it, "minizinc") }.firstOrNull { it.isFile && it.canExecute() }?.canonicalFile
             ?: error("MiniZinc compiler is unavailable")
-        val config = Json.parseToJsonElement(query(executable, "--config-dirs")).jsonObject
+        val executableHash = hash(executable)
+        val query = MiniZincIdentityQuery(executableSha256 = executableHash)
+        val config = Json.parseToJsonElement(query.query(executable, "--config-dirs")).jsonObject
         val standard = File(config.getValue("mznStdlibDir").jsonPrimitive.content)
         require(standard.isDirectory) { "MiniZinc standard library is unavailable" }
         val root = CorpusFetcher.workspaceRoot()
         MiniZincCompilerIdentity(
-            version = query(executable, "--version").trim(),
+            version = query.query(executable, "--version").trim(),
             executable = executable.path,
-            executableSha256 = hash(executable),
+            executableSha256 = executableHash,
             standardLibrary = standard.canonicalPath,
             standardLibrarySha256 = treeHash(standard),
             solverLibrarySha256 = treeHash(File(root, "klause-mzn-lib/share/minizinc/klause")),
             configurationSha256 = hash(File(root, "klause-mzn-lib/share/minizinc/solvers/klause.msc")),
-        )
+        ).also {
+            check(hash(executable) == executableHash) { "MiniZinc executable changed during identity discovery" }
+            System.err.println(buildJsonObject {
+                put("phase", "compiler-identity-completed")
+                put("compilerIdentity", Reports.json.encodeToJsonElement(it))
+            })
+        }
     }
 
     // Compile original bytes without invoking a solver or trusting an earlier compilation.
@@ -156,17 +163,4 @@ internal object MiniZincCompatibility {
     fun hash(file: File): String = hex(MessageDigest.getInstance("SHA-256").digest(file.readBytes()))
 
     private fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(Locale.ROOT, it) }
-
-    private fun query(executable: File, option: String): String {
-        val log = File.createTempFile("minizinc-identity-", ".log")
-        val process = ProcessBuilder(executable.path, option).redirectErrorStream(true).redirectOutput(log).start()
-        try {
-            check(process.waitFor(10, TimeUnit.SECONDS)) { "MiniZinc identity query timed out" }
-            check(process.exitValue() == 0) { "MiniZinc identity query failed: ${log.readText().take(4000)}" }
-            return log.readText()
-        } finally {
-            if (process.isAlive) process.destroyForcibly().waitFor()
-            log.delete()
-        }
-    }
 }
