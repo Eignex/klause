@@ -516,4 +516,30 @@ class PrivateRebuildSatisfactionTest {
         assertNull(result.stats.search.learning["privateRebuildParityDiscoveryWork"])
         assertNull(result.stats.search.learning["privateRebuildConsumers"])
     }
+
+    @Test
+    fun `automatic low coverage misses should retain the complete canonical source`() {
+        val clauses = (0 until 128).flatMap { row ->
+            listOf(1, 2, 4, 7).map { mask ->
+                Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
+            }
+        } + List(600) { Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))) }
+        val source = Problem(130, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+
+        val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+            privateRebuildWork = -1L, learnedMemoryScratchBytes = 4_194_304L,
+            variableSelector = InputOrder, valueSelector = IndomainMin,
+        )))
+
+        assertTrue(clauses.all { clause ->
+            clause.literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+        })
+        val learning = result.stats.search.learning
+        assertEquals(128L, learning["privateRebuildParityBasisColumns"])
+        assertEquals(512L, learning["privateRebuildParityCoveredSourceClauses"])
+        assertEquals(1L, learning["privateRebuildAutomaticDeclinedStructure"])
+        assertNull(learning["privateRebuildConsumers"])
+        assertEquals(learning.getValue("privateRebuildParityDiscoveryWork"),
+            learning.getValue("privateRebuildChargedWork"))
+    }
 }
