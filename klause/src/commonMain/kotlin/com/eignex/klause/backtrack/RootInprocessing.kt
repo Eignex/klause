@@ -314,7 +314,9 @@ internal class RootProbingPass : InprocessingPass {
     }
 
     override fun releaseRetainedBuffers() {
-        resetCursors()
+        neighborhood = null
+        neighborhoodIndex = -1
+        neighborhoodPosition = 0
         implications.releaseRetainedBuffers()
     }
 

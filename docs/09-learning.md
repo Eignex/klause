@@ -680,8 +680,10 @@ rollback, a funded lookup skips a matching direct binary reason and the bounded
 history prevents repeated admissions. At most 64 binaries enter per search scope;
 the 64-key history and pending pair share the probe class and retained-memory
 grants. Unfunded admission resumes at a fresh safe root without another probe.
-Optional buffer release drops unadmitted pairs and history while preserving the
-admission count; reseeding resets that count. Admitted binaries use ordinary
+Optional buffer release drops history and neighborhood arrays while preserving the
+pending pair, primitive cursors and admission count. Learned remapping invalidates
+the direct-reason hint, without changing the proved literals. Reseeding discards
+the pending pair and resets that count. Admitted binaries use ordinary
 learned ownership, forgetting and required attachment completion.
 Completed root facts are published to shared
 components before traversal resumes. Successful and interrupted probes retract to the
