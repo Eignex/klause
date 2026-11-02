@@ -331,7 +331,9 @@ Retired rows stop propagation and export and release their owned literal array.
 Admission, reference-array growth and release debit the containing work ledger.
 A short retirement slice suspends before publication and resumes with its stable handle.
 Policy columns and watch postings retain their separately funded cleanup. Payload
-page directories use a bounded compressed index whose lookups debit the active
+page directories keep their first page directly and use a bounded compressed index
+for later pages. Fixed directory state belongs to propagation preparation.
+Index lookups debit the active
 maintenance grant or the containing propagation ledger. A cached page avoids
 repeated lookups within one page. Empty page headers enter a separate funded
 unlink queue after their row arrays release; a revived header survives that queue.

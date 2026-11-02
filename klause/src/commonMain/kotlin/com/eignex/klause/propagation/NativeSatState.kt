@@ -111,6 +111,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     init {
         state.work += metadata.preparationWork
+        state.preparationIndexWork += learnedPayloads.preparationWork
         for (h in 0 until baseCount) {
             val len = arena.length(h)
             if (len == 1) {

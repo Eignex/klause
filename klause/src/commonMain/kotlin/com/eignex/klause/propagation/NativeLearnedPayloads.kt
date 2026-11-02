@@ -9,7 +9,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         var words = 0L
         var live = 0
         var queued = 0
-        lateinit var slot: MutableIntObjectIndex.Slot<Page>
+        var slot: MutableIntObjectIndex.Slot<Page>? = null
         var next: Page? = null
         var allocationIdentity = Any()
 
@@ -52,6 +52,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
 
     private val directory = MutableIntObjectIndex<Page>()
     private var directoryIdentity = Any()
+    private var primary: Page? = null
     private var cachedIndex = -1
     private var cachedPage: Page? = null
     private var emptyHead: Page? = null
@@ -62,6 +63,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     private var words = 0L
     private var pageCount = 0
     private var referenceSlots = 0L
+    val preparationWork: Long get() = 46L
     val capacityBytes: Long get() = words * Int.SIZE_BYTES
     val referenceCapacity: Long get() = referenceSlots
     val directoryCapacity: Long get() = directory.referenceCapacity
@@ -74,6 +76,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     }
 
     private fun locate(index: Int, visit: (Long) -> Unit): Page? {
+        if (index == 0) return primary
         if (cachedIndex == index) return cachedPage
         val page = directory.lookup(index, visit)
         cachedIndex = index
@@ -82,6 +85,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     }
 
     private fun pageAt(index: Int): Page? {
+        if (index == 0) return primary
         if (cachedIndex == index) return cachedPage
         return locate(index) { units ->
             val active = budget
@@ -94,23 +98,17 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         val required = (size and PAGE_MASK) + 1
         var lookup = 0L
         val page = locate(index) { lookup += it }
-        val insertion = if (page != null) 0L else if (directory.size == 0) 8L else
+        val insertion = if (page != null || index == 0) 0L else if (directory.size == 0) 8L else
             (Int.SIZE_BITS - index.countLeadingZeroBits()) * 2L + 18L
         val allocation = page?.growthWork(required) ?: (capacityFor(required) * 2L + 8L)
-        return (if (ownedLiterals) 0L else literals * 2L) + 14L + lookup + insertion + allocation
+        return (if (ownedLiterals) 0L else literals * 2L) + (if (index == 0) 12L else 14L) +
+            lookup + insertion + allocation
     }
 
     fun add(literals: IntArray, ownedLiterals: Boolean = false) {
         val index = size ushr PAGE_SHIFT
         val slot = size and PAGE_MASK
-        val page = pageAt(index) ?: Page(capacityFor(slot + 1)).also {
-            it.slot = directory.getOrPutSlot(index) { it }
-            pageCount++
-            referenceSlots += it.rows.size
-            directoryIdentity = Any()
-            cachedIndex = index
-            cachedPage = it
-        }
+        val page = pageAt(index) ?: Page(capacityFor(slot + 1)).also { install(index, it) {} }
         val capacity = page.rows.size
         page.growTo(slot + 1)
         referenceSlots += page.rows.size - capacity
@@ -120,6 +118,18 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         page.allocationIdentity = Any()
         words += literals.size
         size++
+    }
+
+    private fun install(index: Int, page: Page, insertionWork: (Long) -> Unit) {
+        if (index == 0) primary = page else {
+            page.slot = directory.getOrPutSlot(index) { page }
+            insertionWork(directory.lastWork)
+            directoryIdentity = Any()
+            cachedIndex = index
+            cachedPage = page
+        }
+        pageCount++
+        referenceSlots += page.rows.size
     }
 
     operator fun get(index: Int): IntArray = checkNotNull(checkNotNull(pageAt(index ushr PAGE_SHIFT))
@@ -151,11 +161,17 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     fun sweepDirectory(budget: ReclamationPreparation) {
         while (true) {
             val page = emptyHead ?: return
-            budget.visit(if (page.live == 0) 24L else 8L)
+            budget.visit(unlinkingWork(page))
             budget.visit(0L)
             unlinkEmpty(page)
             budget.advanced()
         }
+    }
+
+    private fun unlinkingWork(page: Page): Long = when {
+        page.live != 0 -> 8L
+        page.slot == null -> 12L
+        else -> 24L
     }
 
     private fun unlinkEmpty(page: Page) {
@@ -164,9 +180,12 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         page.next = null
         page.queued = 0
         if (page.live != 0) return
-        check(directory.remove(page.slot, {}, {}))
+        val slot = page.slot
+        if (slot == null) { check(primary === page); primary = null } else {
+            check(directory.remove(slot, {}, {}))
+            directoryIdentity = Any()
+        }
         pageCount--
-        directoryIdentity = Any()
         if (cachedPage === page) { cachedPage = null; cachedIndex = -1 }
     }
 
@@ -179,13 +198,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         val targetIndex = target ushr PAGE_SHIFT
         val targetSlot = target and PAGE_MASK
         val targetPage = locate(targetIndex) { work += it } ?: Page(capacityFor(targetSlot + 1)).also {
-            it.slot = directory.getOrPutSlot(targetIndex) { it }
-            work += directory.lastWork
-            pageCount++
-            referenceSlots += it.rows.size
-            directoryIdentity = Any()
-            cachedIndex = targetIndex
-            cachedPage = it
+            install(targetIndex, it) { units -> work += units }
             work += it.rows.size * 2L + 8L
         }
         work += targetPage.growthWork(targetSlot + 1)
@@ -212,7 +225,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         size = count
         while (emptyHead != null) {
             val page = checkNotNull(emptyHead)
-            work += if (page.live == 0) 24L else 8L
+            work += unlinkingWork(page)
             unlinkEmpty(page)
         }
         if (count > 0) {
@@ -240,11 +253,12 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         allPermanent: Boolean,
         protected: (Int) -> Boolean,
     ) {
+        primary?.sharingMemory(sample, 0, protectedRows, allPermanent, protected)
         val retained = directory.protectedCapacity({ units -> repeat(units.toInt()) { sample.step() } }) {
             index, page -> page.sharingMemory(sample, index shl PAGE_SHIFT, protectedRows, allPermanent, protected)
         }
         sample.owned(this, 28L, protectedRows)
-        sample.ownedReferences(this, 7L, protectedRows)
+        sample.ownedReferences(this, 8L, protectedRows)
         sample.ownedPool(directoryIdentity, directory.primitiveCapacityBytes,
             retained.first + if (protectedRows) 12L else 0L)
         sample.ownedReferencesPool(directoryIdentity, directory.referenceCapacity,

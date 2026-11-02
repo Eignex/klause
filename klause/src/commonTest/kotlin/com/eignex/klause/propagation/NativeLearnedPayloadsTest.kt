@@ -79,7 +79,7 @@ class NativeLearnedPayloadsTest {
         }.completeValues)
 
         assertEquals(payloads.primitiveBytes + payloads.capacityBytes, values["ownedPrimitiveBytes"])
-        assertEquals(payloads.referenceCapacity + payloads.directoryCapacity + 15L, values["ownedReferenceSlots"])
+        assertEquals(payloads.referenceCapacity + payloads.directoryCapacity + 16L, values["ownedReferenceSlots"])
         assertTrue(values.getValue("protectedPrimitiveBytes") < values.getValue("ownedPrimitiveBytes"))
         assertTrue(values.getValue("protectedReferenceSlots") < values.getValue("ownedReferenceSlots"))
     }
