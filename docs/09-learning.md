@@ -248,9 +248,9 @@ can alias and cannot be summed to reconstruct these ownership fields.
 Protected ownership includes permanent assertions, live and saved reasons, pending first
 assertions and interrupted root publication. Required metadata, reference containers
 and posting allocations share the protection of the clauses they index.
-Native packed arenas are protected at
-allocation granularity while a retained reason needs them. This floor is conservative,
-rather than a minimum compacted representation. Pressure may release optional pass
+Native learned payloads belong to individual rows; required reference containers
+and metadata stay protected at allocation granularity while a retained reason needs them.
+This floor is conservative, rather than a minimum compacted representation. Pressure may release optional pass
 buffers, while interrupted propagation/publication retains them. Close detaches the
 native generation; reseeding preserves compatible learning and invalidates obsolete pass
 snapshots.
@@ -282,8 +282,9 @@ shared read-only across portfolio workers.
 
 Propagation is two-watched-literal unit propagation over a trail pointer, without
 per-factor dispatch or integer order literals, reading a per-session truth byte per
-variable. Learned clauses live in a growable side buffer with a wrapping
-replacement-scan cursor per clause, and reductions compact them in place. The lane
+variable. Learned clauses own copied literal arrays with a wrapping replacement-scan
+cursor per clause. Reductions compact their handle and reference columns without
+copying surviving literal arrays. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
 
 When complete cap selection cannot be funded, a bounded window over non-permanent
@@ -293,9 +294,14 @@ survivors. Funded heap steps, cursors and pending retirement survive later resta
 and appended clauses; compaction resets them before handles change. Policy updates
 and reason-ownership checks are charged before publication. A later use protects a pending
 eviction; units, pending rechecks and current root reasons survive.
-Retired rows stop propagation and export, while their slots and arena bytes remain
-owned until a funded full compaction reclaims them. Ownership reports include that
-capacity and report `learnedRetiredSlots` separately from active clause count.
+Retired rows stop propagation and export and release their owned literal array.
+Admission, reference-array growth and release debit the containing work ledger.
+A short retirement slice suspends before publication and resumes with its stable handle.
+Policy columns, payload reference slots and watch postings remain owned until funded
+full compaction reclaims them. Ownership reports include those capacities and report
+`learnedRetiredSlots` separately from active clause count. Protected and unprotected
+payload pools aggregate disjoint copied arrays; their primitive bytes exclude reference
+capacity, which is observed separately.
 Window calls, charged work, visits and permanent, active and retained counts remain
 available in the released session's lifecycle totals.
 
