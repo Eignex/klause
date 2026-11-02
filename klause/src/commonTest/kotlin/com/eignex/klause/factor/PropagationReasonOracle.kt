@@ -29,6 +29,13 @@ object PropagationReasonOracle {
             ConflictReasonOracle.assertEntailed(problem, state, 0, label)
             return
         }
+        if (boolsBefore.indices.all { boolsBefore[it] == state.boolValues[it] } &&
+            before.indices.all { before[it] == state.intDomains[it] }
+        ) {
+            // Keep the fixture bounds even when there is no implication to check.
+            FactorPropagationOracle.sourceAssignments(problem)
+            return
+        }
         val solutions = FactorPropagationOracle.enumerateSat(problem, label, null)
         for (b in 0 until problem.numBoolVars) {
             val value = state.boolValues[b] ?: continue
