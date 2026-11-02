@@ -13,6 +13,7 @@ internal data class LearnedReclamation(
     val protectedBytes: Long? = null,
     val work: Long = 0L,
     val protectedLimitExceeded: Boolean = false,
+    val continuationPending: Boolean = false,
 )
 
 internal class ReclamationPreparation(
@@ -26,6 +27,10 @@ internal class ReclamationPreparation(
     var atomicUnits = 0L
         private set
     private var scratch = 0L
+    var progressed = false
+        private set
+
+    fun advanced() { progressed = true }
     val remainingWork: Long get() = maxWork - work
 
     fun supports(units: Long, scratchBytes: Long): Boolean = units <= maxWork && scratchBytes <= maxScratchBytes
@@ -54,6 +59,12 @@ internal class ReclamationPreparation(
     private companion object { const val ATOMIC_PRICE = 32L }
 }
 
+internal fun PropagationState.sweepRetiredGeneralWatchMemory(budget: ReclamationPreparation) {
+    if (incremental || nativeEngine != null) return
+    initializedWatches?.pos?.releaseReservations(budget)
+    sweepRetiredGeneralWatches(budget)
+}
+
 internal fun PropagationState.prepareReclamation(
     budget: ReclamationPreparation,
     keep: (Int, Int) -> Boolean,
@@ -75,7 +86,8 @@ internal fun PropagationState.prepareReclamation(
     if (factorAttribution != null) budget.atomic(count.toLong() * count)
     budget.atomic(propQueue.size.toLong() * 3L + atoms.dirtyFactors.size * 3L + learned.pendingAttach.size,
         (propQueue.size.toLong() + atoms.dirtyFactors.size) * Int.SIZE_BYTES)
-    budget.atomic(watches.pos.primitiveCapacityBytes, watches.pos.primitiveCapacityBytes * 2L)
+    budget.atomic(watches.pos.primitiveCapacityBytes,
+        (watches.pos.primitiveCapacityBytes + watches.pos.referenceCapacity * Long.SIZE_BYTES) * 2L)
     budget.atomic(watches.pos.size.toLong() * watches.pos.size)
     for (lists in listOf(watches.byLit.asList(), watches.blockersByLit.asList(), atoms.watchersByLit)) {
         for (list in lists) {

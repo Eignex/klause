@@ -7,7 +7,7 @@ import com.eignex.klause.util.SharingMemoryObservation
 
 internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
     selectedRetirements.sharingMemory(sample)
-    sample.owned(this, Long.SIZE_BYTES.toLong(), true)
+    sample.owned(this, Long.SIZE_BYTES * 2L, true)
     val protected = protectedLearnedMemory(sample)
     nativeEngine?.sharingMemory(sample, protected) ?: learnedSharingMemory(sample, protected)
     factorAttribution?.sharingMemory(sample)
@@ -180,8 +180,8 @@ private fun PropagationState.learnedSharingMemory(
     val protectedRows = protected.size > 0
     learned.capRanking.sharingMemory(sample, protectedRows)
     var metadata = learned.capRanking.primitiveBytes + learned.admissions.allocatedBytes + Int.SIZE_BYTES +
-        4L * Int.SIZE_BYTES
-    sample.owned(learned, 4L * Int.SIZE_BYTES, protectedRows)
+        4L * Int.SIZE_BYTES + 2L * Long.SIZE_BYTES
+    sample.owned(learned, 4L * Int.SIZE_BYTES + 2L * Long.SIZE_BYTES, protectedRows)
     sample.owned(learned.admissions, learned.admissions.allocatedBytes + Int.SIZE_BYTES, protectedRows)
     sample.ownedReferences(learned.admissions, 1L, protectedRows)
     for (column in columns) {
@@ -206,6 +206,7 @@ private fun PropagationState.learnedSharingMemory(
         sample.owned(blockers.backingData, blockers.backingData.size.toLong() * Int.SIZE_BYTES, retained)
     }
     sample.owned(watches.pos, watches.pos.primitiveCapacityBytes, protectedWatchIndex)
+    sample.ownedReferences(watches.pos, watches.pos.referenceCapacity, protectedWatchIndex)
     for (posting in atoms.watchersByLit) {
         sample.step()
         if (posting == null) continue
@@ -264,6 +265,7 @@ private fun PropagationState.learnedSharingMemory(
         "learnedIntegerRowCacheCapacityBytes" to (learned.integerRows?.capacity?.toLong() ?: 0L) * Long.SIZE_BYTES,
         "learnedIntegerRowIndexBytes" to (learned.integerRows?.size?.toLong() ?: 0L) * Int.SIZE_BYTES,
         "sessionWatchCapacityBytes" to watchers,
+        "sessionWatchIndexReferenceSlots" to watches.pos.referenceCapacity,
         "sessionQueueCapacityBytes" to propQueue.allocatedBytes + atoms.dirtyFactors.allocatedBytes,
         "propagationScheduleCapacityBytes" to (propagationSchedule?.capacityBytes ?: 0L),
         "pendingAttachments" to learned.pendingAttach.size.toLong(),

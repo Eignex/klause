@@ -30,6 +30,8 @@ internal class LearnedClauseDb(
     internal var permanentArithmeticCount = 0
     internal var nonClauseCount = 0
     internal var retiredCount = 0
+    internal var deferredWatchTrimWork = 0L
+    internal var deferredWatchTrimScratch = 0L
     internal var watchCleanupLiteral = 0
     internal var watchCleanupIndex = 0
     internal var sweptRetirements = 0
@@ -112,6 +114,8 @@ internal class LearnedClauseDb(
         permanentArithmeticCount = 0
         nonClauseCount = 0
         retiredCount = 0
+        deferredWatchTrimWork = 0L
+        deferredWatchTrimScratch = 0L
         watchCleanupLiteral = 0
         watchCleanupIndex = 0
         sweptRetirements = 0

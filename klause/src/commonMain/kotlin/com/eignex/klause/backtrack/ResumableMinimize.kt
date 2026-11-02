@@ -433,7 +433,7 @@ internal class ResumableMinimize(
                 }
             })
             sink.search.propagationWork = { it.session.work }
-            sink.search.learning = { it.session.learnedLifecycle() }
+            sink.search.learning = { it.session.learnedLifecycle() + it.session.preparationStatistics() }
             sink.search.valueOrdering = { it.session.valueOrdering.snapshot() }
             sink.search.rootPropagationWork = { it.session.rootWork }
             sink.search.propagationNanos = { it.session.propagationNanos }

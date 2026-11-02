@@ -90,6 +90,7 @@ class PropagationSession private constructor(
 
     internal fun recordProjectionCheck(checker: PropagationSession) {
         state.work += checker.work
+        state.preparationIndexWork += checker.state.preparationIndexWork
         state.propagationNanos += checker.propagationNanos
     }
 
@@ -112,6 +113,7 @@ class PropagationSession private constructor(
     private var retiredPropagationNanos = 0L
     private var retiredPropagationCount = 0L
     private var retiredLifecycle: Map<String, Long> = emptyMap()
+    private var retiredPreparationStatistics: Map<String, Long> = emptyMap()
 
     internal fun releaseRetainedState() {
         val owner = retainedState ?: return
@@ -123,6 +125,7 @@ class PropagationSession private constructor(
         retiredPropagationNanos = owner.propagationNanos
         retiredPropagationCount = owner.propagations
         retiredLifecycle = learnedLifecycle()
+        retiredPreparationStatistics = preparationStatistics()
         retainedState = null
         levelStates = emptyArray()
         levelTop = 0
@@ -291,10 +294,8 @@ class PropagationSession private constructor(
         retired.add(factor)
         val native = state.nativeEngine
         if (native != null) native.retireRootSource(factor)
-        else for (literal in literals) {
-            if (state.watches.pos.getOrDefault(state.packWatch(factor, literal), -1) >= 0) {
-                state.removeBoolWatch(factor, literal)
-            }
+        else if (!state.removeInlineBoolWatches(factor, literals.size > 1)) {
+            for (literal in literals) state.removeBoolWatch(factor, literal, onlyIndexed = true)
         }
         if (pendingRootSourceRetirement?.factor == factor) pendingRootSourceRetirement = null
     }
@@ -1306,28 +1307,44 @@ class PropagationSession private constructor(
     ): LearnedReclamation {
         require(softLimitBytes >= 0L && maxWork >= 0L && maxScratchBytes >= 0L)
         val start = work
+        var cleanupProgress = false
+        if (state.nativeEngine == null && !fixpointCancelled && !inprocessingRootPending && !publicationPending &&
+            learnedClauseCount > activeLearnedClauseCount
+        ) {
+            val cleanup = ReclamationPreparation(maxWork, maxScratchBytes, { cancelRequested }) { state.work += it }
+            try {
+                state.sweepRetiredGeneralWatchMemory(cleanup)
+            } catch (_: ReclamationPreparation.Deferred) {
+                return LearnedReclamation(
+                    if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED,
+                    work = work - start, continuationPending = cleanup.progressed && !cancelRequested)
+            }
+            cleanupProgress = cleanup.progressed
+        }
         val scratchEntries = minOf(maxScratchBytes / 64L, Int.MAX_VALUE.toLong()).toInt()
         fun sample() = sharingMemory((maxWork - (work - start)).coerceAtLeast(0L), scratchEntries)
         fun bytes(values: Map<String, Long>) = values.getValue("ownedPrimitiveBytes") +
             values.getValue("ownedReferenceSlots") * Long.SIZE_BYTES
         val before = sample().completeValues ?: return LearnedReclamation(
-            if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED, work = work - start)
+            if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED, work = work - start,
+            continuationPending = cleanupProgress && !cancelRequested)
         val beforeBytes = bytes(before)
+        val reportedBefore = beforeBytes.takeUnless { cleanupProgress }
         val floor = before.getValue("protectedPrimitiveBytes") +
             before.getValue("protectedReferenceSlots") * Long.SIZE_BYTES
         if (beforeBytes <= softLimitBytes) return LearnedReclamation(ReclamationStatus.WITHIN_LIMIT,
-            beforeBytes, beforeBytes, floor, work - start)
+            reportedBefore, beforeBytes, floor, work - start)
         if (fixpointCancelled || inprocessingRootPending || publicationPending) return LearnedReclamation(
-            ReclamationStatus.DEFERRED, beforeBytes, beforeBytes, floor, work - start,
+            ReclamationStatus.DEFERRED, reportedBefore, beforeBytes, floor, work - start,
             protectedLimitExceeded = floor > softLimitBytes)
-        releaseBuffers()
+        val releasedBuffers = releaseBuffers()
         val count = learnedClauseCount
         val published = state.forgetLearnedClauses(
             (maxWork - (work - start)).coerceAtLeast(0L), maxScratchBytes, { cancelRequested }, { _, _ -> false })
         if (learnedClauseCount != count) learnedClauseRevision++
         if (!published) return LearnedReclamation(
             if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED,
-            beforeBytes, protectedBytes = floor, work = work - start)
+            reportedBefore, protectedBytes = floor, work = work - start)
         val after = sample().completeValues
         val afterBytes = after?.let(::bytes)
         val afterFloor = after?.let {
@@ -1335,11 +1352,11 @@ class PropagationSession private constructor(
         }
         return LearnedReclamation(
             when {
-                learnedClauseCount < count || (afterBytes != null && afterBytes < beforeBytes) ->
-                    ReclamationStatus.RECLAIMED
+                learnedClauseCount < count || releasedBuffers -> ReclamationStatus.RECLAIMED
                 afterFloor != null && afterFloor > softLimitBytes -> ReclamationStatus.PROTECTED_FLOOR
+                afterBytes != null && afterBytes < beforeBytes -> ReclamationStatus.RECLAIMED
                 else -> ReclamationStatus.DEFERRED
-            }, beforeBytes, afterBytes, afterFloor ?: floor, work - start,
+            }, reportedBefore, afterBytes, afterFloor ?: floor, work - start,
             protectedLimitExceeded = (afterFloor ?: floor) > softLimitBytes)
     }
 
@@ -1376,6 +1393,9 @@ class PropagationSession private constructor(
         it.learned.lifecycle.snapshot() + (it.nativeEngine?.capWindowStatistics() ?: it.learned.capWindowStatistics()) +
             (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap())
     } ?: retiredLifecycle
+
+    internal fun preparationStatistics(): Map<String, Long> =
+        retainedState?.preparationStatistics() ?: retiredPreparationStatistics
 
     internal fun configureAttribution(
         enabled: Boolean,

@@ -385,6 +385,10 @@ class PropagationState private constructor(
     internal var propagations: Long = 0L
 
     internal var work: Long = 0L
+    internal var preparationIndexWork: Long = 0L
+
+    internal fun preparationStatistics(): Map<String, Long> = if (preparationIndexWork == 0L) emptyMap()
+        else mapOf("propagationPreparationIndexWork" to preparationIndexWork)
     internal val finiteWork = FinitePropagationWork()
     internal var finiteMutationInterruptible = false
     internal var finiteMaintenanceActive = false
@@ -530,7 +534,7 @@ class PropagationState private constructor(
     /** Per-literal bool watcher index (watch lists, blockers, back-pointers) —
      *  see [BoolWatcherIndex]. Mutated by `Watches.kt` and the [forgetLearnedClauses] compaction. */
     private val watchIndex = lazy(LazyThreadSafetyMode.NONE) {
-        prepared?.watches ?: BoolWatcherIndex(problem.numBoolVars)
+        prepared?.watches ?: BoolWatcherIndex(problem.numBoolVars, baseFactorCount = baseFactorCount)
     }
     internal val watches: BoolWatcherIndex get() = watchIndex.value
     internal val initializedWatches: BoolWatcherIndex?
@@ -831,7 +835,8 @@ class PropagationState private constructor(
     init {
         // The native lane uses arena watches and skips general base-factor registration.
         if (prepared == null && nativeEngine == null) {
-            for (fid in 0 until problem.numFactors) registerFactor(fid, projection.propagators[fid])
+            for (fid in 0 until problem.numFactors) registerFactor(fid, projection.propagators[fid], preparation = true)
+            reserveWatchPositions()
         }
     }
 
@@ -851,7 +856,8 @@ class PropagationState private constructor(
                 if (watchers != null) {
                     val blockers = propagator.initialBoolWatcherBlockers
                     for (i in watchers.indices) {
-                        state.installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
+                        state.installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER,
+                            preparation = true)
                         if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
                     }
                 }
@@ -861,6 +867,7 @@ class PropagationState private constructor(
                 }
                 if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
+            state.reserveWatchPositions()
             yield(state)
         }.iterator()
     }
@@ -869,11 +876,17 @@ class PropagationState private constructor(
      *  indices and its delta-consumer accumulators. Shared by initial construction (once per factor,
      *  in factor-id order) and by an incremental presolve session registering a factor added mid-run
      *  without rebuilding the whole state. */
-    private fun registerFactor(fid: Int, propagator: Propagator) {
+    private fun reserveWatchPositions() {
+        if (problem.numBoolVars > 0) preparationIndexWork += watches.pos.reserve(baseFactorCount, 8)
+    }
+
+    private fun registerFactor(fid: Int, propagator: Propagator, preparation: Boolean = false) {
         val watchers = propagator.initialBoolWatchers
         if (watchers != null) {
             val blockers = propagator.initialBoolWatcherBlockers
-            for (i in watchers.indices) installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
+            for (i in watchers.indices) {
+                installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER, preparation)
+            }
         }
         // Base factors' int-event subscriptions are prebuilt into the CSR at [IntEventMachinery]
         // construction; only mid-life factors (fid past the base count) subscribe here, into the overflow.
