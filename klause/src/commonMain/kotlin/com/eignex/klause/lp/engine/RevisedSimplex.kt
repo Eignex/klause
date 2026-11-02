@@ -509,7 +509,11 @@ internal class RevisedSimplex(
         // Row multipliers can lag the basis; exact checking against the original model supplies authority.
         for (row in 0 until m) {
             if (row % 256 == 0 && cancellation()) return null
-            val value = numerical.sourceDual(row, dualValues[row])
+            val value = try {
+                numerical.sourceDual(row, dualValues[row])
+            } catch (_: LpScalingArithmeticException) {
+                return null
+            }
             if (!value.isFinite()) return null
             proposal[row] = value
             if (value != 0.0) nonzero = true
