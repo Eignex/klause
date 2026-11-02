@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.incumbent.IncumbentSource
+import com.eignex.klause.solver.incumbent.IncumbentOfferEvent
 import com.eignex.klause.solver.result.ChannelTraffic
 import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.solver.result.SharingStats
@@ -21,6 +22,14 @@ internal class SharingMeter {
         listener(channel, revision, 1)
     }
     private val clauseCounts = HashMap<String, Long>()
+    private val incumbentCounts = linkedMapOf<String, Long>()
+
+    internal fun incumbentEvent(event: IncumbentOfferEvent) {
+        val name = event.name.replaceFirstChar { it.lowercaseChar() }
+        val previous = incumbentCounts[name] ?: 0L
+        if (previous < Long.MAX_VALUE) incumbentCounts[name] = previous + 1L
+        if (event == IncumbentOfferEvent.Installed) exported(SharingChannel.Incumbents, 1)
+    }
     private val clauseMemory = HashMap<String, Long>()
     private var sampleFields: Set<String> = emptySet()
 
@@ -86,6 +95,7 @@ internal class SharingMeter {
             if (traffic == ChannelTraffic()) null else channel to traffic
         }.toMap(),
         clauseCounts + clauseMemory,
+        incumbentCounts.toMap(),
     )
 
     private companion object {

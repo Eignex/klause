@@ -8,7 +8,8 @@ refutation or optimum proof.
 
 Optional phase timing partitions active preparation, seeding, selection,
 application, publication and other time. Publication includes synchronous offers
-to the verified incumbent exchange and its verifier. Pauses in the result consumer
+to the verified incumbent exchange and its verifier, including deferred checks at
+a portfolio query boundary. Pauses in the result consumer
 remain outside active time.
 
 This chapter describes strategies, preparation and definitions.

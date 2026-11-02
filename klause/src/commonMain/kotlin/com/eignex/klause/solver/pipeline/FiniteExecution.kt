@@ -1089,6 +1089,15 @@ private fun executePortfolio(
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
     val admission = request.executionOptions.reader()[ExecutionOption.companionAdmission]
+    val bufferedPublications = when (val publications =
+        request.executionOptions.reader()[ExecutionOption.portfolioPublications]) {
+        null, "immediate" -> false
+        "segment" -> true
+        else -> pipelineConfigError("portfolio-publications expects immediate|segment, got `$publications`")
+    }
+    if (bufferedPublications && (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
+        pipelineConfigError("portfolio-publications requires curated single-core mixed optimization")
+    }
     val fundedCompanions = when (admission) {
         null, "ordinary" -> false
         "funded" -> true
@@ -1141,7 +1150,7 @@ private fun executePortfolio(
             cores = request.cores,
             executionOptions = request.executionOptions.without(
                 "portfolio-proof-share", "portfolio-proof-workers", "portfolio-lp-start", "portfolio-probes",
-                "boolean-proof-tasks", "companion-admission",
+                "boolean-proof-tasks", "companion-admission", "portfolio-publications",
             ),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
@@ -1169,6 +1178,11 @@ private fun executePortfolio(
             plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
             plan.scenario.annotationArm != null)) {
         pipelineConfigError("portfolio-probes requires a curated recipe pool")
+    }
+    if (bufferedPublications && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
+            plan.scenario.annotationArm != null)) {
+        pipelineConfigError("portfolio-publications requires a curated recipe pool")
     }
     when (plan) {
         is PortfolioPlan.LocalSearchDryRun -> return localSearchDryRun(plan.pool)
@@ -1223,6 +1237,7 @@ private fun executePortfolio(
         probePolicy = probePolicy,
         booleanProofTasks = booleanProofTasks,
         fundedCompanions = fundedCompanions,
+        bufferedPublications = bufferedPublications,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

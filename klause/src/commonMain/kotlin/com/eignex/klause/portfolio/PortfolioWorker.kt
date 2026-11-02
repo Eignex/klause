@@ -14,9 +14,11 @@ import com.eignex.klause.solver.incumbent.CompletedEngineResult
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
+import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 
@@ -56,6 +58,15 @@ class PortfolioWorker private constructor(
 
     /** Where this worker's sharing traffic is recorded, or null when it is not measured. */
     internal var sharingMeter: SharingMeter? = null
+
+    internal var publicationExchange: IncumbentExchange<Sample, Double>? = null
+
+    internal fun <T> withPublicationBatch(cancellation: Cancellation, action: () -> T): T {
+        val exchange = publicationExchange ?: return action()
+        val meter = checkNotNull(sharingMeter)
+        return exchange.withBufferedOffers(cancellation, meter::incumbentEvent,
+            { block -> meter.timed(SharingChannel.Incumbents, block) }, action)
+    }
 
     /** The reward signals this worker can earn: its engine's own and those of the channels it shares through. */
     internal val signals: Set<Signal>

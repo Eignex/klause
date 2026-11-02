@@ -586,15 +586,17 @@ class Portfolio(
                 }
                 // A terminal verdict means the arm finished; null means the slice ended with the search paused.
                 val outcome = runCatching {
-                    val millis = remainingMillis(armToken)
-                    if (worker.acceptsInstructionBudget && handle is InstructionSlicedSearch) {
-                        handle.runScheduledSlice(
-                            run.token, millis, instructionsOf(claim), claim.handleNodes, lsInstructionsPerWork,
-                        ) {
-                            accept(claim, it)
+                    worker.withPublicationBatch(run.token) {
+                        val millis = remainingMillis(armToken)
+                        if (worker.acceptsInstructionBudget && handle is InstructionSlicedSearch) {
+                            handle.runScheduledSlice(
+                                run.token, millis, instructionsOf(claim), claim.handleNodes, lsInstructionsPerWork,
+                            ) {
+                                accept(claim, it)
+                            }
+                        } else {
+                            handle.runSlice(run.token, millis, claim.handleNodes) { accept(claim, it) }
                         }
-                    } else {
-                        handle.runSlice(run.token, millis, claim.handleNodes) { accept(claim, it) }
                     }
                 }
                 terminal = outcome.getOrNull()

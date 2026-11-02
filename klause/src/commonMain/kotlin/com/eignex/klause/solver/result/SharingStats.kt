@@ -37,13 +37,23 @@ data class SharingStats(
     /** Clause lifecycle observations. Byte fields measure primitive buffers or logical payload, not RSS.
      *  Pool fields describe a shared owner and must not be summed across workers. */
     val clauses: Map<String, Long> = emptyMap(),
+    /** Private incumbent offer lifecycle counts for query-boundary publication. */
+    val incumbents: Map<String, Long> = emptyMap(),
 ) {
+    /** Construct sharing traffic with clause lifecycle observations. */
+    constructor(channels: Map<SharingChannel, ChannelTraffic> = emptyMap(), clauses: Map<String, Long> = emptyMap()) :
+        this(channels, clauses, emptyMap())
+
     /** Construct sharing traffic without clause lifecycle observations. */
-    constructor(channels: Map<SharingChannel, ChannelTraffic> = emptyMap()) : this(channels, emptyMap())
+    constructor(channels: Map<SharingChannel, ChannelTraffic> = emptyMap()) : this(channels, emptyMap(), emptyMap())
+
+    /** Copy traffic and clause observations while retaining incumbent observations. */
+    fun copy(channels: Map<SharingChannel, ChannelTraffic> = this.channels,
+        clauses: Map<String, Long> = this.clauses): SharingStats = SharingStats(channels, clauses, incumbents)
 
     /** Copy channel traffic while retaining clause observations. */
     fun copy(channels: Map<SharingChannel, ChannelTraffic> = this.channels): SharingStats =
-        SharingStats(channels, clauses)
+        SharingStats(channels, clauses, incumbents)
 
     /** Nanoseconds spent across every channel. */
     val nanos: Long get() = channels.values.sumOf { it.nanos }

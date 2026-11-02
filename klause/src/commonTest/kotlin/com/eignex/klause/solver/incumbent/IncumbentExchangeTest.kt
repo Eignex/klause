@@ -2,12 +2,147 @@ package com.eignex.klause.solver.incumbent
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 class IncumbentExchangeTest {
+    @Test
+    fun `private offers should coalesce and remain invisible until the boundary check`() {
+        val checked = mutableListOf<String>()
+        val events = mutableListOf<IncumbentOfferEvent>()
+        val exchange = IncumbentExchange<String, Int>({ a, b -> a < b }, { candidate ->
+            checked += candidate.assignment
+            Verification.Accepted(candidate)
+        })
+        val subscription = exchange.subscribe()
+
+        exchange.withBufferedOffers(Cancellation.Never, events::add, { it() }) {
+            exchange.offerFromWorker("first", 4) { it() }
+            exchange.offerFromWorker("best", 2) { it() }
+            exchange.offerFromWorker("later", 3) { it() }
+            assertNull(subscription.poll())
+            assertEquals(emptyList(), checked)
+        }
+
+        assertEquals(listOf("best"), checked)
+        assertEquals("best", subscription.poll()?.assignment)
+        assertEquals(mapOf(IncumbentOfferEvent.Segments to 1, IncumbentOfferEvent.Offered to 3,
+            IncumbentOfferEvent.Coalesced to 2, IncumbentOfferEvent.Checked to 1,
+            IncumbentOfferEvent.Installed to 1), events.groupingBy { it }.eachCount())
+    }
+
+    @Test
+    fun `refuted and undecided buffered points should leave the verified incumbent intact`() {
+        for (refuted in listOf(false, true)) {
+            val events = mutableListOf<IncumbentOfferEvent>()
+            val exchange = IncumbentExchange<String, Int>({ a, b -> a < b }, { candidate ->
+                when {
+                    candidate.assignment == "standing" -> Verification.Accepted(candidate)
+                    refuted -> Verification.Rejected("refuted")
+                    else -> Verification.Indeterminate("unavailable")
+                }
+            })
+            exchange.offer("standing", 5)
+
+            exchange.withBufferedOffers(Cancellation.Never, events::add, { it() }) {
+                exchange.offerFromWorker("proposal", 1) { it() }
+            }
+
+            assertEquals("standing", exchange.current()?.assignment)
+            assertEquals(if (refuted) IncumbentOfferEvent.Rejected else IncumbentOfferEvent.Indeterminate,
+                events.last())
+        }
+    }
+
+    @Test
+    fun `public offers should verify immediately within a private buffering scope`() {
+        val checked = mutableListOf<String>()
+        val events = mutableListOf<IncumbentOfferEvent>()
+        val exchange = IncumbentExchange<String, Int>({ a, b -> a < b }, { candidate ->
+            checked += candidate.assignment
+            Verification.Accepted(candidate)
+        })
+
+        exchange.withBufferedOffers(Cancellation.Never, events::add, { it() }) {
+            exchange.offerFromWorker("queued", 3) { it() }
+            assertIs<Publication.Installed<String, Int>>(exchange.offer("public", 1))
+            assertEquals(listOf("public"), checked)
+            assertEquals("public", exchange.current()?.assignment)
+        }
+
+        assertEquals(listOf("public", "queued"), checked)
+        assertEquals(IncumbentOfferEvent.NotImproving, events.last())
+        assertEquals("public", exchange.current()?.assignment)
+    }
+
+    @Test
+    fun `failed queries should discard pending offers and restore immediate worker publication`() {
+        val events = mutableListOf<IncumbentOfferEvent>()
+        val exchange = minimizing()
+
+        assertFailsWith<IllegalStateException> {
+            exchange.withBufferedOffers(Cancellation.Never, events::add, { it() }) {
+                exchange.offerFromWorker("discard", 1.0) { it() }
+                error("query failed")
+            }
+        }
+        assertNull(exchange.current())
+        exchange.offerFromWorker("fresh", 2.0) { it() }
+
+        assertEquals(IncumbentOfferEvent.Dropped, events.last())
+        assertEquals("fresh", exchange.current()?.assignment)
+    }
+
+    @Test
+    fun `expiration before or during buffered verification should withhold installation`() {
+        for (duringCheck in listOf(false, true)) {
+            var expired = false
+            var checks = 0
+            val events = mutableListOf<IncumbentOfferEvent>()
+            val exchange = IncumbentExchange<String, Int>({ a, b -> a < b }, { candidate ->
+                checks++
+                expired = true
+                Verification.Accepted(candidate)
+            })
+
+            exchange.withBufferedOffers(Cancellation { expired }, events::add, { it() }) {
+                exchange.offerFromWorker("expired", 1) { it() }
+                expired = !duringCheck
+            }
+
+            assertNull(exchange.current())
+            assertEquals(if (duringCheck) 1 else 0, checks)
+            assertEquals(1, events.count { it == IncumbentOfferEvent.Expired })
+            assertEquals(if (duringCheck) 0 else 1, events.count { it == IncumbentOfferEvent.Dropped })
+        }
+    }
+
+    @Test
+    fun `a failed buffered verifier should release the pending point before the next query`() {
+        val exchange = IncumbentExchange<String, Int>({ a, b -> a < b }, { candidate ->
+            check(candidate.assignment != "bad")
+            Verification.Accepted(candidate)
+        })
+        val events = mutableListOf<IncumbentOfferEvent>()
+
+        assertFailsWith<IllegalStateException> {
+            exchange.withBufferedOffers(Cancellation.Never, events::add, { it() }) {
+                exchange.offerFromWorker("bad", 1) { it() }
+            }
+        }
+        exchange.withBufferedOffers(Cancellation.Never, events::add, { it() }) {
+            exchange.offerFromWorker("good", 2) { it() }
+        }
+
+        assertEquals("good", exchange.current()?.assignment)
+        assertEquals(1, events.count { it == IncumbentOfferEvent.Failed })
+        assertEquals(2, events.count { it == IncumbentOfferEvent.Checked })
+    }
+
     @Test
     fun `published sample should keep its verified objective after external mutation`() {
         val values = longArrayOf(3)

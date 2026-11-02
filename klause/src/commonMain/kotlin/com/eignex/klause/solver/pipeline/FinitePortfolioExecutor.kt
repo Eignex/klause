@@ -80,6 +80,7 @@ internal fun FinitePipeline.portfolioExecutor(
     incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
     improvementProofShare: Double = 0.5,
     deferLpProbes: Boolean = false,
+    bufferedPublications: Boolean = false,
     includeRestartingProof: Boolean = false,
     probePolicy: InitialProbePolicy = InitialProbePolicy.ORDINARY,
     booleanProofTasks: Boolean? = false,
@@ -95,6 +96,10 @@ internal fun FinitePipeline.portfolioExecutor(
         scenario.btPool == null && scenario.lsPool == null && scenario.btEdit == null && scenario.annotationArm == null
     if (deferLpProbes && !curatedFiniteInteger) {
         pipelineConfigError("portfolio-lp-start requires a curated single-core mixed finite integer optimization")
+    }
+    if (bufferedPublications && (!curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
+            cancellation.deadline() == null || problem.numRealVars != 0)) {
+        pipelineConfigError("portfolio-publications requires curated elapsed single-core mixed finite integer optimization")
     }
     if (probePolicy != InitialProbePolicy.ORDINARY && (!curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
             cancellation.deadline() == null)) {
@@ -138,7 +143,7 @@ internal fun FinitePipeline.portfolioExecutor(
     }
     val finiteFactories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
-        profile, numericalCompletion, sourceHints, objectiveCoordinates,
+        profile, numericalCompletion, sourceHints, objectiveCoordinates, bufferedPublications,
     ).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
             SourceWorkerBinding(

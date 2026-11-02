@@ -36,7 +36,14 @@ internal class PooledIncumbents(
      *  without an exchange. */
     fun publish(sample: Sample, objective: Double) {
         val target = exchange ?: return
-        timing.inPhase("publication") { target.offer(sample, objective) }
+        if (!target.buffersWorkerOffers) {
+            timing.inPhase("publication") { target.offer(sample, objective) }
+            return
+        }
+        target.offerFromWorker(sample, objective) { action ->
+            val timer = timing
+            if (timer == null) action() else timer.measurePublication(action)
+        }
     }
 
     /**

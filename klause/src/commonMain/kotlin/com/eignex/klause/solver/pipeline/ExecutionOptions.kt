@@ -550,6 +550,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Select ordinary initial probes or give the leading complete worker half their shared budget. */
         val portfolioProbes: ExecutionOption<String> = ExecutionOption("portfolio-probes", ValueKind.STRING)
 
+        internal val portfolioPublications: ExecutionOption<String> =
+            ExecutionOption("portfolio-publications", ValueKind.STRING)
+
         /** The `reseed-stale-threshold` execution setting. */
         val reseedStaleThreshold: ExecutionOption<Int> = ExecutionOption("reseed-stale-threshold", ValueKind.INT)
 
@@ -600,7 +603,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 coreRefinement, companionAfterIncumbent, companionActiveMillis, companionAdmission, portfolioProgress,
                 phaseRetention, portfolioReward, portfolioProofShare, portfolioProofWorkers, portfolioLpStart,
                 booleanProofTasks,
-                portfolioProbes, reseedStaleThreshold,
+                portfolioProbes, portfolioPublications, reseedStaleThreshold,
                 lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
             ).associateBy { it.id }
         }

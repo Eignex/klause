@@ -3,12 +3,38 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Verification
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class PooledIncumbentsTest {
+
+    @Test
+    fun `deferred publication timing should charge the check while excluding consumer pauses`() {
+        var clock = 0L
+        val timer = LocalSearchPhaseTimer { clock }
+        val exchange = IncumbentExchange<Sample, Double>({ a, b -> a < b }, { candidate ->
+            clock += 7L
+            Verification.Accepted(candidate)
+        })
+        val port = PooledIncumbents(exchange, true, { 1.0 }, timer)
+
+        exchange.withBufferedOffers(Cancellation.Never, {}, { it() }) {
+            timer.resume()
+            port.publish(sample, 3.0)
+            port.publish(sample, 1.0)
+            timer.pause()
+            clock += 1000L
+            assertNull(exchange.current())
+        }
+        clock += 1000L
+
+        assertEquals(7L, timer.snapshot().getValue("publication"))
+        assertEquals(7L, timer.snapshot().values.sum())
+        assertEquals(1.0, exchange.current()?.objective)
+    }
 
     private val sample = Sample(booleanArrayOf(true), LongArray(0))
 

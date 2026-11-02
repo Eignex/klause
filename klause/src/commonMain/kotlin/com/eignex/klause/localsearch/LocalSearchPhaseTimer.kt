@@ -61,6 +61,18 @@ internal class LocalSearchPhaseTimer(
         running = false
     }
 
+    fun <T> measurePublication(action: () -> T): T {
+        val wasRunning = running
+        val previous = enter("publication")
+        if (!wasRunning) resume()
+        try {
+            return action()
+        } finally {
+            if (!wasRunning) pause()
+            enter(previous)
+        }
+    }
+
     fun snapshot(): Map<String, Long> {
         if (running) accrue()
         return nanos.toMap()

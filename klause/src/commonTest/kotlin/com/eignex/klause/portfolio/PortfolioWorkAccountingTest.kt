@@ -21,6 +21,8 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.StatelessSession
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
@@ -37,8 +39,45 @@ import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
+import kotlin.time.TestTimeSource
 
 class PortfolioWorkAccountingTest {
+    @Test
+    fun `buffered verification should finish inside the query charge before a sibling runs`() {
+        val clock = TestTimeSource()
+        var finished = false
+        var checks = 0
+        val point = Sample(BooleanArray(0), LongArray(0))
+        val exchange = IncumbentExchange<Sample, Double>({ a, b -> a < b }, { candidate ->
+            checks++
+            clock += 7.milliseconds
+            Verification.Accepted(candidate)
+        })
+        val worker = trackingWorker("buffered", 0, TrackingResumableSearch(null, onRun = {
+            clock += 2.milliseconds
+            exchange.offerFromWorker(point, 3.0) { it() }
+            exchange.offerFromWorker(point, 1.0) { it() }
+            assertEquals(null, exchange.current())
+        })).also {
+            it.publicationExchange = exchange
+            it.sharingMeter = SharingMeter()
+        }
+        val sibling = trackingWorker("sibling", 1, TrackingResumableSearch(null, onRun = {
+            assertEquals(1.0, exchange.current()?.objective)
+            finished = true
+        }))
+
+        val result = Portfolio.thompson(listOf(worker, sibling)).apply { runTimeSource = clock }.use {
+            it.minimize(Cancellation { finished })
+        }
+
+        val arm = result.stats.portfolio.arms.first()
+        assertEquals(1, checks)
+        assertEquals(9L, arm.millis)
+        assertEquals(mapOf("segments" to 1L, "offered" to 2L, "coalesced" to 1L,
+            "checked" to 1L, "installed" to 1L), arm.sharing.incumbents)
+    }
+
     @Test
     fun `scheduled optimization should charge auxiliary work beyond its native instructions`() {
         for (coordinates in listOf(false, true)) {

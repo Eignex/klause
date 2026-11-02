@@ -99,6 +99,7 @@ object PortfolioBuilder {
         numericalCompletion: Boolean,
         sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
         objectiveCoordinates: ObjectiveCoordinateView? = null,
+        bufferedPublications: Boolean = false,
     ): List<FinitePortfolioFactory> {
         val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling, objective) { recipe, eligibility ->
             onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(recipe, eligibility.admitted,
@@ -106,7 +107,10 @@ object PortfolioBuilder {
         }
         val plan = PortfolioComposition.plan(scenario, facts)
         val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
-        val configs = if (scenario.reportLsPhaseTimes) residuals.map { it.withLsPhaseTimes() } else residuals
+        val timed = if (scenario.reportLsPhaseTimes) residuals.map { it.withLsPhaseTimes() } else residuals
+        val configs = if (bufferedPublications) timed.map {
+            if (it is LocalSearchWorkerConfig) it.withBufferedPublications() else it
+        } else timed
         require(!scenario.earlyCoreAdmission || configs.any { it is CoreGuidedWorkerConfig }) {
             "core-early requires an eligible Boolean objective core worker"
         }

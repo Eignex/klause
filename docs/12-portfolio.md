@@ -252,6 +252,21 @@ including for direct engine publications. The low-level portfolio API also
 supports caller-trusted unbound workers with an explicit witness checker. Learned
 clauses are exchanged only when at least two backtrack workers exist.
 
+`portfolio-publications=segment` coalesces private local-search offers within one
+query of a curated single-core mixed finite integer optimization with a containing
+deadline. It retains one immutable candidate, ranked by the worker's canonical
+objective, and checks that candidate at the query boundary before sharing it.
+Failed queries discard pending offers; expiration before or during verification
+withholds installation. Direct public exchange offers retain immediate checking.
+Explicit pools, parallel execution and work-driven schedules reject this policy;
+the default is `immediate`. Private-coordinate workers and ALNS retain their own
+publication paths. Query time includes deferred verification, also reported in the
+LS publication phase and incumbent sharing time; these overlapping measures must
+not be added. `ArmSchedule.sharing.incumbents` and CLI `incumbent*` arm fields report
+offers, coalescing, checks, outcomes and dropped pending points. Exports count
+installed incumbents rather than queued offers. No candidate queue or rejected-point
+history survives the query.
+
 Detailed memory sampling requires `sharing-memory=true`, independently of the
 single-lane charged-work schedule (`portfolio-work`). It defaults to false;
 traffic/work/use counters remain inexpensive. Each sample has separate
