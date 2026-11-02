@@ -11,6 +11,11 @@ application, publication and other time. Publication includes synchronous offers
 to the verified incumbent exchange and its verifier, including deferred checks at
 a portfolio query boundary. Pauses in the result consumer
 remain outside active time.
+Scoring telemetry counts picks that unwind on cooperative cancellation and their
+elapsed nanoseconds, including probe restoration. This time is a subset of active
+selection time, not extra CPU or a measure of discarded work: a source may retain
+bounded coverage between picks. A null pick without scoring interruption is not
+counted as an interruption.
 
 This chapter describes strategies, preparation and definitions.
 [Neighborhoods and restarts](11-neighborhoods.md) covers scoring probes, structured

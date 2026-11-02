@@ -26,7 +26,24 @@ internal class LocalSearchPhaseTimer(
         "prepared" to 0L,
         "indexed" to 0L,
         "generic" to 0L,
+        "selection-picks" to 0L,
+        "selection-interruptions" to 0L,
+        "selection-interrupted-ns" to 0L,
     )
+
+    fun measureScoringPick(pick: () -> Move?): Move? {
+        recordObjectiveScoring("selection-picks")
+        val start = now()
+        try {
+            return pick()
+        } catch (interrupted: LocalSearchScoringInterrupted) {
+            recordObjectiveScoring("selection-interruptions")
+            val elapsed = (now() - start).coerceAtLeast(0L)
+            val previous = objectiveScoring.getValue("selection-interrupted-ns")
+            objectiveScoring["selection-interrupted-ns"] = previous + minOf(elapsed, Long.MAX_VALUE - previous)
+            throw interrupted
+        }
+    }
 
     fun recordObjectiveScoring(outcome: String) {
         val previous = objectiveScoring.getValue(outcome)
