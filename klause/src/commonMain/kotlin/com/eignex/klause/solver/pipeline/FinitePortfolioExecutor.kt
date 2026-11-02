@@ -245,7 +245,8 @@ internal fun FinitePipeline.portfolioExecutor(
             initialHeuristics = when (probePolicy) {
                 InitialProbePolicy.FAMILY_WORK -> workers.indices.filter { arm ->
                     arm < scenario.arms && workers[arm].family == ArmFamily.LocalSearch &&
-                        !workers[arm].startAfterIncumbent && !workers[arm].improvementOnly && !workers[arm].auxiliaryProof
+                        !workers[arm].startAfterIncumbent && !workers[arm].improvementOnly &&
+                        !workers[arm].auxiliaryProof
                 }.toSet()
                 InitialProbePolicy.HEURISTIC_WORK -> workers.indices.filter { arm ->
                     workers[arm].family in setOf(ArmFamily.LocalSearch, ArmFamily.Lns) && !workers[arm].auxiliaryProof
