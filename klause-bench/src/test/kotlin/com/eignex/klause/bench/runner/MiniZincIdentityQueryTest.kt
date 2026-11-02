@@ -141,10 +141,32 @@ class MiniZincIdentityQueryTest {
         assertFalse(failure.evidence.diagnosticComplete)
     }
 
+    @Test
+    fun `a process that survives cleanup retains an unavailable exit`() {
+        val child = Child(alive = true, refusesKill = true)
+        val query = MiniZincIdentityQuery(start = { _, _ -> child }, retain = {})
+
+        val failure = assertFailsWith<MiniZincIdentityFailure> { query.query(File("minizinc"), "--version") }
+
+        assertTrue(failure.evidence.aliveAfterCleanup)
+        assertEquals(null, failure.evidence.exitCode)
+        assertTrue(requireNotNull(failure.evidence.cleanupFailure).contains("kill refused"))
+    }
+
+    @Test
+    fun `empty output cannot establish an identity`() {
+        val query = MiniZincIdentityQuery(start = { _, _ -> Child() }, retain = {})
+
+        val failure = assertFailsWith<MiniZincIdentityFailure> { query.query(File("minizinc"), "--version") }
+
+        assertEquals("empty-output", failure.evidence.outcome)
+    }
+
     private class Child(
         private var alive: Boolean = false,
         private val interrupted: Boolean = false,
         private val exit: Int = 0,
+        private val refusesKill: Boolean = false,
     ) : Process() {
         var killed = false
         val waitAllowances = mutableListOf<Long>()
@@ -161,6 +183,7 @@ class MiniZincIdentityQueryTest {
         }
         override fun destroy() { destroyForcibly() }
         override fun destroyForcibly(): Process {
+            check(!refusesKill) { "kill refused" }
             killed = true
             alive = false
             return this
