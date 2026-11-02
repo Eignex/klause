@@ -36,19 +36,19 @@ object PropagationReasonOracle {
             FactorPropagationOracle.sourceAssignments(problem)
             return
         }
-        val solutions = FactorPropagationOracle.enumerateSat(problem, label, null)
+        val implications = ArrayList<Pair<(Sample) -> Boolean, () -> String>>()
         for (b in 0 until problem.numBoolVars) {
             val value = state.boolValues[b] ?: continue
             if (boolsBefore[b] != null) continue
-            val reason = state.reasonOf(state.boolAntecedents[b])
-            for (s in solutions) {
-                val implied = s.bools[b] == value ||
-                    (reason ?: IntArray(0)).any { lit -> litTrueUnder(problem, state, lit, s) }
-                if (!implied) fail(
+            val reason = state.reasonOf(state.boolAntecedents[b])?.copyOf()
+            implications.add(
+                { s: Sample ->
+                    s.bools[b] == value || reason?.any { lit -> litTrueUnder(problem, state, lit, s) } == true
+                } to {
                     "$label: pinning b$b=$value rests on ${reason?.map { describe(state, problem, it) }}, " +
-                        "which a solution ${s.bools.toList()} ${s.ints.toList()} satisfies with b$b=${s.bools[b]}",
-                )
-            }
+                        "which is falsified"
+                },
+            )
         }
         for (v in 0 until problem.numIntVars) {
             val after = state.intDomains[v]
@@ -67,16 +67,25 @@ object PropagationReasonOracle {
 
                     else -> state.holeReasonFor(v, k) to { s: Sample -> s.ints[v] != k }
                 }
-                val reason = state.reasonOf(recorded)
-                for (s in solutions) {
-                    val implied = holds(s) ||
-                        (reason ?: IntArray(0)).any { lit -> litTrueUnder(problem, state, lit, s) }
-                    if (!implied) fail(
+                val reason = state.reasonOf(recorded)?.copyOf()
+                implications.add(
+                    { s: Sample ->
+                        holds(s) || reason?.any { lit -> litTrueUnder(problem, state, lit, s) } == true
+                    } to {
                         "$label: removing $k from x$v rests on ${reason?.map { describe(state, problem, it) }}, " +
-                            "which a solution ${s.ints.toList()} satisfies with x$v = ${s.ints[v]}",
-                    )
-                }
+                            "which is falsified"
+                    },
+                )
             }
+        }
+        // An assignment satisfying every implication cannot refute a reason, regardless of feasibility.
+        val solutions = FactorPropagationOracle.enumerateSat(problem, label, null) { sample ->
+            implications.any { !it.first(sample) }
+        }
+        for (sample in solutions) {
+            val rejected = implications.first { !it.first(sample) }
+            fail("${rejected.second()} by a source solution (ints=${sample.ints.toList()}, " +
+                "bools=${sample.bools.toList()})")
         }
     }
 

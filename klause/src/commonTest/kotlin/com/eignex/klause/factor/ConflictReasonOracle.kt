@@ -14,7 +14,9 @@ object ConflictReasonOracle {
 
     fun assertEntailed(problem: Problem, state: PropagationState, factorId: Int, label: String = "reason") {
         val reason = state.factorAt(factorId).conflictReason(state, factorId) ?: return
-        val solutions = FactorPropagationOracle.enumerateSat(problem, label, null)
+        val solutions = FactorPropagationOracle.enumerateSat(problem, label, null) { sample ->
+            reason.none { lit -> litTrueUnder(problem, state, lit, sample) }
+        }
         for (s in solutions) {
             val satisfied = reason.any { lit -> litTrueUnder(problem, state, lit, s) }
             if (!satisfied) fail(

@@ -188,11 +188,17 @@ object FactorPropagationOracle {
         state.recompute()
     }
 
-    internal fun enumerateSat(problem: Problem, label: String, satisfies: ((Sample) -> Boolean)?): List<Sample> {
+    internal fun enumerateSat(
+        problem: Problem,
+        label: String,
+        satisfies: ((Sample) -> Boolean)?,
+        relevant: (Sample) -> Boolean = { true },
+    ): List<Sample> {
         val samples = ArrayList<Sample>()
         val assignments = sourceAssignments(problem)
         val state = declaredState(problem)
         for (sample in assignments) {
+            if (!relevant(sample)) continue
             load(state, sample)
             if (satisfies == null) {
                 if (state.cost == 0L) samples.add(sample)
