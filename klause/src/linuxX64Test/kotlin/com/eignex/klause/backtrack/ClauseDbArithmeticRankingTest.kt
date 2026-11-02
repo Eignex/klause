@@ -21,15 +21,16 @@ internal class ClauseDbArithmeticRankingTest {
     @Suppress("FunctionNaming") // Native platform tests follow the common test naming convention.
     internal fun `production caps should rank arithmetic rows with local clauses`() {
         for ((cap, integer) in listOf(4_000 to false, 4_000 to true, 20_000 to false, 20_000 to true)) {
+            val floor = Clause(intArrayOf(1, 2))
             val boolFactors = arrayOf<Factor>(
-                Clause(intArrayOf(1, 2)), Clause(intArrayOf(3, 4)),
+                floor, Clause(intArrayOf(3, 4)),
             )
             val problem = Problem(3, if (integer) 1 else 0,
                 if (integer) arrayOf(IntDomain(0, 10)) else emptyArray(),
                 if (integer) boolFactors + Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10) else boolFactors)
             val session = PropagationSession(problem, nativeSat = false)
             val clause = Clause(intArrayOf(1, 3, 4))
-            repeat(cap - 4) { session.addLearnedClause(clause, 9, permanent = true) }
+            repeat(cap - 4) { session.addLearnedClause(floor, 9, permanent = true) }
             repeat(4) { session.addLearnedClause(clause, 9) }
             if (integer) {
                 val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
