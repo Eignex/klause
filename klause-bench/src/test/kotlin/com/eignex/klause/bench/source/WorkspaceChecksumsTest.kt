@@ -116,8 +116,8 @@ class WorkspaceChecksumsTest {
             WorkspaceChecksums(root, cache, hash = { source ->
                 reads++
                 digest(source)
-            }, reliable = { _ -> false }).use {
-                assertEquals(digest(file), it.checksum(file))
+            }, reliable = { _ -> false }).use { checksums ->
+                assertEquals(digest(file), checksums.checksum(file))
             }
         }
         assertEquals(2, reads)
