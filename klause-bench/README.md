@@ -1173,7 +1173,9 @@ rows are explicit. Compact coefficient pairs do not certify conflicting bounds,
 historical reasons, mapped assertion, admission or source benefit.
 
 Source bytes must match `sha256` after decompression and fit 1 MiB. Optional
-`source64=BASE64 format=FORMAT` accepts at most 96 KiB of encoded input. Canonical
+`source64=BASE64 format=FORMAT` or `sourceGzip64=BASE64 format=FORMAT` accepts at
+most 96 KiB of encoded input. Supply only one encoding; gzip decoding stops at the
+1 MiB source bound. Canonical
 models admit 128 KiB each and live output admits 3 MiB. `models=false` omits
 canonical serialization and exports null model payloads plus coordinate/factor
 counts; source bytes and their hash remain retained. Set the execution timeout

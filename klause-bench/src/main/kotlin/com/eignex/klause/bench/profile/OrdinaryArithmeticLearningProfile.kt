@@ -58,7 +58,8 @@ internal object OrdinaryArithmeticLearningProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(options.keys.all {
             it in setOf("suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
-                "attribution", "recipe", "seed", "worker-seed", "route", "samples", "models", "learning-placement")
+                "attribution", "recipe", "seed", "worker-seed", "route", "samples", "models", "learning-placement",
+                "sourceGzip64")
         })
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -110,11 +111,14 @@ internal object OrdinaryArithmeticLearningProfile {
             put("javaVmName", System.getProperty("java.vm.name"))
         }.toString())
         val source64 = options["source64"]
-        val catalogRef = if (source64 == null) Catalog.uncapped(suite).problems.single { it.name == name } else null
+        val sourceGzip64 = options["sourceGzip64"]
+        require(source64 == null || sourceGzip64 == null)
+        val frozenSource = source64 != null || sourceGzip64 != null
+        val catalogRef = if (!frozenSource) Catalog.uncapped(suite).problems.single { it.name == name } else null
         val format = catalogRef?.format ?: Format.valueOf(requireNotNull(options["format"]).uppercase())
-        val bytes = if (source64 == null) {
+        val bytes = if (!frozenSource) {
             CorpusFiles.open(CorpusFetcher.resolve(requireNotNull(catalogRef).source)).use { it.readNBytes(1_048_577) }
-        } else trajectorySourceBytes(suite, name, hash, source64)
+        } else trajectorySourceBytes(suite, name, hash, source64, sourceGzip64, maxBytes = 1_048_576)
         require(bytes.size <= 1_048_576)
         val sourceFile = out.resolve("source.${format.name.lowercase()}").apply { writeBytes(bytes) }
         val observedHash = sha256(bytes)
@@ -124,7 +128,7 @@ internal object OrdinaryArithmeticLearningProfile {
             put("problem", name)
             put("expectedSha256", hash)
             put("observedSha256", observedHash)
-            put("sourceMode", if (source64 == null) "catalog" else "frozen")
+            put("sourceMode", if (frozenSource) "frozen" else "catalog")
         }.toString())
         check(observedHash == hash) { "source hash mismatch: expected $hash, observed $observedHash" }
         val ref = catalogRef ?: ProblemRef(name, format, ProblemSource.Prepared(sourceFile),
@@ -318,7 +322,7 @@ internal object OrdinaryArithmeticLearningProfile {
                     put("suite", suite)
                     put("problem", name)
                     put("sourceSha256", hash)
-                    put("sourceMode", if (source64 == null) "catalog" else "frozen")
+                    put("sourceMode", if (frozenSource) "frozen" else "catalog")
                     put("integerRowLearning", learning)
                     put("pbLearning", if (route == "single") false else null)
                     put("propagationAttribution", attribution)

@@ -14,19 +14,21 @@ internal fun trajectorySourceBytes(
     expectedSha256: String,
     source64: String?,
     sourceGzip64: String? = null,
+    maxBytes: Int = 64 * 1024 * 1024,
 ): ByteArray {
+    require(maxBytes in 1..64 * 1024 * 1024)
     require(source64 == null || sourceGzip64 == null)
     val bytes = if (source64 == null && sourceGzip64 == null) {
         val reference = Catalog.uncapped(suite).problems.single { it.name == problem }
-        CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readNBytes(64 * 1024 * 1024 + 1) }
+        CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readNBytes(maxBytes + 1) }
     } else {
         val encoded = checkNotNull(source64 ?: sourceGzip64)
         require(encoded.length <= 96 * 1024)
         val decoded = Base64.getDecoder().decode(encoded)
         if (sourceGzip64 == null) decoded else GZIPInputStream(ByteArrayInputStream(decoded)).use {
-            it.readNBytes(64 * 1024 * 1024 + 1)
+            it.readNBytes(maxBytes + 1)
         }
     }
-    require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == expectedSha256)
+    require(bytes.size <= maxBytes && sha256(bytes) == expectedSha256)
     return bytes
 }
