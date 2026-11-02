@@ -188,7 +188,8 @@ class Portfolio(
         }
     internal var initialHeuristicArms: Set<Int> = emptySet()
         set(value) {
-            require(value.all { it in workers.indices && workers[it].family == ArmFamily.LocalSearch })
+            require(value.all { it in workers.indices &&
+                workers[it].family in setOf(ArmFamily.LocalSearch, ArmFamily.Lns) })
             field = value.toSet()
         }
     internal var improvementProofShare: Double = 0.5

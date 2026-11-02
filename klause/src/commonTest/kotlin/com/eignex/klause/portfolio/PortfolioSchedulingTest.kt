@@ -30,6 +30,71 @@ import kotlin.time.TimeSource
 
 class PortfolioSchedulingTest {
     @Test
+    fun `incumbent gated LNS should wait for the same worker heuristic sample`() {
+        val clock = TestTimeSource()
+        val visits = mutableListOf<Int>()
+        var leaderWork = 0L
+        var lnsStartWork: Long? = null
+        val workers = List(5) { arm ->
+            val search = ScriptedSearch({ arm == 2 && it == 0 }) {
+                visits += arm
+                clock += 1.milliseconds
+                if (arm == 2) leaderWork += 2L
+                if (arm == 3) lnsStartWork = leaderWork
+            }
+            val observed = if (arm == 2) object : ResumableSearch by search {
+                override val work: Long get() = leaderWork
+            } else search
+            trackingWorker("worker$arm", arm, observed).also {
+                if (arm >= 2) it.family = if (arm == 3) ArmFamily.Lns else ArmFamily.LocalSearch
+                if (arm == 3) it.improvementOnly = true
+            }
+        }
+
+        val result = Portfolio(workers, fixedBandit(5, 2), baseSliceWork = 5L, maxSliceWork = 5L,
+            sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
+            it.runTimeSource = clock
+            it.initialHeuristicArms = setOf(2, 3, 4)
+        }.use { it.minimize(Cancellation { lnsStartWork != null || visits.size >= 128 }) }
+
+        assertEquals(6L, lnsStartWork)
+        assertTrue(result.stats.portfolio.heuristicStarts.single().completed)
+        assertTrue(0 in visits && 1 in visits)
+    }
+
+    @Test
+    fun `deferring LNS after an incumbent should retain silent complete worker coverage`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(5)
+        var leaderWork = 0L
+        val workers = List(5) { arm ->
+            val search = ScriptedSearch({ arm == 2 && it == 0 }) {
+                elapsed[arm] += 100L
+                clock += 100.milliseconds
+                if (arm == 2) leaderWork++
+            }
+            val observed = if (arm == 2) object : ResumableSearch by search {
+                override val work: Long get() = leaderWork
+            } else search
+            trackingWorker("worker$arm", arm, observed).also {
+                if (arm >= 2) it.family = if (arm == 3) ArmFamily.Lns else ArmFamily.LocalSearch
+                if (arm == 3) it.improvementOnly = true
+            }
+        }
+
+        val result = Portfolio(workers, fixedBandit(5, 2), reseedStaleThreshold = 0).also {
+            it.runTimeSource = clock
+            it.initialHeuristicArms = setOf(2, 3, 4)
+        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+
+        val owed = (elapsed.sum() - 300L) / 4
+        for (arm in 0..1) assertTrue(elapsed[arm] >= owed - 100L)
+        assertEquals(0L, elapsed[3])
+        assertEquals(0L, elapsed[4])
+        assertFalse(result.stats.portfolio.heuristicStarts.single().completed)
+    }
+
+    @Test
     fun `paid heuristic admission should publish the checked boundary point before a sibling starts`() {
         val clock = TestTimeSource()
         val point = Sample(BooleanArray(0), LongArray(0))

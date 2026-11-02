@@ -761,6 +761,19 @@ Both controls require a containing deadline and curated single-core mixed intege
 optimization without Boolean or real columns. Explicit recipes and work diagnostics
 reject them; `ordinary` is the default. Deferred LP admission retains its separate boundary.
 
+`portfolio-probes=family-work` delays additional initial LS queries until one eligible
+LS worker independently spends the existing base work allowance. The
+`heuristic-work` mode applies that gate to LS and ALNS queries, including workers
+whose ordinary eligibility requires an incumbent. The first eligible retained
+heuristic supplies the sample; retirement or temporary unavailability permits the
+next eligible worker to supply its own sample. Failed workers' work is not combined.
+Both modes retain eager factory construction, worker positions and private seeds,
+the full available probe denominator, ordinary incumbent eligibility, complete-worker
+coverage and all containing allowances. `heuristicStart` observations report each
+invocation's participating workers, work and sample completion. These modes require
+the same curated elapsed scope as the weighted probe controls and can compose with
+query-boundary publication coalescing.
+
 Before the first incumbent, an optimization arm with pending private preparation, or
 a local-search arm that has not executed an instruction, receives preparation
 revisits after all initial siblings have been admitted. Unfinished arms rotate in arm

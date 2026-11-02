@@ -1109,8 +1109,9 @@ private fun executePortfolio(
         "lp-transfer" -> InitialProbePolicy.LP_TRANSFER
         "heuristic-second" -> InitialProbePolicy.HEURISTIC_SECOND
         "family-work" -> InitialProbePolicy.FAMILY_WORK
+        "heuristic-work" -> InitialProbePolicy.HEURISTIC_WORK
         else -> pipelineConfigError(
-            "portfolio-probes expects ordinary|leader-half|lp-transfer|heuristic-second|family-work, " +
+            "portfolio-probes expects ordinary|leader-half|lp-transfer|heuristic-second|family-work|heuristic-work, " +
                 "got `$probes`")
     }
     if (probePolicy != InitialProbePolicy.ORDINARY &&
