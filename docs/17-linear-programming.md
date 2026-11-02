@@ -324,8 +324,9 @@ ordering. A restored source root can refresh expired preferences from its curren
 private numerical owner, after rebuilding the current domain and cut view. The
 read requires matching model and exact state at depth zero, preserves child
 invalidation, charges transport and copies only currently available coordinates.
-It runs no numerical query and retains no earlier guide arrays. An attempt stopped
-before spending work can retry in a fresh consultation;
+Completed and interrupted component results share the authority check and private
+snapshot read; no numerical query runs and no earlier guide arrays remain. An
+attempt stopped before spending work can retry in a fresh consultation;
 a paid decline retains its charge. These choices supply no directional-history, bound or proof authority.
 Continuation observations distinguish a pending interruption from a cancelled run,
 spent root or LP work, and a call without an eligible interruption. They record the

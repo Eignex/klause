@@ -572,7 +572,7 @@ internal class ComponentLpSolver(
         if (!currentAuthority() || cancellation()) return null
         val termination = lastTermination
         if (termination != LpFloatTermination.WORK && termination != LpFloatTermination.PIVOTS &&
-            termination != LpFloatTermination.CANCELLED
+            termination != LpFloatTermination.CANCELLED && termination != LpFloatTermination.OPTIMAL_CANDIDATE
         ) return null
         val results = blockResults ?: return null
         val guidance = LpPrimalGuidance(DoubleArray(model.n), BooleanArray(model.n))

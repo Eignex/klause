@@ -15,6 +15,28 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `completed component points supply fresh guidance without resolving`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val factory = RecordingLpEngineFactory()
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            factory = factory)).use { owner ->
+            val point = assertNotNull(owner.resolveBounds())
+            val queries = factory.floatAllowances.size
+
+            val guide = assertNotNull(owner.partialPrimalGuidance())
+
+            assertTrue(guide.known.all { it })
+            assertEquals(point.primal.toList(), guide.coordinates.toList())
+            assertEquals(queries, factory.floatAllowances.size)
+        }
+    }
+
+    @Test
     fun `partial guidance marks only returned child coordinates`() {
         val builder = LpBuilder()
         repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
