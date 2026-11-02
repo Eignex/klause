@@ -651,6 +651,12 @@ retained-level deductions or LP setup can overrun a slice. Local-search arms
 follow the
 [retained handle contract](11-neighborhoods.md#handles-and-exclusive-ownership).
 
+Retained Boolean clause walks with definition repairs price scoring inspections
+alongside their native instructions. The scheduler passes both allowances through
+session-ownership and objective-coordinate wrappers and charges auxiliary work to
+the containing ledger, including atomic overspend. Native instruction limits retain
+their own currency; [local search](10-local-search.md) owns the inspected operations.
+
 #### Private CP preparation
 
 General CP optimization handles keep one private construction cursor through
@@ -677,6 +683,13 @@ checkpoint. [Polynomial execution](16-nonlinear-arithmetic.md#decision-procedure
 owns reconstruction, cumulative probing and refutation authority.
 
 #### Auxiliary incumbent evaluation
+
+Deferred core workers retain each complete sibling's initial charged coverage
+across incumbent improvements. Once an incumbent admits the ordinary core worker,
+its first base trial can follow the initial sibling probes without waiting for an
+improvement-free epoch. Further trials require fresh complete-family work. The
+existing containing work and auxiliary time allowances bound both preparation and
+search.
 
 An auxiliary arm keeps its preparation and receives a bounded search trial after an
 incumbent arrives, running before ordinary selection once every initial sibling has

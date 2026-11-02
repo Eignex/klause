@@ -412,10 +412,20 @@ It consumes no random values; assignment and degree copies are charged to the
 caller. Inspection supplies neither source validation nor proof authority.
 
 Boolean-only clause models close native proposals under clause implications before
-ranking: forced literals propagate to a fixpoint, then a newly broken longer clause
+ranking. Pending falsifications of a longer clause share one queued visit; newly
+forced literals can enqueue it again. Forced literals and mandatory clause visits
+propagate to a fixpoint, then a newly broken longer clause
 gets a replacement supporter ranked by break score, objective delta and literal
 order. Conflicts reject the whole proposal. These closures are heuristic proposals,
 not deductions; every clause and pin is kept for full grading.
+
+Retained Boolean clause walks with definition repairs charge candidate-factor,
+objective and implication inspections to
+their [slice allowance](06-sessions.md#decisions-moves-and-slices). A completed choice
+can pause the walk before its native instruction grant ends, retaining the assignment
+and paying any atomic overspend from later slices. Optional phase diagnostics include
+the cumulative inspection visits and their Boolean repair-graph subset. Both
+operation kinds retain fractional charges across slices under their separate prices.
 
 ### Maintained literal channels
 

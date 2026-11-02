@@ -322,6 +322,8 @@ internal class LocalSearchEngine(
             LocalSearchState.preparation(model, Random(seed), effectiveAssumptions, prepared), params, checkpoint,
         )
         state.phaseTimer = timing
+        state.inspectionWork = checkpoint
+        state.repairWork = checkpoint?.repairWork
         state.compoundTally = compoundTally
         state.violationSoftCap = params.violationSoftCap
         state.weights.normalizeWeightsByClass = params.normalizeWeightsByClass
@@ -329,6 +331,12 @@ internal class LocalSearchEngine(
         if (state.invariants?.hasBooleanLiterals == true) {
             state.booleanRepairs = preparedValue(BooleanRepairClosure.preparation(state), params, checkpoint).closure
         }
+        if (state.booleanRepairs == null) {
+            state.inspectionWork = null
+            state.repairWork = null
+        }
+        timing?.inspectionVisits = checkpoint?.takeIf { state.booleanRepairs != null }?.let { { it.inspectionVisits } }
+        timing?.repairVisits = checkpoint?.takeIf { state.booleanRepairs != null }?.let { { it.repairVisits } }
         return state
     }
 
