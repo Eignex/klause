@@ -64,12 +64,14 @@ class RootProbePairsTest {
             val session = PropagationSession(Problem(4, 0, emptyArray(),
                 arrayOf(Clause(intArrayOf(1, 3, 4)), Clause(intArrayOf(1, 3, 5)))), nativeSat = native)
             session.pinBool(0, true)
-            val params = BacktrackParams(rootProbeBatch = 2, rootProbeWork = 0L)
+            val params = BacktrackParams(rootProbeBatch = 2, rootProbeWork = 1L)
             val budget = InprocessingBudget(session, params, null, InprocessingKind.Probe, 4096L, 4096L)
+            val start = session.work
+            assertTrue(budget.visit())
             val before = session.work
             var attempts = 0
 
-            val child = RootProbePairs().conflict(session, params, 0, budget, before) { attempts++ }
+            val child = RootProbePairs().conflict(session, params, 0, budget, start) { attempts++ }
 
             assertNull(child)
             assertEquals(0, attempts)
