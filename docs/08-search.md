@@ -275,13 +275,17 @@ subtraction, preserving small gains when the constant exceeds floating precision
 The `lp-default` and `lp-aggressive` optimization recipes enable the finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
-and branching must be enabled. The reduced-cost/fractionality scorer selects the
-variable; directional guidance only orders its two existing children.
+and branching must be enabled. The reduced-cost/fractionality scorer supplies its
+winning variable and runner-up. When recent history is available, reliable predicted
+gains compare only those two candidates; missing or tied predictions retain the
+original winner. Candidates outside that shortlist keep no selection priority.
+Shortlist tracking reserves its bounded scan work from the existing LP allowance
+before visiting candidates. It performs no numerical query.
 Two recent samples in each direction supply that variable's predicted child gains,
 using each direction's mean cost per unit of fractional movement. The balanced
-`min + max / 6` score admits finite positive predictions without comparing variables.
-Missing or unreliable history retains the existing order without querying the retained
-basis. History preparation and ordering share the existing LP allowance.
+`min + max / 6` score ranks finite positive predictions in the shortlist.
+Missing or unreliable history retains the existing variable and child order without
+querying the retained basis. History preparation and ordering share the existing LP allowance.
 
 The larger predicted objective increase is tried first, after value and incumbent
 guidance, only when both existing alternatives match the estimated Boolean or integer
@@ -289,7 +293,9 @@ floor/ceil partition. Guidance swaps those alternatives without adding, removing
 replacing a decision. Tied gains, insufficient allowance, pruned alternatives and changed partitions retain the existing
 heuristics. Preferences expire at the next node, point replacement or history reset.
 History and basis side consumption, changed order and unavailable advice are recorded
-separately. Accepted row-extension compatibility checks have their own outcome.
+separately. Variable proposal preparation is separate from actual selection, with
+changed and agreed baseline choices counted at selection. Accepted row-extension
+compatibility checks have their own outcome.
 The readiness check and all analysis spend the existing LP work allowance. Ancestor
 observations use a bounded depth-indexed buffer. Initial buffer preparation and visited
 slot ranges are funded before allocation or clearing, including across scope resets.

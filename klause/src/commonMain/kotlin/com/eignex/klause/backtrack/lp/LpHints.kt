@@ -225,6 +225,44 @@ internal class LpHints(
         }
     }
 
+    fun prepareVariableComparison(variables: Int): Boolean {
+        if (!collect || !directionalGains || !freshRecord || !boundRecorded ||
+            !history.mayHaveScores || variables !in 1..8192
+        ) return false
+        charge(3L * variables + 4L)
+        observe("VARIABLE_COMPARISON")
+        return true
+    }
+
+    fun compareVariables(
+        first: VarRef?,
+        firstDomain: IntDomain?,
+        second: VarRef?,
+        secondDomain: IntDomain?,
+    ): VarRef? {
+        first ?: return null
+        val firstScore = directionalScore(first, firstDomain)
+        val secondScore = second?.let { directionalScore(it, secondDomain) } ?: Double.NaN
+        val proposal = when {
+            secondScore > 1e-9 && !(firstScore >= secondScore) -> second
+            firstScore > 1e-9 -> first
+            else -> null
+        }
+        if (proposal != null) {
+            charge(1L)
+            observe("VARIABLE_ESTIMATED")
+        }
+        return proposal
+    }
+
+    fun applyVariableChoice(proposal: VarRef?, baseline: VarRef?): VarRef? {
+        proposal ?: return baseline
+        charge(2L)
+        observe("VARIABLE_CONSUMED")
+        observe(if (proposal == baseline) "VARIABLE_BASELINE_AGREED" else "VARIABLE_BASELINE_CHANGED")
+        return proposal
+    }
+
     fun directionalScore(variable: VarRef, domain: IntDomain? = null): Double =
         directionalPrediction(variable, value(variable, domain))?.score ?: Double.NaN
 
