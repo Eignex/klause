@@ -8,6 +8,7 @@ import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -42,7 +43,7 @@ internal object RewriteStructureProfile {
         val required = setOf("suite", "problem", "sha256", "presolve")
         require(options.keys.containsAll(required) &&
             (options.keys - required - setOf("orders", "source64", "sourceGzip64", "seed",
-                "timeoutMillis", "presolveMillis", "presolveWork", "impactLimit")).isEmpty())
+                "timeoutMillis", "presolveMillis", "presolveWork", "impactLimit", "definitionGraph")).isEmpty())
         val seed = options["seed"]?.toLong() ?: 3L
         val timeoutMillis = (options["timeoutMillis"]?.toLong() ?: 30000L).also { require(it in 100..30000) }
         val presolveMillis = (options["presolveMillis"]?.toLong() ?: timeoutMillis)
@@ -50,6 +51,7 @@ internal object RewriteStructureProfile {
         val presolveWork = (options["presolveWork"]?.toLong() ?: 5_000_000L)
             .also { require(it in 1..1_000_000_000L) }
         val impactLimit = (options["impactLimit"]?.toInt() ?: 65536).also { require(it in 0..65536) }
+        val captureDefinitions = options["definitionGraph"]?.toBooleanStrict() ?: false
         val arms = options["orders"]?.split(',')?.map { name ->
             val order = AffinePivotOrder.valueOf(name.uppercase())
             Triple(order.name.lowercase(), false, order)
@@ -133,6 +135,9 @@ internal object RewriteStructureProfile {
                 if (node.outIsBool) booleanDepth[node.out] = depth else integerDepth[node.out] = depth
                 maxDepth = maxOf(maxDepth, depth)
             }
+            if (captureDefinitions) {
+                writeDefinitionGraph(out.resolve("definitions-$label.json"), network, diagnosticStop)
+            }
             val report = buildJsonObject {
                 put("sourceSha256", options.getValue("sha256"))
                 put("revision", Reports.readGitSha())
@@ -157,6 +162,7 @@ internal object RewriteStructureProfile {
                 put("maintainedElementDefinitions", elementDefinitions)
                 put("maintainedInputEdges", inputEdges)
                 put("maintainedMaxDepth", maxDepth)
+                put("definitionGraphCaptured", captureDefinitions)
                 put("functionalObjectiveAvailable", hints?.let { get(it, "Objective") } != null)
                 for (table in listOf(false, true)) {
                     val relaxation = MpsLpAdmission.rootRelaxation(prepared.problem, prepared.objective,
@@ -185,6 +191,43 @@ internal object RewriteStructureProfile {
             println(report)
             check(!diagnosticStop())
         }
+    }
+
+    private fun writeDefinitionGraph(file: File, network: InvariantNetwork?, stop: Cancellation) {
+        val size = network?.size ?: 0
+        require(size <= 4096)
+        stop.charge(1L + size)
+        check(!stop())
+        var edges = 0L
+        val nodes = buildJsonArray {
+            if (network != null) for (index in 0 until size) {
+                val node = network.node(index)
+                val integers = node.intInputs
+                val booleans = node.boolInputs
+                val kind = node.javaClass.name.also { require(it.length <= 256) }
+                edges += integers.size.toLong() + booleans.size
+                require(edges <= 65536)
+                stop.charge(6L + integers.size + booleans.size)
+                check(!stop())
+                add(buildJsonObject {
+                    put("wrapperType", kind)
+                    put("output", node.out)
+                    put("booleanOutput", node.outIsBool)
+                    put("integerInputs", JsonArray(integers.map { JsonPrimitive(it) }))
+                    put("booleanInputs", JsonArray(booleans.map { JsonPrimitive(it) }))
+                })
+            }
+        }
+        check(!stop())
+        file.writeText(buildJsonObject {
+            put("schemaVersion", 1)
+            put("complete", true)
+            put("networkPresent", network != null)
+            put("inputEdges", edges)
+            put("nodes", nodes)
+            put("scope", "Constructed hint wrapper types, node order and coordinate read sets; " +
+                "expression payloads, evaluations and worker-state identity are not captured")
+        }.toString())
     }
 
     private fun writeModel(file: File, problem: Problem, objective: LinearObjective?, stop: Cancellation) {
