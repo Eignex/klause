@@ -125,7 +125,8 @@ Eligible retained LP root coordinates can pass directly to the ordinary finite
 traversal as value preferences. Its existing backtracking completes the assignment,
 and complete source checks retain publication authority. This transfer carries no
 LP point, bound or proof authority into a leaf. Before its first incumbent, a retained
-integer guide can keep decisions within one declared factor component at a time.
+integer guide can keep decisions within one declared factor component of the
+undetermined columns at a time.
 The same frame stack handles conflicts and retraction; all source constraints stay
 active and every component still belongs to complete source checking.
 

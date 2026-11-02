@@ -306,7 +306,7 @@ coordinates. LP branching opt-outs, LP tree mode and workers with no decision
 allowance retain the primal completion path. The handoff keeps the same storage,
 work, guide identity and root-state guards as a completed rounding attempt.
 Before its first incumbent, an integer-only traversal can visit declared factor
-components contiguously while using these coordinates. Preparation admits at least
+components of its undetermined columns contiguously while using these coordinates. Preparation admits at least
 two coupled components, charges its graph work to the remaining LP allowance and
 keeps primitive membership arrays inside the same guide storage cap. Prior paid LP
 work also reduces the graph's remaining preparation ceiling. Membership

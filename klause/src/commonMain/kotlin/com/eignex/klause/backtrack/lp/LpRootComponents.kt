@@ -24,7 +24,7 @@ internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellatio
         if (work > 0L) {
             val meter = LpProjectionMeter(work, bytes, cancellation)
             try {
-                val prepared = rootComponentOrder(problem, meter)
+                val prepared = rootComponentOrder(problem, meter, session)
                 if (rootPrimalTargets === targets && !cancellation()) {
                     targets.components = prepared
                     outcome = if (prepared == null) "CONNECTED_DECLINED" else "RETAINED"
@@ -53,22 +53,26 @@ internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellatio
 internal fun rootComponentPreparationBytes(variables: Int): Long =
     512L + (6L * variables + 2L) * Int.SIZE_BYTES
 
-internal fun rootComponentOrder(problem: Problem, meter: LpProjectionMeter): RootComponentOrder? {
+internal fun rootComponentOrder(
+    problem: Problem,
+    meter: LpProjectionMeter,
+    session: PropagationSession? = null,
+): RootComponentOrder? {
     val n = problem.numIntVars
+    if (session != null && session.problem !== problem) return null
     if (problem.numBoolVars != 0 || problem.numRealVars != 0 || n < 4 || n == Int.MAX_VALUE) return null
     meter.reserve(8L * n + 2L, rootComponentPreparationBytes(n), matrix = false)
     val components = IntDisjointSet(n)
     for (factor in problem.factors) {
         val variables = factor.intVars
-        meter.reserve(4L * variables.size + 1L, 0L, matrix = true)
-        if (variables.isEmpty()) continue
-        val first = variables[0]
-        if (first !in 0 until n) return null
+        meter.reserve(8L * variables.size + 1L, 0L, matrix = true)
+        var first = -1
         for (index in variables.indices) {
             if (index % 256 == 0) meter.poll()
             val variable = variables[index]
             if (variable !in 0 until n) return null
-            components.union(first, variable)
+            if (session != null && !session.needsIntDecision(variable)) continue
+            if (first < 0) first = variable else components.union(first, variable)
         }
     }
     val byRoot = IntArray(n) { -1 }
