@@ -18,9 +18,19 @@ internal class XorPropagator(
     private val negativeParity = literals.count { !Lit.isPositive(it) } and 1
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
+        val unassigned = state.refPayload[factorId] as? UnassignedPair
         state.refPayload[factorId] = null
         state.finiteWork.begin()
         state.finiteWork.checkNow()
+        if (unassigned != null) {
+            state.checkFiniteWork()
+            val firstFree = state.boolValues[unassigned.first] == null
+            state.checkFiniteWork()
+            if (firstFree && state.boolValues[unassigned.second] == null) {
+                state.refPayload[factorId] = unassigned
+                return true
+            }
+        }
         var pinnedParity = negativeParity
         var effective = -1
         for (variable in boolVars) {
@@ -28,7 +38,11 @@ internal class XorPropagator(
             if (parityByVar?.coeffOf(variable) == 0) continue
             val value = state.boolValues[variable]
             if (value == null) {
-                if (effective >= 0) return true
+                if (effective >= 0) {
+                    state.checkFiniteWork()
+                    state.refPayload[factorId] = UnassignedPair(effective, variable)
+                    return true
+                }
                 effective = variable
             } else if (value) pinnedParity = pinnedParity xor 1
         }
@@ -47,6 +61,8 @@ internal class XorPropagator(
     override fun interrupted(state: PropagationState, factorId: Int) {
         state.refPayload[factorId] = null
     }
+
+    private class UnassignedPair(val first: Int, val second: Int)
 
     private fun parityAntecedents(state: PropagationState, excludeVar: Int): IntArray? {
         var size = 0

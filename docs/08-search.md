@@ -437,7 +437,11 @@ XOR propagation scans distinct coordinates with their occurrence parity and reta
 the constant contributed by negative literals. Scans and premise construction poll
 the containing finite token and charge visits. Interrupted local scratch is
 discarded before a pin can use it. Completed conflict premises belong to the
-propagation state, so shared projections retain no mutable failure context.
+propagation state, so shared projections retain no mutable failure context. Each
+state can retain an immutable pair of unassigned odd-coefficient coordinates. A
+wake checks their current values before scanning the row: two unassigned terms
+preclude a deduction. The pair can survive retraction because every reuse checks
+both current assignments.
 
 Cumulative propagation polls the same token during task, edge-window and start-bound
 scans. Its window scratch belongs to one fire, so interruption discards that scratch

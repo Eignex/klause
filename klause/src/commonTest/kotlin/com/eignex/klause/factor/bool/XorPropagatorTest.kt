@@ -8,7 +8,9 @@ import com.eignex.klause.propagation.FinitePropagationInterrupted
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.undoTo
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
@@ -80,25 +82,27 @@ class XorPropagatorTest {
 
     @Test
     fun `interrupted parity reasons should withhold their pin and retry`() {
-        val literals = IntArray(3) { Lit.make(it, true) }
-        val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(Xor(literals, 1)))
-        val state = PropagationState(problem, Assumptions.None)
-        assertNull(state.runToFixpoint(allFactors = true))
-        assertTrue(state.pinBool(0, false))
-        assertTrue(state.pinBool(1, false))
-        val propagator = XorPropagator(intArrayOf(0, 1, 2), intArrayOf(), literals, 1)
-        var polls = 0
-        state.finiteWork.cancellation = object : Cancellation {
-            override fun isCancelled(): Boolean = ++polls >= 5
-            override fun workMeter(): WorkMeter = WorkMeter { }
+        for (stopAfter in 1..12) {
+            val literals = IntArray(3) { Lit.make(it, true) }
+            val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(Xor(literals, 1)))
+            val state = PropagationState(problem, Assumptions.None)
+            assertNull(state.runToFixpoint(allFactors = true))
+            assertTrue(state.pinBool(0, false))
+            assertTrue(state.pinBool(1, false))
+            val propagator = XorPropagator(intArrayOf(0, 1, 2), intArrayOf(), literals, 1)
+            var polls = 0
+            state.finiteWork.cancellation = object : Cancellation {
+                override fun isCancelled(): Boolean = ++polls >= stopAfter
+                override fun workMeter(): WorkMeter = WorkMeter { }
+            }
+
+            assertFailsWith<FinitePropagationInterrupted> { propagator.propagate(state, 0) }
+
+            assertNull(state.boolValues[2])
+            state.finiteWork.cancellation = Cancellation.Never
+            assertTrue(propagator.propagate(state, 0))
+            assertEquals(true, state.boolValues[2])
         }
-
-        assertFailsWith<FinitePropagationInterrupted> { propagator.propagate(state, 0) }
-
-        assertNull(state.boolValues[2])
-        state.finiteWork.cancellation = Cancellation.Never
-        assertTrue(propagator.propagate(state, 0))
-        assertEquals(true, state.boolValues[2])
     }
 
     @Test
@@ -119,5 +123,76 @@ class XorPropagatorTest {
 
         assertContentEquals(literals, propagator.conflictReason(first, 0))
         assertNull(propagator.conflictReason(second, 0))
+    }
+
+    @Test
+    fun `unchanged unassigned parity terms should keep repeated wakes within bounded work`() {
+        val literals = IntArray(64) { Lit.make(it, true) }
+        val problem = Problem(64, 0, emptyArray(), arrayOf<Factor>(Xor(literals, 1)))
+        val state = PropagationState(problem, Assumptions.None)
+        assertNull(state.runToFixpoint(allFactors = true))
+        for (column in 0..60) assertTrue(state.pinBool(column, false))
+        val propagator = XorPropagator(IntArray(64) { it }, intArrayOf(), literals, 1)
+        assertTrue(propagator.propagate(state, 0))
+        val before = state.work
+
+        repeat(8) { assertTrue(propagator.propagate(state, 0)) }
+
+        assertTrue(state.work - before <= 24L)
+        for (column in 61..63) assertNull(state.boolValues[column])
+    }
+
+    @Test
+    fun `restored parity terms should be reconsidered before a sibling deduction`() {
+        val literals = IntArray(4) { Lit.make(it, true) }
+        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(Xor(literals, 1)))
+        val state = PropagationState(problem, Assumptions.None)
+        assertNull(state.runToFixpoint(allFactors = true))
+        state.undoLogging = true
+        val root = state.mark()
+        val propagator = XorPropagator(intArrayOf(0, 1, 2, 3), intArrayOf(), literals, 1)
+        assertTrue(state.pinBool(0, false))
+        assertTrue(state.pinBool(1, false))
+        assertTrue(propagator.propagate(state, 0))
+        state.undoTo(root)
+        assertTrue(state.pinBool(2, false))
+        assertTrue(state.pinBool(3, false))
+        assertTrue(propagator.propagate(state, 0))
+        assertTrue(state.pinBool(0, true))
+
+        assertTrue(propagator.propagate(state, 0))
+
+        assertEquals(false, state.boolValues[1])
+    }
+
+    @Test
+    fun `cancelled parity terms should not suppress a remaining unit deduction`() {
+        val literals = intArrayOf(0, 0, 2, 4, 6)
+        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(Xor(literals, 1)))
+        val session = PropagationSession(problem)
+        assertIs<PropagationResult.Implied>(session.seed(Assumptions.None))
+        assertIs<PropagationResult.Implied>(session.pinBool(1, false))
+
+        assertIs<PropagationResult.Implied>(session.pinBool(2, false))
+
+        assertEquals(true, session.boolValue(3))
+        assertNull(session.boolValue(0))
+    }
+
+    @Test
+    fun `cached unassigned parity terms should still observe cancellation`() {
+        val literals = IntArray(3) { Lit.make(it, true) }
+        val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(Xor(literals, 1)))
+        val state = PropagationState(problem, Assumptions.None)
+        assertNull(state.runToFixpoint(allFactors = true))
+        val propagator = XorPropagator(intArrayOf(0, 1, 2), intArrayOf(), literals, 1)
+        state.finiteWork.cancellation = Cancellation { true }
+
+        assertFailsWith<FinitePropagationInterrupted> { propagator.propagate(state, 0) }
+
+        assertNull(propagator.conflictReason(state, 0))
+        for (column in 0..2) assertNull(state.boolValues[column])
+        state.finiteWork.cancellation = Cancellation.Never
+        assertTrue(propagator.propagate(state, 0))
     }
 }
