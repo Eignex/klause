@@ -501,6 +501,11 @@ allocation, capped at 16,384 work and 256 KiB, leaving capacity for continuous-r
 aggregation. Its scans, scalar normalization, failed attempts, proof references and
 retained rows debit the same containing generation and source funding. A shared
 immutable-generation index supplies stated integer endpoints to both recipe kinds.
+It reuses the funded premise snapshot and retains endpoints only for coordinates
+requested by completed aggregates. A fully funded scan records both present and
+missing sides; interrupted scans publish no partial cache. Singleton coefficient
+inspection reads an immutable pair without copying a coefficient map. Scanning,
+lookup storage and cache extension debit the requesting recipe's allowance.
 Input truncation or a stopped slice withholds complete eligibility coverage.
 A pure-integer nonterminal point enters this discovery under the aggregate policy.
 When both source endpoints are stated, aggregate rounding selects the endpoint

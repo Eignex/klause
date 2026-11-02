@@ -487,6 +487,114 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `integer endpoint lookup should ignore unrelated bounds within the production allowance`() {
+        val premises = linkedMapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(3)), BigFraction.ofLong(3))),
+            "lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        )
+        val coordinates = mutableSetOf(x, y)
+        repeat(700) { index ->
+            val id = SourceCoordinate(SourceCoordinate.Kind.Integer, index + 2)
+            coordinates += id
+            premises["unrelated $index"] = SourcePremise(SourceInequality(
+                mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        }
+        val source = SourceProofContext(scope, coordinates, premises)
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            limits = limits, point = mapOf(x to 0.75, y to 0.5)).single()
+
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
+            cut.inequality)
+        assertEquals(setOf(0, 1), cut.owners)
+        assertEquals(1L, observations["AggregateIntegerRowNormalized"])
+        assertEquals(1L, observations["AggregateIntegerBoundScanComplete"])
+        assertEquals(2L, observations["AggregateIntegerBoundCoordinates"])
+        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `integer endpoint lookup should reuse checked coordinates across row recipes`() {
+        val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+            "first" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(3)), BigFraction.ofLong(3))),
+            "second" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                y to BigFraction.ofLong(2)), BigFraction.ofLong(3))),
+            "lower x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "lower y" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val observations = mutableMapOf<String, Long>()
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.6, y to 0.6))
+
+        assertEquals(2L, observations["AggregateIntegerRowEligible"])
+        assertEquals(1L, observations["AggregateIntegerBoundScanComplete"])
+        assertEquals(2L, observations["AggregateIntegerBoundCoordinates"])
+        assertTrue(cuts.all { cut -> SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)) ==
+                SourceEvidenceCheck.Checked })
+    }
+
+    @Test
+    fun `integer endpoint lookup should extend checked coordinates without changing source owners`() {
+        val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val source = SourceProofContext(scope, setOf(x, y, a, b), linkedMapOf(
+            "first" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(3)), BigFraction.ofLong(3))),
+            "lower y" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "second" to SourcePremise(SourceInequality(mapOf(a to BigFraction.ofLong(2),
+                b to BigFraction.ofLong(3)), BigFraction.ofLong(3))),
+            "lower b" to SourcePremise(SourceInequality(mapOf(b to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val observations = mutableMapOf<String, Long>()
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            point = mapOf(x to 0.75, y to 0.5, a to 0.75, b to 0.5))
+
+        assertEquals(setOf(0, 1), cuts.first().owners)
+        assertEquals(setOf(2, 3), cuts[1].owners)
+        assertEquals(2L, observations["AggregateIntegerBoundScanComplete"])
+        assertEquals(4L, observations["AggregateIntegerBoundCoordinates"])
+        assertTrue(cuts.all { cut -> SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)) ==
+                SourceEvidenceCheck.Checked })
+    }
+
+    @Test
+    fun `interrupting an integer endpoint scan should withhold its partially retained bounds`() {
+        val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(3)), BigFraction.ofLong(3))),
+            "lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        var stopped = false
+        val observations = mutableMapOf<String, Long>()
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, count ->
+                observations[name] = (observations[name] ?: 0L) + count
+                if (name == "AggregateIntegerBoundRetained") stopped = true
+            }, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.75, y to 0.5))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+        assertNull(observations["AggregateIntegerBoundScanComplete"])
+        assertNull(observations["AggregateIntegerBoundCoordinates"])
+    }
+
+    @Test
     fun `integer pair recipes should combine pure rows without endpoint premises`() {
         val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
             "first" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),

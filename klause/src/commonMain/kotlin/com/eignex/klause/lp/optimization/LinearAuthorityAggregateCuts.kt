@@ -7,6 +7,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceInequality
+import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRoundingLimit
 import com.eignex.klause.solver.evidence.mixedIntegerRounding
@@ -67,7 +68,8 @@ internal object LinearAuthorityAggregateCuts {
         val candidates = ArrayList<LinearAuthorityCut>()
         var eligibilityKnown = true
         try {
-            meter.reserve(source.premises.size.toLong(), source.premises.size * 128L)
+            meter.reserve(source.premiseCount.toLong(), source.premiseCount * 128L)
+            val premises = source.premises
             val rows = ArrayList<ProbeRow>()
             val integerRows = if (point == null) null else {
                 meter.reserve(1L, 128L)
@@ -75,7 +77,7 @@ internal object LinearAuthorityAggregateCuts {
             }
             val bounds = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
             val incidence = HashMap<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>()
-            for ((owner, entry) in source.premises.entries.withIndex()) {
+            for ((owner, entry) in premises.entries.withIndex()) {
                 meter.reserve(1L, 128L + entry.key.length * 2L)
                 val term = LinearAuthorityAggregateTerm(owner, entry.key, entry.value.inequality)
                 if (term.inequality.supportSize > limits.support) {
@@ -130,7 +132,7 @@ internal object LinearAuthorityAggregateCuts {
             val selectedBounds = if (point == null) bounds else pointBounds(bounds, point, meter, observe)
             val integerBounds = if (point == null) null else {
                 meter.reserve(1L, 64L)
-                IntegerBoundIndex(source)
+                IntegerBoundIndex(premises)
             }
             val extension = if (point == null) null else {
                 meter.reserve(1L, 320L)
@@ -383,24 +385,42 @@ internal object LinearAuthorityAggregateCuts {
         }
     }
 
-    private class IntegerBoundIndex(private val source: SourceProofContext) {
-        private var cached: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>? = null
+    private class IntegerBoundIndex(private val premises: Map<String, SourcePremise>) {
+        private var checked: Set<SourceCoordinate> = emptySet()
+        private var cached: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm> = emptyMap()
 
-        fun get(meter: AggregateMeter): Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm> {
-            cached?.let { return it }
-            meter.reserve(source.premises.size.toLong(), 128L)
-            val bounds = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
-            for ((owner, entry) in source.premises.entries.withIndex()) {
+        fun get(
+            coefficients: Map<SourceCoordinate, BigFraction>, meter: AggregateMeter,
+            observe: (String, Long) -> Unit,
+        ): Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm> {
+            meter.reserve(coefficients.size.toLong(), 128L + coefficients.size * 64L)
+            val missing = coefficients.keys.filterTo(HashSet()) { it !in checked }
+            if (missing.isEmpty()) return cached
+            observe("AggregateIntegerBoundScanAttempts", 1L)
+            meter.reserve(1L, 128L)
+            val pending = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
+            for ((owner, entry) in premises.entries.withIndex()) {
                 meter.reserve(1L)
-                if (entry.value.inequality.supportSize != 1) continue
+                val inequality = entry.value.inequality
+                if (inequality.supportSize != 1) continue
+                meter.reserve(1L, 64L)
+                val (id, coefficient) = checkNotNull(inequality.singleCoefficient())
+                if (id.kind != SourceCoordinate.Kind.Integer || id !in missing) continue
+                meter.reserve(1L, 64L)
+                val side = id to (coefficient > BigFraction.ZERO)
+                if (side in pending) continue
                 meter.reserve(1L, 256L + entry.key.length * 2L)
-                val (id, coefficient) = entry.value.inequality.coefficients.entries.single()
-                if (id.kind != SourceCoordinate.Kind.Integer) continue
-                bounds.getOrPut(id to (coefficient > BigFraction.ZERO)) {
-                    LinearAuthorityAggregateTerm(owner, entry.key, entry.value.inequality)
-                }
+                pending[side] = LinearAuthorityAggregateTerm(owner, entry.key, inequality)
+                observe("AggregateIntegerBoundRetained", 1L)
             }
+            meter.reserve(checked.size + missing.size + cached.size + pending.size.toLong(),
+                256L + (checked.size + missing.size) * 64L + (cached.size + pending.size) * 96L)
+            val completed = checked + missing
+            val bounds = cached + pending
+            checked = completed
             cached = bounds
+            observe("AggregateIntegerBoundCoordinates", missing.size.toLong())
+            observe("AggregateIntegerBoundScanComplete", 1L)
             return bounds
         }
     }
@@ -498,6 +518,7 @@ internal object LinearAuthorityAggregateCuts {
                     SourceDerivation.Combination.Term(scale, SourceDerivation.Premise(term.premise))))
                 capture.integer = IntegerAggregate(normalized, rhs, term.inequality.strict,
                     combination, listOf(term), proofBytes)
+                observe("AggregateIntegerRowNormalized", 1L)
                 halfInteger()
             } catch (stop: AggregateStop) {
                 observe("AggregateIntegerRow" + stop.reason, 1L)
@@ -508,7 +529,7 @@ internal object LinearAuthorityAggregateCuts {
         private fun halfInteger(): LinearAuthorityCut? {
             val aggregate = capture.integer ?: return null
             attempted = true
-            val bounds = integerBounds.get(meter)
+            val bounds = integerBounds.get(aggregate.coefficients, meter, observe)
             val initial = halfIntegerCut(aggregate, bounds, cancellation, charge, limits) ?: return null
             when (separates(initial.cut, point, meter, observe)) {
                 true -> {
