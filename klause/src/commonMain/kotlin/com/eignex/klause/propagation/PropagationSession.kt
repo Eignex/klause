@@ -1299,19 +1299,35 @@ class PropagationSession private constructor(
     ): LearnedReclamation {
         require(softLimitBytes >= 0L && maxWork >= 0L && maxScratchBytes >= 0L)
         val start = work
+        var cleanupProgress = false
+        if (!fixpointCancelled && !inprocessingRootPending && !publicationPending &&
+            learnedClauseCount > activeLearnedClauseCount
+        ) {
+            val cleanup = ReclamationPreparation(maxWork, maxScratchBytes, { cancelRequested }) { state.work += it }
+            try {
+                state.sweepRetiredLearnedMemory(cleanup)
+            } catch (_: ReclamationPreparation.Deferred) {
+                return LearnedReclamation(
+                    if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED,
+                    work = work - start, continuationPending = cleanup.progressed && !cancelRequested)
+            }
+            cleanupProgress = cleanup.progressed
+        }
         val scratchEntries = minOf(maxScratchBytes / 64L, Int.MAX_VALUE.toLong()).toInt()
         fun sample() = sharingMemory((maxWork - (work - start)).coerceAtLeast(0L), scratchEntries)
         fun bytes(values: Map<String, Long>) = values.getValue("ownedPrimitiveBytes") +
             values.getValue("ownedReferenceSlots") * Long.SIZE_BYTES
         val before = sample().completeValues ?: return LearnedReclamation(
-            if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED, work = work - start)
+            if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED, work = work - start,
+            continuationPending = cleanupProgress && !cancelRequested)
         val beforeBytes = bytes(before)
+        val reportedBefore = beforeBytes.takeUnless { cleanupProgress }
         val floor = before.getValue("protectedPrimitiveBytes") +
             before.getValue("protectedReferenceSlots") * Long.SIZE_BYTES
         if (beforeBytes <= softLimitBytes) return LearnedReclamation(ReclamationStatus.WITHIN_LIMIT,
-            beforeBytes, beforeBytes, floor, work - start)
+            reportedBefore, beforeBytes, floor, work - start)
         if (fixpointCancelled || inprocessingRootPending || publicationPending) return LearnedReclamation(
-            ReclamationStatus.DEFERRED, beforeBytes, beforeBytes, floor, work - start,
+            ReclamationStatus.DEFERRED, reportedBefore, beforeBytes, floor, work - start,
             protectedLimitExceeded = floor > softLimitBytes)
         releaseBuffers()
         val count = learnedClauseCount
@@ -1320,7 +1336,7 @@ class PropagationSession private constructor(
         if (learnedClauseCount != count) learnedClauseRevision++
         if (!published) return LearnedReclamation(
             if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED,
-            beforeBytes, protectedBytes = floor, work = work - start)
+            reportedBefore, protectedBytes = floor, work = work - start)
         val after = sample().completeValues
         val afterBytes = after?.let(::bytes)
         val afterFloor = after?.let {
@@ -1332,7 +1348,7 @@ class PropagationSession private constructor(
                     ReclamationStatus.RECLAIMED
                 afterFloor != null && afterFloor > softLimitBytes -> ReclamationStatus.PROTECTED_FLOOR
                 else -> ReclamationStatus.DEFERRED
-            }, beforeBytes, afterBytes, afterFloor ?: floor, work - start,
+            }, reportedBefore, afterBytes, afterFloor ?: floor, work - start,
             protectedLimitExceeded = (afterFloor ?: floor) > softLimitBytes)
     }
 

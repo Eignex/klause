@@ -159,6 +159,7 @@ internal class NativeSatState(private val state: PropagationState) {
             budget.visit(12L, 16L)
             budget.visit(0L)
             metadata.releaseEmptyReservation()
+            budget.advanced()
         }
         if (retiredCount == 0) return
         if (metadataSweepingRetirements < 0) {
@@ -175,6 +176,7 @@ internal class NativeSatState(private val state: PropagationState) {
                 metadata.release(metadataCleanupIndex)
             } else budget.visit(0L)
             metadataCleanupIndex++
+            budget.advanced()
         }
         budget.visit(4L)
         budget.visit(0L)
@@ -223,6 +225,7 @@ internal class NativeSatState(private val state: PropagationState) {
                 budget.visit(0L)
                 removeWatchAt(watchCleanupLiteral, watchCleanupIndex)
             } else watchCleanupIndex++
+            budget.advanced()
         }
         budget.visit(4L)
         budget.visit(0L)

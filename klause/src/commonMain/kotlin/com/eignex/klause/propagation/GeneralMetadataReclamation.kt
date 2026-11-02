@@ -7,6 +7,7 @@ internal fun PropagationState.sweepRetiredGeneralMetadata(budget: ReclamationPre
         budget.visit(12L, 16L)
         budget.visit(0L)
         rows.releaseEmptyReservation()
+        budget.advanced()
     }
     while (learned.retiredMetadataHead >= 0) {
         budget.visit(32L, 16L)
@@ -16,5 +17,6 @@ internal fun PropagationState.sweepRetiredGeneralMetadata(budget: ReclamationPre
         learned.releaseRetiredMetadata(index)
         learned.retiredMetadataHead = next
         if (next < 0) learned.retiredMetadataTail = -1
+        budget.advanced()
     }
 }

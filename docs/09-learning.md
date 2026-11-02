@@ -259,8 +259,11 @@ Reclamation runs at safe propagation/branch boundaries independently of restarts
 Unchanged ownership reuses its maintenance result across short resumed slices; store,
 trail, atom, pass and scope changes invalidate that decision rather than spending a
 whole slice repeatedly before search advances.
-An interrupted optional scan waits for ownership change before retrying; direct
-reclamation attempts remain retryable.
+An interrupted optional observation waits for ownership change before retrying; direct
+reclamation attempts remain retryable. Retired storage cleanup precedes observation
+and resumes while its funded cursor advances, even when ownership sampling is partial.
+An incomplete sample supplies no byte-limit or protected-floor total. Cancellation
+withholds further maintenance until ownership changes.
 `learned-memory-work` and `learned-memory-scratch-bytes` bound preparation and scratch.
 General watch cleanup resumes across bounded maintenance slices without renumbering
 learned handles. Retired Boolean and bound-atom postings are removed independently;

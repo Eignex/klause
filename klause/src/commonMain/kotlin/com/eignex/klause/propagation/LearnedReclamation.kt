@@ -13,6 +13,7 @@ internal data class LearnedReclamation(
     val protectedBytes: Long? = null,
     val work: Long = 0L,
     val protectedLimitExceeded: Boolean = false,
+    val continuationPending: Boolean = false,
 )
 
 internal class ReclamationPreparation(
@@ -26,6 +27,10 @@ internal class ReclamationPreparation(
     var atomicUnits = 0L
         private set
     private var scratch = 0L
+    var progressed = false
+        private set
+
+    fun advanced() { progressed = true }
     val remainingWork: Long get() = maxWork - work
 
     fun supports(units: Long, scratchBytes: Long): Boolean = units <= maxWork && scratchBytes <= maxScratchBytes
@@ -52,6 +57,13 @@ internal class ReclamationPreparation(
     class Deferred : RuntimeException()
 
     private companion object { const val ATOMIC_PRICE = 32L }
+}
+
+internal fun PropagationState.sweepRetiredLearnedMemory(budget: ReclamationPreparation) {
+    nativeEngine?.sweepRetiredWatches(budget)
+    nativeEngine?.sweepRetiredMetadata(budget)
+    sweepRetiredGeneralMetadata(budget)
+    sweepRetiredGeneralWatches(budget)
 }
 
 internal fun PropagationState.prepareReclamation(

@@ -26,6 +26,7 @@ internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPrep
         budget.visit(0L)
         learned.watchCleanupLiteral = boolCount
         learned.watchCleanupIndex = 0
+        budget.advanced()
     }
     while (learned.watchCleanupLiteral < boolCount + atoms.watchersByLit.size) {
         budget.visit(4L)
@@ -41,6 +42,7 @@ internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPrep
         } else if (retiredLearnedFactor(posting[learned.watchCleanupIndex])) {
             if (!removeRetiredWatch(literal, posting, budget)) return
         } else learned.watchCleanupIndex++
+        budget.advanced()
     }
     trimEmptyWatchPositions(budget)
     budget.visit(4L)
@@ -100,6 +102,7 @@ private fun PropagationState.trimPostingArray(posting: IntArrayList, budget: Rec
     budget.visit(work, scratch)
     budget.visit(0L)
     posting.trim()
+    budget.advanced()
 }
 
 private fun PropagationState.trimEmptyWatchPositions(budget: ReclamationPreparation) {
@@ -108,4 +111,5 @@ private fun PropagationState.trimEmptyWatchPositions(budget: ReclamationPreparat
     budget.visit(64L, 192L)
     budget.visit(0L)
     index.pos = MutableLongIntMap()
+    budget.advanced()
 }
