@@ -1,0 +1,89 @@
+package com.eignex.klause.bench.profile
+
+import jdk.jfr.consumer.RecordedEvent
+import jdk.jfr.consumer.RecordingFile
+import kotlinx.serialization.json.*
+import java.nio.file.Files
+import java.nio.file.Path
+
+internal object HarnessRecording {
+    private val events = setOf(
+        "klause.BenchPreparation", "jdk.FileRead", "jdk.FileWrite", "jdk.GarbageCollection", "jdk.GCPhasePause",
+        "jdk.GCHeapSummary", "jdk.CPULoad", "jdk.ThreadCPULoad", "jdk.Compilation", "jdk.ExecutionSample",
+        "jdk.NativeMethodSample", "jdk.ThreadPark", "jdk.JavaMonitorEnter", "jdk.ThreadSleep",
+    )
+
+    fun extract(report: Path) {
+        val start = System.nanoTime()
+        var extractedEvents = 0L
+        val recording = report.resolve("harness.jfr")
+        val failure = runCatching {
+            check(Files.isRegularFile(recording)) { "Harness recording is unavailable" }
+            Files.newBufferedWriter(report.resolve("harness-events.jsonl")).use { output ->
+                output.appendLine(buildJsonObject {
+                    put("scope", "ordinary harness JVM; excludes child CLI JVM and outer adapter extraction")
+                    put("omissions", "profile thresholds, sampling and 128 MiB rolling recording limit apply")
+                    put("overlapPolicy", "nested phases and JVM events overlap; durations are not additive")
+                    put("failurePolicy", "aborted source-preparation may include cleanup before its phase closes")
+                    put("stackDepthLimit", 32)
+                    put("ioPolicy", "IO call duration includes scheduling and GC; it does not prove device wait")
+                }.toString())
+                RecordingFile(recording).use { input ->
+                    while (input.hasMoreEvents()) {
+                        val event = input.readEvent()
+                        if (event.eventType.name in events) {
+                            output.appendLine(describe(event).toString())
+                            extractedEvents++
+                        }
+                    }
+                }
+            }
+        }.exceptionOrNull()
+        if (failure != null) {
+            Files.writeString(report.resolve("harness-analysis-error.txt"),
+                "${failure.javaClass.name}: ${failure.message}\n")
+        }
+        Files.writeString(report.resolve("harness-analysis.json"), buildJsonObject {
+            put("scope", "outer adapter extraction after harness exit; inside case/job ceiling")
+            put("elapsedNanos", System.nanoTime() - start)
+            put("complete", failure == null)
+            put("extractedEvents", extractedEvents)
+        }.toString())
+    }
+
+    private fun describe(event: RecordedEvent): JsonObject = buildJsonObject {
+        put("event", event.eventType.name)
+        put("start", event.startTime.toString())
+        put("durationNanos", event.duration.toNanos())
+        put("thread", event.thread?.javaName)
+        put("stackTruncated", event.stackTrace?.isTruncated)
+        put("stackDepthLimited", (event.stackTrace?.frames?.size ?: 0) > 32)
+        putJsonArray("stack") {
+            event.stackTrace?.frames.orEmpty().take(32).forEach {
+                add("${it.method.type.name}.${it.method.name}")
+            }
+        }
+        putJsonObject("fields") {
+            for (field in event.fields) {
+                if (field.name in setOf("startTime", "duration", "eventThread", "stackTrace")) continue
+                when (field.contentType) {
+                    "jdk.jfr.Timespan" -> put(field.name, event.getDuration(field.name).toNanos())
+                    "jdk.jfr.Timestamp" -> put(field.name, event.getInstant(field.name).toString())
+                    else -> when (val value = event.getValue<Any?>(field.name)) {
+                        null -> put(field.name, JsonNull)
+                        is String -> put(field.name, value)
+                        is Boolean -> put(field.name, value)
+                        is Number -> put(field.name, value)
+                    }
+                }
+            }
+        }
+        putJsonObject("fieldUnits") {
+            for (field in event.fields) {
+                field.contentType?.let {
+                    put(field.name, if (it == "jdk.jfr.Timespan") "nanoseconds" else it)
+                }
+            }
+        }
+    }
+}

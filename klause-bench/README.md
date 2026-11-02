@@ -469,6 +469,25 @@ uses 64 KiB reads. Both read the full plain source before the invocation timer, 
 they do not have identical IO call sizes.
 Native CLI and public-library adapters require cache staging.
 
+`harness-jfr=true` records the ordinary JVM CLI adapter's separate 512 MiB harness
+JVM into `report/harness.jfr`; the default is false. CLI `measurement` remains a
+separate control. The retained harness command and comparison controls identify
+the choice. Phase events cover input verification, preflight, model resolution,
+objective loading, source hashing, build provenance, source preparation, the CLI
+callback and cleanup. Pre-invocation phases stay outside the source allowance and
+inside the case/job ceilings. Recording work inside an invocation spends its
+unchanged allowance. An aborted preparation phase can include cleanup; nested
+phases and JVM events overlap and must not be added as disjoint costs.
+After harness exit, the outer adapter extracts selected phase, IO, GC, CPU,
+compilation, contention and sampled-stack events into `harness-events.jsonl` on
+the lab worker. Raw capture survives extraction failure with an error artifact.
+Profile thresholds, sampling, 32-frame extracts and the 128 MiB rolling recording
+limit can omit observations. IO call durations include scheduling and GC and do
+not identify device wait. Extraction and recording startup/dump costs remain in
+the containing case/job cost. Pair with `harness-jfr=false` at the same source,
+resource and allowance controls; an instrumented timing does not qualify a speedup.
+Native and public-library adapters reject this capture option.
+
 The planner accepts `selections`, a JSON-encoded list of independent selector maps,
 merged without duplicate catalog identities. Paired experiments use lab `configs`,
 `grid` and `repeats`: `ref` selects a revision and `param.<key>` overrides an adapter
