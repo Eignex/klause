@@ -1329,7 +1329,7 @@ internal class ResumableMinimize(
         }
 
         override fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> =
-            lpHints?.orderAlternatives(variable, alternatives, allowBasis = rootBasisGuidance)
+            lpHints?.orderAlternatives(variable, alternatives, allowBasis = false)
                 ?: alternatives
     }
 
