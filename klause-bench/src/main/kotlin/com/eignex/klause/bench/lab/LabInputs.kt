@@ -174,12 +174,13 @@ internal object LabInputs {
                     Files.isRegularFile(file) && hash(file) == it,
                 ) { "Input checksum mismatch: ${input.path}" }
             }
-            case.attributes["inputTree.$index"]?.let {
-                val cache = System.getenv("LAB_WORKSPACE_CACHE")?.let { Path.of(it, "compiler-inputs") }
-                val matches = Files.isDirectory(file) && if (cache != null && input.root == BenchInputRoot.SOURCE && input.role == "compiler") {
-                    CompilerInputReceipts(cache).matches(file, it)
+            case.attributes["inputTree.$index"]?.let { expected ->
+                val cache = System.getenv("LAB_WORKSPACE_CACHE")?.let { storage -> Path.of(storage, "compiler-inputs") }
+                val compiler = cache != null && input.root == BenchInputRoot.SOURCE && input.role == "compiler"
+                val matches = Files.isDirectory(file) && if (compiler) {
+                    CompilerInputReceipts(requireNotNull(cache)).matches(file, expected)
                 } else {
-                    treeHash(file) == it
+                    treeHash(file) == expected
                 }
                 require(matches) { "Input tree changed: ${input.path}" }
             }

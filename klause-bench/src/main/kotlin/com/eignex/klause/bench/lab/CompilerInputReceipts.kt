@@ -70,11 +70,16 @@ internal class CompilerInputReceipts(
         return try {
             val paths = Files.walk(root).use { it.sorted().limit(MAX_FILES + 1L).toList() }
             if (paths.size > MAX_FILES) null else paths.map { path ->
-                val attrs = Files.readAttributes(path, "unix:size,lastModifiedTime,ctime,fileKey,isRegularFile,isDirectory", NOFOLLOW_LINKS)
+                val attrs = Files.readAttributes(
+                    path, "unix:size,lastModifiedTime,ctime,fileKey,isRegularFile,isDirectory", NOFOLLOW_LINKS,
+                )
                 if (attrs["isRegularFile"] != true && attrs["isDirectory"] != true) return null
                 val changed = attrs["ctime"]?.toString() ?: return null
                 val key = attrs["fileKey"]?.toString() ?: return null
-                Stamp(root.relativize(path).toString(), attrs["size"] as Long, attrs["lastModifiedTime"].toString(), changed, key)
+                Stamp(
+                    root.relativize(path).toString(), attrs["size"] as Long,
+                    attrs["lastModifiedTime"].toString(), changed, key,
+                )
             }
         } catch (_: UnsupportedOperationException) {
             null
@@ -82,7 +87,13 @@ internal class CompilerInputReceipts(
     }
 
     @Serializable
-    private data class Stamp(val path: String, val bytes: Long, val modified: String, val changed: String, val key: String)
+    private data class Stamp(
+        val path: String,
+        val bytes: Long,
+        val modified: String,
+        val changed: String,
+        val key: String,
+    )
 
     @Serializable
     private data class Receipt(val root: String, val digest: String, val files: List<Stamp>, val version: Int = 1)
