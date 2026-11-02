@@ -9,7 +9,7 @@ import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.util.Cancellation
 import kotlin.time.TimeSource
 
-// The fresh canonical root is fixed within one uninterrupted strategy call; pinning uses other sessions.
+// The completed model is immutable; the handoff confines its use to one root-primal call.
 internal class LpPrimalHandoff private constructor(
     private var owner: LpEngine?,
     private var setupWork: Long,
@@ -40,8 +40,8 @@ internal class LpPrimalHandoff private constructor(
         if (owner === engine) continuation = source
     }
 
-    fun capture(engine: LpEngine, root: LpRelaxation, cancellation: Cancellation) {
-        if (owner !== engine || captureAttempted) return
+    fun capture(engine: LpEngine, root: LpRelaxation, cancellation: Cancellation): LpRelaxation? {
+        if (owner !== engine || captureAttempted) return null
         engine.requireOpen()
         captureAttempted = true
         val accounting = LpPrimalAssembly(engine, cancellation)
@@ -53,12 +53,13 @@ internal class LpPrimalHandoff private constructor(
             token.checkLpAssembly()
             if (!LpPumpPreparation.hasAffordableShape(engine, root, setupWork + accounting.work + 1L)) {
                 outcome = "DECLINED"
-                return
+                return null
             }
             val detached = root.withModel(root.model, sources = null, primalDefinition = root.primalDefinition)
             token.checkLpAssembly()
             definition = detached
             outcome = "CAPTURED"
+            return detached
         } catch (cancelled: LpAssemblyCancelled) {
             definition = null
             outcome = "CANCELLED"

@@ -90,6 +90,8 @@ class LpPrimalHeuristicsTest {
                     if (reuse) {
                         val saved = assertNotNull(engine.rootRoundingWarmStart)
                         assertNotNull(saved.continuation)
+                        assertNull(saved.relaxation.sourceMap)
+                        assertNull(saved.relaxation.preparationTemplates)
                         if (noIterate) {
                             assertNull(saved.basis)
                             assertNull(saved.primal)

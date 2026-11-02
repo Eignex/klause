@@ -7,11 +7,15 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.engine.Csc
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.buildPrimalSource
+import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
@@ -223,6 +227,49 @@ class LpPrimalContinuationTest {
 
                 assertEquals(1L, charged)
                 assertEquals(0L, guard.paidWorkFor(engine))
+            }
+        }
+    }
+
+    @Test
+    fun `oversized completed buffers should withhold continued provenance before copying domains`() {
+        for (largeMatrix in listOf(false, true)) {
+            val original = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
+                .build(domains)
+            val base = original.model
+            val rows = if (largeMatrix) 16_384 else base.m
+            val model = LpModel(
+                n = base.n,
+                m = rows,
+                csc = if (largeMatrix) Csc(
+                    IntArray(base.n + 1) { it * rows },
+                    IntArray(base.n * rows) { it % rows },
+                    LongArray(base.n * rows) { -1L },
+                ) else base.csc,
+                rhs = LongArray(rows) { -6L },
+                cost = base.cost.copyOf(base.n + rows),
+                upper = base.upper.copyOf(base.n + rows),
+                hasUpper = base.hasUpper.copyOf(base.n + rows),
+                loShift = base.loShift,
+                objConstant = base.objConstant,
+                sense = base.sense,
+                tag = base.tag,
+                rowPremises = Array(rows) {
+                    if (!largeMatrix && it == 0) {
+                        LpRowPremises(IntArray(65_536), BooleanArray(65_536), LongArray(65_536))
+                    } else null
+                },
+            )
+            val root = original.withModel(model, sources = null)
+            var charged = 0L
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
+                SolveStatsSink("large-buffer-source"), projections = selected,
+                reusePumpPreparation = true, containingWork = { charged += it }).use { engine ->
+
+                val guard = LpPrimalContinuation.capture(engine, root, domains, Cancellation.Never, 4L) {}
+
+                assertNull(guard)
+                assertTrue(charged <= 2L)
             }
         }
     }

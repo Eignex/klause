@@ -61,7 +61,7 @@ internal fun LpEngine.lpRoundingProbe(
             outcome = "CANCELLED"
             return null
         }
-        val relaxation = retained?.relaxation ?: buildPrimalRelaxation(objective, session, cancellation) ?: run {
+        var relaxation = retained?.relaxation ?: buildPrimalRelaxation(objective, session, cancellation) ?: run {
             rootRoundingInterrupted = true
             outcome = "CANCELLED"
             return null
@@ -82,7 +82,7 @@ internal fun LpEngine.lpRoundingProbe(
                 } else continuation != null
                 if (currentSource) {
                     handoff.attachContinuation(this, continuation)
-                    handoff.capture(this, relaxation, cancellation)
+                    relaxation = handoff.capture(this, relaxation, cancellation) ?: relaxation
                 }
                 if (retained == null && continuation != null) {
                     val accounting = LpPrimalAssembly(this, cancellation)

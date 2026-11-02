@@ -9,6 +9,7 @@ import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpEmissionScope
 import com.eignex.klause.lp.relaxation.LpEmissionTemplates
+import com.eignex.klause.lp.relaxation.LpPrimalTemplates
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.lp.relaxation.checkLpAssembly
@@ -162,13 +163,17 @@ internal class LpPrimalContinuation private constructor(
             token.checkLpAssembly()
             val problem = engine.problem
             val selection = engine.projections ?: return null
-            val captureWork = 2L + problem.numFactors + problem.numIntVars * 5L + problem.numBoolVars
+            val captureWork = 2L + problem.numFactors + problem.numIntVars * 5L + problem.numBoolVars +
+                root.model.n + root.model.m + root.circuitArcs.size
             var validationWork = 1L + problem.numFactors + problem.numIntVars * 2L + problem.numBoolVars
-            var units = 64L + problem.numFactors + problem.numIntVars * 3L + problem.numBoolVars +
+            var units = 64L + LpPrimalTemplates.minimumUnits(problem, root) +
+                problem.numIntVars * 3L + problem.numBoolVars + root.hullFactorIds.size +
+                root.gatedRows.size * 3L + root.realUpperRows.size * 32L +
                 (root.primalDefinition?.storageUnits ?: 0L)
             if (units > LpEmissionTemplates.MAX_UNITS ||
                 !LpPumpPreparation.hasAffordableShape(engine, root, setupWork + captureWork + validationWork)
             ) return null
+            units = retainedUnits(root, units, token) ?: return null
             // Reserve arrays, their reads, and constant retirement before retaining source values.
             token.charge(1L + problem.numFactors + problem.numIntVars * 5L + problem.numBoolVars)
             token.checkLpAssembly()
@@ -195,6 +200,31 @@ internal class LpPrimalContinuation private constructor(
             return LpPrimalContinuation(engine, root.model, factors, roots, live, sides, booleans,
                 domains.honorsOpenSides, LpEmissionScope(selection.lpEmissionNamespace, problem),
                 accounting.work, validationWork)
+        }
+
+        private fun retainedUnits(root: LpRelaxation, initial: Long, token: Cancellation): Long? {
+            var units = initial
+            for (row in root.model.rowPremises) {
+                token.charge(1L)
+                token.checkLpAssembly()
+                if (row != null) units += 8L + row.vars.size * 4L + row.boolLits.size * 2L
+                if (units > LpEmissionTemplates.MAX_UNITS) return null
+            }
+            for (column in 0 until root.model.n) {
+                token.charge(1L)
+                token.checkLpAssembly()
+                units += 8L + (root.colReq[column]?.size ?: 0) +
+                    (root.colPresence[column]?.storageUnits ?: 0L) * 32L
+                if (units > LpEmissionTemplates.MAX_UNITS) return null
+            }
+            for (arcs in root.circuitArcs) {
+                token.charge(1L)
+                token.checkLpAssembly()
+                units += 8L + arcs.tails.size + arcs.heads.size + arcs.cols.size
+                if (units > LpEmissionTemplates.MAX_UNITS) return null
+            }
+            token.checkLpAssembly()
+            return units
         }
 
         private fun sameDomain(expected: IntDomain, current: IntDomain, token: Cancellation): Boolean {
