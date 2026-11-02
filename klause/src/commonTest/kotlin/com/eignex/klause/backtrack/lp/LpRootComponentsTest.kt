@@ -11,10 +11,13 @@ import com.eignex.klause.lp.bounding.SPARSE_LP_MAX_PREPARATION_WORK
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.engine.LpProjectionMeter
 import com.eignex.klause.lp.engine.LpProjectionStop
+import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,6 +27,43 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpRootComponentsTest {
+    @Test
+    fun `a fresh slice can fund preparation after an unstarted component attempt`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
+        for (boundary in listOf("work", "clock", "initial-poll")) {
+            var offered = 1_000_000L
+            val factory = RecordingLpEngineFactory()
+            LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                    rootCutHarvest = false)), SolveStatsSink("pending-component-preparation"),
+                LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
+                assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+                engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+                assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+                val session = PropagationSession(problem)
+                val queries = factory.floatAllowances.size
+                var polls = 0
+                val token = when (boundary) {
+                    "work" -> Cancellation.Never
+                    "clock" -> Cancellation { true }
+                    else -> Cancellation { ++polls >= 2 }
+                }
+                if (boundary == "work") offered = 0L
+                assertNull(engine.pickRootComponent(session, token), boundary)
+                offered = 1_000_000L
+
+                val chosen = engine.pickRootComponent(session, Cancellation.Never)
+
+                assertEquals(VarRef.IntVar(0), chosen, boundary)
+                assertEquals(queries, factory.floatAllowances.size, boundary)
+            }
+        }
+    }
+
     @Test
     fun `fixed endpoints do not join otherwise independent live components`() {
         val problem = Problem(0, 5, Array(5) { IntDomain(0, if (it == 4) 0 else 1) }, listOf(

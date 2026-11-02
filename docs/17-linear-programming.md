@@ -312,7 +312,8 @@ keeps primitive membership arrays inside the same guide storage cap. Prior paid 
 work also reduces the graph's remaining preparation ceiling. Membership
 walks charge ordinary CP work and revisit retracted variables. Declined preparation
 keeps ordinary branching; guide replacement, restart, reseed and close discard the
-ordering. These choices supply no directional-history, bound or proof authority.
+ordering. An attempt stopped before spending work can retry in a fresh consultation;
+a paid decline retains its charge. These choices supply no directional-history, bound or proof authority.
 Continuation observations distinguish a pending interruption from a cancelled run,
 spent root or LP work, and a call without an eligible interruption. They record the
 existing decision without polling another token or changing its checks.
