@@ -592,6 +592,119 @@ class LpHintsTest {
     }
 
     @Test
+    fun `only comparable completed gains survive context changes`() {
+        val changes = listOf("cutoff" to true, "incumbent" to true, "external" to true,
+            "rows" to true, "finished rows" to true, "append" to false, "objective" to false,
+            "constant" to false, "layout" to false, "kind" to false, "reset" to false, "clear" to false)
+        for ((change, retained) in changes) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 10, cost = 1) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            assertTrue(trail.push())
+            assertTrue(trail.append(
+                LpScopedRow(1L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(8L),
+                    ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))), scoped = true,
+            ))
+            var swapped = false
+            var constant = 0L
+            fun relaxation() = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()),
+                if (swapped) intArrayOf(1, 0) else intArrayOf(0, 1), BooleanArray(2), constant,
+                if (swapped) intArrayOf(1, 0) else intArrayOf(0, 1), IntArray(0))
+            val hints = LpHints(2, 0, directionalGains = true)
+            val variable = VarRef.IntVar(0)
+            val domain = IntDomain(0, 10)
+            val first = BigFraction.ofLong((1L shl 60) + 32L)
+            val second = BigFraction.ofLong((1L shl 60) + 33L)
+            repeat(2) {
+                hints.beginNode(0, 100.0, 1L, first)
+                val parent = relaxation()
+                hints.record(parent, doubleArrayOf(2.25, 2.25), DoubleArray(parent.model.m))
+                hints.recordBound(parent, 10.0)
+                hints.branch(variable, domain)
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                    hints.beginNode(1, 100.0, 1L, first)
+                    val child = relaxation()
+                    hints.record(child, doubleArrayOf(if (up) 3.0 else 2.0, 2.25), DoubleArray(child.model.m))
+                    hints.recordBound(child, if (up) 13.0 else 11.0)
+                }
+            }
+            when (change) {
+                "rows", "finished rows" -> {
+                    assertTrue(trail.pop(0))
+                    if (change == "finished rows") hints.finishNode(trail.state)
+                }
+                "append" -> assertTrue(trail.append(
+                    LpScopedRow(2L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(9L),
+                        ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))), scoped = false,
+                ))
+                "objective" -> {
+                    val old = trail.state.model.objective
+                    assertTrue(trail.replaceObjective(ExactLpObjective(List(old.size) { old.cost(it) },
+                        scale = ExactLpNumber.of(2L))))
+                }
+                "constant" -> constant = 1L
+                "layout" -> swapped = true
+                "reset" -> hints.resetHistory()
+                "clear" -> hints.clear()
+            }
+            hints.beginNode(0, if (change == "cutoff") 99.0 else 100.0,
+                if (change == "incumbent") 2L else 1L, if (change == "external") second else first)
+            val current = relaxation()
+            hints.record(current, doubleArrayOf(2.25, 2.25), DoubleArray(current.model.m))
+            if (change == "kind") hints.recordObjective(current, 10.0) else hints.recordBound(current, 10.0)
+            hints.prepareSide(variable, domain, allowBasis = false) { _, _ -> null }
+            hints.branch(variable, domain)
+            val existing = listOf(SearchDecision.IntAtMost(0, 2), SearchDecision.IntAtLeast(0, 3))
+
+            val ordered = hints.orderAlternatives(variable, existing, allowBasis = false)
+
+            assertEquals(if (retained) existing.reversed() else existing, ordered, change)
+        }
+    }
+
+    @Test
+    fun `current row changes discard prepared side preferences`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertTrue(trail.push())
+        assertTrue(trail.append(
+            LpScopedRow(1L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(8L),
+                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))), scoped = true,
+        ))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+        val hints = LpHints(1, 0, directionalGains = true)
+        val variable = VarRef.IntVar(0)
+        val domain = IntDomain(0, 10)
+        repeat(2) {
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
+            hints.recordBound(relaxation, 10.0)
+            hints.branch(variable, domain)
+            for (up in listOf(false, true)) {
+                hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(relaxation.model.m))
+                hints.recordBound(relaxation, if (up) 13.0 else 11.0)
+            }
+        }
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
+        hints.recordBound(relaxation, 10.0)
+        assertTrue(hints.prepareSide(variable, domain, allowBasis = false) { _, _ -> null })
+        val existing = listOf(SearchDecision.IntAtMost(0, 2), SearchDecision.IntAtLeast(0, 3))
+
+        assertTrue(trail.pop(0))
+        hints.finishNode(trail.state)
+        hints.branch(variable, domain)
+        val ordered = hints.orderAlternatives(variable, existing, allowBasis = false)
+
+        assertEquals(existing, ordered)
+    }
+
+    @Test
     fun `stable objective constants preserve small directional gains`() {
         for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
             val builder = LpBuilder()

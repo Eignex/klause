@@ -92,21 +92,24 @@ internal class LpHints(
             return
         }
         charge(2L * relaxation.colVarId.size + 3L + cutoffComparisonWork())
-        if (scopeModel !== state.baseModel || scopeRows !== state.rows ||
+        val incompatibleModel = scopeModel !== state.baseModel ||
             !scopeVariables.contentEquals(relaxation.colVarId) || !scopeBooleans.contentEquals(relaxation.colIsBool) ||
-            scopeConstant != relaxation.objectiveConstant || scopeCutoff != cutoff || scopeChecked != checked ||
+            scopeConstant != relaxation.objectiveConstant || scopeChecked != checked
+        val changedContext = scopeRows !== state.rows || scopeCutoff != cutoff ||
             scopeIncumbentVersion != incumbentVersion || scopeExternalExact != externalExact
-        ) {
+        if (incompatibleModel || changedContext) {
             if (scopeModel != null) observe("INCOMPATIBLE")
-            charge(2L * relaxation.colVarId.size)
-            history.clear(report = scopeModel != null)
-            scopeModel = state.baseModel
+            charge(if (incompatibleModel) 2L * relaxation.colVarId.size + 9L else 4L)
+            if (incompatibleModel) {
+                history.clear(report = scopeModel != null)
+                scopeModel = state.baseModel
+                scopeVariables = relaxation.colVarId.copyOf()
+                scopeBooleans = relaxation.colIsBool.copyOf()
+                scopeConstant = relaxation.objectiveConstant
+                scopeChecked = checked
+            } else history.clearComparisons()
             scopeRows = state.rows
-            scopeVariables = relaxation.colVarId.copyOf()
-            scopeBooleans = relaxation.colIsBool.copyOf()
-            scopeConstant = relaxation.objectiveConstant
             scopeCutoff = cutoff
-            scopeChecked = checked
             scopeIncumbentVersion = incumbentVersion
             scopeExternalExact = externalExact
         }
@@ -132,11 +135,22 @@ internal class LpHints(
 
     fun finishNode(state: LpExactState? = null) {
         history.finishNode(unavailable.name)
-        if (scopeModel != null && state != null &&
-            (scopeModel !== state.baseModel || scopeRows !== state.rows)
-        ) {
-            observe("INCOMPATIBLE")
-            resetHistory()
+        if (scopeModel != null && state != null) {
+            if (scopeModel !== state.baseModel) {
+                observe("INCOMPATIBLE")
+                resetHistory()
+            } else if (scopeRows !== state.rows) {
+                observe("INCOMPATIBLE")
+                charge(7L)
+                history.clearComparisons()
+                scopeRows = state.rows
+                freshRecord = false
+                pointRelaxation = null
+                pointPrimal = null
+                pendingSide = null
+                activeSide = null
+                boundRecorded = false
+            }
         }
     }
 

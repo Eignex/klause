@@ -293,12 +293,20 @@ unavailable bounds. Scope changes, depth changes and replaced alternatives repor
 attempts separately. These observations spend the existing allowance and do not
 request another solve or supply a gain sample.
 
-Samples share one retained exact base model, active-row identity, objective mapping
-and incumbent cutoff. The cutoff context includes the local incumbent publication
-version and exact external bound, so changes hidden by floating precision invalidate
-history. Exact comparison work spends the existing allowance. Changed rows or cuts,
-layout or objective rescaling invalidate history and pending comparisons. Restart and
-assumption reseeding clear history.
+Each numeric gain compares an immediate parent and child with the same retained exact
+base model, active-row identity, objective mapping, estimate kind and incumbent cutoff.
+The cutoff context includes the local incumbent publication version and exact external
+bound. Changes hidden by floating precision still discard unmatched comparisons, and
+exact comparison work spends the existing allowance.
+
+Completed per-variable averages are advisory priors within the same base model,
+variable layout, objective mapping and estimate kind. Changing the cutoff context or
+which existing rows are active discards pending comparisons and ancestor splits while
+retaining those completed averages. Fresh current-point and partition checks are still
+required before an average can order a child. A row change after the last recorded
+point invalidates that point and its preferences. New matrix rows change the base model
+and clear the averages, as do layout or objective changes, switching between checked
+bounds and floating optima, restart and assumption reseeding.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable

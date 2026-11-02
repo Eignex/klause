@@ -49,11 +49,22 @@ internal class LpDirectionalHistory(
         charge(gains.size.toLong() + parentLimit + 1L)
         gains.clear()
         reliableStamp = -1L
+        discardComparisons()
+        if (report) observe("RESET")
+    }
+
+    fun clearComparisons() {
+        pending?.let { observeDirection("LOST_SCOPE", it) }
+        charge(parentLimit.toLong() + 1L)
+        discardComparisons()
+        observe("CONTEXT_RESET")
+    }
+
+    private fun discardComparisons() {
         parents?.fill(null, 0, parentLimit)
         parentLimit = 0
         pending = null
         objective = Double.NaN
-        if (report) observe("RESET")
     }
 
     fun record(value: Double) {

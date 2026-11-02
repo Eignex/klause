@@ -111,25 +111,55 @@ class LpDirectionalHistoryTest {
 
     @Test
     fun `aged directional observations lose reliability`() {
-        val observations = ArrayList<String>()
-        val history = LpDirectionalHistory(observations::add, maxAge = 2L)
+        for (resetContext in listOf(false, true)) {
+            val observations = ArrayList<String>()
+            val history = LpDirectionalHistory(observations::add, maxAge = 2L)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.Bool(0), 0.5)
+            repeat(2) {
+                history.commit(SearchDecision.Bool(1), 1)
+                history.beginNode(1)
+                history.record(11.0)
+                history.commit(SearchDecision.Bool(0), 1)
+                history.beginNode(1)
+                history.record(12.0)
+            }
+            assertTrue(history.score(VarRef.Bool(0), 0.5).isFinite())
+            if (resetContext) history.clearComparisons()
+            repeat(3) { history.beginNode(0) }
+
+            assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+            assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
+            assertEquals(2, observations.count { it == "EXPIRED" })
+        }
+    }
+
+    @Test
+    fun `context changes discard pending gains while retaining completed scores`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.IntVar(0)
         history.beginNode(0)
         history.record(10.0)
-        history.branch(VarRef.Bool(0), 0.5)
+        history.branch(variable, 2.25)
         repeat(2) {
-            history.commit(SearchDecision.Bool(1), 1)
+            history.commit(SearchDecision.IntAtMost(0, 2), 1)
             history.beginNode(1)
             history.record(11.0)
-            history.commit(SearchDecision.Bool(0), 1)
+            history.commit(SearchDecision.IntAtLeast(0, 3), 1)
             history.beginNode(1)
-            history.record(12.0)
+            history.record(13.0)
         }
-        assertTrue(history.score(VarRef.Bool(0), 0.5).isFinite())
-        repeat(3) { history.beginNode(0) }
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(variable, 2.25)
+        history.commit(SearchDecision.IntAtMost(0, 2), 1)
 
-        assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
-        assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
-        assertEquals(2, observations.count { it == "EXPIRED" })
+        history.clearComparisons()
+        history.beginNode(1)
+        history.record(1000.0)
+
+        assertEquals(1.5, history.score(variable, 2.25), 1e-9)
     }
 
     @Test
