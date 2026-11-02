@@ -506,6 +506,10 @@ requested by completed aggregates. A fully funded scan records both present and
 missing sides; interrupted scans publish no partial cache. Singleton coefficient
 inspection reads an immutable pair without copying a coefficient map. Scanning,
 lookup storage and cache extension debit the requesting recipe's allowance.
+Completed batches retain their funded coordinate sets and endpoint maps without
+copying prior batches. Each lookup charges every batch probe, and batch publication
+reserves its object and list growth after the source scan completes. Failed scans
+or unfunded publication preserve only earlier complete batches.
 Unit-scale normalization reuses the private immutable coefficient snapshot. A funded
 coefficient scan recognizes a half recipe whose stated side choices round every
 coefficient to zero before allocating its proof and scalar accumulators. Other

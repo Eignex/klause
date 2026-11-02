@@ -713,6 +713,76 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `completed integer endpoint batches should preserve allowance for a cross batch row`() {
+        val groups = (0 until 2).map { group ->
+            (0 until 25).map { index -> SourceCoordinate(SourceCoordinate.Kind.Integer, group * 25 + index) }
+        }
+        val premises = linkedMapOf<String, SourcePremise>()
+        groups.forEachIndexed { group, ids ->
+            premises["row $group"] = SourcePremise(SourceInequality(ids.associateWith { BigFraction.ONE },
+                BigFraction.ofLong(25)))
+            ids.forEachIndexed { index, id ->
+                premises["l$group $index"] = SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO))
+                premises["u$group $index"] = SourcePremise(SourceInequality(mapOf(id to BigFraction.ONE),
+                    BigFraction.ONE))
+            }
+        }
+        val a = groups[0].first()
+        val b = groups[1].first()
+        premises["useful"] = SourcePremise(SourceInequality(mapOf(a to BigFraction.ofLong(2),
+            b to BigFraction.ofLong(3)), BigFraction.ofLong(3)))
+        val coordinates = groups.flatten().toMutableSet()
+        repeat(700) { index ->
+            val id = SourceCoordinate(SourceCoordinate.Kind.Integer, index + 50)
+            coordinates += id
+            premises["extra $index"] = SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE),
+                BigFraction.ZERO))
+        }
+        val source = SourceProofContext(scope, coordinates, premises)
+        val point = groups.flatten().associateWith { 0.0 } + mapOf(a to 0.75, b to 0.5)
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            limits = limits, point = point).single()
+
+        assertEquals(SourceInequality(mapOf(a to BigFraction.ONE, b to BigFraction.ONE), BigFraction.ONE),
+            cut.inequality)
+        assertEquals(setOf(102, 52), cut.owners)
+        assertEquals(2L, observations["AggregateIntegerBoundSourceScanComplete"])
+        assertEquals(2L, observations["AggregateIntegerBoundScanComplete"])
+        assertEquals(50L, observations["AggregateIntegerBoundCoordinates"])
+        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `stopping before integer endpoint batch publication should withhold its recipe`() {
+        val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(3)), BigFraction.ofLong(3))),
+            "lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val observations = mutableMapOf<String, Long>()
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, count ->
+                observations[name] = (observations[name] ?: 0L) + count
+                if (name == "AggregateIntegerBoundSourceScanComplete") stopped = true
+            }, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.75, y to 0.5))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+        assertEquals(1L, observations["AggregateIntegerBoundSourceScanComplete"])
+        assertNull(observations["AggregateIntegerBoundScanComplete"])
+    }
+
+    @Test
     fun `integer pair recipes should combine pure rows without endpoint premises`() {
         val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
             "first" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),

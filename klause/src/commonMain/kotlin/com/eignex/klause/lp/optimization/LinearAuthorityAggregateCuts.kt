@@ -308,7 +308,7 @@ internal object LinearAuthorityAggregateCuts {
 
     private fun halfHasNoIntegerActivity(
         aggregate: IntegerAggregate,
-        bounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
+        bounds: IntegerBoundIndex,
         meter: AggregateMeter, observe: (String, Long) -> Unit, upperChoice: SourceCoordinate?,
     ): Boolean {
         for ((id, value) in aggregate.coefficients) {
@@ -316,12 +316,10 @@ internal object LinearAuthorityAggregateCuts {
             observe("AggregateHalfPreviewCoordinates", 1L)
             if (id.kind != SourceCoordinate.Kind.Integer ||
                 (value != BigFraction.ONE && value != BigFraction.MINUS_ONE)) return false
-            meter.reserve(1L, 64L)
-            val lower = bounds[id to false]
+            val lower = bounds.lookup(id, false, meter)
             val upper = lower == null || id == upperChoice
             if (upper) {
-                meter.reserve(1L, 64L)
-                if (bounds[id to true] == null || value != BigFraction.MINUS_ONE) return false
+                if (bounds.lookup(id, true, meter) == null || value != BigFraction.MINUS_ONE) return false
             } else if (value != BigFraction.ONE) return false
         }
         return true
@@ -329,7 +327,7 @@ internal object LinearAuthorityAggregateCuts {
 
     private fun halfIntegerCut(
         aggregate: IntegerAggregate,
-        bounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
+        bounds: IntegerBoundIndex,
         cancellation: Cancellation, observe: (String, Long) -> Unit, limits: LinearAuthorityAggregateLimits,
         upperChoice: SourceCoordinate? = null,
     ): HalfIntegerCut? {
@@ -357,10 +355,9 @@ internal object LinearAuthorityAggregateCuts {
                 }
                 var value = meter.multiply(original, half)
                 if (value.den != BIG_ONE) {
-                    meter.reserve(1L, 64L)
-                    val lower = bounds[id to false]
+                    val lower = bounds.lookup(id, false, meter)
                     val upper = lower == null || id == upperChoice
-                    val bound = (if (upper) bounds[id to true] else lower)
+                    val bound = (if (upper) bounds.lookup(id, true, meter) else lower)
                         ?: stopAggregate("MissingIntegerBounds")
                     val bytes = 128L + bound.premise.length * 2L + (limits.scalarBits + 7L) / 4L
                     if (bytes > limits.proofBytes - proofBytes) stopAggregate("ProofLimit")
@@ -413,16 +410,29 @@ internal object LinearAuthorityAggregateCuts {
     }
 
     private class IntegerBoundIndex(private val premises: Map<String, SourcePremise>) {
-        private var checked: Set<SourceCoordinate> = emptySet()
-        private var cached: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm> = emptyMap()
+        private class CompletedBatch(
+            val coordinates: Set<SourceCoordinate>,
+            val bounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
+        )
+        private var completed: MutableList<CompletedBatch>? = null
 
-        fun get(
+        fun prepare(
             coefficients: Map<SourceCoordinate, BigFraction>, meter: AggregateMeter,
             observe: (String, Long) -> Unit,
-        ): Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm> {
+        ) {
             meter.reserve(coefficients.size.toLong(), 128L + coefficients.size * 64L)
-            val missing = coefficients.keys.filterTo(HashSet()) { it !in checked }
-            if (missing.isEmpty()) return cached
+            val missing = HashSet<SourceCoordinate>()
+            for (id in coefficients.keys) {
+                val batches = completed
+                var index = (batches?.size ?: 0) - 1
+                while (index >= 0) {
+                    meter.reserve(1L)
+                    if (id in checkNotNull(batches)[index].coordinates) break
+                    index--
+                }
+                if (index < 0) missing += id
+            }
+            if (missing.isEmpty()) return
             observe("AggregateIntegerBoundScanAttempts", 1L)
             meter.reserve(1L, 128L)
             val pending = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
@@ -440,15 +450,29 @@ internal object LinearAuthorityAggregateCuts {
                 pending[side] = LinearAuthorityAggregateTerm(owner, entry.key, inequality)
                 observe("AggregateIntegerBoundRetained", 1L)
             }
-            meter.reserve(checked.size + missing.size + cached.size + pending.size.toLong(),
-                256L + (checked.size + missing.size) * 64L + (cached.size + pending.size) * 96L)
-            val completed = checked + missing
-            val bounds = cached + pending
-            checked = completed
-            cached = bounds
+            observe("AggregateIntegerBoundSourceScanComplete", 1L)
+            val size = completed?.size ?: 0
+            meter.reserve(size + 1L, 256L + (size + 1L) * 32L)
+            val batches = completed ?: ArrayList<CompletedBatch>()
+            batches.add(CompletedBatch(missing, pending))
+            completed = batches
             observe("AggregateIntegerBoundCoordinates", missing.size.toLong())
             observe("AggregateIntegerBoundScanComplete", 1L)
-            return bounds
+        }
+
+        fun lookup(
+            id: SourceCoordinate, upper: Boolean, meter: AggregateMeter,
+        ): LinearAuthorityAggregateTerm? {
+            val batches = completed ?: return null
+            meter.reserve(1L, 64L)
+            val side = id to upper
+            var index = batches.lastIndex
+            while (index >= 0) {
+                meter.reserve(1L)
+                batches[index].bounds[side]?.let { return it }
+                index--
+            }
+            return null
         }
     }
 
@@ -562,7 +586,8 @@ internal object LinearAuthorityAggregateCuts {
         private fun halfInteger(): LinearAuthorityCut? {
             val aggregate = capture.integer ?: return null
             attempted = true
-            val bounds = integerBounds.get(aggregate.coefficients, meter, observe)
+            integerBounds.prepare(aggregate.coefficients, meter, observe)
+            val bounds = integerBounds
             val initial = halfIntegerCut(aggregate, bounds, cancellation, charge, limits) ?: return null
             when (separates(initial.cut, point, meter, observe)) {
                 true -> {
@@ -583,7 +608,7 @@ internal object LinearAuthorityAggregateCuts {
 
         private fun integerSide(
             aggregate: IntegerAggregate,
-            bounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>, initial: HalfIntegerCut,
+            bounds: IntegerBoundIndex, initial: HalfIntegerCut,
         ): SourceCoordinate? {
             meter.reserve(1L, 128L)
             var activity = 0.0
@@ -610,8 +635,8 @@ internal object LinearAuthorityAggregateCuts {
             for ((id, value) in aggregate.coefficients) {
                 meter.reserve(1L, 64L)
                 if (meter.multiply(value, half).den == BIG_ONE) continue
-                val lower = bounds[id to false] ?: continue
-                val upper = bounds[id to true] ?: continue
+                val lower = bounds.lookup(id, false, meter) ?: continue
+                val upper = bounds.lookup(id, true, meter) ?: continue
                 val coordinate = point[id]?.takeIf { it.isFinite() } ?: continue
                 observe("AggregateHalfSideScans", 1L)
                 val removed = contribution(lower, meter.number(half.negated()))
