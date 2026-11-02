@@ -131,7 +131,8 @@ class ArithmeticLearningTraceTest {
         assertEquals(1L, later["learningIntegerCensusPostUndoUsedRows"])
         assertTrue(later.getValue("learningIntegerCensusPostUndoBoundPinEvents") > 0)
         assertEquals(later.getValue("learningIntegerCensusUseEvents"),
-            later.getValue("learningIntegerCensusBoundPinEvents") + later.getValue("learningIntegerCensusSeedUseEvents"))
+            later.getValue("learningIntegerCensusBoundPinEvents") +
+                later.getValue("learningIntegerCensusSeedUseEvents"))
         assertEquals(2L, native.intDomain(0).max)
         native.releaseRetainedState()
         assertEquals(later, native.learnedLifecycle())
@@ -162,7 +163,8 @@ class ArithmeticLearningTraceTest {
         assertEquals(pins["learningIntegerCensusBoundPinEvents"], after["learningIntegerCensusBoundPinEvents"])
         assertTrue(after.getValue("learningIntegerCensusSeedUseEvents") > 0)
         assertEquals(after.getValue("learningIntegerCensusUseEvents"),
-            after.getValue("learningIntegerCensusBoundPinEvents") + after.getValue("learningIntegerCensusSeedUseEvents"))
+            after.getValue("learningIntegerCensusBoundPinEvents") +
+                after.getValue("learningIntegerCensusSeedUseEvents"))
         assertEquals(0L, after["learningIntegerCensusBoolPinEvents"])
         assertEquals(0L, after["learningIntegerCensusOtherPinEvents"])
     }
