@@ -32,6 +32,8 @@ which the state evaluates once per assignment change.
 repairs through the generic move sink before comparing their complete weighted
 deltas. Each sampled coordinate contributes at most one strict improvement over
 staying put. Small domains are enumerated; wider ones keep a sampled-target cap.
+Filtered compound offers retain their own surviving primitive list, so reuse of a
+proposer's buffer cannot change an admitted move.
 
 ### Linear repairs
 

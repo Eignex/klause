@@ -169,13 +169,23 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     private fun withoutRedundantParts(parts: List<Move>): List<Move> {
         val net = invariants
         if (net == null && ownerInt == null) return parts
-        return parts.filter { p ->
-            when (p) {
-                is Move.BoolFlip -> net?.isDefinedBool(p.varId) != true
-                is Move.IntSet -> net?.isDefinedInt(p.varId) != true && !ownedByOther(p.varId)
+        fun isRetained(part: Move): Boolean =
+            when (part) {
+                is Move.BoolFlip -> net?.isDefinedBool(part.varId) != true
+                is Move.IntSet -> net?.isDefinedInt(part.varId) != true && !ownedByOther(part.varId)
                 is Move.RealSet, is Move.Compound -> true
             }
+        if (parts !is RandomAccess) return parts.filter { isRetained(it) }
+        var first = 0
+        while (first < parts.size && !isRetained(parts[first])) first++
+        if (first == parts.size) return emptyList()
+        val kept = ArrayList<Move>(minOf(parts.size, INITIAL_COMPOUND_CAPACITY))
+        kept.add(parts[first])
+        for (index in first + 1 until parts.size) {
+            val part = parts[index]
+            if (isRetained(part)) kept.add(part)
         }
+        return kept
     }
 
     private fun addPrimitive(p: Move) {
@@ -310,6 +320,7 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
         const val NO_PROPOSER: Int = -1
 
         private const val INITIAL_CAPACITY: Int = 16
+        private const val INITIAL_COMPOUND_CAPACITY: Int = 10
         private const val MAX_ELEMENT_PRESERVING_PROBES: Int = 4
         private const val KIND_BIT: Long = 1L shl 63
         private const val REAL_BIT: Long = 1L shl 62

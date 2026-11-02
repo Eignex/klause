@@ -52,6 +52,18 @@ class MoveSinkTest {
     }
 
     @Test
+    fun `filtered compound offers should survive reuse of the proposer buffer`() {
+        val sink = MoveSink()
+        sink.setOwners(intArrayOf(-1, -1))
+        val parts = mutableListOf<Move>(Move.IntSet(0, 10), Move.IntSet(1, 20))
+
+        sink.addCompound(parts)
+        parts.clear()
+
+        assertEquals(listOf(Move.Compound(listOf(Move.IntSet(0, 10), Move.IntSet(1, 20)))), sink.list)
+    }
+
+    @Test
     fun `a compound tally should separate pinned rejections from collapsed trims and admissions`() {
         val tally = CompoundTally()
         val sink = MoveSink(Assumptions(ints = mapOf(3 to 5)))
