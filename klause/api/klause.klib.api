@@ -15988,9 +15988,12 @@ final class com.eignex.klause.solver.result/CoreGuidedStats { // com.eignex.klau
 
 final class com.eignex.klause.solver.result/HeuristicStartStats { // com.eignex.klause.solver.result/HeuristicStartStats|null[0]
     constructor <init>(kotlin/Long, kotlin.collections/Map<kotlin/String, kotlin/Long>, kotlin/Boolean) // com.eignex.klause.solver.result/HeuristicStartStats.<init>|<init>(kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Long>;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/Long, kotlin.collections/Map<kotlin/String, kotlin/Long>, kotlin/Boolean, kotlin/Long? = ...) // com.eignex.klause.solver.result/HeuristicStartStats.<init>|<init>(kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Long>;kotlin.Boolean;kotlin.Long?){}[0]
 
     final val completed // com.eignex.klause.solver.result/HeuristicStartStats.completed|{}completed[0]
         final fun <get-completed>(): kotlin/Boolean // com.eignex.klause.solver.result/HeuristicStartStats.completed.<get-completed>|<get-completed>(){}[0]
+    final val completionNanos // com.eignex.klause.solver.result/HeuristicStartStats.completionNanos|{}completionNanos[0]
+        final fun <get-completionNanos>(): kotlin/Long? // com.eignex.klause.solver.result/HeuristicStartStats.completionNanos.<get-completionNanos>|<get-completionNanos>(){}[0]
     final val requiredWork // com.eignex.klause.solver.result/HeuristicStartStats.requiredWork|{}requiredWork[0]
         final fun <get-requiredWork>(): kotlin/Long // com.eignex.klause.solver.result/HeuristicStartStats.requiredWork.<get-requiredWork>|<get-requiredWork>(){}[0]
     final val workByArm // com.eignex.klause.solver.result/HeuristicStartStats.workByArm|{}workByArm[0]
@@ -15999,7 +16002,9 @@ final class com.eignex.klause.solver.result/HeuristicStartStats { // com.eignex.
     final fun component1(): kotlin/Long // com.eignex.klause.solver.result/HeuristicStartStats.component1|component1(){}[0]
     final fun component2(): kotlin.collections/Map<kotlin/String, kotlin/Long> // com.eignex.klause.solver.result/HeuristicStartStats.component2|component2(){}[0]
     final fun component3(): kotlin/Boolean // com.eignex.klause.solver.result/HeuristicStartStats.component3|component3(){}[0]
+    final fun component4(): kotlin/Long? // com.eignex.klause.solver.result/HeuristicStartStats.component4|component4(){}[0]
     final fun copy(kotlin/Long = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ..., kotlin/Boolean = ...): com.eignex.klause.solver.result/HeuristicStartStats // com.eignex.klause.solver.result/HeuristicStartStats.copy|copy(kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Long>;kotlin.Boolean){}[0]
+    final fun copy(kotlin/Long = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ..., kotlin/Boolean = ..., kotlin/Long? = ...): com.eignex.klause.solver.result/HeuristicStartStats // com.eignex.klause.solver.result/HeuristicStartStats.copy|copy(kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Long>;kotlin.Boolean;kotlin.Long?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/HeuristicStartStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/HeuristicStartStats.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/HeuristicStartStats.toString|toString(){}[0]
