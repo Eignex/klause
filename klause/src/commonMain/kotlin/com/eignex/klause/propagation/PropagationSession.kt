@@ -1165,9 +1165,11 @@ class PropagationSession private constructor(
         if (decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot || inprocessingRootPending) {
             return LearnedRetirementResult(LearnedRetirementStatus.Deferred)
         }
-        return owner.selectedRetirements.capture(index, expectedGeneration,
-            selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled), maxRetainedBytes,
-            owner::validateSelectedLearnedRetirement, owner::learnedAdmissionKey)
+        val budget = selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled)
+        return owner.withLearnedOwnershipBudget(budget) {
+            owner.selectedRetirements.capture(index, expectedGeneration, budget, maxRetainedBytes,
+                owner::validateSelectedLearnedRetirement, owner::learnedAdmissionKey)
+        }
     }
 
     internal fun authorizeLearnedRetirement(
@@ -1308,12 +1310,12 @@ class PropagationSession private constructor(
         require(softLimitBytes >= 0L && maxWork >= 0L && maxScratchBytes >= 0L)
         val start = work
         var cleanupProgress = false
-        if (state.nativeEngine == null && !fixpointCancelled && !inprocessingRootPending && !publicationPending &&
+        if (!fixpointCancelled && !inprocessingRootPending && !publicationPending &&
             learnedClauseCount > activeLearnedClauseCount
         ) {
             val cleanup = ReclamationPreparation(maxWork, maxScratchBytes, { cancelRequested }) { state.work += it }
             try {
-                state.sweepRetiredGeneralWatchMemory(cleanup)
+                state.sweepRetiredLearnedMemory(cleanup)
             } catch (_: ReclamationPreparation.Deferred) {
                 return LearnedReclamation(
                     if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED,

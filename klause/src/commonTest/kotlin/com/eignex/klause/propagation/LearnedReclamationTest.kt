@@ -7,9 +7,11 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -278,4 +280,20 @@ class LearnedReclamationTest {
             assertEquals(1L, session.learnedLifecycle().getValue("learningClauseAdmitted"))
         }
     }
+
+    @Test
+    fun `candidate capacity should survive cancellation after funding and trim on retry`() {
+        val candidates = IntArrayList(64)
+        for (value in listOf(7, 2, 9)) candidates.add(value)
+        var work = 0L
+        val cancelled = ReclamationPreparation(11L, 12L, { work >= 11L }, { work += it })
+
+        assertFailsWith<ReclamationPreparation.Deferred> { trimLearnedCandidates(candidates, cancelled) }
+
+        assertEquals(64, candidates.backingData.size)
+        trimLearnedCandidates(candidates, ReclamationPreparation(11L, 12L, { false }, {}))
+        assertEquals(3, candidates.backingData.size)
+        assertEquals(listOf(7, 2, 9), candidates.toIntArray().toList())
+    }
+
 }
