@@ -232,6 +232,9 @@ installed-build identity and available witnesses. Inspect the JSON record even
 when the bench process exits successfully. Independent source validation runs in
 the lab; the bench records `validationPolicy=reported-result-v1`.
 
+DIMACS subprocess solves pass the source to the CLI without constructing a harness
+model. In-process consumers parse and lower that model on first access.
+
 Subprocess stderr is drained in fixed-size chunks. Records retain at most 16 Ki
 characters of normalized stderr, with `stderrComplete` true only for an untruncated
 stream that reached EOF without a forced kill or drain failure. Refusal and crash

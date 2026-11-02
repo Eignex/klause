@@ -60,7 +60,7 @@ internal interface ProblemFormat {
 internal object DimacsFormat : ProblemFormat {
     override val format = Format.DIMACS
     override val inProcess = true
-    override fun ingest(file: File) = Ingested(Dimacs.parse(CorpusFiles.readText(file)).toProblem())
+    override fun ingest(file: File) = Ingested(lazy { Dimacs.parse(CorpusFiles.readText(file)).toProblem() })
 }
 
 internal object WcnfFormat : ProblemFormat {
