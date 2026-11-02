@@ -55,8 +55,13 @@ import kotlin.test.assertTrue
 class LpEngineTest {
     @Test
     fun `a restored root refreshes expired preferences without another lp query`() {
-        val problem = boundedProblem().bake()
-        val objective = LinearObjective(intCoefficients = LongArray(3) { 2L })
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 5) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(6) { 2L })
         val factory = RecordingLpEngineFactory()
         LpEngine(problem, objective,
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
