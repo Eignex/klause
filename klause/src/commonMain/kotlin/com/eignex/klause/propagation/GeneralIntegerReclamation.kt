@@ -9,8 +9,8 @@ internal fun PropagationState.sweepRetiredGeneralIntegerRows(budget: Reclamation
         intEvents.overflow = null
         budget.advanced()
     }
-    val scratch = rows.size.toLong() * Long.SIZE_BYTES
-    if (rows.capacity > rows.size && budget.supports(rows.trimmingWork, scratch)) {
+    val scratch = rows.trimmingScratchBytes
+    if (rows.trimmingWork > 0L && budget.supports(rows.trimmingWork, scratch)) {
         budget.visit(rows.trimmingWork, scratch)
         budget.visit(0L)
         rows.trim()

@@ -353,7 +353,10 @@ Each owner visit is funded; an interrupted check retains the candidate.
 Eligible retired factors become inert
 stable-ID slots; propagation queues and active readers skip them. Integer rows own
 their position in a dense reference cache, allowing retirement to unlink a row
-without scanning other rows. Cache capacity and position fields remain part of
+without scanning other rows. The cache keeps its first 64 references together and
+uses bounded reference pages for its tail. Growth and trimming charge copied directory
+slots and the partial page; an empty tail releases its directory without copying
+retired references. Cache capacity, directory slots and position fields remain part of
 modeled ownership; removing the last row releases the cache backing array. Full
 compaction rebuilds cache positions and remaps integer-event subscriptions even
 when no integer rows remain. The candidate cursor survives admissions and is

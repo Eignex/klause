@@ -337,7 +337,7 @@ class SharingMemoryTest {
             val state = session.explanationState
             val rows = assertNotNull(state.learned.integerRows)
             val overflow = assertNotNull(state.intEvents.overflow)
-            var dependencies = overflow.primitiveCapacityBytes
+            var dependencies = overflow.primitiveCapacityBytes + rows.primitiveCapacityBytes
             overflow.forEach { _, posting ->
                 dependencies += posting.backingData.size.toLong() * Int.SIZE_BYTES
             }
@@ -345,7 +345,7 @@ class SharingMemoryTest {
             val before = assertNotNull(sample.snapshot { state.sharingMemory(sample) }.completeValues)
 
             val after = assertNotNull(sample.snapshot {
-                sample.ownedReferences(rows, rows.size.toLong(), true)
+                rows.sharingMemory(sample, true)
                 sample.owned(overflow, overflow.primitiveCapacityBytes, true)
                 sample.ownedReferences(overflow, overflow.referenceCapacity.toLong(), true)
                 overflow.forEach({ units -> repeat(units.toInt()) { sample.step() } }) { _, posting ->
@@ -358,7 +358,7 @@ class SharingMemoryTest {
             assertEquals(before.getValue("ownedReferenceSlots"), after.getValue("ownedReferenceSlots"))
             assertEquals(if (active) 0L else dependencies,
                 after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"))
-            assertEquals(if (active) 0L else rows.size.toLong() + overflow.referenceCapacity,
+            assertEquals(if (active) 0L else rows.referenceCapacity + overflow.referenceCapacity,
                 after.getValue("protectedReferenceSlots") - before.getValue("protectedReferenceSlots"))
         }
     }

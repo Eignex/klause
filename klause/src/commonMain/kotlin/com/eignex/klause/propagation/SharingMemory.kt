@@ -255,8 +255,10 @@ private fun PropagationState.learnedSharingMemory(
         "learnedPayloadBytes" to payload,
         "learnedMetadataCapacityBytes" to metadata,
         "learnedCapIndexStateBytes" to learned.capRanking.modeledBytes,
-        "learnedReferenceSlots" to learned.store.referenceCapacity + (learned.integerRows?.capacity ?: 0),
-        "learnedIntegerRowCacheCapacityBytes" to (learned.integerRows?.capacity?.toLong() ?: 0L) * Long.SIZE_BYTES,
+        "learnedReferenceSlots" to learned.store.referenceCapacity + (learned.integerRows?.referenceCapacity ?: 0L),
+        "learnedIntegerRowCacheCapacityBytes" to (learned.integerRows?.let {
+            it.primitiveCapacityBytes + it.referenceCapacity * Long.SIZE_BYTES
+        } ?: 0L),
         "learnedIntegerRowIndexBytes" to (learned.integerRows?.size?.toLong() ?: 0L) * Int.SIZE_BYTES,
         "sessionWatchCapacityBytes" to watchers,
         "sessionWatchIndexReferenceSlots" to watches.pos.referenceCapacity,
