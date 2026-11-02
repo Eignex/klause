@@ -446,7 +446,10 @@ After parent cancellation, a fresh read keeps only earlier returned children wit
 optimal, WORK or PIVOTS stops. Cancelled or failed child coordinates stay unknown.
 This supplies no additional bound, certificate or complete-point authority.
 A finished rounding attempt can transfer its private root coordinates and availability
-mask to ordinary finite-search value ordering. The retained root owner and objective
+mask to ordinary finite-search value ordering. Components with known finite targets precede
+components without targets; ties retain source order. Members retain fractional-first
+ordering within their component. Availability and boundary scans spend the existing
+preparation work allowance and reuse its admitted scratch storage. The retained root owner and objective
 must still match at transfer. No coordinate buffer is copied; the target header, protected column maps and
 all simultaneously live guidance buffers share the existing byte limit. Each lookup
 charges the ordinary cumulative LP work allowance. Fresh node hints take precedence;

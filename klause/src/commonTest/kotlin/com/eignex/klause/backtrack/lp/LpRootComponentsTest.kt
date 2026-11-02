@@ -29,6 +29,41 @@ import kotlin.test.assertTrue
 
 class LpRootComponentsTest {
     @Test
+    fun `known component targets precede unknown components`() {
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 2, 4, 5), LinearOp.LE, 4),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.LE, 2),
+        ))
+        val targets = RootPrimalTargets(IntArray(6) { it }, intArrayOf(),
+            doubleArrayOf(0.0, 0.9, 0.0, 0.25, 0.0, 0.0),
+            booleanArrayOf(false, true, false, true, false, false))
+
+        val order = assertNotNull(rootComponentOrder(problem, LpProjectionMeter(), targets = targets))
+
+        assertEquals(listOf(3, 1, 0, 2, 4, 5), order.members.toList())
+        assertEquals(listOf(0, 2, 6), order.offsets.toList())
+    }
+
+    @Test
+    fun `nonfinite and unavailable component targets preserve source ordering`() {
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 2, 4, 5), LinearOp.LE, 4),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.LE, 2),
+        ))
+        for (coordinate in listOf(Double.NaN, Double.POSITIVE_INFINITY, 0.5)) {
+            val available = !coordinate.isFinite()
+            val targets = RootPrimalTargets(IntArray(6) { it }, intArrayOf(),
+                doubleArrayOf(0.0, coordinate, 0.0, coordinate, 0.0, 0.0),
+                booleanArrayOf(false, available, false, available, false, false))
+
+            val order = assertNotNull(rootComponentOrder(problem, LpProjectionMeter(), targets = targets))
+
+            assertEquals(listOf(0, 2, 4, 5, 1, 3), order.members.toList())
+            assertEquals(listOf(0, 4, 6), order.offsets.toList())
+        }
+    }
+
+    @Test
     fun `fractional coordinates precede integral coordinates within each component`() {
         val problem = Problem(0, 8, Array(8) { IntDomain(0, 1) }, listOf(
             Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 2, 4, 6), LinearOp.LE, 4),

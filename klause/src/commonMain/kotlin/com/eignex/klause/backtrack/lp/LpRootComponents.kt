@@ -117,7 +117,7 @@ internal fun rootComponentOrder(
         members[writes[group]++] = variable
     }
     val prepared = RootComponentOrder(offsets, members, groups)
-    val ordered = if (targets == null) prepared else prepared.orderTargets(byRoot, sizes, targets, meter)
+    val ordered = if (targets == null) prepared else prepared.orderTargets(byRoot, sizes, writes, targets, meter)
     meter.poll()
     return ordered
 }
@@ -125,6 +125,7 @@ internal fun rootComponentOrder(
 private fun RootComponentOrder.orderTargets(
     byRoot: IntArray,
     scratch: IntArray,
+    groupRanks: IntArray,
     targets: RootPrimalTargets,
     meter: LpProjectionMeter,
 ): RootComponentOrder {
@@ -136,10 +137,11 @@ private fun RootComponentOrder.orderTargets(
         width *= 2L
     }
     meter.reserve((2L * levels + 2L) * n, 0L, matrix = false)
+    val guidedGroups = rankTargetGroups(groupRanks, targets, meter)
     for (group in 0 until groups) {
         for (index in offsets[group] until offsets[group + 1]) {
             if (index % 256 == 0) meter.poll()
-            byRoot[members[index]] = group
+            byRoot[members[index]] = groupRanks[group]
         }
     }
     // Reusing graph scratch keeps sorting within the admitted primitive storage.
@@ -148,7 +150,46 @@ private fun RootComponentOrder.orderTargets(
         val groupOrder = byRoot[a].compareTo(byRoot[b])
         if (groupOrder != 0) groupOrder else targets.fractionality(b).compareTo(targets.fractionality(a))
     }
+    if (guidedGroups > 0 && guidedGroups < groups) {
+        meter.reserve(n.toLong() + 2L * groups + 1L, 0L, matrix = false)
+        offsets.fill(0)
+        for (index in ordered.indices) {
+            if (index % 256 == 0) meter.poll()
+            offsets[byRoot[ordered[index]] + 1]++
+        }
+        for (group in 0 until groups) {
+            if (group % 256 == 0) meter.poll()
+            offsets[group + 1] += offsets[group]
+        }
+    }
     return if (ordered === members) this else RootComponentOrder(offsets, ordered, groups)
+}
+
+private fun RootComponentOrder.rankTargetGroups(
+    groupRanks: IntArray,
+    targets: RootPrimalTargets,
+    meter: LpProjectionMeter,
+): Int {
+    var guidedGroups = 0
+    for (group in 0 until groups) {
+        groupRanks[group] = 1
+        for (index in offsets[group] until offsets[group + 1]) {
+            if (index % 256 == 0) meter.poll()
+            meter.reserve(8L, 0L, matrix = false)
+            if (targets.fractionality(members[index]) >= 0.0) {
+                groupRanks[group] = 0
+                guidedGroups++
+                break
+            }
+        }
+    }
+    meter.reserve(2L * groups, 0L, matrix = false)
+    var guidedRank = 0
+    var ordinaryRank = guidedGroups
+    for (group in 0 until groups) {
+        groupRanks[group] = if (groupRanks[group] == 0) guidedRank++ else ordinaryRank++
+    }
+    return guidedGroups
 }
 
 private fun RootPrimalTargets.fractionality(variable: Int): Double {
