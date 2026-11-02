@@ -395,11 +395,12 @@ internal class RootProbingPass : InprocessingPass {
     ) {
         if (!session.canSimplifyRoot || params.rootProbeWork <= 0L) return
         spending.run(session, params, stats, containingWork = containingWork) { budget ->
+            val before = session.explanationState.boolPinOrder.size
             if (implications.advance(session, params, budget) && !budget.stopped()) {
-                val before = session.explanationState.boolPinOrder.size
-                probe(session, params, budget)
                 if (session.explanationState.boolPinOrder.size > before) pairs.preferSingle()
+                probe(session, params, budget)
             }
+            if (session.explanationState.boolPinOrder.size > before) pairs.preferSingle()
         }
     }
 
