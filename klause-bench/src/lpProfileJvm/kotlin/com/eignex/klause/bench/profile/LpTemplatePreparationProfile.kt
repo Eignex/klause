@@ -464,6 +464,7 @@ internal object LpTemplatePreparationProfile {
                             put("privateCompletedConsumers", pump?.privateCompletedConsumers)
                             put("privateAdmission", pumpPreparation?.outcomes?.get("ADMITTED"))
                             put("privateRebound", pumpPreparation?.outcomes?.get("REBOUND"))
+                            put("privateCostsReused", pumpPreparation?.outcomes?.get("COSTS_REUSED"))
                             put("privateDeclined", pumpPreparation?.outcomes?.get("DECLINED"))
                             put("privateCancelled", pumpPreparation?.outcomes?.get("CANCELLED"))
                             put("privatePreparationNs", pumpPreparation?.nanos)
