@@ -4,6 +4,7 @@ import com.github.luben.zstd.ZstdInputStreamNoFinalizer
 import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 import java.io.File
 import java.io.InputStream
+import java.io.InterruptedIOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
@@ -54,16 +55,53 @@ internal object CorpusFiles {
     /** Run [block] on a plain-text copy of [file], for a consumer that needs a real path (a docker mount,
      *  a solver that cannot read stdin). A plain [file] is passed through; a compressed one is staged
      *  under its plain name and deleted afterwards. */
-    fun <T> withPlainFile(file: File, block: (File) -> T): T {
+    fun <T> withPlainFile(
+        file: File,
+        checkActive: () -> Unit = {},
+        onCleanup: (Long) -> Unit = {},
+        stagingDirectory: File = stagingRoot,
+        block: (File) -> T,
+    ): T {
+        fun checkStaging() {
+            if (Thread.currentThread().isInterrupted) throw InterruptedIOException("Source staging interrupted")
+            checkActive()
+        }
+        checkStaging()
         if (!isCompressed(file)) return block(file)
-        stagingRoot.mkdirs()
-        val dir = Files.createTempDirectory(stagingRoot.toPath(), "plain-").toFile()
+        stagingDirectory.mkdirs()
+        checkStaging()
+        val dir = Files.createTempDirectory(stagingDirectory.toPath(), "plain-").toFile()
+        var failure: Throwable? = null
         try {
+            checkStaging()
             val plain = File(dir, plainPath(file.name))
-            open(file).use { input -> plain.outputStream().use { input.copyTo(it) } }
+            open(file).use { input ->
+                plain.outputStream().use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        checkStaging()
+                        val count = input.read(buffer)
+                        checkStaging()
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                    }
+                }
+            }
+            checkStaging()
             return block(plain)
+        } catch (caught: Throwable) {
+            failure = caught
+            throw caught
         } finally {
-            dir.deleteRecursively()
+            val cleanupStart = System.nanoTime()
+            try {
+                check(dir.deleteRecursively()) { "Cannot remove staged source: $dir" }
+            } catch (cleanup: Throwable) {
+                if (failure == null) throw cleanup
+                failure.addSuppressed(cleanup)
+            } finally {
+                onCleanup(System.nanoTime() - cleanupStart)
+            }
         }
     }
 

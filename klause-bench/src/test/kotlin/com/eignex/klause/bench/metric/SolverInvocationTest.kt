@@ -55,10 +55,98 @@ class SolverInvocationTest {
             assertEquals(body, CorpusFiles.readText(packed))
             assertEquals(3L, result.elapsedMs)
             assertEquals(2L, result.timeToBestMs)
-            assertTrue("sourceDecodeMs" in result.stats && "sourceInvocationMs" in result.stats)
+            assertTrue(listOf("sourceDecodeMs", "sourceCleanupMs", "sourceCliMs", "sourceInvocationMs")
+                .all { it in result.stats })
         } finally {
             root.deleteRecursively()
         }
+    }
+
+    @Test
+    fun `source preparation stops at its containing deadline before invoking the solver`() {
+        val root = Files.createTempDirectory("solver-source").toFile()
+        try {
+            val packed = File(root, "input.cnf.zst")
+            ZstdOutputStreamNoFinalizer(packed.outputStream(), 1).use { it.write(ByteArray(32 * 1024)) }
+            var ticks = 0L
+
+            val result = SolverInvocation.withSourceInput(packed, Budget(5), nanoTime = { ticks++ * 1_000_000 }) {
+                    _, _ -> error("deadline exhausted")
+            }
+
+            assertNull(result.feasible)
+            assertEquals("true", result.stats["sourcePreparationBudgetExhausted"])
+            assertEquals("0", result.stats["sourceCliMs"])
+            assertTrue(requireNotNull(result.stats["sourceDecodeMs"]).toLong() >= 5L)
+            assertTrue(requireNotNull(result.stats["sourceInvocationMs"]).toLong() >= 5L)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `failed invocations retain source timings and partial solver output`() {
+        val root = Files.createTempDirectory("solver-source").toFile()
+        try {
+            val packed = File(root, "input.cnf.zst")
+            ZstdOutputStreamNoFinalizer(packed.outputStream(), 1).use { it.write("p cnf 0 0\n".toByteArray()) }
+            var staged: File? = null
+
+            val failure = assertFailsWith<SolverInvocation.Failure> {
+                SolverInvocation.withSourceInput(packed, Budget(10_000)) { plain, _ ->
+                    staged = plain
+                    throw SolverInvocation.Failure(SolverInvocation.Result(null, null, null, proven = false,
+                        stats = mapOf("exit" to "2"), rawOutput = "partial", command = "cli", elapsedMs = 3), "failed")
+                }
+            }
+
+            assertFalse(assertNotNull(staged).exists())
+            assertEquals("partial", failure.result.rawOutput)
+            assertEquals("2", failure.result.stats["exit"])
+            assertEquals(3L, failure.result.elapsedMs)
+            assertTrue(listOf("sourceDecodeMs", "sourceCleanupMs", "sourceCliMs", "sourceInvocationMs")
+                .all { it in failure.result.stats })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `cancelled preparation retains timings without a solver verdict`() {
+        try {
+            Thread.currentThread().interrupt()
+
+            val failure = assertFailsWith<SolverInvocation.Failure> {
+                SolverInvocation.withSourceInput(File("missing.cnf.zst"), Budget(10_000)) { _, _ ->
+                    error("cancelled source")
+                }
+            }
+
+            assertNull(failure.result.feasible)
+            assertFalse(failure.result.proven)
+            assertEquals("0", failure.result.stats["sourceCliMs"])
+            assertTrue("sourceInvocationMs" in failure.result.stats)
+            assertTrue(Thread.currentThread().isInterrupted)
+        } finally {
+            Thread.interrupted()
+        }
+    }
+
+    @Test
+    fun `plain inputs retain the whole source invocation cost`() {
+        var nanos = 0L
+
+        val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000), nanoTime = { nanos }) { _, _ ->
+            nanos = 12_000_000
+            SolverInvocation.Result(true, null, null, proven = false,
+                stats = emptyMap(), rawOutput = "sat", command = "cli", elapsedMs = 10)
+        }
+
+        assertEquals("0", result.stats["sourceDecodeMs"])
+        assertEquals("0", result.stats["sourceCleanupMs"])
+        assertEquals("12", result.stats["sourceCliMs"])
+        assertEquals("12", result.stats["sourceInvocationMs"])
+        assertEquals(10L, result.elapsedMs)
     }
 
     @Test
