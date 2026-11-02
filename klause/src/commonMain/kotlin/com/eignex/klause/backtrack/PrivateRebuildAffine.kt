@@ -12,7 +12,7 @@ internal class PrivateRebuildAffine(
     val freeColumns: Int,
 ) {
     private val words = (freeColumns + 63) ushr 6
-    val reconstructionWork: Long = coordinates.size * 12L + rank * (words * 4L + 4L)
+    val reconstructionWork: Long = coordinates.size * 24L + rank * (words * 8L + 8L)
 
     fun privateValue(column: Int): Boolean? = when {
         coordinates[column] == Int.MIN_VALUE -> fixed[column]
