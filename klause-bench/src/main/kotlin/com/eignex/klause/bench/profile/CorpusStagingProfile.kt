@@ -29,9 +29,19 @@ internal object CorpusStagingProfile {
         val budget = request.getValue("budget-ms").toLong().also { require(it in 1..60_000) }
         val repeats = request.getValue("repeats").toInt().also { require(it in 2..4) }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
+        val reference = Catalog.uncapped(request.getValue("suite")).problems
+            .single { it.name == request.getValue("problem") }
+        capture(CorpusFetcher.resolve(reference.source), out, budget, repeats, request.getValue("sha256"))
+    }
+
+    internal fun capture(packed: File, out: File, budget: Long, repeats: Int = 2, expectedHash: String? = null) {
+        require(budget in 1..60_000 && repeats in 2..4)
         val profileStart = System.nanoTime()
         out.resolve("request.json").writeText(buildJsonObject {
-            request.forEach { (key, value) -> put(key, value) }
+            put("source", packed.absolutePath)
+            put("expectedSha256", expectedHash)
+            put("budgetMs", budget)
+            put("repeats", repeats)
             put("osCache", "uncontrolled; parent identity reads and plain materialization precede trials")
             put("jvmCache", "fresh child per mode; first operation then repeated operations in that child")
             put("solverExecuted", false)
@@ -39,18 +49,16 @@ internal object CorpusStagingProfile {
         }.toString())
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         val setupStart = System.nanoTime()
-        val reference = Catalog.uncapped(request.getValue("suite")).problems
-            .single { it.name == request.getValue("problem") }
-        val packed = CorpusFetcher.resolve(reference.source)
         require(CorpusFiles.isCompressed(packed))
         val plain = out.resolve(CorpusFiles.plainPath(packed.name))
         try {
             CorpusFiles.withPlainFile(packed, checkActive = {
                 check((System.nanoTime() - setupStart) / NANOS_PER_MILLI < budget) { "Identity preparation exhausted" }
             }) { Files.move(it.toPath(), plain.toPath(), StandardCopyOption.REPLACE_EXISTING) }
-            require(digest(CorpusFiles.open(plain)) == request.getValue("sha256"))
+            val sourceHash = digest(CorpusFiles.open(plain))
+            require(expectedHash == null || sourceHash == expectedHash)
             out.resolve("identity.json").writeText(buildJsonObject {
-                put("sourceSha256", request.getValue("sha256"))
+                put("sourceSha256", sourceHash)
                 put("packedSha256", digest(packed.inputStream()))
                 put("packedBytes", packed.length())
                 put("plainBytes", plain.length())
@@ -68,7 +76,7 @@ internal object CorpusStagingProfile {
                     "-Xlog:jfr+startup=warning",
                     "-cp", System.getProperty("java.class.path"), CorpusStagingProfile::class.java.name,
                     "trial-path=${if (mode == "plain-hash") plain else packed}", "mode=$mode",
-                    "sha256=${request.getValue("sha256")}", "budget-ms=$budget", "repeats=$repeats")
+                    "sha256=$sourceHash", "budget-ms=$budget", "repeats=$repeats")
                 out.resolve("$mode-command.json").writeText(Reports.json.encodeToString(command))
                 val process = ProcessBuilder(command).redirectOutput(out.resolve("$mode.jsonl"))
                     .redirectError(out.resolve("$mode.stderr")).start()

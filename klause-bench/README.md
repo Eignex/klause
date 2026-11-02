@@ -423,6 +423,10 @@ child JFR captures diagnose source costs. The profile runs no solver and makes n
 throughput or useful-solve-time claim. Use ordinary same-machine paired lab rows
 at the same whole-source allowance for qualification, retaining setup, failures
 and cleanup along with declared cache conditions.
+`lab/staging.json` uses the same diagnostic with the ordinary planner's selective,
+hash-verified corpus inputs. Submit standard catalog selections and `timeout-ms`;
+each accepted row retains all modes on its one worker attempt. This manifest omits
+MiniZinc provisioning and supports compressed file-backed sources only.
 
 The planner accepts `selections`, a JSON-encoded list of independent selector maps,
 merged without duplicate catalog identities. Paired experiments use lab `configs`,
