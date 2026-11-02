@@ -64,6 +64,20 @@ private open class OwnedSearch(protected val source: ResumableSearch, release: (
 private class OwnedInstructionSearch(private val instructionSource: InstructionSlicedSearch, release: () -> Unit) :
     OwnedSearch(instructionSource, release), InstructionSlicedSearch {
     override val chargedInstructions: Long get() = instructionSource.chargedInstructions
+    override val auxiliaryWork: Long get() = instructionSource.auxiliaryWork
+
+    override fun runScheduledSlice(
+        global: Cancellation,
+        sliceMillis: Long,
+        sliceInstructions: Long,
+        sliceWork: Long,
+        instructionsPerWork: Double,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit,
+    ): MinimizeResult? = advance {
+        instructionSource.runScheduledSlice(
+            global, sliceMillis, sliceInstructions, sliceWork, instructionsPerWork, onIncumbent,
+        )
+    }
 
     override fun runInstructionSlice(
         global: Cancellation,
@@ -91,6 +105,15 @@ private open class OwnedSolve(protected val source: ResumableSolve, release: () 
 
 private class OwnedInstructionSolve(private val instructionSource: InstructionSlicedSolve, release: () -> Unit) :
     OwnedSolve(instructionSource, release), InstructionSlicedSolve {
+    override val auxiliaryWork: Long get() = instructionSource.auxiliaryWork
+
+    override fun runScheduledSlice(
+        global: Cancellation, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
+        instructionsPerWork: Double,
+    ): SolveResult? = advance {
+        instructionSource.runScheduledSlice(global, sliceMillis, sliceInstructions, sliceWork, instructionsPerWork)
+    }
+
     override fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long): SolveResult? =
         advance { instructionSource.runInstructionSlice(global, sliceMillis, sliceInstructions) }
 }

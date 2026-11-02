@@ -32,7 +32,13 @@ internal class LocalSearchPhaseTimer(
         if (previous < Long.MAX_VALUE) objectiveScoring[outcome] = previous + 1L
     }
 
-    fun objectiveScoringSnapshot(): Map<String, Long> = objectiveScoring.toMap()
+    var inspectionVisits: (() -> Long)? = null
+    var repairVisits: (() -> Long)? = null
+
+    fun objectiveScoringSnapshot(): Map<String, Long> = objectiveScoring.toMutableMap().apply {
+        inspectionVisits?.let { put("inspection-visits", it()) }
+        repairVisits?.let { put("repair-visits", it()) }
+    }
 
     fun enter(next: String): String {
         require(next in nanos)
