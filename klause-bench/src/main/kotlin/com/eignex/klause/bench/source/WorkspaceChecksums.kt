@@ -16,6 +16,7 @@ import java.nio.file.StandardOpenOption.CREATE
 import java.nio.file.StandardOpenOption.WRITE
 import java.security.MessageDigest
 import java.util.HexFormat
+import java.util.concurrent.ConcurrentHashMap
 
 internal class WorkspaceChecksums(
     root: Path,
@@ -24,6 +25,8 @@ internal class WorkspaceChecksums(
     reliable: (Path) -> Boolean = {
         Files.getFileStore(it).type().lowercase() in setOf("apfs", "ext4", "xfs", "btrfs", "overlay", "tmpfs", "zfs")
     },
+    private val open: (Path) -> FileChannel = { FileChannel.open(it, CREATE, WRITE, NOFOLLOW_LINKS) },
+    private val write: (Path, ByteArray) -> Unit = { path, bytes -> Files.write(path, bytes); Unit },
 ) : AutoCloseable {
     private val identity = root.toRealPath().toString()
     private val device = try {
@@ -59,17 +62,23 @@ internal class WorkspaceChecksums(
         try {
             val bytes = encode() ?: return
             Files.createDirectories(directory)
-            FileChannel.open(directory.resolve("$slot.lock"), CREATE, WRITE).use { channel ->
-                val owner = try { channel.tryLock() } catch (_: OverlappingFileLockException) { null }
-                owner?.use {
-                    val pending = directory.resolve("$slot.pending")
-                    try {
-                        Files.write(pending, bytes)
-                        Files.move(pending, directory.resolve("$slot.bin"), ATOMIC_MOVE, REPLACE_EXISTING)
-                    } finally {
-                        Files.deleteIfExists(pending)
+            val key = directory.toRealPath().resolve("$slot.lock")
+            if (!writers.add(key)) return
+            try {
+                open(key).use { channel ->
+                    val owner = try { channel.tryLock() } catch (_: OverlappingFileLockException) { null }
+                    owner?.use {
+                        val pending = key.resolveSibling("$slot.pending")
+                        try {
+                            write(pending, bytes)
+                            Files.move(pending, key.resolveSibling("$slot.bin"), ATOMIC_MOVE, REPLACE_EXISTING)
+                        } finally {
+                            Files.deleteIfExists(pending)
+                        }
                     }
                 }
+            } finally {
+                writers.remove(key)
             }
         } catch (_: IOException) {
             // Cache availability cannot establish an input identity or prevent byte verification.
@@ -159,6 +168,9 @@ internal class WorkspaceChecksums(
             return HexFormat.of().formatHex(digest.digest())
         }
 
+        // Closing any descriptor can release this process's POSIX record locks. Reserve before
+        // opening, including the interval between unlocking and closing the owning descriptor.
+        private val writers = ConcurrentHashMap.newKeySet<Path>()
         private val SHA256 = Regex("[a-f0-9]{64}")
         private const val FORMAT = 0x57435331
         private const val SLOTS = 32

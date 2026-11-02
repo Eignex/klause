@@ -3,9 +3,12 @@ package com.eignex.klause.bench.source
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+import java.nio.file.StandardOpenOption.CREATE
+import java.nio.file.StandardOpenOption.WRITE
 import java.security.MessageDigest
 import java.util.HexFormat
 import kotlin.test.Test
@@ -104,6 +107,35 @@ class WorkspaceChecksumsTest {
             WorkspaceChecksums(root, root.resolve("cache"), hash = { throw java.io.IOException("read failed") }).use {
                 it.checksum(file)
             }
+        }
+    }
+
+    @Test
+    fun `same process contention preserves the active writer descriptor`(@TempDir root: Path) {
+        val file = Files.writeString(root.resolve("input"), "original")
+        val cache = root.resolve("cache")
+        var opened = 0
+        var written = 0
+        val open: (Path) -> FileChannel = { path ->
+            opened++
+            FileChannel.open(path, CREATE, WRITE)
+        }
+        val second = WorkspaceChecksums(root, cache, open = open)
+        second.checksum(file)
+        val first = WorkspaceChecksums(root, cache, open = open, write = { path, bytes ->
+            second.close()
+            written++
+            Files.write(path, bytes)
+        })
+        first.checksum(file)
+
+        first.close()
+
+        assertEquals(1, opened)
+        assertEquals(1, written)
+        assertEquals(0L, Files.list(cache).use { files -> files.filter { it.toString().endsWith(".pending") }.count() })
+        WorkspaceChecksums(root, cache, hash = { error("published checksum must remain reusable") }).use {
+            assertEquals(digest(file), it.checksum(file))
         }
     }
 

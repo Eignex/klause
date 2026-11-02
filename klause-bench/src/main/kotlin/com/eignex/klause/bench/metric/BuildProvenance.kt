@@ -151,7 +151,6 @@ internal object InstalledBuild {
                     file.relativeTo(root).invariantSeparatorsPath to checksums.checksum(file.toPath())
                 }
         }
-
 }
 
 @Serializable
