@@ -76,7 +76,7 @@ object FactorPropagationOracle {
         }
     }
 
-    fun sourceAssignments(problem: Problem): Sequence<Sample> {
+    fun sourceAssignments(problem: Problem, reuseBuffers: Boolean = false): Sequence<Sample> {
         require(problem !is BakedProblem) { "Pass the original source Problem, before root domains are folded." }
         require(problem.numRealVars == 0) { "The oracle requires a finite Boolean/integer assignment space." }
         require((0 until problem.numIntVars).all { problem.intBounds.hasLower(it) && problem.intBounds.hasUpper(it) }) {
@@ -93,20 +93,25 @@ object FactorPropagationOracle {
         }
         repeat(problem.numBoolVars) { include(2L) }
         domains.forEach { include(it.valueCount) }
-        return (0 until space.toInt()).asSequence().map { ordinal ->
-            var remaining = ordinal.toLong()
-            val bools = BooleanArray(problem.numBoolVars) {
-                val value = remaining % 2L == 1L
-                remaining /= 2L
-                value
+        val radices = LongArray(domains.size) { domains[it].valueCount }
+        val spans = Array(domains.size) { domains[it].values }
+        return sequence {
+            // Reused samples are borrowed until advance; retained witnesses require owned copies.
+            val reused = if (reuseBuffers) Sample(BooleanArray(problem.numBoolVars), LongArray(domains.size)) else null
+            for (ordinal in 0 until space.toInt()) {
+                var remaining = ordinal.toLong()
+                val bools = reused?.bools ?: BooleanArray(problem.numBoolVars)
+                for (v in bools.indices) {
+                    bools[v] = remaining % 2L == 1L
+                    remaining /= 2L
+                }
+                val ints = reused?.ints ?: LongArray(domains.size)
+                for (v in ints.indices) {
+                    ints[v] = spans[v].valueAt((remaining % radices[v]).toInt())
+                    remaining /= radices[v]
+                }
+                yield(reused ?: Sample(bools, ints))
             }
-            val ints = LongArray(problem.numIntVars) { v ->
-                val domain = domains[v]
-                val value = domain.values.valueAt((remaining % domain.valueCount).toInt())
-                remaining /= domain.valueCount
-                value
-            }
-            Sample(bools, ints)
         }
     }
 
@@ -192,26 +197,30 @@ object FactorPropagationOracle {
         problem: Problem,
         label: String,
         satisfies: ((Sample) -> Boolean)?,
-        relevant: (Sample) -> Boolean = { true },
+        relevant: ((Sample) -> Boolean)? = null,
     ): List<Sample> {
         val samples = ArrayList<Sample>()
-        val assignments = sourceAssignments(problem)
+        val assignments = sourceAssignments(problem, reuseBuffers = relevant != null)
         val state = declaredState(problem)
         for (sample in assignments) {
-            if (!relevant(sample)) continue
+            if (relevant?.invoke(sample) == false) continue
             load(state, sample)
-            if (satisfies == null) {
-                if (state.cost == 0L) samples.add(sample)
+            val accepted = if (satisfies == null) {
+                state.cost == 0L
             } else {
-                val accepted = satisfies(sample)
+                val expected = satisfies(sample)
                 assertEquals(
-                    accepted,
+                    expected,
                     state.cost == 0L,
                     "$label: invariant disagrees with direct semantics at bools=${sample.bools.toList()}, " +
                         "ints=${sample.ints.toList()}",
                 )
-                if (accepted) samples.add(sample)
+                expected
             }
+            if (accepted) samples.add(
+                if (relevant == null) sample
+                else sample.copy(bools = sample.bools.copyOf(), ints = sample.ints.copyOf()),
+            )
         }
         return samples
     }
