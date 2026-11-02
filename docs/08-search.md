@@ -247,28 +247,68 @@ modes stop incomplete when their model continuation would require such a blocker
 
 ### Finite LP directional guidance
 
-Finite optimization records passive immediate parent/child floating LP optimum gains
-in minimized working objective units. Each gain is divided by the fractional movement
-to the actual lower or upper branch. A missing or interrupted optimum, infeasibility,
-negative or nonfinite gain, integral point or mismatched split supplies no numeric
-sample. These advisory observations supply no certified bound or pruning authority.
+Finite optimization records passive immediate parent/child progress of already accepted
+LP objective lower bounds in minimized working units. Each gain is divided by the
+fractional movement of the advisory LP iterate to the actual lower or upper branch.
+An unfinished iterate need not be feasible; its existing checked dual bound can still
+supply progress. Missing bounds, infeasibility, negative or nonfinite gains, integral
+coordinates and mismatched splits supply no numeric sample. Boolean coordinates must
+lie within `[0, 1]`; both integer split neighbours must belong to the current domain.
+These advisory observations supply no additional certified bound or pruning authority.
+The bound and fractional coordinates must come from the same working model.
+A cut re-solve that returns an iterate refreshes the point before its accepted bound
+reaches the history. This bounded point snapshot is separate from the initial
+iterate's value-order hints and reduced-cost averages, which continue to supply the
+fallback scorer. Directional advice declines when the refreshed integer point
+would require a different floor split from that value ordering.
+When ordinary bounding needs no certificate, an existing floating optimum remains
+the fallback estimate. Switching between checked bounds and floating optima clears
+history, so the two estimate kinds never train the same gains.
 The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
 
-The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
-`lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit a balanced gain score; otherwise reduced-cost/fractionality
-scoring and the configured selector keep their precedence. Directional scores compete
-with each other before fallback, so objective units are not mixed with reduced costs.
+The `lp-default` and `lp-aggressive` optimization recipes enable the finite consumer; direct
+`BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
+`lp-directional-gains=true`. The execution setting can also disable it. LP bounding
+and branching must be enabled. The reduced-cost/fractionality scorer or the configured
+fallback selector chooses the variable. Directional advice is prepared for that actual
+choice after selection; it only orders the two existing children.
+Two recent samples in each direction supply that variable's predicted child gains,
+using each direction's mean cost per unit of fractional movement. The balanced
+`min + max / 6` score admits finite positive predictions without comparing variables.
+Missing or unreliable history permits one bounded current-basis estimate for the
+selected structural column. A matching retained optimal basis supplies both objective
+costs, multiplied by the corresponding fractional movements. These estimates remain
+current-node advice, separate from observed gains and proof authority.
+
+The smaller predicted objective increase is tried first, after value and incumbent
+guidance, only when both existing alternatives match the estimated Boolean or integer
+floor/ceil partition. Guidance swaps those alternatives without adding, removing or
+replacing a decision. Tied gains, unsupported engines, stale or unfinished bases,
+insufficient allowance, pruned alternatives and changed partitions retain the existing
+heuristics. Preferences expire at the next node, point replacement or history reset.
+History and basis side consumption, changed order and unavailable advice are recorded
+separately. The readiness check and all analysis spend the existing LP work allowance. Ancestor
+observations use a bounded depth-indexed buffer. Initial buffer preparation and visited
+slot ranges are funded before allocation or clearing, including across scope resets.
+Committed observation attempts retain their branch direction. Missing immediate-child
+bound estimates distinguish LP admission gates, suspended or absent results and
+unavailable bounds. Scope changes, depth changes and replaced alternatives report discarded
+attempts separately. These observations spend the existing allowance and do not
+request another solve or supply a gain sample.
 
 Samples share one retained exact base model, active-row identity, objective mapping
-and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
-history and pending comparisons. Restart and assumption reseeding clear history.
+and incumbent cutoff. The cutoff context includes the local incumbent publication
+version and exact external bound, so changes hidden by floating precision invalidate
+history. Exact comparison work spends the existing allowance. Changed rows or cuts,
+layout or objective rescaling invalidate history and pending comparisons. Restart and
+assumption reseeding clear history.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable
-histories and 128 ancestor splits are retained; bookkeeping charges the existing LP
-work allowance and creates no extra LP query. Invocation close releases the scope.
+histories and 128 ancestor splits are retained; bookkeeping charges
+the existing LP work allowance and creates no extra LP query. Invocation close
+releases the scope.
 
 ### Leaf-completed columns
 

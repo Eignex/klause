@@ -18,11 +18,14 @@ import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.TableauCutSolver
+import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
@@ -57,6 +60,95 @@ class LpBoundingTest {
     )
 
     private val sumObjective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
+
+    @Test
+    fun `unfinished node iterates supply checked bound guidance without the objective constant`() {
+        for (constant in listOf(0L, 1L shl 60)) {
+            var unfinished = false
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    refactorUpdateLimit: Int,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                        model, cancellation, refactorUpdateLimit, iterationLimit,
+                        workLimit, trackDegeneracy, pricing,
+                    )
+                    return object : PersistentLpSolver by delegate {
+                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                            delegate.resolveBounds(allowance)?.let { point ->
+                                unfinished = true
+                                FloatLpResult(point.basis, 999.0, point.duals, point.primal,
+                                    optimal = false, exactState = point.exactState)
+                            }
+                    }
+                }
+            }
+            val bounds = ArrayList<Double>()
+            val hints = object : LpHintSink {
+                override fun clear() = Unit
+                override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) = Unit
+                override fun recordBound(relaxation: LpRelaxation, bound: Double) { bounds.add(bound) }
+            }
+            val problem = triangle(1)
+            val objective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L), constant = constant)
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
+                SolveStatsSink("unfinished-guidance"), LpSolveContext(factory)).use { engine ->
+                engine.lpHints = hints
+
+                assertFalse(
+                    engine.pruneNode(PropagationSession(problem), constant.toDouble() + 1024.0, -1, true),
+                )
+            }
+
+            assertTrue(unfinished)
+            assertTrue(bounds.single() in 1.0..2.0)
+        }
+    }
+
+    @Test
+    fun `cut bound guidance uses the point from its final working model`() {
+        val problem = triangle(1)
+        val bounds = ArrayList<Double>()
+        var cutAdded = false
+        var pointModel: LpModel? = null
+        var pointObjective = Double.NaN
+        LpEngine(problem, sumObjective,
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true, probe = false,
+                rootCutHarvest = false, rootBudgetMillis = 0L)),
+            SolveStatsSink("cut-guidance")).use { engine ->
+            engine.lpHints = object : LpHintSink {
+                override fun clear() = Unit
+                override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+                    pointModel = relaxation.model
+                    pointObjective = relaxation.intColOf.sumOf { primal[it] }
+                    if (!cutAdded) {
+                        val cut = engine.dualSimplex(relaxation.model, Cancellation.Never).use { simplex ->
+                            assertNotNull(simplex.solve())
+                            simplex.gomoryCuts(8).first()
+                        }
+                        assertTrue(engine.cutPool.add(cut, relaxation))
+                        cutAdded = true
+                    }
+                }
+                override fun recordBound(relaxation: LpRelaxation, bound: Double) {
+                    assertSame(pointModel, relaxation.model)
+                    assertEquals(bound, pointObjective, 1e-6)
+                    bounds.add(bound)
+                }
+            }
+
+            assertFalse(engine.pruneNode(PropagationSession(problem), 10.0, -1, true))
+        }
+
+        assertTrue(cutAdded)
+        assertEquals(2.0, bounds.single(), 1e-6)
+    }
 
     @Test
     fun `lp bounding should preserve the optimum`() {

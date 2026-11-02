@@ -41,6 +41,8 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpCounterResults
+import com.eignex.klause.lp.engine.LpDirectionalCost
+import com.eignex.klause.lp.engine.LpDirectionalCostSolver
 import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -759,6 +761,30 @@ internal class LpEngine(
     // The fallback node solver stays live for metrics until it is replaced or the engine closes.
     internal var nodeSimplex: PersistentLpSolver? = null
     internal var nodeUsesTrail: Boolean = false
+    private var branchWorkAllowance = 0L
+
+    internal fun directionalCosts(model: LpModel, columns: IntArray): List<LpDirectionalCost?>? {
+        var allowance = branchWorkAllowance
+        branchWorkAllowance = 0L
+        nodeWorkAllowance()?.let { allowance = minOf(allowance, it) }
+        lpEffortGovernor.remainingWork()?.let { allowance = minOf(allowance, it) }
+        if (allowance <= 0L || params.cancellation()) return null
+        val started = TimeSource.Monotonic.markNow()
+        var work = 0L
+        val charge: (Long) -> Unit = { ops ->
+            work += ops
+            noteNodeOverhead(ops)
+        }
+        val costs = if (nodeUsesTrail) {
+            propagator.directionalCosts(model, columns, allowance, params.cancellation, charge)
+        } else {
+            (nodeSimplex as? LpDirectionalCostSolver)?.directionalCosts(
+                model, columns, allowance, params.cancellation, charge,
+            )
+        }
+        sink.lp.observeDirectionalBasis(started.elapsedNow().inWholeNanoseconds, work, costs != null)
+        return costs
+    }
 
     internal val cpAdapter = CpLpAdapter(this)
     internal val propagator = LpPropagator(
@@ -967,7 +993,10 @@ internal class LpEngine(
         requireOpen()
         lpBackjump = null
         for (b in bounds) {
-            if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) return true
+            if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) {
+                if (b !is LpSimplexBound) lpHints?.recordUnavailable(LpHintUnavailable.EARLIER_BOUND)
+                return true
+            }
         }
         return false
     }
@@ -1069,17 +1098,15 @@ internal class LpEngine(
             objectiveVar: Int,
             objectiveAscending: Boolean,
         ): Boolean {
-            val lpRelaxerL = lpRelaxer ?: return false
-            if (params.lpPlan.realResidual && residualOversized) return false
-            if (lpEffortGovernor.allowanceSpent) return false
+            branchWorkAllowance = 0L
+            val lpRelaxerL = lpRelaxer ?: return skip(LpHintUnavailable.MODEL)
+            if (params.lpPlan.realResidual && residualOversized) return skip(LpHintUnavailable.MODEL)
+            if (lpEffortGovernor.allowanceSpent) return skip(LpHintUnavailable.ALLOWANCE)
             lpEffortGovernor.observeNode()
-            if (!params.lpPlan.realResidual && (
-                    session.decisionLevel > params.lpPlan.boundMaxDepth ||
-                        ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
-                        !lpLadder.shouldRun()
-                    )
-            ) {
-                return false
+            if (!params.lpPlan.realResidual) {
+                if (session.decisionLevel > params.lpPlan.boundMaxDepth) return skip(LpHintUnavailable.DEPTH)
+                if (++lpCheckCounter % params.lpPlan.boundEvery != 0) return skip(LpHintUnavailable.CADENCE)
+                if (!lpLadder.shouldRun()) return skip(LpHintUnavailable.LADDER)
             }
             // The ladder's run rung decides whether during-search cuts separate at this node.
             val cutsAllowed = lpLadder.cutsEnabled
@@ -1092,6 +1119,8 @@ internal class LpEngine(
                 null
             }
             nodeWorkStoppedAfterProgress = false
+            val branchBudget = (nodeQueryWorkBudget() ?: nodeWorkBudget()).takeIf { it > 0L }
+                ?: MAX_NODE_WORK_OPS
             val outcome = lpBoundAndFix(
                 lpRelaxerL,
                 session,
@@ -1105,6 +1134,7 @@ internal class LpEngine(
                 warm = warm,
                 cutsAllowed = cutsAllowed,
             )
+            branchWorkAllowance = (branchBudget - minOf(branchBudget, pendingSolveOps)).coerceAtLeast(0L)
             // What this node's LP cost against the nodes explored; the allowance was charged as it spent.
             lpEffortGovernor.observeSolve(pendingSolveOps, outcome.prune,
                 nodeWorkStoppedAfterProgress && outcome.basis == null)
@@ -1128,6 +1158,11 @@ internal class LpEngine(
             }
             lpLadder.record(outcome.prune)
             return outcome.prune
+        }
+
+        private fun skip(reason: LpHintUnavailable): Boolean {
+            lpHints?.recordUnavailable(reason)
+            return false
         }
     }
 

@@ -517,6 +517,13 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
 
+    fun observeDirectionalBasis(nanos: Long, work: Long, available: Boolean) {
+        val key = "DIRECTIONAL_BASIS_NODE"
+        val delta = LpPhaseStats(calls = 1L, nanos = nanos, work = work,
+            outcomes = mapOf((if (available) "AVAILABLE" else "DECLINED") to 1L))
+        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+    }
+
     fun observePrimalPhase(stage: String, outcome: String, nanos: Long) {
         val key = "${stage}_ROOT"
         val delta = LpPhaseStats(calls = 1L, nanos = nanos, outcomes = mapOf(outcome to 1L))

@@ -260,6 +260,17 @@ internal class LpScopedSolver(
         return certified
     }
 
+    fun directionalCosts(
+        pointModel: LpModel,
+        columns: IntArray,
+        allowance: Long,
+        token: Cancellation,
+        charge: (Long) -> Unit,
+    ): List<LpDirectionalCost?>? {
+        if (closed || workingActive || pendingFloat != null || state !== pointModel.exactState || token()) return null
+        return (solver as? LpDirectionalCostSolver)?.directionalCosts(pointModel, columns, allowance, token, charge)
+    }
+
     fun solveFloat(
         warm: Basis? = null,
         token: Cancellation = cancellation,

@@ -4,6 +4,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
@@ -19,29 +20,68 @@ class LpDirectionalHistoryTest {
             history.beginNode(1)
             history.record(11.0)
             assertTrue(history.score(variable, 2.25).isNaN())
+            assertFalse(history.mayHaveScores)
             history.commit(SearchDecision.IntAtLeast(0, 3), 1)
             history.beginNode(1)
             history.record(13.0)
         }
 
         assertEquals(1.5, history.score(variable, 2.25), 1e-9)
+        assertTrue(history.mayHaveScores)
+    }
+
+    @Test
+    fun `boolean gain history declines iterates outside the domain`() {
+        for (value in listOf(-0.5, 1.5)) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.Bool(0)
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, 0.5)
+            repeat(2) {
+                history.commit(SearchDecision.Bool(1), 1)
+                history.beginNode(1)
+                history.record(11.0)
+                history.commit(SearchDecision.Bool(0), 1)
+                history.beginNode(1)
+                history.record(13.0)
+            }
+
+            assertTrue(history.score(variable, value).isNaN())
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(variable, value)
+            for (literal in listOf(1, 0)) {
+                history.commit(SearchDecision.Bool(literal), 1)
+                history.beginNode(1)
+                history.record(100.0)
+            }
+
+            assertEquals(1.5, history.score(variable, 0.5), 1e-9)
+        }
     }
 
     @Test
     fun `missing children cannot borrow a later descendant objective`() {
-        val observations = ArrayList<String>()
-        val history = LpDirectionalHistory(observations::add)
-        history.beginNode(0)
-        history.record(10.0)
-        history.branch(VarRef.IntVar(0), 2.25)
-        history.commit(SearchDecision.IntAtMost(0, 2), 1)
-        history.beginNode(1)
-        history.finishNode()
+        for (up in listOf(false, true)) {
+            for (reason in listOf("UNOBSERVED", "CADENCE", "NO_BOUND")) {
+                val observations = ArrayList<String>()
+                val history = LpDirectionalHistory(observations::add)
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(VarRef.IntVar(0), 2.25)
+                val decision = if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2)
+                history.commit(decision, 1)
+                history.beginNode(1)
+                history.finishNode(reason)
 
-        history.beginNode(2)
-        history.record(15.0)
+                history.beginNode(2)
+                history.record(15.0)
 
-        assertEquals(listOf("MISSING"), observations)
+                val side = if (up) "UP" else "DOWN"
+                assertEquals(listOf("COMMIT_$side", "MISSING", "MISSING_${reason}_$side"), observations)
+            }
+        }
     }
 
     @Test
@@ -57,7 +97,7 @@ class LpDirectionalHistoryTest {
 
             history.record(value)
 
-            assertEquals(listOf("UNUSABLE"), observations)
+            assertEquals(listOf("COMMIT_DOWN", "UNUSABLE", "UNUSABLE_DOWN"), observations)
         }
         val history = LpDirectionalHistory({})
         history.beginNode(0)
@@ -88,6 +128,7 @@ class LpDirectionalHistoryTest {
         repeat(3) { history.beginNode(0) }
 
         assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+        assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
         assertEquals(2, observations.count { it == "EXPIRED" })
     }
 
@@ -104,7 +145,7 @@ class LpDirectionalHistoryTest {
         history.beginNode(1)
         history.record(11.0)
 
-        assertEquals(listOf("RESET"), observations)
+        assertEquals(listOf("COMMIT_DOWN", "LOST_SCOPE_DOWN", "RESET"), observations)
     }
 
     @Test
@@ -120,7 +161,7 @@ class LpDirectionalHistoryTest {
         history.infeasible()
         history.finishNode()
 
-        assertEquals(listOf("INFEASIBLE"), observations)
+        assertEquals(listOf("COMMIT_DOWN", "INFEASIBLE", "INFEASIBLE_DOWN"), observations)
     }
 
     @Test
@@ -138,5 +179,28 @@ class LpDirectionalHistoryTest {
         }
 
         assertTrue(history.score(VarRef.Bool(0), 0.5).isNaN())
+        assertTrue(history.score(VarRef.Bool(1), 0.5).isNaN())
+    }
+
+    @Test
+    fun `other variables cannot fill incomplete directional history`() {
+        val history = LpDirectionalHistory({})
+        for (variable in 0..1) {
+            repeat(if (variable == 0) 2 else 1) {
+                history.beginNode(0)
+                history.record(10.0)
+                history.branch(VarRef.IntVar(variable), 2.25)
+                history.commit(SearchDecision.IntAtMost(variable, 2), 1)
+                history.beginNode(1)
+                history.record(11.0)
+                history.commit(SearchDecision.IntAtLeast(variable, 3), 1)
+                history.beginNode(1)
+                history.record(13.0)
+            }
+        }
+
+        assertEquals(1.5, history.score(VarRef.IntVar(0), 2.25), 1e-9)
+        assertTrue(history.score(VarRef.IntVar(1), 2.25).isNaN())
+        assertTrue(history.score(VarRef.IntVar(2), 2.25).isNaN())
     }
 }

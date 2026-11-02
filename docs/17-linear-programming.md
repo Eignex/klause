@@ -169,11 +169,30 @@ explanations cite the selected bound witnesses and all contributing row premises
 every learned literal is false at the conflict and implied by the cited antecedents.
 One integer or disjunction leaf cannot refute its sibling branches.
 
-The model-facing bounding callback supplies pre-separation floating optima and
-checked infeasibility outcomes to finite search hints. Directional history accepts
-only compatible retained model and row scopes; it adds no certification request.
+The model-facing bounding callback supplies numeric projections of already accepted
+objective bounds and checked infeasibility outcomes to finite search hints. It reuses
+the bound obtained for ordinary pruning, including a dual bound from an unfinished
+iterate. Directional history accepts only compatible retained model and row scopes
+whose fractional coordinates came from that working model; it adds no certification request.
+A cut re-solve that returns an iterate replaces the advisory point before its
+accepted bound is recorded. The search owns a bounded copy of that point for
+directional observations and basis comparisons; this refresh preserves the initial
+iterate's fallback value-order hints and reduced-cost averages. The retained row
+scope still controls compatibility with earlier gains.
+When no certificate is needed, an existing floating optimum can supply the advisory
+estimate; the search keeps that estimate kind in its history scope.
+Unavailable callbacks identify admission gates and incomplete numerical outcomes;
+they carry no optimum, bound or query authorization.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
-history lifetime.
+history lifetime. An optional numerical capability estimates directional objective
+costs from a retained optimal basis for at most two structural columns; finite child
+guidance requests only its selected column. Each basis-row
+solve scans oriented reduced costs, including logical columns, and converts its ratios
+to source-coordinate objective units. It neither pivots nor requests another LP solve
+or certificate. Analysis reserves its work before allocation, within the node's unspent
+query allowance and remaining containing and cumulative allowances; work and elapsed
+time are recorded separately. Changed exact states and incomplete or unsupported bases
+decline. The estimates never enter directional history or certify a branch bound.
 
 A node query that makes pivots but stops on its work allowance before returning a
 point grows the adaptive request within its existing ceiling and remaining

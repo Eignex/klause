@@ -128,7 +128,8 @@ internal class RevisedSimplex(
     private val singletonStart: Boolean = true,
 ) : TableauCutSolver,
     PersistentLpSolver,
-    ResumableLpSolver {
+    ResumableLpSolver,
+    LpDirectionalCostSolver {
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
     private var solveStarted = false
     override val currentWork: Long get() = work.ops
@@ -2784,6 +2785,71 @@ internal class RevisedSimplex(
 
     /** The structural primal `x*` at the last optimal [solve], for scoring tableau cuts by violation. */
     private var optimalPrimal: DoubleArray? = null
+
+    override fun directionalCosts(
+        pointModel: LpModel,
+        columns: IntArray,
+        allowance: Long,
+        token: Cancellation,
+        charge: (Long) -> Unit,
+    ): List<LpDirectionalCost?>? {
+        if (columns.isEmpty() || columns.size > 2 || allowance <= 0L || token() || activeSolve != null ||
+            optimalBasis == null || !basisLifecycle.factorized ||
+            (model !== pointModel && (model.exactState == null || model.exactState !== pointModel.exactState))
+        ) return null
+        val factors = basisLifecycle.current ?: return null
+        val perColumn = 6L * m + 8L * numVars + 2L * colVal.size + nnzB + factors.updateCount.toLong() * m
+        if (perColumn > allowance / columns.size || columns.any { it !in 0 until n }) return null
+        val required = columns.size * perColumn
+        charge(required)
+        if (token()) return null
+        val row = IndexedVector(m)
+        return try {
+            columns.map { column ->
+                if (token()) return null
+                val slot = basicVar.indexOf(column)
+                if (slot < 0) null else {
+                    row.unit(slot)
+                    factors.btran(row, expectedDensity = 1.0)
+                    if (token()) return null
+                    directionalRowCosts(column, row, token)
+                }
+            }
+        } catch (_: BasisArithmeticException) {
+            null
+        } catch (_: ArithmeticException) {
+            null
+        }
+    }
+
+    private fun directionalRowCosts(column: Int, row: IndexedVector, token: Cancellation): LpDirectionalCost? {
+        var down = Double.POSITIVE_INFINITY
+        var up = Double.POSITIVE_INFINITY
+        for (j in 0 until numVars) {
+            if (j % 256 == 0 && token()) return null
+            if (status[j] == VarStatus.BASIC || status[j] == VarStatus.FIXED) continue
+            var coefficient = 0.0
+            for (k in colPtr[j] until colPtr[j + 1]) coefficient += row[rowIdx[k]] * colVal[k]
+            val reducedCost = cost(j) - columnDot(dualValues, j)
+            if (!coefficient.isFinite() || !reducedCost.isFinite()) return null
+            val orientation = if (status[j] == VarStatus.AT_UPPER) -1.0 else 1.0
+            val orientedCost = reducedCost * orientation
+            if (orientedCost < -tolerance) return null
+            val effect = coefficient * orientation
+            if (status[j] == VarStatus.FREE) {
+                if (abs(reducedCost) > tolerance) return null
+                if (abs(effect) > tolerance) return LpDirectionalCost(0.0, 0.0)
+            } else if (effect > tolerance) {
+                down = minOf(down, maxOf(0.0, orientedCost) / effect)
+            } else if (effect < -tolerance) {
+                up = minOf(up, maxOf(0.0, orientedCost) / -effect)
+            }
+        }
+        val scale = numerical.sourceCoordinate(column, 1.0) *
+            (model.exactState?.model?.objective?.scale?.approximation ?: 1.0)
+        if (!scale.isFinite() || scale <= 0.0 || !down.isFinite() || !up.isFinite()) return null
+        return LpDirectionalCost(down / scale, up / scale)
+    }
 
     /** Gomory (Chvátal) integrality cuts from the last optimal basis, up to [maxCuts]; empty if the
      *  last solve was not optimal. Integer-multiplier row aggregation + super-additive rounding in 128
