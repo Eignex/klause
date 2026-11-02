@@ -83,8 +83,8 @@ internal object ArithmeticLearningApplicabilityProfile {
                     put("catalogAfter", after)
                     put("entryPoint", if (preparation == "source") "original-mps-source-setup" else
                         "in-process-finite-preparation")
-                    put("cliRoutingEquivalence", if (preparation == "source") "source-api-only; runtime-unverified" else
-                        "unverified")
+                    put("cliRoutingEquivalence", if (preparation == "source")
+                        "actual-cli-source-only; no-search-outcome-claim" else "unverified")
                     put("preparation", preparation)
                     put("recipe", recipe)
                     put("sourceMode", if (frozenBytes == null) "catalog" else "frozen")
@@ -105,11 +105,14 @@ internal object ArithmeticLearningApplicabilityProfile {
                     val stop = Cancellation.after(timeout.milliseconds)
                     try {
                         val (prepared, annotated) = if (preparation == "source") {
-                            val observed = ArithmeticLearningSourcePreparation.prepare(bytes, stop, recipe)
+                            val observed = ArithmeticLearningSourcePreparation.prepare(
+                                bytes, file.absolutePath, stop, recipe, timeout)
                             if (observed == null) {
                                 put("status", "source-preparation-incomplete-or-not-finite")
                                 return@buildJsonObject
                             }
+                            put("presolveWorkAllowance", observed.presolveWorkAllowance)
+                            put("presolveWorkSpent", observed.presolveWorkSpent)
                             put("declaredSourceVariables", observed.declaredVariables)
                             put("declaredSourceIntegers", observed.declaredIntegers)
                             put("declaredSourceReals", observed.declaredVariables - observed.declaredIntegers)

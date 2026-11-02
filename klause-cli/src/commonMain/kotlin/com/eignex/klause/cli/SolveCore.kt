@@ -10,9 +10,11 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.ExecutionOptions
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
 import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
@@ -38,6 +40,11 @@ import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
+internal class SourcePreparationObserver(
+    val before: (Problem) -> Unit,
+    val after: (Problem, FinitePipelinePreparation) -> Unit,
+)
+
 /**
  * The unified, mode-agnostic solve driver. Every CLI mode (MiniZinc, XCSP3, SMT-LIB) feeds a
  * [Solvable] + [CommonOptions] in, and all terminal reporting goes out through the mode's
@@ -46,7 +53,13 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 internal object SolveCore {
 
-    fun solve(rawSolvable: Solvable, common: CommonOptions, protocol: OutputProtocol) {
+    fun solve(
+        rawSolvable: Solvable,
+        common: CommonOptions,
+        protocol: OutputProtocol,
+        onSourcePrepared: SourcePreparationObserver? = null,
+    ) {
+        if (onSourcePrepared != null) check(EngineParams(common.engineParams).bool("dry-run-presolve") == true)
         val invocationStats = cliInvocationStats(common, rawSolvable.rendering)
         val output = object : OutputProtocol by protocol {
             override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
@@ -82,11 +95,12 @@ internal object SolveCore {
             SourceExecutionRequest(
                 invocation, policy, ExecutionOptions.parse(common.engineParams),
                 finiteRequest = { shape ->
+                    onSourcePrepared?.before?.invoke(shape.finiteProblem)
                     finiteRequest(
                         shape, common, engine, openCores, config, solutionSetSensitive,
                         presolveCancel, presolveBudget, deadlineCancel, deadline, common.nodeBudget, policy,
                         rawSolvable.numericalCompletion, rawSolvable.toleranceCheck,
-                    )
+                    ).also { if (onSourcePrepared != null) check(it.prepareOnly) }
                 },
                 cores = openCores, randomSeed = common.randomSeed, nodeBudget = common.nodeBudget,
                 timeout = deadlineCancel, presolveConfig = config,
@@ -95,7 +109,8 @@ internal object SolveCore {
         }
         when (val pipeline = rawSolvable.rendering) {
             is SourceRendering.LinearSource -> {
-                solveLinearSource(rawSolvable, pipeline, requireNotNull(sourceControls), common, output, publication)
+                solveLinearSource(rawSolvable, pipeline, requireNotNull(sourceControls), common, output, publication,
+                    onSourcePrepared?.after)
                 return
             }
 

@@ -71,6 +71,7 @@ dependencies {
     }
     implementation("com.eignex:lab-bench:$labBenchVersion")
     implementation(project(":klause"))
+    implementation(project(":klause-cli"))
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.21")
     testImplementation("org.junit.jupiter:junit-jupiter")
     // SolveStats exposes kumulant summary types (SumResult/MaxResult); needed to read them.
