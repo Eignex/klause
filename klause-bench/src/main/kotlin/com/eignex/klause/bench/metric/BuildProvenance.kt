@@ -2,11 +2,13 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.WorkspaceChecksums
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.BasicFileAttributes
 import java.security.MessageDigest
@@ -133,27 +135,21 @@ internal object InstalledBuild {
         require(File(distribution, "lib").isDirectory) { "Missing installed CLI libraries: $distribution" }
         require(File(javaHome, "bin/java").isFile) { "Missing Java runtime: $javaHome" }
         return BuildProvenance(
-            distribution = hashes(distribution),
-            runtime = hashes(javaHome),
+            distribution = hashes(distribution, WorkspaceChecksums.directory(environment)),
+            runtime = hashes(javaHome, WorkspaceChecksums.directory(environment)),
             runtimeOptions = runtimeOptions(environment),
             osName = System.getProperty("os.name"),
             osArch = System.getProperty("os.arch"),
         )
     }
 
-    private fun hashes(root: File): Map<String, String> = root.walkTopDown().filter { it.isFile }
-        .sortedBy { it.relativeTo(root).invariantSeparatorsPath }
-        .associate { file ->
-            val digest = MessageDigest.getInstance("SHA-256")
-            file.inputStream().use { input ->
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    digest.update(buffer, 0, count)
+    private fun hashes(root: File, cacheDirectory: Path? = WorkspaceChecksums.directory()): Map<String, String> =
+        WorkspaceChecksums(root.toPath(), cacheDirectory).use { checksums ->
+            root.walkTopDown().filter { it.isFile }
+                .sortedBy { it.relativeTo(root).invariantSeparatorsPath }
+                .associate { file ->
+                    file.relativeTo(root).invariantSeparatorsPath to checksums.checksum(file.toPath())
                 }
-            }
-            file.relativeTo(root).invariantSeparatorsPath to hex(digest.digest())
         }
 }
 
