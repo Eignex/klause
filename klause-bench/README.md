@@ -415,8 +415,10 @@ recording options. After installing the bench, `scripts/draw-sets.sh <features-d
 `bench.profile.CorpusStagingProfile` accepts `suite=ID problem=NAME sha256=HEX
 budget-ms=N repeats=2`. It compares packed reads, decoding with hashing, temporary
 staging and plain reads in separate fresh JVMs, with repeated operations in each.
-An additional `stage-uninstrumented` child omits JFR. `order=forward|reverse`
-counterbalances control order across lab configurations.
+Additional `stage-uninstrumented` and `stage-prehashed` children omit JFR. The latter
+hashes the source before staging, matching the ordinary bench's identity preparation;
+`prehashNanos` and `iterationTotalNanos` retain that cost separately from the source
+span. `order=forward|reverse` counterbalances control order across lab configurations.
 The parent verifies the original plain-byte hash and records materialization,
 filesystem and build identities. OS cache state is uncontrolled and preceded by
 identity reads/materialization. Each first operation uses a fresh JVM; JFR can
