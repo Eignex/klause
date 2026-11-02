@@ -41,7 +41,7 @@ class MiniZincIdentityQueryTest {
         val failure = assertFailsWith<MiniZincIdentityFailure> { query.query(File("minizinc"), "--config-dirs") }
 
         assertEquals("timed-out", failure.evidence.outcome)
-        assertEquals(11, failure.evidence.startupNs)
+        assertEquals(11L, failure.evidence.startupNs)
         assertEquals(listOf(TimeUnit.SECONDS.toNanos(2)), child.waitAllowances)
         assertTrue(child.killed)
         assertFalse(failure.evidence.aliveAfterCleanup)
@@ -105,6 +105,40 @@ class MiniZincIdentityQueryTest {
 
         assertEquals("exited", failure.evidence.outcome)
         assertEquals(1, failure.evidence.exitCode)
+    }
+
+    @Test
+    fun `cancellation before startup never starts a compiler`() {
+        var started = false
+        val query = MiniZincIdentityQuery(start = { _, _ ->
+            started = true
+            Child()
+        }, retain = {})
+        Thread.currentThread().interrupt()
+        try {
+            val failure = assertFailsWith<MiniZincIdentityFailure> { query.query(File("minizinc"), "--version") }
+
+            assertFalse(started)
+            assertTrue(failure.evidence.cancelled)
+            assertTrue(Thread.currentThread().isInterrupted)
+        } finally {
+            Thread.interrupted()
+        }
+    }
+
+    @Test
+    fun `truncated output cannot establish an identity`() {
+        val query = MiniZincIdentityQuery(start = { _, log ->
+            log.writeText("v".repeat(16385))
+            Child()
+        }, retain = {})
+
+        val failure = assertFailsWith<MiniZincIdentityFailure> { query.query(File("minizinc"), "--version") }
+
+        assertEquals("output-truncated", failure.evidence.outcome)
+        assertEquals(16385L, failure.evidence.diagnosticBytes)
+        assertEquals(16384, failure.evidence.diagnostic.length)
+        assertFalse(failure.evidence.diagnosticComplete)
     }
 
     private class Child(
