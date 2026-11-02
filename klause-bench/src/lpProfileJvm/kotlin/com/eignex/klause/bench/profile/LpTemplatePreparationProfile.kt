@@ -549,13 +549,29 @@ internal object LpTemplatePreparationProfile {
                         val expected = floatingSignatures.getValue("disabled")
                         check(
                             floatingSignatures.values.all { points ->
-                                points.size == expected.size && points.zip(expected).all { (point, reference) ->
-                                    point.matches(reference)
+                                points.size == expected.size && points.indices.all { step ->
+                                    val point = points[step]
+                                    val interrupted = change == "cancel" && step % 2 == 1
+                                    val reference = expected[if (interrupted) step - 1 else step]
+                                    if (interrupted && point.outcome == "CANCELLED") {
+                                        point.objective == null
+                                    } else {
+                                        point.matches(reference)
+                                    }
                                 }
                             },
                         ) { "floating consumer results differ across reuse modes" }
                     } else {
-                        check(signatures.values.distinct().size == 1) { "consumer results differ across reuse modes" }
+                        val expected = signatures.getValue("disabled")
+                        check(
+                            signatures.values.all { points ->
+                                points.size == expected.size && points.indices.all { step ->
+                                    val interrupted = change == "cancel" && step % 2 == 1
+                                    val reference = expected[if (interrupted) step - 1 else step]
+                                    (interrupted && points[step] == "cancelled") || points[step] == reference
+                                }
+                            },
+                        ) { "consumer results differ across reuse modes" }
                     }
                 }
             }
