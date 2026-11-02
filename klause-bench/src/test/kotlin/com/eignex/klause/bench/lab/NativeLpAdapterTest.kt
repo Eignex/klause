@@ -42,9 +42,10 @@ class NativeLpAdapterTest {
         assertFailsWith<IllegalArgumentException> { NativeLpSuite.plan(request) }
     }
 
-    @Test
-    fun `native LP plans should reject multiple processors`() {
-        val request = BenchRequest(parameters = mapOf("suite" to "mps-core", "name" to "blend-tiny", "cpus" to "2"))
+    @ParameterizedTest
+    @CsvSource("cpus,2", "source-staging,temporary")
+    fun `native LP plans should reject unsupported controls`(key: String, value: String) {
+        val request = BenchRequest(parameters = mapOf("suite" to "mps-core", "name" to "blend-tiny", key to value))
 
         assertFailsWith<IllegalArgumentException> { NativeLpSuite.plan(request) }
     }

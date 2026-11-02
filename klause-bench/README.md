@@ -452,7 +452,7 @@ IO event extracts are written after all trials on the lab worker. They retain
 recording-threshold omissions and overlapping event scopes explicitly; absent
 events do not establish zero IO cost.
 
-Ordinary solves accept `source-staging=cache|temporary` for compressed input copies;
+Ordinary JVM CLI solves accept `source-staging=cache|temporary` for compressed input copies;
 the default is `cache`. Decoding, staging and cleanup spend the same source allowance
 for either choice. The comparison record retains the policy, actual staging root
 and CLI arguments. Identity preparation, checking and reporting remain in case/job
@@ -467,6 +467,7 @@ verifies both identities and retains failed results. Request source validation w
 qualification. The diagnostic prehash uses 8 KiB reads; ordinary identity hashing
 uses 64 KiB reads. Both read the full plain source before the invocation timer, but
 they do not have identical IO call sizes.
+Native CLI and public-library adapters require cache staging.
 
 The planner accepts `selections`, a JSON-encoded list of independent selector maps,
 merged without duplicate catalog identities. Paired experiments use lab `configs`,

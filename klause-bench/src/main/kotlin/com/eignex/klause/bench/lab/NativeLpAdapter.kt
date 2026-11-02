@@ -39,6 +39,9 @@ internal object NativeLpSuite : BenchSuite {
         }
         require(case.parameters["input-only"] != "true") { "Native LP qualification executes the original source" }
         require(case.resources.cpus == 1) { "Native LP qualification uses one processor" }
+        require(case.parameters["source-staging"] == "cache") {
+            "Native and library adapters require cache source staging"
+        }
         require(case.parameters["measurement"] in setOf("none", "resources")) {
             "Native LP qualification supports ordinary timing and process resources"
         }
