@@ -33,10 +33,11 @@ internal class JointRepairNeighborhood private constructor(
         }
     }
 
-    fun guide(hint: LinearRepairGuidance.Hint, centers: List<BigFraction>,
+    fun guide(hint: LinearRepairGuidance.Hint?, centers: List<BigFraction>,
         budget: SourceLpBudget, token: Cancellation): Boolean {
         guidedSeeds = null
-        if (token() || centers.size < integers || centers.size > LinearRepairGuidance.MAX_COLUMNS) return false
+        if (hint == null || token() || centers.size < integers ||
+            centers.size > LinearRepairGuidance.MAX_COLUMNS) return false
         val funding = budget.funding ?: return false
         val work = 1L + 16L * seeds.size
         val bytes = 256L + 128L * seeds.size

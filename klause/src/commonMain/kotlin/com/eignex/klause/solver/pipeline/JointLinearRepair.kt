@@ -209,7 +209,7 @@ internal class JointLinearRepair(
                 val proposalRound = if (pooled != null && completion != null)
                     round.coerceAtMost(Long.MAX_VALUE - 1) + 1 else round
                 val hint = if (pooled != null && completion != null) repairGuidance?.find(source) else null
-                val guided = hint?.let { requireNotNull(selection).guide(it, from, budget, stop) } == true
+                val guided = requireNotNull(selection).guide(hint, from, budget, stop)
                 if (hint == null && pooled != null && completion != null && repairGuidance != null) {
                     observe("jointRepairSharedGuidanceUnavailable")
                 }

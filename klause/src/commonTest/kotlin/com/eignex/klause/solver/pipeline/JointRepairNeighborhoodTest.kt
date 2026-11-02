@@ -59,6 +59,28 @@ class JointRepairNeighborhoodTest {
     }
 
     @Test
+    fun `missing guidance should restore connected selection after a guided proposal`() {
+        val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val source = SourceProofContext(SourceScope(SourceRevision("shared-fallback", "exact")),
+            columns.toSet(), mapOf("edge" to SourcePremise(SourceInequality(
+                mapOf(columns[0] to BigFraction.ONE, columns[1] to BigFraction.ONE), BigFraction.ONE))))
+        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+        val budget = SourceLpBudget(funding = funding)
+        val guidance = LinearRepairGuidance()
+        guidance.remember(source, mapOf(columns[0] to 2.0, columns[2] to 1.0), budget, Cancellation.Never)
+        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never))
+        val centers = List(3) { BigFraction.ZERO }
+        repair.guide(assertNotNull(guidance.find(source)), centers, budget, Cancellation.Never)
+        repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
+
+        repair.guide(null, centers, budget, Cancellation.Never)
+        val condition = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
+
+        assertEquals(mapOf(2 to BigFraction.ZERO), condition.lower)
+        assertEquals(condition.lower, condition.upper)
+    }
+
+    @Test
     fun `cancelled or unfunded guidance should retain the ordinary seed order`() {
         val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val source = SourceProofContext(SourceScope(SourceRevision("shared-decline", "exact")),
