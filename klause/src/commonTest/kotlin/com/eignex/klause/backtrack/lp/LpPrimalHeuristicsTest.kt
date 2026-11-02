@@ -119,7 +119,7 @@ class LpPrimalHeuristicsTest {
         )).bake(FactorProjectionProviders.Default)
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val sink = SolveStatsSink("retained-guidance-handoff")
-        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
             reusePumpPreparation = true).use { engine ->
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             assertNotNull(engine.rootRoundingWarmStart)
@@ -128,6 +128,8 @@ class LpPrimalHeuristicsTest {
                     handoff = handoff, accept = { null }))
 
                 assertFalse(handoff.hasDefinitionFor(engine))
+                assertEquals(1L, sink.snapshot().lp.phases.getValue("PRIMAL_LP_GUIDANCE_ROOT")
+                    .outcomes["REUSED"])
             }
         }
     }
