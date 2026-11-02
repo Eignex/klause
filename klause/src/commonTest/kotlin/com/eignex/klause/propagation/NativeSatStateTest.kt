@@ -25,6 +25,19 @@ class NativeSatStateTest {
     private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
 
     @Test
+    fun `a borrowed clause array should remain independent of its native payload`() {
+        val session = session(4, or(2, true, 3, true))
+        val clause = Clause(or(0, true, 1, true))
+        session.addLearnedClause(clause, 9)
+
+        clause.literals[0] = Lit.make(2, true)
+        clause.literals[1] = Lit.make(3, true)
+        session.pinBool(0, false)
+
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
     fun `native payload growth should preserve the last learned implication`() {
         for (count in listOf(1, 2, 3, 63, 64, 65, 66)) {
             val session = session(8, or(6, true, 7, true))

@@ -185,11 +185,12 @@ internal fun PropagationState.addLearnedClause(
     lbd: Int,
     permanent: Boolean = false,
     origin: Int = OWN_ORIGIN,
+    ownedLiterals: Boolean = false,
 ): Int {
     // The native-SAT lane keeps learned clauses in its own arena-backed store with its own watches
     // and policy columns, not the general learned database.
-    nativeEngine?.let { return it.addLearned(clause.literals, lbd, permanent, origin) }
-    val literals = clause.literals.copyOf()
+    nativeEngine?.let { return it.addLearned(clause.literals, lbd, permanent, origin, ownedLiterals) }
+    val literals = if (ownedLiterals) clause.literals else clause.literals.copyOf()
     return addLearnedClause(ClausePropagator(literals.litVars(), EmptyIntArray, literals), lbd, permanent, origin)
 }
 
