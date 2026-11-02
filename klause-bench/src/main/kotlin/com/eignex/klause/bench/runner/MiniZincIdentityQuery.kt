@@ -27,6 +27,7 @@ internal data class MiniZincIdentityEvidence(
     val cpuNs: Long? = null,
     val cancelled: Boolean = false,
     val aliveAfterCleanup: Boolean = false,
+    val cleanupFailure: String? = null,
     val diagnostic: String = "",
     val diagnosticBytes: Long = 0,
     val diagnosticComplete: Boolean = false,
@@ -72,6 +73,7 @@ internal class MiniZincIdentityQuery(
         var cause: Throwable? = null
         var cancelled = false
         var cleanupNs = 0L
+        var cleanupFailure: String? = null
         try {
             try {
                 if (Thread.currentThread().isInterrupted) throw InterruptedException("Identity discovery cancelled")
@@ -115,8 +117,10 @@ internal class MiniZincIdentityQuery(
                     if (child.isAlive) {
                         runCatching {
                             child.descendants().use { descendants -> descendants.forEach { it.destroyForcibly() } }
+                        }.onFailure {
+                            cleanupFailure = it.toString()
                         }
-                        child.destroyForcibly()
+                        runCatching { child.destroyForcibly() }.onFailure { cleanupFailure = it.toString() }
                         try {
                             child.waitFor(2, TimeUnit.SECONDS)
                         } catch (failure: InterruptedException) {
@@ -129,17 +133,29 @@ internal class MiniZincIdentityQuery(
                 }
                 cleanupNs = clock() - cleanupStart
             }
-            val bytes = log?.takeIf(File::isFile)?.length() ?: 0
-            val diagnostic = log?.takeIf(File::isFile)?.inputStream()?.use { it.readNBytes(OUTPUT_LIMIT) }
-                ?.toString(Charsets.UTF_8).orEmpty()
+            val captured = log?.takeIf(File::isFile)
+            val bytes = captured?.length() ?: 0
+            val output = runCatching { captured?.inputStream()?.use { it.readNBytes(OUTPUT_LIMIT) } }
+            val diagnostic = output.getOrNull()?.toString(Charsets.UTF_8).orEmpty()
+            if (output.isFailure) {
+                cause = output.exceptionOrNull()
+                if (outcome == "completed") outcome = "capture-failed"
+            }
+            if (outcome == "completed" && diagnostic.isBlank()) outcome = "empty-output"
             val deleteStart = clock()
             log?.delete()
             cleanupNs += clock() - deleteStart
             val alive = process?.isAlive == true
             // Reading the binary before spawning it would change a cold-start observation.
             val hashStart = clock()
-            val executableHash = runCatching { MiniZincCompatibility.hash(executable) }.getOrNull()
+            val executableHash = if (cancelled || alive || Thread.currentThread().isInterrupted) null else {
+                runCatching { MiniZincCompatibility.hash(executable) }.getOrNull()
+            }
             val hashNs = clock() - hashStart
+            if (Thread.currentThread().isInterrupted) {
+                cancelled = true
+                outcome = "cancelled"
+            }
             val evidence = initial.copy(
                 outcome = if (outcome == "completed" && bytes > OUTPUT_LIMIT) "output-truncated" else outcome,
                 elapsedNs = clock() - began,
@@ -153,9 +169,11 @@ internal class MiniZincIdentityQuery(
                 cpuNs = cpuNs,
                 cancelled = cancelled,
                 aliveAfterCleanup = alive,
+                cleanupFailure = cleanupFailure,
                 diagnostic = diagnostic.ifEmpty { cause?.message.orEmpty() },
                 diagnosticBytes = bytes,
-                diagnosticComplete = outcome in setOf("completed", "exited") && bytes <= OUTPUT_LIMIT && !alive,
+                diagnosticComplete = captured != null && output.isSuccess &&
+                    outcome in setOf("completed", "exited") && bytes <= OUTPUT_LIMIT && !alive,
             )
             retain(evidence)
             if (outcome != "completed" || !evidence.diagnosticComplete) throw MiniZincIdentityFailure(evidence, cause)
