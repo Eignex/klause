@@ -22,7 +22,8 @@ class SolveMetricTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `a solve should retain the emitted numerical policy without inventing absent declarations`(declared: Boolean) {
-        val text = "{\"schema\":\"mps-decimal-semantics-v1\",\"effective\":{\"objective\":\"exact\"}}".takeIf { declared }
+        val text = "{\"schema\":\"mps-decimal-semantics-v1\",\"effective\":{\"objective\":\"exact\"}}"
+            .takeIf { declared }
         val (record, _) = SolveMetric.solve(
             entry(),
             SolverInvocation.Settings(),
