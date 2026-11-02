@@ -83,6 +83,9 @@ internal class JointLinearRepair(
     private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
     private var guidedProposal: ExactNeighborhoodCondition? = null
+    private var checkedTrialWidth = 0
+    private var enlargedTrialPending = false
+    private var enlargedTrialProposal: ExactNeighborhoodCondition? = null
     var incumbentTrialPending = false
         private set
     private var closed = false
@@ -210,11 +213,25 @@ internal class JointLinearRepair(
                     round.coerceAtMost(Long.MAX_VALUE - 1) + 1 else round
                 val hint = if (pooled != null && completion != null) repairGuidance?.find(source) else null
                 val guided = requireNotNull(selection).guide(hint, from, budget, stop)
+                if (guided) stages["jointRepairSharedGuidanceMaxIntegers"] = maxOf(
+                    stages["jointRepairSharedGuidanceMaxIntegers"] ?: 0L,
+                    requireNotNull(selection).guidedIntegerCount.toLong())
                 if (hint == null && pooled != null && completion != null && repairGuidance != null) {
                     observe("jointRepairSharedGuidanceUnavailable")
                 }
                 requireNotNull(selection).propose(from, pooled?.bools ?: bools, width, proposalRound, radius, limit)
-                    .also { guidedProposal = it.takeIf { guided } }
+                    .also { condition ->
+                        guidedProposal = condition.takeIf { guided }
+                        val freed = (sourceIntegers?.size ?: model.numIntVars) - condition.lower.size
+                        if (checkedStart) {
+                            checkedTrialWidth = freed
+                            enlargedTrialPending = adaptive && guided &&
+                                requireNotNull(selection).guidedIntegerCount > freed
+                        } else if (!guided || requireNotNull(selection).guidedIntegerCount <= checkedTrialWidth) {
+                            enlargedTrialPending = false
+                        }
+                        if (enlargedTrialPending && freed > checkedTrialWidth) enlargedTrialProposal = condition
+                    }
             },
         )
     }
@@ -313,7 +330,19 @@ internal class JointLinearRepair(
 
     fun attempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
         val result = advanceAttempt(condition, cancellation)
-        if (result.result != ExactNeighborhoodResult.Paused) incumbentTrialPending = false
+        if (result.result != ExactNeighborhoodResult.Paused) {
+            val enlarged = condition === enlargedTrialProposal
+            if (enlarged && (result.result == ExactNeighborhoodResult.Refuted ||
+                    result.result is ExactNeighborhoodResult.Witness)) observe("jointRepairEnlargedTrialCompletions")
+            val continuing = result.result == ExactNeighborhoodResult.Refuted && enlargedTrialPending &&
+                !enlarged && !exhausted && !stop()
+            if (continuing) observe("jointRepairEnlargedTrialContinuations")
+            else {
+                enlargedTrialPending = false
+                enlargedTrialProposal = null
+            }
+            incumbentTrialPending = continuing
+        }
         return result
     }
 
@@ -338,6 +367,7 @@ internal class JointLinearRepair(
             }
             pending = condition
             if (condition === guidedProposal) observe("jointRepairSharedGuidanceQueries")
+            if (condition === enlargedTrialProposal) observe("jointRepairEnlargedTrialStarts")
             query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)),
                 params.copy(sourceIncumbentCompletion = false),
                 external = { externalIncumbent() ?: anchor }, state = state, borrowedAuthority = authority,
@@ -441,6 +471,8 @@ internal class JointLinearRepair(
         if (closed) return
         closed = true
         incumbentTrialPending = false
+        enlargedTrialPending = false
+        enlargedTrialProposal = null
         guidedProposal = null
         val resources = SearchInvocationResources()
         resources.own(authority)

@@ -145,7 +145,14 @@ coverage until the proposal finishes or the companion's existing allowance retir
 it. This trial grants no incumbent reward and does not renew work, allocation or
 active time. Completion-enabled companion repair uses adaptive neighborhood
 widths after the small first proposal, within the same integer selection, proposal
-and funding ceilings. Later proposals use ordinary worker selection.
+and funding ceilings. Proposals after the initial trial use ordinary worker selection.
+
+When shared guidance identifies more displaced integers than the small first
+proposal can release, a refuted small neighborhood keeps the initial trial pending
+through its first enlarged adaptive proposal. Owed complete-worker coverage still
+precedes continuation. A checked discovery, an unavailable query or completion of
+the enlarged proposal ends the trial; its work and lifetime are cumulative.
+Continuation earns no reward and cannot renew the companion's allowance.
 
 The numerical companion can retain one completed root relaxation point for checked
 handoff repair. A private snapshot belongs to the same captured source context and
@@ -519,8 +526,7 @@ An available dimension-compatible incumbent requests continuation through root a
 preparation and the first proposal, behind owed complete-worker coverage and within
 the existing active cap. Availability grants no import authority; the source checks
 still complete advisory coordinates and admit the center. A declined center clears
-the preparation request, and a completed or declined first proposal returns to
-ordinary selection.
+the preparation request. Completed or declined trials return to ordinary selection.
 
 A numerical optimum or refutation can complete the finite
 invocation only after its typed terminal verifies against the same captured working

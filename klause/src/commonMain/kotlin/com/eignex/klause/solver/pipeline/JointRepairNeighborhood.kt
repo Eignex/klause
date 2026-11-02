@@ -20,6 +20,7 @@ internal class JointRepairNeighborhood private constructor(
     }
     private var seeds = inputs?.toList() ?: (0 until integers).toList()
     private var guidedSeeds: List<Int>? = null
+    val guidedIntegerCount: Int get() = guidedSeeds?.size ?: 0
     var selectedIntegers: Long = 0
         private set
     var visitedEntries: Long = 0

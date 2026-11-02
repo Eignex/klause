@@ -15,12 +15,15 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
+import com.eignex.klause.lp.SourceLpBudget
+import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceClaim
+import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
@@ -41,6 +44,43 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
+    @Test
+    fun `a guided checked trial should continue through its first enlarged neighborhood`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+        val guidance = LinearRepairGuidance()
+        guidance.remember(source, (0..2).associate {
+            SourceCoordinate(SourceCoordinate.Kind.Integer, it) to 0.0
+        }, SourceLpBudget(funding = funding), Cancellation.Never)
+        val seed = Sample(booleanArrayOf(), longArrayOf(1, 1, 1))
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 3, maxFlips = 3),
+            external = { seed }, repairGuidance = guidance).use { repair ->
+            repair.search(adaptive = true).use { search ->
+                repeat(64) {
+                    if (repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures") != 1L) {
+                        search.advance(Cancellation.Never, 1)
+                    }
+                }
+                assertTrue(repair.incumbentTrialPending)
+                var done = false
+                repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
+
+                val result = search.minimizeResult(TerminationReason.BudgetExhausted)
+                assertEquals(0.0, assertIs<MinimizeResult.BestFound>(result).objective)
+                assertFalse(repair.incumbentTrialPending)
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairEnlargedTrialStarts"))
+            }
+        }
+    }
+
     @Test
     fun `shared guidance should free a coupled improving pair before an agreeing row neighbor`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
