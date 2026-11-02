@@ -83,6 +83,7 @@ private fun PropagationState.generalCapPolicy(
         budget.visit(0L)
         val kind = learnedKind(index)
         learned.retire(index, kind)
+        arithmeticLearningTrace?.integerCensus?.retire(baseFactorCount + index)
         factorAttribution?.retire(prop)
         if (prop is ClausePropagator) forgetDeferredClause(prop.literals)
         if (prop is LearnedIntegerPropagator) checkNotNull(learned.integerRows).unlink(prop)

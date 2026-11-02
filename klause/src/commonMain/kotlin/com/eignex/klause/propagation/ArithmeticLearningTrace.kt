@@ -22,6 +22,12 @@ internal class ArithmeticLearningTrace(
         private set
     var captureFirstInteger = false
     var collectDeclines = false
+        set(value) {
+            field = value
+            integerCensus = if (value) integerCensus ?: IntegerLearningCensus() else null
+        }
+    var integerCensus: IntegerLearningCensus? = null
+        private set
     private val declineNames = ArrayList<String>()
     private val declineIndices = HashMap<String, Int>()
     private val declineTotals = LongArray(DECLINE_CENSUS_KINDS)
@@ -241,6 +247,7 @@ internal class ArithmeticLearningTrace(
     }
 
     fun remap(base: Int, remap: IntArray) {
+        integerCensus?.remap(base, remap)
         if (!accepting) return
         val retained = mutableMapOf<Int, Int>()
         for ((factor, id) in storedIds) {

@@ -1035,7 +1035,11 @@ class PropagationSession private constructor(
             if (state.nativeEngine == null) it.admit(state.factorAt(newFid))
             else if (it.admissionFamilies != 0) it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)
         }
-        val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid, cancellation = cancellation)
+        val conflict = try {
+            state.runToFixpoint(allFactors = false, initialFactor = newFid, cancellation = cancellation)
+        } finally {
+            state.arithmeticLearningTrace?.integerCensus?.admissionFinished(newFid)
+        }
         if (conflict != null) return revertAndUnsat(conflict)
         // The asserted facts are implied by the decisions up to the current level, so they join the
         // level's baseline: re-snapshot the top mark. Otherwise the next failed pin's revert — which
@@ -1392,7 +1396,8 @@ class PropagationSession private constructor(
             "learningIntegerTransientConsumed" to it.integerTransientConsumed,
         )
         if (it.integerRowLearning) {
-            counts + diagnostics + transientLifecycle + ("learningIntegerSessions" to 1L)
+            counts + diagnostics + transientLifecycle + (attached?.integerCensus?.snapshot() ?: emptyMap()) +
+                ("learningIntegerSessions" to 1L)
         } else counts
     } ?: retiredLifecycle
 

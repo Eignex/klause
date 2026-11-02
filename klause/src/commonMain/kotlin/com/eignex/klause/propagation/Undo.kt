@@ -129,6 +129,7 @@ internal fun PropagationState.prepareMark(): Iterator<PropagationState.LevelMark
  */
 internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
     pendingFiniteMutation = null
+    if (undo.size > mark.undoSize) arithmeticLearningTrace?.integerCensus?.retracted()
     replayVarUndo(mark.undoSize)
     undo.truncateTo(mark.undoSize)
     restoreReversibleCells(mark.revSize)

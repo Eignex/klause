@@ -138,6 +138,18 @@ or evidence of benefit. Temporary-row diagnostics report their construction coun
 largest width and largest normalized coefficient magnitude, including after
 retirement; these observations do not count as learned-row admission or consumption.
 
+The same opt-in recorder counts admitted integer-row widths, largest coefficient and
+binary-domain shapes. A binary row equivalent to a clause is classified by the
+number of necessary violating endpoints, including clauses shorter than the row;
+other nonconstant binary inequalities remain separate. Arithmetic overflow withholds
+that shape classification. At most 64 live factor identities retain
+use flags, with no row or premise payloads. Admission-fixpoint use, later use and use
+after an actual variable-trail rewind have separate event and distinct-row totals.
+Post-undo use identifies retraction followed by a deduction or conflict, without
+claiming a sibling branch, causal benefit or source validation. Compaction remaps
+identities and retirement releases them; saturation and untracked admissions remain
+explicit. Completed totals survive session retirement.
+
 The controls preserve propagation order, containing cancellation, historical trail
 boundaries and reason authority. Eager support observations occur at reason delivery;
 their construction cost is included in factor propagation. Lazy reconstruction and

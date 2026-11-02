@@ -169,6 +169,7 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     val rows = learned.integerRows ?: LearnedIntegerRows().also { learned.integerRows = it; work++ }
     work += rows.admissionWork
     rows.admit(propagator)
+    arithmeticLearningTrace?.integerCensus?.admit(factor, row, problem.intBounds)
     arithmeticLearningTrace?.stored(factor, "integer")
     learned.lbds.add(lbd)
     learned.permanent.add(0)
@@ -247,6 +248,7 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
     }
     val idx = fid - problem.numFactors
     if (idx !in 0 until learned.size || learned.retiredOf(idx)) return
+    arithmeticLearningTrace?.integerCensus?.used(fid)
     factorAttribution?.used(learned.store[idx])
     noteLearnedStage(idx, LearnedStage.Consumed, 2)
     if (!learned.usedOf(idx)) learned.importUses.note(learned.origins[idx])

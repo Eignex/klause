@@ -22,6 +22,119 @@ import kotlin.test.assertTrue
 
 class ArithmeticLearningTraceTest {
     @Test
+    fun `integer census should classify normalized binary row shapes`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, emptyArray())
+        val variants = listOf(
+            Triple(mapOf(0 to 2L, 1 to -3L), 1L, "BinaryClause"),
+            Triple(mapOf(0 to 2L, 1 to -3L), -1L, "BinaryClause"),
+            Triple(mapOf(0 to 1L, 1 to 1L, 2 to -1L), 0L, "BinaryNonclausal"),
+            Triple(mapOf(0 to 2L, 1 to -3L), 2L, "BinaryTautology"),
+            Triple(mapOf(0 to 2L, 1 to -3L), -4L, "BinaryImpossible"),
+            Triple(mapOf(0 to Long.MAX_VALUE, 1 to 1L), 1L, "ShapeUnavailable"),
+        )
+        for ((terms, bound, shape) in variants) {
+            val census = IntegerLearningCensus()
+            val row = requireNotNull(IntegerConflictRow.normalized(terms, bound, Lit.NONE))
+
+            census.admit(0, row, problem.intBounds)
+
+            val snapshot = census.snapshot()
+            assertEquals(1L, snapshot["learningIntegerCensus" + shape])
+            assertEquals(1L, snapshot["learningIntegerCensusBinary"])
+            assertEquals(1L, snapshot["learningIntegerCensusWidth" + terms.size])
+            if (shape == "BinaryClause") {
+                assertEquals(1L, snapshot["learningIntegerCensusClauseWidth" + if (bound == -1L) 1 else 2])
+            }
+        }
+    }
+
+    @Test
+    fun `integer census should withhold binary shape on a wider declared domain`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 6) }, emptyArray())
+        val row = requireNotNull(IntegerConflictRow.normalized(mapOf(0 to 2L, 1 to -3L), 1L, Lit.make(0, true)))
+        val census = IntegerLearningCensus()
+
+        census.admit(0, row, problem.intBounds)
+
+        assertEquals(0L, census.snapshot()["learningIntegerCensusBinary"])
+        assertEquals(1L, census.snapshot()["learningIntegerCensusGuarded"])
+        assertEquals(3L, census.snapshot()["learningIntegerCensusMaxCoefficient"])
+    }
+
+    @Test
+    fun `integer census should preserve use identity through compaction and retirement`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val row = requireNotNull(IntegerConflictRow.normalized(mapOf(0 to 1L), 0L, Lit.NONE))
+        val census = IntegerLearningCensus()
+        census.admit(4, row, problem.intBounds)
+        census.used(4)
+        census.admissionFinished(4)
+        census.used(4)
+        census.retracted()
+        census.remap(3, intArrayOf(-1, 0))
+        repeat(2) { census.used(3) }
+
+        census.retire(3)
+        census.used(3)
+
+        val snapshot = census.snapshot()
+        assertEquals(4L, snapshot["learningIntegerCensusUseEvents"])
+        assertEquals(1L, snapshot["learningIntegerCensusAdmissionUseEvents"])
+        assertEquals(3L, snapshot["learningIntegerCensusLaterUseEvents"])
+        assertEquals(2L, snapshot["learningIntegerCensusPostUndoUseEvents"])
+        assertEquals(1L, snapshot["learningIntegerCensusPostUndoUsedRows"])
+        assertEquals(1L, snapshot["learningIntegerCensusRetired"])
+        assertEquals(0, census.retainedEntries)
+    }
+
+    @Test
+    fun `integer census should bound live identities without dropping admission totals`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val row = requireNotNull(IntegerConflictRow.normalized(mapOf(0 to 1L), 0L, Lit.NONE))
+        val census = IntegerLearningCensus()
+
+        repeat(80) { census.admit(it, row, problem.intBounds) }
+        census.remap(0, IntArray(80) { -1 })
+
+        assertEquals(80L, census.snapshot()["learningIntegerCensusAdmitted"])
+        assertEquals(16L, census.snapshot()["learningIntegerCensusUntracked"])
+        assertEquals(64L, census.snapshot()["learningIntegerCensusRetired"])
+        assertEquals(0, census.retainedEntries)
+    }
+
+    @Test
+    fun `integer census should observe a retained row after retraction`() {
+        val problem = Problem(0, 3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ))
+        val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+        native.enableIntegerRowLearning()
+        val cp = CpSearchComponent(native)
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(2, 7)))
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(0, 2)))
+        val learned = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(learned.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(learned.apply(shared))
+        val admission = native.learnedLifecycle()
+        shared.popTo(0)
+
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(2, 11)))
+
+        val later = native.learnedLifecycle()
+        assertEquals(1L, admission["learningIntegerCensusAdmitted"])
+        assertEquals(1L, admission["learningIntegerCensusAdmissionUseEvents"])
+        assertEquals(0L, admission["learningIntegerCensusPostUndoUseEvents"])
+        assertEquals(1L, later["learningIntegerCensusPostUndoUsedRows"])
+        assertEquals(2L, native.intDomain(0).max)
+        native.releaseRetainedState()
+        assertEquals(later, native.learnedLifecycle())
+    }
+
+    @Test
     fun `integer attribution should report bounded declines after retirement`() {
         val session = PropagationSession(PropagationProblem(Problem(0, 0, emptyArray(), emptyArray())),
             attribution = true)
