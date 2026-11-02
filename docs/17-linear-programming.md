@@ -1403,7 +1403,9 @@ Exact mechanisms have no default internal clock cap but keep work and memory
 limits and caller cancellation; root LP keeps a deadline backstop. Fallback,
 retries and nested operations share one invocation allowance, and setup, failed
 attempts and cleanup are charged. Cheap exact arithmetic charges operand
-word-length squared.
+word-length squared. Certifier pricing has a one-word coefficient floor, which
+compact integer storage already establishes. IEEE and retained exact matrices
+inspect their rational numerator and denominator widths.
 
 Reconstruction and refinement poll ordinary tokens every 64 calls or 4096 work,
 while resource caps are checked on every charge. Cancelled evidence is discarded.

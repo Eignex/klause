@@ -4,6 +4,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -115,6 +116,45 @@ internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = 
 }
 
 class LpSolverTest {
+
+    @Test
+    fun `compact coefficient scans should preserve conservative word prices`() {
+        for (coefficient in longArrayOf(0L, Long.MIN_VALUE, Long.MAX_VALUE)) {
+            val model = LpBuilder().apply {
+                val column = addVar(0L, 1L)
+                addRow(intArrayOf(column), longArrayOf(coefficient), Relation.LE, 0L)
+            }.build(Sense.MINIMIZE)
+            val entries = model.csc.rowIdx.size.toLong() + model.numVars + model.m
+            val widths = listOf(1 to 1L, 64 to 1L, 65 to 4L, 128 to 4L, 129 to 9L,
+                Int.MAX_VALUE to (1L shl 50))
+
+            for ((operandBits, multiplier) in widths) {
+                val scans = LpScanCount(model)
+
+                scans.scan(operandBits)
+
+                assertEquals(entries * multiplier, scans.cost().work)
+            }
+        }
+    }
+
+    @Test
+    fun `noncompact coefficient scans should retain rational denominator prices`() {
+        val ieee = LpBuilder().apply {
+            val column = addRealVar(0.0, 1.0)
+            addRealRow(intArrayOf(column), doubleArrayOf(Double.MIN_VALUE), Relation.LE, 1.0)
+        }.build(Sense.MINIMIZE)
+        val retained = assertNotNull(LpExactState(assertNotNull(ieee.authoritativeModel())).toWorkingModel())
+
+        for (model in listOf(ieee, retained)) {
+            val scans = LpScanCount(model)
+            val entries = (model.doubleView?.colPtr ?: model.csc.colPtr)[model.n].toLong() + model.numVars + model.m
+
+            scans.scan()
+
+            assertEquals(entries * 289L, scans.cost().work)
+        }
+    }
 
     @Test
     fun `factory should receive general component persistent and tableau construction`() {

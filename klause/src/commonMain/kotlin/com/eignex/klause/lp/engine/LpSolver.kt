@@ -31,7 +31,12 @@ internal class LpScanCount(private val model: LpModel) {
 
     /** One pass whose operand values are at most [operandBits] wide. */
     fun scan(operandBits: Int = Long.SIZE_BITS) {
-        val words = (maxOf(model.coefficientBits, Long.SIZE_BITS) + operandBits - 1L) / Long.SIZE_BITS
+        val coefficientBits = if (model.hasContinuous) {
+            maxOf(model.coefficientBits, Long.SIZE_BITS)
+        } else {
+            Long.SIZE_BITS
+        }
+        val words = (coefficientBits.toLong() + operandBits - 1L) / Long.SIZE_BITS
         val square = words * words
         units = if (units > Long.MAX_VALUE - square) Long.MAX_VALUE else units + square
     }
