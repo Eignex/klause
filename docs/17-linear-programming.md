@@ -424,11 +424,14 @@ Retired unselected candidates
 are omitted from proof replay as well as scoring. Masked-query reuse distinguishes
 whether unselected candidates are checked; installed cuts retain fresh source
 verification under the current scope.
-Managed current masks and fully installed selected families retain retired row
-definitions as inactive numerical rows. Selected-layout retention does not authorize
+Managed current masks and fully checked selected families retain unselected and
+retired row definitions as inactive numerical rows. A completed scoring scan with
+an installed or newly selected cut can retain the candidate layout within the
+same pool and preparation limits. Layout retention does not change discovery
+cooldown or authorize
 reusing point-directed definitions as the ordinary current recipe.
 Their free logical columns impose no restriction and carry zero certificate
-multiplier. This preserves a compatible numerical owner across retirement.
+multiplier. This preserves a compatible numerical owner across additions and retirement.
 Suspension maps source row IDs through equality packing; both sides of a packed
 equality must have matching activity. An incompatible mask declines retained
 guidance, keeping failed mapping and ordinary fallback costs in the containing

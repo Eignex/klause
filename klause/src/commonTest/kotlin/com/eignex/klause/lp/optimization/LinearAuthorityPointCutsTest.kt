@@ -236,6 +236,77 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `adding another checked cut should retain the numerical owner`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val context = SourceProofContext(mixedMaximum.scope.copy(
+            objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            mixedMaximum.coordinates + setOf(y, other), mixedMaximum.premises + mapOf(
+                "other mixed" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+                "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE),
+                    BigFraction.ofLong(2))),
+            ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            val first = authority.advanceWithPointCuts(context, Cancellation.Never)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(9) * BigFraction.ofLong(2).reciprocal()),
+                (assertNotNull(first.bound).claim as SourceClaim.Bound).value)
+            val preparations = authority.preparations
+
+            val second = authority.advanceWithPointCuts(context, Cancellation.Never)
+
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(4)),
+                (assertNotNull(second.bound).claim as SourceClaim.Bound).value)
+            assertEquals(preparations, authority.preparations)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context.withLinearAuthority())
+                .verify(assertNotNull(second.bound)))
+        }
+    }
+
+    @Test
+    fun `retained unselected definitions should not replace the ordinary current recipe`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val context = SourceProofContext(mixedMaximum.scope.copy(
+            objective = SourceObjective("sum", ObjectiveSense.MAXIMIZE)),
+            mixedMaximum.coordinates + setOf(y, other), mixedMaximum.premises + mapOf(
+                "other mixed" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    other to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+                "other lower" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+                "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE),
+                    BigFraction.ofLong(2))),
+            ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.advanceWithPointCuts(context, Cancellation.Never)
+
+            val result = authority.advance(context, Cancellation.Never, cuts = true)
+
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(5)),
+                (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `an unchecked candidate should prevent retaining its family layout`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("y upper")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE), emptySet(), Cancellation.Never)
+
+        assertEquals(setOf(0), selected)
+        assertFalse(selection.retainsCandidateLayout(rows))
+    }
+
+    @Test
     fun `candidate cooldown should avoid repeated scoring work`() {
         val rows = listOf(LinearAuthorityCut(0,
             SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE), SourceDerivation.Premise("upper")))
@@ -445,6 +516,7 @@ class LinearAuthorityPointCutsTest {
         assertEquals(setOf(0, 1), installed)
         assertEquals(null, selection.observations["numericalCutSelectionRetiredInstalled"])
         assertEquals(null, selection.observations["numericalCutSelectionRetiredFamilies"])
+        assertFalse(selection.retainsCandidateLayout(rows))
     }
 
     @Test
