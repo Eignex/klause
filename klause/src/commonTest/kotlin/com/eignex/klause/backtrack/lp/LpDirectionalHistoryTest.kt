@@ -9,6 +9,25 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `a child observation does not create another parent bound`() {
+        val observations = ArrayList<String>()
+        val history = LpDirectionalHistory(observations::add)
+        history.beginNode(0)
+        history.record(10.0)
+        history.branch(VarRef.IntVar(0), 2.25)
+        history.commit(SearchDecision.IntAtMost(0, 2), 1)
+        history.beginNode(1)
+
+        assertTrue(history.observeChild(11.0))
+        history.branch(VarRef.IntVar(1), 0.5)
+        history.commit(SearchDecision.IntAtMost(1, 0), 2)
+        history.beginNode(2)
+        history.record(20.0)
+
+        assertEquals(1, observations.count { it == "DOWN" })
+    }
+
+    @Test
     fun `both directions need two observations before scoring`() {
         val history = LpDirectionalHistory({})
         val variable = VarRef.IntVar(0)

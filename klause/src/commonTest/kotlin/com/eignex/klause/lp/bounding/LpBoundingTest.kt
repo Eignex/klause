@@ -18,6 +18,7 @@ import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
@@ -60,6 +61,58 @@ class LpBoundingTest {
     )
 
     private val sumObjective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
+
+    @Test
+    fun `finite bound observations reuse ordinary pruning without an LP query`() {
+        val problem = triangle(1)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L), constant = 17L)
+        val sink = SolveStatsSink("finite-bound-observation")
+        val observed = ArrayList<Long>()
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan()), sink).use { engine ->
+            engine.lpHints = object : LpHintSink {
+                override val finiteBoundWork = 15L
+                override fun clear() = Unit
+                override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) = Unit
+                override fun recordFiniteBound(state: LpExactState?, sourceBound: Long) { observed.add(sourceBound) }
+            }
+            val session = PropagationSession(problem)
+
+            engine.pruneNode(session, 18.0, -1, true)
+            engine.pruneNode(session, Double.POSITIVE_INFINITY, -1, true)
+            engine.pruneNode(session, 17.0, -1, true)
+        }
+
+        assertEquals(listOf(17L, 17L), observed)
+        assertEquals(0.0, sink.lp.solves.sum)
+    }
+
+    @Test
+    fun `finite bound observations decline exhausted containing work`() {
+        for (allowance in listOf(0L, 18L, 19L)) {
+            val problem = triangle(1)
+            val objective = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
+            val sink = SolveStatsSink("finite-bound-allowance")
+            var remaining = allowance
+            var observed = 0
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan()), sink,
+                nodeWorkAllowance = { remaining }, containingWork = { remaining -= it }).use { engine ->
+                engine.lpHints = object : LpHintSink {
+                    override val finiteBoundWork = 15L
+                    override fun clear() = Unit
+                    override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) = Unit
+                    override fun recordFiniteBound(state: LpExactState?, sourceBound: Long) {
+                        engine.noteNodeOverhead(15L)
+                        observed++
+                    }
+                }
+
+                engine.pruneNode(PropagationSession(problem), 1.0, -1, true)
+
+                assertEquals(if (allowance == 19L) 1 else 0, observed, allowance.toString())
+                assertEquals(if (allowance == 19L) 0L else allowance, remaining, allowance.toString())
+            }
+        }
+    }
 
     @Test
     fun `unfinished node iterates supply checked bound guidance without the objective constant`() {

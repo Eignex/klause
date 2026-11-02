@@ -30,6 +30,27 @@ import kotlin.test.assertTrue
 
 class ResumableMinimizeDirectionalTest {
     @Test
+    fun `finite search records an immediate child pruned by its objective bound`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, arrayOf<Factor>(
+            Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 3L),
+            Linear(longArrayOf(1L, 1L), intArrayOf(1, 2), LinearOp.GE, 2L),
+            Linear(longArrayOf(3L, 1L), intArrayOf(0, 2), LinearOp.GE, 4L),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(2L, 3L, 4L))
+        val params = BacktrackParams(randomSeed = 3L, maxDecisions = 64L, objectiveBoundSupplier = { 10.0 },
+            lpDirectionalGains = true,
+            lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
+                boundMaxOpsPerNode = 0L))
+        ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
+            var slices = 0
+            while (slices++ < 8 && !search.isDone) search.runSlice(Cancellation.Never, 1000L, 8L) {}
+
+            val observations = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
+            assertTrue((observations?.get("FINITE_BOUND_RECORDED") ?: 0L) > 0L, observations.toString())
+        }
+    }
+
+    @Test
     fun `finite search consumes observed child advice across cooperative slices`() {
         val blocks = 4
         val variables = blocks * 3

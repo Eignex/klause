@@ -271,6 +271,13 @@ the fallback estimate. Switching between checked bounds and floating optima clea
 history, so the two estimate kinds never train the same gains.
 The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
+An ordinary finite objective lower bound can complete a pending immediate-child
+observation when no LP child bound was recorded. It requires the same checked-bound
+parent, retained base, active rows, cutoff, publication version and exact external
+context. Subtracting the scoped constant in checked integer arithmetic precedes
+floating conversion. This completion supplies no fresh LP point or new parent
+observation. Objective-bound pruning can supply progress; pure infeasibility cannot.
+Unsupported or overflowing bounds retain the missing-observation fallback.
 
 The `lp-default` and `lp-aggressive` optimization recipes enable the finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or

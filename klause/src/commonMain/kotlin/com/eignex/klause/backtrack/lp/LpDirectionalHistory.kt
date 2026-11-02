@@ -44,6 +44,8 @@ internal class LpDirectionalHistory(
 
     val hasObservations: Boolean get() = gains.isNotEmpty()
 
+    val hasPendingChild: Boolean get() = pending != null
+
     val mayHaveScores: Boolean get() = reliableStamp >= 0L && stamp - reliableStamp <= maxAge
 
     fun clear(report: Boolean = true) {
@@ -71,19 +73,25 @@ internal class LpDirectionalHistory(
 
     fun record(value: Double) {
         objective = value
-        val child = pending ?: return
+        observeChild(value)
+    }
+
+    fun observeChild(value: Double): Boolean {
+        val child = pending ?: return false
+        charge(7L)
         pending = null
         val gain = value - child.parent.objective
         val normalized = gain / child.distance
         if (!gain.isFinite() || gain < 0.0 || !normalized.isFinite()) {
             observe("UNUSABLE")
             observeDirection("UNUSABLE", child)
-            return
+            return false
         }
         val history = gains.getOrPut(child.parent.variable, ::Gains)
         update(if (child.up) history.up else history.down, normalized)
         if (recent(history)) reliableStamp = stamp
         observe(if (child.up) "UP" else "DOWN")
+        return true
     }
 
     fun branch(variable: VarRef, value: Double) {

@@ -27,6 +27,8 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -47,6 +49,124 @@ class LpHintsTest {
         }
         hints.record(rel, primal, DoubleArray(rel.model.m))
         return hints
+    }
+
+    @Test
+    fun `finite child bounds train history without refreshing the LP point`() {
+        for (constant in listOf(0L, 1L shl 60, -(1L shl 60))) {
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                BooleanArray(1), constant, intArrayOf(0), IntArray(0))
+            val observations = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = true, observe = observations::add)
+            val variable = VarRef.IntVar(0)
+            val domain = IntDomain(0, 10)
+            repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+                hints.branch(variable, domain)
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                    hints.beginNode(1, 100.0)
+                    val bound = constant + if (up) 13L else 11L
+
+                    hints.recordFiniteBound(trail.state, bound)
+                    hints.recordFiniteBound(trail.state, bound)
+                    hints.finishNode(trail.state)
+
+                    assertFalse(hints.prepareSide(variable, domain, allowBasis = false) { _, _ -> null })
+                }
+            }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            hints.prepareSide(variable, domain, allowBasis = false) { _, _ -> null }
+            hints.branch(variable, domain)
+            val existing = listOf(SearchDecision.IntAtMost(0, 2), SearchDecision.IntAtLeast(0, 3))
+
+            assertEquals(existing.reversed(), hints.orderAlternatives(variable, existing, allowBasis = false))
+            assertEquals(4, observations.count { it == "FINITE_BOUND_RECORDED" })
+        }
+    }
+
+    @Test
+    fun `finite child observations require the matching checked parent context`() {
+        for (change in listOf("same", "equal", "weaker", "cutoff", "incumbent", "external", "rows", "floating",
+            "LP bound", "disabled", "overflow", "unavailable", "infeasible", "absent")) {
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val constant = if (change == "overflow") -1L else 0L
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                BooleanArray(1), constant, intArrayOf(0), IntArray(0))
+            val observations = ArrayList<String>()
+            val hints = LpHints(1, 0, directionalGains = change != "disabled", observe = observations::add)
+            val first = BigFraction.ofLong((1L shl 60) + 32L)
+            val second = BigFraction.ofLong((1L shl 60) + 33L)
+            hints.beginNode(0, 100.0, 1L, first)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            if (change == "floating") hints.recordObjective(relaxation, 10.0) else hints.recordBound(relaxation, 10.0)
+            if (change != "absent") {
+                hints.branch(VarRef.IntVar(0))
+                hints.commit(SearchDecision.IntAtMost(0, 2), 1)
+            }
+            hints.beginNode(1, if (change == "cutoff") 99.0 else 100.0,
+                if (change == "incumbent") 2L else 1L, if (change == "external") second else first)
+            if (change == "rows") assertTrue(trail.append(
+                LpScopedRow(0L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(8L),
+                    ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))), scoped = false,
+            ))
+            if (change == "LP bound") {
+                hints.record(relaxation, doubleArrayOf(2.0), DoubleArray(0))
+                hints.recordBound(relaxation, 11.0)
+            }
+            if (change == "infeasible") hints.recordInfeasible()
+            val bound = when (change) {
+                "equal" -> 10L
+                "weaker" -> 9L
+                "overflow" -> Long.MAX_VALUE
+                "unavailable" -> Long.MIN_VALUE
+                else -> 11L
+            }
+
+            hints.recordFiniteBound(trail.state, bound)
+            hints.finishNode(trail.state)
+
+            assertEquals(if (change == "same" || change == "equal") 1 else 0,
+                observations.count { it == "FINITE_BOUND_RECORDED" }, change)
+            if (change == "LP bound") assertEquals(1, observations.count { it == "DOWN" })
+        }
+    }
+
+    @Test
+    fun `finite bound reservation failure preserves the pending child`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+        var remaining = Long.MAX_VALUE
+        val observations = ArrayList<String>()
+        val hints = LpHints(1, 0, directionalGains = true, observe = observations::add, charge = { work ->
+            require(work <= remaining)
+            remaining -= work
+        })
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+        hints.recordBound(relaxation, 10.0)
+        hints.branch(VarRef.IntVar(0))
+        hints.commit(SearchDecision.IntAtMost(0, 2), 1)
+        hints.beginNode(1, 100.0)
+        remaining = 7L
+
+        assertFailsWith<IllegalArgumentException> { hints.recordFiniteBound(trail.state, 11L) }
+        remaining = Long.MAX_VALUE
+        hints.recordFiniteBound(trail.state, 11L)
+
+        assertEquals(1, observations.count { it == "DOWN" })
     }
 
     @Test

@@ -992,20 +992,51 @@ internal class LpEngine(
     ): Boolean {
         requireOpen()
         lpBackjump = null
-        for (b in bounds) {
-            if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) {
-                if (b !is LpSimplexBound) lpHints?.recordUnavailable(LpHintUnavailable.EARLIER_BOUND)
-                return true
-            }
+        val finiteHints = lpHints?.takeIf {
+            val work = it.finiteBoundWork
+            work > 0L && finiteBoundWorkFits(work + 4L)
         }
-        return false
+        if (finiteHints != null) {
+            noteNodeOverhead(4L)
+            captureFiniteObjectiveBound = true
+            finiteObjectiveBound = Long.MIN_VALUE
+        }
+        try {
+            for (b in bounds) {
+                if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) {
+                    if (b !is LpSimplexBound) lpHints?.recordUnavailable(LpHintUnavailable.EARLIER_BOUND)
+                    if (b is LinearBound) recordFiniteObjectiveBound(finiteHints)
+                    return true
+                }
+            }
+            recordFiniteObjectiveBound(finiteHints)
+            return false
+        } finally {
+            if (finiteHints != null) captureFiniteObjectiveBound = false
+        }
     }
+
+    private fun finiteBoundWorkFits(work: Long): Boolean = !params.cancellation() &&
+        nodeWorkAllowance()?.let { it >= work } != false &&
+        lpEffortGovernor.remainingWork()?.let { it >= work } != false
+
+    private fun recordFiniteObjectiveBound(hints: LpHintSink?) {
+        if (hints == null || finiteObjectiveBound == Long.MIN_VALUE) return
+        val work = hints.finiteBoundWork
+        if (work > 0L && finiteBoundWorkFits(work)) {
+            hints.recordFiniteBound(cpAdapter.currentModel?.exactState, finiteObjectiveBound)
+        }
+    }
+
+    private var captureFiniteObjectiveBound = false
+    private var finiteObjectiveBound = Long.MIN_VALUE
 
     internal fun linearBoundDominates(session: PropagationSession, cutoff: Double): Boolean {
         if (cutoff.isNaN() || cutoff == Double.POSITIVE_INFINITY) return false
         if (cutoff == Double.NEGATIVE_INFINITY) return true
         if (abs(cutoff) < 9_007_199_254_740_992.0) {
             val lower = linearLowerBound(objective, session)
+            if (captureFiniteObjectiveBound) finiteObjectiveBound = lower
             return lower != Long.MIN_VALUE && lower >= cutoff
         }
 

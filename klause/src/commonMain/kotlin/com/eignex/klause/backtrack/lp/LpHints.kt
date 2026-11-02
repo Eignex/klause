@@ -12,7 +12,9 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.subExact
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.min
@@ -184,6 +186,38 @@ internal class LpHints(
     override fun recordUnavailable(reason: LpHintUnavailable) {
         if (scopeModel != null) charge(1L)
         unavailable = reason
+    }
+
+    override val finiteBoundWork: Long get() = if (collect && directionalGains && scopeChecked &&
+        !boundRecorded && history.hasPendingChild
+    ) 15L + cutoffComparisonWork() else 0L
+
+    override fun recordFiniteBound(state: LpExactState?, sourceBound: Long) {
+        if (!finiteBoundCompatible(state)) return
+        charge(3L)
+        if (sourceBound == Long.MIN_VALUE) {
+            observe("FINITE_BOUND_UNAVAILABLE")
+            return
+        }
+        val value = try {
+            subExact(sourceBound, scopeConstant)
+        } catch (_: CheckedLongOverflowException) {
+            observe("FINITE_BOUND_UNAVAILABLE")
+            return
+        }
+        observe("FINITE_BOUND_PREPARED")
+        val accepted = history.observeChild(value.toDouble())
+        if (accepted) {
+            charge(1L)
+            observe("FINITE_BOUND_RECORDED")
+        }
+    }
+
+    private fun finiteBoundCompatible(state: LpExactState?): Boolean {
+        if (finiteBoundWork == 0L || state == null || scopeModel !== state.baseModel || scopeRows !== state.rows
+        ) return false
+        charge(4L + cutoffComparisonWork())
+        return scopeCutoff == cutoff && scopeIncumbentVersion == incumbentVersion && scopeExternalExact == externalExact
     }
 
     fun finishNode(state: LpExactState? = null) {

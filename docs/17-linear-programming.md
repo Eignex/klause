@@ -183,6 +183,12 @@ When no certificate is needed, an existing floating optimum can supply the advis
 estimate; the search keeps that estimate kind in its history scope.
 Unavailable callbacks identify admission gates and incomplete numerical outcomes;
 they carry no optimum, bound or query authorization.
+The ordinary finite linear-bound check can retain its already computed integer
+lower bound for a pending child observation, including a node it prunes. Capture
+and delivery require remaining containing and cumulative LP work; actual work is
+charged at each step. Infinite cutoffs, the large exact-cutoff path and overflow
+supply no retained scalar. The callback performs no extra domain scan, numerical
+query or certification, and publishes neither a point nor a new pruning bound.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
 history lifetime. An optional numerical capability estimates directional objective
 costs from a retained optimal basis for at most two structural columns; finite child

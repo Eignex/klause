@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.util.Cancellation
@@ -53,6 +54,10 @@ internal enum class LpHintUnavailable {
  * type) is what lets the engine live below the search layer.
  */
 internal interface LpHintSink {
+    val finiteBoundWork: Long get() = 0L
+
+    fun recordFiniteBound(state: LpExactState?, sourceBound: Long) {}
+
     fun clear()
 
     /** Advisory numeric projection of an accepted bound in minimized working units; adds no proof authority. */
