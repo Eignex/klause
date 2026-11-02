@@ -960,17 +960,17 @@ Feasibility gradients are recomputed after each step. The sparse breakpoint
 workspace, ordering and value updates consume the same floating work and
 iteration allowance as other pivots.
 
-Empty structural columns price at zero, and singleton columns use one stored-entry
-product with a zero accumulator. Other columns pass the current owned CSC matrix
-to Koblas's validated column dot. Pricing reads the installed CSC arrays without
+Structural columns with at most two stored entries price in storage order from a
+zero accumulator. Other columns pass the current owned CSC matrix to Koblas's
+validated column dot. Pricing reads the installed CSC arrays without
 column copies; an unscaled fallback refreshes those arrays with its matrix and
 retires the basis backend. Stored zeros and current coefficient values retain
 stored-entry arithmetic.
 
 Sparse accumulation skips empty columns and treats a zero multiplier as a no-op.
-A singleton with a nonzero multiplier updates its stored row directly from the
-current CSC arrays; larger columns use the validated backend. Work charges belong
-to the calling solve operation.
+Columns with at most two entries update their stored rows directly from the current
+CSC arrays; larger columns use the validated backend. Work charges belong to the
+calling solve operation.
 
 Dual leaving selection uses verified Devex, reselecting when a maintained weight
 falls below `0.25 * norm(rho)^2`. Entering selection uses a scaled Harris window,

@@ -43,15 +43,6 @@ if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
 // default repository set.
 allprojects {
     val targetProject = this
-    // Fresh CLI invocations use callbacks and type dispatch before the JVM can amortize linkage.
-    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
-        compilerOptions.freeCompilerArgs.addAll(listOf(
-            "-Xlambdas=class",
-            "-Xsam-conversions=class",
-            "-Xstring-concat=inline",
-            "-Xwhen-expressions=inline",
-        ))
-    }
     // Direct consumers need platform constraints because timestamped KMP roots redirect to mutable snapshots.
     configurations.matching { it.name == "commonMainImplementation" || it.name == "implementation" }.all {
         for ((module, pinned) in koblasPins + skemaPins + kumulantPins) {

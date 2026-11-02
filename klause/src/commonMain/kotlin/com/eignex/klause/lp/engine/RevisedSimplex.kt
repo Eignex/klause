@@ -557,8 +557,11 @@ internal class RevisedSimplex(
         if (j >= n) return y[j - n]
         val from = colPtr[j]
         val until = colPtr[j + 1]
-        if (from == until) return 0.0
-        if (until == from + 1) return 0.0 + colVal[from] * y[rowIdx[from]]
+        if (until - from <= 2) {
+            var value = 0.0
+            for (at in from until until) value += colVal[at] * y[rowIdx[at]]
+            return value
+        }
         return koblas.sparseKernels.dotColumn(columns, j, y)
     }
 
@@ -834,10 +837,11 @@ internal class RevisedSimplex(
         if (alpha == 0.0) return
         val from = colPtr[column]
         val until = colPtr[column + 1]
-        if (from == until) return
-        if (until == from + 1) {
-            val row = rowIdx[from]
-            destination[row] += alpha * colVal[from]
+        if (until - from <= 2) {
+            for (at in from until until) {
+                val row = rowIdx[at]
+                destination[row] += alpha * colVal[at]
+            }
             return
         }
         koblas.sparseKernels.axpy(
