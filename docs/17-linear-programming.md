@@ -305,6 +305,15 @@ coordinates can transfer without completing the numerical parent or the missing
 coordinates. LP branching opt-outs, LP tree mode and workers with no decision
 allowance retain the primal completion path. The handoff keeps the same storage,
 work, guide identity and root-state guards as a completed rounding attempt.
+Before its first incumbent, an integer-only traversal can visit declared factor
+components of its undetermined columns contiguously while using these coordinates. Preparation admits at least
+two coupled components, charges its graph work to the remaining LP allowance and
+keeps primitive membership arrays inside the same guide storage cap. Prior paid LP
+work also reduces the graph's remaining preparation ceiling. Membership
+walks charge ordinary CP work and revisit retracted variables. Declined preparation
+keeps ordinary branching; guide replacement, restart, reseed and close discard the
+ordering. An attempt stopped before spending work can retry in a fresh consultation;
+a paid decline retains its charge. These choices supply no directional-history, bound or proof authority.
 Continuation observations distinguish a pending interruption from a cancelled run,
 spent root or LP work, and a call without an eligible interruption. They record the
 existing decision without polling another token or changing its checks.
