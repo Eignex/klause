@@ -8,6 +8,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.ownSearch
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -18,6 +19,7 @@ import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -27,6 +29,54 @@ import kotlin.time.TestTimeSource
 import kotlin.time.TimeSource
 
 class PortfolioSchedulingTest {
+    @Test
+    fun `a deferred witness should open only after its producer supplies readiness`() {
+        val order = mutableListOf<Int>()
+        var ready = false
+        val model = ModelIdentity.of(Any())
+        val witness = PortfolioWorker.ofMinimize("witness", 0, resumable = {
+            assertTrue(ready)
+            ScriptedSearch({ false }) { order += 0 }
+        }) { _, _, _, _ -> error("the retained handle must run") }.bindEvidence(model, provesResults = false)
+        val producer = trackingWorker("producer", 1, ScriptedSearch({ false }) {
+            order += 1
+            ready = true
+        }).bindEvidence(model)
+
+        Portfolio.thompson(listOf(witness, producer), reseedStaleThreshold = 0).also {
+            it.deferWitnessStart(0) { ready }
+        }.use { it.minimize(Cancellation { order.size >= 2 }) }
+
+        assertEquals(listOf(1, 0), order)
+    }
+
+    @Test
+    fun `silent complete search should retain its slices while a witness waits`() {
+        var completeSlices = 0
+        val model = ModelIdentity.of(Any())
+        val witness = PortfolioWorker.ofMinimize("witness", 0, resumable = {
+            error("an unavailable witness must not open")
+        }) { _, _, _, _ -> error("an unavailable witness must not run") }
+            .bindEvidence(model, provesResults = false)
+        val complete = trackingWorker("complete", 1, ScriptedSearch({ false }) { completeSlices++ })
+            .bindEvidence(model)
+
+        Portfolio.thompson(listOf(witness, complete), reseedStaleThreshold = 0).also {
+            it.deferWitnessStart(0) { false }
+        }.use { it.minimize(Cancellation { completeSlices >= 4 }) }
+
+        assertEquals(4, completeSlices)
+    }
+
+    @Test
+    fun `complete workers should reject deferred availability`() {
+        val worker = trackingWorker("complete", 0, ScriptedSearch({ false }) { })
+
+        Portfolio.thompson(listOf(worker)).use { portfolio ->
+            assertFailsWith<IllegalArgumentException> { portfolio.deferWitnessStart(0) { false } }
+        }
+    }
+
     @Test
     fun `first witness workers should retire after either sibling supplies an incumbent`() {
         for (helperFindsFirst in listOf(false, true)) {

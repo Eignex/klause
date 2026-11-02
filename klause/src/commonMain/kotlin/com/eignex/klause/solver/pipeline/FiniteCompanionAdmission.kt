@@ -21,6 +21,7 @@ internal class FiniteCompanionAdmission(
     val initiallyFunded = !cancellation.isCancelled() && remaining() > pairLifetime
     private var attempted = false
     private var context: SourceProofContext? = null
+    val preparedContext: SourceProofContext? get() = context
     private var elapsedNanos = 0L
     private var startDeclines = 0L
     var declineReason: TerminationReason = TerminationReason.BudgetExhausted

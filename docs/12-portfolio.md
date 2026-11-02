@@ -111,6 +111,16 @@ Each worker rechecks its own remaining lifetime before opening; a late start or
 unavailable capture retires without a source verdict. Finite recipes, indices and
 seed positions remain intact, including explicit selections.
 
+`companion-admission=guided` adds a start dependency for the witness-only repair
+worker. It requires funded incumbent-gated admission and checked source completion.
+Repair waits for a retained numerical root point in the same captured context before
+constructing its private neighborhood or LP state. Availability reads the paid
+snapshot without opening a root query or completing a seed. The opening attempt
+still rechecks its remaining lifetime; waiting grants no active time, work or
+allocation. Complete workers retain their ordinary eligibility and coverage.
+`finiteJointGuidanceChecks` and `finiteJointGuidanceWaits` report the constant-time
+availability checks, whose cost belongs to the containing invocation.
+
 Deferred capture is attempted once for the pair and charged inside the opening
 worker's query and active lifetime. Its preparation counters are subsets of that
 query's time. `finiteCompanionAdmissionDeclined` records an unfunded initial pair;

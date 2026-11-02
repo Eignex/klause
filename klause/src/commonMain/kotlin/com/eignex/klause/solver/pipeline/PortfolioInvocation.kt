@@ -52,6 +52,7 @@ internal class PortfolioInvocationPolicy(
     val reserveBeforeIncumbentOnly: Boolean = false,
     probes: Set<Int> = emptySet(),
     probeWeights: IntArray = intArrayOf(),
+    val deferredStart: Pair<Int, () -> Boolean>? = null,
     val onProgress: ((PortfolioEvent) -> Unit)? = null,
 ) {
     private val minimumShares = shares.copyOf()
@@ -122,6 +123,7 @@ internal class PortfolioInvocation(
             it.reserveBeforeIncumbentOnly = selected.reserveBeforeIncumbentOnly
             it.incumbentProbeArms = selected.probes
             it.initialProbeWeights = selected.probeWeights
+            selected.deferredStart?.let { (arm, ready) -> it.deferWitnessStart(arm, ready) }
             it.improvementProofShare = controls.improvementProofShare
             it.includeRestartingProof = controls.includeRestartingProof
             val automatic = controls.booleanProofTasks == null && controls.parallelism == 1 && objective == null &&

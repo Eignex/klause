@@ -97,6 +97,21 @@ internal class FiniteNumericalCompanions private constructor(
     private val completionSharing = if (params.sourceIncumbentCompletion && incumbentCompletionCheck != null)
         LinearIncumbentSharing() else null
     private val repairGuidance = if (completionSharing != null) LinearRepairGuidance() else null
+    private var guidanceChecks = 0L
+    private var guidanceWaits = 0L
+
+    fun guidanceStages(): Map<String, Long> = mapOf(
+        "finiteJointGuidanceChecks" to guidanceChecks,
+        "finiteJointGuidanceWaits" to guidanceWaits,
+    )
+
+    fun repairReady(): Boolean {
+        guidanceChecks++
+        val source = context ?: admission?.preparedContext
+        val ready = source != null && repairGuidance?.find(source) != null
+        if (!ready) guidanceWaits++
+        return ready
+    }
 
     fun factories(plan: PreparedSourcePlan, firstArm: Int): List<PortfolioArmFactory> {
         val identity = ModelIdentity.of(model, objective)

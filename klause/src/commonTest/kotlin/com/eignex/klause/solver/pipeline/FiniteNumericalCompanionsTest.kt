@@ -24,6 +24,8 @@ import com.eignex.klause.solver.withRealDifferenceSystem
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -32,6 +34,58 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class FiniteNumericalCompanionsTest {
+    @Test
+    fun `guided admission should reject missing funding or checked completion contracts`() {
+        for (missing in listOf("funding", "completion", "original")) {
+            val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1))
+            val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+            val scenario = PortfolioScenario.sequential(Kind.COP).copy(companionAfterIncumbent = true)
+            val check: ((Sample, BigFraction, Cancellation) -> Boolean)? =
+                if (missing == "original") null else { _, _, _ -> true }
+
+            assertFailsWith<PipelineConfigException> {
+                FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
+                    plan, Cancellation.after(30.seconds), numericalCompletion = true,
+                    numericalCompanions = TheoryParams(sourceIncumbentCompletion = missing != "completion"),
+                    fundedCompanions = missing != "funding", guidedCompanions = true,
+                    incumbentCompletionCheck = check).use { }
+            }
+        }
+    }
+
+    @Test
+    fun `repair readiness should reuse a paid root without triggering affine capture`() {
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val params = TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 1)
+        val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+            objective, params).requirements.construction
+        val stop = Cancellation.after(30.seconds)
+        val admission = FiniteNumericalCompanions.admission(model, objective, stop, cost)
+        val companions = FiniteNumericalCompanions.deferred(model, objective, params, stop, cost, admission,
+            incumbentCompletionCheck = { _, _, _ -> true })
+
+        assertFalse(companions.repairReady())
+        assertEquals(0L, admission.stages()["finiteCompanionPreparationAttempts"])
+        PortfolioInvocationResources(2, 1, 0, stop, null).use { resources ->
+            companions.factories(plan, 0).first().materialize(plan, resources.slots[0]).use { worker ->
+                assertNotNull(worker.newResumableSearch { Double.POSITIVE_INFINITY }).use { search ->
+                    repeat(32) {
+                        if (!search.isDone) search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5_000) { }
+                    }
+                }
+            }
+
+            assertTrue(companions.repairReady())
+            assertEquals(1L, admission.stages()["finiteCompanionPreparationAttempts"])
+        }
+        assertFalse(companions.repairReady())
+    }
+
     @Test
     fun `checked companion repair should retain root guidance after numerical search closes`() {
         val model = Problem(0, 3, Array(3) { IntDomain(0, 1) }, emptyArray(), numRealVars = 1,
@@ -159,8 +213,9 @@ class FiniteNumericalCompanionsTest {
 
     @Test
     fun `funded admission should preserve an explicit finite selection`() {
-        for (explicit in listOf(PortfolioScenario.sequential(Kind.COP).copy(explicitArms = true),
-            PortfolioScenario.sequential(Kind.COP).copy(arms = 1))) {
+        val selections = listOf(PortfolioScenario.sequential(Kind.COP).copy(explicitArms = true),
+            PortfolioScenario.sequential(Kind.COP).copy(arms = 1))
+        for ((explicit, guided) in selections.flatMap { scenario -> listOf(false, true).map { scenario to it } }) {
             val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
                 realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
             val objective = LinearObjective(intCoefficients = longArrayOf(1))
@@ -171,8 +226,9 @@ class FiniteNumericalCompanionsTest {
             val baseline = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
                 plan, lifetime, numericalCompletion = true)
             val candidate = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
-                plan, lifetime, numericalCompletion = true, numericalCompanions = TheoryParams(),
-                fundedCompanions = true)
+                plan, lifetime, numericalCompletion = true,
+                numericalCompanions = TheoryParams(sourceIncumbentCompletion = guided),
+                fundedCompanions = true, guidedCompanions = guided)
 
             baseline.use { before -> candidate.use { after ->
                 assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })

@@ -185,6 +185,15 @@ class Portfolio(
             field = value
         }
     internal var includeRestartingProof: Boolean = false
+    private var witnessStartAvailability: ((Int) -> Boolean)? = null
+
+    internal fun deferWitnessStart(arm: Int, available: () -> Boolean) {
+        require(arm in workers.indices && !workers[arm].permitsSourceProofs) {
+            "complete workers cannot defer their availability"
+        }
+        check(witnessStartAvailability == null) { "a witness start dependency is already installed" }
+        witnessStartAvailability = { it != arm || available() }
+    }
 
     internal var evidenceVerification: PortfolioEvidence? = workers.firstNotNullOfOrNull { it.evidenceModel }?.let {
         val verifier = PortfolioEvidence(it, CandidateVerifier.trusting())
@@ -852,7 +861,7 @@ class Portfolio(
         fun recordAcceptedGain(arm: Int, gain: Double) {
             (scopedReward as? SourceRateReward)?.recordAcceptedGain(arm, gain)
         }
-        private var availability: ((Int) -> Boolean)? = null
+        private var availability: ((Int) -> Boolean)? = witnessStartAvailability
         private val earlyCoreTrials = workers.indices.filter { workers[it].earlyCoreTrial }
 
         fun restrictAvailability(available: (Int) -> Boolean) { availability = available }
@@ -1087,7 +1096,8 @@ class Portfolio(
                 for (arm in firstWitnessArms) if (!busy[arm]) retire(arm)
             }
             if (remaining == 0) return@locked null
-            val dedicated = diagnostics == null && lanes == workers.size && workers.none { it.startAfterIncumbent }
+            val dedicated = diagnostics == null && availability == null && lanes == workers.size &&
+                workers.none { it.startAfterIncumbent }
             val eligible = eligibleArms().let { arms -> availability?.let { arms.filter(it) } ?: arms }
             val earlyCore = if (dedicated) null else earlyCoreTrials.firstOrNull {
                 it in eligible && !busy[it] && !retired[it]

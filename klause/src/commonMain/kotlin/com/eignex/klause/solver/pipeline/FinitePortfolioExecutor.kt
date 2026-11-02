@@ -84,6 +84,7 @@ internal fun FinitePipeline.portfolioExecutor(
     probePolicy: InitialProbePolicy = InitialProbePolicy.ORDINARY,
     booleanProofTasks: Boolean? = false,
     fundedCompanions: Boolean = false,
+    guidedCompanions: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -107,6 +108,12 @@ internal fun FinitePipeline.portfolioExecutor(
     }
     if (fundedCompanions && (!scenario.companionAfterIncumbent || cancellation.deadline() == null)) {
         pipelineConfigError("companion-admission=funded requires companion-after-incumbent and a solve deadline")
+    }
+    if (guidedCompanions && (!fundedCompanions || numericalCompanions?.sourceIncumbentCompletion != true)) {
+        pipelineConfigError("companion-admission=guided requires funded starts and source-incumbent-completion")
+    }
+    if (guidedCompanions && companionEligibility?.admitted == true && incumbentCompletionCheck == null) {
+        pipelineConfigError("companion-admission=guided requires an original-source completion check")
     }
     val companionAdmission = if (fundedCompanions && companionEligibility?.admitted == true) {
         FiniteNumericalCompanions.admission(problem, requireNotNull(objective),
@@ -194,7 +201,9 @@ internal fun FinitePipeline.portfolioExecutor(
                 "finiteCompanionPreparationReady" to if (companions != null) 1L else 0L,
                 "finiteCompanionPreparationUnavailable" to if (companions == null) 1L else 0L)
         }.orEmpty(),
-        livePreparationStages = companionAdmission?.let { it::stages },
+        livePreparationStages = if (guidedCompanions) {
+            { companionAdmission?.stages().orEmpty() + companions?.guidanceStages().orEmpty() }
+        } else companionAdmission?.let { it::stages },
     ) { workers ->
         val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
         val shares = if (proofShares.isEmpty()) {
@@ -233,6 +242,9 @@ internal fun FinitePipeline.portfolioExecutor(
         }
         PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes,
             probeWeights = probeWeights,
+            deferredStart = if (guidedCompanions && companions != null) {
+                workers.indexOfFirst { it.label == "ls/finite-joint-companion" } to companions::repairReady
+            } else null,
             onProgress = deferred)
     }
 }
