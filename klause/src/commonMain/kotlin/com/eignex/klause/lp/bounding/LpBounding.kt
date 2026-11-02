@@ -1533,6 +1533,7 @@ private fun LpEngine.retainedRootLpRelaxationBound(
             )
             return bound
         }
+        sink.lp.observePrimalPhase("ROOT_QUERY_STOP", rootQueryStopView(), 0L)
         observeStage("QUERY_LOOP_STOPPED")
         return Double.NaN
     } finally {

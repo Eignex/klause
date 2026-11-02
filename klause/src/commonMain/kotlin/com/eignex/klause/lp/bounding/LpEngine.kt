@@ -679,8 +679,27 @@ internal class LpEngine(
      */
     internal fun retainedRootRemainingWork(): Long {
         var remaining = retainedRootCumulativeWork()
-        nodeWorkAllowance()?.let { remaining = minOf(remaining, it.coerceAtLeast(0L)) }
+        val offered = nodeWorkAllowance()
+        lastRootWorkOffer = offered
+        offered?.let { remaining = minOf(remaining, it.coerceAtLeast(0L)) }
         return remaining
+    }
+
+    internal fun rootQueryStopView(): String {
+        val rootCap = minOf(params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
+            SPARSE_LP_MAX_WORK)
+        val rootSpent = totalSolveOps >= rootCap ||
+            workSpentExceeds(params.lpPlan.rootMaxWork, sink.lp.standaloneWork)
+        val lpState = if (lpWorkAllowanceSpent(sink.lp.standaloneWork)) "LP_SPENT" else "LP_OPEN"
+        val rootState = if (rootSpent) "ROOT_SPENT" else "ROOT_OPEN"
+        val offered = lastRootWorkOffer
+        val offerState = when {
+            offered == null -> "OFFER_NONE"
+            offered <= 0L -> "OFFER_SPENT"
+            else -> "OFFER_OPEN"
+        }
+        val cursorState = if (propagator.floatPaused) "PAUSED" else "UNPAUSED"
+        return "${lpState}_${rootState}_${offerState}_$cursorState"
     }
 
     private fun retainedRootCumulativeWork(): Long {
@@ -736,6 +755,8 @@ internal class LpEngine(
             else -> minOf(root, remaining)
         }
     }
+
+    private var lastRootWorkOffer: Long? = null
 
     // Work the current node's LP has charged, across its base, cut-augmented and recovery solves.
     private var pendingSolveOps = 0L
