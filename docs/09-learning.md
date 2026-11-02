@@ -273,7 +273,9 @@ Watcher movement rewinds the current scan prefix. Small posting arrays trim with
 the same work and scratch limits. Posting and blocker arrays trim in separate funded
 transactions, so their combined copy need not fit one grant. The Boolean
 back-pointer index uses a bounded factor directory, two inline positions per factor
-and a balanced overflow for additional positions. Empty rows and directory branches
+and a balanced overflow for additional positions. Source preparation reserves eight
+future rows and their directory paths; pressure releases unused reservations.
+Empty rows and directory branches
 release their primitive and reference allocations. Deletion and a swapped watch's
 position update publish together after bounded funding.
 Primitive node fields and reference slots remain separately owned; live and saved

@@ -8,6 +8,23 @@ import kotlin.test.assertTrue
 
 class BoolWatchPositionIndexTest {
     @Test
+    fun `pressure should release unused startup rows without removing admitted positions`() {
+        val index = BoolWatchPositionIndex()
+        assertTrue(index.reserve(16, 8) > 0L)
+        index.put(16L shl 32, 3)
+        val bytes = index.primitiveCapacityBytes
+        val references = index.referenceCapacity
+        val budget = ReclamationPreparation(4096L, 256L, { false }, {})
+
+        index.releaseReservations(budget)
+
+        assertTrue(index.primitiveCapacityBytes < bytes)
+        assertTrue(index.referenceCapacity < references)
+        assertEquals(1, index.size)
+        assertEquals(3, index.getOrDefault(16L shl 32, -1))
+    }
+
+    @Test
     fun `sparse factor keys should retain independent inline and overflow positions`() {
         val index = BoolWatchPositionIndex()
         for (factor in listOf(0, 16, 4096, Int.MAX_VALUE)) {

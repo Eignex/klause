@@ -64,6 +64,7 @@ internal fun PropagationState.sweepRetiredLearnedMemory(budget: ReclamationPrepa
     nativeEngine?.sweepRetiredWatches(budget)
     sweepRetiredGeneralIntegerRows(budget)
     sweepRetiredGeneralMetadata(budget)
+    if (!incremental && nativeEngine == null) initializedWatches?.pos?.releaseReservations(budget)
     sweepRetiredGeneralWatches(budget)
 }
 

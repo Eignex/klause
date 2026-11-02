@@ -155,7 +155,8 @@ class GeneralWatchReclamationTest {
     @Test
     fun `an empty watch position index should release its retained capacity`() {
         val session = PropagationSession(Problem(4, 0, emptyArray(), emptyArray()), nativeSat = false)
-        val baseline = session.explanationState.watches.pos.primitiveCapacityBytes
+        val baseline = BoolWatchPositionIndex().primitiveCapacityBytes
+        assertTrue(session.explanationState.watches.pos.primitiveCapacityBytes > baseline)
         repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
         val generation = session.learnedRetirementGeneration

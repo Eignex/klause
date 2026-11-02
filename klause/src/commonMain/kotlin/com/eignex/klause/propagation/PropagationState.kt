@@ -845,6 +845,7 @@ class PropagationState private constructor(
         // The native lane uses arena watches and skips general base-factor registration.
         if (prepared == null && nativeEngine == null) {
             for (fid in 0 until problem.numFactors) registerFactor(fid, projection.propagators[fid], preparation = true)
+            reserveWatchPositions()
         }
     }
 
@@ -875,8 +876,13 @@ class PropagationState private constructor(
                 }
                 if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
+            state.reserveWatchPositions()
             yield(state)
         }.iterator()
+    }
+
+    private fun reserveWatchPositions() {
+        if (problem.numBoolVars > 0) preparationIndexWork += watches.pos.reserve(baseFactorCount, 8)
     }
 
     /** Install factor [fid]'s static wakeup subscriptions into the per-literal / per-int-event advisor

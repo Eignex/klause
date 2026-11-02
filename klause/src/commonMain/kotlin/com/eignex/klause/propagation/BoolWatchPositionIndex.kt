@@ -22,12 +22,44 @@ internal class BoolWatchPositionIndex {
     private var rows = 0
     private var overflowBytes = 0L
     private var overflowReferences = 0L
+    private var reservationStart = 0L
+    private var reservationEnd = 0L
     var size = 0
         private set
     var lastWork = 0L
         private set
-    val primitiveCapacityBytes: Long get() = 40L + directories * 4L + rows * 16L + overflowBytes
+    val primitiveCapacityBytes: Long get() = 56L + directories * 4L + rows * 16L + overflowBytes
     val referenceCapacity: Long get() = 1L + directories * 17L + rows + overflowReferences
+
+    fun reserve(first: Int, count: Int): Long {
+        require(first >= 0 && count >= 0)
+        lastWork = 2L
+        reservationStart = first.toLong()
+        reservationEnd = minOf(first.toLong() + count, Int.MAX_VALUE.toLong() + 1L)
+        for (factor in reservationStart until reservationEnd) ensureRow(factor.toInt())
+        return lastWork
+    }
+
+    fun releaseReservations(budget: ReclamationPreparation) {
+        while (reservationStart < reservationEnd) {
+            repeat(depth + 2) { budget.visit() }
+            budget.visit(0L)
+            val row = findRow(reservationStart.toInt())
+            if (row != null && row.firstKey < 0 && row.secondKey < 0 && row.overflow == null) {
+                val bound = 16L + (depth + 1L) * 7L
+                if (!budget.supports(bound + depth + 3L, 0L)) return
+                repeat(bound.toInt()) { budget.visit() }
+                budget.visit(0L)
+                lastWork = 0L
+                dropRow(reservationStart.toInt())
+            } else {
+                budget.visit()
+                budget.visit(0L)
+            }
+            reservationStart++
+            budget.advanced()
+        }
+    }
 
     fun getOrDefault(key: Long, default: Int): Int {
         lastWork = 0L
@@ -160,14 +192,7 @@ internal class BoolWatchPositionIndex {
         }
         size--
         if (row.firstKey < 0 && row.secondKey < 0 && row.overflow == null) {
-            removeRow(checkNotNull(root), factor, depth)
-            while (depth > 0 && root?.live == 1 && root?.entries?.get(0) is Directory) {
-                root = root?.entries?.get(0) as Directory
-                depth--
-                directories--
-                lastWork += 3L
-            }
-            if (root?.live == 0) { root = null; depth = 0; directories--; lastWork += 3L }
+            dropRow(factor)
         }
         return previous
     }
@@ -222,6 +247,17 @@ internal class BoolWatchPositionIndex {
             rows++
             lastWork += 8L
         }
+    }
+
+    private fun dropRow(factor: Int) {
+        removeRow(checkNotNull(root), factor, depth)
+        while (depth > 0 && root?.live == 1 && root?.entries?.get(0) is Directory) {
+            root = root?.entries?.get(0) as Directory
+            depth--
+            directories--
+            lastWork += 3L
+        }
+        if (root?.live == 0) { root = null; depth = 0; directories--; lastWork += 3L }
     }
 
     private fun removeRow(node: Directory, factor: Int, level: Int) {
