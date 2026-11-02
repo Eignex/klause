@@ -409,8 +409,8 @@ class PrivateRebuildSatisfactionTest {
             val source = Problem(130, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
 
             val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
-                nativeSat = native, privateRebuildWork = -1L, variableSelector = InputOrder,
-                valueSelector = IndomainMin,
+                nativeSat = native, privateRebuildWork = -1L, learnedMemoryScratchBytes = 4_194_304L,
+                variableSelector = InputOrder, valueSelector = IndomainMin,
             )))
 
             assertTrue(clauses.all { clause ->
@@ -440,7 +440,7 @@ class PrivateRebuildSatisfactionTest {
         val source = Problem(128, 0, emptyArray(), clauses).bake()
 
         val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
-            privateRebuildWork = -1L,
+            privateRebuildWork = -1L, learnedMemoryScratchBytes = 4_194_304L,
         )))
 
         assertTrue(clauses.all { factor ->
@@ -460,13 +460,13 @@ class PrivateRebuildSatisfactionTest {
 
     @Test
     fun `explicit zero should disable discovery on an automatically sized source`() {
-        val clauses = (0 until 128).flatMap {
+        val clauses = (0 until 128).flatMap { row ->
             listOf(1, 2, 4, 7).map { mask ->
-                Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })
+                Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
             }
         }.toTypedArray<Factor>()
-        val source = Problem(128, 0, emptyArray(), clauses).bake()
-        val automatic = BacktrackParams(privateRebuildWork = -1L)
+        val source = Problem(130, 0, emptyArray(), clauses).bake()
+        val automatic = BacktrackParams(privateRebuildWork = -1L, learnedMemoryScratchBytes = 4_194_304L)
 
         val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(
             automatic.copy(privateRebuildWork = 0L),
