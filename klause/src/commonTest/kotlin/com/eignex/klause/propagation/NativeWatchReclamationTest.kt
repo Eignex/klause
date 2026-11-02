@@ -9,6 +9,26 @@ import kotlin.test.assertTrue
 
 class NativeWatchReclamationTest {
     @Test
+    fun `a completed watch scan should stay complete until another clause retires`() {
+        val session = PropagationSession(Problem(6, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = true)
+        assertTrue(session.usesNativeSat)
+        repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+        session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
+        repeat(80) { session.compactLearnedClauses(40L, 1_048_576L, { false }) { _, _ -> true } }
+        val before = session.work
+
+        session.compactLearnedClauses(40L, 1_048_576L, { false }) { _, _ -> true }
+
+        assertTrue(session.work - before < 16L)
+        repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+        session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
+        repeat(80) { session.compactLearnedClauses(40L, 1_048_576L, { false }) { _, _ -> true } }
+        val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        assertEquals(2L, after.getValue("sessionWatchEntries"))
+    }
+
+    @Test
     fun `cancelled watch cleanup should resume without changing its retained generation`() {
         val session = PropagationSession(Problem(6, 0, emptyArray(),
             arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = true)
@@ -19,9 +39,9 @@ class NativeWatchReclamationTest {
         val generation = session.learnedRetirementGeneration
         val stopAt = session.work + 4L
 
-        session.compactLearnedClauses(40L, 1_048_576L, { session.work >= stopAt }) { true }
+        session.compactLearnedClauses(40L, 1_048_576L, { session.work >= stopAt }) { _, _ -> true }
         val cancelled = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
-        repeat(80) { session.compactLearnedClauses(40L, 1_048_576L, { false }) { true } }
+        repeat(80) { session.compactLearnedClauses(40L, 1_048_576L, { false }) { _, _ -> true } }
         val resumed = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
         assertEquals(initial.getValue("sessionWatchEntries"), cancelled.getValue("sessionWatchEntries"))
@@ -41,7 +61,7 @@ class NativeWatchReclamationTest {
 
         repeat(80) {
             val before = session.work
-            session.compactLearnedClauses(40L, 1_048_576L, { false }) { true }
+            session.compactLearnedClauses(40L, 1_048_576L, { false }) { _, _ -> true }
             assertTrue(session.work - before <= 40L)
         }
         val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
@@ -58,7 +78,7 @@ class NativeWatchReclamationTest {
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9, permanent = true)
         repeat(64) { session.addLearnedClause(Clause(intArrayOf(4, 6)), 9) }
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
-        repeat(80) { session.compactLearnedClauses(40L, 1_048_576L, { false }) { true } }
+        repeat(80) { session.compactLearnedClauses(40L, 1_048_576L, { false }) { _, _ -> true } }
 
         session.pinBool(0, false)
 
@@ -77,7 +97,7 @@ class NativeWatchReclamationTest {
 
         repeat(16) {
             val before = session.work
-            session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { true }
+            session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true }
             assertTrue(session.work - before <= 65_536L)
         }
         val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
@@ -97,7 +117,7 @@ class NativeWatchReclamationTest {
 
         repeat(16) {
             val before = session.work
-            session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { true }
+            session.compactLearnedClauses(65_536L, 1_048_576L, { false }) { _, _ -> true }
             assertTrue(session.work - before <= 65_536L)
         }
         val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)

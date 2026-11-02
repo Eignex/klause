@@ -151,6 +151,8 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private var watchCleanupLiteral = 0
     private var watchCleanupIndex = 0
+    private var sweptRetirements = 0
+    private var sweepingRetirements = -1
 
     private fun addWatch(lit: Int, handle: Int, blocker: Int) {
         val entries = watchEntries[lit] ?: NativeWatchEntries().also { watchEntries[lit] = it }
@@ -173,6 +175,12 @@ internal class NativeSatState(private val state: PropagationState) {
 
     internal fun sweepRetiredWatches(budget: ReclamationPreparation) {
         if (retiredCount == 0) return
+        if (sweepingRetirements < 0) {
+            if (sweptRetirements == retiredCount) return
+            budget.visit(4L)
+            budget.visit(0L)
+            sweepingRetirements = retiredCount
+        }
         while (watchCleanupLiteral < watchEntries.size) {
             budget.visit(4L)
             budget.visit(0L)
@@ -187,6 +195,10 @@ internal class NativeSatState(private val state: PropagationState) {
                 removeWatchAt(watchCleanupLiteral, watchCleanupIndex)
             } else watchCleanupIndex++
         }
+        budget.visit(4L)
+        budget.visit(0L)
+        sweptRetirements = sweepingRetirements
+        sweepingRetirements = -1
         watchCleanupLiteral = 0
         watchCleanupIndex = 0
     }
@@ -385,7 +397,7 @@ internal class NativeSatState(private val state: PropagationState) {
         sample.ownedReferences(watchEntries, watchEntries.size.toLong(), true)
         var watchBytes = 0L
         var watchPostings = 0L
-        sample.owned(this, 8L, watchCleanupLiteral > 0 || watchCleanupIndex > 0)
+        sample.owned(this, 16L, sweepingRetirements >= 0)
         for (entries in watchEntries) {
             sample.step()
             if (entries == null) continue
@@ -666,6 +678,8 @@ internal class NativeSatState(private val state: PropagationState) {
 
         watchCleanupLiteral = 0
         watchCleanupIndex = 0
+        sweptRetirements = 0
+        sweepingRetirements = -1
 
         // A survivor's destination precedes its source, so moving references cannot overwrite unread rows.
         permanentCount = 0

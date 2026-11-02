@@ -3,7 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.util.SharingMemoryObservation
 
 internal class NativeWatchEntries(initialCapacity: Int = 0) {
-    private var pages = arrayOfNulls<LongArray>(pageSlots(initialCapacity).coerceAtLeast(1))
+    private var pages = arrayOfNulls<LongArray>(reservedPageSlots(initialCapacity).coerceAtLeast(1))
     private var capacityWords = 0L
     var size = 0
         private set
@@ -11,9 +11,11 @@ internal class NativeWatchEntries(initialCapacity: Int = 0) {
     val referenceSlots: Long get() = pages.size + 1L
 
     init {
-        for (index in 0 until pageSlots(initialCapacity)) {
-            val remaining = initialCapacity - (index shl PAGE_SHIFT)
-            val capacity = minOf(PAGE_SIZE, remaining + 1)
+        // A base posting can admit one replacement without copying its established page.
+        val reserved = if (initialCapacity == 0) 0L else initialCapacity.toLong() + 1L
+        for (index in 0 until reservedPageSlots(initialCapacity)) {
+            val remaining = reserved - (index.toLong() shl PAGE_SHIFT)
+            val capacity = minOf(PAGE_SIZE.toLong(), remaining).toInt()
             pages[index] = LongArray(capacity)
             capacityWords += capacity
         }
@@ -102,6 +104,11 @@ internal class NativeWatchEntries(initialCapacity: Int = 0) {
         sample.ownedReferences(this, 1L, retained)
         sample.ownedReferences(pages, pages.size.toLong(), retained)
         return primitiveBytes
+    }
+
+    private fun reservedPageSlots(count: Int): Int {
+        require(count >= 0)
+        return if (count == 0) 0 else ((count.toLong() + 1L + PAGE_MASK) ushr PAGE_SHIFT).toInt()
     }
 
     private fun pageSlots(count: Int): Int = ((count.toLong() + PAGE_MASK) ushr PAGE_SHIFT).toInt()
