@@ -19,6 +19,8 @@ internal data class MiniZincIdentityEvidence(
     val cleanupNs: Long = 0,
     val timeoutNs: Long,
     val executableSha256: String? = null,
+    val executableHashNs: Long? = null,
+    val executableHashObservation: String = "after-query",
     val randomSeed: Int = MZN_RANDOM_SEED,
     val pid: Long? = null,
     val exitCode: Int? = null,
@@ -41,7 +43,6 @@ internal class MiniZincIdentityFailure(
 )
 
 internal class MiniZincIdentityQuery(
-    private val executableSha256: String? = null,
     private val timeoutNs: Long = TimeUnit.SECONDS.toNanos(10),
     private val clock: () -> Long = System::nanoTime,
     private val start: (List<String>, File) -> Process = { command, log ->
@@ -60,7 +61,6 @@ internal class MiniZincIdentityQuery(
             outcome = "starting",
             elapsedNs = 0,
             timeoutNs = timeoutNs,
-            executableSha256 = executableSha256,
         )
         retain(initial)
         var log: File? = null
@@ -136,11 +136,17 @@ internal class MiniZincIdentityQuery(
             log?.delete()
             cleanupNs += clock() - deleteStart
             val alive = process?.isAlive == true
+            // Reading the binary before spawning it would change a cold-start observation.
+            val hashStart = clock()
+            val executableHash = runCatching { MiniZincCompatibility.hash(executable) }.getOrNull()
+            val hashNs = clock() - hashStart
             val evidence = initial.copy(
                 outcome = if (outcome == "completed" && bytes > OUTPUT_LIMIT) "output-truncated" else outcome,
                 elapsedNs = clock() - began,
                 startupNs = startupNs,
                 waitNs = waitNs,
+                executableSha256 = executableHash,
+                executableHashNs = hashNs,
                 cleanupNs = cleanupNs,
                 pid = process?.let { runCatching { it.pid() }.getOrNull() },
                 exitCode = process?.takeUnless { it.isAlive }?.exitValue(),
