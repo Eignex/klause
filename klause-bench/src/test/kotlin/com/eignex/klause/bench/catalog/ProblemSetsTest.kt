@@ -10,10 +10,19 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
 class ProblemSetsTest {
+    companion object {
+        @BeforeAll
+        @JvmStatic
+        fun initializeCodec() {
+            Json.parseToJsonElement("{}")
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["bench.json", "bench-linux.json"])
     fun `declared private workspaces should retain every frozen set`(manifest: String) {
