@@ -23,5 +23,15 @@
       "platform:linux",
       "arch:x86_64"
     ]
-  }
+  },
+  "workspaceInputs": [
+    ".git",
+    "klause-bench/lab",
+    "klause-bench/scripts",
+    "klause-bench/smoke-corpus",
+    "klause-bench/build/install",
+    "klause-bench/build/lab-runtime",
+    "klause-cli/build/install",
+    "klause-mzn-lib"
+  ]
 }
