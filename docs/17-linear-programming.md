@@ -506,6 +506,11 @@ requested by completed aggregates. A fully funded scan records both present and
 missing sides; interrupted scans publish no partial cache. Singleton coefficient
 inspection reads an immutable pair without copying a coefficient map. Scanning,
 lookup storage and cache extension debit the requesting recipe's allowance.
+Unit-scale normalization reuses the private immutable coefficient snapshot. A funded
+coefficient scan recognizes a half recipe whose stated side choices round every
+coefficient to zero before allocating its proof and scalar accumulators. Other
+recipes retain their bound validation and exact proof construction. Both paths
+spend the same requesting allowance.
 Input truncation or a stopped slice withholds complete eligibility coverage.
 A pure-integer nonterminal point enters this discovery under the aggregate policy.
 When both source endpoints are stated, aggregate rounding selects the endpoint

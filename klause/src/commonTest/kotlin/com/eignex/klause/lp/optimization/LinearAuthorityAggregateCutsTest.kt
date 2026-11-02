@@ -595,6 +595,124 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `an empty half recipe should leave production allowance for a later useful row`() {
+        val unit = (2 until 27).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf("empty" to SourcePremise(SourceInequality(
+            unit.associateWith { BigFraction.ONE }, BigFraction.ofLong(25))))
+        unit.forEachIndexed { index, id ->
+            premises["l$index"] = SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE),
+                BigFraction.ZERO))
+        }
+        premises["useful"] = SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+            y to BigFraction.ofLong(3)), BigFraction.ofLong(3)))
+        premises["lower y"] = SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        val coordinates = (unit + listOf(x, y)).toMutableSet()
+        repeat(900) { index ->
+            val id = SourceCoordinate(SourceCoordinate.Kind.Integer, index + 27)
+            coordinates += id
+            premises["u$index"] = SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE),
+                BigFraction.ZERO))
+        }
+        val source = SourceProofContext(scope, coordinates, premises)
+        val point = unit.associateWith { 0.0 } + mapOf(x to 0.75, y to 0.5)
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            limits = limits, point = point).single()
+
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
+            cut.inequality)
+        assertEquals(setOf(26, 27), cut.owners)
+        assertTrue((observations["AggregateHalfPreviewNoIntegerActivity"] ?: 0L) > 0L)
+        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `an empty half preview should respect either stated endpoint direction`() {
+        for (sign in listOf(-1L, 1L)) {
+            val coefficient = BigFraction.ofLong(sign)
+            val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+                "row" to SourcePremise(SourceInequality(mapOf(x to coefficient, y to coefficient),
+                    if (sign > 0L) BigFraction.ofLong(2) else BigFraction.ZERO)),
+                "x side" to SourcePremise(SourceInequality(mapOf(x to coefficient.negated()), BigFraction.ZERO)),
+                "y side" to SourcePremise(SourceInequality(mapOf(y to coefficient.negated()), BigFraction.ZERO)),
+            ))
+            val observations = mutableMapOf<String, Long>()
+
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.0, y to 0.0))
+
+            assertTrue(cuts.isEmpty())
+            assertEquals(1L, observations["AggregateHalfPreviewNoIntegerActivity"])
+            assertEquals(1L, observations["AggregateHalfNoIntegerActivity"])
+        }
+    }
+
+    @Test
+    fun `an empty half preview should preserve missing endpoint refusal`() {
+        for (sign in listOf(-1L, 1L)) {
+            val source = SourceProofContext(scope, setOf(x, y), mapOf(
+                "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(sign),
+                    y to BigFraction.ofLong(sign)), BigFraction.ofLong(2))),
+            ))
+            val observations = mutableMapOf<String, Long>()
+
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.0, y to 0.0))
+
+            assertTrue(cuts.isEmpty())
+            assertNull(observations["AggregateHalfPreviewNoIntegerActivity"])
+            assertEquals(1L, observations["AggregateHalfMissingIntegerBounds"])
+        }
+    }
+
+    @Test
+    fun `interrupting a half preview should withhold the unfinished recipe`() {
+        val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
+                BigFraction.ofLong(2))),
+            "lower x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "lower y" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, _ -> if (name == "AggregateHalfPreviewCoordinates") stopped = true },
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.0, y to 0.0))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+    }
+
+    @Test
+    fun `integer row normalization should retain nonunit rational scaling`() {
+        val half = BigFraction.ofLong(2).reciprocal()
+        val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE,
+                y to BigFraction.ofLong(3) * half), BigFraction.ofLong(3) * half)),
+            "lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val observations = mutableMapOf<String, Long>()
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.75, y to 0.5)).single()
+
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
+            cut.inequality)
+        assertEquals(1L, observations["AggregateIntegerRowScaled"])
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `integer pair recipes should combine pure rows without endpoint premises`() {
         val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
             "first" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
