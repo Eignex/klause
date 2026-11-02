@@ -15,6 +15,31 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `paused numerical children expose only their returned predecessors`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            var polls = 0
+            owner.openSolve().use { cursor ->
+                assertIs<LpSolveStep.Paused>(cursor.advance(shouldPause = {
+                    owner.lastMetrics.componentSolves >= 2 && ++polls >= 2
+                }))
+                val paid = owner.lastMetrics
+
+                val guidance = assertNotNull(owner.partialPrimalGuidance())
+
+                assertEquals(listOf(true, false, false), guidance.known.toList())
+                assertEquals(0.5, guidance.coordinates[0])
+                assertEquals(paid, owner.lastMetrics)
+            }
+        }
+    }
+
+    @Test
     fun `advancing component cursors withhold returned guidance`() {
         val builder = LpBuilder()
         repeat(3) {
