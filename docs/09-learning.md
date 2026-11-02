@@ -530,7 +530,9 @@ the same grant. Sixteen-entry posting pages release at tail boundaries, and an e
 posting list releases its directory. Posting mutations rewind an affected scan prefix;
 no learned handle or reason is remapped by this scan. A completed pass is reused until
 another learned retirement requires a scan. Native policy and admission metadata occupy
-sixteen-row pages. A separate resumable pass releases retired slots and drops empty
+pages with at most sixteen rows. A startup-owned first slot and later page growth
+retain their preparation/admission work. Capacity changes replace the disjoint
+pool allocation identity. A separate resumable pass releases retired slots and drops empty
 pages without remapping live handles; a protected row retains its page allocation.
 Appended rows enter the current scan or a later retirement epoch. Ownership observations
 retain unfinished pages and use a disjoint metadata pool rather than per-row scratch.

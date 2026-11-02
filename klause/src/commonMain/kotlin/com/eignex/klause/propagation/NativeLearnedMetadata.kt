@@ -3,23 +3,57 @@ package com.eignex.klause.propagation
 import com.eignex.klause.util.SharingMemoryObservation
 
 internal class NativeLearnedMetadata {
-    private class Page {
-        val values = IntArray(PAGE_SIZE * COLUMNS)
-        val admissions = LongArray(PAGE_SIZE)
+    private class Page(capacity: Int) {
+        var values = IntArray(capacity * COLUMNS)
+        var admissions = LongArray(capacity)
         var retained = 0
+        val bytes: Long get() = values.size.toLong() * Int.SIZE_BYTES + admissions.size.toLong() * Long.SIZE_BYTES
+        val capacity: Int get() = admissions.size
     }
 
-    private var pages = arrayOfNulls<Page>(1)
-    private var pageCount = 0
+    private var pages = arrayOfNulls<Page>(1).also { it[0] = Page(1) }
+    private var pageCount = 1
+    private var allocatedBytes = ROW_BYTES
+    private var allocationIdentity = Any()
     var size = 0
         private set
-    val primitiveBytes: Long get() = 8L + pageCount * PAGE_BYTES
+    val primitiveBytes: Long get() = 16L + allocatedBytes + pageCount * Int.SIZE_BYTES
+    val preparationWork: Long get() = 32L
     val admissionWork: Long
         get() {
-            val page = size ushr PAGE_SHIFT
-            return 32L + (if (page >= pages.size) pages.size * 3L + 1L else 0L) +
-                (if (pages.getOrNull(page) == null) PAGE_BYTES / Int.SIZE_BYTES * 2L + 8L else 0L)
+            val index = size ushr PAGE_SHIFT
+            return 7L + (if (index >= pages.size) pages.size * 3L + 1L else 0L) +
+                allocationWork(pages.getOrNull(index), (size and PAGE_MASK) + 1)
         }
+
+    private fun allocationWork(page: Page?, required: Int): Long = when {
+        page == null -> capacityFor(required) * ROW_BYTES / Int.SIZE_BYTES * 2L + 8L
+        required > page.capacity -> capacityFor(required) * ROW_BYTES / Int.SIZE_BYTES * 2L +
+            page.bytes / Int.SIZE_BYTES + 8L
+        else -> 0L
+    }
+
+    private fun pageFor(index: Int, required: Int): Page {
+        if (index >= pages.size) pages = pages.copyOf(maxOf(index + 1, pages.size * 2))
+        val page = pages[index]
+        if (page == null) {
+            val created = Page(capacityFor(required))
+            pages[index] = created
+            pageCount++
+            allocatedBytes += created.bytes
+            allocationIdentity = Any()
+            return created
+        }
+        if (required > page.capacity) {
+            val capacity = capacityFor(required)
+            allocatedBytes -= page.bytes
+            page.values = page.values.copyOf(capacity * COLUMNS)
+            page.admissions = page.admissions.copyOf(capacity)
+            allocatedBytes += page.bytes
+            allocationIdentity = Any()
+        }
+        return page
+    }
 
     operator fun get(index: Int, column: Int): Int {
         val page = pages.getOrNull(index ushr PAGE_SHIFT)
@@ -42,12 +76,9 @@ internal class NativeLearnedMetadata {
     } ?: 0L
 
     fun add(lbd: Int, permanent: Boolean, origin: Int, admission: Long) {
-        val pageIndex = size ushr PAGE_SHIFT
-        if (pageIndex >= pages.size) pages = pages.copyOf(maxOf(pageIndex + 1, pages.size * 2))
-        val page = pages[pageIndex] ?: Page().also { pages[pageIndex] = it; pageCount++ }
         val slot = size and PAGE_MASK
+        val page = pageFor(size ushr PAGE_SHIFT, slot + 1)
         page.retained = page.retained or (1 shl slot)
-        page.values.fill(0, slot * COLUMNS, (slot + 1) * COLUMNS)
         page.values[slot * COLUMNS + LBD] = lbd
         page.values[slot * COLUMNS + PERMANENT] = if (permanent) 1 else 0
         page.values[slot * COLUMNS + TIER] = ClauseTier.UNSET.ordinal
@@ -60,10 +91,15 @@ internal class NativeLearnedMetadata {
         val pageIndex = index ushr PAGE_SHIFT
         val page = pages[pageIndex] ?: return
         page.retained = page.retained and (1 shl (index and PAGE_MASK)).inv()
-        if (page.retained == 0) {
-            pages[pageIndex] = null
-            pageCount--
-        }
+        if (page.retained == 0) releasePage(pageIndex)
+    }
+
+    private fun releasePage(index: Int) {
+        val page = pages[index] ?: return
+        allocatedBytes -= page.bytes
+        pages[index] = null
+        pageCount--
+        allocationIdentity = Any()
     }
 
     fun move(source: Int, target: Int): Long {
@@ -72,37 +108,40 @@ internal class NativeLearnedMetadata {
         val sourceSlot = source and PAGE_MASK
         check(sourcePage.retained and (1 shl sourceSlot) != 0)
         val pageIndex = target ushr PAGE_SHIFT
-        val allocated = pages[pageIndex] == null
-        val targetPage = pages[pageIndex] ?: Page().also { pages[pageIndex] = it; pageCount++ }
         val targetSlot = target and PAGE_MASK
+        val allocation = allocationWork(pages[pageIndex], targetSlot + 1)
+        val targetPage = pageFor(pageIndex, targetSlot + 1)
         sourcePage.values.copyInto(targetPage.values, targetSlot * COLUMNS,
             sourceSlot * COLUMNS, (sourceSlot + 1) * COLUMNS)
         targetPage.admissions[targetSlot] = sourcePage.admissions[sourceSlot]
         targetPage.retained = targetPage.retained or (1 shl targetSlot)
-        return COLUMNS * 2L + 8L + if (allocated) PAGE_BYTES / Int.SIZE_BYTES * 2L + 8L else 0L
+        return COLUMNS * 2L + 8L + allocation
     }
 
     fun truncateTo(count: Int): Long {
         require(count in 0..size)
         var work = 4L
-        if (count == 0 && pages[0] != null) {
-            pages[0] = null
-            pageCount--
-        }
+        if (count == 0) releasePage(0)
         if (count > 0 && count and PAGE_MASK != 0) {
-            val last = pages[(count - 1) ushr PAGE_SHIFT]
+            val index = (count - 1) ushr PAGE_SHIFT
+            val last = pages[index]
             if (last != null) {
-                last.retained = last.retained and ((1 shl (count and PAGE_MASK)) - 1)
-                if (last.retained == 0) {
-                    pages[(count - 1) ushr PAGE_SHIFT] = null
-                    pageCount--
+                val required = count and PAGE_MASK
+                last.retained = last.retained and ((1 shl required) - 1)
+                if (last.retained == 0) releasePage(index) else {
+                    allocatedBytes -= last.bytes
+                    last.values = last.values.copyOf(required * COLUMNS)
+                    last.admissions = last.admissions.copyOf(required)
+                    allocatedBytes += last.bytes
+                    allocationIdentity = Any()
+                    work += required * ROW_BYTES / Int.SIZE_BYTES * 2L + 8L
                 }
             }
         }
         val retained = pageSlots(count)
         for (index in retained until pages.size) {
-            work += 4L
-            if (pages[index] != null) { pages[index] = null; pageCount-- }
+            work += 8L
+            releasePage(index)
         }
         if (pages.size != retained) {
             pages = pages.copyOf(retained)
@@ -114,26 +153,27 @@ internal class NativeLearnedMetadata {
 
     fun prepareRemap(budget: ReclamationPreparation) {
         val count = pageSlots(size).toLong()
-        budget.atomic(size * (COLUMNS * 2L + 12L) + count * PAGE_BYTES / Int.SIZE_BYTES * 2L + pages.size * 4L,
-            count * PAGE_BYTES + pages.size * Long.SIZE_BYTES)
+        budget.atomic(size * (COLUMNS * 2L + 12L) + count * PAGE_BYTES / Int.SIZE_BYTES * 2L + pages.size * 8L,
+            count * PAGE_BYTES * 4L + pages.size * Long.SIZE_BYTES)
     }
 
     fun sharingMemory(sample: SharingMemoryObservation, protectedRows: Boolean, protected: (Int) -> Boolean) {
-        var protectedBytes = if (protectedRows) 8L else 0L
+        var protectedBytes = 0L
         for (index in pages.indices) {
             sample.step()
             val page = pages[index] ?: continue
-            for (slot in 0 until PAGE_SIZE) {
+            for (slot in 0 until page.capacity) {
                 sample.step()
                 if (page.retained and (1 shl slot) != 0 && protected((index shl PAGE_SHIFT) + slot)) {
-                    protectedBytes += PAGE_BYTES
+                    protectedBytes += page.bytes + Int.SIZE_BYTES
                     break
                 }
             }
         }
-        // Arrays are exclusive to this table; one disjoint pool avoids per-row observation scratch.
-        sample.ownedPool(this, primitiveBytes, protectedBytes)
-        sample.ownedReferences(this, 1L + pages.size + pageCount * 2L, protectedRows)
+        sample.owned(this, 16L, protectedRows)
+        // Private arrays form a disjoint pool; capacity changes replace its immutable allocation identity.
+        sample.ownedPool(allocationIdentity, primitiveBytes - 16L, protectedBytes)
+        sample.ownedReferences(this, 2L + pages.size + pageCount * 2L, protectedRows)
     }
 
     private fun pageSlots(count: Int): Int = ((count.toLong() + PAGE_MASK) ushr PAGE_SHIFT).toInt().coerceAtLeast(1)
@@ -153,6 +193,9 @@ internal class NativeLearnedMetadata {
         private const val PAGE_SHIFT = 4
         private const val PAGE_SIZE = 1 shl PAGE_SHIFT
         private const val PAGE_MASK = PAGE_SIZE - 1
-        private val PAGE_BYTES = PAGE_SIZE.toLong() * (COLUMNS * Int.SIZE_BYTES + Long.SIZE_BYTES) + Int.SIZE_BYTES
+        private val ROW_BYTES = COLUMNS.toLong() * Int.SIZE_BYTES + Long.SIZE_BYTES
+        private val PAGE_BYTES = PAGE_SIZE * ROW_BYTES + Int.SIZE_BYTES
+        private fun capacityFor(required: Int): Int =
+            1 shl (Int.SIZE_BITS - (required - 1).countLeadingZeroBits())
     }
 }

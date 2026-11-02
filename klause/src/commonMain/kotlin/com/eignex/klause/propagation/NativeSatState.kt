@@ -110,6 +110,7 @@ internal class NativeSatState(private val state: PropagationState) {
     private var pendingConflict = false
 
     init {
+        state.work += metadata.preparationWork
         for (h in 0 until baseCount) {
             val len = arena.length(h)
             if (len == 1) {
@@ -164,7 +165,7 @@ internal class NativeSatState(private val state: PropagationState) {
         while (metadataCleanupIndex < learnedCount) {
             budget.visit(4L)
             if (retiredOf(metadataCleanupIndex)) {
-                budget.visit(16L)
+                budget.visit(16L, 16L)
                 budget.visit(0L)
                 metadata.release(metadataCleanupIndex)
             } else budget.visit(0L)
@@ -898,7 +899,8 @@ internal class NativeSatState(private val state: PropagationState) {
             val replacement = findNonFalse(lits, start, len, lIdx, otherIdx, scanStart)
             if (replacement >= 0) {
                 if (!baseClause) {
-                    metadata[h - baseCount, NativeLearnedMetadata.SCAN] = if (replacement + 1 == len) 0 else replacement + 1
+                    metadata[h - baseCount, NativeLearnedMetadata.SCAN] =
+                        if (replacement + 1 == len) 0 else replacement + 1
                 }
                 val newLit = lits[start + replacement]
                 setWatchPosition(h, if (slot0IsFalse) 0 else 1, replacement)

@@ -154,10 +154,9 @@ class NativeWatchReclamationTest {
     @Test
     fun `appended retirements should resume metadata cleanup while retaining a live reason`() {
         val base = Clause(intArrayOf(8, 10))
-        val session = PropagationSession(Problem(6, 0, emptyArray(), arrayOf(base)), nativeSat = true)
+        val session = PropagationSession(Problem(6, 0, emptyArray(), arrayOf(base, Clause(intArrayOf(1)))), nativeSat = true)
         repeat(16) { session.addLearnedClause(base, 2, permanent = true) }
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
-        session.pinBool(0, false)
         val reason = assertNotNull(session.boolReasonClause(1)).toList()
         val generation = session.learnedRetirementGeneration
         repeat(3) {
@@ -165,6 +164,7 @@ class NativeWatchReclamationTest {
             repeat(8) { session.maintainCapWindow(0, 32_768L, 4096L, { false }) { false } }
             repeat(8) { session.compactLearnedClauses(40L, 256L, { false }) { _, _ -> true } }
         }
+        assertEquals(17, session.activeLearnedClauseCount)
         val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
         val stopAt = session.work + 4L
 

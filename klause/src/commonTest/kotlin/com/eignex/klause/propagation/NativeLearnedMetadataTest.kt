@@ -70,4 +70,22 @@ class NativeLearnedMetadataTest {
         assertTrue(observed.getValue("protectedPrimitiveBytes") > 16L)
         assertTrue(observed.getValue("protectedPrimitiveBytes") < observed.getValue("ownedPrimitiveBytes"))
     }
+    @Test
+    fun `capacity growth should keep each observed allocation identity immutable`() {
+        val metadata = NativeLearnedMetadata()
+        val sample = SharingMemoryObservation(10_000L, 4096, { false }, {})
+        assertNotNull(sample.snapshot { metadata.sharingMemory(sample, false) { false } }.completeValues)
+        repeat(32) { metadata.add(9, false, it, it.toLong()) }
+        val before = assertNotNull(sample.snapshot {
+            metadata.sharingMemory(sample, false) { false }
+        }.completeValues)
+
+        val protected = assertNotNull(sample.snapshot {
+            metadata.sharingMemory(sample, true) { true }
+        }.completeValues)
+
+        assertEquals(before.getValue("ownedPrimitiveBytes"), protected.getValue("ownedPrimitiveBytes"))
+        assertEquals(metadata.primitiveBytes, protected.getValue("protectedPrimitiveBytes"))
+    }
+
 }
