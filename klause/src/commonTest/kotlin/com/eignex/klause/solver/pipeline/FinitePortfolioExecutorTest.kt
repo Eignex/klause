@@ -34,13 +34,14 @@ import kotlin.time.TestTimeSource
 
 class FinitePortfolioExecutorTest {
     @Test
-    fun `heuristic work admission should include LNS without changing worker slots`() {
+    fun `paid heuristic modes should preserve worker slots and their sample providers`() {
         val source = Problem(0, 3, Array(3) { IntDomain(0, 1) }, emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3))
         val prepared = source.prepareExecutionPlan(objective, preferFinite = true)
         val scenario = PortfolioScenario(cores = 1, arms = PortfolioScenario.DEFAULT_ARMS,
             kind = Kind.COP, engine = EngineMix.MIXED)
-        val schedules = listOf(InitialProbePolicy.FAMILY_WORK, InitialProbePolicy.HEURISTIC_WORK).map { policy ->
+        val schedules = listOf(InitialProbePolicy.FAMILY_WORK, InitialProbePolicy.HEURISTIC_WORK,
+            InitialProbePolicy.ALNS_WORK).map { policy ->
             val invocation = FinitePipeline.portfolioExecutor(source.bake(), scenario, objective, null, null,
                 null, null, prepared, Cancellation.after(1.seconds), numericalCompletion = false,
                 probePolicy = policy)
@@ -48,10 +49,12 @@ class FinitePortfolioExecutorTest {
         }
 
         assertEquals(schedules[0].arms.map { it.label }, schedules[1].arms.map { it.label })
+        assertEquals(schedules[0].arms.map { it.label }, schedules[2].arms.map { it.label })
         val localSearch = schedules[0].heuristicStarts.single().workByArm.keys
         val allHeuristics = schedules[1].heuristicStarts.single().workByArm.keys
         assertTrue(localSearch.isNotEmpty() && localSearch.all { it.startsWith("ls/") })
         assertEquals(localSearch + "alns/balanced", allHeuristics)
+        assertEquals(localSearch, schedules[2].heuristicStarts.single().workByArm.keys)
     }
 
     @Test

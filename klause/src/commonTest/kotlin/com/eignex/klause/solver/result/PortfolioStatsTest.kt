@@ -5,9 +5,18 @@ import kotlin.test.assertEquals
 
 class PortfolioStatsTest {
     @Test
+    fun `copying heuristic samples should retain their completion time`() {
+        val sample = HeuristicStartStats(5L, mapOf("first" to 6L), true, 7L)
+
+        val copy = sample.copy(workByArm = mapOf("first" to 8L))
+
+        assertEquals(7L, copy.completionNanos)
+    }
+
+    @Test
     fun `merging heuristic starts should retain invocation boundaries`() {
         val incomplete = HeuristicStartStats(5L, mapOf("first" to 2L), false)
-        val complete = HeuristicStartStats(5L, mapOf("first" to 6L), true)
+        val complete = HeuristicStartStats(5L, mapOf("first" to 6L), true, 7L)
 
         val combined = PortfolioStats(heuristicStarts = listOf(incomplete))
             .mergedWith(PortfolioStats(heuristicStarts = listOf(complete)))

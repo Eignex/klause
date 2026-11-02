@@ -39,6 +39,7 @@ import com.eignex.klause.util.parseBigInt
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 
@@ -62,6 +63,7 @@ class CliStatsTest {
     fun `heuristic start statistics should retain work and completion by invocation`() {
         val stats = SolveStats(portfolio = PortfolioStats(heuristicStarts = listOf(
             HeuristicStartStats(5L, mapOf("ls/fixed" to 2L, "ls/other" to 0L), false),
+            HeuristicStartStats(5L, mapOf("ls/fixed" to 6L), true, 7L),
         )))
 
         val pairs = portfolioStatPairs(stats).toMap()
@@ -70,6 +72,8 @@ class CliStatsTest {
         assertEquals("false", pairs["heuristicStart.0.completed"])
         assertEquals("2", pairs["heuristicStart.0.work.ls/fixed"])
         assertEquals("0", pairs["heuristicStart.0.work.ls/other"])
+        assertFalse(pairs.containsKey("heuristicStart.0.completedNs"))
+        assertEquals("7", pairs["heuristicStart.1.completedNs"])
     }
 
     @Test

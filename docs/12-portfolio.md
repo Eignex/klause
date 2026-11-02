@@ -774,6 +774,18 @@ invocation's participating workers, work and sample completion. These modes requ
 the same curated elapsed scope as the weighted probe controls and can compose with
 query-boundary publication coalescing.
 
+`portfolio-probes=alns-work` keeps the initial LS queries eligible and defers only
+ALNS. Each initial LS worker can supply the sample, but one worker must independently
+reach the existing base allowance; their work is not combined. ALNS keeps its ordinary
+eligibility when no sample provider is available. Sample observations contain the LS
+providers, while ALNS query lifecycle observations report its actual admission.
+Worker construction, complete-worker coverage, probe fractions and allowances follow
+the same rules as the other paid-work modes.
+
+`heuristicStart` completion time uses the portfolio invocation origin shared by
+worker lifecycle times. It is recorded after sampled search and deferred checks,
+before subsequent worker admission, and remains absent when unobserved.
+
 Before the first incumbent, an optimization arm with pending private preparation, or
 a local-search arm that has not executed an instruction, receives preparation
 revisits after all initial siblings have been admitted. Unfinished arms rotate in arm

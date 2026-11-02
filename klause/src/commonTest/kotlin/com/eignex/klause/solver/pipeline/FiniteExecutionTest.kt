@@ -303,7 +303,8 @@ class FiniteExecutionTest {
 
     @Test
     fun `initial probe policies should require a containing time deadline`() {
-        for (policy in listOf("leader-half", "lp-transfer", "heuristic-second", "family-work", "heuristic-work")) {
+        for (policy in listOf("leader-half", "lp-transfer", "heuristic-second", "family-work", "heuristic-work",
+            "alns-work")) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -341,7 +342,13 @@ class FiniteExecutionTest {
             ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work", "portfolio-lp-start=after-probes")),
             ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-work"),
                 ExecutionOption.portfolioPublications("segment")),
-            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work", "portfolio-publications=segment")))) {
+            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work", "portfolio-publications=segment")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("alns-work")),
+            ExecutionOptions.parse(listOf("portfolio-probes=alns-work")),
+            ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-lp-start=after-probes")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("alns-work"),
+                ExecutionOption.portfolioPublications("segment")),
+            ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-publications=segment")))) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -374,7 +381,10 @@ class FiniteExecutionTest {
             listOf("portfolio-probes=family-work", "portfolio-work=100"),
             listOf("portfolio-probes=heuristic-work", "arms=2"),
             listOf("portfolio-probes=heuristic-work", "bt-arm=satOptimized"),
-            listOf("portfolio-probes=heuristic-work", "portfolio-work=100"))) {
+            listOf("portfolio-probes=heuristic-work", "portfolio-work=100"),
+            listOf("portfolio-probes=alns-work", "arms=2"),
+            listOf("portfolio-probes=alns-work", "bt-arm=satOptimized"),
+            listOf("portfolio-probes=alns-work", "portfolio-work=100"))) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -411,7 +421,8 @@ class FiniteExecutionTest {
 
     @Test
     fun `initial probe policies should reject Boolean sources`() {
-        for (policy in listOf("leader-half", "lp-transfer", "heuristic-second", "family-work", "heuristic-work")) {
+        for (policy in listOf("leader-half", "lp-transfer", "heuristic-second", "family-work", "heuristic-work",
+            "alns-work")) {
             val shape = FiniteSolveShape(Problem(1, 0, emptyArray(), emptyArray()), true, false, null,
                 LinearObjective(longArrayOf(1)), 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(

@@ -547,7 +547,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Select ordinary LP probes or defer them until the other initial probes finish or find an incumbent. */
         val portfolioLpStart: ExecutionOption<String> = ExecutionOption("portfolio-lp-start", ValueKind.STRING)
 
-        /** Select ordinary probes, weighted budgets or an early heuristic probe. */
+        /** Select initial probe ordering, budgets or measured heuristic admission. */
         val portfolioProbes: ExecutionOption<String> = ExecutionOption("portfolio-probes", ValueKind.STRING)
 
         internal val portfolioPublications: ExecutionOption<String> =

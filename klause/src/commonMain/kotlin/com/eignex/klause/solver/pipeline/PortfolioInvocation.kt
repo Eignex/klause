@@ -54,6 +54,7 @@ internal class PortfolioInvocationPolicy(
     probeWeights: IntArray = intArrayOf(),
     probeRanks: IntArray = intArrayOf(),
     initialHeuristics: Set<Int> = emptySet(),
+    heuristicTargets: Set<Int>? = null,
     val onProgress: ((PortfolioEvent) -> Unit)? = null,
 ) {
     private val minimumShares = shares.copyOf()
@@ -61,11 +62,13 @@ internal class PortfolioInvocationPolicy(
     private val initialWeights = probeWeights.copyOf()
     private val initialRanks = probeRanks.copyOf()
     private val heuristicArms = initialHeuristics.toSet()
+    private val deferredHeuristics = heuristicTargets?.toSet()
     val shares: DoubleArray get() = minimumShares.copyOf()
     val probes: Set<Int> get() = improvingProbes.toSet()
     val probeWeights: IntArray get() = initialWeights.copyOf()
     val probeRanks: IntArray get() = initialRanks.copyOf()
     val initialHeuristics: Set<Int> get() = heuristicArms.toSet()
+    val heuristicTargets: Set<Int>? get() = deferredHeuristics?.toSet()
 }
 
 @Suppress("TooGenericExceptionCaught") // construction failure closes every allocated worker and source service
@@ -130,6 +133,7 @@ internal class PortfolioInvocation(
             it.initialProbeWeights = selected.probeWeights
             it.initialProbeRanks = selected.probeRanks
             it.initialHeuristicArms = selected.initialHeuristics
+            it.initialHeuristicTargets = selected.heuristicTargets
             it.improvementProofShare = controls.improvementProofShare
             it.includeRestartingProof = controls.includeRestartingProof
             val automatic = controls.booleanProofTasks == null && controls.parallelism == 1 && objective == null &&

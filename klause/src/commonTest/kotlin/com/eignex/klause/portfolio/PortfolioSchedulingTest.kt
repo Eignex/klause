@@ -22,6 +22,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -29,6 +30,104 @@ import kotlin.time.TestTimeSource
 import kotlin.time.TimeSource
 
 class PortfolioSchedulingTest {
+    @Test
+    fun `ALNS deferral should retain every LS probe and require one independent sample`() {
+        val clock = TestTimeSource()
+        val visits = mutableListOf<Int>()
+        val sampleWork = LongArray(4)
+        var targetStart: List<Long>? = null
+        val workers = List(4) { arm ->
+            val search = ScriptedSearch({ arm == 1 && it == 0 }) {
+                visits += arm
+                clock += 1.milliseconds
+                if (arm == 1) sampleWork[arm] += 3L
+                if (arm == 2) sampleWork[arm] += if (sampleWork[arm] == 0L) 2L else 3L
+                if (arm == 3) targetStart = listOf(sampleWork[1], sampleWork[2])
+            }
+            val observed = if (arm in 1..2) object : ResumableSearch by search {
+                override val work: Long get() = sampleWork[arm]
+            } else search
+            trackingWorker("worker$arm", arm, observed).also {
+                if (arm > 0) it.family = if (arm == 3) ArmFamily.Lns else ArmFamily.LocalSearch
+                if (arm == 3) it.improvementOnly = true
+            }
+        }
+
+        val result = Portfolio(workers, fixedBandit(4, 2), baseSliceWork = 5L, maxSliceWork = 5L,
+            sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
+            it.runTimeSource = clock
+            it.initialHeuristicArms = setOf(1, 2)
+            it.initialHeuristicTargets = setOf(3)
+        }.use { it.minimize(Cancellation { targetStart != null || visits.size >= 128 }) }
+
+        assertEquals(listOf(3L, 5L), targetStart)
+        val completed = assertNotNull(result.stats.portfolio.heuristicStarts.single().completionNanos)
+        assertTrue(assertNotNull(result.stats.portfolio.arms[3].lifecycle.firstQueryNanos) >= completed)
+    }
+
+    @Test
+    fun `ALNS deferral should retain silent complete worker coverage with all LS probes`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(5)
+        val sampleWork = LongArray(5)
+        val workers = List(5) { arm ->
+            val search = ScriptedSearch({ arm == 2 && it == 0 }) {
+                elapsed[arm] += 100L
+                clock += 100.milliseconds
+                if (arm in 2..3) sampleWork[arm]++
+            }
+            val observed = if (arm in 2..3) object : ResumableSearch by search {
+                override val work: Long get() = sampleWork[arm]
+            } else search
+            trackingWorker("worker$arm", arm, observed).also {
+                if (arm >= 2) it.family = if (arm == 4) ArmFamily.Lns else ArmFamily.LocalSearch
+                if (arm == 4) it.improvementOnly = true
+            }
+        }
+
+        Portfolio(workers, fixedBandit(5, 2), reseedStaleThreshold = 0).also {
+            it.runTimeSource = clock
+            it.initialHeuristicArms = setOf(2, 3)
+            it.initialHeuristicTargets = setOf(4)
+        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+
+        val owed = (elapsed.sum() - 300L) / 4
+        for (arm in 0..1) assertTrue(elapsed[arm] >= owed - 100L)
+        for (arm in 2..3) assertTrue(elapsed[arm] > 0L)
+        assertEquals(0L, elapsed[4])
+    }
+
+    @Test
+    fun `ALNS should retain ordinary eligibility when its last sample provider retires`() {
+        var providerWork = 0L
+        var targetSlices = 0
+        var slices = 0
+        val provider = ScriptedSearch({ false }) {
+            slices++
+            providerWork += 3L
+            error("provider failed")
+        }
+        val workers = listOf(
+            trackingWorker("complete", 0, ScriptedSearch({ false }) { slices++ }),
+            trackingWorker("provider", 1, object : ResumableSearch by provider {
+                override val work: Long get() = providerWork
+            }).also { it.family = ArmFamily.LocalSearch },
+            trackingWorker("target", 2, ScriptedSearch({ false }) {
+                slices++
+                targetSlices++
+            }).also { it.family = ArmFamily.Lns },
+        )
+
+        val result = Portfolio(workers, fixedBandit(3, 0), baseSliceWork = 5L, maxSliceWork = 5L,
+            reseedStaleThreshold = 0).also {
+            it.initialHeuristicArms = setOf(1)
+            it.initialHeuristicTargets = setOf(2)
+        }.use { it.minimize(Cancellation { targetSlices > 0 || slices >= 128 }) }
+
+        assertEquals(1, targetSlices)
+        assertFalse(result.stats.portfolio.heuristicStarts.single().completed)
+    }
+
     @Test
     fun `incumbent gated LNS should wait for the same worker heuristic sample`() {
         val clock = TestTimeSource()

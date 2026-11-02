@@ -243,7 +243,7 @@ internal fun FinitePipeline.portfolioExecutor(
             probeRanks = if (probePolicy == InitialProbePolicy.HEURISTIC_SECOND)
                 heuristicSecondProbeRanks(workers) else intArrayOf(),
             initialHeuristics = when (probePolicy) {
-                InitialProbePolicy.FAMILY_WORK -> workers.indices.filter { arm ->
+                InitialProbePolicy.FAMILY_WORK, InitialProbePolicy.ALNS_WORK -> workers.indices.filter { arm ->
                     arm < scenario.arms && workers[arm].family == ArmFamily.LocalSearch &&
                         !workers[arm].startAfterIncumbent && !workers[arm].improvementOnly &&
                         !workers[arm].auxiliaryProof
@@ -253,6 +253,9 @@ internal fun FinitePipeline.portfolioExecutor(
                 }.toSet()
                 else -> emptySet()
             },
+            heuristicTargets = if (probePolicy == InitialProbePolicy.ALNS_WORK) workers.indices.filter { arm ->
+                workers[arm].family == ArmFamily.Lns && !workers[arm].auxiliaryProof
+            }.toSet() else null,
             onProgress = deferred)
     }
 }

@@ -1110,9 +1110,10 @@ private fun executePortfolio(
         "heuristic-second" -> InitialProbePolicy.HEURISTIC_SECOND
         "family-work" -> InitialProbePolicy.FAMILY_WORK
         "heuristic-work" -> InitialProbePolicy.HEURISTIC_WORK
+        "alns-work" -> InitialProbePolicy.ALNS_WORK
         else -> pipelineConfigError(
-            "portfolio-probes expects ordinary|leader-half|lp-transfer|heuristic-second|family-work|heuristic-work, " +
-                "got `$probes`")
+            "portfolio-probes expects ordinary|leader-half|lp-transfer|heuristic-second|family-work|" +
+                "heuristic-work|alns-work, got `$probes`")
     }
     if (probePolicy != InitialProbePolicy.ORDINARY &&
         (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {

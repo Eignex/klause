@@ -192,6 +192,12 @@ class Portfolio(
                 workers[it].family in setOf(ArmFamily.LocalSearch, ArmFamily.Lns) })
             field = value.toSet()
         }
+    internal var initialHeuristicTargets: Set<Int>? = null
+        set(value) {
+            require(value == null || value.all { it in workers.indices &&
+                workers[it].family in setOf(ArmFamily.LocalSearch, ArmFamily.Lns) })
+            field = value?.toSet()
+        }
     internal var improvementProofShare: Double = 0.5
         set(value) {
             require(value.isFinite() && value in 0.5..1.0)
@@ -946,8 +952,15 @@ class Portfolio(
         private var remaining = workers.size
         private val probed = BooleanArray(workers.size)
         private val initialHeuristics = initialHeuristicArms.toSet()
+        private val heuristicTargets = initialHeuristicTargets?.toSet()
         private val heuristicSampleWork = if (initialHeuristics.isEmpty()) LongArray(0) else LongArray(workers.size)
         private var heuristicSampled = initialHeuristics.isEmpty()
+        private var heuristicSampleCompletion: Long? = null
+
+        init {
+            require(heuristicTargets == null || heuristicTargets.none { it in initialHeuristics })
+        }
+
         private val productive = BooleanArray(workers.size)
         private val trialStarted = BooleanArray(workers.size)
         private val trialPreparationTime = Array(workers.size) { Duration.ZERO }
@@ -1183,7 +1196,9 @@ class Portfolio(
         private fun initialHeuristicEligibility(eligible: List<Int>): List<Int> {
             if (heuristicSampled || diagnostics != null || lanes != 1) return eligible
             val first = eligible.firstOrNull { it in initialHeuristics && !retired[it] } ?: return eligible
-            return eligible.filter { it !in initialHeuristics || it == first }
+            val targets = heuristicTargets
+            return if (targets == null) eligible.filter { it !in initialHeuristics || it == first }
+            else eligible.filter { it !in targets }
         }
 
         private fun eligibleArms(): List<Int> {
@@ -1344,7 +1359,10 @@ class Portfolio(
             if (!heuristicSampled && arm in initialHeuristics) {
                 heuristicSampleWork[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - heuristicSampleWork[arm])
                 if (!failed && claim.fault == null && failure !is SearchInitializationCancelled &&
-                    heuristicSampleWork[arm] >= baseSliceWork) heuristicSampled = true
+                    heuristicSampleWork[arm] >= baseSliceWork) {
+                    heuristicSampled = true
+                    heuristicSampleCompletion = epoch.elapsedNow().inWholeNanoseconds
+                }
             }
             if (claim.closedProof) account.credit(arm, Signal.ProofClosure, 1.0)
             siblingWork[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - siblingWork[arm])
@@ -1487,7 +1505,7 @@ class Portfolio(
                     heuristicStarts = if (initialHeuristics.isEmpty()) emptyList() else listOf(
                         HeuristicStartStats(baseSliceWork,
                             initialHeuristics.associate { workers[it].label to heuristicSampleWork[it] },
-                            heuristicSampled),
+                            heuristicSampled, heuristicSampleCompletion),
                     ),
                 ),
             )

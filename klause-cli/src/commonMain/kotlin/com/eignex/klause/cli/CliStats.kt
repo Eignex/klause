@@ -390,7 +390,8 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         listOf(
             "heuristicStart.$index.requiredWork" to "${start.requiredWork}",
             "heuristicStart.$index.completed" to "${start.completed}",
-        ) + start.workByArm.map { (arm, work) -> "heuristicStart.$index.work.$arm" to "$work" }
+        ) + listOfNotNull(start.completionNanos?.let { "heuristicStart.$index.completedNs" to "$it" }) +
+            start.workByArm.map { (arm, work) -> "heuristicStart.$index.work.$arm" to "$work" }
     }
     val schedule = stats.portfolio.arms.map { arm ->
         val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
