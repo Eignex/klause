@@ -65,7 +65,9 @@ class CorpusZipCollectionTest {
     @Test
     fun `cold discovery and selection fetch only eligible selected member bodies`() {
         val original = "NAME NEOS\nROWS\n N OBJECTIVE\nENDATA\n".encodeToByteArray()
-        val gzip = ByteArrayOutputStream().also { out -> GZIPOutputStream(out).use { it.write(original) } }.toByteArray()
+        val gzip = ByteArrayOutputStream().also { out ->
+            GZIPOutputStream(out).use { it.write(original) }
+        }.toByteArray()
         val archive = ByteArrayOutputStream().also { out ->
             ZipOutputStream(out).use { zip ->
                 val unrelated = ByteArray(524288)
@@ -77,7 +79,10 @@ class CorpusZipCollectionTest {
                 })
                 zip.write(unrelated)
                 zip.closeEntry()
-                for ((name, bytes) in listOf("nested/neos.mps.gz" to gzip, "other.mps" to original, "oversized.mps.gz" to ByteArray(2048))) {
+                val instances = listOf(
+                    "nested/neos.mps.gz" to gzip, "other.mps" to original, "oversized.mps.gz" to ByteArray(2048),
+                )
+                for ((name, bytes) in instances) {
                     zip.putNextEntry(ZipEntry(name))
                     zip.write(bytes)
                     zip.closeEntry()
@@ -111,7 +116,8 @@ class CorpusZipCollectionTest {
             val selected = collection.fetch("nested/neos.mps.zst", root)
 
             assertContentEquals(original, CorpusFiles.open(selected).use { it.readBytes() })
-            assertEquals(listOf("nested/neos.mps.zst"), root.walkTopDown().filter { it.isFile }.map { it.relativeTo(root).path }.toList())
+            val stored = root.walkTopDown().filter { it.isFile }.map { it.relativeTo(root).path }.toList()
+            assertEquals(listOf("nested/neos.mps.zst"), stored)
             assertTrue(transferred < archive.size / 2, "unselected archive bodies must remain unfetched")
         } finally {
             root.deleteRecursively()

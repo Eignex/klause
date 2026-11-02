@@ -44,7 +44,10 @@ internal class CorpusZipCollection(
         try {
             archive { zip ->
                 val entry = requireNotNull(zip.getEntry(member.path))
-                require(entry.size == member.bytes && entry.crc == member.crc && !entry.isUnixSymlink && zip.canReadEntryData(entry)) {
+                require(
+                    entry.size == member.bytes && entry.crc == member.crc &&
+                        !entry.isUnixSymlink && zip.canReadEntryData(entry),
+                ) {
                     "ZIP member changed after discovery"
                 }
                 val checksum = CRC32()
@@ -55,9 +58,8 @@ internal class CorpusZipCollection(
                 require(checksum.value == member.crc) { "ZIP member checksum mismatch: ${member.path}" }
             }
             return CorpusFiles.compress(plain)
-        } catch (failure: Exception) {
+        } finally {
             plain.delete()
-            throw failure
         }
     }
 

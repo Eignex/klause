@@ -32,7 +32,9 @@ internal class CorpusStore(private val root: File, private val workspace: File =
             val staging = Files.createTempDirectory(parent, "$id-member-")
             try {
                 val source = fetch(staging.toFile()).toPath()
-                require(source.toRealPath().startsWith(staging.toRealPath()) && Files.isRegularFile(source, NOFOLLOW_LINKS))
+                require(
+                    source.toRealPath().startsWith(staging.toRealPath()) && Files.isRegularFile(source, NOFOLLOW_LINKS),
+                )
                 Files.createDirectories(target.parent)
                 require(target.parent.toRealPath().startsWith(collection.toPath().toRealPath()))
                 Files.move(source, target, ATOMIC_MOVE)
