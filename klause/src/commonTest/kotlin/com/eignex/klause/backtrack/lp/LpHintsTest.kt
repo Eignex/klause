@@ -421,6 +421,38 @@ class LpHintsTest {
     }
 
     @Test
+    fun `side fallback identifies the incompatible branch alternatives`() {
+        val variable = VarRef.IntVar(0)
+        val lower = SearchDecision.IntAtMost(0, 0L)
+        val upper = SearchDecision.IntAtLeast(0, 1L)
+        for ((target, alternatives, reason) in listOf(
+            Triple(variable, emptyList(), "ARITY"),
+            Triple(variable, listOf(lower), "ARITY"),
+            Triple(variable, listOf(SearchDecision.IntAtMost(0, 1L), SearchDecision.IntAtLeast(0, 2L)), "PARTITION"),
+            Triple(VarRef.IntVar(1), listOf(lower, upper), "VARIABLE"),
+        )) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 2) }
+            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val events = mutableListOf<String>()
+            var work = 0L
+            val hints = LpHints(2, 0, directionalGains = true, observe = events::add, charge = { work += it })
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            hints.prepareSide(variable, IntDomain(0, 2)) { _, _ -> listOf(LpDirectionalCost(1.0, 4.0)) }
+            hints.branch(variable, IntDomain(0, 2))
+            val preparedWork = work
+
+            val ordered = hints.orderAlternatives(target, alternatives)
+
+            assertEquals(alternatives, ordered, reason)
+            assertEquals(12L, work - preparedWork, reason)
+            assertEquals(listOf("SIDE_FALLBACK", "BASIS_SIDE_FALLBACK_" + reason),
+                events.filter { it.contains("SIDE_FALLBACK") }, reason)
+        }
+    }
+
+    @Test
     fun `tied basis child gains preserve the existing order`() {
         val builder = LpBuilder()
         builder.addVar(0, 2)

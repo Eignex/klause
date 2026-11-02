@@ -384,8 +384,14 @@ internal class LpHints(
         allowBasis: Boolean,
     ): List<SearchDecision> {
         charge(12L)
-        if (advice.variable != variable || alternatives.size != 2) {
+        if (advice.variable != variable) {
             observe("SIDE_FALLBACK")
+            observe(if (advice.basis) "BASIS_SIDE_FALLBACK_VARIABLE" else "HISTORY_SIDE_FALLBACK_VARIABLE")
+            return alternatives
+        }
+        if (alternatives.size != 2) {
+            observe("SIDE_FALLBACK")
+            observe(if (advice.basis) "BASIS_SIDE_FALLBACK_ARITY" else "HISTORY_SIDE_FALLBACK_ARITY")
             return alternatives
         }
         val firstUp = alternatives[0].matchesSide(advice, up = true)
@@ -394,6 +400,7 @@ internal class LpHints(
             !(firstDown && alternatives[1].matchesSide(advice, up = true))
         ) {
             observe("SIDE_FALLBACK")
+            observe(if (advice.basis) "BASIS_SIDE_FALLBACK_PARTITION" else "HISTORY_SIDE_FALLBACK_PARTITION")
             return alternatives
         }
         if (advice.basis && !allowBasis) {

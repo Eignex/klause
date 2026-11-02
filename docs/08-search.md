@@ -312,7 +312,8 @@ floor/ceil partition. Guidance swaps those alternatives without adding, removing
 replacing a decision. Tied gains, insufficient allowance, pruned alternatives and changed partitions retain the existing
 heuristics. Preferences expire at the next node, point replacement or history reset.
 History and basis side consumption, changed order and unavailable advice are recorded
-separately. Variable proposal preparation is separate from actual selection, with
+separately. Child-order fallback distinguishes a changed variable, an incomplete pair
+and a different partition. Variable proposal preparation is separate from actual selection, with
 changed and agreed baseline choices counted at selection. Accepted row-extension
 compatibility checks have their own outcome.
 The readiness check and all analysis spend the existing LP work allowance. Ancestor
