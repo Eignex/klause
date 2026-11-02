@@ -90,6 +90,9 @@ internal sealed interface FetchMethod {
      *  compressed inside, e.g. XCSP3 `*.xml.lzma`). */
     data object Zip : FetchMethod
 
+    /** Discover [extension] instances from the ZIP directory and materialize only selected members. */
+    data class SelectiveZip(val extension: String) : FetchMethod
+
     /** Fetch the uniquely named ZIP member through bounded HTTP ranges, unpack optional XZ compression,
      *  and require the original plain bytes to match [sha256]. [name] is a basename, not an archive path. */
     data class ZipMember(val name: String, val sha256: String) : FetchMethod

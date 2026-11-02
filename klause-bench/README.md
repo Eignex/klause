@@ -17,6 +17,11 @@ replaces the complete unfinished row rather than mixing arms from different
 machines or attempts. Accepted rows remain valid; retain failed and preparation
 costs and report repeated infrastructure losses separately.
 
+The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
+needed in private workspaces. The lab computes planner identities against the complete verified build before
+copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time
+and directory membership checks, and expire with the worker session. Unsupported filesystems hash the bytes.
+
 A standalone `cp` control sets both `param.bt-arm=LABEL` and `param.arms=1`.
 Named recipes repeat across the configured worker slots otherwise. Check the
 emitted `arm.*` entries to verify the actual worker count before comparing controls.
@@ -1237,6 +1242,16 @@ The CLI deadline includes frontend construction/preparation/search; compressed
 source decoding reduces its remaining allowance. MiniZinc compilation, preflight,
 artifact hashing and output reconstruction are outside that deadline and inside
 the containing case/job allowance. Independent checking is separate lab work.
+Staging checks the containing deadline and thread interruption between bounded
+read/write chunks and before invoking the CLI. It closes streams and removes
+partial files on cancellation, exhausted preparation, decoding failure and CLI
+failure. Cleanup runs even after the deadline and its cost remains charged.
+`sourceDecodeMs`, `sourceCliMs`, `sourceCleanupMs` and `sourceInvocationMs` retain
+preparation, the invocation callback, retirement and the whole source scope on
+successful and failed attempts. `elapsedMs` remains the subprocess measurement.
+An exhausted preparation records no solver verdict and zero CLI time. Plain inputs
+retain the same source ledger without decompression or temporary files. Staging cooperates between
+IO calls; a blocked filesystem call can delay observation of cancellation.
 JFR measurements retain phase, caller and allocation summaries in `solve.log`.
 Summary analysis runs after CLI exit, outside its elapsed time and inside the
 containing case/job allowance. Sample shares and estimated allocations diagnose

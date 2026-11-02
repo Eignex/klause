@@ -48,7 +48,12 @@ class RootInprocessingSearchTest {
     @Test
     fun `ordinary search should consume root probes without a restart schedule`() {
         for (native in listOf(false, true)) {
-            val configured = params(native).copy(lubyRestartBase = null, inprocessingInterval = 1L,
+            var observedNative: Boolean? = null
+            val exchange = object : ClauseExchange {
+                override fun onSearchStart(session: PropagationSession) { observedNative = session.usesNativeSat }
+                override fun onRestart(session: PropagationSession) = Unit
+            }
+            val configured = params(native, exchange).copy(lubyRestartBase = null, inprocessingInterval = 1L,
                 inprocessingWork = 4096L, inprocessingRootWork = 512L, inprocessingProbeWork = 512L,
                 rootRebuildCaptureVisits = 1024)
 
@@ -59,6 +64,11 @@ class RootInprocessingSearchTest {
             assertTrue(result.stats.search.learning.getValue("inprocessWorkTriggers") > 0L)
             assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
             assertTrue(result.stats.search.learning.getValue("inprocessRootRebuildComplete") > 0L)
+            assertEquals(native, observedNative)
+            assertEquals(if (native) 1L else 0L,
+                result.stats.search.learning["propagationNativeSatSessions"] ?: 0L)
+            assertEquals(if (native) 0L else 1L,
+                result.stats.search.learning["propagationGeneralSessions"] ?: 0L)
         }
     }
 
@@ -74,6 +84,10 @@ class RootInprocessingSearchTest {
             assertIs<SolveResult.Sat>(result)
             assertEquals(0.0, result.stats.search.restarts.sum)
             assertTrue(result.stats.search.learning.getValue("inprocessProbeUnits") > 0L)
+            assertEquals(if (native) 1L else 0L,
+                result.stats.search.learning["propagationNativeSatSessions"] ?: 0L)
+            assertEquals(if (native) 0L else 1L,
+                result.stats.search.learning["propagationGeneralSessions"] ?: 0L)
         }
     }
 
@@ -83,7 +97,7 @@ class RootInprocessingSearchTest {
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
             Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
         ))
-        val configured = BacktrackParams(nativeSat = false, variableSelector = InputOrder,
+        val configured = BacktrackParams(nativeSat = true, variableSelector = InputOrder,
             valueSelector = IndomainMax, rootProbeBatch = 4, inprocessingInterval = 1L,
             inprocessingWork = 4096L, inprocessingProbeWork = 512L)
 
@@ -91,6 +105,8 @@ class RootInprocessingSearchTest {
 
         assertIs<SolveResult.Sat>(result)
         assertTrue(result.stats.search.learning.getValue("inprocessProbeEndpointUnits") > 0L)
+        assertEquals(1L, result.stats.search.learning.getValue("propagationGeneralSessions"))
+        assertEquals(0L, result.stats.search.learning["propagationNativeSatSessions"] ?: 0L)
     }
 
     @Test
@@ -235,6 +251,107 @@ class RootInprocessingSearchTest {
             assertTrue(result.assignment.bools[3])
             assertEquals(0.0, result.stats.search.inprocessProbes.sum)
             assertEquals(0.0, result.stats.search.inprocessVisits.sum)
+        }
+    }
+
+    @Test
+    fun `selected retirement should wait until its root premise reaches a peer`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)), Clause(intArrayOf(4, 6)),
+            ))
+            var retained: PropagationSession? = null
+            var target = -1
+            var activeAtPublication: Boolean? = null
+            var retiredOnClose = false
+            val exchange = object : ClauseExchange {
+                override fun onSearchStart(session: PropagationSession) {
+                    assertEquals(native, session.usesNativeSat)
+                    retained = session
+                    target = session.learnedClauseCount
+                    session.importClause(SharedClause(intArrayOf(0, 4), longArrayOf(), 2), origin = 7)
+                }
+                override fun onRestart(session: PropagationSession) = Unit
+                override fun onSearchClose(session: PropagationSession) {
+                    retiredOnClose = !session.isLearnedClause(target)
+                }
+            }
+            val peer = object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                    if (decision == SearchDecision.Bool(0) && context.decisionLevel == 0) {
+                        val session = assertNotNull(retained)
+                        assertEquals(0, session.decisionLevel)
+                        activeAtPublication = session.isLearnedClause(target)
+                    }
+                    return ComponentResult.Consistent
+                }
+            }
+            val configured = params(native, exchange).copy(lubyRestartBase = null, rootProbeBatch = 2,
+                inprocessingInterval = 1L, inprocessingWork = 4096L, inprocessingRootWork = 256L,
+                inprocessingProbeWork = 512L, componentFactory = { listOf(peer) })
+
+            val result = BacktrackSolver(source.bake()).solve(configured)
+
+            assertIs<SolveResult.Sat>(result)
+            assertEquals(true, activeAtPublication)
+            assertTrue(retiredOnClose)
+            assertTrue(result.assignment.bools[0])
+        }
+    }
+
+    @Test
+    fun `a paused peer publication should retain selected ownership until resumed`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)), Clause(intArrayOf(4, 6)),
+            ))
+            var retained: PropagationSession? = null
+            var target = -1
+            var block = true
+            var deliveries = 0
+            var retiredOnClose = false
+            val exchange = object : ClauseExchange {
+                override fun onSearchStart(session: PropagationSession) {
+                    assertEquals(native, session.usesNativeSat)
+                    retained = session
+                    target = session.learnedClauseCount
+                    session.importClause(SharedClause(intArrayOf(0, 4), longArrayOf(), 2), origin = 7)
+                }
+                override fun onRestart(session: PropagationSession) = Unit
+                override fun onSearchClose(session: PropagationSession) {
+                    retiredOnClose = !session.isLearnedClause(target)
+                }
+            }
+            val peer = object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                    if (decision == SearchDecision.Bool(0) && context.decisionLevel == 0) {
+                        deliveries++
+                        assertTrue(assertNotNull(retained).isLearnedClause(target))
+                        if (block) {
+                            return ComponentResult.Indeterminate
+                        }
+                    }
+                    return ComponentResult.Consistent
+                }
+            }
+            val configured = params(native, exchange).copy(lubyRestartBase = null, rootProbeBatch = 2,
+                inprocessingInterval = 1L, inprocessingWork = 4096L, inprocessingRootWork = 256L,
+                inprocessingProbeWork = 512L, componentFactory = { listOf(peer) })
+            val search = BacktrackSolver(source.bake()).resumableSolve(configured)
+
+            val result = search.use {
+                assertNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, Long.MAX_VALUE))
+                val session = assertNotNull(retained)
+                assertTrue(session.isLearnedClause(target))
+                assertEquals(0, session.decisionLevel)
+                block = false
+                finish(it)
+            }
+
+            assertIs<SolveResult.Sat>(result)
+            assertTrue(deliveries >= 2)
+            assertTrue(retiredOnClose)
+            assertTrue(result.assignment.bools[0])
         }
     }
 
