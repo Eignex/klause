@@ -2,7 +2,10 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
+import kotlin.math.exp
+import kotlin.math.expm1
 import kotlin.math.ln
+import kotlin.math.ln1p
 import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -148,8 +151,14 @@ internal class FamilyPolicy(
     }
 }
 
-/** A draw from Beta([alpha], [beta]), both positive, as the ratio of two Gamma draws. */
+/** A draw from Beta([alpha], [beta]), both positive, using inverse CDFs for unit shapes. */
 internal fun Random.nextBeta(alpha: Double, beta: Double): Double {
+    // Unit shapes have closed inverse CDFs and need no rejection loop.
+    if (alpha == 1.0) {
+        if (beta == 1.0) return nextDouble()
+        return -expm1(ln1p(-nextDouble()) / beta)
+    }
+    if (beta == 1.0) return exp(ln1p(-nextDouble()) / alpha)
     val x = nextGamma(alpha)
     val y = nextGamma(beta)
     return if (x + y > 0.0) x / (x + y) else 0.5

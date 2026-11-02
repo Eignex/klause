@@ -2,12 +2,42 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
+import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class FamilyPolicyTest {
+
+    @Test
+    fun `unit shape beta draws should retain their posterior distribution`() {
+        for ((alpha, beta) in listOf(1.0 to 1.0, 1.0 to 4.0, 4.0 to 1.0, 1.0 to 1e20)) {
+            val random = Random(7)
+            val total = alpha + beta
+            val expectedMean = alpha / total
+            val expectedVariance = beta / (alpha * (total + 1.0))
+            var sum = 0.0
+            var squares = 0.0
+            var withinBounds = true
+            val draws = 4_096
+
+            repeat(draws) {
+                val value = random.nextBeta(alpha, beta)
+                withinBounds = withinBounds && value.isFinite() && value in 0.0..1.0
+                val normalized = value / expectedMean
+                sum += normalized
+                squares += normalized * normalized
+            }
+            val mean = sum / draws
+            val variance = squares / draws - mean * mean
+
+            assertTrue(withinBounds)
+            assertTrue(abs(mean - 1.0) < 0.08, "Beta($alpha, $beta) normalized mean was $mean")
+            assertTrue(abs(variance - expectedVariance) < 0.02 + expectedVariance / 4.0,
+                "Beta($alpha, $beta) normalized variance was $variance")
+        }
+    }
 
     private val pair = listOf(ArmFamily.Backtrack, ArmFamily.LocalSearch)
 
