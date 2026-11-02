@@ -584,7 +584,12 @@ See [MiniZinc setup](../klause-mzn-lib/README.md) for direct MiniZinc runs and t
 To reuse installed-build hashes across repeated bench processes, run
 `provenance out=/absolute/path/provenance.json` with the installed launcher and set
 `KLAUSE_BENCH_PROVENANCE` to that path. Regenerate it after rebuilding or restoring
-an installation. Without it, each process captures its own installed-build hashes.
+an installation. Ordinary lab processes also reuse per-file hashes in the existing
+private `LAB_WORKSPACE_CACHE`. Every use traverses its current input/provenance
+inventory and checks filesystem identity, inode, change time, modification time
+and size. Unsupported filesystems and unavailable receipts fall back to reading
+the bytes. The checksum cache uses at most 64 MiB including bounded replacement
+files; it adds no corpus, solver-result or MiniZinc identity-query cache.
 
 ## Weighted objective qualification
 

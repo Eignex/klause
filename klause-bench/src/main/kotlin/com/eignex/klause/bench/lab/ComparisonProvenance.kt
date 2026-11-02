@@ -3,9 +3,10 @@ package com.eignex.klause.bench.lab
 import com.eignex.klause.bench.metric.BuildProvenance
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
+import com.eignex.klause.bench.source.WorkspaceChecksums
 import kotlinx.serialization.encodeToString
 import java.io.File
-import java.security.MessageDigest
+import java.nio.file.Path
 import java.util.jar.JarFile
 
 internal object ComparisonProvenance {
@@ -29,37 +30,26 @@ internal object ComparisonProvenance {
         runtimeOptions = build.runtimeOptions - "KLAUSE_CLI_OPTS" - "KLAUSE_CLI_PREFLIGHT_OPTS",
     ).fingerprint
 
-    internal fun capture(location: File, classpath: List<File>): Identities {
+    internal fun capture(location: File, classpath: List<File>, cacheDirectory: Path? = WorkspaceChecksums.directory()): Identities {
         val root = location.canonicalFile
-        val classes = if (root.isDirectory) {
-            root.resolve(PREFIX).walkTopDown().filter { it.isFile && it.extension == "class" }
-                .map { it.relativeTo(root).invariantSeparatorsPath to hash(it) }.toList()
-        } else {
-            JarFile(root).use { jar ->
-                jar.entries().asSequence()
-                    .filter { !it.isDirectory && it.name.startsWith(PREFIX) && it.name.endsWith(".class") }
-                    .map { entry -> entry.name to jar.getInputStream(entry).use { sha256(it.readBytes()) } }.toList()
+        return WorkspaceChecksums(root.toPath(), cacheDirectory).use { checksums ->
+            val classes = if (root.isDirectory) {
+                root.resolve(PREFIX).walkTopDown().filter { it.isFile && it.extension == "class" }
+                    .map { it.relativeTo(root).invariantSeparatorsPath to checksums.checksum(it.toPath()) }.toList()
+            } else {
+                JarFile(root).use { jar ->
+                    jar.entries().asSequence()
+                        .filter { !it.isDirectory && it.name.startsWith(PREFIX) && it.name.endsWith(".class") }
+                        .map { entry -> entry.name to jar.getInputStream(entry).use { sha256(it.readBytes()) } }.toList()
+                }
             }
+            require(classes.isNotEmpty()) { "Bench harness classes unavailable at $location" }
+            val libraries = classpath.map(File::getCanonicalFile)
+                .filter { it.isFile && it.extension == "jar" && it != root && !solverLibrary(it.name) }
+                .mapIndexed { index, file -> "$index/${file.name}" to checksums.checksum(file.toPath()) }.toMap()
+            require(libraries.isNotEmpty()) { "Bench runtime libraries unavailable" }
+            Identities(classes.sortedBy { it.first }.toMap(), libraries)
         }
-        require(classes.isNotEmpty()) { "Bench harness classes unavailable at $location" }
-        val libraries = classpath.map(File::getCanonicalFile)
-            .filter { it.isFile && it.extension == "jar" && it != root && !solverLibrary(it.name) }
-            .mapIndexed { index, file -> "$index/${file.name}" to hash(file) }.toMap()
-        require(libraries.isNotEmpty()) { "Bench runtime libraries unavailable" }
-        return Identities(classes.sortedBy { it.first }.toMap(), libraries)
-    }
-
-    private fun hash(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        file.inputStream().use { input ->
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                digest.update(buffer, 0, count)
-            }
-        }
-        return digest.digest().joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
     }
 
     private fun solverLibrary(name: String): Boolean =
