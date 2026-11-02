@@ -10,6 +10,7 @@ import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
 import com.eignex.klause.solver.result.BooleanProofStats
 import com.eignex.klause.solver.result.CoreGuidedStats
+import com.eignex.klause.solver.result.HeuristicStartStats
 import com.eignex.klause.solver.result.LocalSearchResidual
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
 import com.eignex.klause.solver.result.LocalSearchStats
@@ -41,6 +42,20 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class CliStatsTest {
+    @Test
+    fun `heuristic start statistics should retain work and completion by invocation`() {
+        val stats = SolveStats(portfolio = PortfolioStats(heuristicStarts = listOf(
+            HeuristicStartStats(5L, mapOf("ls/fixed" to 2L, "ls/other" to 0L), false),
+        )))
+
+        val pairs = portfolioStatPairs(stats).toMap()
+
+        assertEquals("5", pairs["heuristicStart.0.requiredWork"])
+        assertEquals("false", pairs["heuristicStart.0.completed"])
+        assertEquals("2", pairs["heuristicStart.0.work.ls/fixed"])
+        assertEquals("0", pairs["heuristicStart.0.work.ls/other"])
+    }
+
     @Test
     fun `Boolean proof output should retain native closures and probe subsets separately`() {
         val proof = BooleanProofStats(2, 2, 1, 5000L, 22000L, retainedProbes = 1)

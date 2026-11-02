@@ -508,6 +508,16 @@ probe weights and work limits. Initial attempts and silent complete-worker cover
 remain required. This option changes the state and time available to later probes;
 it grants no additional source allowance.
 
+`portfolio-probes=family-work` delays additional curated local-search starts until
+one available heuristic has spent the existing base work allowance. Complete
+workers retain their initial probes and silent coverage, and probe fractions keep
+the full initial pool as their denominator. Observed failed worker work stays recorded but
+does not complete another worker's sample. An unavailable or retired first worker
+allows the next eligible heuristic to start its own sample. Reaching the allowance
+opens the remaining heuristic starts for the invocation; it grants no work or time.
+The same curated single-core finite integer scope applies. `heuristicStart` statistics
+retain required work, observed work by worker and completion separately per invocation.
+
 The opt-in `portfolio-reward=source` ablation retains ordinary feasibility rewards.
 After a source incumbent exists, only an accepted strict incumbent or terminal
 closure earns reward. Violation reductions, created deductions and delayed sharing
