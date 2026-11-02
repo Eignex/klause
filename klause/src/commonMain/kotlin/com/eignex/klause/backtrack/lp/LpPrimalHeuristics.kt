@@ -14,6 +14,7 @@ import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.SessionDomains
 import com.eignex.klause.lp.relaxation.buildPrimalSource
+import com.eignex.klause.lp.relaxation.checkLpAssembly
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.propagation.PropagationResult
@@ -48,10 +49,16 @@ internal fun LpEngine.lpRoundingProbe(
             rootRoundingInterrupted = true
             return null
         }
-        val retained = rootRoundingWarmStart?.takeIf { it.objective === objective }
-        rootRoundingWarmStart = retained
         if (session.isUnsatAtRoot) {
             outcome = "DISCRETE_ROOT_REJECTED"
+            rootRoundingWarmStart = null
+            return null
+        }
+        val retained = try {
+            validatedRoundingWarmStart(objective, session, cancellation, handoff)
+        } catch (_: LpAssemblyCancelled) {
+            rootRoundingInterrupted = true
+            outcome = "CANCELLED"
             return null
         }
         val relaxation = retained?.relaxation ?: buildPrimalRelaxation(objective, session, cancellation) ?: run {
@@ -70,17 +77,23 @@ internal fun LpEngine.lpRoundingProbe(
                 val onWork: (Long) -> Unit = { handoff.includeSourceWork(this, it) }
                 val currentSource = if (retained == null) {
                     continuation = LpPrimalContinuation.capture(this, relaxation, domains, cancellation,
-                        handoff.setupWorkFor(this) + 2L, onWork)
+                        handoff.setupWorkFor(this) + 3L, onWork)
                     true
-                } else {
-                    continuation?.let {
-                        handoff.includeSourceWork(this, it.paidWorkFor(this))
-                        it.matches(this, relaxation, domains, cancellation, onWork)
-                    } == true
-                }
+                } else continuation != null
                 if (currentSource) {
                     handoff.attachContinuation(this, continuation)
                     handoff.capture(this, relaxation, cancellation)
+                }
+                if (retained == null && continuation != null) {
+                    val accounting = LpPrimalAssembly(this, cancellation)
+                    accounting.token.charge(1L)
+                    continuation?.includeSetupWork(this, accounting.work)
+                    handoff.includeSourceWork(this, accounting.work)
+                    accounting.token.checkLpAssembly()
+                    rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, basis = null,
+                        continuation = continuation)
+                    sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "DEFINITION_RETAINED",
+                        started.elapsedNow().inWholeNanoseconds, accounting.work)
                 }
             } catch (_: LpAssemblyCancelled) {
                 rootRoundingInterrupted = true
@@ -176,6 +189,33 @@ internal fun LpEngine.lpRoundingProbe(
         if (!rootRoundingInterrupted) rootRoundingWarmStart = null
         if (rootRoundingWarmStart?.continuation !== continuation) continuation?.close()
         sink.lp.observePrimalPhase("PRIMAL_ROUNDING", outcome, started.elapsedNow().inWholeNanoseconds)
+    }
+}
+
+private fun LpEngine.validatedRoundingWarmStart(
+    objective: LinearObjective,
+    session: PropagationSession,
+    cancellation: Cancellation,
+    handoff: LpPrimalHandoff?,
+): RootRoundingWarmStart? {
+    val retained = rootRoundingWarmStart ?: return null
+    if (retained.objective !== objective) {
+        rootRoundingWarmStart = null
+        return null
+    }
+    val source = retained.continuation ?: return retained
+    handoff?.includeSourceWork(this, source.paidWorkFor(this))
+    return try {
+        val valid = source.matches(this, retained.relaxation, SessionDomains(session), cancellation) {
+            handoff?.includeSourceWork(this, it)
+        }
+        if (valid) retained else {
+            rootRoundingWarmStart = null
+            null
+        }
+    } catch (cancelled: LpAssemblyCancelled) {
+        rootRoundingWarmStart = null
+        throw cancelled
     }
 }
 

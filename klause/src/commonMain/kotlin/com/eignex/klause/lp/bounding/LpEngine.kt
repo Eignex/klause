@@ -109,7 +109,7 @@ internal class GatedResidual(
 internal class RootRoundingWarmStart(
     val objective: LinearObjective,
     val relaxation: LpRelaxation,
-    val basis: Basis,
+    val basis: Basis?,
     val primal: DoubleArray? = null,
     val continuation: RootPrimalContinuation? = null,
 )
@@ -146,7 +146,7 @@ internal class LpEngine(
     private val containingWork: (Long) -> Unit = {},
     private val rootQueryPolicy: LpRootQueryPolicy = LpRootQueryPolicy.SHARED_WORK,
     internal val reusePrimalTemplates: Boolean = false,
-    internal val reusePumpPreparation: Boolean = true,
+    internal val reusePumpPreparation: Boolean = false,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)

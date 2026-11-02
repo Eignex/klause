@@ -241,11 +241,15 @@ optimal floating iterates provide no certificate or source-acceptance authority.
 A root-primal call can hand its canonical rounding definition to the pump's
 initial query. The handoff belongs to one engine and closes on return or pause.
 A freshly assembled rounding source may attach bounded provenance to its private
-warm continuation. On resume, a fresh propagation root must match the same model,
-engine, source namespace, semantics, dimensions, ordered factors, stated sides,
+warm continuation before numerical solving. A cancelled solve with no iterate can
+retain that completed definition without a basis or point. On resume, a fresh
+propagation root must match the same model, engine, source namespace, semantics,
+dimensions, ordered factors, stated sides,
 complete root and live integer domains, Boolean pins and open-side policy before
-that definition enters another handoff. Immutable domain values preserve interior
-holes; changed representations receive bounded, paid value comparison. Wide
+that definition supplies another numerical call or handoff. A refused guard
+discards the continuation and rebuilds from the current source. Immutable domain
+values preserve interior holes; changed representations receive bounded, paid
+value comparison. Wide
 uncarved intervals need no enumeration. The guard bounds retained domain storage
 and validation work, retires on refusal or cancellation, and keeps no predecessor.
 Guidance from other producers has no canonical provenance and supplies no handoff.

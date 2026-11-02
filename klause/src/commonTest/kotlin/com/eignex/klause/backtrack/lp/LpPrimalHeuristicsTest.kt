@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.RootRoundingWarmStart
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -24,6 +25,8 @@ import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.SessionDomains
+import com.eignex.klause.lp.relaxation.buildPrimalSource
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -46,14 +49,34 @@ import kotlin.test.assertTrue
 class LpPrimalHeuristicsTest {
     @Test
     fun `paused canonical preparation should reach a fresh pump numerical owner`() {
-        for (reuse in listOf(false, true)) {
+        for ((reuse, noIterate) in listOf(false to false, true to false, false to true, true to true)) {
             val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, (1..6).map {
                 Linear(intArrayOf(1, it, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6)
             }).bake(FactorProjectionProviders.Default)
             val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
             val sink = SolveStatsSink("continued-pump-source")
-            val factory = RecordingLpEngineFactory()
             var stopped = false
+            var constructed = 0
+            val factory = RecordingLpEngineFactory(object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newTableauSolver(
+                    model: LpModel, cancellation: Cancellation, iterationLimit: Int, workLimit: Long,
+                    trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                ): TableauCutSolver {
+                    val first = noIterate && constructed++ == 0
+                    val delegate = ProductionLpEngineFactory.newTableauSolver(
+                        model, cancellation, iterationLimit, workLimit, trackDegeneracy, pricing,
+                    )
+                    return object : TableauCutSolver by delegate {
+                        override val lastTermination get() =
+                            if (first) LpFloatTermination.CANCELLED else delegate.lastTermination
+                        override fun solve(warm: Basis?): FloatLpResult? {
+                            if (!first) return delegate.solve(warm)
+                            stopped = true
+                            return null
+                        }
+                    }
+                }
+            })
             val token = Cancellation { stopped }
             LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
                 LpSolveContext(factory), reusePumpPreparation = reuse).use { engine ->
@@ -64,7 +87,14 @@ class LpPrimalHeuristicsTest {
                         null
                     }))
                     assertTrue(engine.rootRoundingInterrupted)
-                    if (reuse) assertNotNull(engine.rootRoundingWarmStart?.continuation)
+                    if (reuse) {
+                        val saved = assertNotNull(engine.rootRoundingWarmStart)
+                        assertNotNull(saved.continuation)
+                        if (noIterate) {
+                            assertNull(saved.basis)
+                            assertNull(saved.primal)
+                        }
+                    } else if (noIterate) assertNull(engine.rootRoundingWarmStart)
                 } finally {
                     first?.close()
                 }
@@ -79,7 +109,7 @@ class LpPrimalHeuristicsTest {
                     assertEquals(6L, assertNotNull(sample).ints.sum())
                     assertTrue(factory.calls.size > owners)
                     val phases = sink.snapshot().lp.phases
-                    assertEquals(if (reuse) 1L else 2L,
+                    assertEquals(if (reuse) 1L else if (noIterate) 3L else 2L,
                         phases.getValue("PRIMAL_LP_ASSEMBLY_ROOT").outcomes["COMPLETE"])
                     if (reuse) {
                         assertEquals(1L, phases.getValue("PRIMAL_LP_CONTINUATION_ROOT").outcomes["VALIDATED"])
@@ -131,6 +161,71 @@ class LpPrimalHeuristicsTest {
                 assertEquals(1L, sink.snapshot().lp.phases.getValue("PRIMAL_LP_CONTINUATION_ROOT")
                     .outcomes["CANCELLED"])
             }
+        }
+    }
+
+    @Test
+    fun `changed root domains should rebuild a definition without an iterate`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, (1..6).map {
+            Linear(intArrayOf(1, it, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6)
+        }).bake(FactorProjectionProviders.Default)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val sink = SolveStatsSink("changed-definition-only-source")
+        val domains = SessionDomains(PropagationSession(problem, Cancellation.Never))
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
+            reusePumpPreparation = true).use { engine ->
+            val root = buildPrimalSource(problem, objective, domains, Cancellation.Never, {}, engine.projections,
+                reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+            val source = assertNotNull(LpPrimalContinuation.capture(engine, root, domains, Cancellation.Never, 4L) {})
+            engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, root, basis = null,
+                continuation = source)
+            problem.foldedIntDomains[0] = IntDomain(8, 10)
+
+            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+
+            assertEquals(8L, assertNotNull(sample).ints.sum())
+            val phases = sink.snapshot().lp.phases
+            assertEquals(1L, phases.getValue("PRIMAL_LP_CONTINUATION_ROOT").outcomes["DECLINED"])
+            assertEquals(1L, phases.getValue("PRIMAL_LP_ASSEMBLY_ROOT").outcomes["COMPLETE"])
+            assertEquals(0L, source.paidWorkFor(engine))
+        }
+    }
+
+    @Test
+    fun `cancelled definition validation should withhold numerical solving without a handoff`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, (1..6).map {
+            Linear(intArrayOf(1, it, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6)
+        }).bake(FactorProjectionProviders.Default)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val sink = SolveStatsSink("cancelled-definition-only-source")
+        var armed = false
+        val factory = RecordingLpEngineFactory()
+        val domains = SessionDomains(PropagationSession(problem, Cancellation.Never))
+        var stopped = false
+        var charged = 0L
+        val token = Cancellation { stopped }
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
+            LpSolveContext(factory), reusePumpPreparation = true, containingWork = {
+                if (armed) {
+                    charged += it
+                    stopped = true
+                }
+            }).use { engine ->
+            val root = buildPrimalSource(problem, objective, domains, Cancellation.Never, {}, engine.projections,
+                reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+            val source = assertNotNull(LpPrimalContinuation.capture(engine, root, domains, Cancellation.Never, 4L) {})
+            engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, root, basis = null,
+                continuation = source)
+            armed = true
+
+            val sample = engine.lpRoundingProbe(objective, token)
+
+            assertNull(sample)
+            assertTrue(factory.calls.isEmpty())
+            assertEquals(1L, charged)
+            assertNull(engine.rootRoundingWarmStart)
+            assertEquals(0L, source.paidWorkFor(engine))
+            assertEquals(1L, sink.snapshot().lp.phases.getValue("PRIMAL_LP_CONTINUATION_ROOT").outcomes["CANCELLED"])
         }
     }
 
