@@ -17,6 +17,7 @@ internal class BoolWatcherIndex(
     preparedWatches: Array<IntArrayList>? = null,
     preparedBlockers: Array<IntArrayList>? = null,
     preparedPositions: BoolWatchPositionIndex? = null,
+    baseFactorCount: Int = 0,
 ) {
     /**
      * Slot `byLit[lit]` lists factor ids that should fire when literal `lit` transitions to false.
@@ -52,9 +53,9 @@ internal class BoolWatcherIndex(
      * falls back to the linear scan on any mismatch — a desynced index can never silently remove
      * the wrong watcher.
      */
-    var pos: BoolWatchPositionIndex = preparedPositions ?: BoolWatchPositionIndex()
+    var pos: BoolWatchPositionIndex = preparedPositions ?: BoolWatchPositionIndex(baseFactorCount)
     companion object {
-        fun preparation(numBoolVars: Int): Sequence<BoolWatcherIndex?> = sequence {
+        fun preparation(numBoolVars: Int, baseFactorCount: Int): Sequence<BoolWatcherIndex?> = sequence {
             val watches = arrayOfNulls<IntArrayList>(2 * numBoolVars)
             yield(null)
             val blockers = arrayOfNulls<IntArrayList>(2 * numBoolVars)
@@ -64,7 +65,7 @@ internal class BoolWatcherIndex(
                 blockers[lit] = IntArrayList(initialCapacity = 2)
                 if ((lit + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
-            val positions = BoolWatchPositionIndex()
+            val positions = BoolWatchPositionIndex(baseFactorCount)
             yield(null)
             @Suppress("UNCHECKED_CAST")
             yield(BoolWatcherIndex(

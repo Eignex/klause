@@ -72,6 +72,33 @@ internal fun PropagationState.removeBoolWatch(factorId: Int, lit: Int, onlyIndex
     rewindWatchCleanup(lit, recorded)
 }
 
+internal fun PropagationState.removeInlineBoolWatches(factor: Int, pairExpected: Boolean): Boolean {
+    val positions = watches.pos.detachInline(factor, pairExpected, watches.byLit)
+    work += watches.pos.lastWork
+    if (positions == null) return false
+    val firstLiteral = positions.firstKey
+    val firstPosition = positions.firstValue
+    val secondLiteral = positions.secondKey
+    val secondPosition = positions.secondValue
+    fun moved(literal: Int, position: Int): Int {
+        if (literal < 0) return -1
+        val list = watches.byLit[literal]
+        val movedFactor = if (position < list.size - 1) list[list.size - 1] else -1
+        swapPopWatch(list, watches.blockersByLit[literal], position)
+        rewindWatchCleanup(literal, position)
+        return movedFactor
+    }
+    val firstMoved = moved(firstLiteral, firstPosition)
+    val secondMoved = moved(secondLiteral, secondPosition)
+    if (firstMoved >= 0 && firstMoved == secondMoved) {
+        work += watches.pos.updatePair(firstMoved, firstLiteral, firstPosition, secondLiteral, secondPosition)
+    } else {
+        if (firstMoved >= 0) work += watches.pos.put(packWatch(firstMoved, firstLiteral), firstPosition)
+        if (secondMoved >= 0) work += watches.pos.put(packWatch(secondMoved, secondLiteral), secondPosition)
+    }
+    return true
+}
+
 /** Swap-pop index [pos] from a watcher list and its parallel blocker list in lockstep,
  *  keeping the two index-aligned. The caller fixes [BoolWatcherIndex.pos] for the moved entry. */
 internal fun PropagationState.swapPopWatch(list: IntArrayList, blockers: IntArrayList, pos: Int) {

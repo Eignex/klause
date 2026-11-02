@@ -272,9 +272,11 @@ Boolean back-pointer deletion and swap-pop publication share one funded transact
 Watcher movement rewinds the current scan prefix. Small posting arrays trim within
 the same work and scratch limits. Posting and blocker arrays trim in separate funded
 transactions, so their combined copy need not fit one grant. The Boolean
-back-pointer index uses a bounded factor directory, two inline positions per factor
-and a balanced overflow for additional positions. Source preparation reserves eight
-future rows and their directory paths; pressure releases unused reservations.
+back-pointer index uses direct slots for source factors and eight startup rows,
+a bounded sparse directory for later factors, two packed positions per factor
+and a balanced overflow for additional positions. Source preparation reserves the
+startup rows; pressure releases unused reservations. Paired clause watches install
+and retire through one row lookup, and paired swap-pop moves update together.
 Empty rows and directory branches
 release their primitive and reference allocations. Deletion and a swapped watch's
 position update publish together after bounded funding.

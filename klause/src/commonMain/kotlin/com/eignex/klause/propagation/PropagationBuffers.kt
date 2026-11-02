@@ -152,7 +152,7 @@ internal class PropagationBuffers(
             val atoms = AtomStore(problem.numIntVars)
             yield(null)
             var watcherIndex: BoolWatcherIndex? = null
-            for (next in BoolWatcherIndex.preparation(problem.numBoolVars)) {
+            for (next in BoolWatcherIndex.preparation(problem.numBoolVars, problem.numFactors)) {
                 if (next != null) watcherIndex = next
                 yield(null)
             }

@@ -113,6 +113,7 @@ class PropagationSession private constructor(
     private var retiredPropagationNanos = 0L
     private var retiredPropagationCount = 0L
     private var retiredLifecycle: Map<String, Long> = emptyMap()
+    private var retiredPreparationStatistics: Map<String, Long> = emptyMap()
 
     internal fun releaseRetainedState() {
         val owner = retainedState ?: return
@@ -124,6 +125,7 @@ class PropagationSession private constructor(
         retiredPropagationNanos = owner.propagationNanos
         retiredPropagationCount = owner.propagations
         retiredLifecycle = learnedLifecycle()
+        retiredPreparationStatistics = preparationStatistics()
         retainedState = null
         levelStates = emptyArray()
         levelTop = 0
@@ -292,7 +294,9 @@ class PropagationSession private constructor(
         retired.add(factor)
         val native = state.nativeEngine
         if (native != null) native.retireRootSource(factor)
-        else for (literal in literals) state.removeBoolWatch(factor, literal, onlyIndexed = true)
+        else if (!state.removeInlineBoolWatches(factor, literals.size > 1)) {
+            for (literal in literals) state.removeBoolWatch(factor, literal, onlyIndexed = true)
+        }
         if (pendingRootSourceRetirement?.factor == factor) pendingRootSourceRetirement = null
     }
 
@@ -1326,7 +1330,7 @@ class PropagationSession private constructor(
         if (fixpointCancelled || inprocessingRootPending || publicationPending) return LearnedReclamation(
             ReclamationStatus.DEFERRED, reportedBefore, beforeBytes, floor, work - start,
             protectedLimitExceeded = floor > softLimitBytes)
-        releaseBuffers()
+        val releasedBuffers = releaseBuffers()
         val count = learnedClauseCount
         val published = state.forgetLearnedClauses(
             (maxWork - (work - start)).coerceAtLeast(0L), maxScratchBytes, { cancelRequested }, { _, _ -> false })
@@ -1341,9 +1345,9 @@ class PropagationSession private constructor(
         }
         return LearnedReclamation(
             when {
-                learnedClauseCount < count || (afterBytes != null && afterBytes < beforeBytes) ->
-                    ReclamationStatus.RECLAIMED
+                learnedClauseCount < count || releasedBuffers -> ReclamationStatus.RECLAIMED
                 afterFloor != null && afterFloor > softLimitBytes -> ReclamationStatus.PROTECTED_FLOOR
+                afterBytes != null && afterBytes < beforeBytes -> ReclamationStatus.RECLAIMED
                 else -> ReclamationStatus.DEFERRED
             }, reportedBefore, afterBytes, afterFloor ?: floor, work - start,
             protectedLimitExceeded = (afterFloor ?: floor) > softLimitBytes)
@@ -1380,9 +1384,11 @@ class PropagationSession private constructor(
 
     internal fun learnedLifecycle(): Map<String, Long> = retainedState?.let {
         it.learned.lifecycle.snapshot() + (it.nativeEngine?.capWindowStatistics() ?: it.learned.capWindowStatistics()) +
-            (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap()) +
-            it.preparationStatistics()
+            (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap())
     } ?: retiredLifecycle
+
+    internal fun preparationStatistics(): Map<String, Long> =
+        retainedState?.preparationStatistics() ?: retiredPreparationStatistics
 
     internal fun configureAttribution(
         enabled: Boolean,

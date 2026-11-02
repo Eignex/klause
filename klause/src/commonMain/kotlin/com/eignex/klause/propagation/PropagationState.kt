@@ -543,7 +543,7 @@ class PropagationState private constructor(
     /** Per-literal bool watcher index (watch lists, blockers, back-pointers) —
      *  see [BoolWatcherIndex]. Mutated by `Watches.kt` and the [forgetLearnedClauses] compaction. */
     private val watchIndex = lazy(LazyThreadSafetyMode.NONE) {
-        prepared?.watches ?: BoolWatcherIndex(problem.numBoolVars)
+        prepared?.watches ?: BoolWatcherIndex(problem.numBoolVars, baseFactorCount = baseFactorCount)
     }
     internal val watches: BoolWatcherIndex get() = watchIndex.value
     internal val initializedWatches: BoolWatcherIndex?
