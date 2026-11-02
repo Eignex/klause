@@ -9,7 +9,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.solver.Sample
-import kotlin.test.assertTrue
+import kotlin.test.fail
 
 object ConflictReasonOracle {
 
@@ -20,8 +20,7 @@ object ConflictReasonOracle {
         val solutions = BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
         for (s in solutions) {
             val satisfied = reason.any { lit -> litTrueUnder(problem, state, lit, s) }
-            assertTrue(
-                satisfied,
+            if (!satisfied) fail(
                 "$label: reason ${reason.toList()} is falsified by a solution (ints=${s.ints.toList()}, " +
                     "bools=${s.bools.toList()}) — unsound nogood",
             )

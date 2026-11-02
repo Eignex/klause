@@ -13,7 +13,7 @@ import com.eignex.klause.propagation.factorAt
 import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.solver.Sample
-import kotlin.test.assertTrue
+import kotlin.test.fail
 
 object PropagationReasonOracle {
 
@@ -40,8 +40,7 @@ object PropagationReasonOracle {
             for (s in solutions) {
                 val implied = s.bools[b] == value ||
                     (reason ?: IntArray(0)).any { lit -> litTrueUnder(problem, state, lit, s) }
-                assertTrue(
-                    implied,
+                if (!implied) fail(
                     "$label: pinning b$b=$value rests on ${reason?.map { describe(state, problem, it) }}, " +
                         "which a solution ${s.bools.toList()} ${s.ints.toList()} satisfies with b$b=${s.bools[b]}",
                 )
@@ -60,8 +59,7 @@ object PropagationReasonOracle {
                 for (s in solutions) {
                     val implied = holds(s) ||
                         (reason ?: IntArray(0)).any { lit -> litTrueUnder(problem, state, lit, s) }
-                    assertTrue(
-                        implied,
+                    if (!implied) fail(
                         "$label: removing $k from x$v rests on ${reason?.map { describe(state, problem, it) }}, " +
                             "which a solution ${s.ints.toList()} satisfies with x$v = ${s.ints[v]}",
                     )
