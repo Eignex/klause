@@ -76,7 +76,7 @@ worker. Zero is the default. `ProgressPins` excludes baked-root facts;
 baked root without a captured equivalence keeps its canonical traversal.
 `BinaryScanWork` and `BinaryScanNanos` retain bounded discovery costs;
 `BinaryRelations` counts captured reciprocal implications and `EquivalentColumns`
-counts actual source implication-graph merges. Discovery accepts only owned global
+counts actual signed source substitutions. Discovery accepts only owned global
 binary learning and checks at most 128 binaries within 32,768 work per observation.
 `BinaryHistoryWork` and `BinaryHistoryBytes` retain the fixed history's initialization
 and primitive storage. At most 32 relations are attempted in one worker. Its history
@@ -136,6 +136,29 @@ Projection work remains inside `WarmClauseWork` and preparation. Tautological,
 wide or unsupported selected translations contribute no copied consequence.
 `WarmClauseNormalizationWork` records the final input-normalization reservation;
 it is a subset of transfer and preparation work, rather than another total to add.
+
+
+Private parity discovery reports `ParityDiscoveryWork`, `ParityDiscoveryNanos`,
+`ParityRows` and `ParityPins`. Discovery work is a subset of `ChargedWork`,
+separate from canonical root propagation and later `PreparationWork`.
+`ParityGenerationPins` counts proved pins in a prepared private model;
+`Consumers` confirms that its worker opened.
+`ParityAffineColumns` and `ParityAffineFreeColumns` describe a fully covered
+captured affine basis. `AffineGenerationColumns` and `AffineGenerationFreeColumns`
+count its coordinates in a prepared model. These private pivot slots require
+affine reconstruction and cannot receive unprojected canonical learned clauses.
+`ParityBasisColumns` and `ParityCoveredSourceClauses` describe the captured
+linear subsystem. `ParityReducedRows`, `ParityReducedLiterals` and
+`ParityCoveredClauses` identify a prepared mixed Clause/Xor view with original
+coordinate meanings; they do not count eliminated columns. Coverage declines name
+incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
+larger widths). Such a miss can retain proved global pins or a mixed view.
+`ParityWorkspaceBytes` is the maximum modeled table/matrix/snapshot workspace
+within one private coordinator, rather than RSS or cumulative allocation.
+`ParityDeclinedPartial`, `Memory`, `NoRows`, `NoPins` and
+`RefutationDeferred` retain unsupported or incomplete outcomes. A derived
+contradiction supplies no checked source proof. Consumer witnesses still require
+reconstruction and complete canonical source checks.
 
 Run from the repository root with JDK 25 or newer:
 

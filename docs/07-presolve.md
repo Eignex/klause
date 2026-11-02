@@ -250,15 +250,14 @@ contract. The diagnostic itself creates no replacement or publication authority.
 
 `privateRebuildWork` funds bounded private Boolean satisfaction trials. An
 unconditional consistent root pauses its canonical traversal, simplifies a private
-copy with the root's global pins and runs source BVE with typed reconstruction.
+copy with global pins and applies bounded source reductions with typed reconstruction.
 The new baked model has a fresh identity; mappings compose through the pinned,
-eliminated and baked objects. Column slots remain stable. Only an actual elimination
-opens a consumer. Assumptions, external components, arithmetic and LP-enabled
+eliminated and baked objects. Column slots remain stable. A consumer opens after an actual elimination, newly proved parity pins or a completely covered affine view. Assumptions, external components, arithmetic and LP-enabled
 workers retain their canonical traversal. Enumeration and optimization do not use
 this trial.
 
 Source preparation retains unchanged immutable clauses by reference and copies
-shortened or complemented rows. Column counts stay identical, preserving the clauses' plain-Boolean
+shortened or substituted rows. Column counts stay identical, preserving the clauses' plain-Boolean
 classification. Each new baked model owns its projection, watches and search state;
 the shared factor input carries no mutable search state.
 
@@ -282,20 +281,62 @@ declined pivot cannot consume its resolution allowance. Later opportunities amon
 protected columns wait for a fresh root view. This selection is a heuristic, not
 an exhaustive elimination pass.
 
+A bounded source scan can recognize two- and three-column parity equations from
+their complete two- and four-clause Boolean encodings. Each clause excludes one assignment;
+the complete parity class of exclusions entails the opposite parity equation.
+A preparation-only GF(2) matrix substitutes the canonical global pins and uses
+forward elimination followed by affine back substitution over its free coordinates.
+A pivot is globally forced only when its complete free-coordinate dependency
+cancels. Additional Boolean pins are emitted only after complete elimination.
+Incomplete clause groups, duplicate exclusions and partial matrix work grant no
+additional pins. A derived contradiction supplies no source
+refutation authority.
+
+The immutable source identity binds the captured pin snapshot. Its table,
+matrix and snapshot allocation, initialization, probes, elimination and publication
+consume the private work and modeled-memory grants. Complete absence of encoded
+rows parks the immutable-source scan; a completed miss for new pins may retry
+after canonical global pins grow. The private model installs the proved values
+as unit clauses and composes its reconstruction over the fixed source view.
+Canonical search state stays unchanged. A changed fixed view can open a consumer
+without an additional BVE pivot; its pins are counted separately from eliminated
+columns. Closing or declining releases the captured snapshot with its generation.
+
+When every source clause is covered by complete parity encodings, tautologies or
+canonical global unit facts, the rebuilt model can replace the encoded equations
+with their free-coordinate view. Source column slots remain stable; a private
+pivot slot is fixed to a placeholder and has no canonical literal authority.
+Reconstruction evaluates the owned affine basis from the private free-coordinate
+values, preserving every source solution rather than choosing a source constant.
+The complete coverage proof is required before dropping any encoded clause.
+Uncovered clauses prevent the placeholder view. Canonical learned clauses are
+withheld from the affine view because their pivot literals lack a supported
+projection. The containing grants cover the basis and reconstruction; every
+consumer point still reconstructs and checks the complete canonical source.
+
+A mixed source can retain its uncovered clauses and replace only proved parity
+encodings with an independent reduced XOR basis. Coverage records each original
+clause's excluded assignment, so extra exclusions in an otherwise complete group
+remain constraints. Each replacement row has at most 64 distinct coordinates;
+unsupported widths decline the row view. Row arrays, coefficient projections and
+fresh worker indexes share the containing work and modeled-memory grants.
+The mixed view preserves original coordinate meanings, including its live pivots,
+and can retain supported canonical warm clauses through the fixed-value projection.
+Its reduced rows and covered clauses are counted separately from eliminated columns.
+
 A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker
 qualifies. Discovery charges retained slot visits and skips logically retired entries
 before reading their literals. The capture binds its exact source object and owns its clauses; preparation
 rechecks that its columns remain unfixed. Global consequences remain valid after
-their canonical learned entries are reclaimed. Adding
-them to the pinned source preserves the premises of the source implication-graph
-pass. A complemented pair flips one column in the private source view before
-the equal-valued graph pass. The source mapping reverses that flip when lifting a
-witness; canonical learned literals receive the same flip before private projection.
-Equivalent and complemented columns retain Boolean slots and record `CopyLiteral`
-reconstruction; transitive binary deletion alone opens no consumer. Literal
-remapping reserves normalization work before the graph pass receives half the
-remaining allowance. Discovery visits recent learning first, scanning at most 128 eligible binaries and
+their canonical learned entries are reclaimed. The pinned source retains both
+owned premises. A signed substitution replaces their higher-numbered column with
+the retained column at the captured polarity and records `CopyLiteral` reconstruction.
+The premise objects must belong to that exact pinned source. Unchanged clauses
+retain their immutable buffers; affected clauses own normalized copies. Factor and
+literal visits, replacement construction and delta ownership consume the local
+pass allowance. An interrupted substitution publishes no changed view. Warm
+consequences follow the same signed reconstruction without changing canonical coordinates. Discovery visits recent learning first, scanning at most 128 eligible binaries and
 32,768 work units per root observation, inside the cumulative trial allowance.
 Reciprocal matching uses a temporary fixed-capacity key table and one source walk
 for the retained learned keys. Table initialization and probes consume discovery work.

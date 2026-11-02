@@ -3,90 +3,66 @@ package com.eignex.klause.factor.bool
 import com.eignex.klause.factor.CoeffLookup
 import com.eignex.klause.factor.bool.internals.buildParityByVar
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.propagation.InterruptiblePropagator
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.propagation.checkFiniteWork
 
 internal class XorPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,
-    private val literals: IntArray,
+    literals: IntArray,
     private val targetParity: Int,
-) : Propagator {
-
-    /** Per-variable parity contribution: its occurrence count in [literals], mod 2. */
-    private val parityByVar: CoeffLookup = buildParityByVar(boolVars, literals)
-
-    private fun parityOf(v: Int): Int = parityByVar.coeffOf(v)
+) : InterruptiblePropagator {
+    private val parityByVar: CoeffLookup? = if (boolVars.size == literals.size) null
+    else buildParityByVar(boolVars, literals)
+    private val negativeParity = literals.count { !Lit.isPositive(it) } and 1
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        var pinnedParity = 0
-        val unassigned = IntHashSet()
-        for (lit in literals) {
-            val v = Lit.variable(lit)
-            val b = state.boolValues[v]
-            if (b == null) {
-                unassigned.add(v)
-            } else if (Lit.evaluate(lit, b)) {
-                pinnedParity = pinnedParity xor 1
-            }
-        }
+        state.refPayload[factorId] = null
+        state.finiteWork.begin()
+        state.finiteWork.checkNow()
+        var pinnedParity = negativeParity
         var effective = -1
-        var effectiveCount = 0
-        unassigned.forEach { v ->
-            if (parityOf(v) == 1) {
-                effectiveCount++
-                if (effectiveCount > 1) return true
-                effective = v
-            }
+        for (variable in boolVars) {
+            state.checkFiniteWork()
+            if (parityByVar?.coeffOf(variable) == 0) continue
+            val value = state.boolValues[variable]
+            if (value == null) {
+                if (effective >= 0) return true
+                effective = variable
+            } else if (value) pinnedParity = pinnedParity xor 1
         }
-        if (effectiveCount == 0) return pinnedParity == targetParity
-        val v = effective
-        var posOdd = 0
-        var negOdd = 0
-        for (lit in literals) {
-            if (Lit.variable(lit) != v) continue
-            if (Lit.isPositive(lit)) posOdd = posOdd xor 1 else negOdd = negOdd xor 1
+        if (effective >= 0) {
+            val reason = parityAntecedents(state, effective)
+            return state.pinBool(effective, pinnedParity != targetParity, reason)
         }
-        val parityIfTrue = pinnedParity xor posOdd
-        val parityIfFalse = pinnedParity xor negOdd
-        return when {
-            parityIfTrue == targetParity && parityIfFalse != targetParity ->
-                state.pinBool(v, true, parityAntecedents(state, excludeVar = v))
-
-            parityIfFalse == targetParity && parityIfTrue != targetParity ->
-                state.pinBool(v, false, parityAntecedents(state, excludeVar = v))
-
-            parityIfTrue != targetParity && parityIfFalse != targetParity -> false
-
-            else -> true
-        }
+        if (pinnedParity == targetParity) return true
+        state.refPayload[factorId] = parityAntecedents(state, -1)
+        return false
     }
 
-    /**
-     * Clause-form nogood when [propagate] returns false. An n-ary XOR needs 2^(n-1) clauses for full
-     * equivalence, so this is the weak but sound "at least one currently-pinned literal must flip" clause:
-     * the disjunction of currently-*false* literals across all assigned vars.
-     */
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        parityAntecedents(state, excludeVar = -1)
+        state.refPayload[factorId] as? IntArray
 
-    /** One currently-false literal per pinned variable except [excludeVar]: the partial assignment that
-     *  forced a pin or drove parity to violation. */
+    override fun interrupted(state: PropagationState, factorId: Int) {
+        state.refPayload[factorId] = null
+    }
+
     private fun parityAntecedents(state: PropagationState, excludeVar: Int): IntArray? {
-        var n = 0
-        for (v in boolVars) {
-            if (v == excludeVar) continue
-            if (state.boolValues[v] != null) n++
+        var size = 0
+        for (variable in boolVars) {
+            state.checkFiniteWork()
+            if (variable != excludeVar && state.boolValues[variable] != null) size++
         }
-        if (n == 0) return null
-        val out = IntArray(n)
-        var w = 0
-        for (v in boolVars) {
-            if (v == excludeVar) continue
-            val b = state.boolValues[v] ?: continue
-            out[w++] = Lit.make(v, !b)
+        if (size == 0) return null
+        val result = IntArray(size)
+        var next = 0
+        for (variable in boolVars) {
+            state.checkFiniteWork()
+            if (variable == excludeVar) continue
+            val value = state.boolValues[variable] ?: continue
+            result[next++] = Lit.make(variable, !value)
         }
-        return out
+        return result
     }
 }
