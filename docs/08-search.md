@@ -568,8 +568,8 @@ new deductions to propagation-aware selectors. Phase saving captures values befo
 retraction, so propagated as well as decided polarities survive backjumps and
 restarts. Dom/wdeg failure weights belong to the solve and survive restarts; fresh
 selectors isolate solves that share a projection.
-LinUCB constructs its private posterior on its first scoring or reward update;
-each fresh selector retains its own unlearned model.
+LinUCB builds its Bayesian regression runtime directly on first use.
+Fresh selectors start with separate unlearned posteriors.
 Each fresh finite selector receives its native-session attachment before search
 and LP branch proposals; the attachment can precede root initialization.
 

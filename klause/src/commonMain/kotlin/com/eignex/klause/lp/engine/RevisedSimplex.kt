@@ -553,10 +553,13 @@ internal class RevisedSimplex(
     }
 
     // Uncharged pricing reads the current owner so an unscaled fallback cannot retain a retired CSC generation.
-    internal fun columnDot(y: DoubleArray, j: Int): Double = if (j < n) {
-        koblas.sparseKernels.dotColumn(columns, j, y)
-    } else {
-        y[j - n]
+    internal fun columnDot(y: DoubleArray, j: Int): Double {
+        if (j >= n) return y[j - n]
+        val from = colPtr[j]
+        val until = colPtr[j + 1]
+        if (from == until) return 0.0
+        if (until == from + 1) return 0.0 + colVal[from] * y[rowIdx[from]]
+        return koblas.sparseKernels.dotColumn(columns, j, y)
     }
 
     /** `y · A_j` for the dual vector [y], charged to the work meter. */

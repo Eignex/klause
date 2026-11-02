@@ -960,11 +960,12 @@ Feasibility gradients are recomputed after each step. The sparse breakpoint
 workspace, ordering and value updates consume the same floating work and
 iteration allowance as other pivots.
 
-Selected structural-column pricing passes the current owned CSC matrix to Koblas's
-validated column dot, reusing its support without copying columns. An unscaled
-fallback replaces that matrix with the scaling view and retires the basis backend;
-pricing retains no column views across replacement. Stored zeros and current
-coefficient values follow the selected indexed kernel's arithmetic.
+Empty structural columns price at zero, and singleton columns use one stored-entry
+product with a zero accumulator. Other columns pass the current owned CSC matrix
+to Koblas's validated column dot. Pricing reads the installed CSC arrays without
+column copies; an unscaled fallback refreshes those arrays with its matrix and
+retires the basis backend. Stored zeros and current coefficient values retain
+stored-entry arithmetic.
 
 Dual leaving selection uses verified Devex, reselecting when a maintained weight
 falls below `0.25 * norm(rho)^2`. Entering selection uses a scaled Harris window,
