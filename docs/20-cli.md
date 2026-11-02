@@ -66,6 +66,12 @@ MPS witnesses use original units, exact decimals and their exact-source or toler
 qualification. The adapter performs no solver work or admission:
 [portfolio admission](12-portfolio.md) owns acceptance.
 
+Every prepared MPS invocation emits `c numericalSemantics=` with a versioned JSON
+declaration of the captured declared and effective policy, including rational
+tolerance components, numeric authority, default bounds and exact integrality and
+objective equality. It is emitted even without overrides or statistics. This
+declaration identifies the source contract; it grants no witness or proof authority.
+
 Frontend solve paths keep a `PreparedSourceInvocation` and consume
 `SourceExecutionResult` from `SourceSetup.execute` without selecting another solver
 or reinterpreting a native refutation. Linear sources such as MPS render through
