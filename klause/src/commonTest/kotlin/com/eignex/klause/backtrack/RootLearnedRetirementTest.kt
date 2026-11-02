@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.LearnedRetirementStatus
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -11,6 +12,57 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class RootLearnedRetirementTest {
+    @Test
+    fun `an empty controller should remain in the owned memory observation`() {
+        val retirement = RootLearnedRetirement()
+        val owner = Any()
+        val sample = SharingMemoryObservation(1024L, 128, { false }, {})
+
+        val memory = sample.snapshot { retirement.retainedMemory(sample, owner) }
+
+        val values = assertNotNull(memory.completeValues)
+        assertEquals(12L, values["ownedPrimitiveBytes"])
+        assertEquals(3L, values["ownedReferenceSlots"])
+        assertEquals(0L, values["protectedPrimitiveBytes"])
+        assertEquals(0L, values["protectedReferenceSlots"])
+    }
+
+    @Test
+    fun `captured metadata should remain protected until cancellation completes`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(Problem(4, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+            val retirement = RootLearnedRetirement()
+            val owner = Any()
+            val spending = InprocessingSpending(InprocessingKind.Root)
+            val params = BacktrackParams(inprocessingRootWork = 256L)
+            spending.run(session, params, null) { budget ->
+                assertEquals(LearnedRetirementStatus.Captured,
+                    retirement.capture(session, 0, session.learnedRetirementGeneration, params, budget))
+            }
+            retirement.abandon()
+            val before = SharingMemoryObservation(1024L, 128, { false }, {})
+            val retained = assertNotNull(before.snapshot {
+                retirement.retainedMemory(before, owner)
+            }.completeValues)
+            assertEquals(12L, retained["protectedPrimitiveBytes"])
+            assertEquals(3L, retained["protectedReferenceSlots"])
+
+            spending.run(session, params, null) { budget -> retirement.prepare(session, params, budget) }
+            val after = SharingMemoryObservation(1024L, 128, { false }, {})
+            val released = assertNotNull(after.snapshot {
+                retirement.retainedMemory(after, owner)
+            }.completeValues)
+
+            assertEquals(12L, released["ownedPrimitiveBytes"])
+            assertEquals(3L, released["ownedReferenceSlots"])
+            assertEquals(0L, released["protectedPrimitiveBytes"])
+            assertEquals(0L, released["protectedReferenceSlots"])
+        }
+    }
+
     @Test
     fun `an earlier publication should not authorize a later selection`() {
         for (native in listOf(false, true)) {

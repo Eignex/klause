@@ -292,7 +292,6 @@ class RootInprocessingSearchTest {
             var retained: PropagationSession? = null
             var target = -1
             var block = true
-            var paused = false
             var deliveries = 0
             var retiredOnClose = false
             val exchange = object : ClauseExchange {
@@ -313,26 +312,23 @@ class RootInprocessingSearchTest {
                         deliveries++
                         assertTrue(assertNotNull(retained).isLearnedClause(target))
                         if (block) {
-                            paused = true
                             return ComponentResult.Indeterminate
                         }
                     }
                     return ComponentResult.Consistent
                 }
             }
-            val token = Cancellation { paused }
             val configured = params(native, exchange).copy(lubyRestartBase = null, rootProbeBatch = 2,
                 inprocessingInterval = 1L, inprocessingWork = 4096L, inprocessingRootWork = 256L,
-                inprocessingProbeWork = 512L, cancellation = token, componentFactory = { listOf(peer) })
+                inprocessingProbeWork = 512L, componentFactory = { listOf(peer) })
             val search = BacktrackSolver(source.bake()).resumableSolve(configured)
 
             val result = search.use {
-                assertNull(it.runSlice(token, Long.MAX_VALUE, Long.MAX_VALUE))
+                assertNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, Long.MAX_VALUE))
                 val session = assertNotNull(retained)
                 assertTrue(session.isLearnedClause(target))
                 assertEquals(0, session.decisionLevel)
                 block = false
-                paused = false
                 finish(it)
             }
 

@@ -396,8 +396,10 @@ class RootInprocessingTest {
 
             repeat(100) { loop.onRestart(session, params) }
 
+            assertTrue(session.isLearnedClause(0))
+            assertFalse(session.isLearnedClause(1))
             assertTrue((0 until session.learnedClauseCount).any {
-                session.learnedClauseLiterals(it).toSet() == setOf(4, 6)
+                session.isLearnedClause(it) && session.learnedClauseLiterals(it).toSet() == setOf(4, 6)
             }, "native=$native work=$work learning=${stats.snapshot().learning}")
         }
     }
@@ -799,8 +801,8 @@ class RootInprocessingTest {
             val after = SharingMemoryObservation(1024L, 128, { false }, {})
             val released = after.snapshot { pass.retainedMemory(after, false) }
 
-            assertTrue(assertNotNull(retained.completeValues).getValue("ownedPrimitiveBytes") >= 24L)
-            assertEquals(0L, assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes"))
+            assertTrue(assertNotNull(retained.completeValues).getValue("ownedPrimitiveBytes") >= 36L)
+            assertEquals(12L, assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes"))
             assertEquals(0, session.learnedClauseCount)
         }
     }
@@ -822,7 +824,7 @@ class RootInprocessingTest {
 
         assertEquals(0, session.learnedClauseCount)
         assertFalse(session.fixpointCancelled)
-        assertEquals(0L, assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes"))
+        assertEquals(12L, assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes"))
     }
 
     @Test
