@@ -11,6 +11,7 @@ internal object HarnessRecording {
         "klause.BenchPreparation", "jdk.FileRead", "jdk.FileWrite", "jdk.GarbageCollection", "jdk.GCPhasePause",
         "jdk.GCHeapSummary", "jdk.CPULoad", "jdk.ThreadCPULoad", "jdk.Compilation", "jdk.ExecutionSample",
         "jdk.NativeMethodSample", "jdk.ThreadPark", "jdk.JavaMonitorEnter", "jdk.ThreadSleep",
+        "jdk.ActiveSetting", "jdk.DataLoss", "jdk.Shutdown",
     )
 
     fun extract(
@@ -23,17 +24,22 @@ internal object HarnessRecording {
         val failure = runCatching {
             check(Files.isRegularFile(recording)) { "Harness recording is unavailable" }
             Files.newBufferedWriter(report.resolve("harness-events.jsonl")).use { output ->
-                output.appendLine(buildJsonObject {
-                    put("scope", scope)
-                    put("omissions", "recording thresholds, sampling and retention settings can omit observations")
-                    put("overlapPolicy", "nested phases and JVM events overlap; durations are not additive")
-                    put("failurePolicy", "aborted source-preparation may include cleanup before its phase closes")
-                    put("stackDepthLimit", 32)
-                    put("fieldPolicy",
-                        "scalar fields only; nested objects remain in raw capture; timespans in nanoseconds")
-                    put("ioPolicy", "IO call duration includes scheduling and GC; it does not prove device wait")
-                }.toString())
                 RecordingFile(recording).use { input ->
+                    output.appendLine(buildJsonObject {
+                        put("scope", scope)
+                        put("omissions", "recording thresholds, sampling and retention settings can omit observations")
+                        put("overlapPolicy", "nested phases and JVM events overlap; durations are not additive")
+                        put("failurePolicy", "aborted source-preparation may include cleanup before its phase closes")
+                        put("stackDepthLimit", 32)
+                        put("fieldPolicy",
+                            "scalar fields only; nested objects remain in raw capture; timespans in nanoseconds")
+                        put("ioPolicy", "IO call duration includes scheduling and GC; it does not prove device wait")
+                        putJsonArray("eventTypes") {
+                            input.readEventTypes().filter { it.name in events }.forEach { type ->
+                                add(buildJsonObject { put("name", type.name); put("id", type.id) })
+                            }
+                        }
+                    }.toString())
                     while (input.hasMoreEvents()) {
                         val event = input.readEvent()
                         if (event.eventType.name in events) {
@@ -49,7 +55,7 @@ internal object HarnessRecording {
                 "${failure.javaClass.name}: ${failure.message}\n")
         }
         Files.writeString(report.resolve("harness-analysis.json"), buildJsonObject {
-            put("scope", "outer adapter extraction after harness exit; inside case/job ceiling")
+            put("scope", "extraction outside recorded interval; inside current case/job ceiling")
             put("elapsedNanos", System.nanoTime() - start)
             put("complete", failure == null)
             put("extractedEvents", extractedEvents)
@@ -58,6 +64,7 @@ internal object HarnessRecording {
 
     private fun describe(event: RecordedEvent): JsonObject = buildJsonObject {
         put("event", event.eventType.name)
+        put("eventTypeId", event.eventType.id)
         put("start", event.startTime.toString())
         put("durationNanos", event.duration.toNanos())
         val thread = if (event.hasField("sampledThread")) event.getThread("sampledThread") else event.thread
