@@ -63,9 +63,10 @@ class JointLinearRepairTest {
                 var done = false
                 repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
 
-                val result = assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
-                assertEquals(0L, result.sample.intValue(0))
-                assertEquals(0L, result.sample.intValue(2))
+                val result = search.minimizeResult(TerminationReason.BudgetExhausted)
+                val sample = assertIs<MinimizeResult.WithSample>(result).sample
+                assertEquals(0L, sample.intValue(0))
+                assertEquals(0L, sample.intValue(2))
                 assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairSharedGuidanceQueries"))
             }
         }
