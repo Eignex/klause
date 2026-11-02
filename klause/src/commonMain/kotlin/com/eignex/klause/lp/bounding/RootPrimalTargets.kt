@@ -7,4 +7,11 @@ internal class RootPrimalTargets(
     val knownColumns: BooleanArray?,
 ) {
     var valueOrderOffered: Boolean = false
+    var componentOrderAttempted: Boolean = false
+    var components: RootComponentOrder? = null
+}
+
+internal class RootComponentOrder(val offsets: IntArray, val members: IntArray, val groups: Int) {
+    var offered: Boolean = false
+    val retainedBytes: Long get() = 128L + (offsets.size.toLong() + members.size) * Int.SIZE_BYTES
 }

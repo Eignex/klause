@@ -159,4 +159,26 @@ class LabInputsTest {
         }
     }
 
+    @Test
+    fun `cached input trees retain exact digests and detect changed membership`() {
+        val root = Files.createTempDirectory("cached-input-tree-")
+        try {
+            val inputs = Files.createDirectory(root.resolve("inputs"))
+            Files.writeString(inputs.resolve("original"), "source")
+            val cache = root.resolve("checksums")
+            val fresh = LabInputs.treeHash(inputs, null)
+            assertEquals(fresh, LabInputs.treeHash(inputs, cache))
+            assertEquals(fresh, LabInputs.treeHash(inputs, cache))
+
+            val added = Files.writeString(inputs.resolve("added"), "extra")
+            val changed = LabInputs.treeHash(inputs, cache)
+            Files.delete(added)
+
+            assertNotEquals(fresh, changed)
+            assertEquals(fresh, LabInputs.treeHash(inputs, cache))
+        } finally {
+            root.toFile().deleteRecursively()
+        }
+    }
+
 }
