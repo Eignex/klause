@@ -6,9 +6,12 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryObservation
 
 internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
+    selectedRetirements.sharingMemory(sample)
+    sample.owned(this, Long.SIZE_BYTES.toLong(), true)
     val protected = protectedLearnedMemory(sample)
     nativeEngine?.sharingMemory(sample, protected) ?: learnedSharingMemory(sample, protected)
-    val reasons = sample.seen<IntArray>()
+    factorAttribution?.sharingMemory(sample)
+    val reasons = sample.seenIdentities<IntArray>()
     var reasonBytes = 0L
     var reasonSlots = 0L
     fun add(reason: IntArray?) {
@@ -42,7 +45,7 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
         "reasonReferenceSlots" to reasonSlots))
 
     val atomColumns = listOf(atoms.intVar, atoms.truth, atoms.lvl, atoms.undoAtomId, atoms.undoTruth, atoms.undoLvl)
-    val atomRuns = sample.seen<VarAtomIndex>()
+    val atomRuns = sample.seenIdentities<VarAtomIndex>()
     var atomBytes = atoms.threshold.allocatedBytes
     sample.owned(atoms.threshold, atoms.threshold.allocatedBytes, true)
     for (column in atomColumns) {
@@ -87,7 +90,7 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
 private fun PropagationState.protectedLearnedMemory(
     sample: SharingMemoryObservation,
 ): SharingMemoryObservation.Seen<Int> {
-    val protected = sample.seen<Int>()
+    val protected = sample.seenIds()
     val count = nativeEngine?.count ?: learned.size
     fun protect(fid: Int) {
         sample.step()
@@ -115,21 +118,20 @@ private fun PropagationState.protectedPosting(
     posting: IntArrayList,
     protected: SharingMemoryObservation.Seen<Int>,
 ): Boolean {
-    var retained = false
     for (i in 0 until posting.size) {
         sample.step()
         val factor = posting[i]
-        if (!retained) retained = factor < baseFactorCount || sample.contains(protected, factor - baseFactorCount)
+        if (factor < baseFactorCount || sample.contains(protected, factor - baseFactorCount)) return true
     }
-    return retained
+    return false
 }
 
 private fun PropagationState.learnedSharingMemory(
     sample: SharingMemoryObservation,
     protected: SharingMemoryObservation.Seen<Int>,
 ) {
-    val ints = sample.seen<IntArray>()
-    val longs = sample.seen<LongArray>()
+    val ints = sample.seenIdentities<IntArray>()
+    val longs = sample.seenIdentities<LongArray>()
     var payload = 0L
     fun add(value: IntArray?) {
         sample.step()
@@ -173,17 +175,20 @@ private fun PropagationState.learnedSharingMemory(
         if (peer && used) consumedPeerImports++
         if (used) consumed++
     }
-    val columns = listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
-        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)
+    val columns = listOf(learned.stages, learned.lbds, learned.permanent, learned.tier, learned.boolReasons,
+        learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)
     val protectedRows = protected.size > 0
-    var metadata = 0L
+    learned.capRanking.sharingMemory(sample, protectedRows)
+    var metadata = learned.capRanking.primitiveBytes + learned.admissions.allocatedBytes + Int.SIZE_BYTES
+    sample.owned(learned.admissions, learned.admissions.allocatedBytes + Int.SIZE_BYTES, protectedRows)
+    sample.ownedReferences(learned.admissions, 1L, protectedRows)
     for (column in columns) {
         sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
         sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
     }
     sample.ownedReferences(learned.store, learned.size.toLong(), protectedRows)
     sample.ownedReferences(refPayloadStore, refPayloadStore.size.toLong(), baseFactorCount > 0 || protectedRows)
-    learned.integerRows?.let { sample.ownedReferences(it, it.size.toLong(), protectedInteger) }
+    learned.integerRows?.sharingMemory(sample, protectedInteger)
     var watchers = watches.pos.primitiveCapacityBytes
     var protectedWatchIndex = false
     sample.ownedReferences(watches.byLit, watches.byLit.size.toLong(), true)
@@ -252,7 +257,10 @@ private fun PropagationState.learnedSharingMemory(
         "learnedRetiredSlots" to learned.retiredCount.toLong(),
         "learnedPayloadBytes" to payload,
         "learnedMetadataCapacityBytes" to metadata,
-        "learnedReferenceSlots" to learned.size.toLong() * 2L + (learned.integerRows?.size ?: 0),
+        "learnedCapIndexStateBytes" to learned.capRanking.modeledBytes,
+        "learnedReferenceSlots" to learned.size.toLong() * 2L + (learned.integerRows?.capacity ?: 0),
+        "learnedIntegerRowCacheCapacityBytes" to (learned.integerRows?.capacity?.toLong() ?: 0L) * Long.SIZE_BYTES,
+        "learnedIntegerRowIndexBytes" to (learned.integerRows?.size?.toLong() ?: 0L) * Int.SIZE_BYTES,
         "sessionWatchCapacityBytes" to watchers,
         "sessionQueueCapacityBytes" to propQueue.allocatedBytes + atoms.dirtyFactors.allocatedBytes,
         "propagationScheduleCapacityBytes" to (propagationSchedule?.capacityBytes ?: 0L),

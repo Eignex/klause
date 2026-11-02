@@ -4,9 +4,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.OriginCounts
 import com.eignex.klause.util.SharingMemoryObservation
 
@@ -19,7 +19,8 @@ import com.eignex.klause.util.SharingMemoryObservation
  * Watch positions `watchPos(2h)` and `watchPos(2h+1)` index the two watched literals of clause `h`;
  * `watchEntries(L)` lists clauses watching `L`. Watches are rebuilt per session and may drift
  * across backtracking. Base literals stay in the immutable [ClauseArena]; learned clauses use
- * a growable side buffer. Relocation moves indices and leaves the arena shareable read-only.
+ * individually owned payload array per learned clause. Relocation moves handles and leaves the
+ * arena shareable read-only.
  */
 internal class NativeSatState(private val state: PropagationState) {
 
@@ -38,28 +39,31 @@ internal class NativeSatState(private val state: PropagationState) {
         return boolTruth[Lit.variable(lit)].toInt() == 1 + (lit and 1)
     }
 
-    // Learned clauses appended during search: literals concatenated in [learnedLits], clause `i`
-    // starting at learnedStarts[i]. Clause handle `h >= baseCount` decodes to learned index
-    // `h - baseCount`. Base handles `[0, baseCount)` index straight into [arena].
-    private val learnedLits = IntArrayList()
-    private val learnedStarts = IntArrayList()
+    // Learned handles remain stable while each payload can release independently of other rows.
+    private val learnedPayloads = NativeLearnedPayloads()
     private var learnedCount = 0
+    private var peerImports = 0
+    private var consumedPeerImports = 0
+    private var consumed = 0
     private var permanentCount = 0
     private var retiredCount = 0
     private val capCandidates = IntArrayList(1)
-    private var capRead = 0
-    private var capWrite = 0
+    private val capRanking = LearnedCapRanking(capCandidates)
     private var capCalls = 0L
     private var capWork = 0L
     private var capVisits = 0L
+    private var capBoundaryDefers = 0L
+    private var capPreparationDefers = 0L
+    private var capPendingReplayCalls = 0L
 
     // Per-learned-clause policy columns, parallel to the learned index — the native mirror of
-    // LearnedClauseDb's forgetting/three-tier metadata. `tier` holds a [ClauseTier] ordinal;
-    // `used` is a 0/1 reuse flag since the last reduction; `permanent` clauses survive every forget.
+    // LearnedClauseDb's forgetting/three-tier metadata. Recent use shares lifecycle storage;
+    // permanent clauses survive every forget.
     private val learnedLbd = IntArrayList()
     private val learnedPermanent = IntArrayList()
     private val learnedTier = IntArrayList()
-    private val learnedUsed = IntArrayList()
+    private val learnedBoolReasons = IntArrayList(1)
+    private val learnedAdmissions = LongArrayList(1)
     private val lifecycleStages = IntArrayList()
     private val learnedUnits = IntArrayList()
     private var unitsPending = false
@@ -78,17 +82,17 @@ internal class NativeSatState(private val state: PropagationState) {
     private val watchPos = IntArray(2 * baseCount)
     private val learnedWatchPos = IntArrayList()
 
-    // Pack each handle and blocker into one word. Exact initial capacities avoid millions of empty
-    // list objects and growth copies; literals with no watcher share the empty array.
+    // Pack each handle and blocker into one word. Empty literals own no posting container;
+    // page boundaries release retired posting capacity without moving factor handles.
     private val watchSizes = IntArray(2 * numBoolVars)
-    private val watchEntries: Array<LongArray> = run {
+    private val watchEntries: Array<NativeWatchEntries?> = run {
         for (h in 0 until baseCount) {
             if (arena.length(h) < 2) continue
             watchSizes[arena.lits[arena.start(h)]]++
             watchSizes[arena.lits[arena.start(h) + 1]]++
         }
         Array(watchSizes.size) { lit ->
-            if (watchSizes[lit] == 0) EmptyLongArray else LongArray(watchSizes[lit])
+            if (watchSizes[lit] == 0) null else NativeWatchEntries(watchSizes[lit])
         }.also { watchSizes.fill(0) }
     }
 
@@ -132,13 +136,11 @@ internal class NativeSatState(private val state: PropagationState) {
         while (size < n) add(0)
     }
 
-    private fun learnedEnd(i: Int): Int = if (i + 1 < learnedCount) learnedStarts[i + 1] else learnedLits.size
-
     private fun clauseLen(h: Int): Int =
-        if (h < baseCount) arena.length(h) else learnedEnd(h - baseCount) - learnedStarts[h - baseCount]
+        if (h < baseCount) arena.length(h) else learnedPayloads.length(h - baseCount)
 
     private fun litOf(h: Int, k: Int): Int =
-        if (h < baseCount) arena.lits[arena.start(h) + k] else learnedLits[learnedStarts[h - baseCount] + k]
+        if (h < baseCount) arena.lits[arena.start(h) + k] else learnedPayloads[h - baseCount][k]
 
     private fun packWatch(handle: Int, blocker: Int): Long =
         (blocker.toLong() shl 32) or (handle.toLong() and 0xFFFFFFFFL)
@@ -150,29 +152,64 @@ internal class NativeSatState(private val state: PropagationState) {
         if (h < baseCount) watchPos[2 * h + slot] = position else learnedWatchPos[2 * (h - baseCount) + slot] = position
     }
 
+    private var watchCleanupLiteral = 0
+    private var watchCleanupIndex = 0
+    private var sweptRetirements = 0
+    private var sweepingRetirements = -1
+
     private fun addWatch(lit: Int, handle: Int, blocker: Int) {
-        var entries = watchEntries[lit]
-        val size = watchSizes[lit]
-        if (size == entries.size) {
-            entries = entries.copyOf((entries.size * 2).coerceAtLeast(2))
-            watchEntries[lit] = entries
-        }
-        entries[size] = packWatch(handle, blocker)
-        watchSizes[lit] = size + 1
+        val entries = watchEntries[lit] ?: NativeWatchEntries().also { watchEntries[lit] = it }
+        state.work += entries.appendWork
+        entries.add(packWatch(handle, blocker))
+        watchSizes[lit] = entries.size
     }
 
-    /** Swap-pop the watcher at [idx] in literal [lit]'s lists. The caller re-processes [idx]. */
+    private fun watchRemovalWork(lit: Int): Long = checkNotNull(watchEntries[lit]).removalWork + 4L
+
+    /** Swap-pop the watcher at [idx] in literal [lit]'s lists. The caller funds the removal. */
     private fun removeWatchAt(lit: Int, idx: Int) {
-        val entries = watchEntries[lit]
-        val last = watchSizes[lit] - 1
-        entries[idx] = entries[last]
-        watchSizes[lit] = last
+        val entries = checkNotNull(watchEntries[lit])
+        entries[idx] = entries[entries.size - 1]
+        entries.removeLast()
+        watchSizes[lit] = entries.size
+        if (entries.size == 0) watchEntries[lit] = null
+        if (lit == watchCleanupLiteral && idx < watchCleanupIndex) watchCleanupIndex = idx
+    }
+
+    internal fun sweepRetiredWatches(budget: ReclamationPreparation) {
+        if (retiredCount == 0) return
+        if (sweepingRetirements < 0) {
+            if (sweptRetirements == retiredCount) return
+            budget.visit(4L)
+            budget.visit(0L)
+            sweepingRetirements = retiredCount
+        }
+        while (watchCleanupLiteral < watchEntries.size) {
+            budget.visit(4L)
+            budget.visit(0L)
+            val entries = watchEntries[watchCleanupLiteral]
+            if (entries == null || watchCleanupIndex >= entries.size) {
+                watchCleanupLiteral++
+                watchCleanupIndex = 0
+            } else if (entries[watchCleanupIndex].toInt() >= baseCount &&
+                retiredOf(entries[watchCleanupIndex].toInt() - baseCount)) {
+                budget.visit(watchRemovalWork(watchCleanupLiteral))
+                budget.visit(0L)
+                removeWatchAt(watchCleanupLiteral, watchCleanupIndex)
+            } else watchCleanupIndex++
+        }
+        budget.visit(4L)
+        budget.visit(0L)
+        sweptRetirements = sweepingRetirements
+        sweepingRetirements = -1
+        watchCleanupLiteral = 0
+        watchCleanupIndex = 0
     }
 
     /** The clause's literals as a fresh array (the seed reason for conflict analysis). */
     private fun clauseLits(h: Int): IntArray {
-        val lits = if (h < baseCount) arena.lits else learnedLits.backingData
-        val start = if (h < baseCount) arena.start(h) else learnedStarts[h - baseCount]
+        val lits = if (h < baseCount) arena.lits else learnedPayloads[h - baseCount]
+        val start = if (h < baseCount) arena.start(h) else 0
         return lits.copyOfRange(start, start + clauseLen(h)).also {
             state.factorAttribution?.remember(it, 1 shl FactorFamily.Clause.ordinal)
         }
@@ -183,8 +220,8 @@ internal class NativeSatState(private val state: PropagationState) {
     private fun antecedentsExcept(h: Int, skip: Int): IntArray? {
         val len = clauseLen(h)
         if (len <= 1) return null
-        val lits = if (h < baseCount) arena.lits else learnedLits.backingData
-        val start = if (h < baseCount) arena.start(h) else learnedStarts[h - baseCount]
+        val lits = if (h < baseCount) arena.lits else learnedPayloads[h - baseCount]
+        val start = if (h < baseCount) arena.start(h) else 0
         val out = IntArray(len - 1)
         lits.copyInto(out, 0, start, start + skip)
         lits.copyInto(out, skip, start + skip + 1, start + len)
@@ -209,9 +246,15 @@ internal class NativeSatState(private val state: PropagationState) {
      * already false, or just install watches when two or more literals are still open. The trailing
      * [propagate] call continues BCP from any pin this makes.
      */
-    fun addLearned(lits: IntArray, lbd: Int, permanent: Boolean, origin: Int = OWN_ORIGIN): Int {
+    fun addLearned(
+        lits: IntArray,
+        lbd: Int,
+        permanent: Boolean,
+        origin: Int = OWN_ORIGIN,
+        ownedLiterals: Boolean = false,
+    ): Int {
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Constructed)
-        val h = appendLearned(lits, lbd, permanent, origin)
+        val h = appendLearned(lits, lbd, permanent, origin, ownedLiterals)
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Admitted)
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Asserted)
         val len = lits.size
@@ -277,11 +320,13 @@ internal class NativeSatState(private val state: PropagationState) {
         return best
     }
 
-    private fun appendLearned(lits: IntArray, lbd: Int, permanent: Boolean, origin: Int): Int {
+    private fun appendLearned(
+        lits: IntArray, lbd: Int, permanent: Boolean, origin: Int, ownedLiterals: Boolean,
+    ): Int {
         val i = learnedCount
         lifecycleStages.add(0)
-        learnedStarts.add(learnedLits.size)
-        learnedLits.addAll(lits)
+        state.work += learnedPayloads.admissionWork(lits.size, ownedLiterals)
+        learnedPayloads.add(lits, ownedLiterals)
         learnedLbd.add(lbd)
         learnedPermanent.add(if (permanent) 1 else 0)
         state.work++
@@ -293,8 +338,23 @@ internal class NativeSatState(private val state: PropagationState) {
             capCandidates.add(i)
         }
         learnedTier.add(ClauseTier.UNSET.ordinal)
-        learnedUsed.add(0)
+        state.work += 1L + when {
+            learnedBoolReasons.size == learnedBoolReasons.backingData.size -> learnedBoolReasons.size * 3L + 1L
+            learnedBoolReasons.size == 0 -> 1L
+            else -> 0L
+        }
+        learnedBoolReasons.add(0)
+        state.work += 3L + when {
+            learnedAdmissions.size.toLong() * Long.SIZE_BYTES == learnedAdmissions.allocatedBytes ->
+                learnedAdmissions.size * 3L + 1L
+            learnedAdmissions.size == 0 -> 1L
+            else -> 0L
+        }
+        check(state.nextLearnedAdmissionKey < Long.MAX_VALUE)
+        learnedAdmissions.add(state.nextLearnedAdmissionKey++)
         learnedOrigin.add(origin)
+        state.work += 2L
+        if (origin >= 0) peerImports++
         learnedScanPos.add(0)
         learnedCount++
         learnedWatchPos.add(0)
@@ -305,33 +365,33 @@ internal class NativeSatState(private val state: PropagationState) {
     // Learned-clause policy accessors: the native mirror of the LearnedClauseDb columns.
 
     internal fun sharingMemory(sample: SharingMemoryObservation, protected: SharingMemoryObservation.Seen<Int>) {
-        var peerImports = 0L
-        var consumedPeerImports = 0L
-        var consumed = 0L
-        for (i in 0 until learnedCount) {
-            sample.step()
-            val peer = learnedOrigin[i] >= 0
-            val used = lifecycleStages[i] and 1 != 0
-            if (learnedPermanent[i] == 1) sample.retain(protected, i)
-            if (peer) peerImports++
-            if (peer && used) consumedPeerImports++
-            if (used) consumed++
-        }
+        repeat(3) { sample.step() }
         for (i in recheckHead until rechecks.size) {
             sample.step()
             val index = rechecks[i] - baseCount
             if (lifecycleStages[index] and 1 == 0) sample.retain(protected, index)
         }
-        val protectedRows = protected.size > 0
-        val columns = listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier,
-            learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
-            capCandidates, state.learned.capCandidates)
-        var metadata = 0L
+        val protectedRows = protected.size > 0 || permanentCount > 0
+        capRanking.sharingMemory(sample, protectedRows)
+        state.learned.capRanking.sharingMemory(sample, protectedRows)
+        val columns = listOf(learnedLbd, learnedPermanent, learnedTier, learnedBoolReasons,
+            lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
+            capCandidates, state.learned.capCandidates, state.learned.boolReasons)
+        var metadata = 12L + capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
+            learnedPayloads.primitiveBytes
+        for (keys in listOf(learnedAdmissions, state.learned.admissions)) {
+            sample.step()
+            metadata += keys.allocatedBytes + Int.SIZE_BYTES
+            sample.owned(keys, keys.allocatedBytes + Int.SIZE_BYTES, protectedRows)
+            sample.ownedReferences(keys, 1L, protectedRows)
+        }
         for (column in columns) {
             sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
             sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
         }
-        sample.owned(learnedLits.backingData, learnedLits.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
+        learnedPayloads.sharingMemory(sample, protectedRows, permanentCount == learnedCount) { index ->
+            learnedPermanent[index] == 1 || sample.contains(protected, index)
+        }
         sample.owned(arena.lits, arena.lits.size.toLong() * Int.SIZE_BYTES, true, shared = true)
         sample.owned(arena.starts, arena.starts.size.toLong() * Int.SIZE_BYTES, true, shared = true)
         sample.owned(watchSizes, watchSizes.size.toLong() * Int.SIZE_BYTES, true)
@@ -339,32 +399,38 @@ internal class NativeSatState(private val state: PropagationState) {
         sample.owned(baseUnits.backingData, baseUnits.backingData.size.toLong() * Int.SIZE_BYTES, true)
         sample.ownedReferences(watchEntries, watchEntries.size.toLong(), true)
         var watchBytes = 0L
-        for (literal in watchEntries.indices) {
-            val entries = watchEntries[literal]
-            sample.step(); watchBytes += entries.size.toLong() * Long.SIZE_BYTES
-            var retained = false
-            for (i in 0 until watchSizes[literal]) {
-                sample.step()
-                val handle = entries[i].toInt()
-                if (!retained) retained = handle < baseCount || sample.contains(protected, handle - baseCount)
+        var watchPostings = 0L
+        sample.ownedPool(this, 28L, (if (protectedRows) 12L else 0L) +
+            (if (sweepingRetirements >= 0) 16L else 0L))
+        for (entries in watchEntries) {
+            sample.step()
+            if (entries == null) continue
+            watchPostings += entries.size
+            watchBytes += entries.sharingMemory(sample) { entry ->
+                val handle = entry.toInt()
+                handle < baseCount || learnedPermanent[handle - baseCount] == 1 ||
+                    sample.contains(protected, handle - baseCount)
             }
-            sample.owned(entries, entries.size.toLong() * Long.SIZE_BYTES, retained)
         }
         sample.record(mapOf(
             "learnedObjects" to learnedCount.toLong(),
             "learnedRetiredSlots" to retiredCount.toLong(),
-            "learnedPayloadBytes" to learnedLits.size.toLong() * Int.SIZE_BYTES,
-            "learnedArenaCapacityBytes" to learnedLits.backingData.size.toLong() * Int.SIZE_BYTES,
+            "learnedPayloadBytes" to learnedPayloads.capacityBytes,
+            "learnedArenaCapacityBytes" to learnedPayloads.capacityBytes,
+            "learnedPayloadReferenceCapacity" to learnedPayloads.referenceCapacity,
+            "learnedPayloadDirectoryCapacity" to learnedPayloads.directoryCapacity,
             "learnedMetadataCapacityBytes" to metadata,
+            "learnedCapIndexStateBytes" to capRanking.modeledBytes + state.learned.capRanking.modeledBytes,
+            "sessionWatchEntries" to watchPostings,
             "sessionWatchCapacityBytes" to watchBytes +
                 (watchSizes.size.toLong() + watchPos.size) * Int.SIZE_BYTES +
                 baseUnits.backingData.size.toLong() * Int.SIZE_BYTES,
             "rootRetiredSourceCapacityBytes" to (retiredRootSources?.allocatedBytes ?: 0L),
             "pendingAttachments" to (rechecks.size - recheckHead).toLong(),
             "importUseCapacityBytes" to importUses.allocatedBytes,
-            "retainedPeerImports" to peerImports,
-            "retainedConsumedPeerImports" to consumedPeerImports,
-            "retainedConsumed" to consumed,
+            "retainedPeerImports" to peerImports.toLong(),
+            "retainedConsumedPeerImports" to consumedPeerImports.toLong(),
+            "retainedConsumed" to consumed.toLong(),
         ))
         retiredRootSources?.let { sample.owned(it, it.allocatedBytes, true) }
         sample.owned(importUses, importUses.allocatedBytes)
@@ -376,13 +442,14 @@ internal class NativeSatState(private val state: PropagationState) {
     fun lbdOf(i: Int): Int = learnedLbd[i]
     fun permanentOf(i: Int): Boolean = learnedPermanent[i] == 1
     fun originOf(i: Int): Int = learnedOrigin[i]
+    fun admissionKeyOf(i: Int): Long = learnedAdmissions[i]
     fun tierOf(i: Int): ClauseTier = ClauseTier.entries[learnedTier[i]]
     fun setTierOf(i: Int, tier: ClauseTier) {
         learnedTier[i] = tier.ordinal
     }
-    fun usedOf(i: Int): Boolean = learnedUsed[i] == 1
+    fun usedOf(i: Int): Boolean = lifecycleStages[i] and RECENT_USED != 0
     fun clearUsed(i: Int) {
-        learnedUsed[i] = 0
+        lifecycleStages[i] = lifecycleStages[i] and RECENT_USED.inv()
     }
 
     internal fun maintainCapWindow(
@@ -390,54 +457,101 @@ internal class NativeSatState(private val state: PropagationState) {
         maxWork: Long,
         maxScratchBytes: Long,
         cancelled: () -> Boolean,
+        canDrop: (Int) -> Boolean,
         keep: (Int) -> Boolean,
     ): Int {
         capCalls++
-        if (permanentCount < cap || maxScratchBytes < 64L || !initialized || pendingConflict || unitsPending ||
-            recheckHead < rechecks.size || bcpHead != state.boolPinOrder.size || state.runCancelled
-        ) return 0
-        var work = 0L
-        var retired = 0
-        while (capRead < capCandidates.size && maxWork - work >= 32L) {
-            if (cancelled()) return retired
-            val index = capCandidates[capRead]
-            val length = literalCountOf(index)
-            val price = 32L + length.toLong() * 4L
-            if (price > maxWork - work) {
-                state.work += 16L
-                capWork += 16L
-                work += 16L
-                if (cancelled()) return retired
-            } else {
-                state.work += price
-                capWork += price
-                work += price
-                if (cancelled()) return retired
-                var protected = length <= 1 || lifecycleStages[index] and 2 != 0
-                // Native antecedents are copied literals, and Boolean undo saves no prior handle.
-                // Every remaining live clause handle belongs to a reason for one of its literals.
-                for (offset in 0 until length) {
-                    if (cancelled()) return retired
-                    if (state.boolReason[variableOf(index, offset)] == baseCount + index) protected = true
-                }
-                if (cancelled()) return retired
-                if (!keep(index) && !protected) {
-                    lifecycleStages[index] = lifecycleStages[index] or RETIRED
-                    state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
-                    retiredCount++
-                    retired++
-                }
-            }
-            if (!retiredOf(index)) capCandidates[capWrite++] = index
-            capRead++
-            capVisits++
+        if (unitsPending || recheckHead < rechecks.size) capPendingReplayCalls++
+        if (maxScratchBytes < 64L || !initialized || pendingConflict ||
+            bcpHead != state.boolPinOrder.size || state.runCancelled
+        ) {
+            capBoundaryDefers++
+            return 0
         }
-        if (capRead == capCandidates.size) {
-            capCandidates.truncateTo(capWrite)
-            capRead = 0
-            capWrite = 0
+        val before = retiredCount
+        val budget = ReclamationPreparation(maxWork, maxScratchBytes, cancelled) {
+            state.work += it
+            capWork += it
         }
-        return retired
+        try {
+            budget.visit(0L, 64L)
+            capRanking.advance(cap, permanentCount, budget, capPolicy(budget, canDrop, keep))
+        } catch (_: ReclamationPreparation.Deferred) {
+            capPreparationDefers++
+            // Heap steps and pending retirement keep their handles across roots.
+        }
+        return retiredCount - before
+    }
+
+    private fun capPolicy(
+        budget: ReclamationPreparation,
+        mayDrop: (Int) -> Boolean,
+        retain: (Int) -> Boolean,
+    ): LearnedCapPolicy = object : LearnedCapPolicy {
+        override fun alive(index: Int): Boolean = !retiredOf(index)
+        private var prepared = -1
+        private var protected = false
+        override fun lbd(index: Int): Int = learnedLbd[index]
+        override fun keep(index: Int): Boolean {
+            val retained = retain(index)
+            return retained || protected
+        }
+        override fun visited() { capVisits++ }
+        override fun prepare(index: Int): Boolean {
+            protected = capProtected(index, budget, CAP_ROW_POLICY_WORK)
+            prepared = index
+            return true
+        }
+        override fun retire(index: Int): Boolean {
+            if (!mayDrop(index)) return false
+            val pinned = if (index == prepared) protected else capProtected(index, budget, 0L)
+            if (pinned) return false
+            budget.visit(24L)
+            budget.visit(0L)
+            learnedPayloads.release(index)
+            lifecycleStages[index] = lifecycleStages[index] or RETIRED
+            state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
+            retiredCount++
+            return true
+        }
+    }
+
+    private fun capProtected(index: Int, budget: ReclamationPreparation, work: Long): Boolean {
+        val length = literalCountOf(index)
+        budget.visit(work + 8L)
+        budget.visit(0L)
+        return length <= 1 || lifecycleStages[index] and 2 != 0 || learnedBoolReasons[index] > 0
+    }
+
+    internal fun noteBoolReason(factor: Int, delta: Int) {
+        val index = factor - baseCount
+        if (index !in 0 until learnedCount) return
+        state.work += 2L
+        val count = learnedBoolReasons[index] + delta
+        check(count >= 0)
+        learnedBoolReasons[index] = count
+    }
+
+    internal fun retireSelectedLearnedClause(index: Int, budget: ReclamationPreparation): LearnedRetirementResult {
+        if (!initialized || pendingConflict || bcpHead != state.boolPinOrder.size || state.runCancelled) {
+            return LearnedRetirementResult(LearnedRetirementStatus.Deferred)
+        }
+        if (index !in 0 until learnedCount) return LearnedRetirementResult(LearnedRetirementStatus.AlreadyGone,
+            payloadReleased = true, physicalReleased = true)
+        if (retiredOf(index)) return LearnedRetirementResult(LearnedRetirementStatus.AlreadyGone,
+            payloadReleased = true)
+        budget.visit(16L)
+        if (learnedPermanent[index] == 1 || literalCountOf(index) <= 1 || learnedBoolReasons[index] > 0 ||
+            lifecycleStages[index] and 2 != 0
+        ) return LearnedRetirementResult(LearnedRetirementStatus.ProtectedFloor)
+        budget.visit(40L)
+        budget.visit(0L)
+        learnedPayloads.release(index)
+        lifecycleStages[index] = lifecycleStages[index] or RETIRED
+        state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
+        retiredCount++
+        capRanking.invalidateRetiredHandles()
+        return LearnedRetirementResult(LearnedRetirementStatus.Retired, payloadReleased = true)
     }
 
     internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) emptyMap() else mapOf(
@@ -445,6 +559,10 @@ internal class NativeSatState(private val state: PropagationState) {
         "learnedCapCalls" to capCalls,
         "learnedCapWork" to capWork,
         "learnedCapVisits" to capVisits,
+        "learnedCapBoundaryDefers" to capBoundaryDefers,
+        "learnedCapPreparationDefers" to capPreparationDefers,
+        "learnedCapPendingReplayCalls" to capPendingReplayCalls,
+        "learnedCapRankedPasses" to capRanking.passes,
         "learnedCapPermanentClauses" to permanentCount.toLong(),
         "learnedCapRetainedSlots" to learnedCount.toLong(),
         "learnedCapRetiredSlots" to retiredCount.toLong(),
@@ -461,7 +579,7 @@ internal class NativeSatState(private val state: PropagationState) {
     fun variableOf(i: Int, k: Int): Int = Lit.variable(litOf(baseCount + i, k))
 
     fun forEachBinaryPartner(lit: Int, action: (Int) -> Unit) {
-        val entries = watchEntries[lit]
+        val entries = watchEntries[lit] ?: return
         for (i in 0 until watchSizes[lit]) {
             state.work++
             val h = entries[i].toInt()
@@ -479,11 +597,14 @@ internal class NativeSatState(private val state: PropagationState) {
         state.factorAttribution?.used(1 shl FactorFamily.Clause.ordinal)
         if (lifecycleStages[i] and 1 == 0) {
             lifecycleStages[i] = lifecycleStages[i] or 1
+            state.work += 3L
+            consumed++
+            if (learnedOrigin[i] >= 0) consumedPeerImports++
             state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Consumed)
             state.factorAttribution?.note(1 shl FactorFamily.Clause.ordinal, FactorAttribution.Metric.Consumed)
         }
-        if (learnedUsed[i] == 0) importUses.note(learnedOrigin[i])
-        learnedUsed[i] = 1
+        if (!usedOf(i)) importUses.note(learnedOrigin[i])
+        lifecycleStages[i] = lifecycleStages[i] or RECENT_USED
     }
 
     internal fun prepareReclamation(
@@ -500,14 +621,17 @@ internal class NativeSatState(private val state: PropagationState) {
             val index = rechecks[i] - baseCount
             if (lifecycleStages[index] and 1 == 0) retained[index] = true
         }
-        budget.atomic(learnedLits.backingData.size.toLong(), learnedLits.backingData.size.toLong() * Int.SIZE_BYTES)
-        for (column in listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedUsed,
+        learnedPayloads.prepareRemap(budget)
+        budget.atomic(learnedAdmissions.allocatedBytes / Long.SIZE_BYTES, learnedAdmissions.allocatedBytes)
+        for (column in listOf(learnedLbd, learnedPermanent, learnedTier, learnedBoolReasons,
             lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos, capCandidates)) {
             budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
         }
         for (entries in watchEntries) {
             budget.visit()
-            budget.atomic(entries.size.toLong() + 1L, entries.size.toLong() * Long.SIZE_BYTES)
+            if (entries == null) continue
+            budget.atomic(entries.primitiveBytes + entries.referenceSlots,
+                entries.primitiveBytes + entries.referenceSlots * Long.SIZE_BYTES)
         }
         budget.ready()
     }
@@ -522,10 +646,20 @@ internal class NativeSatState(private val state: PropagationState) {
             remap[i] = if (retained[i]) survivors++ else -1
         }
         if (survivors == learnedCount) return
+        state.work += state.selectedRetirements.remapWork
+        state.selectedRetirements.remap(remap)
 
         for (i in 0 until learnedCount) if (remap[i] < 0) {
-            state.work++
+            state.work += 8L
+            val peer = learnedOrigin[i] >= 0
+            if (peer) peerImports--
+            if (lifecycleStages[i] and 1 != 0) {
+                consumed--
+                if (peer) consumedPeerImports--
+            }
             if (!retiredOf(i)) state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
+            state.work += 24L
+            learnedPayloads.release(i)
         }
         state.remapReasons(state.boolReason, remap, baseCount)
         var queued = 0
@@ -539,7 +673,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
         for (lit in watchEntries.indices) {
             state.work++
-            val entries = watchEntries[lit]
+            val entries = watchEntries[lit] ?: continue
             var w = 0
             for (r in 0 until watchSizes[lit]) {
                 state.work++
@@ -550,33 +684,34 @@ internal class NativeSatState(private val state: PropagationState) {
                 entries[w++] = packWatch(newH, (entry ushr 32).toInt())
             }
             watchSizes[lit] = w
-            if (entries.size > w) watchEntries[lit] = entries.copyOf(w)
+            state.work += entries.truncationWork(w)
+            entries.truncateTo(w)
+            if (w == 0) watchEntries[lit] = null
         }
 
-        // A survivor's destination precedes its source, so packing forward cannot overwrite an
-        // unread clause. Keep the original starts and buffer size live until every source is read.
-        var literalWrite = 0
+        watchCleanupLiteral = 0
+        watchCleanupIndex = 0
+        sweptRetirements = 0
+        sweepingRetirements = -1
+
+        // A survivor's destination precedes its source, so moving references cannot overwrite unread rows.
         permanentCount = 0
         retiredCount = 0
         capCandidates.clear()
-        capRead = 0
-        capWrite = 0
+        capRanking.reset()
         for (i in 0 until learnedCount) {
             state.work++
             val target = remap[i]
             if (target < 0) continue
-            val start = learnedStarts[i]
-            val end = learnedEnd(i)
-            learnedStarts[target] = literalWrite
-            for (k in start until end) {
-                state.work++
-                learnedLits[literalWrite++] = learnedLits[k]
-            }
+            state.work += learnedPayloads.move(i, target)
             lifecycleStages[target] = lifecycleStages[i]
             learnedLbd[target] = learnedLbd[i]
             learnedPermanent[target] = learnedPermanent[i]
             learnedTier[target] = learnedTier[i]
-            learnedUsed[target] = learnedUsed[i]
+            state.work++
+            learnedBoolReasons[target] = learnedBoolReasons[i]
+            state.work++
+            learnedAdmissions[target] = learnedAdmissions[i]
             learnedOrigin[target] = learnedOrigin[i]
             learnedScanPos[target] = learnedScanPos[i]
             learnedWatchPos[2 * target] = learnedWatchPos[2 * i]
@@ -589,12 +724,15 @@ internal class NativeSatState(private val state: PropagationState) {
             }
         }
         lifecycleStages.truncateTo(survivors)
-        learnedLits.truncateTo(literalWrite)
-        learnedStarts.truncateTo(survivors)
+        state.work += learnedPayloads.trimTo(survivors)
         learnedLbd.truncateTo(survivors)
         learnedPermanent.truncateTo(survivors)
         learnedTier.truncateTo(survivors)
-        learnedUsed.truncateTo(survivors)
+        state.work += learnedBoolReasons.size.toLong() - survivors
+        learnedBoolReasons.truncateTo(survivors)
+        state.work += 2L + survivors.coerceAtLeast(1) * 2L
+        learnedAdmissions.truncateTo(survivors)
+        learnedAdmissions.trim()
         learnedOrigin.truncateTo(survivors)
         learnedScanPos.truncateTo(survivors)
         learnedWatchPos.truncateTo(2 * survivors)
@@ -604,8 +742,9 @@ internal class NativeSatState(private val state: PropagationState) {
             state.work++
             if (!retiredOf(i) && clauseLen(baseCount + i) == 1) learnedUnits.add(baseCount + i)
         }
-        for (column in listOf(learnedLits, learnedStarts, learnedLbd, learnedPermanent, learnedTier,
-            learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
+        state.work += learnedBoolReasons.size.toLong() * 2L
+        for (column in listOf(learnedLbd, learnedPermanent, learnedTier, learnedBoolReasons,
+            lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos,
             capCandidates)) {
             column.trim()
         }
@@ -735,13 +874,14 @@ internal class NativeSatState(private val state: PropagationState) {
 
     /** Process every clause watching [falseLit] (which just became false). Returns false on conflict. */
     private fun propagateFalse(falseLit: Int): Boolean {
-        val entries = watchEntries[falseLit]
+        val entries = watchEntries[falseLit] ?: return true
         var wi = 0
         while (wi < watchSizes[falseLit]) {
             state.work++
             val entry = entries[wi]
             val h = entry.toInt()
             if (isRetired(h)) {
+                state.work += watchRemovalWork(falseLit)
                 removeWatchAt(falseLit, wi)
                 continue
             }
@@ -751,9 +891,9 @@ internal class NativeSatState(private val state: PropagationState) {
                 continue
             }
             val baseClause = h < baseCount
-            val lits = if (baseClause) arena.lits else learnedLits.backingData
-            val start = if (baseClause) arena.start(h) else learnedStarts[h - baseCount]
-            val len = if (baseClause) arena.length(h) else learnedEnd(h - baseCount) - start
+            val lits = if (baseClause) arena.lits else learnedPayloads[h - baseCount]
+            val start = if (baseClause) arena.start(h) else 0
+            val len = if (baseClause) arena.length(h) else lits.size
             val i0 = watchPosition(h, 0)
             val i1 = watchPosition(h, 1)
             val slot0IsFalse = lits[start + i0] == falseLit
@@ -771,6 +911,7 @@ internal class NativeSatState(private val state: PropagationState) {
                 if (!baseClause) learnedScanPos[h - baseCount] = if (replacement + 1 == len) 0 else replacement + 1
                 val newLit = lits[start + replacement]
                 setWatchPosition(h, if (slot0IsFalse) 0 else 1, replacement)
+                state.work += watchRemovalWork(falseLit)
                 removeWatchAt(falseLit, wi) // swap-pop; re-process wi without advancing
                 addWatch(newLit, h, otherLit)
                 continue
@@ -806,6 +947,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private companion object {
         const val RETIRED = 4
+        const val RECENT_USED = 8
         // Poll the deadline every 4096 propagated literals.
         const val CANCEL_POLL_MASK = 0xFFF
     }

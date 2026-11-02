@@ -177,6 +177,7 @@ private fun PropagationState.replayVarUndo(undoSize: Int) {
                 val v = undo.varId[i]
                 retracting?.invoke(v)
                 recheckRetractedLearning(boolReason[v])
+                noteLearnedBoolReason(boolReason[v], -1)
                 boolValues[v] = null
                 boolLevel[v] = -1
                 boolReason[v] = -1
