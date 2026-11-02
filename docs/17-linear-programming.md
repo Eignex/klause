@@ -500,8 +500,16 @@ When nearest-endpoint rounding does not separate, a completed continuous residua
 can retry the same aggregate with the ordinary stated sides that retain negative
 residuals. Identical side choices require no additional derivation. Each attempt
 replays its exact source-bound premises and shares the generation's work,
-allocation, cancellation and proof limits. A nonseparating seed or continuation
-tries these sides before following one opposite-sign continuous incidence path through
+allocation, cancellation and proof limits. A completed pure-integer aggregate can
+also try half scaling. Each odd coefficient cites a stated singleton integer lower
+bound to round down, or a stated upper bound to round up when no lower bound is
+available. Even coefficients require no bound. A positive combination of those
+premises gives integral activity, and integer rounding supplies the conclusion.
+The proposal retains every supporting owner and uses the aggregation-MIR family.
+Missing stated sides decline the attempt; scoped domains do not supply premises.
+The singleton index, exact arithmetic and nested proof share the same generation
+allowance. A nonseparating seed or continuation tries these alternatives before
+following one opposite-sign continuous incidence path through
 at most four distinct original source rows. Exact positive rescaling preserves
 the earlier combination while cancelling the next coordinate. Singleton continuous bounds remain part of mixed
 rounding. Residual capture, continuation scans, term weights, failed derivations

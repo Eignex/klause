@@ -151,7 +151,8 @@ internal class LinearAuthorityPointCuts(
             if (aggregateOnly) {
                 for (row in rows) {
                     if (!meter.charge(1L)) return installed
-                    aggregateOnly = aggregateOnly && row.family == CutFamily.SOURCE_AGGREGATION
+                    aggregateOnly = aggregateOnly && (row.family == CutFamily.SOURCE_AGGREGATION ||
+                        row.family == CutFamily.AGGREGATION_MIR)
                 }
             }
             if ((integerOnly || aggregateOnly) && installed.isEmpty() && rows.size <= maximumCuts &&

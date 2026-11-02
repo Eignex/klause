@@ -430,6 +430,204 @@ class LinearAuthorityAggregateCutsTest {
 
 
     @Test
+    fun `half aggregation should strengthen the checked numerical bound`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    real to BigFraction.ONE), BigFraction.ONE)),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+                "bound" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ), mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+
+        val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithPointCuts(source, Cancellation.Never)
+        }
+
+        assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
+            assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+        assertTrue(CutFamily.AGGREGATION_MIR in result.cutBoundFamilies)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+    }
+
+    @Test
+    fun `half aggregation should cite the stated lower or upper integer side`() {
+        for (sign in listOf(-1L, 1L)) {
+            val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    real to BigFraction.ONE), BigFraction.ONE)),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3L * sign),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+                "bound" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(-2L * sign)),
+                    BigFraction.ZERO)),
+            ))
+
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 2),
+                point = mapOf(x to 0.75, y to 0.5 * sign, real to -0.5))
+
+            val cut = cuts.single()
+            assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ofLong(sign)),
+                BigFraction.ONE), cut.inequality)
+            assertEquals(setOf(0, 1, 2), cut.owners)
+            assertEquals(CutFamily.AGGREGATION_MIR, cut.family)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+            assertTrue(LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never).isEmpty())
+        }
+    }
+
+    @Test
+    fun `half aggregation should decline an odd coefficient without a stated integer bound`() {
+        val source = SourceProofContext(scope.copy(condition = SourceCondition(lower = mapOf(y to BigFraction.ZERO))),
+            setOf(x, y, real), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    real to BigFraction.ONE), BigFraction.ONE)),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+            ))
+        val observations = mutableMapOf<String, Long>()
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            point = mapOf(x to 0.75, y to 0.5, real to -0.5))
+
+        assertTrue(cuts.isEmpty())
+        assertEquals(1L, observations["AggregateHalfMissingIntegerBounds"])
+    }
+
+    @Test
+    fun `interrupting half aggregation should withhold its partial proposal`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                real to BigFraction.ONE), BigFraction.ONE)),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+            "bound" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, _ -> if (name == "AggregateHalfAttempts") stopped = true },
+            point = mapOf(x to 0.75, y to 0.5, real to -0.5))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+    }
+
+    @Test
+    fun `half aggregation should share spent generation work and allocation`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                real to BigFraction.ONE), BigFraction.ONE)),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+            "bound" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val point = mapOf(x to 0.75, y to 0.5, real to -0.5)
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+        var work = 0L
+        var allocation = 0L
+        var beforeWork = 0L
+        var beforeAllocation = 0L
+        val complete = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count ->
+                if (name == "AggregateWork") work += count
+                if (name == "AggregateAllocation") allocation += count
+                if (name == "AggregateHalfAttempts") {
+                    beforeWork = work
+                    beforeAllocation = allocation
+                }
+            }, limits = limits, point = point)
+        assertEquals(1, complete.size)
+        assertTrue(beforeWork > 0L && beforeAllocation > 0L)
+
+        for (limited in listOf(limits.copy(work = beforeWork), limits.copy(allocation = beforeAllocation))) {
+            val observations = mutableMapOf<String, Long>()
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                limits = limited, point = point)
+
+            assertTrue(cuts.isEmpty())
+            assertTrue((observations["AggregateWork"] ?: 0L) <= limited.work)
+            assertTrue((observations["AggregateAllocation"] ?: 0L) <= limited.allocation)
+        }
+    }
+
+    @Test
+    fun `half aggregation should rebuild integer bound premises for each generation`() {
+        for (rhs in listOf(0L, 2L, 0L)) {
+            val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    real to BigFraction.ONE), BigFraction.ONE)),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+                "bound" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE),
+                    BigFraction.ofLong(rhs))),
+            ))
+
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                point = mapOf(x to 0.75, y to 0.5, real to -0.5))
+
+            if (rhs == 0L) {
+                val cut = cuts.single()
+                assertEquals(BigFraction.ONE, cut.inequality.rhs)
+                assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                    SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+            } else assertTrue(cuts.isEmpty())
+        }
+    }
+
+    @Test
+    fun `half aggregation should retain supporting integer bound guards and pins`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val pin = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val source = SourceProofContext(scope, setOf(x, y, real, bool, pin), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                real to BigFraction.ONE), BigFraction.ONE)),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+            "bound" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO),
+                mapOf(0 to true), mapOf(pin to BigFraction.ONE)),
+        ))
+        val established = SourceCondition(bools = mapOf(0 to true),
+            lower = mapOf(pin to BigFraction.ONE), upper = mapOf(pin to BigFraction.ONE))
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            point = mapOf(x to 0.75, y to 0.5, real to -0.5)).single()
+
+        for (condition in listOf(established, SourceCondition(lower = established.lower, upper = established.upper),
+            SourceCondition(bools = established.bools, lower = established.lower), established)) {
+            val scoped = source.atScope(scope.copy(condition = condition))
+            val check = SourceEvidenceVerifier(scoped).verify(
+                SourceEvidence(scoped.scope, SourceClaim.Consequence(cut.inequality), cut.derivation))
+
+            if (condition == established) assertEquals(SourceEvidenceCheck.Checked, check)
+            else assertIs<SourceEvidenceCheck.Rejected>(check)
+        }
+    }
+
+    @Test
+    fun `half aggregation should round strict integral endpoints below their right side`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                real to BigFraction.ONE), BigFraction.ONE)),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+            "bound" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE, strict = true)),
+        ))
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            point = mapOf(x to -0.75, y to 1.5, real to 2.5)).single()
+
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ZERO),
+            cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `point separation should cancel a third source row within its configured row limit`() {
         val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(x, y, real, otherReal), linkedMapOf(

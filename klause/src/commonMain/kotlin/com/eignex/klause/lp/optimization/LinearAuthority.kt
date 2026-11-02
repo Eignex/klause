@@ -194,7 +194,7 @@ internal class LinearAuthority(
             val baselineQuery = prepared
             val currentRows = checkNotNull(family.cuts).rows
             val generatedRecipe = currentRows.isNotEmpty() && currentRows.size <= 64 &&
-                currentRows.all { it.family == CutFamily.SOURCE_AGGREGATION }
+                currentRows.all { it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR }
             if (!generatedRecipe && !checkNotNull(family.cuts).pointDirected && directedFamily !== family &&
                 pointMask == null &&
                 ((aggregateCuts && prepared.coordinates.any { it.kind == SourceCoordinate.Kind.Real }) ||

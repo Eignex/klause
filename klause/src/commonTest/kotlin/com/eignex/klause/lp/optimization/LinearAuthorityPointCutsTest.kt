@@ -3,6 +3,7 @@ package com.eignex.klause.lp.optimization
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
+import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -592,6 +593,24 @@ class LinearAuthorityPointCutsTest {
         assertEquals(null, selection.observations["numericalCutSelectionRetiredInstalled"])
         assertEquals(null, selection.observations["numericalCutSelectionRetiredFamilies"])
         assertFalse(selection.retainsCandidateLayout(rows))
+    }
+
+    @Test
+    fun `installed half aggregation should enter aging with its checked recipe`() {
+        for (family in listOf(CutFamily.SOURCE_AGGREGATION, CutFamily.AGGREGATION_MIR)) {
+            val rows = listOf(LinearAuthorityCut(0,
+                SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("cut"), family = family))
+            val selection = LinearAuthorityPointCuts(SourceLpBudget())
+
+            val selected = selection.select(rows, listOf(x, mixedReal), List(2) { BigFraction.ZERO },
+                setOf(0), List(2) { BigFraction.ZERO }, emptySet(), Cancellation.Never, adoptCurrent = true)
+
+            assertEquals(setOf(0), selected)
+            assertTrue(selection.managesCurrentRecipe(rows))
+            assertTrue(selection.retainsCandidateLayout(rows))
+            assertEquals(1L, selection.observations["numericalCutSelectionAdoptedInstalled"])
+        }
     }
 
     @Test
