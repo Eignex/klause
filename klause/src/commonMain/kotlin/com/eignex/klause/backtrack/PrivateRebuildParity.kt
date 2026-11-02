@@ -1,9 +1,14 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 
 internal class PrivateRebuildParity private constructor(
     val source: BakedProblem,
@@ -12,10 +17,37 @@ internal class PrivateRebuildParity private constructor(
     val rows: Int,
     val modeledBytes: Long,
     val basis: PrivateRebuildAffine?,
+    private val sourceKeys: LongArray,
+    private val sourceRhs: IntArray,
+    val sourceRowLiterals: Long,
     val coveredSource: BooleanArray,
     val coveredClauses: Int,
 ) {
     val affine: PrivateRebuildAffine? get() = basis.takeIf { coveredClauses == source.numFactors }
+
+    val sourceRowCount: Int get() = sourceKeys.size
+
+    fun materializeSourceRows(cancellation: Cancellation): Array<Factor>? {
+        cancellation.charge(sourceKeys.size * 2L + 8L)
+        if (cancellation()) return null
+        val result = ArrayList<Factor>(sourceKeys.size)
+        for (row in sourceKeys.indices) {
+            val key = sourceKeys[row]
+            val width = if (key and COLUMN_MASK.toLong() == COLUMN_MASK.toLong()) 2 else 3
+            cancellation.charge(width * width.toLong() + width * 16L + 16L)
+            if (cancellation()) return null
+            val literals = IntArray(width) { index ->
+                val column = when (index) {
+                    0 -> (key ushr (COLUMN_BITS * 2)).toInt()
+                    1 -> ((key ushr COLUMN_BITS) and COLUMN_MASK.toLong()).toInt()
+                    else -> (key and COLUMN_MASK.toLong()).toInt()
+                }
+                Lit.make(column, true)
+            }
+            result.add(Xor(literals, sourceRhs[row]))
+        }
+        return result.toTypedArray()
+    }
 
     companion object {
         private const val MAX_FACTORS = 32_768
@@ -49,20 +81,23 @@ internal class PrivateRebuildParity private constructor(
             if (!table.collect(source, session)) return null
             val rowCount = table.countRows() ?: return null
             if (rowCount == 0) { onDecline("NoRows"); return null }
+            val covered = table.coverage() ?: return null
+            val sourceRows = if (table.coveredClauses == source.numFactors) 0 else rowCount
             val words = (source.numBoolVars + 63) ushr 6
-            val bytes = tableBytes + rowCount * (words * 16L + 128L) + source.numBoolVars * 16L
+            val bytes = tableBytes + rowCount * (words * 16L + 128L) + source.numBoolVars * 16L + sourceRows * 12L
             if (table.entries * 512L + bytes > byteLimit) { onDecline("Memory"); return null }
-            if (!funded(source.numBoolVars * 3L + rowCount * (words + 3L))) return null
+            if (!funded(source.numBoolVars * 3L + rowCount * (words + 3L) + sourceRows * 3L)) return null
             onWorkspace(bytes)
             val fixed = Array(source.numBoolVars) { session.boolValue(it) }
             val matrix = Matrix(rowCount, source.numBoolVars, words, fixed, funded)
-            if (!table.populate(matrix)) return null
+            val sourceKeys = if (sourceRows == 0) EmptyLongArray else LongArray(sourceRows)
+            val sourceRhs = if (sourceRows == 0) EmptyIntArray else IntArray(sourceRows)
+            if (!table.populate(matrix, sourceKeys, sourceRhs)) return null
             val pins = matrix.derive(onDecline) ?: return null
             if (pins == 0 && matrix.basis == null) { onDecline("NoPins"); return null }
-            val covered = table.coverage() ?: return null
             if (!funded(16L)) return null
-            return PrivateRebuildParity(source, fixed, pins, rowCount, bytes, matrix.basis, covered,
-                table.coveredClauses)
+            return PrivateRebuildParity(source, fixed, pins, rowCount, bytes, matrix.basis,
+                sourceKeys, sourceRhs, table.sourceRowLiterals, covered, table.coveredClauses)
         }
 
         private fun pattern(key: Long, parity: Int): Int {
@@ -90,6 +125,9 @@ internal class PrivateRebuildParity private constructor(
                 private set
 
             var coveredClauses = 0
+                private set
+
+            var sourceRowLiterals = 0L
                 private set
 
             fun collect(source: BakedProblem, session: PropagationSession): Boolean {
@@ -187,12 +225,18 @@ internal class PrivateRebuildParity private constructor(
                 return result
             }
 
-            fun populate(matrix: Matrix): Boolean {
+            fun populate(matrix: Matrix, sourceKeys: LongArray, sourceRhs: IntArray): Boolean {
+                var row = 0
                 for (slot in keys.indices) {
                     if (!visit(4L)) return false
                     if (keys[slot] == EMPTY) continue
                     for (parity in 0..1) if (complete(keys[slot], masks[slot], parity)) {
                         if (!matrix.add(keys[slot], parity xor 1)) return false
+                        if (sourceKeys.isEmpty()) continue
+                        if (!visit(4L)) return false
+                        sourceKeys[row] = keys[slot]
+                        sourceRhs[row++] = parity xor 1
+                        sourceRowLiterals += if (keys[slot] and COLUMN_MASK.toLong() == COLUMN_MASK.toLong()) 2 else 3
                     }
                 }
                 return true
