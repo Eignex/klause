@@ -43,6 +43,8 @@ rejects further slices.
 Results retain captured source semantics even without an assignment. Resumable
 handles keep lifetime cancellation across slices, while each slice supplies its own
 invocation token; neither wrapping nor resuming renews an allowance.
+Session-ownership and objective-coordinate handles preserve live pending-incumbent
+trial signals. These signals affect scheduling without renewing work or lifetime.
 
 ## Retained state and repair
 
