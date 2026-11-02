@@ -119,6 +119,26 @@ internal object CorpusSelection {
             val ext: String,
             val familyOf: (String) -> String = { it.substringBefore('/') },
         ) : Layout {
+            fun discover(paths: List<String>): List<Discovered> {
+                val prefix = if (subDir.isEmpty()) "" else "$subDir/"
+                return paths.filter { it.startsWith(prefix) && CorpusFiles.plainPath(it).endsWith(".$ext") }
+                    .sortedBy(CorpusFiles::plainPath)
+                    .map { path ->
+                        val name = CorpusFiles.plainPath(path.removePrefix(prefix)).removeSuffix(".$ext")
+                        Discovered(name, path, familyKey = familyOf(name))
+                    }.distinctBy { it.name }
+            }
+
+            fun named(paths: List<String>, names: List<String>): List<Discovered> {
+                val available = discover(paths).associateBy { it.name }
+                return names.distinct().mapNotNull { name ->
+                    require(name.isNotBlank() && name.length <= 2048)
+                    require(name.split('/').none { it.isEmpty() || it == "." || it == ".." })
+                    require(name.none { it == '\\' || it.code < 32 || it.code == 127 })
+                    available[name]
+                }
+            }
+
             /** A fixed set already knows its paths; do not enumerate unrelated corpus members. */
             fun named(root: File, names: List<String>): List<Discovered> {
                 val base = if (subDir.isEmpty()) root else File(root, subDir)
@@ -165,8 +185,13 @@ internal object CorpusSelection {
          *  needs the collection's bytes; without it discovery may run on the collection's index listing alone. */
         expected: ((File) -> Expected)? = null,
     ): List<ProblemRef> {
-        val root = if (expected == null) CorpusFetcher.listing(collection) else CorpusFetcher.ensure(collection)
-        val discovered = layout.discover(root)
+        val paths = if (expected == null && layout is Layout.Flat) CorpusFetcher.selectivePaths(collection) else null
+        val root = if (paths == null) {
+            if (expected == null) CorpusFetcher.listing(collection) else CorpusFetcher.ensure(collection)
+        } else {
+            File(CorpusFetcher.cacheRoot, collection.id)
+        }
+        val discovered = if (paths == null) layout.discover(root) else (layout as Layout.Flat).discover(paths)
         // Reject empty discovery so a mismatched archive layout cannot look like a completed measurement.
         require(discovered.isNotEmpty()) {
             "corpus '${collection.id}' yielded no instances under '$layout' in $root: " +
@@ -185,8 +210,14 @@ internal object CorpusSelection {
         category: Category,
         format: Format,
     ): List<ProblemRef> {
-        val root = CorpusFetcher.listing(collection)
-        return references(collection, root, layout.named(root, names), category, format, null)
+        val paths = CorpusFetcher.selectivePaths(collection)
+        val root = if (paths == null) {
+            CorpusFetcher.listing(collection)
+        } else {
+            File(CorpusFetcher.cacheRoot, collection.id)
+        }
+        val discovered = if (paths == null) layout.named(root, names) else layout.named(paths, names)
+        return references(collection, root, discovered, category, format, null)
     }
 
     private fun references(

@@ -13,6 +13,27 @@ import kotlin.test.assertTrue
 class CorpusSelectionTest {
 
     @Test
+    fun `archive paths preserve flat discovery and seeded family selection`() {
+        val root = Files.createTempDirectory("archive-corpus").toFile()
+        try {
+            val paths = listOf("set/alpha-2.mps.zst", "set/beta-1.mps.zst", "set/alpha-1.mps.zst", "README")
+            for (path in paths) File(root, path).apply { parentFile.mkdirs(); writeText("fixture") }
+            val layout = Layout.Flat("set", "mps") { it.substringBefore('-') }
+            val selection = Selection(perFamily = 1, maxInstances = 2, sampleSeed = 7)
+
+            assertEquals(layout.discover(root), layout.discover(paths))
+            assertEquals(
+                CorpusSelection.applySelection(layout.discover(root), selection),
+                CorpusSelection.applySelection(layout.discover(paths), selection),
+            )
+            val names = listOf("beta-1", "alpha-1")
+            assertEquals(layout.named(root, names), layout.named(paths, names))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `named flat selection should match discovery and reject paths outside its layout`() {
         val root = Files.createTempDirectory("named-corpus").toFile()
         try {
