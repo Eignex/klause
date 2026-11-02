@@ -525,7 +525,7 @@ class LinearAuthorityAggregateCutsTest {
             "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
                 y to BigFraction.ofLong(3)), BigFraction.ofLong(3)), mapOf(0 to true)),
             "lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO),
-                integerPins = mapOf(pin to BigFraction.ONE)),
+                guards = emptyMap(), integerPins = mapOf(pin to BigFraction.ONE)),
         ))
         val established = SourceCondition(bools = mapOf(0 to true),
             lower = mapOf(pin to BigFraction.ONE), upper = mapOf(pin to BigFraction.ONE))
