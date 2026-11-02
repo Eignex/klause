@@ -37,7 +37,8 @@ data class SharingStats(
     /** Clause lifecycle observations. Byte fields measure primitive buffers or logical payload, not RSS.
      *  Pool fields describe a shared owner and must not be summed across workers. */
     val clauses: Map<String, Long> = emptyMap(),
-    /** Private incumbent offer lifecycle counts for query-boundary publication. */
+    /** Private incumbent offer lifecycle counts for query-boundary publication.
+     *  Empty before the first buffered query; all event kinds, including zero counts, are present afterwards. */
     val incumbents: Map<String, Long> = emptyMap(),
 ) {
     /** Construct sharing traffic with clause lifecycle observations. */

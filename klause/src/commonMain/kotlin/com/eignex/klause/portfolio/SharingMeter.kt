@@ -25,6 +25,11 @@ internal class SharingMeter {
     private val incumbentCounts = linkedMapOf<String, Long>()
 
     internal fun incumbentEvent(event: IncumbentOfferEvent) {
+        if (incumbentCounts.isEmpty()) {
+            for (kind in IncumbentOfferEvent.entries) {
+                incumbentCounts[kind.name.replaceFirstChar { it.lowercaseChar() }] = 0L
+            }
+        }
         val name = event.name.replaceFirstChar { it.lowercaseChar() }
         val previous = incumbentCounts[name] ?: 0L
         if (previous < Long.MAX_VALUE) incumbentCounts[name] = previous + 1L

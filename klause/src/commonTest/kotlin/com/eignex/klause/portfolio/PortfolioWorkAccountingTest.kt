@@ -75,7 +75,7 @@ class PortfolioWorkAccountingTest {
         assertEquals(1, checks)
         assertEquals(9L, arm.millis)
         assertEquals(mapOf("segments" to 1L, "offered" to 2L, "coalesced" to 1L,
-            "checked" to 1L, "installed" to 1L), arm.sharing.incumbents)
+            "checked" to 1L, "installed" to 1L), arm.sharing.incumbents.filterValues { it > 0L })
     }
 
     @Test

@@ -18,7 +18,9 @@ class SharingMeterTest {
         val snapshot = meter.snapshot()
 
         assertEquals(mapOf("offered" to 2L, "coalesced" to 1L, "checked" to 1L, "installed" to 1L),
-            snapshot.incumbents)
+            snapshot.incumbents.filterValues { it > 0L })
+        assertEquals(0L, snapshot.incumbents.getValue("dropped"))
+        assertEquals(0L, snapshot.incumbents.getValue("expired"))
         assertEquals(1L, snapshot.channels.getValue(SharingChannel.Incumbents).exported)
         assertEquals(snapshot.incumbents, snapshot.copy(channels = emptyMap()).incumbents)
         assertEquals(snapshot.incumbents, snapshot.copy(clauses = mapOf("sample" to 1L)).incumbents)

@@ -83,7 +83,7 @@ class IncumbentExchange<A, V>(
         action: () -> T,
     ): T {
         check(bufferedOffers == null) { "incumbent buffering requires an exclusive query" }
-        val buffered = BufferedIncumbentOffers(improves, observe)
+        val buffered = BufferedIncumbentOffers<A, V>(improves, observe)
         bufferedOffers = buffered
         try {
             val result = action()
