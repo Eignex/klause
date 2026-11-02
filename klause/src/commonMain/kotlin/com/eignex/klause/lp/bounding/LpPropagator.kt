@@ -122,6 +122,8 @@ internal class LpPropagator(
     val floatPaused: Boolean get() = owner?.floatPaused == true
     val pausedTrialProgress: Map<String, Long> get() = owner?.pausedTrialProgress.orEmpty()
 
+    fun pausedDualProposal(token: Cancellation): DoubleArray? = owner?.pausedDualProposal(token)
+
     val primalGuidanceState: String get() = withOwner { it.primalGuidanceState } ?: "ABSENT_OWNER"
 
     fun boundPremise(witness: Long): SearchAtomPremise = witnesses[witness] ?: SearchAtomPremise.Unavailable

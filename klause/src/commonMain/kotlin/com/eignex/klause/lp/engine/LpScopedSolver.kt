@@ -146,6 +146,13 @@ internal class LpScopedSolver(
         return true
     }
 
+    fun pausedDualProposal(token: Cancellation): DoubleArray? {
+        requireAvailable()
+        val pending = pendingFloat ?: return null
+        if (closed || pending.cursor.isAdvancing || token()) return null
+        return solver?.pausedDualProposal(token)
+    }
+
     fun partialPrimalGuidance(token: Cancellation): LpPrimalGuidance? {
         requireAvailable()
         if (closed || token()) return null

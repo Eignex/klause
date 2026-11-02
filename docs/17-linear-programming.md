@@ -677,7 +677,13 @@ lifting and ordinary evidence checking still decide whether the bound is usable.
 
 The scoped root-guidance operation advances the existing floating cursor under
 finite cumulative and per-consultation work limits. Pauses publish no coordinates
-or proofs. A completed point remains heuristic even when bound certification declines.
+or proofs. An admitted sparse root query can separately copy nonzero row multipliers
+from its suspended numerical owner and submit them as a dual proposal. The copy
+performs no basis solve and can lag a pivot. Only the existing exact check against
+the unchanged root model can establish a bound. Snapshot work and storage spend
+the containing root/checking allowances; zero, nonfinite, cancelled or declined
+proposals leave the private cursor suspended. A checked bound uses the ordinary
+source projection and lower-bound publisher without completing the floating query. A completed point remains heuristic even when bound certification declines.
 Dual-only certification checks exact Lagrangian evidence under its own sparse input,
 arithmetic and allocation limits. A refused binary dual candidate enters the bounded
 dual-vector rational reconstruction schedule under the same work, allocation and
