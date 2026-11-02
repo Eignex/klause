@@ -265,8 +265,20 @@ reclamation attempts remain retryable.
 General watch cleanup resumes across bounded maintenance slices without renumbering
 learned handles. Retired Boolean and bound-atom postings are removed independently;
 Boolean back-pointer deletion and swap-pop publication share one funded transaction.
-Watcher movement rewinds the current scan prefix. Small posting arrays trim within
-the same work and scratch limits; larger allocations wait for full compaction.
+Watcher movement rewinds the current scan prefix. Posting and blocker arrays trim
+in separate funded transactions. An affordable later grant retries deferred trims.
+The Boolean back-pointer index uses direct slots for source factors and eight startup
+rows, a bounded sparse directory for later factors, two packed positions per factor,
+and a balanced overflow for additional positions. Preparation owns startup rows;
+pressure releases unused reservations. Empty rows, directory branches and overflow
+entries release their primitive and reference capacity. Paired watches install and
+retire through one row lookup, and paired swap-pop moves update together. Ordinary
+index mutations retain their work charges. Initial construction records
+`propagationPreparationIndexWork` separately from runtime lifecycle events and
+propagation work, including private source-check construction. Its CPU and elapsed
+cost remain within the containing source invocation. Funded General watch cleanup
+precedes a whole-store sample and retains its continuation across unchanged roots;
+a partial sample supplies no byte-limit or protected-floor total.
 Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,
 queues and event indexes, with a conservative envelope for indivisible publication.
 Cancellation or an oversized envelope defers without mutation; accepted publication

@@ -11,6 +11,21 @@ import kotlin.test.assertTrue
 
 class LearnedMemoryMaintenanceTest {
     @Test
+    fun `a changed maintenance grant should retry unchanged ownership`() {
+        val session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()))
+        val maintenance = LearnedMemoryMaintenance()
+        maintenance.run(session, BacktrackParams(learnedMemoryBytes = 0L, learnedMemoryWork = 1L), null, null)
+        val before = session.work
+
+        maintenance.run(session, BacktrackParams(learnedMemoryBytes = 0L, learnedMemoryWork = 100_000L), null, null)
+
+        assertTrue(session.work > before)
+        val after = session.work
+        maintenance.run(session, BacktrackParams(learnedMemoryBytes = 0L, learnedMemoryWork = 100_000L), null, null)
+        assertEquals(after, session.work)
+    }
+
+    @Test
     fun `cancelled optional maintenance should defer until native ownership changes`() {
         var limited = false
         var sliceStart = 0L

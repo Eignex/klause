@@ -14,31 +14,71 @@ class RevisedSimplexTest {
 
     @Test
     fun `basis directional costs preserve source units and seated directions`() {
-        for (upperSeated in listOf(false, true)) for ((coefficient, objectiveScale) in
-            listOf(2L to 1L, 2048L to 1L, 2L to 4L)) {
+        for (sense in listOf(Sense.MINIMIZE, Sense.MAXIMIZE)) for (upperSeated in listOf(false, true)) {
+            for ((coefficient, objectiveScale) in listOf(2L to 1L, 2048L to 1L, 2L to 4L)) {
+                val sign = if (sense == Sense.MAXIMIZE) -1L else 1L
+                val builder = LpBuilder()
+                val x = builder.addVar(0, 2)
+                val down = builder.addVar(0, 1, cost = (if (upperSeated) -3L else 3L) * sign)
+                val up = builder.addVar(0, 1, cost = 5L * sign)
+                builder.addRow(intArrayOf(x, down, up),
+                    longArrayOf(coefficient, if (upperSeated) -coefficient else coefficient, -coefficient),
+                    Relation.EQ, if (upperSeated) -coefficient / 2 else coefficient / 2)
+                val trail = LpBoundTrail(assertNotNull(builder.build(sense).authoritativeModel()))
+                val objective = trail.state.model.objective
+                assertTrue(trail.replaceObjective(ExactLpObjective(List(objective.size) { objective.cost(it) },
+                    scale = ExactLpNumber.of(objectiveScale), externalConstant = ExactLpNumber.of(1L shl 60))))
+                val model = assertNotNull(trail.state.ownerWorkingModel())
+                RevisedSimplex(model).use { solver ->
+                    val optimum = assertNotNull(solver.solve())
+                    assertEquals(0.5, optimum.primal[x], 1e-8)
+                    var work = 0L
+
+                    val costs = assertNotNull(solver.directionalCosts(model, intArrayOf(x), 100_000L,
+                        Cancellation.Never) { work += it })
+
+                    assertEquals(3.0 / objectiveScale, assertNotNull(costs.single()).down, 1e-7)
+                    assertEquals(5.0 / objectiveScale, assertNotNull(costs.single()).up, 1e-7)
+                    assertTrue(work in 1L..100_000L)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `two basis columns require their combined analysis allowance`() {
+        for (exact in listOf(false, true)) {
             val builder = LpBuilder()
-            val x = builder.addVar(0, 2)
-            val down = builder.addVar(0, 1, cost = if (upperSeated) -3 else 3)
-            val up = builder.addVar(0, 1, cost = 5)
-            builder.addRow(intArrayOf(x, down, up),
-                longArrayOf(coefficient, if (upperSeated) -coefficient else coefficient, -coefficient),
-                Relation.EQ, if (upperSeated) -coefficient / 2 else coefficient / 2)
-            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-            val objective = trail.state.model.objective
-            assertTrue(trail.replaceObjective(ExactLpObjective(List(objective.size) { objective.cost(it) },
-                scale = ExactLpNumber.of(objectiveScale), externalConstant = ExactLpNumber.of(1L shl 60))))
-            val model = assertNotNull(trail.state.ownerWorkingModel())
+            val columns = IntArray(2)
+            for ((index, costs) in listOf(3L to 5L, 7L to 11L).withIndex()) {
+                val x = builder.addVar(0, 2)
+                columns[index] = x
+                val down = builder.addVar(0, 1, cost = costs.first)
+                val up = builder.addVar(0, 1, cost = costs.second)
+                builder.addRow(intArrayOf(x, down, up), longArrayOf(2, 2, -2), Relation.EQ, 1)
+            }
+            val built = builder.build(Sense.MINIMIZE)
+            val model = if (exact) {
+                assertNotNull(LpExactState(assertNotNull(built.authoritativeModel())).ownerWorkingModel())
+            } else built
             RevisedSimplex(model).use { solver ->
-                val optimum = assertNotNull(solver.solve())
-                assertEquals(0.5, optimum.primal[x], 1e-8)
+                assertNotNull(solver.solve())
                 var work = 0L
-
-                val costs = assertNotNull(solver.directionalCosts(model, intArrayOf(x), 100_000L,
+                val costs = assertNotNull(solver.directionalCosts(model, columns, 100_000L,
                     Cancellation.Never) { work += it })
-
-                assertEquals(3.0 / objectiveScale, assertNotNull(costs.single()).down, 1e-7)
-                assertEquals(5.0 / objectiveScale, assertNotNull(costs.single()).up, 1e-7)
+                assertEquals(3.0, assertNotNull(costs[0]).down, 1e-7)
+                assertEquals(5.0, assertNotNull(costs[0]).up, 1e-7)
+                assertEquals(7.0, assertNotNull(costs[1]).down, 1e-7)
+                assertEquals(11.0, assertNotNull(costs[1]).up, 1e-7)
                 assertTrue(work in 1L..100_000L)
+                val required = work
+                work = 0L
+
+                val unavailable = solver.directionalCosts(model, columns, required - 1L,
+                    Cancellation.Never) { work += it }
+
+                assertNull(unavailable)
+                assertEquals(0L, work)
             }
         }
     }

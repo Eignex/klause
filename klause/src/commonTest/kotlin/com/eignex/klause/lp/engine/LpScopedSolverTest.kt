@@ -43,18 +43,26 @@ class LpScopedSolverTest {
     }
 
     @Test
-    fun `reading child guidance does not construct a numerical owner`() {
-        val builder = LpBuilder()
-        val column = builder.addVar(0L, 5L, cost = 1L)
-        builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
-        val factory = RecordingLpEngineFactory()
-        LpScopedSolver(LpExactState(source), context = LpSolveContext(factory), componentSplit = true).use { owner ->
+    fun `reading optional guidance does not construct a numerical owner`() {
+        for (directional in listOf(false, true)) {
+            val builder = LpBuilder()
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+            val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+            val state = LpExactState(source)
+            val point = assertNotNull(state.ownerWorkingModel())
+            val factory = RecordingLpEngineFactory()
+            var work = 0L
+            LpScopedSolver(state, context = LpSolveContext(factory), componentSplit = true).use { owner ->
 
-            val guidance = owner.partialPrimalGuidance(Cancellation.Never)
+                val guidance = if (directional) {
+                    owner.directionalCosts(point, intArrayOf(column), 100_000L, Cancellation.Never) { work += it }
+                } else owner.partialPrimalGuidance(Cancellation.Never)
 
-            assertNull(guidance)
-            assertTrue(factory.calls.isEmpty())
+                assertNull(guidance)
+                assertTrue(factory.calls.isEmpty())
+                assertEquals(0L, work)
+            }
         }
     }
 

@@ -213,7 +213,7 @@ internal class CpSatisfactionTraversal(
                 if (it.session.usesNativeSat) "propagationNativeSatSessions" else "propagationGeneralSessions", 1L,
             )
             search.propagationWork = { it.session.work }
-            search.learning = { it.session.learnedLifecycle() }
+            search.learning = { it.session.learnedLifecycle() + it.session.preparationStatistics() }
             search.valueOrdering = { it.session.valueOrdering.snapshot() }
             search.rootPropagationWork = { it.session.rootWork }
             search.propagationNanos = { it.session.propagationNanos }

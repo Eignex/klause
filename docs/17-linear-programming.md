@@ -216,17 +216,12 @@ charged at each step. Infinite cutoffs, the large exact-cutoff path and overflow
 supply no retained scalar. The callback performs no extra domain scan, numerical
 query or certification, and publishes neither a point nor a new pruning bound.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
-history lifetime. An optional numerical capability estimates directional objective
-costs from a retained optimal basis for at most two structural columns; finite child
-guidance can request only its selected root column, at most once per hint owner
-while reliable history is absent. It retains that attempt limit across restarts and
-reseeding. Each basis-row
-solve scans oriented reduced costs, including logical columns, and converts its ratios
-to source-coordinate objective units. It neither pivots nor requests another LP solve
-or certificate. Analysis reserves its work before allocation, within the node's unspent
-query allowance and remaining containing and cumulative allowances; work and elapsed
-time are recorded separately. Changed exact states and incomplete or unsupported bases
-decline. The estimates never enter directional history or certify a branch bound.
+history lifetime. It can request [advisory basis costs](#floating-simplex-and-basis-factors)
+for its selected root column, at most once per hint owner while reliable history is
+absent. It retains that attempt limit across restarts and reseeding. Analysis spends
+the node's unspent query allowance and remaining containing and cumulative allowances;
+work and elapsed time are recorded separately. The estimates never enter directional
+history or certify a branch bound.
 
 A node query that makes pivots but stops on its work allowance before returning a
 point grows the adaptive request within its existing ceiling and remaining
@@ -960,6 +955,15 @@ owns headings, statuses and the lazy basis backend, and invalidates them on
 retirement even when close fails. `SimplexPricingState` owns Devex weights and
 `SimplexObservations` per-solve counters; `RevisedSimplex` coordinates allowance
 charging, recovery and publication.
+
+A retained optimal basis can provide advisory objective costs per unit of a source
+coordinate, using the model's minimization orientation, for at most two basic
+structural columns. Each inverse-transpose row reads
+current nonbasic orientations and reduced costs, then converts column and objective
+scales. The caller funds the complete bounded analysis before allocation or basis
+access. Changed models, unfinished solves, missing directions and cancellation
+retain unavailability. This read preserves the retained optimum and carries no
+bound, infeasibility or certificate authority.
 
 A retained numerical owner can expose a private solve cursor. It suspends between
 iterations, retaining the current phase, factors, artificial seats, pricing state

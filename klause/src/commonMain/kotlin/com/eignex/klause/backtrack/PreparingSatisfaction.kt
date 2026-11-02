@@ -43,7 +43,15 @@ internal class PreparingSatisfaction(
     private val propagationWork: Long get() = session?.work ?: preparation?.work ?: 0L
 
     init {
-        sink.search.learning = { session?.learnedLifecycle() ?: preparation?.learning() ?: emptyMap() }
+        sink.search.learning = {
+            val live = session
+            val preparing = preparation
+            when {
+                live != null -> live.learnedLifecycle() + live.preparationStatistics()
+                preparing != null -> preparing.learning() + preparing.preparationStatistics()
+                else -> emptyMap()
+            }
+        }
         sink.search.propagationWork = { propagationWork }
         sink.search.rootPropagationWork = { session?.rootWork ?: preparation?.work ?: 0L }
         sink.search.propagationNanos = { session?.propagationNanos ?: preparation?.propagationNanos ?: 0L }
