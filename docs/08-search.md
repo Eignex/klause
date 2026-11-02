@@ -418,6 +418,12 @@ decision atom cascades use the same pending completion and retract with their pi
 Bulk allocations, immutable domain construction and non-interruptible propagator
 internals remain atomic.
 
+XOR propagation scans distinct coordinates with their occurrence parity and retains
+the constant contributed by negative literals. Scans and premise construction poll
+the containing finite token and charge visits. Interrupted local scratch is
+discarded before a pin can use it. Completed conflict premises belong to the
+propagation state, so shared projections retain no mutable failure context.
+
 Cumulative propagation polls the same token during task, edge-window and start-bound
 scans. Its window scratch belongs to one fire, so interruption discards that scratch
 and leaves the factor queued to rebuild it. Completed deductions and their historical
