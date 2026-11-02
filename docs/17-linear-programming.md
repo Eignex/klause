@@ -496,8 +496,12 @@ nearest the point independently for each continuous coordinate. One-sided coordi
 retain their stated side; unavailable finite distances retain the ordinary choice.
 Aggregate proposal retention requires the same finite normalized violation used
 by point selection, so satisfied proposals leave room for later separating pairs.
-Before retaining a separating proposal, a nonseparating or declined seed with a
-completed residual can follow one opposite-sign continuous incidence path through
+When nearest-endpoint rounding does not separate, a completed continuous residual
+can retry the same aggregate with the ordinary stated sides that retain negative
+residuals. Identical side choices require no additional derivation. Each attempt
+replays its exact source-bound premises and shares the generation's work,
+allocation, cancellation and proof limits. A nonseparating seed or continuation
+tries these sides before following one opposite-sign continuous incidence path through
 at most four distinct original source rows. Exact positive rescaling preserves
 the earlier combination while cancelling the next coordinate. Singleton continuous bounds remain part of mixed
 rounding. Residual capture, continuation scans, term weights, failed derivations

@@ -348,6 +348,88 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `a farther stated endpoint should separate when nearer aggregate rounding does not`() {
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        for (sign in listOf(-1L, 1L)) {
+            val source = SourceProofContext(scope, setOf(x, y, real, otherReal), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(5),
+                    otherReal to BigFraction.ONE, real to BigFraction.ofLong(4L * sign)), BigFraction.ofLong(7))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(5),
+                    otherReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                    if (sign < 0) BigFraction.ZERO else BigFraction.ONE)),
+                "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE),
+                    if (sign < 0) BigFraction.ONE else BigFraction.ZERO)),
+            ))
+
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 2),
+                point = mapOf(x to 1.88, y to 0.0, real to -0.6 * sign, otherReal to 0.0))
+
+            val cut = cuts.single()
+            assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE,
+                real to BigFraction.ofLong(4L * sign) * BigFraction.ofLong(3).reciprocal()), BigFraction.ONE),
+                cut.inequality)
+            assertEquals(setOf(0, 1, if (sign < 0) 2 else 3), cut.owners)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+    }
+
+    @Test
+    fun `interrupting a preferred endpoint derivation should withhold its partial proposal`() {
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(x, y, real, otherReal), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(5),
+                otherReal to BigFraction.ONE, real to BigFraction.ofLong(-4)), BigFraction.ofLong(7))),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(5),
+                otherReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ONE)),
+        ))
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, _ -> if (name == "AggregatePreferredSideAttempts") stopped = true },
+            maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 2),
+            point = mapOf(x to 1.88, y to 0.0, real to 0.6, otherReal to 0.0))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+    }
+
+    @Test
+    fun `an alternative endpoint should share the spent generation work allowance`() {
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(x, y, real, otherReal), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(5),
+                otherReal to BigFraction.ONE, real to BigFraction.ofLong(-4)), BigFraction.ofLong(7))),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(5),
+                otherReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ONE)),
+        ))
+        val point = mapOf(x to 1.88, y to 0.0, real to 0.6, otherReal to 0.0)
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 2)
+        var work = 0L
+        var beforePreferred = 0L
+        LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never, observe = { name, count ->
+            if (name == "AggregateWork") work += count
+            if (name == "AggregatePreferredSideAttempts") beforePreferred = work
+        }, maximumCandidates = 1, limits = limits, point = point)
+        assertTrue(beforePreferred > 0L)
+        val observations = mutableMapOf<String, Long>()
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            maximumCandidates = 1, limits = limits.copy(work = beforePreferred), point = point)
+
+        assertTrue(cuts.isEmpty())
+        assertTrue((observations["AggregateWork"] ?: 0L) <= beforePreferred)
+    }
+
+
+    @Test
     fun `point separation should cancel a third source row within its configured row limit`() {
         val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val source = SourceProofContext(scope, setOf(x, y, real, otherReal), linkedMapOf(

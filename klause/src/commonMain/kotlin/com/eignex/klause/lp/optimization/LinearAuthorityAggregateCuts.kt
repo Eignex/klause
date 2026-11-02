@@ -113,8 +113,8 @@ internal object LinearAuthorityAggregateCuts {
             }
             val selectedBounds = if (point == null) bounds else pointBounds(bounds, point, meter, observe)
             val extension = if (point == null) null else {
-                meter.reserve(1L, 192L)
-                PairExtension(incidence, selectedBounds, point, meter, attemptLimits, derivedStop, observe)
+                meter.reserve(1L, 256L)
+                PairExtension(incidence, selectedBounds, bounds, point, meter, attemptLimits, derivedStop, observe)
             }
             for (row in rows) {
                 meter.reserve(1L)
@@ -241,6 +241,7 @@ internal object LinearAuthorityAggregateCuts {
     private class PairExtension(
         private val incidence: Map<Pair<SourceCoordinate, Boolean>, List<ProbeRow>>,
         private val continuousBounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
+        private val preferredBounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
         private val point: Map<SourceCoordinate, Double>,
         private val meter: AggregateMeter,
         private val limits: LinearAuthorityAggregateLimits,
@@ -276,13 +277,40 @@ internal object LinearAuthorityAggregateCuts {
             return null
         }
 
+        private fun preferredSide(
+            terms: List<LinearAuthorityAggregateTerm>, snapshots: List<Map<SourceCoordinate, BigFraction>>,
+        ): LinearAuthorityCut? {
+            if (continuousBounds.size == preferredBounds.size) return null
+            val aggregate = capture.coefficients ?: return null
+            meter.reserve(aggregate.size.toLong(), 128L)
+            val different = aggregate.any { (id, value) ->
+                if (id.kind != SourceCoordinate.Kind.Real) false else {
+                    meter.reserve(1L, 64L)
+                    val preferred = id to (value > BigFraction.ZERO)
+                    preferred in preferredBounds && preferred !in continuousBounds
+                }
+            }
+            if (!different) return null
+            attempted = true
+            observe("AggregatePreferredSideAttempts", 1L)
+            val cut = deriveWithCoefficients(terms, cancellation, charge, limits, allowMixed = true,
+                continuousBounds = preferredBounds, coefficientSnapshots = snapshots, capture = capture)
+                ?: return null
+            if (separates(cut, point, meter, observe) != true) return null
+            observe("AggregatePreferredSideEligible", 1L)
+            return cut
+        }
+
         fun extend(
             seed: List<LinearAuthorityAggregateTerm>, seedCoefficients: List<Map<SourceCoordinate, BigFraction>>,
         ): LinearAuthorityCut? {
             attempted = false
             var terms = seed
             var snapshots = seedCoefficients
-            while (terms.size < minOf(4, limits.rows)) {
+            while (true) {
+                val preferred = preferredSide(terms, snapshots)
+                if (preferred != null) return preferred
+                if (terms.size >= minOf(4, limits.rows)) return null
                 val aggregate = capture.coefficients ?: return null
                 val next = continuation(terms, aggregate) ?: return null
                 val existingScale = meter.number(if (next.pivot > BigFraction.ZERO) next.pivot
@@ -305,7 +333,6 @@ internal object LinearAuthorityAggregateCuts {
                     return cut
                 }
             }
-            return null
         }
     }
 
