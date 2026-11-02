@@ -85,12 +85,15 @@ internal object RewriteStructureProfile {
             val objective = parsed.objective?.toLinearObjective()
             val budget = PresolveBudget(presolveWork)
             val preparationStop = budget.orSpent(stop or Cancellation.after(presolveMillis.milliseconds))
-            val invocation = SourceSetup.prepare(SourceSetupRequest(
-                if (parsed.definedVars.isEmpty()) SourceAttachment(parsed.problem, parsed.definitionHints)
-                else SourceAttachment(parsed.problem, parsed.definedVars, emptyList(), parsed.definitionHints),
-                if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
-                FiniteEngine.MIXED, objective = objective, cancellation = preparationStop,
-            ))
+            val invocation = SourcePreparationScope(preparationStop, stop).use { sourceStop ->
+                SourceSetup.prepare(SourceSetupRequest(
+                    if (parsed.definedVars.isEmpty()) SourceAttachment(parsed.problem, parsed.definitionHints)
+                    else SourceAttachment(parsed.problem, parsed.definedVars, emptyList(), parsed.definitionHints),
+                    if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
+                    FiniteEngine.MIXED, objective = objective, cancellation = sourceStop,
+                    boundCancellation = preparationStop,
+                ))
+            }
             val plan = requireNotNull(invocation.preparedPlan)
             val prepared = FinitePipeline.prepare(FinitePipelineRequest(
                 requireNotNull(plan.model), FiniteEngine.MIXED, objective,
@@ -163,6 +166,7 @@ internal object RewriteStructureProfile {
                 put("maintainedInputEdges", inputEdges)
                 put("maintainedMaxDepth", maxDepth)
                 put("definitionGraphCaptured", captureDefinitions)
+                put("hintsAvailable", hints != null)
                 put("functionalObjectiveAvailable", hints?.let { get(it, "Objective") } != null)
                 for (table in listOf(false, true)) {
                     val relaxation = MpsLpAdmission.rootRelaxation(prepared.problem, prepared.objective,
@@ -190,6 +194,22 @@ internal object RewriteStructureProfile {
             })
             println(report)
             check(!diagnosticStop())
+        }
+    }
+
+    private class SourcePreparationScope(
+        private var preparation: Cancellation?,
+        private val containing: Cancellation,
+    ) : Cancellation, AutoCloseable {
+        override fun isCancelled(): Boolean = (preparation ?: containing)()
+
+        override fun deadline() = (preparation ?: containing).deadline()
+
+        override fun workMeter() = preparation?.workMeter()
+
+        override fun close() {
+            // Retained source invocations borrow the phase ledger only during source setup.
+            preparation = null
         }
     }
 

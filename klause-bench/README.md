@@ -467,6 +467,9 @@ Optional `definitionGraph=true` captures the constructed hint network's ordered
 wrapper types, outputs and integer/Boolean read sets. It permits at most 4,096 nodes
 and 65,536 input entries within the same diagnostic allowance. Expression payloads,
 evaluations and working-state identity remain outside this view.
+Source setup borrows its phase deadline and ledger until setup returns; retained
+hint construction observes the arm deadline and consumer-diagnostic allowance.
+The report distinguishes unavailable hints from an observed empty network.
 Optional `seed`, `timeoutMillis`, `presolveMillis`, `presolveWork` and `impactLimit`
 match recorded preparation controls. Defaults are seed 3, a 30-second arm deadline,
 five million preparation units and impact limit 65,536. The phase deadline is at
