@@ -9,6 +9,7 @@ import com.eignex.klause.util.SharingMemoryObservation
 internal class RootProbeImplications {
     private var pending = 0L
     private var reason = -1
+    private var reasonGeneration = -1L
     private var reasonChecked = false
     private var lookup = 0
     private var history: LongArray? = null
@@ -42,6 +43,7 @@ internal class RootProbeImplications {
         val value = session.boolValue(variable) ?: return
         pending = key(Lit.negate(literal), Lit.make(variable, value))
         reason = session.explanationState.boolReason[variable]
+        reasonGeneration = session.learnedRetirementGeneration
         reasonChecked = false
         lookup = 0
         budget.note("ImplicationCandidates")
@@ -58,7 +60,11 @@ internal class RootProbeImplications {
         }
         if (!reasonChecked) {
             if (budget.remaining < REASON_WORK || !budget.visit()) return false
-            val literals = if (reason >= 0) session.rootClauseLiterals(reason, 2, includePermanent = true) else null
+            val currentReason = reason < session.problem.numFactors ||
+                reasonGeneration == session.learnedRetirementGeneration
+            val literals = if (reason >= 0 && currentReason) {
+                session.rootClauseLiterals(reason, 2, includePermanent = true)
+            } else null
             reasonChecked = true
             if (literals != null && literals.size == 2 && key(literals[0], literals[1]) == pending) {
                 budget.note("ImplicationDirect")
@@ -94,12 +100,13 @@ internal class RootProbeImplications {
     }
 
     fun releaseRetainedBuffers() {
-        clearPending()
         history = null
         historySize = 0
+        lookup = 0
     }
 
     fun reset() {
+        clearPending()
         releaseRetainedBuffers()
         admissions = 0
     }
@@ -115,6 +122,7 @@ internal class RootProbeImplications {
     private fun clearPending() {
         pending = 0L
         reason = -1
+        reasonGeneration = -1L
         reasonChecked = false
         lookup = 0
     }
@@ -134,6 +142,6 @@ internal class RootProbeImplications {
         private const val REASON_WORK = 5
         private const val ADMISSION_WORK = 8
         private const val HISTORY_BYTES = ADMISSION_LIMIT * Long.SIZE_BYTES * 1L
-        private const val BOOKKEEPING_BYTES = Long.SIZE_BYTES + 4L * Int.SIZE_BYTES + 1L
+        private const val BOOKKEEPING_BYTES = 2L * Long.SIZE_BYTES + 4L * Int.SIZE_BYTES + 1L
     }
 }

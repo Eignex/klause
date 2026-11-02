@@ -548,8 +548,8 @@ class RootInprocessingTest {
     @Test
     fun `optional buffer release should preserve the implication admission bound`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(1, 4),
-                intArrayOf(3, 5, 6)).bake(), nativeSat = native)
+            val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(3, 4),
+                intArrayOf(5, 6), intArrayOf(7, 0)).bake(), nativeSat = native)
             val pass = RootProbingPass()
             val stats = SearchStatsSink()
 
@@ -585,8 +585,15 @@ class RootInprocessingTest {
                 intArrayOf(3, 5, 6)).bake(), nativeSat = native)
             val pass = RootProbingPass()
 
-            pass.run(session, BacktrackParams(rootProbeBatch = 1, rootProbeWork = 1L), null)
+            var cancelled = false
+            val token = Cancellation {
+                if (session.decisionLevel > 0) cancelled = true
+                cancelled
+            }
 
+            pass.run(session, BacktrackParams(rootProbeBatch = 1, cancellation = token), null)
+
+            assertTrue(cancelled)
             assertEquals(0, session.learnedClauseCount)
             assertEquals(0, session.decisionLevel)
             assertFalse(pass.hasContinuation(session))
@@ -595,19 +602,57 @@ class RootInprocessingTest {
     }
 
     @Test
-    fun `discarding buffers should cancel an unadmitted consistent implication`() {
-        for ((native, release) in listOf(false to false, false to true, true to false, true to true)) {
+    fun `reset should cancel an unadmitted consistent implication`() {
+        for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
             val pass = RootProbingPass()
             val params = BacktrackParams(rootProbeBatch = 1, inprocessingProbeWork = 256L)
             pass.run(session, params, null, containingWork = 63L)
             assertTrue(pass.hasContinuation(session))
 
-            if (release) pass.releaseRetainedBuffers() else pass.reset()
+            pass.reset()
             pass.continueAtRoot(session, params, null, containingWork = 256L)
 
             assertFalse(pass.hasContinuation(session))
             assertEquals(0, session.learnedClauseCount)
+        }
+    }
+
+    @Test
+    fun `buffer release should retain an unadmitted consistent implication`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 1, inprocessingProbeWork = 256L)
+            val stats = SearchStatsSink()
+            pass.run(session, params, stats, containingWork = 63L)
+            assertTrue(pass.hasContinuation(session))
+            val probes = stats.inprocessProbes
+
+            pass.releaseRetainedBuffers()
+            pass.continueAtRoot(session, params, stats, containingWork = 256L)
+
+            assertEquals(probes, stats.inprocessProbes)
+            assertEquals(1, session.learnedClauseCount)
+            assertFalse(pass.hasContinuation(session))
+        }
+    }
+
+    @Test
+    fun `buffer release should preserve progress toward a later failed literal`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(8, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(14, 2)), Clause(intArrayOf(14, 3)),
+            ))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+            val pass = RootProbingPass()
+
+            repeat(16) {
+                pass.run(session, BacktrackParams(rootProbeBatch = 1), null)
+                pass.releaseRetainedBuffers()
+            }
+
+            assertEquals(true, session.boolValue(7))
         }
     }
 
