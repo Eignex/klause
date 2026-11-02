@@ -159,6 +159,16 @@ claiming a sibling branch, causal benefit or source validation. Compaction remap
 identities and retirement releases them; saturation and untracked admissions remain
 explicit. Completed totals survive session retirement.
 
+Unit-coefficient binary rows also report their complemented cardinality limit and
+their width and limit under the session's root bounds at admission. Fixed binary
+endpoints established at level zero supplement the prepared root box; branch pins
+cannot enter that box. These observations keep the row's signed guard condition.
+At-most-one, all-false and single-clause shapes have separate, overlapping counts:
+an at-most-one row with more than two terms needs several binary clauses. Short
+delivered reasons therefore establish neither root reduction nor single-clause
+equivalence. Missing root bounds and arithmetic overflow withhold classification.
+The recorder retains only fixed counter arrays, without root domains or row payloads.
+
 The controls preserve propagation order, containing cancellation, historical trail
 boundaries and reason authority. Eager support observations occur at reason delivery;
 their construction cost is included in factor propagation. Lazy reconstruction and

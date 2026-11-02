@@ -169,7 +169,12 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     val rows = learned.integerRows ?: LearnedIntegerRows().also { learned.integerRows = it; work++ }
     work += rows.admissionWork
     rows.admit(propagator)
-    arithmeticLearningTrace?.integerCensus?.admit(factor, row, problem.intBounds)
+    arithmeticLearningTrace?.integerCensus?.admit(factor, row, problem.intBounds) { variable ->
+        val domain = intDomains[variable]
+        // A fixed binary endpoint cannot be tightened further and lose its root level.
+        if ((domain.min == 1L && intMinLevel[variable] == 0) ||
+            (domain.max == 0L && intMaxLevel[variable] == 0)) domain else rootDomains[variable]
+    }
     arithmeticLearningTrace?.stored(factor, "integer")
     learned.lbds.add(lbd)
     learned.permanent.add(0)

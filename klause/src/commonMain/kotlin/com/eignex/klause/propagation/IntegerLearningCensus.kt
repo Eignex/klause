@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.SharingMemoryObservation
@@ -24,6 +25,7 @@ internal class IntegerLearningCensus {
     private val widths = LongArray(INTEGER_LEARNING_TERMS + 1)
     private val clauseWidths = LongArray(INTEGER_LEARNING_TERMS + 1)
     private val rows = HashMap<Int, Entry>()
+    private val unitShapes = IntegerUnitShapeCensus()
     private var undo = 0L
     private var maxCoefficient = 0L
     private var saturated = false
@@ -35,7 +37,7 @@ internal class IntegerLearningCensus {
         if (values[index] == Long.MAX_VALUE) saturated = true else values[index]++
     }
 
-    fun admit(factor: Int, row: IntegerConflictRow, bounds: IntBounds) {
+    fun admit(factor: Int, row: IntegerConflictRow, bounds: IntBounds, rootDomain: ((Int) -> IntDomain?)? = null) {
         increment(Count.Admitted)
         increment(widths, row.variables.size)
         if (row.guard != Lit.NONE) increment(Count.Guarded)
@@ -47,6 +49,7 @@ internal class IntegerLearningCensus {
                 bounds.lower(it) != 0L || bounds.upper(it) != 1L }) return
         increment(Count.Binary)
         classifyBinary(row)
+        unitShapes.admit(row, rootDomain)
     }
 
     private fun classifyBinary(row: IntegerConflictRow) {
@@ -153,6 +156,7 @@ internal class IntegerLearningCensus {
     }
 
     fun snapshot(): Map<String, Long> = buildMap {
+        putAll(unitShapes.snapshot())
         for (count in Count.entries) put("learningIntegerCensus" + count.name, counts[count.ordinal])
         for (width in widths.indices) put("learningIntegerCensusWidth" + width, widths[width])
         for (width in clauseWidths.indices) put("learningIntegerCensusClauseWidth" + width, clauseWidths[width])
@@ -162,6 +166,7 @@ internal class IntegerLearningCensus {
     }
 
     fun sharingMemory(sample: SharingMemoryObservation) {
+        unitShapes.sharingMemory(sample)
         sample.owned(counts, counts.size.toLong() * Long.SIZE_BYTES, false)
         sample.owned(widths, widths.size.toLong() * Long.SIZE_BYTES, false)
         sample.owned(clauseWidths, clauseWidths.size.toLong() * Long.SIZE_BYTES, false)
