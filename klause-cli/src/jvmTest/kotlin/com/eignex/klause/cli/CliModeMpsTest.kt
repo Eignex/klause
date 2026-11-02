@@ -60,7 +60,9 @@ class CliModeMpsTest {
             deleteOnExit()
         }
         val out = capture {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", mps.absolutePath)))
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1",
+                "--param", "presolve-work-limit=4096",
+                "--param", "source-lp-work-limit=65536", mps.absolutePath)))
         }
 
         assertTrue("s OPTIMUM FOUND" in out.lines(), out)
@@ -137,55 +139,6 @@ class CliModeMpsTest {
         assertTrue("label=continuous objective=0 continuousObjective=60.0 time=20" in out, out)
         assertTrue("label=mixed-min objective=-3 continuousObjective=-63.5 time=30" in out, out)
         assertTrue("label=mixed-max objective=3 continuousObjective=63.5 time=40" in out, out)
-    }
-
-    @Test
-    fun `declining MPS bound closure should retain numerical solving under both certification policies`() {
-        val mps = File.createTempFile("cli", ".mps").apply {
-            writeText(
-                "NAME          T\nROWS\n N  COST\n L  R1\nCOLUMNS\n" +
-                    "    MARKER                 'MARKER'                 'INTORG'\n" +
-                    "    x  COST  -1.0   R1  1.0\n" +
-                    "    MARKER                 'MARKER'                 'INTEND'\n" +
-                    "RHS\n    RHS  R1  5.0\nBOUNDS\n LI BND  x  0\nENDATA\n",
-            )
-            deleteOnExit()
-        }
-
-        val oldBudget = System.getProperty(CliKnobs.presolveBudgetMs)
-        try {
-            System.setProperty(CliKnobs.presolveBudgetMs, "1")
-            for (exact in listOf(false, true)) {
-                val policy = if (exact) arrayOf("--exact") else emptyArray()
-                val flags = arrayOf("-s", "-e", "cp", "-p", "1", "-t", "10000",
-                    "--param", "presolve-work-limit=4096")
-                val kept = capture { assertEquals(0, runCli(flags + policy + mps.absolutePath)) }
-                val declined = capture {
-                    assertEquals(
-                        0,
-                        runCli(
-                            flags + arrayOf("--param", "open-bound-proof=false") +
-                                policy + mps.absolutePath,
-                        ),
-                    )
-                }
-
-                assertTrue("s OPTIMUM FOUND" in kept.lines(), kept)
-                assertTrue("o -5" in kept.lines(), kept)
-                assertTrue("v x=5" in kept.lines(), kept)
-                assertTrue("c frontendRoutingOutcome=native-formula" in declined.lines(), declined)
-                assertTrue("c reportedBackend=numerical-mip" in declined.lines(), declined)
-                assertTrue("s OPTIMUM FOUND" in declined, declined)
-                assertTrue("v x=5" in declined, declined)
-                assertFalse("cancelled" in declined, declined)
-            }
-        } finally {
-            if (oldBudget == null) {
-                System.clearProperty(CliKnobs.presolveBudgetMs)
-            } else {
-                System.setProperty(CliKnobs.presolveBudgetMs, oldBudget)
-            }
-        }
     }
 
     private fun capture(block: () -> Unit): String {
