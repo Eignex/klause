@@ -138,6 +138,10 @@ Bounds prune only against checked incumbents, and pruning supplies no learned
 clause. Exhaustion publishes an optimum, unattained limit or refutation; a stopped
 branch withholds these claims.
 
+Resumable traversal forwards its containing deadline and work meter to the shared
+session. Clause maintenance and arithmetic completion debit that same cumulative
+allowance across slices.
+
 A real relaxation's unboundedness does not establish integer unboundedness. A
 fixed-integer unbounded completion is sufficient, as is, with affine constraints, a
 checked quadratic recession ray scaled to integer direction coordinates from an

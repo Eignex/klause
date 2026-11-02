@@ -257,9 +257,23 @@ single-lane charged-work schedule (`portfolio-work`). It defaults to false;
 traffic/work/use counters remain inexpensive. Each sample has separate
 `sharing-memory-work` and `sharing-memory-scratch` limits (32,768 visits and
 4,096 deduplication entries by default; zero is permitted).
+Posting protection checks stop after finding a required owner; the full allocated
+capacity remains counted.
 Clause accounting is reported per worker in `ArmSchedule.sharing.clauses` and as
 `clause*` fields in the CLI arm record. Pool payload belongs to one shared pool;
-primitive payload arrays are counted once by identity. Private clause-reference,
+primitive payload arrays are counted once by identity. A private owner of disjoint
+arrays can report one stable pool identity with total bytes and its cumulative protected
+portion. Pool reports cover the same immutable owned region within an observation;
+upgrading protection preserves the owned-byte total. A weaker report retains earlier
+protection. Reference allocations retain their own protection granularity.
+Owner deduplication follows platform identity-hash bits through a binary tree.
+Each owner uses one scratch entry; lookups charge each visited node and never invoke
+user equality or hash functions. After the 32 hash bits, identity collisions follow
+a charged chain. Protected-ID sets use value equality; copied-reason and payload
+sets use identity. These sets follow the same hash-bit traversal and fund one
+scratch entry per retained value. New owners fund their allocation before publication. Exhausting
+either observation limit leaves a partial sample without complete byte totals.
+Private clause-reference,
 global-flag, origin, key and payload-owner array capacities are modeled separately.
 Sources with no integer variables use a Boolean-only pool whose payload-owner
 index reserves one array per clause; atom payloads are declined. Empty export
@@ -341,8 +355,13 @@ and shared observers use one allowance and one scratch-entry cap; `accountingWor
 reports that work in the containing propagation allowance. `uses` drains the existing origin-use counter once,
 sharing that observation with contribution rewards: it counts consumption once per
 reduction window, rather than exports or checks. The retained peer-import and
-consumed-peer-import counts describe distinct live objects, so repeated window
-uses do not imply additional imports.
+consumed-peer-import counts describe retained objects, including logically retired
+slots awaiting compaction, so repeated window uses do not imply additional imports.
+Native totals update at admission, first consumption and physical removal; ownership
+snapshots read these totals without traversing the policy columns. When every
+retained Native row is permanent, payload-page word totals also determine the
+protected payload capacity without a row scan. Mixed stores inspect protection
+for their retained payload rows.
 
 Learned-store observations include native arena capacity or general clause/PB/row
 payload, policy columns, session watch/queue capacity, pending attachments and
@@ -350,7 +369,12 @@ active or historical antecedent arrays and their factor/position indexes, undo
 journal and bound/hole histories. Typed event subscriptions/deltas, pending atom
 channeling and root-source retirement indexes retain their own observations. The immutable source clause arena belongs to the prepared problem and is shared
 across workers. Session watch capacity includes base
-watches and cannot be added to a separate base-watch estimate. Reason arrays are
+watches and cannot be added to a separate base-watch estimate. Native posting pages
+report their allocated primitive capacity as one private pool per literal. A protected
+posting protects its page and the containing directory, while unrelated pages remain
+outside the protected floor. `sessionWatchEntries` includes retained stale postings;
+`sessionWatchCapacityBytes` includes posting headers and allocated page capacity.
+Native posting reference slots count allocated directory capacity and its owning link. Reason arrays are
 identity-deduplicated within their observation, including saved integer/atom reasons
 and lazy markers/memo results; they can alias learned payload. Reference-slot
 counts describe live entries unless explicitly named capacity. Object headers,

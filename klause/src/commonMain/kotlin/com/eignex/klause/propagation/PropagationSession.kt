@@ -116,6 +116,10 @@ class PropagationSession private constructor(
 
     internal fun releaseRetainedState() {
         val owner = retainedState ?: return
+        if (owner.selectedRetirements.hasRequests) {
+            owner.work += 8L
+            owner.selectedRetirements.release()
+        }
         retiredWork = owner.work
         retiredPropagationNanos = owner.propagationNanos
         retiredPropagationCount = owner.propagations
@@ -264,10 +268,12 @@ class PropagationSession private constructor(
         lbd: Int,
         origin: Int,
         sourceReplacement: Boolean,
+        ownedLiterals: Boolean = false,
     ): PropagationResult = withRequiredInprocessingCancellation {
         check(canSimplifyRoot)
         val base = state.undoTop
-        val fid = state.addLearnedClause(clause, lbd, permanent = sourceReplacement, origin = origin)
+        val fid = state.addLearnedClause(clause, lbd, permanent = sourceReplacement, origin = origin,
+            ownedLiterals = ownedLiterals)
         state.factorAttribution?.let {
             if (state.nativeEngine == null) it.admit(state.factorAt(fid))
             else if (it.admissionFamilies != 0) it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)
@@ -654,6 +660,10 @@ class PropagationSession private constructor(
      */
     fun seed(assumptions: Assumptions): PropagationResult {
         bakedUnsat?.let { return it }
+        if (state.selectedRetirements.hasRequests) {
+            state.work += 8L
+            state.selectedRetirements.resetScope()
+        }
         state.undoTo(requireNotNull(levelStates[0]))
         if (levelTop > 1) levelTruncateAfterRoot()
         clearPins()
@@ -1112,27 +1122,129 @@ class PropagationSession private constructor(
     /** Request a bounded learned-store compaction, preserving permanent, live and historical reasons.
      * Cancelled or unfunded preparation leaves the generation intact. */
     fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
+        compactLearnedClauses(65_536L, 1_048_576L, { false }, keep)
+    }
+
+    internal fun compactLearnedClauses(
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+        keep: (learnedIndex: Int, lbd: Int) -> Boolean,
+    ): Boolean {
         val before = learnedClauseCount
-        state.forgetLearnedClauses(cancelled = { cancelRequested }, keep = keep)
+        val published = state.forgetLearnedClauses(maxWork, maxScratchBytes,
+            cancelled = { cancelRequested || cancelled() }, keep = keep)
         if (learnedClauseCount != before) learnedClauseRevision++
+        return published
     }
 
     internal val activeLearnedClauseCount: Int
         get() = retainedState?.let { it.nativeEngine?.activeCount ?: it.learned.activeCount } ?: 0
+
+    internal val learnedRetirementGeneration: Long
+        get() = retainedState?.selectedRetirements?.generation ?: -1L
+
+    internal val hasLearnedRetirementContinuation: Boolean
+        get() = retainedState?.selectedRetirements?.hasContinuation == true
+
+    internal fun queueLearnedRetirement(
+        index: Int,
+        expectedGeneration: Long,
+        maxWork: Long,
+        maxScratchBytes: Long,
+        maxRetainedBytes: Long,
+        cancelled: () -> Boolean,
+    ): LearnedRetirementResult {
+        require(maxWork >= 0L && maxScratchBytes >= 0L && maxRetainedBytes >= 0L)
+        val owner = retainedState ?: return LearnedRetirementResult(LearnedRetirementStatus.ScopeReleased)
+        if (decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot || inprocessingRootPending) {
+            return LearnedRetirementResult(LearnedRetirementStatus.Deferred)
+        }
+        return owner.selectedRetirements.capture(index, expectedGeneration,
+            selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled), maxRetainedBytes,
+            owner::validateSelectedLearnedRetirement, owner::learnedAdmissionKey)
+    }
+
+    internal fun authorizeLearnedRetirement(
+        handle: LearnedRetirementHandle,
+        publicationComplete: Boolean,
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+    ): LearnedRetirementResult {
+        val owner = retainedState ?: return LearnedRetirementResult(LearnedRetirementStatus.ScopeReleased, handle)
+        if (!publicationComplete || decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot ||
+            inprocessingRootPending
+        ) {
+            return LearnedRetirementResult(LearnedRetirementStatus.Deferred, handle)
+        }
+        return owner.selectedRetirements.authorize(handle,
+            selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled))
+    }
+
+    internal fun cancelLearnedRetirement(
+        handle: LearnedRetirementHandle,
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+    ): LearnedRetirementResult {
+        val owner = retainedState ?: return LearnedRetirementResult(LearnedRetirementStatus.ScopeReleased, handle)
+        return owner.selectedRetirements.cancel(handle,
+            selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled))
+    }
+
+    internal fun acknowledgeLearnedRetirement(
+        handle: LearnedRetirementHandle,
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+    ): LearnedRetirementResult {
+        val owner = retainedState ?: return LearnedRetirementResult(LearnedRetirementStatus.ScopeReleased, handle)
+        return owner.selectedRetirements.acknowledge(handle,
+            selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled))
+    }
+
+    internal fun advanceLearnedRetirements(
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+        publicationPending: Boolean,
+    ): LearnedRetirementResult {
+        val owner = retainedState ?: return LearnedRetirementResult(LearnedRetirementStatus.ScopeReleased)
+        if (publicationPending || decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot || inprocessingRootPending) {
+            return LearnedRetirementResult(LearnedRetirementStatus.Deferred)
+        }
+        val result = owner.selectedRetirements.advance(
+            selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled), owner::retireSelectedLearnedClause)
+        if (result.status == LearnedRetirementStatus.Retired) learnedClauseRevision++
+        return result
+    }
+
+    private fun selectedRetirementBudget(
+        owner: PropagationState,
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+    ): ReclamationPreparation {
+        require(maxWork >= 0L && maxScratchBytes >= 0L)
+        return ReclamationPreparation(maxWork, maxScratchBytes, { cancelRequested || cancelled() }) { owner.work += it }
+    }
 
     internal fun maintainCapWindow(
         cap: Int,
         maxWork: Long,
         maxScratchBytes: Long,
         cancelled: () -> Boolean,
+        canDrop: (Int) -> Boolean = { true },
         keep: (Int) -> Boolean,
     ): Int {
         if (retainedState == null || decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot ||
             inprocessingRootPending
         ) return 0
         val retired = state.nativeEngine?.maintainCapWindow(cap, maxWork, maxScratchBytes,
-            { cancelRequested || cancelled() }, keep)
-            ?: state.maintainGeneralCapWindow(cap, maxWork, maxScratchBytes, { cancelRequested || cancelled() }, keep)
+            { cancelRequested || cancelled() }, canDrop, keep)
+            ?: state.maintainGeneralCapWindow(cap, maxWork, maxScratchBytes,
+                { cancelRequested || cancelled() }, canDrop, keep)
         if (retired > 0) learnedClauseRevision++
         return retired
     }
