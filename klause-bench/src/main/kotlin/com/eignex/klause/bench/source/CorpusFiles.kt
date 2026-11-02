@@ -31,10 +31,11 @@ internal object CorpusFiles {
     private const val PROGRESS_EVERY = 1000
 
     private const val DIGEST_BUFFER_BYTES = 1 shl 16
+    private const val MAX_STAGING_BUFFER_BYTES = 1 shl 16
 
     /** Where [withPlainFile] stages decompressed copies: under the cache root (so inside `$HOME`, which a
      *  colima docker VM mounts) and outside every collection directory, so discovery never walks into it. */
-    private val stagingRoot: File get() = File(CorpusFetcher.cacheRoot, ".plain")
+    val stagingRoot: File get() = File(CorpusFetcher.cacheRoot, ".plain")
 
     fun isCompressed(file: File): Boolean = file.name.endsWith(SUFFIX)
 
@@ -60,9 +61,11 @@ internal object CorpusFiles {
         checkActive: () -> Unit = {},
         onCleanup: (Long) -> Unit = {},
         stagingDirectory: File = stagingRoot,
+        bufferBytes: Int = DEFAULT_BUFFER_SIZE,
         nanoTime: () -> Long = System::nanoTime,
         block: (File) -> T,
     ): T {
+        require(bufferBytes in 1..MAX_STAGING_BUFFER_BYTES)
         fun checkStaging() {
             if (Thread.currentThread().isInterrupted) throw InterruptedIOException("Source staging interrupted")
             checkActive()
@@ -78,7 +81,7 @@ internal object CorpusFiles {
             val plain = File(it.file, plainPath(file.name))
             open(file).use { input ->
                 plain.outputStream().use { output ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    val buffer = ByteArray(bufferBytes)
                     while (true) {
                         checkStaging()
                         val count = input.read(buffer)

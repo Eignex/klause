@@ -3,6 +3,7 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.bench.source.SourceStaging
 import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 
 import org.junit.jupiter.api.BeforeAll
@@ -34,8 +35,9 @@ class SolverInvocationTest {
         }
     }
 
-    @Test
-    fun `compressed input reaches the solver as original bytes and is retired afterwards`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["cache", "temporary"])
+    fun `compressed input reaches the solver as original bytes and is retired afterwards`(target: String) {
         val root = Files.createTempDirectory("solver-source").toFile()
         try {
             val body = "p cnf 2 1\n1 -2 0\n"
@@ -43,9 +45,12 @@ class SolverInvocationTest {
             ZstdOutputStreamNoFinalizer(packed.outputStream(), 1).use { it.write(body.toByteArray()) }
             var staged: File? = null
 
-            val result = SolverInvocation.withSourceInput(packed, Budget(10_000)) { plain, remaining ->
+            val staging = SourceStaging.parse(target)
+            val result = SolverInvocation.withSourceInput(packed, Budget(10_000), staging = staging) {
+                    plain, remaining ->
                 staged = plain
                 assertEquals(body, plain.readText())
+                assertEquals(staging.directory.canonicalFile, plain.parentFile.parentFile.canonicalFile)
                 assertTrue(remaining.timeoutMillis in 1..10_000)
                 SolverInvocation.Result(true, null, 2L, proven = false,
                     stats = emptyMap(), rawOutput = "sat", command = plain.path, elapsedMs = 3L)
