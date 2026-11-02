@@ -49,6 +49,9 @@ private fun PropagationState.generalCapPolicy(
             return learned.store[index, GeneralLearnedRows.BOOL_REASONS] > 0 ||
                 learned.store[index, GeneralLearnedRows.STAGES] and 4 != 0
         }
+        if (!budget.supports(learned.size.toLong(), learned.size.toLong())) {
+            return hasLearnedReason(baseFactorCount + index, budget)
+        }
         val snapshot = references ?: run {
             budget.visit(learned.size.toLong(), learned.size.toLong())
             BooleanArray(learned.size).also {
@@ -91,4 +94,28 @@ private fun PropagationState.generalCapPolicy(
         learned.store.setPayload(index, null)
         return true
     }
+}
+
+private fun PropagationState.hasLearnedReason(factor: Int, budget: ReclamationPreparation): Boolean {
+    if (containsLearnedReason(boolReason, factor, budget) || containsLearnedReason(intMinReason, factor, budget) ||
+        containsLearnedReason(intMaxReason, factor, budget)
+    ) return true
+    for (index in 0 until undo.size) {
+        budget.visit()
+        if (undo.tag[index] == 1) {
+            budget.visit(2L)
+            if (undo.minReason[index] == factor || undo.maxReason[index] == factor) return true
+        }
+    }
+    budget.visit(2L)
+    val stage = learned.store[factor - baseFactorCount, GeneralLearnedRows.STAGES]
+    return stage and 4 != 0 && stage and 2 == 0
+}
+
+private fun containsLearnedReason(reasons: IntArray, factor: Int, budget: ReclamationPreparation): Boolean {
+    for (reason in reasons) {
+        budget.visit()
+        if (reason == factor) return true
+    }
+    return false
 }

@@ -900,7 +900,9 @@ class PropagationState private constructor(
         // Base factors' int-event subscriptions are prebuilt into the CSR at [IntEventMachinery]
         // construction; only mid-life factors (fid past the base count) subscribe here, into the overflow.
         if (intEvents.on && fid >= baseFactorCount) {
-            propagator.initialIntEventWatches?.let { for (packed in it) work += intEvents.subscribeMidlife(packed, fid) }
+            propagator.initialIntEventWatches?.let { events ->
+                for (packed in events) work += intEvents.subscribeMidlife(packed, fid)
+            }
         }
         if (intEvents.deltaOn && propagator.consumesIntEventDelta) {
             intEvents.dirtyVars[fid] = IntArrayList()

@@ -347,7 +347,10 @@ Boolean undo stores no historical factor handle. Admissions classify these claus
 and full compaction remaps their counters with their factor IDs. Their windows use
 those counts and pending-attachment flags without a store-sized protection mask.
 Other constraints use a funded snapshot covering current Boolean and integer reasons,
-saved integer bounds and pending first assertions. Eligible retired factors become inert
+saved integer bounds and pending first assertions. When its store-sized allocation
+exceeds the slice allowance, a candidate checks those owners directly without scratch.
+Each owner visit is funded; an interrupted check retains the candidate.
+Eligible retired factors become inert
 stable-ID slots; propagation queues and active readers skip them. Integer rows own
 their position in a dense reference cache, allowing retirement to unlink a row
 without scanning other rows. Cache capacity and position fields remain part of

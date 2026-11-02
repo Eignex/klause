@@ -173,4 +173,35 @@ class GeneralIntegerReclamationTest {
         session.releaseRetainedState()
         assertEquals(com.eignex.klause.util.SharingMemoryStatus.STALE, session.sharingMemory().status)
     }
+
+    @Test
+    fun `small scratch retirement should preserve current and historical integer reasons`() {
+        val session = PropagationSession(Problem(6, 2, Array(2) { IntDomain(0, 10) },
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
+        val first = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 8), useLo = true))
+        val second = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 6), useLo = true))
+        val unused = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(1),
+            longArrayOf(1), intArrayOf(1), LinearOp.LE, 10), useLo = true))
+        session.addLearnedIntegerRow(first, 9)
+        session.addLearnedIntegerRow(second, 9)
+        session.addLearnedIntegerRow(unused, 9)
+        val floor = Clause(intArrayOf(8, 10))
+        repeat(64) { session.addLearnedClause(floor, 2, permanent = true) }
+        val state = session.explanationState
+        val reason = state.intMaxReason[0]
+
+        repeat(64) {
+            val work = session.work
+            session.maintainCapWindow(0, 256L, 64L, { false }) { false }
+            assertTrue(session.work - work <= 256L)
+        }
+
+        assertEquals(66, session.activeLearnedClauseCount)
+        assertEquals(2, assertNotNull(state.learned.integerRows).size)
+        assertEquals(reason, state.intMaxReason[0])
+        assertEquals(IntDomain(0, 6), session.intDomain(0))
+    }
+
 }
