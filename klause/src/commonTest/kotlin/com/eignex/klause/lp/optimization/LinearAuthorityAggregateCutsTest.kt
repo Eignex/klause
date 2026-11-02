@@ -783,6 +783,81 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `singleton inspection reuse should leave production allowance for a later disjoint row`() {
+        val groups = (0 until 3).map { group ->
+            (0 until 25).map { index -> SourceCoordinate(SourceCoordinate.Kind.Integer, group * 25 + index + 2) }
+        }
+        val premises = linkedMapOf<String, SourcePremise>()
+        groups.forEachIndexed { group, ids ->
+            premises["row $group"] = SourcePremise(SourceInequality(ids.associateWith { BigFraction.ONE },
+                BigFraction.ofLong(25)))
+            ids.forEachIndexed { index, id ->
+                premises["l$group $index"] = SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO))
+                premises["u$group $index"] = SourcePremise(SourceInequality(mapOf(id to BigFraction.ONE),
+                    BigFraction.ONE))
+            }
+        }
+        premises["useful"] = SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+            y to BigFraction.ofLong(3)), BigFraction.ofLong(3)))
+        premises["lower y"] = SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        val coordinates = (groups.flatten() + listOf(x, y)).toMutableSet()
+        repeat(700) { index ->
+            val id = SourceCoordinate(SourceCoordinate.Kind.Integer, index + 77)
+            coordinates += id
+            premises["extra $index"] = SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE),
+                BigFraction.ZERO))
+        }
+        val source = SourceProofContext(scope, coordinates, premises)
+        val point = groups.flatten().associateWith { 0.0 } + mapOf(x to 0.75, y to 0.5)
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            limits = limits, point = point)
+
+        val cut = assertNotNull(cuts.find { it.owners == setOf(153, 154) })
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
+            cut.inequality)
+        assertEquals(1L, observations["AggregateIntegerBoundSnapshotComplete"])
+        assertTrue((observations["AggregateIntegerBoundSnapshotReuseAttempts"] ?: 0L) >= 3L)
+        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `cancelling a reused singleton scan should withhold the unfinished recipe`() {
+        val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val source = SourceProofContext(scope, setOf(x, y, a, b), linkedMapOf(
+            "empty" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
+                BigFraction.ofLong(2))),
+            "lower x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "lower y" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "useful" to SourcePremise(SourceInequality(mapOf(a to BigFraction.ofLong(2),
+                b to BigFraction.ofLong(3)), BigFraction.ofLong(3))),
+            "lower b" to SourcePremise(SourceInequality(mapOf(b to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val observations = mutableMapOf<String, Long>()
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, count ->
+                observations[name] = (observations[name] ?: 0L) + count
+                if (name == "AggregateIntegerBoundSnapshotReuseAttempts") stopped = true
+            }, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            point = mapOf(x to 0.0, y to 0.0, a to 0.75, b to 0.5))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+        assertEquals(1L, observations["AggregateIntegerBoundScanComplete"])
+        assertNull(observations["AggregateIntegerRowEligible"])
+    }
+
+    @Test
     fun `an integral unit coefficient should preserve the checked rounded row for either sign`() {
         for (sign in listOf(-1L, 1L)) {
             val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(

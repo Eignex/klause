@@ -429,6 +429,7 @@ internal object LinearAuthorityAggregateCuts {
             val bounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
         )
         private var completed: MutableList<CompletedBatch>? = null
+        private var singletonCoefficients: Array<Pair<SourceCoordinate, BigFraction>?>? = null
 
         fun prepare(
             coefficients: Map<SourceCoordinate, BigFraction>, meter: AggregateMeter,
@@ -450,12 +451,25 @@ internal object LinearAuthorityAggregateCuts {
             observe("AggregateIntegerBoundScanAttempts", 1L)
             meter.reserve(1L, 128L)
             val pending = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
+            val saved = singletonCoefficients
+            val snapshot = saved ?: run {
+                meter.reserve(premises.size.toLong(), 128L + premises.size * 8L)
+                arrayOfNulls<Pair<SourceCoordinate, BigFraction>>(premises.size)
+            }
+            if (saved != null) observe("AggregateIntegerBoundSnapshotReuseAttempts", 1L)
             for ((owner, entry) in premises.entries.withIndex()) {
                 meter.reserve(1L)
                 val inequality = entry.value.inequality
-                if (inequality.supportSize != 1) continue
-                meter.reserve(1L, 64L)
-                val (id, coefficient) = checkNotNull(inequality.singleCoefficient())
+                val singleton = if (saved != null) {
+                    saved[owner] ?: continue
+                } else {
+                    if (inequality.supportSize != 1) continue
+                    meter.reserve(1L, 64L)
+                    val inspected = checkNotNull(inequality.singleCoefficient())
+                    snapshot[owner] = inspected
+                    inspected
+                }
+                val (id, coefficient) = singleton
                 if (id.kind != SourceCoordinate.Kind.Integer || id !in missing) continue
                 meter.reserve(1L, 64L)
                 val side = id to (coefficient > BigFraction.ZERO)
@@ -470,6 +484,10 @@ internal object LinearAuthorityAggregateCuts {
             val batches = completed ?: ArrayList<CompletedBatch>()
             batches.add(CompletedBatch(missing, pending))
             completed = batches
+            if (saved == null) {
+                singletonCoefficients = snapshot
+                observe("AggregateIntegerBoundSnapshotComplete", 1L)
+            }
             observe("AggregateIntegerBoundCoordinates", missing.size.toLong())
             observe("AggregateIntegerBoundScanComplete", 1L)
         }

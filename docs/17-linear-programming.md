@@ -504,8 +504,12 @@ immutable-generation index supplies stated integer endpoints to both recipe kind
 It reuses the funded premise snapshot and retains endpoints only for coordinates
 requested by completed aggregates. A fully funded scan records both present and
 missing sides; interrupted scans publish no partial cache. Singleton coefficient
-inspection reads an immutable pair without copying a coefficient map. Scanning,
-lookup storage and cache extension debit the requesting recipe's allowance.
+inspection reads an immutable pair without copying a coefficient map. The first
+funded scan captures those pairs in a source-ordered array, including singleton
+rows outside the requested coordinates. Its initialization and storage debit the
+requesting recipe's allowance, and it publishes only with a completed endpoint
+batch. Later scans charge each indexed probe and reuse the captured pairs.
+Endpoint storage and cache extension debit the same requesting allowance.
 Completed batches retain their funded coordinate sets and endpoint maps without
 copying prior batches. Each lookup charges every batch probe, and batch publication
 reserves its object and list growth after the source scan completes. Failed scans
