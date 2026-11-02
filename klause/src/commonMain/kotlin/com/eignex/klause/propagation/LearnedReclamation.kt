@@ -76,7 +76,7 @@ private fun PropagationState.sweepRetiredOwners(budget: ReclamationPreparation) 
     nativeEngine?.sweepRetiredWatches(budget)
     sweepRetiredGeneralIntegerRows(budget)
     sweepRetiredGeneralMetadata(budget)
-    if (nativeEngine == null) trimLearnedCandidates(learned.capCandidates, budget)
+    if (nativeEngine == null && learned.retiredCount > 0) trimLearnedCandidates(learned.capCandidates, budget)
     if (!incremental && nativeEngine == null) initializedWatches?.pos?.releaseReservations(budget)
     sweepRetiredGeneralWatches(budget)
 }

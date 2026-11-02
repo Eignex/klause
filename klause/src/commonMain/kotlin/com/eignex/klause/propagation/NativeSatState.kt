@@ -169,7 +169,7 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         metadata.sweepDirectory(budget)
         learnedPayloads.sweepDirectory(budget)
-        trimLearnedCandidates(capCandidates, budget)
+        if (retiredCount > 0) trimLearnedCandidates(capCandidates, budget)
     }
 
     private fun enqueueRetiredMetadata(index: Int) {
@@ -389,7 +389,7 @@ internal class NativeSatState(private val state: PropagationState) {
         metadata.sharingMemory(sample, protectedRows) { index ->
             metadata[index, NativeLearnedMetadata.PERMANENT] == 1 || sample.contains(protected, index)
         }
-        sample.owned(state.learned, 52L, protectedRows)
+        sample.owned(state.learned, 44L, protectedRows)
         state.learned.initializedStore?.let { rows ->
             metadataBytes += rows.primitiveBytes
             rows.sharingMemory(sample, protectedRows) { false }
@@ -418,7 +418,8 @@ internal class NativeSatState(private val state: PropagationState) {
             watchPostings += entries.size
             watchBytes += entries.sharingMemory(sample) { entry ->
                 val handle = entry.toInt()
-                handle < baseCount || metadata[handle - baseCount, NativeLearnedMetadata.PERMANENT] == 1 ||
+                handle < baseCount || permanentCount == learnedCount ||
+                    metadata[handle - baseCount, NativeLearnedMetadata.PERMANENT] == 1 ||
                     sample.contains(protected, handle - baseCount)
             }
         }
@@ -430,7 +431,7 @@ internal class NativeSatState(private val state: PropagationState) {
             "learnedPayloadReferenceCapacity" to learnedPayloads.referenceCapacity,
             "learnedPayloadDirectoryCapacity" to learnedPayloads.directoryCapacity,
             "learnedMetadataCapacityBytes" to metadataBytes,
-            "learnedCleanupCursorCapacityBytes" to 28L,
+            "learnedCleanupCursorCapacityBytes" to 20L,
             "learnedCapIndexStateBytes" to capRanking.modeledBytes + state.learned.capRanking.modeledBytes,
             "sessionWatchEntries" to watchPostings,
             "sessionWatchCapacityBytes" to watchBytes +

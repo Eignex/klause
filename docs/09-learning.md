@@ -548,7 +548,9 @@ a whole-store selection buffer. Permanent clauses, protected reasons and policy 
 reduce the heap quota. A pending eviction that gains protection also consumes that
 quota before the next heap step. Mid rows
 survive their demotion window, and classification clears survivor reuse flags.
-An unfunded next-row transaction suspends the cursor for a later grant.
+An unfunded next-row transaction suspends the cursor for a later grant. A completed
+row classification retains its pending admission while heap comparisons wait;
+cleanup comparisons finish before publishing their candidate mutations.
 Current or historical reasons can retain additional rows above the soft cap.
 Native post-undo replay protects its queued clause handles and learned units without
 freezing unrelated retirement. Incomplete trail propagation, conflicts and root
@@ -569,7 +571,9 @@ per page. General pages include propagator and mutable-payload references. The f
 page belongs directly to its owner; later pages use a bounded sparse index. Fixed
 startup ownership belongs to state preparation, and admissions fund subsequent
 growth and index insertion. Lookups debit the active maintenance or observation
-grant, or the containing propagation ledger; a cached page avoids repeated lookups.
+grant, or the containing propagation ledger. A fixed-size page cache avoids repeated
+lookups during ranking; its reference allocation belongs to fixed preparation and
+modeled ownership. Header unlinking clears its cache slot before releasing the page.
 A page queue and per-page retirement masks resume row release without scanning
 permanent rows or looking up another page. Retained import/use counters survive
 released metadata. Empty arrays release within their row transaction; empty headers
