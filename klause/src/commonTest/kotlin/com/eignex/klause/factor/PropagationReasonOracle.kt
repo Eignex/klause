@@ -48,8 +48,16 @@ object PropagationReasonOracle {
             for (k in values(before[v])) {
                 if (k in after) continue
                 val (recorded, holds) = when {
-                    k < after.min -> state.intMinAntecedents[v] to { s: Sample -> s.ints[v] >= after.min }
-                    k > after.max -> state.intMaxAntecedents[v] to { s: Sample -> s.ints[v] <= after.max }
+                    k < after.min -> {
+                        if (k != before[v].min) continue
+                        state.intMinAntecedents[v] to { s: Sample -> s.ints[v] >= after.min }
+                    }
+
+                    k > after.max -> {
+                        if (k != before[v].max) continue
+                        state.intMaxAntecedents[v] to { s: Sample -> s.ints[v] <= after.max }
+                    }
+
                     else -> state.holeReasonFor(v, k) to { s: Sample -> s.ints[v] != k }
                 }
                 val reason = state.reasonOf(recorded)
