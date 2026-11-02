@@ -111,7 +111,7 @@ class RootInprocessingTest {
 
             assertEquals(listOf(4), partners)
             assertEquals(2L, stats.snapshot().learning.getValue("inprocessRootCandidates"))
-            assertTrue(session.work - work < 64L)
+            assertTrue(session.work - work < 64L, "native=$native work=${session.work - work}")
         }
     }
 

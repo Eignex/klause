@@ -282,8 +282,9 @@ shared read-only across portfolio workers.
 
 Propagation is two-watched-literal unit propagation over a trail pointer, without
 per-factor dispatch or integer order literals, reading a per-session truth byte per
-variable. Learned clauses own copied literal arrays in fixed-size reference pages,
-with a wrapping replacement-scan cursor per clause. Empty pages release their arrays
+variable. Learned clauses own copied literal arrays in bounded reference pages,
+with a wrapping replacement-scan cursor per clause. Each page grows from one slot
+to its fixed maximum; full compaction trims a partial last page. Empty pages release their arrays
 without changing live clause handles. Reductions compact their handle and reference columns without
 copying surviving literal arrays. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
