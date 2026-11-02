@@ -30,7 +30,11 @@ internal object ComparisonProvenance {
         runtimeOptions = build.runtimeOptions - "KLAUSE_CLI_OPTS" - "KLAUSE_CLI_PREFLIGHT_OPTS",
     ).fingerprint
 
-    internal fun capture(location: File, classpath: List<File>, cacheDirectory: Path? = WorkspaceChecksums.directory()): Identities {
+    internal fun capture(
+        location: File,
+        classpath: List<File>,
+        cacheDirectory: Path? = WorkspaceChecksums.directory(),
+    ): Identities {
         val root = location.canonicalFile
         return WorkspaceChecksums(root.toPath(), cacheDirectory).use { checksums ->
             val classes = if (root.isDirectory) {
@@ -40,7 +44,9 @@ internal object ComparisonProvenance {
                 JarFile(root).use { jar ->
                     jar.entries().asSequence()
                         .filter { !it.isDirectory && it.name.startsWith(PREFIX) && it.name.endsWith(".class") }
-                        .map { entry -> entry.name to jar.getInputStream(entry).use { sha256(it.readBytes()) } }.toList()
+                        .map { entry ->
+                            entry.name to jar.getInputStream(entry).use { sha256(it.readBytes()) }
+                        }.toList()
                 }
             }
             require(classes.isNotEmpty()) { "Bench harness classes unavailable at $location" }

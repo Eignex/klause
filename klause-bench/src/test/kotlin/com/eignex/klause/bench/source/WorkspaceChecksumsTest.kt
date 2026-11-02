@@ -3,6 +3,7 @@ package com.eignex.klause.bench.source
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import java.io.IOException
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.Path
@@ -23,7 +24,10 @@ class WorkspaceChecksumsTest {
         val cache = root.resolve("cache")
         var reads = 0
         repeat(2) {
-            WorkspaceChecksums(root, cache, hash = { reads++; digest(it) }).use { checksums ->
+            WorkspaceChecksums(root, cache, hash = { source ->
+            reads++
+            digest(source)
+        }).use { checksums ->
                 assertEquals(digest(file), checksums.checksum(file))
             }
         }
@@ -46,7 +50,10 @@ class WorkspaceChecksumsTest {
             Files.move(replacement, file, REPLACE_EXISTING)
         }
         var reads = 0
-        WorkspaceChecksums(root, cache, hash = { reads++; digest(it) }).use {
+        WorkspaceChecksums(root, cache, hash = { source ->
+            reads++
+            digest(source)
+        }).use {
             assertEquals(digest(file), it.checksum(file))
         }
         assertEquals(1, reads)
@@ -58,10 +65,15 @@ class WorkspaceChecksumsTest {
         val file = Files.writeString(root.resolve("input"), "original")
         val cache = root.resolve("cache")
         WorkspaceChecksums(root, cache).use { it.checksum(file) }
-        val receipt = Files.list(cache).use { files -> files.filter { it.toString().endsWith(".bin") }.findFirst().orElseThrow() }
+        val receipt = Files.list(cache).use { files ->
+            files.filter { it.toString().endsWith(".bin") }.findFirst().orElseThrow()
+        }
         Files.write(receipt, if (failure == "corrupt") byteArrayOf(1) else ByteArray(1024 * 1024 + 1))
         var reads = 0
-        WorkspaceChecksums(root, cache, hash = { reads++; digest(it) }).use {
+        WorkspaceChecksums(root, cache, hash = { source ->
+            reads++
+            digest(source)
+        }).use {
             assertEquals(digest(file), it.checksum(file))
         }
         assertEquals(1, reads)
@@ -73,7 +85,10 @@ class WorkspaceChecksumsTest {
         val cache = root.resolve("cache")
         var reads = 0
         repeat(2) {
-            WorkspaceChecksums(root, cache, hash = { reads++; digest(it) }, reliable = { false }).use {
+            WorkspaceChecksums(root, cache, hash = { source ->
+                reads++
+                digest(source)
+            }, reliable = { _ -> false }).use {
                 assertEquals(digest(file), it.checksum(file))
             }
         }
@@ -103,8 +118,8 @@ class WorkspaceChecksumsTest {
     @Test
     fun `checksum failures retain their error rather than supplying a cache claim`(@TempDir root: Path) {
         val file = Files.writeString(root.resolve("input"), "original")
-        assertFailsWith<java.io.IOException> {
-            WorkspaceChecksums(root, root.resolve("cache"), hash = { throw java.io.IOException("read failed") }).use {
+        assertFailsWith<IOException> {
+            WorkspaceChecksums(root, root.resolve("cache"), hash = { throw IOException("read failed") }).use {
                 it.checksum(file)
             }
         }

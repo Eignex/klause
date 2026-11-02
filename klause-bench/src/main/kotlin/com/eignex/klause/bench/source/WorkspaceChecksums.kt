@@ -26,7 +26,10 @@ internal class WorkspaceChecksums(
         Files.getFileStore(it).type().lowercase() in setOf("apfs", "ext4", "xfs", "btrfs", "overlay", "tmpfs", "zfs")
     },
     private val open: (Path) -> FileChannel = { FileChannel.open(it, CREATE, WRITE, NOFOLLOW_LINKS) },
-    private val write: (Path, ByteArray) -> Unit = { path, bytes -> Files.write(path, bytes); Unit },
+    private val write: (Path, ByteArray) -> Unit = { path, bytes ->
+        Files.write(path, bytes)
+        Unit
+    },
 ) : AutoCloseable {
     private val identity = root.toRealPath().toString()
     private val device = try {
@@ -66,7 +69,11 @@ internal class WorkspaceChecksums(
             if (!writers.add(key)) return
             try {
                 open(key).use { channel ->
-                    val owner = try { channel.tryLock() } catch (_: OverlappingFileLockException) { null }
+                    val owner = try {
+                        channel.tryLock()
+                    } catch (_: OverlappingFileLockException) {
+                        null
+                    }
                     owner?.use {
                         val pending = key.resolveSibling("$slot.pending")
                         try {
@@ -87,7 +94,11 @@ internal class WorkspaceChecksums(
 
     private fun stamp(file: Path): Stamp? {
         return try {
-            val attributes = Files.readAttributes(file, "unix:dev,size,lastModifiedTime,ctime,fileKey,isRegularFile", NOFOLLOW_LINKS)
+            val attributes = Files.readAttributes(
+                file,
+                "unix:dev,size,lastModifiedTime,ctime,fileKey,isRegularFile",
+                NOFOLLOW_LINKS,
+            )
             if (attributes["isRegularFile"] != true || attributes["dev"] != device) return null
             val changed = attributes["ctime"]?.toString() ?: return null
             val key = attributes["fileKey"]?.toString() ?: return null
