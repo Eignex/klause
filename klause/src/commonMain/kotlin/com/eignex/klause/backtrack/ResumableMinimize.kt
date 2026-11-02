@@ -1287,7 +1287,8 @@ internal class ResumableMinimize(
             lpHints?.order(variable, values) ?: values
 
         override fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> =
-            lpHints?.orderAlternatives(variable, alternatives, allowBasis = false) ?: alternatives
+            lpHints?.orderAlternatives(variable, alternatives, allowBasis = false)
+                ?: alternatives
     }
 
     /** Refutes LP-dominated partial assignments through the shared frame stack. */
