@@ -4,7 +4,7 @@ plugins {
     id("com.eignex.cli") version "1.3.5"
 }
 
-tasks.named<org.gradle.api.tasks.testing.Test>("jvmTest") {
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     val recording = layout.buildDirectory.file("reports/tests/plain-jvm-profile/worker.jfr").get().asFile
     jvmArgs("-XX:FlightRecorderOptions=stackdepth=256", "-XX:StartFlightRecording=filename=" + recording.absolutePath + ",settings=profile,dumponexit=true")
     doFirst { recording.parentFile.mkdirs() }
