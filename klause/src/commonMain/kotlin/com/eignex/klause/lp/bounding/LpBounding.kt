@@ -1496,6 +1496,7 @@ private fun LpEngine.retainedRootLpRelaxationBound(
             if (attempt == null) {
                 val metrics = propagator.lastMetrics.copy(preparationOps = 0L)
                 observeRootWork(metrics, finished = !propagator.floatPaused)
+                observeSparsePausedProgress()
                 if (!propagator.floatPaused || metrics.workOps == 0L) {
                     observeStage("QUERY_DECLINED_${propagator.floatTermination?.name ?: "NO_TERMINATION"}")
                     return Double.NaN

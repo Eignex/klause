@@ -62,6 +62,12 @@ internal class LpScopedSolver(
         override val workScheduled: Boolean get() = floatInvocation.workScheduled()
     }
     val floatPaused: Boolean get() = pendingFloat != null
+    val pausedTrialProgress: Map<String, Long>
+        get() {
+            requireAvailable()
+            if (closed || pendingFloat == null) return emptyMap()
+            return solver?.trialProgress.orEmpty()
+        }
     val floatFundingStopped: Boolean get() = floatPaused &&
         (lastFloatTermination == LpFloatTermination.WORK || lastFloatTermination == LpFloatTermination.PIVOTS)
     private var closed = false

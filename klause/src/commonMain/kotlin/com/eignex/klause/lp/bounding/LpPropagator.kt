@@ -120,6 +120,7 @@ internal class LpPropagator(
     val metrics: LpScopedMetrics? get() = owner?.metrics
     val floatTermination get() = owner?.lastFloatTermination
     val floatPaused: Boolean get() = owner?.floatPaused == true
+    val pausedTrialProgress: Map<String, Long> get() = owner?.pausedTrialProgress.orEmpty()
 
     val primalGuidanceState: String get() = withOwner { it.primalGuidanceState } ?: "ABSENT_OWNER"
 

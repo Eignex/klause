@@ -522,6 +522,7 @@ private fun LpEngine.solveRetainedPrimalRelaxation(
         val attempt = propagator.solveFloat(token = token, queryAllowance = {
             minOf(rootPrimalWorkBudget(), retainedRootRemainingWork()).coerceAtLeast(1L)
         })
+        if (attempt == null) observeSparsePausedProgress()
         val result = attempt?.second
         val termination = propagator.floatTermination
         outcome = if (result?.optimal == true) "RETAINED_OPTIMAL" else {

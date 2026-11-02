@@ -522,6 +522,20 @@ internal class LpEngine(
         if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial + solver.trialProgress
     }
 
+    internal fun observeSparsePausedProgress() {
+        if (!sparseTrialActive) return
+        val progress = propagator.pausedTrialProgress
+        if (progress.isEmpty()) return
+        val previous = sink.lp.sparseTrial
+        sink.lp.sparseTrial = buildMap {
+            putAll(previous)
+            for ((key, value) in progress) {
+                val field = "Paused$key"
+                put(field, maxOf(previous[field] ?: 0L, value))
+            }
+        }
+    }
+
     internal fun rootCertificationObserver(): LpCertificationObserver {
         val observer = sink.lp.certificationObserver(LpRoute.ROOT)
         if (!retainedRootEnabled) return observer

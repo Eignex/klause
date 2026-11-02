@@ -951,6 +951,11 @@ infeasibility separately for boxed dual, ordinary dual, primal feasibility and
 primal objective phases. It counts degenerate steps, flips and priced columns;
 factor-policy metrics identify rebuild triggers. These observations carry no
 coordinate, bound or infeasibility authority.
+Retained sparse consumers publish maxima of bounded trace snapshots at cursor pauses
+under separate `Paused` fields. Phase flags identify the last sampled phases in
+those snapshots; a capped trace need not describe the latest iteration. Maxima can
+come from different consultations or workers and do not form a trajectory.
+Reading a snapshot neither advances the cursor nor constructs a numerical owner.
 The owner rejects another solve or authority adoption while that cursor is live;
 closing it unwinds the suspended operation and retires its factors. Synchronous
 calls consume the same operation without suspension.

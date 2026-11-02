@@ -330,6 +330,49 @@ class LpScopedSolverTest {
     }
 
     @Test
+    fun `reading paused progress does not prepare a numerical owner`() {
+        val factory = RecordingLpEngineFactory()
+        LpScopedSolver(LpExactState(lowerBoundModel()), context = LpSolveContext(factory)).use { owner ->
+
+            val progress = owner.pausedTrialProgress
+
+            assertTrue(progress.isEmpty())
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
+
+    @Test
+    fun `paused numerical progress is observable without advancing the cursor`() {
+        LpScopedSolver(LpExactState(lowerBoundModel()),
+            pricing = LpPricingOptions(basisEntryLimit = 100_000L)).use { owner ->
+            val allowance = LpFloatAllowance(100_000L, 100)
+            assertNull(owner.advanceFloat(1L, allowance))
+            assertNull(owner.advanceFloat(1L, allowance))
+            val before = owner.lastMetrics
+
+            val progress = owner.pausedTrialProgress
+
+            assertTrue(owner.floatPaused)
+            assertTrue(progress.getValue("ProgressSamples") > 0L)
+            assertEquals(1L, progress["ProgressPhaseDUAL"])
+            assertEquals(before, owner.lastMetrics)
+            assertNull(owner.lastResult)
+        }
+    }
+
+    @Test
+    fun `completed numerical solves withhold paused progress`() {
+        LpScopedSolver(LpExactState(lowerBoundModel()),
+            pricing = LpPricingOptions(basisEntryLimit = 100_000L)).use { owner ->
+            assertNotNull(owner.solveFloat())
+
+            val progress = owner.pausedTrialProgress
+
+            assertTrue(progress.isEmpty())
+        }
+    }
+
+    @Test
     fun `checkpointed floating work should match uninterrupted work without publishing a paused result`() {
         val model = lowerBoundModel()
         val expected = LpScopedSolver(LpExactState(model)).use { owner ->
