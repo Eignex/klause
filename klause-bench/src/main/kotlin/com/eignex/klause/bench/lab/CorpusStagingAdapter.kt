@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.lab
 
+import com.eignex.klause.bench.profile.CorpusStagingControls
 import com.eignex.klause.bench.profile.CorpusStagingProfile
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchCli
@@ -29,9 +30,11 @@ internal object CorpusStagingSuite : BenchSuite {
     override fun describe() = BenchDescriptor("corpus-staging", "Source IO diagnostics without solver execution")
 
     override fun plan(request: BenchRequest): List<BenchCase> {
-        require(request.parameters.keys - "order" == setOf("inputs", "timeout-ms"))
-        val order = request.parameters["order"] ?: "forward"
-        require(order in setOf("forward", "reverse"))
+        require(request.parameters.keys - setOf("order", "staging-target", "staging-buffer-kib") ==
+            setOf("inputs", "timeout-ms"))
+        val controls = CorpusStagingControls(request.parameters["order"] ?: "forward",
+            request.parameters["staging-target"] ?: "cache",
+            (request.parameters["staging-buffer-kib"] ?: "8").toInt())
         val budget = request.parameters.getValue("timeout-ms").toLong().also { require(it in 1..10_000) }
         val inputs = BenchProtocol.json.decodeFromString<List<FrozenStagingInput>>(
             request.parameters.getValue("inputs"),
@@ -40,9 +43,11 @@ internal object CorpusStagingSuite : BenchSuite {
         return inputs.map { input ->
             require(input.suite.isNotBlank() && input.problem.isNotBlank() && input.path.endsWith(".zst"))
             require(input.plainSha256.matches(Regex("[a-f0-9]{64}")))
-            BenchCase("${input.suite}/${input.problem}/staging/$order",
+            val variant = "${controls.order}/${controls.stagingTarget}/${controls.bufferKiB}"
+            BenchCase("${input.suite}/${input.problem}/staging/$variant",
                 parameters = mapOf("timeout-ms" to budget.toString(),
-                    "plain-sha256" to input.plainSha256, "order" to order),
+                    "plain-sha256" to input.plainSha256, "order" to controls.order,
+                    "staging-target" to controls.stagingTarget, "staging-buffer-kib" to controls.bufferKiB.toString()),
                 resources = BenchResources(1, 4096, 280),
                 inputs = listOf(BenchInput(input.path, BenchInputRoot.CORPUS, "model", input.packedSha256)),
                 attributes = mapOf("suite" to input.suite, "problem" to input.problem, "format" to input.format,
@@ -63,7 +68,8 @@ internal object CorpusStagingSuite : BenchSuite {
                 out,
                 case.parameters.getValue("timeout-ms").toLong(),
                 expectedHash = case.parameters.getValue("plain-sha256"),
-                order = case.parameters.getValue("order"),
+                controls = CorpusStagingControls(case.parameters.getValue("order"),
+                    case.parameters.getValue("staging-target"), case.parameters.getValue("staging-buffer-kib").toInt()),
             )
         }.exceptionOrNull()
         return BenchResult(case.id, if (failure == null) BenchStatus.SUCCESS else BenchStatus.FAILED,

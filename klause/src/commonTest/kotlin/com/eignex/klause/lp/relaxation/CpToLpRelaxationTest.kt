@@ -21,12 +21,52 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CpToLpRelaxationTest {
+    @Test
+    fun `completed assembly reports no discarded work`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+        ))
+        var discardCalls = 0
+
+        CpToLpRelaxation(problem, null).build(RootDomains(problem), emptyList(), Cancellation.Never) {
+            discardCalls++
+        }
+
+        assertEquals(0, discardCalls)
+    }
+
+    @Test
+    fun `cancelled assembly reports discarded construction work`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 10) }, arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 5),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 5),
+        ))
+        val root = RootDomains(problem)
+        var cancelled = false
+        val domains = object : RelaxationDomains by root {
+            override fun intDomain(varId: Int): IntDomain = root.intDomain(varId).also {
+                if (varId == 2) cancelled = true
+            }
+        }
+        var discardedWork = 0L
+
+        assertFailsWith<LpAssemblyCancelled> {
+            CpToLpRelaxation(problem, null).build(domains, emptyList(), Cancellation { cancelled }) {
+                discardedWork += it
+            }
+        }
+
+        assertTrue(discardedWork > 0L)
+    }
+
     @Test
     fun `unrepresentable Boolean rows should decline through direct and delegated source views`() {
         val sources = listOf(

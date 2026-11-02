@@ -159,7 +159,8 @@ root; `-Dklause.*` properties are forwarded to the bench JVM.
 `list [suite]` lists suites or their problems. `select` emits JSON lines containing
 the `suite` and `problem` identities accepted by `solve-one`.
 `files=true` adds resolved model/data/include paths; `features=true` adds structural
-classification. Fetched suites download their corpus during resolution.
+classification. Fetched suites download their corpus during resolution, with progress
+on stderr so stdout retains selection JSON lines.
 
 | Selection filter | Purpose |
 |---|---|
@@ -196,6 +197,15 @@ on the lab worker, limiting method aggregation to 32 frames per sample and 100,0
 distinct methods. Capture truncation and the analysis depth limit are reported
 separately. Large captures must not be passed through profile arguments:
 the generated shell command is subject to the operating system's argument-size limit.
+Optional `events=true` also extracts the selected phase, IO, GC, CPU, compilation,
+contention and sampled-stack events into `harness-events.jsonl` on the worker,
+retaining the original recording scope in its header. Event timestamps establish
+order; file order need not be chronological. Recording thresholds and retention
+settings still apply. Event-type IDs, active settings and recording-loss/shutdown
+events are retained when present, so missing events need not be mistaken for disabled capture.
+The raw hash-checked capture and sampled summary survive
+event-extraction failure, with an error artifact and failed analysis result.
+Decoding and both analysis passes spend the containing case/job allowance; no solver runs.
 
 `param.ls-phase-times=true` also reports `lsObjectiveScoring.*`. `plain` and
 `functional` count the selected objective views; `maintained` counts index-preparation
@@ -436,11 +446,72 @@ catalog discovery. Each accepted row retains all modes on its one worker attempt
 An optional `order` request selects `forward` or `reverse`; both retain the same
 source comparison identity. Child samples and JVM launcher output use separate
 files.
+`staging-target=cache|temporary` selects the corpus cache or JVM temporary directory
+for diagnostic staging. Cross this control with both mode orders in paired rows.
+Parent identity preparation uses the cache for either target; its cost and filesystem
+remain separate from the trial destination. Trial samples retain the selected path,
+and filesystem identities describe the actual source, control and staging stores.
+`staging-buffer-kib=8|64` varies the diagnostic IO chunk size while keeping parent
+identity preparation and hash verification unchanged. The default is 8 KiB.
+Both sizes check the containing deadline between bounded reads and writes and
+retain partial-output cleanup; every sample records the actual byte count.
 This manifest omits MiniZinc provisioning and supports compressed file-backed
 sources only.
 IO event extracts are written after all trials on the lab worker. They retain
 recording-threshold omissions and overlapping event scopes explicitly; absent
 events do not establish zero IO cost.
+
+Ordinary JVM CLI solves accept `source-staging=cache|temporary` for compressed input copies;
+the default is `cache`. Decoding, staging and cleanup spend the same source allowance
+for either choice. The comparison record retains the policy, actual staging root
+and CLI arguments. Identity preparation, checking and reporting remain in case/job
+costs outside the source invocation; comparing invocation times alone omits them.
+`lab/frozen.json` executes the ordinary adapter over `cases`, a JSON array of retained
+single-model `BenchCase` templates for DIMACS, WCNF or MPS. Each template retains its
+packed corpus path/hash and declares `sourcePlainSha256` in its attributes. Planning
+expands ordinary engine/seed/repeat controls from at most eight templates into at
+most 128 cases without catalog discovery; execution
+verifies both identities and retains failed results. Request source validation with
+`bench.sourceValidation`, and retain full-cost same-machine paired rows for staging
+qualification. The diagnostic prehash uses 8 KiB reads; ordinary identity hashing
+uses 64 KiB reads. Both read the full plain source before the invocation timer, but
+they do not have identical IO call sizes.
+Native CLI and public-library adapters require cache staging.
+
+`source-staging=cli` passes the original compressed path to the JVM CLI's existing
+streaming decoder. Use `lab/compressed.json` for frozen-source comparisons; it declares
+the required `zstd` executable without adding a tool dependency to ordinary frozen runs.
+The decoder executable path and SHA-256 are retained; capturing that identity spends
+the source preparation allowance. Source hashing before invocation remains unchanged.
+`sourcePreparationMs` measures harness preparation for every delivery policy. In CLI
+delivery, decompression and decoder retirement belong to `sourceCliMs` and
+`sourceInvocationMs`; `sourceDecodeMs` is unavailable, rather than zero, and
+`sourceDecodeLocation=cli-frontend` identifies the scope. `sourceCleanupMs` measures
+only harness temporary-file cleanup. Frontend loading includes decompression and
+parsing and is not an additional disjoint cost. The CLI deadline starts before loading;
+its existing subprocess watchdog and descendant cleanup still apply. This control
+does not establish cooperative cancellation within a blocked CLI input read.
+Compare full invocation and case/job costs at the same allowance and retain the
+original-source checks, runtime/decoder identities and declared cache conditions.
+
+`harness-jfr=true` records the ordinary JVM CLI adapter's separate 512 MiB harness
+JVM into `report/harness.jfr`; the default is false. CLI `measurement` remains a
+separate control. The retained harness command and comparison controls identify
+the choice. Phase events cover input verification, preflight, model resolution,
+objective loading, source hashing, build provenance, source preparation, the CLI
+callback and cleanup. Pre-invocation phases stay outside the source allowance and
+inside the case/job ceilings. Recording work inside an invocation spends its
+unchanged allowance. An aborted preparation phase can include cleanup; nested
+phases and JVM events overlap and must not be added as disjoint costs.
+After harness exit, the outer adapter extracts selected phase, IO, GC, CPU,
+compilation, contention and sampled-stack events into `harness-events.jsonl` on
+the lab worker. Raw capture survives extraction failure with an error artifact.
+Profile thresholds, sampling, 32-frame extracts and the 128 MiB rolling recording
+limit can omit observations. IO call durations include scheduling and GC and do
+not identify device wait. Extraction and recording startup/dump costs remain in
+the containing case/job cost. Pair with `harness-jfr=false` at the same source,
+resource and allowance controls; an instrumented timing does not qualify a speedup.
+Native and public-library adapters reject this capture option.
 
 The planner accepts `selections`, a JSON-encoded list of independent selector maps,
 merged without duplicate catalog identities. Paired experiments use lab `configs`,
@@ -510,9 +581,10 @@ they do not execute search or validate a source outcome.
 
 ## Corpus and build identity
 
-Compressed file inputs are staged with the existing corpus decoder before CLI
-launch. `sourceDecodeMs` is deducted from the CLI deadline, and
-`sourceInvocationMs` includes decoding, invocation and staged-file retirement.
+Compressed file inputs are staged with the corpus decoder by default.
+`sourcePreparationMs` is deducted from the CLI deadline, and
+`sourceInvocationMs` includes preparation, invocation and staged-file retirement.
+CLI delivery streams compressed input during the invocation instead.
 `elapsedMs` and process witness times retain their subprocess scope. A spent
 preparation allowance supplies no solver verdict. Plain source digests and frozen
 compressed input identities remain available for independent checking.
@@ -529,7 +601,12 @@ See [MiniZinc setup](../klause-mzn-lib/README.md) for direct MiniZinc runs and t
 To reuse installed-build hashes across repeated bench processes, run
 `provenance out=/absolute/path/provenance.json` with the installed launcher and set
 `KLAUSE_BENCH_PROVENANCE` to that path. Regenerate it after rebuilding or restoring
-an installation. Without it, each process captures its own installed-build hashes.
+an installation. Ordinary lab processes also reuse per-file hashes in the existing
+private `LAB_WORKSPACE_CACHE`. Every use traverses its current input/provenance
+inventory and checks filesystem identity, inode, change time, modification time
+and size. Unsupported filesystems and unavailable receipts fall back to reading
+the bytes. The checksum cache uses at most 64 MiB including bounded replacement
+files; it adds no corpus, solver-result or MiniZinc identity-query cache.
 
 ## Weighted objective qualification
 
@@ -863,17 +940,6 @@ endpoint independently from the point. Its generation shares the original
 and any resulting owner replacement retain their containing source/recipe costs.
 `PointPreparationUnavailable` does not establish complete ineligibility.
 
-[9277](https://lab.eignex.com/jobs/9277) exercises both sources at `0af8492830`
-with ownership and root cuts toggled independently. With root cuts off, node
-queries reuse 4 and 27 child results; with cuts on, 2 and 3 cuts become active.
-All eight source witnesses pass the independent MIPLIB solchecker with zero
-violations and objectives 4 and 6. Witness checking does not certify optimality.
-Preparation takes 6.4 seconds through a verified build cache; the preceding
-[9275](https://lab.eignex.com/jobs/9275) takes 333 seconds to prepare and retains
-the unpinned controls that often finish in LP-free arms. Earlier admission,
-worker-loss and deadline failures retain no numerical outcome. These small
-controls support lifecycle consumption, without a timing or default-activation claim.
-
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
 ```sh
@@ -904,7 +970,7 @@ They require Linux x86_64; the lab supplies `LAB_WORKTREE` and `OUT`.
 |---|---|
 | `lp-lifecycle-profile.sh` | `mps-NAME [repeats] [jvm\|native\|both] [mode] [source-sha256 highs-revision]` |
 | `lp-lifecycle-qualification.sh` | `jvm\|native [repeats]` |
-| `lp-template-preparation-profile.sh` | `cover-2x3\|cover-3x3 [repeats] [steps]` |
+| `lp-template-preparation-profile.sh` | `cover-2x3\|cover-3x3\|miplib3-p0033\|miplib3-p0201 [repeats] [steps] [standalone\|retained]` |
 
 Lifecycle repeats range from one to five and default to three. Available modes are
 `lifecycle`, `claims`, `precision`, `checkpoint`, `checkpoint-feasibility` and
@@ -915,6 +981,8 @@ For JVM profiles, request `:klause:stageLpProfileJvm` as the lab build task.
 For Native profiles, request `:klause:linkLpProfileReleaseExecutableLinuxX64`.
 Prepare only the target used by a separate runtime job. Combined preparation links
 Native before staging JVM profiles. Template preparation profiles use the JVM task.
+
+MIPLIB template profiles also require `:klause-bench:installDist`.
 
 The qualification script runs Afiro, Adlittle, Avgas and Blending sequentially in
 `checkpoint-feasibility` mode, retaining one output directory per source. Profile
@@ -932,25 +1000,20 @@ trial or completed lab job alone establishes no useful deduction or source proof
 Keep physical RSS separate from modeled storage reservations. Source checking and
 all preparation, failed work and retirement belong to the containing comparison.
 
-[9172](https://lab.eignex.com/jobs/9172) compares default and trial at
-`bde182ce9b`, seed 3, ten seconds and one Linux/amd64 processor, with matching
-source and installed-build/runtime hashes. On `cap6000`, 18,243 nonzeros across
-2,171 rows and 6,000 columns admit the trial. Native exact certification accepts
-the root lower bound -2,451,537, and ordinary search exports it to the shared
-objective floor; the root owner is retained for subsequent queries. The trial
-finds no witness. The default witness at -2,442,801 passes the external MIPLIB
-solchecker; that receipt certifies the witness, not the trial's bound or optimality.
-On `rentacar`, the ordinary root-node query reaches 132 pivots and reduces sampled
-violated basics from 815 to 794 before its work stop, without a certificate.
-
-The trial reserves about 529 MiB and 669 MiB respectively; measured process RSS
-peaks at about 258 MiB and 462 MiB. Preparation includes 287 seconds of remote
-compilation, and the four-case job takes about 417 seconds. These single-repeat
-controls establish bounded execution and useful native bound consumption, with
-large-source no-yield evidence retained. They establish no whole-source speedup,
-independent source proof or basis for default activation. Earlier controls and
-negatives remain in [9134](https://lab.eignex.com/jobs/9134) and
-[9166](https://lab.eignex.com/jobs/9166).
+`ROOT_ADMISSION_ROOT` distinguishes duty-cycle skips, declined relaxers and queries.
+`ROOT_LAYOUT_PREPARATION_ROOT` records active cold construction and exact-state
+installation across private worker pauses. Its work and time include completed and
+discarded chunks; waiting between slices is excluded. A ready layout grants no bound.
+These are subsets of containing LP work; nested template costs are not additional totals.
+`ROOT_NUMERICAL_PREPARATION_ROOT` separates private numerical-owner readiness from
+layout readiness. Its work and time are included in layout preparation and ordinary
+LP construction totals; do not add these nested counters.
+`ROOT_QUERY_ROOT` records the requested component, sparse or standalone route and
+its work, cancellation, layout, numerical, certification or projection stop.
+A component request does not establish that a component owner was constructed;
+use the component lifecycle counters for that. Query work is the delta of charged
+LP operations and overlaps assembly, numerical and certificate counters. Its time
+also includes nested stages; do not add those observations together.
 
 ## Worker admission qualification
 
@@ -1276,9 +1339,11 @@ Staging checks the containing deadline and thread interruption between bounded
 read/write chunks and before invoking the CLI. It closes streams and removes
 partial files on cancellation, exhausted preparation, decoding failure and CLI
 failure. Cleanup runs even after the deadline and its cost remains charged.
-`sourceDecodeMs`, `sourceCliMs`, `sourceCleanupMs` and `sourceInvocationMs` retain
+`sourcePreparationMs`, `sourceCliMs`, `sourceCleanupMs` and `sourceInvocationMs` retain
 preparation, the invocation callback, retirement and the whole source scope on
 successful and failed attempts. `elapsedMs` remains the subprocess measurement.
+Staged inputs also retain preparation as `sourceDecodeMs`; CLI delivery leaves
+that separate decode measurement unavailable.
 An exhausted preparation records no solver verdict and zero CLI time. Plain inputs
 retain the same source ledger without decompression or temporary files. Staging cooperates between
 IO calls; a blocked filesystem call can delay observation of cancellation.

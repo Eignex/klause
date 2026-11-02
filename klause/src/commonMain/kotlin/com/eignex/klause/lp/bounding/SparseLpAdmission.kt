@@ -16,8 +16,9 @@ import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.forEachRationalColumn
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
@@ -32,9 +33,9 @@ internal const val SPARSE_LP_MAX_FACTOR_WORK = 8_000_000L
 internal const val SPARSE_LP_CHECKING_ALLOCATION = 16L * 1024L * 1024L
 private const val MAX_DIMENSION = 65_536L
 private const val MAX_ENTRIES = 1_000_000L
-private const val MAX_PREPARATION_WORK = 8_000_000L
+internal const val SPARSE_LP_MAX_PREPARATION_WORK = 8_000_000L
 
-internal class SparseLpAdmission(val metrics: Map<String, Long>) {
+internal class SparseLpAdmission(val metrics: Map<String, Long>, val sourceLayout: LpRelaxation? = null) {
     val admitted: Boolean get() = metrics["Admitted"] == 1L
     val work: Long get() = metrics["PreparationWork"] ?: 0L
 }
@@ -53,7 +54,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     var entries = 0L
     var inspected = 0L
     var assemblyWork = 0L
-    val preparationAllowance = minOf(MAX_PREPARATION_WORK, workAllowance.coerceAtLeast(0L))
+    val preparationAllowance = minOf(SPARSE_LP_MAX_PREPARATION_WORK, workAllowance.coerceAtLeast(0L))
     fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
         "PreparationWork" to maxOf(inspected, assemblyWork)))
     if ((problem as? BakedProblem)?.factorProjections?.builtInRelaxation == false) return decline("Projection")
@@ -82,20 +83,26 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     val reservation = sparseLpStorage(rows, columns, entries)
     if (reservation > SPARSE_LP_MAX_ALLOCATION) return decline("Storage")
     assemblyWork = 32L * (entries + rows + columns)
-    val model = try {
+    val relaxation = try {
         val relaxer = CpToLpRelaxation(problem, objective, deferred = true)
         relaxer.preparation().forEach {
             if (cancellation()) return decline("Cancelled")
             yield(Unit)
         }
-        relaxer.build(PropagationSession(problem, cancellation), cancellation = cancellation).model
+        relaxer.build(RootDomains(problem), cancellation = cancellation)
     } catch (_: LpAssemblyCancelled) {
         return decline("Cancelled")
     } catch (_: CheckedLongOverflowException) {
         return decline("ScalarWidth")
     }
     if (cancellation()) return decline("Cancelled")
-    return estimateSparseLpAdmission(model, assemblyWork, cancellation)
+    val model = relaxation.model
+    val estimate = estimateSparseLpAdmission(model, assemblyWork, cancellation)
+    val reusable = estimate.admitted && problem.numRealVars == 0 && relaxation.persistentEligible &&
+        !model.hasContinuous && relaxation.colVarId.all { it >= 0 } &&
+        model.extent() * LpNodeOverhead.BUILD <= assemblyWork
+    if (cancellation()) return decline("Cancelled")
+    return if (reusable) SparseLpAdmission(estimate.metrics, relaxation) else estimate
 }
 
 // Reserve capped factor storage, CSC, exact authority, temporary maps, transforms and scratch.
@@ -181,7 +188,7 @@ internal fun estimateSparseLpAdmission(
     val decline = when {
         scalarBits > 128 -> "ScalarWidth"
         storage > SPARSE_LP_MAX_ALLOCATION -> "Storage"
-        preparationWork > MAX_PREPARATION_WORK -> "PreparationWork"
+        preparationWork > SPARSE_LP_MAX_PREPARATION_WORK -> "PreparationWork"
         else -> null
     }
     return SparseLpAdmission(buildMap {

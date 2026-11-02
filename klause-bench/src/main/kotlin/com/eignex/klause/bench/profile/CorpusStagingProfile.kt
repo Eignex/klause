@@ -28,14 +28,16 @@ internal object CorpusStagingProfile {
             trial(request)
             return
         }
-        require(request.keys - "order" == setOf("suite", "problem", "sha256", "budget-ms", "repeats"))
+        require(request.keys - setOf("order", "staging-target", "staging-buffer-kib") ==
+            setOf("suite", "problem", "sha256", "budget-ms", "repeats"))
         val budget = request.getValue("budget-ms").toLong().also { require(it in 1..60_000) }
         val repeats = request.getValue("repeats").toInt().also { require(it in 2..4) }
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         val reference = Catalog.uncapped(request.getValue("suite")).problems
             .single { it.name == request.getValue("problem") }
         capture(CorpusFetcher.resolve(reference.source), out, budget, repeats, request.getValue("sha256"),
-            request["order"] ?: "forward")
+            CorpusStagingControls(request["order"] ?: "forward", request["staging-target"] ?: "cache",
+                (request["staging-buffer-kib"] ?: "8").toInt()))
     }
 
     internal fun capture(
@@ -44,17 +46,20 @@ internal object CorpusStagingProfile {
         budget: Long,
         repeats: Int = 2,
         expectedHash: String? = null,
-        order: String = "forward",
+        controls: CorpusStagingControls = CorpusStagingControls(),
     ) {
         require(budget in 1..60_000 && repeats in 2..4)
-        require(order in setOf("forward", "reverse"))
+        val stagingRoot = controls.stagingRoot
         val profileStart = System.nanoTime()
         out.resolve("request.json").writeText(buildJsonObject {
             put("source", packed.absolutePath)
             put("expectedSha256", expectedHash)
             put("budgetMs", budget)
             put("repeats", repeats)
-            put("order", order)
+            put("order", controls.order)
+            put("stagingTarget", controls.stagingTarget)
+            put("stagingBufferBytes", controls.bufferKiB * 1024)
+            put("stagingDirectory", stagingRoot.absolutePath)
             put("instrumentation", "stage-uninstrumented and stage-prehashed have no JFR")
             put("prehash", "stage-prehashed matches canonical source hashing before the source deadline")
             put("osCache", "uncontrolled; parent identity reads and plain materialization precede trials")
@@ -79,12 +84,14 @@ internal object CorpusStagingProfile {
                 put("plainBytes", plain.length())
                 put("sourceFileStore", Files.getFileStore(packed.toPath()).toString())
                 put("plainFileStore", Files.getFileStore(plain.toPath()).toString())
-                put("stagingFileStore", Files.getFileStore(File(CorpusFetcher.cacheRoot, ".plain").toPath()).toString())
+                put("identityStagingFileStore",
+                    Files.getFileStore(File(CorpusFetcher.cacheRoot, ".plain").toPath()).toString())
+                put("stagingFileStore", Files.getFileStore(stagingRoot.toPath()).toString())
                 put("setupNanos", System.nanoTime() - setupStart)
             }.toString())
             val modes = listOf("packed-read", "decode-hash", "stage", "stage-uninstrumented",
                 "stage-prehashed", "plain-hash")
-                .let { if (order == "reverse") it.reversed() else it }
+                .let { if (controls.order == "reverse") it.reversed() else it }
             for (mode in modes) {
                 val command = buildList {
                     addAll(listOf(File(System.getProperty("java.home"), "bin/java").absolutePath,
@@ -97,7 +104,9 @@ internal object CorpusStagingProfile {
                     addAll(listOf("-cp", System.getProperty("java.class.path"), CorpusStagingProfile::class.java.name,
                         "trial-path=${if (mode == "plain-hash") plain else packed}", "mode=$mode",
                         "sha256=$sourceHash", "budget-ms=$budget", "repeats=$repeats",
-                        "samples=${out.resolve("$mode.jsonl")}"))
+                        "samples=${out.resolve("$mode.jsonl")}", "staging-target=${controls.stagingTarget}",
+                        "staging-buffer-bytes=${controls.bufferKiB * 1024}",
+                        "staging-directory=${stagingRoot.absolutePath}"))
                 }
                 out.resolve("$mode-command.json").writeText(Reports.json.encodeToString(command))
                 val process = ProcessBuilder(command).redirectOutput(out.resolve("$mode.stdout"))
@@ -170,6 +179,8 @@ internal object CorpusStagingProfile {
                     when (mode) {
                         "stage", "stage-uninstrumented", "stage-prehashed" -> CorpusFiles.withPlainFile(
                             source, ::checkActive, { cleanupNanos = it },
+                            stagingDirectory = File(request.getValue("staging-directory")),
+                            bufferBytes = request.getValue("staging-buffer-bytes").toInt(),
                         ) { plain ->
                             stagingNanos = System.nanoTime() - start
                             val verifyStart = System.nanoTime()
@@ -192,6 +203,9 @@ internal object CorpusStagingProfile {
                     put("jvmCache", if (index == 0) "fresh-first-operation" else "same-process-repeated-operation")
                     put("osCache", "uncontrolled; parent read and materialization completed before child startup")
                     put("sourcePath", source.absolutePath)
+                    put("stagingTarget", request.getValue("staging-target"))
+                    put("stagingBufferBytes", request.getValue("staging-buffer-bytes").toInt())
+                    put("stagingDirectory", request.getValue("staging-directory"))
                     put("sourceFileBytes", source.length())
                     put("stagedBytes", stagedBytes)
                     put("sha256", observedHash)

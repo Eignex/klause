@@ -3,6 +3,7 @@ package com.eignex.klause.bench.metric
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.bench.source.SourceStaging
 import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 
 import org.junit.jupiter.api.BeforeAll
@@ -34,8 +35,9 @@ class SolverInvocationTest {
         }
     }
 
-    @Test
-    fun `compressed input reaches the solver as original bytes and is retired afterwards`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["cache", "temporary"])
+    fun `compressed input reaches the solver as original bytes and is retired afterwards`(target: String) {
         val root = Files.createTempDirectory("solver-source").toFile()
         try {
             val body = "p cnf 2 1\n1 -2 0\n"
@@ -43,9 +45,12 @@ class SolverInvocationTest {
             ZstdOutputStreamNoFinalizer(packed.outputStream(), 1).use { it.write(body.toByteArray()) }
             var staged: File? = null
 
-            val result = SolverInvocation.withSourceInput(packed, Budget(10_000)) { plain, remaining ->
+            val staging = SourceStaging.parse(target)
+            val result = SolverInvocation.withSourceInput(packed, Budget(10_000), staging = staging) {
+                    plain, remaining ->
                 staged = plain
                 assertEquals(body, plain.readText())
+                assertEquals(staging.directory.canonicalFile, plain.parentFile.parentFile.canonicalFile)
                 assertTrue(remaining.timeoutMillis in 1..10_000)
                 SolverInvocation.Result(true, null, 2L, proven = false,
                     stats = emptyMap(), rawOutput = "sat", command = plain.path, elapsedMs = 3L)
@@ -111,13 +116,15 @@ class SolverInvocationTest {
         }
     }
 
-    @Test
-    fun `cancelled preparation retains timings without a solver verdict`() {
+    @ParameterizedTest
+    @ValueSource(strings = ["cache", "cli"])
+    fun `cancelled preparation retains timings without a solver verdict`(target: String) {
         try {
             Thread.currentThread().interrupt()
 
             val failure = assertFailsWith<SolverInvocation.Failure> {
-                SolverInvocation.withSourceInput(File("missing.cnf.zst"), Budget(10_000)) { _, _ ->
+                SolverInvocation.withSourceInput(File("missing.cnf.zst"), Budget(10_000),
+                    staging = SourceStaging.parse(target), decoderIdentity = { error("cancelled identity") }) { _, _ ->
                     error("cancelled source")
                 }
             }
@@ -130,6 +137,53 @@ class SolverInvocationTest {
         } finally {
             Thread.interrupted()
         }
+    }
+
+    @Test
+    fun `CLI delivery passes the original archive and charges decoder identity to preparation`() {
+        val packed = File("original.cnf.zst")
+        var nanos = 0L
+
+        val result = SolverInvocation.withSourceInput(packed, Budget(1000), nanoTime = { nanos },
+            staging = SourceStaging.CLI, decoderIdentity = { checkActive ->
+                nanos = 3_000_000
+                checkActive()
+                mapOf("sourceDecoderSha256" to "identity")
+            }) { input, remaining ->
+            assertEquals(packed, input)
+            assertEquals(997L, remaining.timeoutMillis)
+            nanos += 12_000_000
+            SolverInvocation.Result(null, null, null, proven = false,
+                stats = emptyMap(), rawOutput = "unknown", command = "cli", elapsedMs = 10)
+        }
+
+        assertEquals("cli", result.stats["sourceStaging"])
+        assertEquals("", result.stats["sourceStagingDirectory"])
+        assertEquals("identity", result.stats["sourceDecoderSha256"])
+        assertEquals("cli-frontend", result.stats["sourceDecodeLocation"])
+        assertNull(result.stats["sourceDecodeMs"])
+        assertEquals("3", result.stats["sourcePreparationMs"])
+        assertEquals("0", result.stats["sourceCleanupMs"])
+        assertEquals("12", result.stats["sourceCliMs"])
+        assertEquals("15", result.stats["sourceInvocationMs"])
+    }
+
+    @Test
+    fun `decoder identity exhaustion supplies no solver verdict`() {
+        var nanos = 0L
+
+        val result = SolverInvocation.withSourceInput(File("original.cnf.zst"), Budget(5), nanoTime = { nanos },
+            staging = SourceStaging.CLI, decoderIdentity = { checkActive ->
+                nanos = 5_000_000
+                checkActive()
+                emptyMap()
+            }) { _, _ -> error("deadline exhausted") }
+
+        assertNull(result.feasible)
+        assertEquals("true", result.stats["sourcePreparationBudgetExhausted"])
+        assertEquals("5", result.stats["sourcePreparationMs"])
+        assertEquals("0", result.stats["sourceCliMs"])
+        assertEquals("5", result.stats["sourceInvocationMs"])
     }
 
     @Test

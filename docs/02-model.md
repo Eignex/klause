@@ -9,7 +9,9 @@ immutable assignments. A view alone authorizes no result.
 
 `Problem` stores source integer declarations as bounds and, where necessary,
 `SourceIntDomains` value sets. Mutable search domains belong to `BakedProblem` and
-the propagation session; a declaration assigns no engine ownership.
+the propagation session; a declaration assigns no engine ownership. Domain tables
+record whether their endpoint storage is stable or shares a live array. Views
+carrying a shared table retain that distinction even when their model type changes.
 
 `Problem` arrays and `Factor` payloads are borrowed read-only: their producer keeps
 them unchanged while any model, plan, lazy operation or proof uses them. A rewrite
