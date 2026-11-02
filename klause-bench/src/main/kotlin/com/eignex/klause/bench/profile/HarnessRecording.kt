@@ -13,16 +13,19 @@ internal object HarnessRecording {
         "jdk.NativeMethodSample", "jdk.ThreadPark", "jdk.JavaMonitorEnter", "jdk.ThreadSleep",
     )
 
-    fun extract(report: Path) {
+    fun extract(
+        report: Path,
+        recording: Path = report.resolve("harness.jfr"),
+        scope: String = "ordinary harness JVM; excludes child CLI JVM and outer adapter extraction",
+    ) {
         val start = System.nanoTime()
         var extractedEvents = 0L
-        val recording = report.resolve("harness.jfr")
         val failure = runCatching {
             check(Files.isRegularFile(recording)) { "Harness recording is unavailable" }
             Files.newBufferedWriter(report.resolve("harness-events.jsonl")).use { output ->
                 output.appendLine(buildJsonObject {
-                    put("scope", "ordinary harness JVM; excludes child CLI JVM and outer adapter extraction")
-                    put("omissions", "profile thresholds, sampling and 128 MiB rolling recording limit apply")
+                    put("scope", scope)
+                    put("omissions", "recording thresholds, sampling and retention settings can omit observations")
                     put("overlapPolicy", "nested phases and JVM events overlap; durations are not additive")
                     put("failurePolicy", "aborted source-preparation may include cleanup before its phase closes")
                     put("stackDepthLimit", 32)
