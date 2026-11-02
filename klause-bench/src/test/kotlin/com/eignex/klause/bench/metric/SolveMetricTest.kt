@@ -8,6 +8,7 @@ import com.eignex.klause.bench.catalog.corpus
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
+import kotlinx.serialization.json.Json
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
@@ -17,6 +18,30 @@ import kotlin.test.assertNull
 
 class SolveMetricTest {
     private val ref = ProblemRef("fam/inst", Format.MINIZINC, corpus("absent.mzn"), Category.CSP, Expected.Unknown)
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `a solve should retain the emitted numerical policy without inventing absent declarations`(declared: Boolean) {
+        val text = "{\"schema\":\"mps-decimal-semantics-v1\",\"effective\":{\"objective\":\"exact\"}}"
+            .takeIf { declared }
+        val (record, _) = SolveMetric.solve(
+            entry(),
+            SolverInvocation.Settings(),
+            Budget(),
+            "now",
+            "fixture",
+            installedBuild = { null },
+            invoke = { _, _, _, _ ->
+                SolverInvocation.Result(
+                    true, null, null, proven = false,
+                    stats = text?.let { mapOf("numericalSemantics" to it) }.orEmpty(),
+                    rawOutput = "v X=1\n", command = "cli",
+                )
+            },
+        )
+
+        assertEquals(text?.let { Json.parseToJsonElement(it) }, record.numericalSemantics)
+    }
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
