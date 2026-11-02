@@ -9,6 +9,7 @@ private const val INTEGER_LEARNING_STEPS = 16
 private const val INTEGER_LEARNING_LEVELS = 64
 
 internal class IntegerConflictLearner(private val state: PropagationState) {
+    private var selectedRetainedSource = false
     private var previousSource: IntegerSourceRow? = null
     private var previousUseLo = false
     private var previousRow: IntegerLearningInequality? = null
@@ -22,13 +23,12 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         currentLevel: Int,
         fallback: ConflictAnalyzer.AnalysisResult.Learned,
     ): ConflictAnalyzer.AnalysisResult.LearnedIntegerRow? = try {
+        selectedRetainedSource = false
         derive(factorId, currentLevel, fallback)
     } catch (_: CheckedLongOverflowException) {
-        state.arithmeticLearningTrace?.record("integer.decline.overflow")
-        null
+        decline("overflow")
     } catch (_: IntegerSourceWorkLimit) {
-        state.arithmeticLearningTrace?.record("integer.decline.source-work-limit")
-        null
+        decline("source-work-limit")
     }
 
     private fun retainedDecline(cause: String): Nothing? {
@@ -38,6 +38,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
 
     private fun decline(cause: String): Nothing? {
         state.arithmeticLearningTrace?.record("integer.decline.$cause")
+        if (selectedRetainedSource) state.arithmeticLearningTrace?.record("integer.retained.decline.$cause")
         return null
     }
 
@@ -75,6 +76,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val allowWideSources = source != null && source.linear.vars.size > INTEGER_LEARNING_TERMS
         var retainedSources = if (retained == null) 0 else 1
         if (retained != null) {
+            selectedRetainedSource = true
             state.integerChainedSources++
             state.arithmeticLearningTrace?.record("integer.retained-seed", factorId.toLong())
         }
@@ -96,12 +98,13 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             val event = reason(row, used, allowWideSources) ?: return decline("no-qualified-endpoint")
             used.add(event.key)
             if (event.key.retained) {
+                selectedRetainedSource = true
                 retainedSources++
                 state.integerChainedSources++
                 state.arithmeticLearningTrace?.row("integer.retained-parent-row", event.row, state)
             } else state.arithmeticLearningTrace?.row("integer.pivot-row", event.row, state, event.trail)
-            val combined = if (allowWideSources) {
-                row.resolveTransient(event.row, event.variable, sourceWork)
+            val combined = if (allowWideSources || retainedSources > 0) {
+                row.resolveTransient(event.row, event.variable, sourceWork, allowCompactGrowth = retainedSources > 0)
             } else row.resolve(event.row, event.variable, sourceWork)
             combined ?: return decline("combination-shape-or-guard")
             row = combined

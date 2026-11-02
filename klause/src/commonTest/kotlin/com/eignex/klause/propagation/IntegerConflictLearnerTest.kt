@@ -44,6 +44,74 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `a compact owned derivation should cross temporary width before asserting in mapped coordinates`() {
+        val padding = IntArray(14) { it + 6 }
+        val problem = Problem(0, 20, Array(20) { if (it < 6) IntDomain(0, 1) else IntDomain(0, 0) }, arrayOf(
+            Linear(intArrayOf(1, 1, -1), intArrayOf(0, 3, 2), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(5, 0), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(5, 4), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1) + IntArray(14) { 1 }, intArrayOf(4, 1) + padding, LinearOp.LE, 0),
+        ))
+        val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+            .apply { enableIntegerRowLearning() }
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(0 to 1L, 1 to 1L, 2 to -1L), 0L, Lit.NONE)), 1)
+        val cp = CpSearchComponent(native, IntArray(20) { it + 5 })
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(10, 1)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+        assertContentEquals(intArrayOf(2, 5) + padding, learned.row.variables)
+        assertContentEquals(longArrayOf(-1, 2) + LongArray(14) { 1 }, learned.row.coefficients)
+        assertEquals(2, learned.row.transientSteps)
+        assertEquals(1, learned.row.retainedSources)
+        assertEquals(0L, shared.intUpperBound(10))
+        assertEquals(17L, native.learnedLifecycle()["learningIntegerTransientMaxTerms"])
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerChainedAdmitted"])
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerChainedConsumed"])
+        val before = native.learnedLifecycle()
+        native.releaseRetainedState()
+        assertEquals(before, native.learnedLifecycle())
+    }
+
+    @Test
+    fun `a guarded compact seed should decline an oversized owned intermediate beside clause fallback`() {
+        val padding = IntArray(14) { it + 6 }
+        val native = PropagationSession(Problem(1, 20,
+            Array(20) { if (it < 6) IntDomain(0, 1) else IntDomain(0, 0) }, arrayOf(
+                Linear(intArrayOf(1, 1, -1), intArrayOf(0, 3, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.LE, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(5, 0), LinearOp.LE, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(5, 4), LinearOp.LE, 0),
+                ReifiedLinear(0, intArrayOf(1, -1) + IntArray(14) { 1 },
+                    intArrayOf(4, 1) + padding, LinearOp.LE, 0),
+            )), pbLearning = false).apply {
+            enableIntegerRowLearning()
+            configureAttribution(true, false)
+        }
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(0 to 1L, 1 to 1L, 2 to -1L), 0L, Lit.NONE)), 1)
+        assertIs<PropagationResult.Implied>(native.pinBool(0, true))
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(5, 1))
+
+        val fallback = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
+        assertTrue(fallback.literals.contains(Lit.make(0, false)))
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerChainedSources"])
+        assertEquals(0L, native.learnedLifecycle()["learningIntegerChainedProduced"])
+        assertEquals(0L, native.learnedLifecycle()["learningIntegerChainedAdmitted"])
+        assertEquals(1L, requireNotNull(native.explanationState.arithmeticLearningTrace).declineCensus[
+            "integer.retained.decline.combination-shape-or-guard"])
+        assertEquals(1, native.explanationState.learned.integerRows?.size)
+    }
+
+    @Test
     fun `an owned at most one conflict should produce and consume a composed row beside its fallback`() {
         val native = PropagationSession(Problem(0, 5, Array(5) { IntDomain(0, 1) }, arrayOf(
             Linear(intArrayOf(1, 1, -1), intArrayOf(0, 3, 2), LinearOp.LE, 0),

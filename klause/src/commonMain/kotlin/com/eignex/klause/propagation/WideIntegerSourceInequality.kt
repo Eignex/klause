@@ -77,15 +77,20 @@ internal fun IntegerLearningInequality.resolveTransient(
     other: IntegerLearningInequality,
     variable: Int,
     work: IntegerSourceWork,
-): IntegerLearningInequality? = combine(other, variable, work, allowTransient = true)
+    allowCompactGrowth: Boolean = false,
+): IntegerLearningInequality? =
+    combine(other, variable, work, allowTransient = true, allowCompactGrowth = allowCompactGrowth)
 
 private fun IntegerLearningInequality.combine(
     other: IntegerLearningInequality,
     variable: Int,
     work: IntegerSourceWork,
     allowTransient: Boolean,
+    allowCompactGrowth: Boolean = false,
 ): IntegerLearningInequality? {
-    if (this is IntegerConflictRow && other is IntegerConflictRow) return resolve(other, variable)
+    if (this is IntegerConflictRow && other is IntegerConflictRow && !allowCompactGrowth) {
+        return resolve(other, variable)
+    }
     if (guard != Lit.NONE && other.guard != Lit.NONE && guard != other.guard) return null
     val a = coefficient(variable)
     val b = other.coefficient(variable)

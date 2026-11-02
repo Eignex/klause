@@ -483,11 +483,14 @@ A guarded temporary result wider than 16 terms declines. The 4,096 source-refere
 visits fund all temporary-row visits and cancellation entries. A compact conflicting seed retains its 16-term reason-source
 limit; a wide conflicting seed enables wide sources throughout that analysis. This
 keeps wide-source preparation out of compact-seed analysis. Exhaustion retains
-clause fallback. Compact pairs keep their compact resolver. Temporary steps count
+clause fallback. Compact pairs without an owned source keep their compact resolver. Temporary steps count
 inside the same 16-combination allowance, and each result must remain conflicting.
 Opt-in arithmetic diagnostics count analyses with a live integer-row store, their
-level-limit declines, owned bound endpoints visited during the original-source walk, selections that prefer an original endpoint while such an owner is
-present, and retained-parent qualification or rejection causes. An observed owner
+level-limit declines, owned bound endpoints visited during the original-source walk,
+selections that prefer an original endpoint while such an owner is present, and
+retained-parent qualification or rejection causes. Declines after an actual
+retained-source selection retain their own cause counts, including interruption
+by the source allowance or checked arithmetic overflow. An observed owner
 is not a qualified arithmetic parent. These counters retain no parent payloads and
 use the same bounded name census as other source diagnostics.
 An active owned unguarded at-most-one row over declared binary integer coordinates
@@ -504,6 +507,12 @@ side and parent identity can be used once per analysis. The child retains derive
 coefficients and a bounded source-count origin, without parent identities; retirement
 and compaction cannot invalidate its arithmetic. Source selections, produced children,
 admission and first consumption have separate counters, including after retirement.
+After selecting an owned source, an unconditional derivation may use the same
+32-term temporary rows even when its original seed is compact. Original historical
+sources keep that compact seed's 16-term input limit; source-reference visits,
+scratch coordinates and combination counts retain their containing allowances.
+Guarded temporary results wider than 16 terms still decline. No temporary result
+enters the store or supplies a propagation reason.
 Only a compact result is tested for admission. A retained row must propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have
