@@ -71,6 +71,8 @@ internal data class SolveRecord(
     /** Bytes supplied to the CLI and output renderer; absent for historical or uncompiled inputs. */
     val compiledInputHashes: Map<String, String> = emptyMap(),
     val comparisonControls: Map<String, String> = emptyMap(),
+    /** Actual declared and effective MPS policy emitted by the installed CLI; absent on historical records. */
+    val numericalSemantics: kotlinx.serialization.json.JsonObject? = null,
 )
 
 internal object SolveMetric {
@@ -269,6 +271,10 @@ internal object SolveMetric {
             feasible = r.feasible,
             objective = r.objective,
             exactObjective = r.exactObjective,
+            numericalSemantics = r.stats["numericalSemantics"]?.let {
+                runCatching { kotlinx.serialization.json.Json.parseToJsonElement(it) as? kotlinx.serialization.json.JsonObject }
+                    .getOrNull()
+            },
             timeToBestMs = bestMs,
             timeToFirstFeasibleMs = firstFeasibleMs,
             processTimeToFirstFeasibleMs = processFirstMs,
