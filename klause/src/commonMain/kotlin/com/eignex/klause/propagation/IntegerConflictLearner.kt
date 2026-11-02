@@ -165,6 +165,13 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         used: Set<PivotKey>,
         allowWideSources: Boolean,
     ): BoundEvent? {
+        sourceWork.visit()
+        if (state.learned.integerRows?.isNotEmpty() == true) {
+            retainedReason(row, used)?.let {
+                state.arithmeticLearningTrace?.record("integer.retained.preferred")
+                return it
+            }
+        }
         var candidates: IntArray? = null
         var count = 0
         var ownedEndpoint = false
@@ -204,7 +211,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             indices[position] = index
             count++
         }
-        val indices = candidates ?: return retainedReason(row, used)
+        val indices = candidates ?: return null
         for (position in 0 until count) {
             row.visit(state)
             qualifiedReason(row, indices[position], allowWideSources)?.let {
@@ -212,7 +219,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 return it
             }
         }
-        return retainedReason(row, used)
+        return null
     }
 
     private fun retainedAmoSource(factorId: Int): IntegerConflictRow? {

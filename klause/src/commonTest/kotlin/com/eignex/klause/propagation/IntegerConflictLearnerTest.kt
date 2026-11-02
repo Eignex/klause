@@ -79,7 +79,7 @@ class IntegerConflictLearnerTest {
     }
 
     @Test
-    fun `an eager at most one bound should supply a parent after original endpoints are exhausted`() {
+    fun `an owned arithmetic parent should precede a qualified original endpoint`() {
         val native = PropagationSession(Problem(0, 6, Array(6) { IntDomain(0, 1) }, arrayOf(
             Linear(intArrayOf(1, 1, -1), intArrayOf(0, 3, 2), LinearOp.LE, 0),
             Linear(intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.LE, 0),
@@ -93,6 +93,9 @@ class IntegerConflictLearnerTest {
         native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
             mapOf(0 to 1L, 1 to 1L, 2 to -1L), 0L, Lit.NONE)), 1)
 
+        val trace = ArithmeticLearningTrace(1024, 65536).apply { collectDeclines = true }
+        native.explanationState.arithmeticLearningTrace = trace
+
         val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(5, 1))
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
 
@@ -103,7 +106,10 @@ class IntegerConflictLearnerTest {
         assertEquals(1L, native.learnedLifecycle()["learningIntegerChainedProduced"])
         assertEquals(0L, native.learnedLifecycle()["learningIntegerChainedAdmitted"])
         val census = requireNotNull(native.explanationState.arithmeticLearningTrace).declineCensus
-        assertTrue(requireNotNull(census["integer.retained.endpoint"]) > 0L)
+        assertEquals("integer.retained-parent-row", trace.events.first {
+            it.kind == "integer.retained-parent-row" || it.kind == "integer.pivot-row"
+        }.kind)
+        assertTrue(requireNotNull(census["integer.retained.preferred"]) > 0L)
         assertTrue(requireNotNull(census["integer.retained.qualified"]) > 0L)
     }
 
