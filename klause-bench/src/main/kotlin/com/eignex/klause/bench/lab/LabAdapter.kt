@@ -17,6 +17,7 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.SourceStaging
 import com.eignex.klause.bench.target.collectionOf
 import com.eignex.lab.bench.*
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonObject
 import java.nio.file.Files
 import java.nio.file.Path
