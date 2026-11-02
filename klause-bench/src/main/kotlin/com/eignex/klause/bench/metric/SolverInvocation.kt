@@ -117,13 +117,9 @@ internal object SolverInvocation {
         var cliNanos = 0L
         var result = Result(null, null, null, proven = false, stats = emptyMap(),
             rawOutput = "", command = "SOURCE_PREPARATION")
-        var failure: Exception? = null
-        fun checkActive() {
-            if (Thread.currentThread().isInterrupted) throw InterruptedIOException("Source staging interrupted")
-            if ((nanoTime() - start) / NANOS_PER_MILLI >= budget.timeoutMillis) throw SourcePreparationTimeout()
-        }
-        try {
-            CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it }) { plain ->
+        fun checkActive() = checkSourceActive(nanoTime() - start, budget)
+        val failure = runCatching {
+            CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it }, nanoTime = nanoTime) { plain ->
                 checkActive()
                 val cliStart = nanoTime()
                 preparationNanos = cliStart - start
@@ -131,18 +127,14 @@ internal object SolverInvocation {
                 if (remaining <= 0L) throw SourcePreparationTimeout()
                 try {
                     result = solve(plain, Budget(remaining))
-                } catch (caught: Failure) {
-                    result = caught.result
-                    throw caught
                 } finally {
                     cliNanos = nanoTime() - cliStart
                 }
             }
-        } catch (caught: SourcePreparationTimeout) {
+        }.exceptionOrNull()
+        if (failure is Failure) result = failure.result
+        if (failure is SourcePreparationTimeout) {
             result = result.copy(stats = result.stats + ("sourcePreparationBudgetExhausted" to "true"))
-            if (caught.suppressed.isNotEmpty()) failure = caught
-        } catch (caught: Exception) {
-            failure = caught
         }
         val totalNanos = nanoTime() - start
         result = result.copy(stats = result.stats + mapOf(
@@ -151,8 +143,15 @@ internal object SolverInvocation {
             "sourceCliMs" to (cliNanos / NANOS_PER_MILLI).toString(),
             "sourceInvocationMs" to (totalNanos / NANOS_PER_MILLI).toString(),
         ))
-        failure?.let { throw Failure(result, it.message.orEmpty(), it) }
+        if (failure != null && (failure !is SourcePreparationTimeout || failure.suppressed.isNotEmpty())) {
+            throw Failure(result, failure.message.orEmpty(), failure)
+        }
         return result
+    }
+
+    private fun checkSourceActive(elapsedNanos: Long, budget: Budget) {
+        if (Thread.currentThread().isInterrupted) throw InterruptedIOException("Source staging interrupted")
+        if (elapsedNanos / NANOS_PER_MILLI >= budget.timeoutMillis) throw SourcePreparationTimeout()
     }
 
     private class SourcePreparationTimeout : IOException("Source preparation budget exhausted")
