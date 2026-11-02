@@ -368,7 +368,8 @@ class FiniteExecutionTest {
 
     @Test
     fun `initial probe policies should compose with deferred LP starts`() {
-        for (options in listOf(ExecutionOptions.parse(listOf("portfolio-probes=leader-half", "portfolio-lp-start=after-probes")),
+        for (options in listOf(
+            ExecutionOptions.parse(listOf("portfolio-probes=leader-half", "portfolio-lp-start=after-probes")),
             ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer", "portfolio-lp-start=after-probes")),
             ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second", "portfolio-lp-start=after-probes")),
             ExecutionOptions.parse(listOf("portfolio-probes=family-work", "portfolio-lp-start=after-probes")),
