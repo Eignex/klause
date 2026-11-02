@@ -474,7 +474,7 @@ class LinearAuthorityAggregateCutsTest {
 
             val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
                 limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
-            point = mapOf(x to 0.75, y to 0.5 * sign)).single()
+                point = mapOf(x to 0.75, y to 0.5 * sign)).single()
 
             assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ofLong(sign)),
                 BigFraction.ONE), cut.inequality)
@@ -649,7 +649,8 @@ class LinearAuthorityAggregateCutsTest {
 
         assertEquals(16, cuts.size)
         assertTrue(cuts.all { cut -> SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)) == SourceEvidenceCheck.Checked })
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)) ==
+                SourceEvidenceCheck.Checked })
     }
 
     @Test
