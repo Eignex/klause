@@ -201,7 +201,9 @@ Optional `events=true` also extracts the selected phase, IO, GC, CPU, compilatio
 contention and sampled-stack events into `harness-events.jsonl` on the worker,
 retaining the original recording scope in its header. Event timestamps establish
 order; file order need not be chronological. Recording thresholds and retention
-settings still apply. The raw hash-checked capture and sampled summary survive
+settings still apply. Event-type IDs, active settings and recording-loss/shutdown
+events are retained when present, so missing events need not be mistaken for disabled capture.
+The raw hash-checked capture and sampled summary survive
 event-extraction failure, with an error artifact and failed analysis result.
 Decoding and both analysis passes spend the containing case/job allowance; no solver runs.
 
