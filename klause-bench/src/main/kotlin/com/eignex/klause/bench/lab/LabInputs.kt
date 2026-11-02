@@ -174,8 +174,15 @@ internal object LabInputs {
                     Files.isRegularFile(file) && hash(file) == it,
                 ) { "Input checksum mismatch: ${input.path}" }
             }
-            case.attributes["inputTree.$index"]?.let {
-                require(Files.isDirectory(file) && treeHash(file) == it) { "Input tree changed: ${input.path}" }
+            case.attributes["inputTree.$index"]?.let { expected ->
+                val cache = System.getenv("LAB_WORKSPACE_CACHE")?.let { storage -> Path.of(storage, "compiler-inputs") }
+                val compiler = cache != null && input.root == BenchInputRoot.SOURCE && input.role == "compiler"
+                val matches = Files.isDirectory(file) && if (compiler) {
+                    CompilerInputReceipts(requireNotNull(cache)).matches(file, expected)
+                } else {
+                    treeHash(file) == expected
+                }
+                require(matches) { "Input tree changed: ${input.path}" }
             }
         }
     }
@@ -202,7 +209,7 @@ internal object LabInputs {
         }
     }
 
-    private fun treeHash(directory: Path): String {
+    internal fun treeHash(directory: Path): String {
         val digest = MessageDigest.getInstance("SHA-256")
         Files.walk(directory).use { files ->
             files.filter(Files::isRegularFile).sorted().forEach { file ->

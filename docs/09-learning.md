@@ -121,7 +121,8 @@ They describe participation and consumption, without asserting causal benefit.
 One state owns at most 1,024 reason identities of at most 64 words each and 1,024
 learned provenance entries. Reason eviction and provenance exhaustion affect only
 diagnostics; missing identities use the unattributed family. Retirement releases
-learned provenance, and compaction preserves it by object identity. The native SAT
+learned provenance and diagnostic ring entries aliasing that clause's literals;
+compaction preserves retained provenance by object identity. The native SAT
 lane retains packed propagation and credits its clause family without constructing
 general propagator projections. Its fire counter counts BCP calls rather than
 general factor invocations. Disabling attribution retains no diagnostic maps.
@@ -239,7 +240,8 @@ and explicit completeness; see [sharing accounting](12-portfolio.md#shared-chann
 Observation never invokes retirement or materializes a reason. Partial data and
 historical peaks cannot authorize a byte-limit decision.
 Payload counts and index capacity have separate ownership;
-reference counts exclude platform object layout. An owner-aware aggregate counts
+reference counts exclude platform object layout. The bounded attribution reason ring
+and its modeled map references participate in this observation. An owner-aware aggregate counts
 each primitive payload or allocated index once, including aliased reasons; modeled
 references use eight bytes per slot for byte-limit policy. Completeness covers the
 enumerated owners, rather than the worker's entire heap. Active and historical
@@ -257,9 +259,9 @@ can alias and cannot be summed to reconstruct these ownership fields.
 Protected ownership includes permanent assertions, live and saved reasons, pending first
 assertions and interrupted root publication. Required metadata, reference containers
 and posting allocations share the protection of the clauses they index.
-Native packed arenas are protected at
-allocation granularity while a retained reason needs them. This floor is conservative,
-rather than a minimum compacted representation. Pressure may release optional pass
+Native learned payloads belong to individual rows; required reference containers
+and metadata stay protected at allocation granularity while a retained reason needs them.
+This floor is conservative, rather than a minimum compacted representation. Pressure may release optional pass
 buffers, while interrupted propagation/publication retains them. Close detaches the
 native generation; reseeding preserves compatible learning and invalidates obsolete pass
 snapshots.
@@ -274,8 +276,8 @@ reclamation attempts remain retryable.
 Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,
 queues and event indexes, with a conservative envelope for indivisible publication.
 Cancellation or an oversized envelope defers without mutation; accepted publication
-remaps the whole generation and trims retained primitive capacity. Shared search prepares
-a replacement generation and polls before swapping its stores and indexes. Protected
+remaps the whole generation and trims retained primitive capacity. Shared search retains
+stable handles and resumes separately funded owner removals. Protected
 state or an unfunded preparation permits continued search above the soft limit, with an
 explicit protected/deferred observation. Work debt supplies no hard pause-latency
 guarantee. Thresholds and default retention remain separate policy decisions.
@@ -289,32 +291,79 @@ ineligible. Clause literals are packed into an immutable arena whose clause indi
 match the model's factors, so reasons still identify source factors, and the arena is
 shared read-only across portfolio workers.
 
+Satisfaction traversals count constructed sessions by their actual propagation
+backend. The CLI exposes `nativePropagationNativeSatSessions` and
+`nativePropagationGeneralSessions`; retained traversal slices and reseeding keep
+the same construction observation. A constructed session alone establishes neither
+search work nor source completion.
+
 Propagation is two-watched-literal unit propagation over a trail pointer, without
 per-factor dispatch or integer order literals, reading a per-session truth byte per
-variable. Learned clauses live in a growable side buffer with a wrapping
-replacement-scan cursor per clause, and reductions compact them in place. The lane
+variable. Learned clauses own copied literal arrays in bounded reference pages,
+with a wrapping replacement-scan cursor per clause. Each page grows from one slot
+to its fixed maximum; full compaction trims a partial last page. Empty pages release their arrays
+without changing live clause handles. Reductions compact their handle and reference columns without
+copying surviving literal arrays. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
 
-When permanent native clauses already fill a restart cap, a bounded window over
-non-permanent learned clauses can retire unused local rows without renumbering
-handles. Each row funds its policy update and live-reason scan before publication;
-units, pending rechecks and current root reasons survive. An unfinished window
-retains its read and write cursors across later restarts and appended clauses.
-Retired rows stop propagation and export, while their slots and arena bytes remain
-owned until a funded full compaction reclaims them. Ownership reports include that
-capacity and report `learnedRetiredSlots` separately from active clause count.
+A bounded window over non-permanent
+learned clauses retains the lowest LBD and stable-handle keys after permanent and
+tier-protected ownership. Its max-heap shares the candidate index with retained
+survivors. Funded heap steps, cursors and pending retirement survive later restarts
+and appended clauses; compaction resets them before handles change. Policy updates
+and reason-ownership checks are charged before publication. A later use protects a pending
+eviction; units, pending rechecks and current root reasons survive.
+Retired rows stop propagation and export and release their owned literal array.
+Admission, reference-array growth and release debit the containing work ledger.
+A short retirement slice suspends before publication and resumes with its stable handle.
+Policy columns, the reference-page directory and watch postings remain owned until
+funded full compaction reclaims them. Ownership reports include those capacities and report
+`learnedRetiredSlots` separately from active clause count. A page owns a disjoint pool
+of copied arrays. Its observation separates total and cumulative protected payload
+bytes under one stable pool identity; only required rows protect payload, while a
+required row protects the complete page reference allocation. Permanent-row checks read the policy
+column directly. Reference-page and directory capacities are observed separately.
 Window calls, charged work, visits and permanent, active and retained counts remain
 available in the released session's lifecycle totals.
 
-General CP uses the same handle-preserving clause retirement above a permanent
-clause floor. Its funded protection snapshot covers current Boolean and integer
-reasons, saved integer bounds and pending first assertions. Retired factor payloads
-remain readable for explanations while propagation queues, binary minimization and
-active-clause readers skip those rows. The candidate cursor survives appended
-clauses and is rebuilt when full compaction renumbers the store. Ownership includes
-the candidate index and every retained payload; logical retirement reports no
-physical release. Lifecycle totals identify the packed-native or general backend
-and distinguish boundary, floor and preparation deferrals.
+General CP ranks learned clauses, pseudo-Boolean constraints and integer rows in
+the same candidate index. Permanent arithmetic constraints contribute to its floor.
+Pure-Boolean clauses keep a current-reason count updated by pinning and retraction;
+Boolean undo stores no historical factor handle. Admissions classify these clauses,
+and full compaction remaps their counters with their factor IDs. Their windows use
+those counts and pending-attachment flags without a store-sized protection mask.
+Other constraints use a funded snapshot covering current Boolean and integer reasons,
+saved integer bounds and pending first assertions. Eligible retired factors become inert
+stable-ID slots; propagation queues and active readers skip them. Integer rows own
+their position in a dense reference cache, allowing retirement to unlink a row
+without scanning other rows. Cache capacity and position fields remain part of
+modeled ownership; removing the last row releases the cache backing array. Full
+compaction rebuilds cache positions and remaps integer-event subscriptions even
+when no integer rows remain. The candidate cursor survives admissions and is
+rebuilt when full compaction renumbers the store. Lifecycle totals identify the
+packed-native or general backend and report completed ranking passes and
+boundary/preparation deferrals.
+
+Selected pure-Boolean retirement captures an opaque admission handle before a
+replacement is admitted. Immutable admission keys survive compaction; a bounded
+compressed binary index reuses an already-owned request instead of allocating another.
+Recent use shares the lifecycle word, while admission keys occupy a remapped column.
+A separate compaction generation rejects stale selections;
+captured handles retain no clause payload and survive later factor-ID remapping.
+The caller authorizes a request only after replacement propagation and required
+root/peer publication finish. Authorized requests stay kernel-owned when optional
+pass buffers are released. A bounded round-robin continuation rechecks current
+reasons and pending attachments, so protected requests do not block later eligible
+ones. Terminal results stay in the continuation signal until acknowledged and unlinked.
+Acknowledgement and request-owner release have separate funded steps; capture also
+checks its retained-metadata allowance. Deferred captures report observed minimum
+work, scratch or retained bytes. A caller distinguishes a fresh-slice retry from an
+unfundable class grant without accumulating credit for an atomic mutation.
+Reseeding or closing the scope
+invalidates outstanding handles. Selected retirement reports logical disabling,
+payload unlinking and full physical release separately. The cap index repairs
+externally retired heap and survivor entries through funded resumable steps before
+continuing its LBD ranking; its scalar continuation state remains modeled ownership.
 
 ## Pseudo-Boolean learning
 
@@ -486,7 +535,11 @@ diagnostic invocation; an incomplete trace cannot establish exhaustive applicabi
 
 Native forgetting runs at restart boundaries only with a configured cap. Permanent
 and glue clauses (default LBD at most 2) survive; remaining space favors lower LBD.
-The SAT preset enables capped tiered retention:
+Cap eligibility and survivor quotas use active constraints; stable retired slots do not
+consume the quota or count as newly retired in a sweep event. Below the active cap,
+retired-slot cleanup uses the containing work and scratch grant without aging tier policy.
+An unfunded cleanup remains retryable at later restarts. The SAT preset enables
+capped tiered retention:
 
 | Tier | Initial classification | Lifetime |
 |---|---|---|
@@ -500,30 +553,49 @@ ranking by LBD. [ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/bac
 and [SearchLearning](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
 own the respective stores.
 
-Restart-cap candidate preparation admits its complete candidate arrays, tier columns
-and worst-case ranking work against `learnedMemoryWork` and
-`learnedMemoryScratchBytes` before allocating. Candidate scans and heap ranking
-poll cancellation; unfinished preparation publishes no tier changes or sweep event.
-Insufficient work or scratch safely defers the cap sweep. Completed selection keeps
-the same LBD priorities and tier lifetimes; a sweep event requires actual retirement.
+Restart-cap selection uses the bounded handle-preserving window. The candidate index
+retains the best eligible LBD keys as a max-heap; each funded step can resume without
+a whole-store selection buffer. Permanent clauses, protected reasons and policy survivors
+reduce the heap quota. A pending eviction that gains protection also consumes that
+quota before the next heap step. Mid rows
+survive their demotion window, and classification clears survivor reuse flags.
+An unfunded next-row transaction suspends the cursor for a later grant.
+Current or historical reasons can retain additional rows above the soft cap.
+Native post-undo replay protects its queued clause handles and learned units without
+freezing unrelated retirement. Incomplete trail propagation, conflicts and root
+publication still defer the window.
+General retirement replaces its payload with an inert stable-ID slot and releases
+its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
+aliases. Stale watches skip that slot; their allocated capacity and policy columns
+remain owned until compaction. Selection and subsequent retired-slot compaction share
+one work grant; compaction keeps every active row and receives only its remainder.
+Root simplification transfers its fresh residual literal array into the learned store;
+other admissions copy borrowed literal arrays. Native learned-watch cleanup scans
+resumably before whole-store preparation under
+the same grant. Sixteen-entry posting pages release at tail boundaries, and an empty
+posting list releases its directory. Posting mutations rewind an affected scan prefix;
+no learned handle or reason is remapped by this scan. A completed pass is reused until
+another learned retirement requires a scan. Policy columns and full generation
+remapping retain their separate funding requirements.
+Tier classification publishes within each funded row transaction. Arithmetic reason
+snapshots and native/general full physical compaction require their complete funding.
 
-If complete candidate preparation cannot be funded, the permanent-clause-floor
-case uses the bounded handle-preserving window. Permanent ownership already
-exhausts the cap, so every eligible local row is excess and no LBD ranking is needed.
-Mid rows survive their demotion window; each completed window clears survivor reuse
-flags. Other constraint kinds, shared stores and caps retain the complete selection
-and remap preflight.
-
-Shared learning also accepts an optional modeled-byte soft limit checked at
-propagation boundaries independently of restarts. Units, glue clauses, live reason
-owners and pending first attachments form its protected floor; copied trail reasons
-and queued component publications remain privately protected. Reclamation prepares
-replacement stores, signatures, watches, stages, reason IDs and queues within a
-conservative work and scratch bound. Cancellation before publication discards the
-replacement; publication swaps the complete generation without callbacks. Rebuilding
-the indexes releases obsolete capacity as well as clause payload. Insufficient
-allowance defers reclamation, and a protected floor above the limit reports that
-condition while preserving the search state. Root reseeding releases obsolete copied
+Shared learning uses stable handles and bounded-height owned indexes for clauses,
+LBD ranking, watches, signatures and live reasons. Count-cap windows retire eligible
+clauses in descending LBD order, retaining older clauses on ties. A window fixes its
+admission boundary; appended clauses enter a later window. Epochs retain recent-use
+protection without a whole-store flag reset.
+The optional modeled-byte soft limit runs independently at propagation boundaries.
+Units, glue clauses, live reason owners and pending first attachments form its
+protected floor; copied trail reasons and queued component publications remain
+privately protected. Logical retirement disables propagation before separately funded
+watch, signature and index removal releases payload and metadata ownership. A partial
+release keeps its owner and cursor across calls. Each bounded mutation polls after
+its work debit and publishes without callbacks. Retired payload and unfinished
+metadata stay in ownership observations until released; partial observations supply
+no byte-limit authority. Unfinished maintenance bypasses completed-result caching.
+An insufficient atomic-operation grant explicitly defers while preserving the cursor.
+Root reseeding releases obsolete copied
 reasons; terminal release drops shared learning without rewriting lifetime counters.
 A cancelled automatic scan permits one propagation opportunity before another
 attempt, including when a suspended decision retracts and retries.
@@ -578,7 +650,10 @@ every root pin, the ordinary cursor skips the remaining source suffix and contin
 through learned clauses. Missing indexes retain the full source scan. Learned
 compaction invalidates learned candidates while preserving stable source candidates
 and source scan progress at an unchanged root. A changed root restarts the source
-scan after learned compaction.
+scan after learned compaction. Logical retirement preserves both root passes'
+learned cursor positions; cached learned candidates are checked for liveness before
+their payload is used. The separate physical mapping generation invalidates indices
+after compaction or slot reuse.
 A shortened
 source clause enters as a permanent session-local replacement before its watches
 retire; immutable source text remains available for reasons. The propagation session
@@ -586,7 +661,19 @@ owns unfinished source-watch retirement
 after replacement admission. Pass reset or optional buffer release retains that record;
 a funded slice retires its watches before admitting another source replacement.
 Session close releases it. Satisfied source watches retire without changing variable IDs.
-Learned replacements retain their imported origin. Compaction protects live and
+Learned selections capture a stable retirement handle before replacement admission;
+an unfunded capture retains the candidate and admits no replacement. The root pass
+stages one inactive selection at a time. Replacement propagation and required peer
+publication complete before a funded root slice authorizes retirement. A satisfied
+clause uses the same publication boundary for its premises. Authorized requests stay
+kernel-owned through optional buffer release. Abandoned inactive captures retain a
+small cancellation owner until cancellation is funded or their scope is released.
+Caller metadata and kernel requests share a finite retained allowance bounded by
+the configured memory scratch envelope and any learned-memory soft limit. Existing
+candidate literal buffers remain part of the pass memory observation. The pass
+observes its lifetime controller even without a request; active capture and protected
+continuation handles protect its scalar and reference ownership.
+Learned replacements retain their imported origin. Physical compaction protects live and
 historical reasons and removes obsolete watches; attaching a shortened binary installs
 both implication directions and evaluates facts already assigned at the root. There
 is no separate stale binary graph or whole-graph rebuild.
@@ -616,7 +703,7 @@ complete root; interruption supplies no deduction. Speculative retractions prese
 the saved search phases while retaining ordinary unassignment notifications for
 variable selectors. Clause scans and probes enter the existing inprocessing and
 propagation work counters. Cursors survive suspension and
-reset on reseeding; learned indices never survive a pass snapshot.
+reset on reseeding; learned snapshots retain their physical mapping generation.
 
 Both root passes require an unconditional complete decision-level-zero root. Assumptions,
 seed restrictions, permanent objective cutoffs, model blockers and externally implied
@@ -630,7 +717,9 @@ The containing invocation and worker work allowance includes scans, occurrence-i
 preparation, probing, attachment propagation and protected retirement. Scans enter
 the propagation-work ledger; diagnostic probe and visit counts add no second charge.
 Each of the four classes has a separate work ceiling inside the scheduled slice's
-total ceiling. Zero withholds that class. Completed atomic copying, sorting and
+total ceiling. Each pass receives the containing remainder after earlier passes;
+its remaining optional work is the smaller of that remainder and its class grant
+after debt repayment. Zero withholds that class. Completed atomic copying, sorting and
 compaction can overspend; the class and scheduled loop repay their respective debt
 before admitting more work. Separate containing and per-class debt-added and
 debt-repaid counters retain those charges without adding work. Reseeding resets
@@ -642,7 +731,10 @@ The containing invocation still cancels them. An interrupted root attachment kee
 its queued fixpoint and completes under the next invocation before publishing root
 facts or making a decision. Root publication retains its bounded scan across slices.
 It retains the CP publisher so a consequence reaches peers without creating another
-private decision level in its producer.
+private decision level in its producer. Passes receive a completion marker after
+consistent publication, or after a slice that requires no publication. Cancellation,
+an indeterminate peer and an unfinished attachment withhold that marker. The marker
+records completion without running another class slice or granting more work.
 
 A completed root scan waits for changed input. Appended learned clauses extend its
 remaining range without replaying unchanged sources; new permanent root facts or
@@ -652,8 +744,9 @@ Root scan positions and residual candidates, probe cursors, vivification replace
 batches and subsumption preparation survive suspension. The subsumption occurrence
 window retains at most 1,024 clauses
 and 8,192 literals, advances round-robin, and declines a clause exceeding its remaining
-literal space. Compaction invalidates snapshots by a session-local revision, without
-changing source variable IDs. Replacement attachment precedes retirement; active and
+literal space. Compaction invalidates root indices through their mapping generation
+and other pass snapshots through the learned revision, without changing source
+variable IDs. Replacement attachment precedes retirement; active and
 historical reasons retain their ordinary protection.
 The retained-memory observation counts each primitive buffer once by identity,
 including residual capacity, occurrence postings and replacement metadata, and models
@@ -675,6 +768,13 @@ publication finish ahead of optional admission. Class rotation
 prevents a cheap pass from always taking the entire offered slice. Work and growth
 triggers, cooldown and warmup are disabled by default; the additional work ceilings are
 unlimited unless configured. Existing general off and SAT preset controls remain.
+Funded root continuation resumes retained candidates, source-watch retirement and
+selected requests before optional trigger gates. It receives one root-class grant
+inside the containing grant and starts no new optional scan. Protected requests
+yield ordinary search after a complete protected cycle; deferred work leaves that
+cycle incomplete. Ownership changes reopen protection checks, while memory
+observation alone supplies no new opportunity. Capture, authorization, cancellation,
+acknowledgement and retirement retain their charged work and class latency.
 Per-class attempted, eligible, shortened, unit, stopped and work counters diagnose
 applicability. Probe outcomes distinguish a consistent fixpoint, a completed
 refutation and an interrupted attempt; these counters add no second work charge.
