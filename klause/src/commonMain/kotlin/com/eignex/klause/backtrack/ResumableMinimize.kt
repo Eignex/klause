@@ -1356,7 +1356,7 @@ internal class ResumableMinimize(
 
         override fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> {
             val hints = lpHints ?: return alternatives
-            val allowBasis = rootBasisGuidance
+            val allowBasis = false
             if (!hints.rootSideReady) return hints.orderAlternatives(variable, alternatives, allowBasis)
             return hints.orderSelectedAlternatives(variable,
                 (variable as? VarRef.IntVar)?.let { session.intDomain(it.varId) }, alternatives,
