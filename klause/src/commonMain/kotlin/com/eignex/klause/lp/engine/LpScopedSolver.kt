@@ -4,6 +4,8 @@ import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.SchedulingCancellation
+import com.eignex.klause.util.workScheduled
 
 internal data class LpScopedMetrics(
     val editAttempts: Long,
@@ -52,6 +54,13 @@ internal class LpScopedSolver(
         var reported = LpSolveMetrics()
     }
     private var pendingFloat: PendingFloat? = null
+    private var floatInvocation: Cancellation = Cancellation.Never
+    private val floatInvocationToken = object : SchedulingCancellation {
+        override fun isCancelled(): Boolean = floatInvocation()
+        override fun deadline() = floatInvocation.deadline()
+        override fun workMeter() = floatInvocation.workMeter()
+        override val workScheduled: Boolean get() = floatInvocation.workScheduled()
+    }
     val floatPaused: Boolean get() = pendingFloat != null
     val floatFundingStopped: Boolean get() = floatPaused &&
         (lastFloatTermination == LpFloatTermination.WORK || lastFloatTermination == LpFloatTermination.PIVOTS)
@@ -94,16 +103,47 @@ internal class LpScopedSolver(
         appendBasisWork, appendUnknownWork, reservedConstructionWork, constructionWork,
     )
 
+    val primalGuidanceState: String
+        get() {
+            if (closed) return "CLOSED"
+            val current = solver ?: return "UNPREPARED"
+            if (current !is ComponentLpSolverCapability) return "MONOLITHIC"
+            if (pendingFloat != null) return "PAUSED"
+            if (current.solvedExactState !== state) return "UNMATCHED_STATE"
+            val metrics = current.lastMetrics
+            val children = metrics.componentSolves.toLong() + metrics.componentReuses.toLong()
+            val attempted = when {
+                children <= 0L -> "NO_CHILD"
+                children == 1L -> "ONE_CHILD"
+                else -> "MULTIPLE_CHILDREN"
+            }
+            return "${current.lastTermination?.name ?: "NO_STOP"}_$attempted"
+        }
+
     init {
         require(maxRetainedRows >= 0 && refactorUpdateLimit > 0 && iterationLimit >= 0 && workLimit >= 0L)
     }
 
-    fun prepare(token: Cancellation = cancellation): Boolean {
+    fun prepare(token: Cancellation = cancellation): Boolean = prepare(token, null)
+
+    fun prepare(token: Cancellation, workAllowance: Long?): Boolean {
         requireAvailable()
         if (closed || token() || state.model.m > maxRetainedRows) return false
         if (solver != null) return true
-        solver = prepared(state, token)?.first ?: return false
+        if (workAllowance != null && workAllowance <= 0L) return false
+        val available = when {
+            workAllowance == null -> workLimit
+            workLimit <= 0L -> workAllowance
+            else -> minOf(workLimit, workAllowance)
+        }
+        solver = prepared(state, token, workBudget = available)?.first ?: return false
         return true
+    }
+
+    fun partialPrimalGuidance(token: Cancellation): LpPrimalGuidance? {
+        requireAvailable()
+        if (closed || token()) return null
+        return (solver as? ComponentLpSolverCapability)?.partialPrimalGuidance(token)
     }
 
     fun push(token: Cancellation = cancellation): Boolean = edit(token) { it.push(token) }
@@ -312,6 +352,7 @@ internal class LpScopedSolver(
     ): Pair<LpSolver, FloatLpResult?>? {
         requireAvailable()
         require(quantum > 0L && allowance.work > 0L)
+        floatInvocation = token
         lastResult = null
         lastMetrics = LpSolveMetrics()
         lastFloatTermination = null
@@ -340,7 +381,7 @@ internal class LpScopedSolver(
             pending.allowance = allowance
         }
         if (pending == null) {
-            if (!current.adopt(state, token)) {
+            if (!current.adopt(state, floatInvocationToken)) {
                 solver = null
                 closeOwner(current)
                 return null

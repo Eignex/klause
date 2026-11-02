@@ -13,6 +13,7 @@ import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -25,6 +26,75 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpRetainedSourcesTest {
+    @Test
+    fun `completed source preparation should charge fresh emissions once`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+        ))
+        val sources = LpRetainedSources(
+            problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1))),
+        )
+        var work = 0L
+        LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+            val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)) { work += it })
+
+            assertEquals(edit.emittedExtent, work)
+            assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false, objective = edit.objective))
+            edit.commit()
+            val charged = work
+            assertNotNull(sources.prepare(owner.state, RootDomains(problem)) { work += it })
+            assertEquals(charged, work)
+        }
+    }
+
+    @Test
+    fun `cancelled source preparation should retain completed emission charges`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+        ))
+        val sources = LpRetainedSources(
+            problem, CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1))),
+        )
+        var work = 0L
+
+        assertFailsWith<LpAssemblyCancelled> {
+            sources.prepare(LpExactState(LpRetainedSources.emptyModel()), RootDomains(problem),
+                Cancellation { work > 0L }) { work += it }
+        }
+
+        assertEquals(1L, work)
+    }
+
+    @Test
+    fun `retained template imports should preserve wide exact origins and open sides`() {
+        val modes = listOf(false to false, true to false, true to true)
+        for ((templates, metadata) in modes) for (open in listOf(false, true)) {
+            val origin = 9_007_199_254_740_993L
+            val problem = Problem(0, 2, Array(2) { IntDomain(origin, origin + 4L) }, arrayOf<Factor>(
+                Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 2L * origin + 3L),
+            ), openIntHi = booleanArrayOf(false, open))
+            val consumer = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L, 1L)),
+                projections = FactorProjectionProviders.Default.prepare(problem),
+                reuseSourceTemplates = templates, reuseTemplateMetadata = metadata)
+            val sources = LpRetainedSources(problem, consumer)
+            LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+                val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)))
+                val assertions = assertNotNull(edit.boundAssertions(0L))
+                assertTrue(owner.replaceRows(edit.retired, edit.columns, edit.rows, false,
+                    permanentRows = edit.permanentRows, objective = edit.objective, assertions = assertions))
+                edit.commit()
+
+                val result = assertNotNull(owner.solve())
+
+                assertEquals(BigFraction.ofLong(2L * origin + 3L), result.lowerBound)
+                assertEquals(BigFraction.ofLong(origin), owner.state.model.column(0).origin.value)
+                assertEquals(open, owner.state.model.column(1).bounds.upper == null)
+                if (templates) assertSame(assertNotNull(consumer.preparationTemplates).bounds.getValue(0).column,
+                    owner.state.model.column(0))
+            }
+        }
+    }
+
     @Test
     fun `selected element groups retain exact joint bounds across holes and pop`() {
         val problem = Problem(

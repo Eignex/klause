@@ -10,10 +10,10 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.RelaxationProjection
 import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationPolicy
-import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpModel
@@ -22,11 +22,13 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
+import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.continueExactLp
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.solver.FactorProjectionProviders
@@ -41,6 +43,65 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
+    @Test
+    fun `paid sparse source layout starts numerical preparation without another assembly slice`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L)).bake()
+        val factory = RecordingLpEngineFactory()
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 2), constant = 7L),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            SolveStatsSink("paid-sparse-source-layout"), LpSolveContext(factory),
+            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+            val paid = engine.totalSolveWork()
+
+            val readyInFirstSlice = engine.prepareRootLayout(Cancellation.Never,
+                Cancellation { engine.totalSolveWork() > paid })
+
+            assertFalse(readyInFirstSlice)
+            assertTrue(paid > 0L)
+            assertEquals(EngineConstruction.PERSISTENT, factory.calls.single().kind)
+            val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList())
+            assertEquals(8.0, bound)
+            assertEquals(1, factory.calls.size)
+            assertEquals(1, factory.floatAllowances.size)
+        }
+    }
+
+    @Test
+    fun `cancelled sparse source adoption retains its paid charge without constructing an owner`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L)).bake()
+        val factory = RecordingLpEngineFactory()
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 2)),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
+            SolveStatsSink("cancelled-sparse-source-adoption"), LpSolveContext(factory)).use { engine ->
+            val paid = engine.totalSolveWork()
+            val cancelled = Cancellation { true }
+
+            engine.prepareRootLayout(cancelled, Cancellation.Never)
+            val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList(), cancelled)
+
+            assertTrue(paid > 0L)
+            assertEquals(paid, engine.totalSolveWork())
+            assertTrue(factory.calls.isEmpty())
+            assertTrue(bound.isNaN())
+        }
+    }
+
+    @Test
+    fun `sparse admission measures source bounds before root propagation`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 64)),
+            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+
+        val admission = LpAutoConfig.admission(problem, LpConfig.parse("default,+sparse-trial"), LpPlan())
+
+        assertTrue(admission.plan.bounding)
+        assertEquals(7L, requireNotNull(admission.sparseTrial).metrics["ScalarBits"])
+    }
+
     @Test
     fun `cancelled sparse assembly retains its reserved construction charge`() {
         val row = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)
@@ -145,11 +206,9 @@ class SparseLpAdmissionTest {
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
             settings = ProblemSettings(lpCeilingTableauCells = 1L))
         var refusals = 0
-        val policy = LpCertificationPolicy { certifier, successful ->
-            if (certifier == LpCertifier.RATIONAL && successful) {
-                refusals++
-                false
-            } else successful
+        val policy = LpCertificationPolicy { _, successful ->
+            if (successful) refusals++
+            false
         }
 
         val bound = LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1, 1)),
@@ -163,8 +222,8 @@ class SparseLpAdmissionTest {
     }
 
     @Test
-    fun `sparse trials preserve the ordinary root probe intent`() {
-        for (ceiling in listOf(1L, 1_000_000L)) {
+    fun `admitted sparse roots retain primal consumers when the ordinary size proxy declines`() {
+        for ((ceiling, ordinaryLp) in listOf(1L to false, 1_000_000L to true)) {
             val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
                 listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
                 settings = ProblemSettings(lpCeilingTableauCells = ceiling))
@@ -172,7 +231,10 @@ class SparseLpAdmissionTest {
 
             val trial = LpAutoConfig.resolve(problem, LpConfig.parse("default,+sparse-trial"))
 
-            assertEquals(ordinary.probe, trial.probe)
+            assertEquals(ordinaryLp, ordinary.bounding)
+            assertEquals(ordinaryLp, ordinary.probe)
+            assertTrue(trial.bounding)
+            assertTrue(trial.probe)
         }
     }
 
@@ -360,8 +422,7 @@ class SparseLpAdmissionTest {
         assertEquals(1L, sink.snapshot().lp.sparseTrial["Admitted"])
         assertTrue(sink.snapshot().lp.pruned.sum > 0.0)
         assertTrue(sink.snapshot().lp.workOps.sum > 0.0)
-        assertTrue(sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
-            .sumOf { it.outcomes["ROWS"] ?: 0L } > 0L)
+        assertTrue((sink.snapshot().lp.sparseTrial["PreparationWork"] ?: 0L) > 0L)
     }
 
     @Test

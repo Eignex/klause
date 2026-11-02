@@ -77,6 +77,7 @@ internal class LpEmissionCache(private val relaxer: CpToLpRelaxation) {
         domains: RelaxationDomains,
         targetDepth: Int,
         cancellation: Cancellation = Cancellation.Never,
+        onWork: ((Long) -> Unit)? = null,
     ): LpEmissionUpdate {
         require(targetDepth >= 0)
         check(generation < Long.MAX_VALUE)
@@ -99,7 +100,7 @@ internal class LpEmissionCache(private val relaxer: CpToLpRelaxation) {
             if (cancellation()) throw LpAssemblyCancelled()
             val previous = next[index]
             if (previous == null || !previous.dependencies.matches(domains)) {
-                val emitted = relaxer.emitRegion(relaxer.emissionRegions[index], domains, cancellation)
+                val emitted = relaxer.emitRegion(relaxer.emissionRegions[index], domains, cancellation, onWork)
                 emittedRegions++
                 if (targetDepth > 0 && saved.add(index)) changes.add(Change(targetDepth, index, previous))
                 next[index] = emitted

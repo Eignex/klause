@@ -522,6 +522,9 @@ internal class LpBuilder {
     )
 
     private val rows = ArrayList<RawRow>()
+    private var rowEntries = 0L
+
+    val constructionSize: Long get() = varCount.toLong() + rowCount + rowEntries
 
     /** Number of structural variables added so far; valid column indices are `0 until varCount`. */
     val varCount: Int get() = lo.size
@@ -652,6 +655,7 @@ internal class LpBuilder {
                 strict = strict,
             ),
         )
+        rowEntries += cols.size
     }
 
     /**
@@ -672,6 +676,7 @@ internal class LpBuilder {
     ) {
         require(cols.size == vals.size) { "cols/vals length mismatch: ${cols.size} vs ${vals.size}" }
         rows.add(RawRow(cols.copyOf(), vals.copyOf(), rel, rhs, global, premises))
+        rowEntries += cols.size
     }
 
     /** Convenience overload for sparse maps (test call sites); unpacks into parallel arrays. */
@@ -685,6 +690,7 @@ internal class LpBuilder {
             k++
         }
         rows.add(RawRow(cols, vals, rel, rhs, global = true, premises = null))
+        rowEntries += cols.size
     }
 
     /**

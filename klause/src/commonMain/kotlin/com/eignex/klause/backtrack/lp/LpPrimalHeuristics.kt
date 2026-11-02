@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.snapshotAssignment
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpRounding
 import com.eignex.klause.lp.bounding.RootRoundingWarmStart
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -34,17 +35,35 @@ internal fun LpEngine.lpRoundingProbe(
     toleranceReals: Boolean = false,
     accept: (Sample) -> Sample? = { it },
 ): Sample? {
+    requireOpen()
     val started = TimeSource.Monotonic.markNow()
     var outcome = "RELAXATION_DECLINED"
     rootRoundingInterrupted = false
-    val session = PropagationSession(problem, cancellation)
+    val pending = rootRoundingWarmStart?.takeIf { it.objective === objective }
+    rootRoundingWarmStart = pending
+    if (pending?.roundingComplete == true && problem.numRealVars == 0) {
+        if (!cancellation()) retainRootPrimalTargets(cancellation)
+        rootRoundingInterrupted = cancellation()
+        if (!rootRoundingInterrupted) rootRoundingWarmStart = null
+        sink.lp.observePrimalPhase("PRIMAL_ROUNDING",
+            if (rootRoundingInterrupted) "COMPLETED_PENDING" else "COMPLETED_REUSED",
+            started.elapsedNow().inWholeNanoseconds)
+        return null
+    }
+    if (pending != null && pending.primal == null) {
+        retainRootPartialPrimalGuidance(pending.relaxation, cancellation)
+    }
+    val retained = rootRoundingWarmStart
+    val resumed = retained?.pinning
+    val session = resumed ?: PropagationSession(problem, cancellation)
+    var previousWork = if (resumed == null) 0L else session.work
+    var keepPinning = resumed != null
     try {
         if (cancellation()) {
             rootRoundingInterrupted = true
             return null
         }
-        val retained = rootRoundingWarmStart?.takeIf { it.objective === objective }
-        rootRoundingWarmStart = retained
+        val knownColumns = retained?.knownColumns
         if (session.isUnsatAtRoot) {
             outcome = "DISCRETE_ROOT_REJECTED"
             return null
@@ -55,7 +74,8 @@ internal fun LpEngine.lpRoundingProbe(
             return null
         }
         val primal = retained?.primal?.also {
-            sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "REUSED", started.elapsedNow().inWholeNanoseconds)
+            val guidance = if (knownColumns == null) "REUSED" else "PARTIAL_REUSED"
+            sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", guidance, started.elapsedNow().inWholeNanoseconds)
         } ?: run {
             val result = try {
                 solvePrimalRelaxation(
@@ -74,51 +94,121 @@ internal fun LpEngine.lpRoundingProbe(
             } catch (_: CheckedLongOverflowException) {
                 return null
             } ?: return null
-            retainRoundingPrimalGuidance(relaxation, result, objective)
-            result.primal
+            if (ownsRootPrimalModel(relaxation.model)) {
+                retainRootPrimalGuidance(relaxation, result, cancellation)
+            } else retainRoundingPrimalGuidance(relaxation, result, objective)
+            rootRoundingWarmStart?.takeIf {
+                it.objective === objective && it.relaxation === relaxation && it.knownColumns == null
+            }?.primal ?: result.primal
         }
-        val reals = if (toleranceReals && problem.numRealVars > 0) relaxation.floatReals(primal, problem) else null
+        val reals = if (toleranceReals && problem.numRealVars > 0 && knownColumns == null) {
+            relaxation.floatReals(primal, problem)
+        } else null
         val seed = initial?.takeIf {
             it.numIntVars == problem.numIntVars && it.numBoolVars == problem.numBoolVars
         }
+        val guidance = rootRoundingWarmStart?.takeIf {
+            problem.numRealVars == 0 && it.objective === objective &&
+                it.relaxation === relaxation && it.primal === primal
+        }
+        guidance?.pinning = session
+        if (resumed != null) {
+            sink.lp.observePrimalPhase("PRIMAL_CP_GUIDANCE", "REUSED", started.elapsedNow().inWholeNanoseconds)
+        }
+        val discrete = problem.numRealVars == 0
+        val directed = retainedRootEnabled
         val seen = HashSet<String>()
+        fun completeDirection(rounding: LpRounding) {
+            if (!discrete || guidance == null) return
+            if (!directed) {
+                guidance.roundingComplete = true
+                return
+            }
+            when (rounding) {
+                LpRounding.NEAREST -> guidance.rounding = LpRounding.UP
+                LpRounding.UP -> guidance.rounding = LpRounding.DOWN
+                LpRounding.DOWN -> guidance.roundingComplete = true
+            }
+        }
         fun propose(rounding: LpRounding, seed: Sample? = null, reals: DoubleArray? = null): Sample? {
             if (cancellation()) {
                 rootRoundingInterrupted = true
                 return null
             }
-            val attempt = if (rounding == LpRounding.NEAREST && seed == null) session else {
+            val attempt = if (seed == null && (discrete || rounding == LpRounding.NEAREST)) session else {
                 PropagationSession(problem, cancellation)
             }
             try {
                 if (attempt.isUnsatAtRoot) return null
-                val sample = pinToward(attempt, relaxation, rounding) { col ->
-                    if (col !in relaxation.colVarId.indices) {
-                        null
-                    } else if (seed == null) {
-                        primal.getOrNull(col)
-                    } else {
-                        val variable = relaxation.colVarId[col]
-                        if (relaxation.colIsBool[col]) {
-                            if (seed.boolValue(variable)) 1.0 else 0.0
-                        } else seed.intValue(variable).toDouble()
+                if (attempt === session) keepPinning = false
+                if (attempt.fixpointCancelled) {
+                    rootRoundingInterrupted = true
+                    outcome = "CANCELLED"
+                    return null
+                }
+                val sample = attempt.withProbeInvocation(cancellation) {
+                    pinToward(attempt, relaxation, rounding) { col ->
+                        if (col !in relaxation.colVarId.indices) {
+                            null
+                        } else if (seed == null) {
+                            primal.getOrNull(col)?.takeIf {
+                                it.isFinite() && (knownColumns == null || knownColumns.getOrNull(col) == true)
+                            }
+                        } else {
+                            val variable = relaxation.colVarId[col]
+                            if (relaxation.colIsBool[col]) {
+                                if (seed.boolValue(variable)) 1.0 else 0.0
+                            } else seed.intValue(variable).toDouble()
+                        }
                     }
+                }
+                if (sample == null && !attempt.fixpointCancelled && !attempt.probeCancelled) {
+                    completeDirection(rounding)
                 }
                 if (attempt.fixpointCancelled || attempt.probeCancelled || cancellation()) {
                     rootRoundingInterrupted = true
+                    keepPinning = attempt === session && !attempt.fixpointCancelled &&
+                        (sample != null || attempt.probeCancelled)
                     outcome = "CANCELLED"
                     return null
                 }
                 if (sample == null) return null
                 outcome = "PROPOSED"
-                if (!seen.add(pumpKey(sample.ints, sample.bools))) return null
-                return accept(if (reals == null) sample else sample.copy(reals = reals))
+                if (!seen.add(pumpKey(sample.ints, sample.bools))) {
+                    completeDirection(rounding)
+                    return null
+                }
+                val accepted = accept(if (reals == null) sample else sample.copy(reals = reals))
+                if (discrete && accepted == null) {
+                    if (cancellation()) {
+                        rootRoundingInterrupted = true
+                        keepPinning = attempt === session
+                        outcome = "CANCELLED"
+                    } else completeDirection(rounding)
+                }
+                return accepted
             } finally {
-                if (attempt !== session) primalPropagationWork += attempt.work
+                if (attempt !== session) {
+                    primalPropagationWork += attempt.work
+                    attempt.releaseRetainedState()
+                }
             }
         }
         outcome = "PINNING_DECLINED"
         fun roundings(reals: DoubleArray?): Sample? {
+            if (discrete) {
+                var rounding = LpRounding.NEAREST
+                if (directed && guidance != null) rounding = guidance.rounding
+                while (true) {
+                    propose(rounding)?.let { return it }
+                    primalPropagationWork += session.work - previousWork
+                    previousWork = session.work
+                    if (rootRoundingInterrupted || !directed || rounding == LpRounding.DOWN) return null
+                    session.popToLevel(0)
+                    rounding = if (rounding == LpRounding.NEAREST) LpRounding.UP else LpRounding.DOWN
+                    guidance?.rounding = rounding
+                }
+            }
             propose(LpRounding.NEAREST, reals = reals)?.let { return it }
             if (problem.numRealVars > 0) {
                 if (seed != null) {
@@ -135,9 +225,21 @@ internal fun LpEngine.lpRoundingProbe(
         }
         return roundings(null)
     } finally {
-        primalPropagationWork += session.work
+        primalPropagationWork += session.work - previousWork
         if (cancellation()) rootRoundingInterrupted = true
-        if (!rootRoundingInterrupted) rootRoundingWarmStart = null
+        val guidance = rootRoundingWarmStart
+        if (keepPinning && rootRoundingInterrupted && !session.fixpointCancelled &&
+            guidance?.pinning === session
+        ) {
+            sink.lp.observePrimalPhase("PRIMAL_CP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
+        } else {
+            if (guidance != null && guidance.pinning === session) guidance.pinning = null
+            session.releaseRetainedState()
+        }
+        if (!rootRoundingInterrupted) {
+            retainRootPrimalTargets(cancellation)
+            rootRoundingWarmStart = null
+        }
         sink.lp.observePrimalPhase("PRIMAL_ROUNDING", outcome, started.elapsedNow().inWholeNanoseconds)
     }
 }
@@ -184,8 +286,6 @@ internal fun LpEngine.pinToward(
     return snapshotAssignment(session)
 }
 
-internal enum class LpRounding { NEAREST, UP, DOWN }
-
 /** Pin [v] to the rounded LP value (or [lo] when it has no LP column), falling back to the other side
  *  of the LP value on a conflict. A conflicting pin reverts to its pre-pin state for the fallback;
  *  interruption restores the last complete fixpoint and withholds the proposal. */
@@ -197,7 +297,12 @@ private fun pinIntTowardLp(
     hi: Long,
     rounding: LpRounding,
 ): Boolean {
-    if (lp == null) return session.probeInt(v, lo)?.let { it !is PropagationResult.Unsat } ?: false
+    if (lp == null) {
+        val result = session.probeInt(v, lo) ?: return false
+        if (result !is PropagationResult.Unsat) return true
+        if (lo != 0L || hi != 1L) return false
+        return session.probeInt(v, hi)?.let { it !is PropagationResult.Unsat } ?: false
+    }
     val target = when (rounding) {
         LpRounding.NEAREST -> round(lp)
         LpRounding.UP -> ceil(lp)
@@ -377,6 +482,7 @@ private fun LpEngine.solvePrimalRelaxation(
 ): FloatLpResult? {
     requireOpen()
     if (cancellation()) return null
+    if (ownsRootPrimalModel(model)) return solveRetainedPrimalRelaxation(cancellation, observeResult)
     val started = TimeSource.Monotonic.markNow()
     val simplex = newTableauCutSolver(model, cancellation,
         workLimit = rootPrimalWorkBudget(), factory = solveContext.engineFactory, pricing = pricingOptions)
@@ -399,6 +505,41 @@ private fun LpEngine.solvePrimalRelaxation(
                 val stage = if (primal) "PRIMAL_LP_PRIMAL" else "PRIMAL_LP_DUAL"
                 sink.lp.observePrimalPhase(stage, outcome, started.elapsedNow().inWholeNanoseconds)
             }
+        }
+    }
+}
+
+private fun LpEngine.solveRetainedPrimalRelaxation(
+    cancellation: Cancellation,
+    observeResult: ((FloatLpResult?, LpFloatTermination?) -> Unit)?,
+): FloatLpResult? {
+    val started = TimeSource.Monotonic.markNow()
+    var outcome = "RETAINED_DECLINED"
+    val remaining = minOf(rootPrimalWorkBudget(), retainedRootRemainingWork())
+    if (remaining <= 0L) return null
+    val token = cancellation or Cancellation { retainedRootRemainingWork() <= 0L }
+    try {
+        val attempt = propagator.solveFloat(token = token, queryAllowance = {
+            minOf(rootPrimalWorkBudget(), retainedRootRemainingWork()).coerceAtLeast(1L)
+        })
+        val result = attempt?.second
+        val termination = propagator.floatTermination
+        outcome = if (result?.optimal == true) "RETAINED_OPTIMAL" else {
+            "RETAINED_${termination?.name ?: "OTHER"}"
+        }
+        observeResult?.invoke(result, termination)
+        if (result?.optimal != true && (propagator.floatPaused || termination == LpFloatTermination.WORK ||
+                termination == LpFloatTermination.PIVOTS || termination == LpFloatTermination.CANCELLED)
+        ) {
+            rootRoundingInterrupted = true
+        }
+        attempt?.first?.let(::observeSparseTrial)
+        return result?.takeIf { it.optimal }
+    } finally {
+        try {
+            observeRootWork(propagator.lastMetrics.copy(preparationOps = 0L), finished = !propagator.floatPaused)
+        } finally {
+            sink.lp.observePrimalPhase("PRIMAL_LP_DUAL", outcome, started.elapsedNow().inWholeNanoseconds)
         }
     }
 }
