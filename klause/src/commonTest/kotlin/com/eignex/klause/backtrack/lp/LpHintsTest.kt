@@ -79,6 +79,12 @@ class LpHintsTest {
             listOf(LpDirectionalCost(1.0, 4.0))
         }
 
+        val existing = listOf(SearchDecision.IntAtMost(0, 0L), SearchDecision.IntAtLeast(0, 1L))
+        assertEquals(existing, hints.orderSelectedAlternatives(variable, domain, existing) { _, _ ->
+            queries++
+            listOf(LpDirectionalCost(1.0, 4.0))
+        })
+
         assertEquals(0L, work)
         assertEquals(0, queries)
     }
@@ -418,6 +424,115 @@ class LpHintsTest {
 
             assertEquals(existing, ordered, change)
         }
+    }
+
+    @Test
+    fun `root basis gains describe the actual complementary children`() {
+        for (boolean in listOf(false, true)) for (split in if (boolean) listOf(0L) else listOf(-1L, 0L, 1L)) {
+            for (upFirst in listOf(false, true)) for (allowBasis in listOf(false, true)) {
+                val builder = LpBuilder()
+                builder.addVar(if (boolean) 0L else -2L, if (boolean) 1L else 3L)
+                val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0),
+                    booleanArrayOf(boolean), 0L, if (boolean) IntArray(0) else intArrayOf(0),
+                    if (boolean) intArrayOf(0) else IntArray(0))
+                val events = mutableListOf<String>()
+                val hints = LpHints(if (boolean) 0 else 1, if (boolean) 1 else 0,
+                    directionalGains = true, rootBasis = true, observe = events::add)
+                val variable = if (boolean) VarRef.Bool(0) else VarRef.IntVar(0)
+                val domain = if (boolean) null else IntDomain(-2, 3)
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+                hints.branch(variable, domain)
+                val lower = if (boolean) SearchDecision.Bool(1) else SearchDecision.IntAtMost(0, split)
+                val upper = if (boolean) SearchDecision.Bool(0) else SearchDecision.IntAtLeast(0, split + 1L)
+                val existing = if (upFirst) listOf(upper, lower) else listOf(lower, upper)
+                var queries = 0
+
+                val ordered = hints.orderSelectedAlternatives(variable, domain, existing, allowBasis) { _, _ ->
+                    queries++
+                    listOf(LpDirectionalCost(1.0, 4.0))
+                }
+
+                val expected = if (!allowBasis) existing else
+                    if (split < 0L) listOf(lower, upper) else listOf(upper, lower)
+                assertEquals(expected, ordered)
+                assertEquals(1, queries)
+                assertEquals(1, events.count { it == "BASIS_PARTITION_PREPARED" })
+                assertEquals(if (allowBasis) 1 else 0, events.count { it == "BASIS_SIDE_CONSUMED" })
+                assertEquals(if (allowBasis) 0 else 1, events.count { it == "BASIS_SIDE_WITHHELD" })
+            }
+        }
+    }
+
+    @Test
+    fun `incomplete root partitions preserve the single funded basis opportunity`() {
+        val variable = VarRef.IntVar(0)
+        val domain = IntDomain(0, 2)
+        val existing = listOf(SearchDecision.IntAtMost(0, 0L), SearchDecision.IntAtLeast(0, 1L))
+        for (invalid in listOf(emptyList(), existing.take(1),
+            listOf(SearchDecision.IntAtMost(0, 0L), SearchDecision.IntAtLeast(0, 2L)),
+            listOf(SearchDecision.IntAtMost(1, 0L), SearchDecision.IntAtLeast(1, 1L)),
+            listOf(SearchDecision.IntAtMost(0, -1L), SearchDecision.IntAtLeast(0, 0L)),
+            listOf(SearchDecision.IntAtMost(0, Long.MAX_VALUE), SearchDecision.IntAtLeast(0, Long.MIN_VALUE)))) {
+            val builder = LpBuilder()
+            builder.addVar(0, 2)
+            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0),
+                BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+            var work = 0L
+            var queries = 0
+            val hints = LpHints(1, 0, directionalGains = true, rootBasis = true, charge = { work += it })
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+            hints.branch(variable, domain)
+            val before = work
+            val estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>? = { _, _ ->
+                queries++
+                listOf(LpDirectionalCost(1.0, 4.0))
+            }
+
+            assertEquals(invalid, hints.orderSelectedAlternatives(variable, domain, invalid, estimate = estimate))
+            assertEquals(0, queries)
+            assertTrue(work - before <= 24L)
+            assertEquals(existing.reversed(), hints.orderSelectedAlternatives(variable, domain, existing,
+                estimate = estimate))
+            hints.resetHistory()
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+            hints.branch(variable, domain)
+            assertEquals(existing, hints.orderSelectedAlternatives(variable, domain, existing, estimate = estimate))
+            assertEquals(1, queries)
+        }
+    }
+
+    @Test
+    fun `unfunded partition preparation preserves the root basis opportunity`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 2)
+        val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0),
+            BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+        val hints = LpHints(1, 0, directionalGains = true, rootBasis = true)
+        val variable = VarRef.IntVar(0)
+        val domain = IntDomain(0, 2)
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+        hints.branch(variable, domain)
+        val existing = listOf(SearchDecision.IntAtMost(0, 0L), SearchDecision.IntAtLeast(0, 1L))
+        var requested = 0L
+        var queries = 0
+        val estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>? = { _, _ ->
+            queries++
+            listOf(LpDirectionalCost(1.0, 4.0))
+        }
+
+        val unchanged = hints.orderSelectedAlternatives(variable, domain, existing,
+            reserve = { requested = it; false }, estimate = estimate)
+
+        assertEquals(existing, unchanged)
+        assertEquals(24L, requested)
+        assertEquals(0, queries)
+        assertEquals(existing.reversed(), hints.orderSelectedAlternatives(variable, domain, existing,
+            estimate = estimate))
+        assertEquals(1, queries)
     }
 
     @Test

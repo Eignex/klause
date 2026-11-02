@@ -958,12 +958,24 @@ internal class LpEngine(
     internal var nodeUsesTrail: Boolean = false
     private var branchWorkAllowance = 0L
 
-    internal fun directionalCosts(model: LpModel, columns: IntArray): List<LpDirectionalCost?>? {
+    private fun remainingDirectionalWork(): Long {
         var allowance = branchWorkAllowance
-        branchWorkAllowance = 0L
         nodeWorkAllowance()?.let { allowance = minOf(allowance, it) }
         lpEffortGovernor.remainingWork()?.let { allowance = minOf(allowance, it) }
-        if (allowance <= 0L || params.cancellation()) return null
+        return if (allowance <= 0L || params.cancellation()) 0L else allowance
+    }
+
+    internal fun reserveDirectionalWork(work: Long): Boolean {
+        if (work <= 0L || work > remainingDirectionalWork()) return false
+        branchWorkAllowance -= work
+        noteNodeOverhead(work)
+        return true
+    }
+
+    internal fun directionalCosts(model: LpModel, columns: IntArray): List<LpDirectionalCost?>? {
+        val allowance = remainingDirectionalWork()
+        branchWorkAllowance = 0L
+        if (allowance <= 0L) return null
         val started = TimeSource.Monotonic.markNow()
         var work = 0L
         val charge: (Long) -> Unit = { ops ->

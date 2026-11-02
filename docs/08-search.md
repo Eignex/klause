@@ -300,17 +300,21 @@ using each direction's mean cost per unit of fractional movement. The balanced
 `min + max / 6` score ranks finite positive predictions in the shortlist.
 Missing or unreliable history retains the existing variable order. The selected
 variable at the root can request one child-order
-estimate from its retained optimal basis. This attempt is limited to one column and
+estimate from its retained optimal basis after the actual complementary alternatives
+exist. This attempt is limited to one column and
 one attempt per hint owner, including across slices, restarts and assumption reseeding.
 An unsupported or unfunded attempt consumes that opportunity and retains the existing
 child order. Reliable history takes precedence and consumes no basis opportunity.
 History preparation and ordering share the existing LP allowance.
 
 The larger predicted objective increase is tried first, after value and incumbent
-guidance, only when both existing alternatives match the estimated Boolean or integer
-floor/ceil partition. Guidance swaps those alternatives without adding, removing or
-replacing a decision. Tied gains, insufficient allowance, pruned alternatives and changed partitions retain the existing
-heuristics. Preferences expire at the next node, point replacement or history reset.
+guidance. Passive history requires the estimated Boolean or integer floor/ceil
+partition. A root basis estimate scales its source-coordinate unit costs by each
+actual child bound's distance from the LP point. A child bound already satisfied by
+that point has zero estimated movement. Partition inspection and conversion reserve 24 work units
+from the existing LP allowance before the query. Guidance swaps those alternatives
+without adding, removing or replacing a decision. Tied gains, insufficient allowance,
+pruned alternatives and incompatible partitions retain the existing heuristics. Preferences expire at the next node, point replacement or history reset.
 History and basis side consumption, changed order and unavailable advice are recorded
 separately. Child-order fallback distinguishes a changed variable, an incomplete pair
 and a different partition. Variable proposal preparation is separate from actual selection, with

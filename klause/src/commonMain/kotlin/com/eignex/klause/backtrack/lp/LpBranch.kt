@@ -61,8 +61,8 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
             second, (second as? VarRef.IntVar)?.let { session.intDomain(it.varId) })
     } else null
     val selected = hints.applyVariableChoice(proposal, best)
-    hints.prepareSelectedSide(selected, (selected as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
-        estimate = ::directionalCosts)
+    hints.prepareSide(selected, (selected as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
+        allowBasis = false, estimate = ::directionalCosts)
     return selected
 }
 
