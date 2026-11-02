@@ -94,7 +94,10 @@ internal class WatchedClauseStore {
             var protectedPosting = false
             for (position in 0 until list.size) {
                 sample.step()
-                if (sample.contains(protectedIds, list[position])) protectedPosting = true
+                if (sample.contains(protectedIds, list[position])) {
+                    protectedPosting = true
+                    break
+                }
             }
             protectedWatches = protectedWatches || protectedPosting
             sample.owned(list, list.backingData.size.toLong() * Int.SIZE_BYTES, protectedPosting)
@@ -109,7 +112,10 @@ internal class WatchedClauseStore {
             var protectedPosting = false
             for (position in 0 until list.size) {
                 sample.step()
-                if (sample.contains(protectedIds, list[position])) protectedPosting = true
+                if (sample.contains(protectedIds, list[position])) {
+                    protectedPosting = true
+                    break
+                }
             }
             protectedSignatures = protectedSignatures || protectedPosting
             sample.owned(list, list.backingData.size.toLong() * Int.SIZE_BYTES, protectedPosting)

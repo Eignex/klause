@@ -369,8 +369,11 @@ internal class NativeSatState(private val state: PropagationState) {
             for (i in 0 until watchSizes[literal]) {
                 sample.step()
                 val handle = entries[i].toInt()
-                if (!retained) retained = handle < baseCount || learnedPermanent[handle - baseCount] == 1 ||
-                    sample.contains(protected, handle - baseCount)
+                if (handle < baseCount || learnedPermanent[handle - baseCount] == 1 ||
+                    sample.contains(protected, handle - baseCount)) {
+                    retained = true
+                    break
+                }
             }
             sample.owned(entries, entries.size.toLong() * Long.SIZE_BYTES, retained)
         }

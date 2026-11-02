@@ -257,6 +257,8 @@ single-lane charged-work schedule (`portfolio-work`). It defaults to false;
 traffic/work/use counters remain inexpensive. Each sample has separate
 `sharing-memory-work` and `sharing-memory-scratch` limits (32,768 visits and
 4,096 deduplication entries by default; zero is permitted).
+Posting protection checks stop after finding a required owner; the full allocated
+capacity remains counted.
 Clause accounting is reported per worker in `ArmSchedule.sharing.clauses` and as
 `clause*` fields in the CLI arm record. Pool payload belongs to one shared pool;
 primitive payload arrays are counted once by identity. A private owner of disjoint

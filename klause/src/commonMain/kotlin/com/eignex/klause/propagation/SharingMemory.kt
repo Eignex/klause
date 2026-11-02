@@ -118,13 +118,12 @@ private fun PropagationState.protectedPosting(
     posting: IntArrayList,
     protected: SharingMemoryObservation.Seen<Int>,
 ): Boolean {
-    var retained = false
     for (i in 0 until posting.size) {
         sample.step()
         val factor = posting[i]
-        if (!retained) retained = factor < baseFactorCount || sample.contains(protected, factor - baseFactorCount)
+        if (factor < baseFactorCount || sample.contains(protected, factor - baseFactorCount)) return true
     }
-    return retained
+    return false
 }
 
 private fun PropagationState.learnedSharingMemory(
