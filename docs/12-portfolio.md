@@ -259,7 +259,12 @@ traffic/work/use counters remain inexpensive. Each sample has separate
 4,096 deduplication entries by default; zero is permitted).
 Clause accounting is reported per worker in `ArmSchedule.sharing.clauses` and as
 `clause*` fields in the CLI arm record. Pool payload belongs to one shared pool;
-primitive payload arrays are counted once by identity. Private clause-reference,
+primitive payload arrays are counted once by identity. A private owner of disjoint
+arrays can report one stable pool identity with total bytes and its cumulative protected
+portion. Pool reports cover the same immutable owned region within an observation;
+upgrading protection preserves the owned-byte total. A weaker report retains earlier
+protection. Reference allocations retain their own protection granularity.
+Private clause-reference,
 global-flag, origin, key and payload-owner array capacities are modeled separately.
 Sources with no integer variables use a Boolean-only pool whose payload-owner
 index reserves one array per clause; atom payloads are declined. Empty export

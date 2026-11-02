@@ -36,28 +36,36 @@ internal class SharingMemoryObservation(
     private var protectedSlots = 0L
     private var sharedBytes = 0L
 
-    private class Owner(val identity: Any, val bytes: Long, val slots: Long, var protected: Boolean,
+    private class Owner(val identity: Any, val bytes: Long, val slots: Long, var protectedAmount: Long,
         var shared: Boolean, val next: Owner?)
 
     fun owned(identity: Any, bytes: Long, protected: Boolean = false, shared: Boolean = false) =
-        own(identity, bytes, 0L, protected, shared)
+        own(identity, bytes, 0L, if (protected) bytes else 0L, shared)
 
     fun ownedReferences(identity: Any, slots: Long, protected: Boolean = false) =
-        own(identity, 0L, slots, protected, false)
+        own(identity, 0L, slots, if (protected) slots else 0L, false)
 
-    private fun own(identity: Any, bytes: Long, slots: Long, protected: Boolean, shared: Boolean) {
+    // Pool reports cover an immutable region and its cumulative protected subset.
+    fun ownedPool(identity: Any, bytes: Long, cumulativeProtectedBytes: Long) =
+        own(identity, bytes, 0L, cumulativeProtectedBytes, false, pool = true)
+
+    private fun own(identity: Any, bytes: Long, slots: Long, protectedAmount: Long, shared: Boolean,
+        pool: Boolean = false) {
         require(bytes >= 0L && slots >= 0L)
+        require(protectedAmount >= 0L && protectedAmount <= if (slots == 0L) bytes else slots)
         if (bytes == 0L && slots == 0L) return
         step()
         var owner = owners
         while (owner != null) {
             step()
             if (owner.identity === identity && (owner.slots == 0L) == (slots == 0L)) {
+                if (pool) require(owner.bytes == bytes && owner.slots == 0L)
                 if (shared && !owner.shared) { owner.shared = true; sharedBytes += owner.bytes }
-                if (protected && !owner.protected) {
-                    owner.protected = true
-                    protectedBytes += owner.bytes
-                    protectedSlots += owner.slots
+                val retained = minOf(protectedAmount, if (slots == 0L) owner.bytes else owner.slots)
+                if (retained > owner.protectedAmount) {
+                    val added = retained - owner.protectedAmount
+                    owner.protectedAmount = retained
+                    if (slots == 0L) protectedBytes += added else protectedSlots += added
                 }
                 return
             }
@@ -65,10 +73,10 @@ internal class SharingMemoryObservation(
         }
         if (scratchEntries >= maxScratchEntries) throw Stopped()
         scratchEntries++
-        owners = Owner(identity, bytes, slots, protected, shared, owners)
+        owners = Owner(identity, bytes, slots, protectedAmount, shared, owners)
         ownedBytes += bytes
         ownedSlots += slots
-        if (protected) { protectedBytes += bytes; protectedSlots += slots }
+        if (slots == 0L) protectedBytes += protectedAmount else protectedSlots += protectedAmount
         if (shared) sharedBytes += bytes
     }
 

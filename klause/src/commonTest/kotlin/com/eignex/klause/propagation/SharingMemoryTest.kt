@@ -20,6 +20,22 @@ import kotlin.test.assertTrue
 
 class SharingMemoryTest {
     @Test
+    fun `an unprotected page neighbor should not increase protected payload bytes`() {
+        val session = PropagationSession(Problem(6, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = true)
+        assertTrue(session.usesNativeSat)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+        session.pinBool(0, false)
+        val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9)
+        val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        assertEquals(after.getValue("learnedMetadataCapacityBytes") - before.getValue("learnedMetadataCapacityBytes"),
+            after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"))
+    }
+
+    @Test
     fun `tiny allowances stop observations before completing either learned store`() {
         for (native in listOf(false, true)) for (allowance in listOf(0L, 1L, 7L)) {
             val session = PropagationSession(Problem(32, 0, emptyArray(),
