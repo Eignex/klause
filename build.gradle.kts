@@ -24,6 +24,17 @@ val koblasPins = mapOf(
 val skemaPins = listOf("skema", "skema-jvm", "skema-linuxx64", "skema-linuxarm64", "skema-macosarm64")
     .associateWith { "0.3.1-20261028.100806-19" }
 
+if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
+    // Lab builds retain complete distributions; each fresh tree discards its incremental indexes.
+    gradle.projectsEvaluated {
+        allprojects {
+            tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+                incremental = false
+            }
+        }
+    }
+}
+
 // Koblas, Kumulant and Skema use timestamped snapshots; this endpoint is outside the conventions'
 // default repository set.
 allprojects {

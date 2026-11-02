@@ -1,0 +1,3 @@
+# Immutable independent covering blocks with direct additive objectives.
+lp-component-split/mps-cover-2x3
+lp-component-split/mps-cover-3x3

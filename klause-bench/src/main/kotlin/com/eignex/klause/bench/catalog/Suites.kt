@@ -36,7 +36,9 @@ internal object Suites {
             NonlinearIntegerBooleanResidueSuite.suite +
             DivModSuite.suite + AbsSuite.suite +
             ContinuousArithmeticSuite.suite + MpsLinearSourceSuite.suite +
-            SourceOwnershipSuite.suite + ExactGlobalsSuite.suite + SourceEqualitySuite.suite +
+            SourceOwnershipSuite.suite + RewriteStructureSuite.suite + RewriteStructureSuite.canonicalSuite +
+            ExactGlobalsSuite.suite +
+            SourceEqualitySuite.suite +
             IntegerAggregateSuite.suite
     }
 
@@ -783,6 +785,10 @@ internal object Suites {
 
     private val lpComponentSplit = suite("lp-component-split", "Targeted separable and linked dense LP models") {
         license = "internal"
+        for ((name, optimum) in listOf("cover-2x3" to 4L, "cover-3x3" to 6L)) {
+            vendored("mps-$name", Category.OPTIMIZATION, Expected.Opt(optimum),
+                relPath = "lp-component-split/$name.mps", format = Format.MPS)
+        }
         for (name in listOf("dense-2x12", "dense-8x24", "linked-8x24")) {
             vendoredMzn("mzn-$name", Category.OPTIMIZATION, Expected.Opt(1), model = "lp-component-split/$name.mzn")
         }
@@ -842,17 +848,17 @@ internal object Suites {
         format = Format.MINIZINC
         license = "internal"
         val base = "klause-mzn-lib/test-models"
-        workspace("argmax", "$base/argmax.mzn", Category.CSP, Expected.Sat)
-        workspace("bin_packing", "$base/bin_packing.mzn", Category.PACKING, Expected.Sat)
-        workspace("connected", "$base/connected.mzn", Category.CSP, Expected.Sat)
-        workspace("diffn_nonstrict_k", "$base/diffn_nonstrict_k.mzn", Category.PACKING, Expected.Sat)
-        workspace("graph_coloring", "$base/graph_coloring.mzn", Category.CSP, Expected.Sat)
-        workspace("latin_square", "$base/latin_square.mzn", Category.CSP, Expected.Sat)
-        workspace("magic_square", "$base/magic_square.mzn", Category.CSP, Expected.Sat)
-        workspace("queens", "$base/queens.mzn", Category.CSP, Expected.Sat)
-        workspace("send_more_money", "$base/send_more_money.mzn", Category.CSP, Expected.Sat)
-        workspace("sudoku", "$base/sudoku.mzn", Category.CSP, Expected.Sat)
-        workspace("zero_one_knapsack", "$base/zero_one_knapsack.mzn", Category.PACKING, Expected.Unknown)
+        workspace("argmax", "$base/klause-test-argmax.mzn", Category.CSP, Expected.Sat)
+        workspace("bin_packing", "$base/klause-test-bin_packing.mzn", Category.PACKING, Expected.Sat)
+        workspace("connected", "$base/klause-test-connected.mzn", Category.CSP, Expected.Sat)
+        workspace("diffn_nonstrict_k", "$base/klause-test-diffn_nonstrict_k.mzn", Category.PACKING, Expected.Sat)
+        workspace("graph_coloring", "$base/klause-test-graph_coloring.mzn", Category.CSP, Expected.Sat)
+        workspace("latin_square", "$base/klause-test-latin_square.mzn", Category.CSP, Expected.Sat)
+        workspace("magic_square", "$base/klause-test-magic_square.mzn", Category.CSP, Expected.Sat)
+        workspace("queens", "$base/klause-test-queens.mzn", Category.CSP, Expected.Sat)
+        workspace("send_more_money", "$base/klause-test-send_more_money.mzn", Category.CSP, Expected.Sat)
+        workspace("sudoku", "$base/klause-test-sudoku.mzn", Category.CSP, Expected.Sat)
+        workspace("zero_one_knapsack", "$base/klause-test-zero_one_knapsack.mzn", Category.PACKING, Expected.Unknown)
     }
 }
 
