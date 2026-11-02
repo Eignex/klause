@@ -68,23 +68,21 @@ internal class LpPumpPreparation private constructor(
             token.checkLpAssembly()
             if (objective.boolWeightValues[variable] != 0L && current.boolColOf[variable] < 0) return null
         }
-        token.charge(model.n * 3L + model.numVars)
+        token.charge(model.n.toLong() + model.numVars)
         token.checkLpAssembly()
-        val columns = IntArray(model.n) { it }
-        val costs = LongArray(model.n) { column ->
-            token.checkLpAssembly()
-            val variable = current.colVarId[column]
-            when {
-                variable < 0 -> 0L
-                current.colIsBool[column] -> if (current.boolColOf[variable] == column) {
-                    objective.boolWeightValues.getOrElse(variable) { 0L }
-                } else 0L
-                current.intColOf[variable] == column -> objective.intCoefficientValues.getOrElse(variable) { 0L }
-                else -> 0L
-            }
-        }
         val rebound = try {
-            model.withRowObjective(columns, costs)
+            model.withStructuralObjective { column ->
+                token.checkLpAssembly()
+                val variable = current.colVarId[column]
+                when {
+                    variable < 0 -> 0L
+                    current.colIsBool[column] -> if (current.boolColOf[variable] == column) {
+                        objective.boolWeightValues.getOrElse(variable) { 0L }
+                    } else 0L
+                    current.intColOf[variable] == column -> objective.intCoefficientValues.getOrElse(variable) { 0L }
+                    else -> 0L
+                }
+            }
         } catch (_: CheckedLongOverflowException) {
             return null
         }
@@ -99,7 +97,7 @@ internal class LpPumpPreparation private constructor(
             val definition = root.primalDefinition
             if (definition != null && !definition.matches(engine.problem, engine.projections, model)) return false
             val bindingWork = 1L + engine.problem.numIntVars + engine.problem.numBoolVars +
-                model.n * 3L + model.numVars
+                model.n.toLong() + model.numVars
             val construction = (model.n.toLong() + model.m + model.csc.rowIdx.size) * LpNodeOverhead.BUILD
             val sourceWork = definition?.paidWork ?: engine.problem.numFactors.toLong()
             val inspection = bindingWork + sourceWork + 1L + setupWork

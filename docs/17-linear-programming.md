@@ -199,7 +199,9 @@ Unary reified equalities additionally retain bounded source and live value snaps
 so interior-hole changes invalidate their definition. Objective changes require every
 current nonzero coordinate to exist in the retained layout; changed costs receive private
 arrays and checked shift arithmetic; an unrepresentable rebind falls back to ordinary
-construction. A constant changes only the envelope.
+construction. Compact rebinding writes structural coefficients directly into the final
+private cost buffer, with zero logical costs. No intermediate column map or coefficient
+buffer is retained or allocated. A constant changes only the envelope.
 The retained definition drops build-specific source maps and preparation metadata.
 Numerical bases, mutable restrictions, results and source acceptance remain private.
 Capture, guard checks, objective rebinding, refusal and publication charge the current
@@ -226,9 +228,9 @@ completed construction. Unmarked models instead require the audited linear and
 Boolean source cohort and pay its factor inspection. A cheaper binding retains only
 the current immutable model view, with no predecessor chain or shared numerical
 basis. Nonzero objective coordinates must already exist in that layout; new costs
-and checked affine shifts receive private arrays. Build-specific
-source maps are detached. An unchanged-model handoff may explicitly retain the
-witness; model replacement, remapping and shared preparation publication drop it.
+and checked affine shifts receive a private final cost buffer directly, without temporary
+column-index or coefficient arrays. Build-specific source maps are detached. An
+unchanged-model handoff may explicitly retain the witness; model replacement, remapping and shared preparation publication drop it.
 The witness supplies no domain-lifetime guarantee: continued definitions still
 require the complete source and domain guard. Exact-state, IEEE, continuous and
 unsupported selections keep ordinary construction. Cancellation withholds a view

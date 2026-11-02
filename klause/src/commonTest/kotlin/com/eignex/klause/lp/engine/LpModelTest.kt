@@ -60,10 +60,26 @@ class LpModelTest {
 
         val single = source.withSingleColumnObjective(1, -1L)
         val row = source.withRowObjective(intArrayOf(0), longArrayOf(3L))
+        val structural = source.withStructuralObjective { if (it == 0) 3L else 0L }
 
         assertContentEquals(longArrayOf(0L, -1L, 0L), single.cost)
         assertContentEquals(longArrayOf(3L, 0L, 0L), row.cost)
+        assertContentEquals(longArrayOf(3L, 0L, 0L), structural.cost)
         assertContentEquals(longArrayOf(7L, 11L, 13L), source.cost)
+    }
+
+    @Test
+    fun `structural objective rebinding should preserve exact shifted constants`() {
+        val source = LpBuilder().apply {
+            addVar(2L, 7L, cost = 7L)
+            addVar(-3L, 9L, cost = 11L)
+            addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.LE, 4L)
+        }.build(Sense.MINIMIZE)
+
+        val rebound = source.withStructuralObjective { if (it == 0) -3L else 2L }
+
+        assertEquals(-12L, rebound.objConstant)
+        assertEquals(-19L, source.objConstant)
     }
 
     @Test

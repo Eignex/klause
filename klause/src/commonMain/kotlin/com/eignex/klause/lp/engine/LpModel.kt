@@ -335,6 +335,25 @@ internal class LpModel(
     /** Column index of row `i`'s slack variable. */
     fun slackCol(i: Int): Int = n + i
 
+    inline fun withStructuralObjective(costAt: (Int) -> Long): LpModel {
+        require(exactState == null && doubleView == null) { "structural objective rebinding requires a compact model" }
+        val cost = LongArray(numVars)
+        var constant = 0L
+        for (column in 0 until n) {
+            val coefficient = costAt(column)
+            cost[column] = coefficient
+            constant = addExact(constant, mulExact(coefficient, loShift[column]))
+        }
+        return LpModel(
+            n = n, m = m, csc = csc, rhs = rhs, cost = cost,
+            upper = upper, hasUpper = hasUpper, loShift = loShift,
+            objConstant = constant, sense = sense, tag = tag,
+            rowGlobal = rowGlobal, rowStrict = rowStrict, rowPremises = rowPremises, flippedRhs = flippedRhs,
+            probeClampedLo = probeClampedLo, probeClampedHi = probeClampedHi,
+            colContinuous = colContinuous,
+        )
+    }
+
     /**
      * Iterate the nonzero structural entries of column [j] as `(row, value)`, rows ascending, over the
      * CSC core — the column-oriented readers ([RevisedSimplex], [safeObjectiveLowerBound],

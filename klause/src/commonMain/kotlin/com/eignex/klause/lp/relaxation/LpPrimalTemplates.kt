@@ -50,7 +50,6 @@ internal class LpPrimalTemplates private constructor(
     private val liveUpper = LongArray(problem.numIntVars) { domains.intDomain(it).max }
     private val booleans = ByteArray(problem.numBoolVars) { pin(domains.boolValue(it)) }
     private val honorsOpenSides = domains.honorsOpenSides
-    private val columns = IntArray(relaxation.model.n) { it }
 
     fun replacementWork(completed: Long, token: Cancellation): Long {
         token.charge(1L)
@@ -102,14 +101,14 @@ internal class LpPrimalTemplates private constructor(
         }
         val previous = relaxation.model
         var changed = false
-        for (column in columns) {
+        for (column in 0 until previous.n) {
             if (!visit()) return null
             if (cost(objective, column) != previous.cost[column]) changed = true
         }
         val model = if (changed) {
-            if (!visit(previous.n.toLong() * 2L + previous.numVars)) return null
+            if (!visit(previous.n.toLong() + previous.numVars)) return null
             try {
-                previous.withRowObjective(columns, LongArray(previous.n) { cost(objective, it) })
+                previous.withStructuralObjective { cost(objective, it) }
             } catch (_: CheckedLongOverflowException) {
                 return null
             }
@@ -142,7 +141,7 @@ internal class LpPrimalTemplates private constructor(
 
         fun captureWork(problem: Problem, relaxation: LpRelaxation): Long =
             2L + problem.numFactors * 2L + problem.numIntVars * 5L + problem.numBoolVars +
-                relaxation.model.n * 2L + relaxation.model.m
+                relaxation.model.n.toLong() + relaxation.model.m
 
         fun capture(
             selection: PreparedFactorProjections,
@@ -213,7 +212,7 @@ internal class LpPrimalTemplates private constructor(
                 roots.add(snapshot(problem.rootDomainOf(variable)) ?: return null)
                 live.add(snapshot(domains.intDomain(variable)) ?: return null)
             }
-            if (!visit(1L + problem.numFactors + problem.numIntVars * 5L + problem.numBoolVars + model.n)) return null
+            if (!visit(1L + problem.numFactors + problem.numIntVars * 5L + problem.numBoolVars)) return null
             val detached = relaxation.withModel(model, sources = null, reusedPrimalDefinition = true)
             return LpPrimalTemplates(LpEmissionScope(selection.lpEmissionNamespace, problem), units,
                 detached, problem, domains, holes, roots.toTypedArray(), live.toTypedArray()).takeUnless { token() }
