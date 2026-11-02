@@ -3,12 +3,15 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.RootComponentOrder
+import com.eignex.klause.lp.bounding.RootPrimalTargets
 import com.eignex.klause.lp.engine.LpProjectionMeter
 import com.eignex.klause.lp.engine.LpProjectionStop
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntDisjointSet
+import com.eignex.klause.util.argsortBy
+import kotlin.math.floor
 import kotlin.time.TimeSource
 
 internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellation: Cancellation): VarRef? {
@@ -27,7 +30,7 @@ internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellatio
             targets.componentOrderAttempted = true
             val meter = LpProjectionMeter(work, bytes, cancellation)
             try {
-                val prepared = rootComponentOrder(problem, meter, session)
+                val prepared = rootComponentOrder(problem, meter, session, targets)
                 if (rootPrimalTargets === targets && !cancellation()) {
                     targets.components = prepared
                     outcome = if (prepared == null) "CONNECTED_DECLINED" else "RETAINED"
@@ -61,6 +64,7 @@ internal fun rootComponentOrder(
     problem: Problem,
     meter: LpProjectionMeter,
     session: PropagationSession? = null,
+    targets: RootPrimalTargets? = null,
 ): RootComponentOrder? {
     val n = problem.numIntVars
     if (session != null && session.problem !== problem) return null
@@ -104,8 +108,47 @@ internal fun rootComponentOrder(
         val group = byRoot[components.find(variable)]
         members[writes[group]++] = variable
     }
+    val prepared = RootComponentOrder(offsets, members, groups)
+    val ordered = if (targets == null) prepared else prepared.orderTargets(byRoot, sizes, targets, meter)
     meter.poll()
-    return RootComponentOrder(offsets, members, groups)
+    return ordered
+}
+
+private fun RootComponentOrder.orderTargets(
+    byRoot: IntArray,
+    scratch: IntArray,
+    targets: RootPrimalTargets,
+    meter: LpProjectionMeter,
+): RootComponentOrder {
+    val n = members.size
+    var levels = 0L
+    var width = 1L
+    while (width < n) {
+        levels++
+        width *= 2L
+    }
+    meter.reserve((2L * levels + 2L) * n, 0L, matrix = false)
+    for (group in 0 until groups) {
+        for (index in offsets[group] until offsets[group + 1]) {
+            if (index % 256 == 0) meter.poll()
+            byRoot[members[index]] = group
+        }
+    }
+    // Reusing graph scratch keeps sorting within the admitted primitive storage.
+    val ordered = argsortBy(n, members, scratch) { a, b ->
+        meter.reserve(8L, 0L, matrix = false)
+        val groupOrder = byRoot[a].compareTo(byRoot[b])
+        if (groupOrder != 0) groupOrder else targets.fractionality(b).compareTo(targets.fractionality(a))
+    }
+    return if (ordered === members) this else RootComponentOrder(offsets, ordered, groups)
+}
+
+private fun RootPrimalTargets.fractionality(variable: Int): Double {
+    val column = intColumns.getOrNull(variable) ?: return -1.0
+    if (knownColumns != null && knownColumns.getOrNull(column) != true) return -1.0
+    val coordinate = coordinates.getOrNull(column)?.takeIf { it.isFinite() } ?: return -1.0
+    val fraction = coordinate - floor(coordinate)
+    return minOf(fraction, 1.0 - fraction)
 }
 
 internal fun firstRootComponentVariable(

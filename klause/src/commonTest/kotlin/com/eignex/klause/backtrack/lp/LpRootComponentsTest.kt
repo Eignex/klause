@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.RootPrimalTargets
 import com.eignex.klause.lp.bounding.SPARSE_LP_MAX_PREPARATION_WORK
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.engine.LpProjectionMeter
@@ -27,6 +28,58 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpRootComponentsTest {
+    @Test
+    fun `fractional coordinates precede integral coordinates within each component`() {
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 2, 4, 6), LinearOp.LE, 4),
+            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(1, 3, 5, 7), LinearOp.LE, 4),
+        ))
+        val columns = intArrayOf(6, 1, 4, 3, 2, 5, 0, 7)
+        val coordinates = DoubleArray(8)
+        for ((variable, value) in listOf(1.0, 0.9, -0.5, -0.5, 0.25, 0.5, 0.5, 0.0).withIndex()) {
+            coordinates[columns[variable]] = value
+        }
+        val targets = RootPrimalTargets(columns, intArrayOf(), coordinates, null)
+
+        val order = assertNotNull(rootComponentOrder(problem, LpProjectionMeter(), targets = targets))
+
+        assertEquals(listOf(2, 6, 4, 0, 3, 5, 1, 7), order.members.toList())
+    }
+
+    @Test
+    fun `unknown and nonfinite coordinates follow known component targets in source order`() {
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
+        ))
+        for (unknown in listOf(0.5, Double.NaN, Double.POSITIVE_INFINITY)) {
+            val targets = RootPrimalTargets(IntArray(6) { it }, intArrayOf(),
+                doubleArrayOf(1.0, Double.NaN, 0.25, unknown, 0.5, 0.0),
+                booleanArrayOf(true, true, true, false, false, true))
+
+            val order = assertNotNull(rootComponentOrder(problem, LpProjectionMeter(), targets = targets))
+
+            assertEquals(listOf(2, 0, 4, 5, 1, 3), order.members.toList())
+        }
+    }
+
+    @Test
+    fun `target ordering cannot publish a component order beyond its preparation allowance`() {
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
+        ))
+        val graph = LpProjectionMeter()
+        assertNotNull(rootComponentOrder(problem, graph))
+        val meter = LpProjectionMeter(graph.work + 1L, rootComponentPreparationBytes(6))
+        val targets = RootPrimalTargets(IntArray(6) { it }, intArrayOf(), DoubleArray(6) { 0.5 }, null)
+
+        assertFailsWith<LpProjectionStop> { rootComponentOrder(problem, meter, targets = targets) }
+
+        assertEquals(graph.work, meter.work)
+        assertTrue(meter.allocation <= rootComponentPreparationBytes(6))
+    }
+
     @Test
     fun `a fresh slice can fund preparation after an unstarted component attempt`() {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
