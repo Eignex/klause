@@ -179,5 +179,10 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         return latest
     }
 
-    private class BoundEvent(val row: IntegerLearningInequality, val variable: Int, val trail: Int, val key: Pair<Int, Int>)
+    private class BoundEvent(
+        val row: IntegerLearningInequality,
+        val variable: Int,
+        val trail: Int,
+        val key: Pair<Int, Int>,
+    )
 }
