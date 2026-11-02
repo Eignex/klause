@@ -11,7 +11,7 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
     val protected = protectedLearnedMemory(sample)
     nativeEngine?.sharingMemory(sample, protected) ?: learnedSharingMemory(sample, protected)
     factorAttribution?.sharingMemory(sample)
-    val reasons = sample.seen<IntArray>()
+    val reasons = sample.seenIdentities<IntArray>()
     var reasonBytes = 0L
     var reasonSlots = 0L
     fun add(reason: IntArray?) {
@@ -45,7 +45,7 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
         "reasonReferenceSlots" to reasonSlots))
 
     val atomColumns = listOf(atoms.intVar, atoms.truth, atoms.lvl, atoms.undoAtomId, atoms.undoTruth, atoms.undoLvl)
-    val atomRuns = sample.seen<VarAtomIndex>()
+    val atomRuns = sample.seenIdentities<VarAtomIndex>()
     var atomBytes = atoms.threshold.allocatedBytes
     sample.owned(atoms.threshold, atoms.threshold.allocatedBytes, true)
     for (column in atomColumns) {
@@ -90,7 +90,7 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
 private fun PropagationState.protectedLearnedMemory(
     sample: SharingMemoryObservation,
 ): SharingMemoryObservation.Seen<Int> {
-    val protected = sample.seen<Int>()
+    val protected = sample.seenIds()
     val count = nativeEngine?.count ?: learned.size
     fun protect(fid: Int) {
         sample.step()
@@ -131,8 +131,8 @@ private fun PropagationState.learnedSharingMemory(
     sample: SharingMemoryObservation,
     protected: SharingMemoryObservation.Seen<Int>,
 ) {
-    val ints = sample.seen<IntArray>()
-    val longs = sample.seen<LongArray>()
+    val ints = sample.seenIdentities<IntArray>()
+    val longs = sample.seenIdentities<LongArray>()
     var payload = 0L
     fun add(value: IntArray?) {
         sample.step()

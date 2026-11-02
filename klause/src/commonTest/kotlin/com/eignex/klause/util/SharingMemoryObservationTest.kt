@@ -3,6 +3,7 @@ package com.eignex.klause.util
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -153,5 +154,41 @@ class SharingMemoryObservationTest {
         assertEquals(SharingMemoryStatus.PARTIAL, memory.status)
         assertEquals(1, memory.scratchEntries)
         assertNull(memory.completeValues)
+    }
+    @Test
+    fun `protected ids with long shared hash prefixes should fit the default grant`() {
+        val sample = SharingMemoryObservation(SharingMemoryObservation.DEFAULT_WORK,
+            SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES, { false }, {})
+        val ids = sample.seenIds()
+
+        val memory = sample.snapshot {
+            repeat(384) { assertTrue(sample.retain(ids, it shl 23)) }
+            repeat(384) { assertFalse(sample.retain(ids, (383 - it) shl 23)) }
+            for (index in listOf(0, 127, 255, 383)) assertTrue(sample.contains(ids, index shl 23))
+            assertFalse(sample.contains(ids, -1))
+        }
+
+        assertEquals(SharingMemoryStatus.COMPLETE, memory.status)
+        assertEquals(384, ids.size)
+        assertEquals(384, memory.scratchEntries)
+    }
+
+    @Test
+    fun `equal payload contents should retain distinct array identities`() {
+        val first = intArrayOf(1, 2)
+        val second = intArrayOf(1, 2)
+        val sample = SharingMemoryObservation(1024L, 128, { false }, {})
+        val arrays = sample.seenIdentities<IntArray>()
+
+        val memory = sample.snapshot {
+            assertTrue(sample.retain(arrays, first))
+            assertTrue(sample.retain(arrays, second))
+            assertFalse(sample.retain(arrays, first))
+            assertTrue(sample.contains(arrays, first))
+            assertTrue(sample.contains(arrays, second))
+        }
+
+        assertEquals(SharingMemoryStatus.COMPLETE, memory.status)
+        assertEquals(2, arrays.size)
     }
 }

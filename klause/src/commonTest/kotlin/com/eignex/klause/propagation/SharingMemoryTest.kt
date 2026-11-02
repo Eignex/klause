@@ -208,18 +208,18 @@ class SharingMemoryTest {
         val native = assertNotNull(state.nativeEngine)
         val sample = SharingMemoryObservation(1_000_000L, 4096, { false }, {})
         val baseline = assertNotNull(sample.snapshot {
-            native.sharingMemory(sample, sample.seen())
+            native.sharingMemory(sample, sample.seenIds())
         }.completeValues)
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
         session.pinBool(0, false)
         val reason = state.boolReason[1] - state.baseFactorCount
         assertEquals(0, reason)
         val before = assertNotNull(sample.snapshot {
-            native.sharingMemory(sample, sample.seen())
+            native.sharingMemory(sample, sample.seenIds())
         }.completeValues)
 
         val after = assertNotNull(sample.snapshot {
-            val protected = sample.seen<Int>()
+            val protected = sample.seenIds()
             sample.retain(protected, reason)
             native.sharingMemory(sample, protected)
         }.completeValues)
