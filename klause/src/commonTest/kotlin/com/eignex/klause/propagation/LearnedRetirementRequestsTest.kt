@@ -39,7 +39,7 @@ class LearnedRetirementRequestsTest {
             val retired = session.advanceLearnedRetirements(256L, 256L, { false }, publicationPending = false)
             assertEquals(LearnedRetirementStatus.Retired, retired.status)
             assertEquals(0, session.activeLearnedClauseCount)
-            assertEquals(!native, retired.payloadReleased)
+            assertTrue(retired.payloadReleased)
             assertFalse(retired.physicalReleased)
         }
     }
