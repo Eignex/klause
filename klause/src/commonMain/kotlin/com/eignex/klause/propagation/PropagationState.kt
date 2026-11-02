@@ -872,14 +872,14 @@ class PropagationState private constructor(
         }.iterator()
     }
 
-    /** Install factor [fid]'s static wakeup subscriptions into the per-literal / per-int-event advisor
-     *  indices and its delta-consumer accumulators. Shared by initial construction (once per factor,
-     *  in factor-id order) and by an incremental presolve session registering a factor added mid-run
-     *  without rebuilding the whole state. */
     private fun reserveWatchPositions() {
         if (problem.numBoolVars > 0) preparationIndexWork += watches.pos.reserve(baseFactorCount, 8)
     }
 
+    /** Install factor [fid]'s static wakeup subscriptions into the per-literal / per-int-event advisor
+     *  indices and its delta-consumer accumulators. Shared by initial construction (once per factor,
+     *  in factor-id order) and by an incremental presolve session registering a factor added mid-run
+     *  without rebuilding the whole state. */
     private fun registerFactor(fid: Int, propagator: Propagator, preparation: Boolean = false) {
         val watchers = propagator.initialBoolWatchers
         if (watchers != null) {
