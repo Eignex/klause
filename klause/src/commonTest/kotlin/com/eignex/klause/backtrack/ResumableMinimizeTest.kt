@@ -239,7 +239,8 @@ class ResumableMinimizeTest {
             var firstPasses = Double.NaN
             var firstDeferrals = 0L
 
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {
+            val observed = Cancellation { samples.isNotEmpty() && search.stats.lp.nodePasses.sum > 0.0 }
+            search.runSlice(observed, Long.MAX_VALUE, -1L) {
                 if (samples.isEmpty()) {
                     firstPasses = search.stats.lp.nodePasses.sum
                     firstDeferrals = search.stats.lp.phases["PRIMAL_COMPONENT_ORDER_ROOT"]
