@@ -280,6 +280,12 @@ ineligible. Clause literals are packed into an immutable arena whose clause indi
 match the model's factors, so reasons still identify source factors, and the arena is
 shared read-only across portfolio workers.
 
+Satisfaction traversals count constructed sessions by their actual propagation
+backend. The CLI exposes `nativePropagationNativeSatSessions` and
+`nativePropagationGeneralSessions`; retained traversal slices and reseeding keep
+the same construction observation. A constructed session alone establishes neither
+search work nor source completion.
+
 Propagation is two-watched-literal unit propagation over a trail pointer, without
 per-factor dispatch or integer order literals, reading a per-session truth byte per
 variable. Learned clauses own copied literal arrays in bounded reference pages,
