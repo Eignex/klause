@@ -63,7 +63,7 @@ class LpBoundingTest {
 
     @Test
     fun `unfinished node iterates supply checked bound guidance without the objective constant`() {
-        for (constant in listOf(0L, 1L shl 60)) for (initialOnly in listOf(false, true)) {
+        for (constant in listOf(0L, 1L shl 60)) {
             var unfinished = false
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
@@ -91,10 +91,6 @@ class LpBoundingTest {
             }
             val bounds = ArrayList<Double>()
             val hints = object : LpHintSink {
-                override val initialOptimumOnly = initialOnly
-                override fun recordObjective(relaxation: LpRelaxation, objective: Double) {
-                    error("An unfinished iterate supplied optimum guidance")
-                }
                 override fun clear() = Unit
                 override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) = Unit
                 override fun recordBound(relaxation: LpRelaxation, bound: Double) { bounds.add(bound) }
@@ -111,83 +107,47 @@ class LpBoundingTest {
             }
 
             assertTrue(unfinished)
-            if (initialOnly) assertTrue(bounds.isEmpty()) else assertTrue(bounds.single() in 1.0..2.0)
+            assertTrue(bounds.single() in 1.0..2.0)
         }
     }
 
     @Test
-    fun `initial optimum guidance records once across ordinary cutoff paths`() {
-        for (cutoff in listOf(Double.POSITIVE_INFINITY, 10.0, 1.0)) {
-            val optima = ArrayList<Double>()
-            val problem = triangle(1)
-            LpEngine(problem, sumObjective, LpParams(lpPlan = LpPlan(bounding = true)),
-                SolveStatsSink("initial-guidance")).use { engine ->
-                engine.lpHints = object : LpHintSink {
-                    override val initialOptimumOnly = true
-                    override fun clear() = Unit
-                    override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) = Unit
-                    override fun recordObjective(relaxation: LpRelaxation, objective: Double) { optima.add(objective) }
-                    override fun recordBound(relaxation: LpRelaxation, bound: Double) {
-                        error("A checked bound entered initial optimum guidance")
-                    }
-                }
-
-                engine.pruneNode(PropagationSession(problem), cutoff, -1, true)
-            }
-
-            assertEquals(listOf(1.5), optima)
-        }
-    }
-
-    @Test
-    fun `guidance keeps the point from its selected estimate model`() {
-        for (initialOnly in listOf(false, true)) {
-            val problem = triangle(1)
-            val bounds = ArrayList<Double>()
-            val optima = ArrayList<Double>()
-            var cutAdded = false
-            var pointModel: LpModel? = null
-            var pointObjective = Double.NaN
-            LpEngine(problem, sumObjective,
-                LpParams(lpPlan = LpPlan(bounding = true, cuts = true, probe = false,
-                    rootCutHarvest = false, rootBudgetMillis = 0L)),
-                SolveStatsSink("cut-guidance")).use { engine ->
-                engine.lpHints = object : LpHintSink {
-                    override val initialOptimumOnly = initialOnly
-                    override fun recordObjective(relaxation: LpRelaxation, objective: Double) { optima.add(objective) }
-                    override fun clear() = Unit
-                    override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
-                        pointModel = relaxation.model
-                        pointObjective = relaxation.intColOf.sumOf { primal[it] }
-                        if (!cutAdded) {
-                            val cut = engine.dualSimplex(relaxation.model, Cancellation.Never).use { simplex ->
-                                assertNotNull(simplex.solve())
-                                simplex.gomoryCuts(8).first()
-                            }
-                            assertTrue(engine.cutPool.add(cut, relaxation))
-                            cutAdded = true
+    fun `cut bound guidance uses the point from its final working model`() {
+        val problem = triangle(1)
+        val bounds = ArrayList<Double>()
+        var cutAdded = false
+        var pointModel: LpModel? = null
+        var pointObjective = Double.NaN
+        LpEngine(problem, sumObjective,
+            LpParams(lpPlan = LpPlan(bounding = true, cuts = true, probe = false,
+                rootCutHarvest = false, rootBudgetMillis = 0L)),
+            SolveStatsSink("cut-guidance")).use { engine ->
+            engine.lpHints = object : LpHintSink {
+                override fun clear() = Unit
+                override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+                    pointModel = relaxation.model
+                    pointObjective = relaxation.intColOf.sumOf { primal[it] }
+                    if (!cutAdded) {
+                        val cut = engine.dualSimplex(relaxation.model, Cancellation.Never).use { simplex ->
+                            assertNotNull(simplex.solve())
+                            simplex.gomoryCuts(8).first()
                         }
-                    }
-                    override fun recordBound(relaxation: LpRelaxation, bound: Double) {
-                        assertSame(pointModel, relaxation.model)
-                        assertEquals(bound, pointObjective, 1e-6)
-                        bounds.add(bound)
+                        assertTrue(engine.cutPool.add(cut, relaxation))
+                        cutAdded = true
                     }
                 }
-
-                assertFalse(engine.pruneNode(PropagationSession(problem), 10.0, -1, true))
+                override fun recordBound(relaxation: LpRelaxation, bound: Double) {
+                    assertSame(pointModel, relaxation.model)
+                    assertEquals(bound, pointObjective, 1e-6)
+                    bounds.add(bound)
+                }
             }
 
-            assertTrue(cutAdded)
-            if (initialOnly) {
-                assertTrue(bounds.isEmpty())
-                assertEquals(listOf(1.5), optima)
-                assertEquals(1.5, pointObjective, 1e-6)
-            } else {
-                assertEquals(2.0, bounds.single(), 1e-6)
-                assertTrue(optima.isEmpty())
-            }
+            assertFalse(engine.pruneNode(PropagationSession(problem), 10.0, -1, true))
         }
+
+        assertTrue(cutAdded)
+        assertEquals(2.0, bounds.single(), 1e-6)
     }
 
     @Test

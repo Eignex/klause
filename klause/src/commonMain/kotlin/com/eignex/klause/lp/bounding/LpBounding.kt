@@ -579,8 +579,6 @@ internal fun LpEngine.sparseSafePrune(
     // branch values toward the LP point and pick reduced-cost-impactful fractional variables. Purely
     // advisory — it never changes feasibility or the optimum.
     hints?.record(relaxation, result.primal, result.duals)
-    val boundHints = hints?.takeUnless { it.initialOptimumOnly }
-    if (result.optimal && hints?.initialOptimumOnly == true) hints.recordObjective(relaxation, result.objective)
     // The scoped owner carries appended-row bases itself; the hint is only for external fresh solves.
     var optimalBasis: Basis? = result.basis
     val rowMeter = if (problem.numRealVars > 0 &&
@@ -591,7 +589,7 @@ internal fun LpEngine.sparseSafePrune(
     val objectiveCeiling = if (canPrune) null else singleObjectiveCeiling(relaxation, cancellation)
     val canFix = canPrune || objectiveCeiling != null
     if (!canFix && !canPropagate) {
-        if (result.optimal) boundHints?.recordObjective(relaxation, result.objective)
+        if (result.optimal) hints?.recordObjective(relaxation, result.objective)
         if (rowMeter != null && applyMixedRowBounds(relaxation, session, sink, learn, cancellation, rowMeter)) {
             return LpNodeOutcome(true, null)
         }
@@ -661,7 +659,7 @@ internal fun LpEngine.sparseSafePrune(
     // reduced-cost fixing. Compute it once when any of them needs it; a singular/unbounded certify
     // yields null and each falls back to its cheap certificate-less path, which is sound.
     if (cancellation()) return LpNodeOutcome(false, null)
-    if (boundRel.model !== relaxation.model) boundHints?.recordPoint(boundRel, boundRes.primal, boundRes.duals)
+    if (boundRel.model !== relaxation.model) hints?.recordPoint(boundRel, boundRes.primal, boundRes.duals)
     activateCutAttribution(boundRel)
     val additionalCertificates = ArrayList<LpDeductionCertificate>(2)
     val cert = if ((learn && canPropagate) || canFix) {
@@ -719,7 +717,7 @@ internal fun LpEngine.sparseSafePrune(
         if ((integralCutoff != null && full.ceilLong()?.let { it >= integralCutoff } == true) ||
             full >= rationalCutoff
         ) {
-            boundHints?.let {
+            hints?.let {
                 noteNodeOverhead(words)
                 it.recordBound(boundRel, lower.toDouble())
             }
@@ -742,7 +740,7 @@ internal fun LpEngine.sparseSafePrune(
             applyMixedRowBounds(boundRel, session, sink, learn, cancellation, rowMeter, relaxer) { optimalBasis = null }
         return LpNodeOutcome(prune, if (prune) null else optimalBasis)
     }
-    boundHints?.recordBound(boundRel, lower)
+    hints?.recordBound(boundRel, lower)
     val full = checkNotNull(BigFraction.ofDouble(lower)) + BigFraction.ofLong(boundRel.objectiveConstant)
     val sourceRange = sourceObjectiveRange(boundRel)
     val cutoff = if (canPrune) sourceObjectiveCutoff(boundRel, bound, sourceRange) else null

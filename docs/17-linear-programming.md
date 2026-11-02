@@ -169,19 +169,18 @@ explanations cite the selected bound witnesses and all contributing row premises
 every learned literal is false at the conflict and implied by the cited antecedents.
 One integer or disjunction leaf cannot refute its sibling branches.
 
-The model-facing bounding callback can supply numeric projections of already accepted
-objective bounds and checked infeasibility outcomes to search hints. Its default
-bound mode reuses ordinary pruning bounds, including a dual bound from an unfinished
-iterate, and refreshes the advisory point after a cut re-solve. The search owns that
-bounded snapshot separately from fallback value-order hints and reduced-cost averages.
-
-Finite directional guidance selects the initial-optimum mode instead. It receives
-the initial optimal objective after the ordinary point callback, including when
-bounding subsequently needs a certificate. It declines unfinished iterates and
-skips later advisory bound callbacks and cut-point copies. Pruning, fixing and
-certification retain their own accepted bounds and authority. The search checks
-the final retained model and row context before using an initial observation.
-Both modes require matching estimate and point models and create no numerical query.
+The model-facing bounding callback supplies numeric projections of already accepted
+objective bounds and checked infeasibility outcomes to finite search hints. It reuses
+the bound obtained for ordinary pruning, including a dual bound from an unfinished
+iterate. Directional history accepts only compatible retained model and row scopes
+whose fractional coordinates came from that working model; it adds no certification request.
+A cut re-solve that returns an iterate replaces the advisory point before its
+accepted bound is recorded. The search owns a bounded copy of that point for
+directional observations and basis comparisons; this refresh preserves the initial
+iterate's fallback value-order hints and reduced-cost averages. The retained row
+scope still controls compatibility with earlier gains.
+When no certificate is needed, an existing floating optimum can supply the advisory
+estimate; the search keeps that estimate kind in its history scope.
 Unavailable callbacks identify admission gates and incomplete numerical outcomes;
 they carry no optimum, bound or query authorization.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and

@@ -53,14 +53,12 @@ internal enum class LpHintUnavailable {
  * type) is what lets the engine live below the search layer.
  */
 internal interface LpHintSink {
-    val initialOptimumOnly: Boolean get() = false
-
     fun clear()
 
     /** Advisory numeric projection of an accepted bound in minimized working units; adds no proof authority. */
     fun recordBound(relaxation: LpRelaxation, bound: Double) {}
 
-    /** Advisory floating optimum in minimized working units; adds no proof authority. */
+    /** Advisory floating optimum when ordinary bounding needs no certificate. */
     fun recordObjective(relaxation: LpRelaxation, objective: Double) {}
 
     fun recordInfeasible() {}

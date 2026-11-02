@@ -247,22 +247,23 @@ modes stop incomplete when their model continuation would require such a blocker
 
 ### Finite LP directional guidance
 
-Finite optimization records passive immediate parent/child progress between the initial
-floating optima returned by ordinary node LP queries, in minimized working units.
-Each gain is divided by the fractional movement of that optimum's advisory iterate
-to the actual lower or upper branch. An unfinished iterate, missing optimum,
-infeasibility, negative or nonfinite gain, integral coordinate or mismatched split
-supplies no numeric sample. Boolean coordinates must lie within `[0, 1]`; both
-integer split neighbours must belong to the current domain. These advisory
-observations supply no additional certified bound or pruning authority.
-
-The estimate and fractional coordinates come from the same initial working model.
-The search reads its owned value-order coordinates without copying a later cut
-iterate for history. Bound certification, reduced-cost fixing and cut separation
-keep their ordinary query policy. A changed final base or active-row context
-invalidates that node's pending comparison and point advice. Checked lower bounds
-and later cut optima do not train this production history. The value-order hints
-and reduced-cost averages also come from the initial iterate.
+Finite optimization records passive immediate parent/child progress of already accepted
+LP objective lower bounds in minimized working units. Each gain is divided by the
+fractional movement of the advisory LP iterate to the actual lower or upper branch.
+An unfinished iterate need not be feasible; its existing checked dual bound can still
+supply progress. Missing bounds, infeasibility, negative or nonfinite gains, integral
+coordinates and mismatched splits supply no numeric sample. Boolean coordinates must
+lie within `[0, 1]`; both integer split neighbours must belong to the current domain.
+These advisory observations supply no additional certified bound or pruning authority.
+The bound and fractional coordinates must come from the same working model.
+A cut re-solve that returns an iterate refreshes the point before its accepted bound
+reaches the history. This bounded point snapshot is separate from the initial
+iterate's value-order hints and reduced-cost averages, which continue to supply the
+fallback scorer. Directional advice declines when the refreshed integer point
+would require a different floor split from that value ordering.
+When ordinary bounding needs no certificate, an existing floating optimum remains
+the fallback estimate. Switching between checked bounds and floating optima clears
+history, so the two estimate kinds never train the same gains.
 The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
 
