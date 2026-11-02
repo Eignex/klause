@@ -154,7 +154,8 @@ class CliModeMpsTest {
 
         for (exact in listOf(false, true)) {
             val policy = if (exact) arrayOf("--exact") else emptyArray()
-            val flags = arrayOf("-s", "-e", "cp", "-p", "1", "-t", "10000")
+            val flags = arrayOf("-s", "-e", "cp", "-p", "1", "-t", "10000",
+                "--param", "presolve-work-limit=4096")
             val kept = capture { assertEquals(0, runCli(flags + policy + mps.absolutePath)) }
             val declined = capture {
                 assertEquals(

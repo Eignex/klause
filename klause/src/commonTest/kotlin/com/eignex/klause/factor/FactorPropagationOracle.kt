@@ -209,18 +209,19 @@ object FactorPropagationOracle {
     ): List<Sample> {
         val samples = ArrayList<Sample>()
         val assignments = sourceAssignmentValues(problem)
-        val state = declaredState(problem)
+        var state: LocalSearchState? = null
         for (assignment in assignments) {
             if (!relevant(assignment)) continue
-            load(state, assignment)
+            val current = state ?: declaredState(problem).also { state = it }
+            load(current, assignment)
             if (satisfies == null) {
-                if (state.cost == 0L) samples.add(assignment.snapshot())
+                if (current.cost == 0L) samples.add(assignment.snapshot())
             } else {
                 val sample = assignment.snapshot()
                 val accepted = satisfies(sample)
                 assertEquals(
                     accepted,
-                    state.cost == 0L,
+                    current.cost == 0L,
                     "$label: invariant disagrees with direct semantics at bools=${sample.bools.toList()}, " +
                         "ints=${sample.ints.toList()}",
                 )
