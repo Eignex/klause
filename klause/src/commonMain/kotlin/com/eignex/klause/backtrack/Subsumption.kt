@@ -25,10 +25,15 @@ internal class Subsumption : InprocessingPass {
         pending = null
     }
 
-    override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
+    override fun run(
+        session: PropagationSession,
+        params: BacktrackParams,
+        stats: SearchStatsSink?,
+        containingWork: Long,
+    ) {
         if (pending?.revision != session.learnedClauseRevision) pending = null
         if (!session.canSimplifyRoot || session.learnedClauseCount < 2) return
-        spending.run(session, params, stats) { budget ->
+        spending.run(session, params, stats, containingWork = containingWork) { budget ->
             val slice = pending?.takeIf { it.revision == session.learnedClauseRevision }
                 ?: SubsumptionSlice(session, cursor, params.subsumeBatch).also { pending = it }
             if (slice.advance(session, budget)) {

@@ -9,6 +9,22 @@ import kotlin.test.assertTrue
 
 class SearchTrailTest {
     @Test
+    fun `copied root reasons should fit the default memory observation grant`() {
+        val session = SearchSession(emptyList())
+        repeat(384) { variable ->
+            session.imply(variable * 2, SearchExplanation(intArrayOf(variable * 2)))
+        }
+        val sample = SharingMemoryObservation(SharingMemoryObservation.DEFAULT_WORK,
+            SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES, { false }, {})
+
+        val memory = sample.snapshot { session.retainedLearningMemory(sample) }
+
+        val values = requireNotNull(memory.completeValues)
+        assertEquals(384L * Int.SIZE_BYTES, values.getValue("sharedReasonPayloadBytes"))
+        assertTrue(memory.work <= SharingMemoryObservation.DEFAULT_WORK)
+    }
+
+    @Test
     fun `root reseeding should release obsolete copied reason payload and index capacity`() {
         val session = SearchSession(emptyList())
         repeat(24) { variable ->

@@ -18,6 +18,22 @@ import kotlin.test.assertTrue
 
 class LearnedReclamationTest {
     @Test
+    fun `native compaction should retain a large payload within index scratch`() {
+        val session = PropagationSession(Problem(4096, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(0, 1)))), nativeSat = true)
+        assertTrue(session.usesNativeSat)
+        session.addLearnedClause(Clause(IntArray(4096) { it * 2 }), 2)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+
+        val published = session.explanationState.forgetLearnedClauses(
+            maxWork = 1_000_000L, maxScratchBytes = 8192L) { index, _ -> index == 0 }
+
+        assertTrue(published)
+        assertEquals(1, session.learnedClauseCount)
+        assertEquals(4096, session.learnedClauseLiteralCount(0))
+    }
+
+    @Test
     fun `reclamation should release unused payload watches and primitive metadata on both stores`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(Problem(4, 0, emptyArray(),
@@ -101,21 +117,21 @@ class LearnedReclamationTest {
     }
 
     @Test
-    fun `insufficient native arena scratch should preserve the store before publication`() {
-        val session = PropagationSession(Problem(4096, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(0, 1)))), nativeSat = true)
+    fun `insufficient native index scratch should preserve the store before publication`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = true)
         assertTrue(session.usesNativeSat)
-        session.addLearnedClause(Clause(IntArray(4096) { it * 2 }), 2)
-        assertEquals(4096, session.learnedClauseLiteralCount(0))
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+        assertEquals(2, session.learnedClauseLiteralCount(0))
         val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
         val published = session.explanationState.forgetLearnedClauses(
-            maxWork = 1_000_000L, maxScratchBytes = 8192L) { _, _ -> false }
+            maxWork = 1_000_000L, maxScratchBytes = 32L) { _, _ -> false }
         val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
         assertFalse(published)
         assertEquals(1, session.learnedClauseCount)
-        assertEquals(4096, session.learnedClauseLiteralCount(0))
+        assertEquals(2, session.learnedClauseLiteralCount(0))
         assertEquals(before.getValue("learnedArenaCapacityBytes"), after.getValue("learnedArenaCapacityBytes"))
         assertEquals(before.getValue("ownedPrimitiveBytes"), after.getValue("ownedPrimitiveBytes"))
     }

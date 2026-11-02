@@ -3,12 +3,12 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.OWN_ORIGIN
+import com.eignex.klause.propagation.LearnedRetirementStatus
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.SharingMemoryObservation
 
 internal class RootSimplificationPass : InprocessingPass {
@@ -17,7 +17,8 @@ internal class RootSimplificationPass : InprocessingPass {
     private var scanEnd = 0
     private var scanRoot = -1
     override val spending = InprocessingSpending(InprocessingKind.Root)
-    private var dropped = IntHashSet()
+    private val retirement = RootLearnedRetirement()
+    private var maintenanceFirst = true
     private var revision = -1L
     private var pending: RootCandidate? = null
     private var deferredFactor = -1
@@ -28,7 +29,7 @@ internal class RootSimplificationPass : InprocessingPass {
     private var neighborhoodLeft = 0
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
-        sample.owned(dropped, dropped.allocatedBytes, protected)
+        retirement.retainedMemory(sample, this)
         pending?.let { candidate ->
             sample.step()
             sample.ownedReferences(candidate, 2L, protected)
@@ -42,7 +43,8 @@ internal class RootSimplificationPass : InprocessingPass {
         cursor = 0
         scanEnd = 0
         scanRoot = -1
-        dropped = IntHashSet()
+        retirement.abandon()
+        maintenanceFirst = true
         revision = -1L
         pending = null
         deferredFactor = -1
@@ -52,43 +54,80 @@ internal class RootSimplificationPass : InprocessingPass {
         preferNeighborhood = false
     }
 
-    override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
+    override fun run(
+        session: PropagationSession,
+        params: BacktrackParams,
+        stats: SearchStatsSink?,
+        containingWork: Long,
+    ) {
+        runRoot(session, params, stats, containingWork, admitNewWork = true)
+    }
+
+    override fun rootPublished() = retirement.rootPublished()
+
+    override fun hasContinuation(session: PropagationSession): Boolean =
+        retirement.hasContinuation(session) || pending != null || session.pendingRootSourceRetirement != null
+
+    override fun continueAtRoot(
+        session: PropagationSession,
+        params: BacktrackParams,
+        stats: SearchStatsSink?,
+        containingWork: Long,
+    ) = runRoot(session, params, stats, containingWork, admitNewWork = false)
+
+    private fun runRoot(
+        session: PropagationSession,
+        params: BacktrackParams,
+        stats: SearchStatsSink?,
+        containingWork: Long,
+        admitNewWork: Boolean,
+    ) {
         if (!session.canSimplifyRoot) return
-        spending.run(session, params, stats) { budget ->
-            simplify(session, params, budget)
-            PrivateRebuildCapture.observe(session, budget, params.rootRebuildCaptureVisits)
+        spending.run(session, params, stats, containingWork = containingWork) { budget ->
+            try {
+                if (revision != session.learnedRetirementGeneration) {
+                    if ((pending?.factor ?: -1) >= session.problem.numFactors) retirement.abandon()
+                    refreshClauseScan(session)
+                    revision = session.learnedRetirementGeneration
+                }
+                val index = pending?.factor?.minus(session.problem.numFactors) ?: -1
+                if (index >= 0 && !session.isLearnedClause(index)) {
+                    retirement.abandon()
+                    pending = null
+                }
+                if (!retirement.prepare(session, params, budget)) return@run
+                if (!admitNewWork && !retirement.selectionPending && pending == null &&
+                    session.pendingRootSourceRetirement == null) {
+                    retirement.advance(session, params, budget)
+                    return@run
+                }
+                if (maintenanceFirst) retirement.advance(session, params, budget)
+                simplify(session, params, budget, admitNewWork)
+                if (!maintenanceFirst) retirement.advance(session, params, budget)
+                maintenanceFirst = !maintenanceFirst
+                if (admitNewWork) PrivateRebuildCapture.observe(session, budget, params.rootRebuildCaptureVisits)
+            } finally {
+                retirement.finishSlice(session)
+            }
         }
     }
 
-    private fun simplify(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
+    private fun simplify(
+        session: PropagationSession,
+        params: BacktrackParams,
+        budget: InprocessingBudget,
+        admitNewWork: Boolean,
+    ) {
         if (session.problem.numBoolVars == 0 || session.explanationState.boolPinOrder.isEmpty()) {
             budget.note("NoBooleanFacts")
             return
         }
         val count = session.rootClauseCount
-        if (revision != session.learnedClauseRevision) {
-            dropped = IntHashSet()
-            refreshClauseScan(session)
-        }
-        revision = session.learnedClauseRevision
         if (count == 0) return
         session.pendingRootSourceRetirement?.let { (factor, literals) ->
             if (!budget.visit(literals.size + 1)) return
             session.retireRootSource(factor, literals)
             budget.note("RetirementWork", literals.size + 1L)
-        }
-        if (!dropped.isEmpty()) {
-            if (budget.stopped()) return
-            val before = session.work
-            val beforeCount = session.learnedClauseCount
-            session.forgetLearnedClauses { index, _ -> index !in dropped }
-            budget.note("RetirementWork", session.work - before)
-            dropped = IntHashSet()
-            revision = session.learnedClauseRevision
-            if (session.learnedClauseCount < beforeCount) {
-                refreshClauseScan(session)
-            }
-            return
         }
         if (cursor >= scanEnd && pending == null && deferredFactor < 0) {
             if (scanRoot != session.explanationState.undoTop) {
@@ -101,6 +140,7 @@ internal class RootSimplificationPass : InprocessingPass {
         var literalsVisited = 0
         neighborhoodLeft = ROOT_LITERAL_LIMIT
         while (examined++ < params.rootSimplifyBatch) {
+            if (!admitNewWork && pending == null) break
             if (!session.canSimplifyRoot || literalsVisited >= ROOT_LITERAL_LIMIT || budget.stopped()) break
             var candidate = pending
             if (candidate == null) {
@@ -139,16 +179,28 @@ internal class RootSimplificationPass : InprocessingPass {
                 continue
             }
             val source = factor < session.problem.numFactors
+            if (!source && !retirement.hasCapture) {
+                when (retirement.capture(session, factor - session.problem.numFactors,
+                    session.learnedRetirementGeneration, params, budget)) {
+                    LearnedRetirementStatus.Captured -> Unit
+                    LearnedRetirementStatus.Deferred -> return
+                    else -> {
+                        pending = null
+                        continue
+                    }
+                }
+            }
+            if (budget.stopped()) return
             if (!satisfied) {
                 val index = factor - session.problem.numFactors
                 val origin = if (source) OWN_ORIGIN else session.learnedClauseOrigin(index)
                 val lbd = if (source) residual.size else minOf(session.learnedClauseLbd(index), residual.size)
                 if (!budget.visit(residual.size * 2 + 1)) break
                 val before = session.work
-                session.addRootDerivedClause(Clause(residual.toIntArray()), lbd, origin, source)
+                session.addRootDerivedClause(Clause(residual.toIntArray()), lbd, origin, source, ownedLiterals = true)
                 pending = null
                 if (source) session.retainRootSourceRetirement(factor, literals)
-                else dropped.add(index)
+                else retirement.markSelected()
                 budget.note("AttachmentWork", session.work - before + residual.size * 2 + 1L)
                 budget.note("Shortened")
                 if (!session.canSimplifyRoot) break
@@ -158,19 +210,9 @@ internal class RootSimplificationPass : InprocessingPass {
                 if (!budget.visit(literals.size + 1)) break
                 session.retireRootSource(factor, literals)
                 budget.note("RetirementWork", literals.size + 1L)
-            } else dropped.add(factor - session.problem.numFactors)
+            } else if (satisfied) retirement.markSelected()
             pending = null
-        }
-        val beforeCompaction = session.learnedClauseCount
-        if (!dropped.isEmpty() && !budget.stopped()) {
-            val before = session.work
-            session.forgetLearnedClauses { index, _ -> index !in dropped }
-            budget.note("RetirementWork", session.work - before)
-            dropped = IntHashSet()
-            revision = session.learnedClauseRevision
-        }
-        if (session.learnedClauseCount < beforeCompaction) {
-            refreshClauseScan(session)
+            if (!source) break
         }
     }
 
@@ -259,6 +301,7 @@ internal class RootProbingPass : InprocessingPass {
     private var learnedCursor = 0
     private var revision = -1L
     private var neighborhood: IntArray? = null
+    private var neighborhoodIndex = -1
     private var neighborhoodPosition = 0
     private var preferNeighborhood = true
     private var preparationLeft = 0
@@ -271,6 +314,7 @@ internal class RootProbingPass : InprocessingPass {
         learnedCursor = 0
         revision = -1L
         neighborhood = null
+        neighborhoodIndex = -1
         neighborhoodPosition = 0
         preferNeighborhood = true
     }
@@ -283,15 +327,19 @@ internal class RootProbingPass : InprocessingPass {
     }
 
     private fun neighborhoodLiteral(session: PropagationSession, budget: InprocessingBudget): Int? {
-        if (revision != session.learnedClauseRevision) {
+        if (revision != session.learnedRetirementGeneration) {
             learnedCursor = 0
             neighborhood = null
-            revision = session.learnedClauseRevision
+            neighborhoodIndex = -1
+            revision = session.learnedRetirementGeneration
         }
         while (!budget.stopped()) {
             val row = neighborhood
-            if (row != null && neighborhoodPosition < row.size) return Lit.negate(row[neighborhoodPosition])
+            if (row != null && session.isLearnedClause(neighborhoodIndex) && neighborhoodPosition < row.size) {
+                return Lit.negate(row[neighborhoodPosition])
+            }
             neighborhood = null
+            neighborhoodIndex = -1
             if (learnedCursor >= session.learnedClauseCount || preparationLeft <= 0 || !budget.visit()) return null
             preparationLeft--
             val index = learnedCursor++
@@ -302,15 +350,23 @@ internal class RootProbingPass : InprocessingPass {
             if (literals.size == 2 && literals[0] == Lit.negate(literals[1])) continue
             if (literals.any { budget.truth(it) == true }) continue
             neighborhood = literals
+            neighborhoodIndex = index
             neighborhoodPosition = 0
             budget.note("NeighborhoodEligible")
         }
         return null
     }
 
-    override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
+    override fun run(
+        session: PropagationSession,
+        params: BacktrackParams,
+        stats: SearchStatsSink?,
+        containingWork: Long,
+    ) {
         if (!session.canSimplifyRoot || params.rootProbeWork <= 0L) return
-        spending.run(session, params, stats) { budget -> probe(session, params, budget) }
+        spending.run(session, params, stats, containingWork = containingWork) { budget ->
+            probe(session, params, budget)
+        }
     }
 
     private fun probe(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
