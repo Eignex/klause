@@ -196,7 +196,49 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
-    fun `an addition should let the next point admit a complementary cut`() {
+    fun `checked round progress should let the next point admit a complementary cut`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("y upper")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        val installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE), emptySet(), Cancellation.Never)
+        selection.observeRound(rows, improved = true)
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ZERO, BigFraction.ONE), installed, Cancellation.Never)
+
+        assertEquals(setOf(0, 1), selected)
+    }
+
+    @Test
+    fun `a stalled round should wait seven queries before admitting another violated cut`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("y upper")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        val installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE), emptySet(), Cancellation.Never)
+        selection.observeRound(rows, improved = false)
+        repeat(7) {
+            assertEquals(installed, selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO },
+                setOf(0, 1), listOf(BigFraction.ZERO, BigFraction.ONE), installed, Cancellation.Never))
+        }
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ZERO, BigFraction.ONE), installed, Cancellation.Never)
+
+        assertEquals(setOf(0, 1), selected)
+    }
+
+    @Test
+    fun `an unfinished round should leave discovery cooling down`() {
         val rows = listOf(
             LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
                 SourceDerivation.Premise("x upper")),
@@ -210,7 +252,29 @@ class LinearAuthorityPointCutsTest {
         val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
             listOf(BigFraction.ZERO, BigFraction.ONE), installed, Cancellation.Never)
 
-        assertEquals(setOf(0, 1), selected)
+        assertEquals(installed, selected)
+    }
+
+    @Test
+    fun `progress for a replaced family should not enable discovery`() {
+        val previous = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("x upper")),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("y upper")),
+        )
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        selection.select(previous, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE), emptySet(), Cancellation.Never)
+        val rows = previous.toList()
+        val installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ofLong(2), BigFraction.ONE), emptySet(), Cancellation.Never)
+        selection.observeRound(previous, improved = true)
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ZERO, BigFraction.ONE), installed, Cancellation.Never)
+
+        assertEquals(installed, selected)
     }
 
     @Test
@@ -224,6 +288,7 @@ class LinearAuthorityPointCutsTest {
         val selection = LinearAuthorityPointCuts(SourceLpBudget())
         val installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
             listOf(BigFraction.ofLong(2), BigFraction.ONE), emptySet(), Cancellation.Never)
+        selection.observeRound(rows, improved = true)
         selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
             List(2) { BigFraction.ZERO }, installed, Cancellation.Never)
         val work = selection.observations["numericalCutSelectionWork"]
@@ -833,6 +898,7 @@ class LinearAuthorityPointCutsTest {
         LinearAuthority(budget, retainLp = true).use { authority ->
             val paused = authority.advanceWithPointCuts(mixedMaximum, Cancellation.Never)
             assertTrue(paused.paused)
+            assertNull(authority.cutObservations()["numericalCutSelectionImprovedRounds"])
             assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
                 (assertNotNull(paused.bound).claim as SourceClaim.Bound).value)
 
@@ -843,6 +909,7 @@ class LinearAuthorityPointCutsTest {
             assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
                 (assertNotNull(completed.bound).claim as SourceClaim.Bound).value)
             assertEquals(2, budget.operations)
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionImprovedRounds"])
         }
     }
 }

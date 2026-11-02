@@ -50,6 +50,12 @@ internal class LinearAuthorityPointCuts(
         inactiveScans.clear()
     }
 
+    fun observeRound(rows: List<LinearAuthorityCut>, improved: Boolean) {
+        if (family !== rows || retired || managedInstalled) return
+        cooldown = if (improved) 0 else 7
+        observe(if (improved) "ImprovedRounds" else "StalledRounds")
+    }
+
     fun observe(name: String, amount: Long = 1L) {
         val key = "numericalCutSelection$name"
         counts[key] = (counts[key] ?: 0L) + amount
@@ -277,7 +283,7 @@ internal class LinearAuthorityPointCuts(
                     for (id in expired) onCut(rows[id].family, "POINT_INSTALLED_RETIRED", 1L)
                     inactiveScans.keys.removeAll(expired)
                 }
-                cooldown = if (managedInstalled || selected.isNotEmpty()) 0 else 7
+                cooldown = if (managedInstalled) 0 else 7
             }
             return retained + selected.map { it.id }
         } finally {

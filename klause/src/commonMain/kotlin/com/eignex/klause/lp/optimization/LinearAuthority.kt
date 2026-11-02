@@ -87,6 +87,7 @@ internal class LinearAuthority(
     private var deferAggregatePreparation = false
     private class PointRound(
         val query: LinearAuthorityQuery, val base: LinearAuthorityResult, val mask: Set<Int>,
+        val rows: List<LinearAuthorityCut>,
     ) {
         var reported = false
     }
@@ -235,7 +236,7 @@ internal class LinearAuthority(
             }
             if (selected == pointMask) return base
             pointMask = selected
-            pending = PointRound(prepared, base, selected)
+            pending = PointRound(prepared, base, selected, checkNotNull(family.cuts).rows)
             pointRound = pending
             policy.observe("Rounds")
             budget.funding?.charge(0L, 1024L + 64L * (base.fractional.size + base.relaxedPoint.size))
@@ -256,11 +257,17 @@ internal class LinearAuthority(
         if (result.paused && (budget.funding?.exhausted == true || cancellation())) {
             return pending.base.copy(primalStages = stages)
         }
+        val completed = !result.paused && budget.funding?.paused != true && !cancellation()
         if (!result.paused && result.evidence == null && result.incumbent == null && result.split == null) {
+            if (completed) policy.observeRound(pending.rows, improved = false)
             policy.observe("UnavailableRounds")
             return pending.base.copy(primalStages = stages)
         }
         val strongest = strongerLinearBound(pending.base.bound, result.bound)
+        if (completed) {
+            policy.observeRound(pending.rows, result.evidence != null || result.incumbent != null ||
+                (strongest != null && strongest !== pending.base.bound))
+        }
         return result.copy(bound = strongest, primalStages = stages,
             cutBoundFamilies = if (strongest != null && strongest === pending.base.bound) {
                 pending.base.cutBoundFamilies
