@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.RootPrimalContinuation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.checkLpAssembly
@@ -15,10 +16,24 @@ internal class LpPrimalHandoff private constructor(
 ) : AutoCloseable {
     private var definition: LpRelaxation? = null
     private var captureAttempted = false
+    private var sourceWork = 0L
+    private var continuation: RootPrimalContinuation? = null
 
     fun hasDefinitionFor(engine: LpEngine): Boolean = owner === engine && definition != null
 
     fun setupWorkFor(engine: LpEngine): Long = if (owner === engine) setupWork else 0L
+
+    fun includeSourceWork(engine: LpEngine, work: Long) {
+        require(work >= 0L)
+        if (owner === engine) {
+            setupWork += work
+            sourceWork += work
+        }
+    }
+
+    fun attachContinuation(engine: LpEngine, source: RootPrimalContinuation?) {
+        if (owner === engine) continuation = source
+    }
 
     fun capture(engine: LpEngine, root: LpRelaxation, cancellation: Cancellation) {
         if (owner !== engine || captureAttempted) return
@@ -80,6 +95,8 @@ internal class LpPrimalHandoff private constructor(
         val engine = owner ?: return
         val started = TimeSource.Monotonic.markNow()
         val outcome = if (definition == null) "RETIRED" else "DISCARDED"
+        continuation?.includeSetupWork(engine, setupWork - sourceWork)
+        continuation = null
         definition = null
         owner = null
         engine.sink.lp.observePrimalPhase("PRIMAL_LP_HANDOFF", outcome, started.elapsedNow().inWholeNanoseconds)

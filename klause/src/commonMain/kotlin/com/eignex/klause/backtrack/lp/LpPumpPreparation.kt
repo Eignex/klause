@@ -84,7 +84,7 @@ internal class LpPumpPreparation private constructor(
 
     companion object {
         fun hasAffordableShape(engine: LpEngine, root: LpRelaxation, setupWork: Long = 0L): Boolean {
-            require(setupWork in 0L..LpEmissionTemplates.MAX_UNITS)
+            if (setupWork !in 0L..LpEmissionTemplates.MAX_UNITS) return false
             val model = root.model
             val bindingWork = 1L + engine.problem.numIntVars + engine.problem.numBoolVars +
                 model.n * 3L + model.numVars

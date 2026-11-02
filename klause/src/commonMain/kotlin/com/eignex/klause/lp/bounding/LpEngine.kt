@@ -111,6 +111,7 @@ internal class RootRoundingWarmStart(
     val relaxation: LpRelaxation,
     val basis: Basis,
     val primal: DoubleArray? = null,
+    val continuation: RootPrimalContinuation? = null,
 )
 
 internal enum class LpRootQueryPolicy {
@@ -145,7 +146,7 @@ internal class LpEngine(
     private val containingWork: (Long) -> Unit = {},
     private val rootQueryPolicy: LpRootQueryPolicy = LpRootQueryPolicy.SHARED_WORK,
     internal val reusePrimalTemplates: Boolean = false,
-    internal val reusePumpPreparation: Boolean = true,
+    internal val reusePumpPreparation: Boolean = false,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
@@ -161,6 +162,10 @@ internal class LpEngine(
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
     internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
+        set(value) {
+            if (field?.continuation !== value?.continuation) field?.continuation?.close()
+            field = value
+        }
     internal var rootRoundingInterrupted: Boolean = false
     private val selectedSourceRelaxation: CpToLpRelaxation? by lazy {
         if (projections?.builtInRelaxation == false) {
@@ -303,6 +308,7 @@ internal class LpEngine(
         relaxation: LpRelaxation,
         result: FloatLpResult,
         guidanceObjective: LinearObjective,
+        continuation: RootPrimalContinuation? = null,
     ) {
         if (!params.lpPlan.probe || !result.optimal ||
             result.primal.size.toLong() * Double.SIZE_BYTES > ROOT_PRIMAL_GUIDANCE_BYTES || lpWorkAllowanceSpent(1L)
@@ -314,7 +320,8 @@ internal class LpEngine(
         // The auxiliary solver has closed; its completed output buffer belongs to this private worker.
         // Pause bookkeeping preserves it while future pinning polls the next invocation's token.
         noteNodeOverhead(1L)
-        rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation, result.basis, result.primal)
+        rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation, result.basis,
+            result.primal, continuation)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 

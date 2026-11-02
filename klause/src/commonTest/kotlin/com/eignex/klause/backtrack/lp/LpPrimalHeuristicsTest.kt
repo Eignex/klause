@@ -45,6 +45,123 @@ import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
     @Test
+    fun `paused canonical preparation should reach a fresh pump numerical owner`() {
+        for (reuse in listOf(false, true)) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, (1..6).map {
+                Linear(intArrayOf(1, it, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6)
+            }).bake(FactorProjectionProviders.Default)
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+            val sink = SolveStatsSink("continued-pump-source")
+            val factory = RecordingLpEngineFactory()
+            var stopped = false
+            val token = Cancellation { stopped }
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
+                LpSolveContext(factory), reusePumpPreparation = reuse).use { engine ->
+                val first = LpPrimalHandoff.open(engine, token)
+                try {
+                    assertNull(engine.lpRoundingProbe(objective, token, handoff = first, accept = {
+                        stopped = true
+                        null
+                    }))
+                    assertTrue(engine.rootRoundingInterrupted)
+                    if (reuse) assertNotNull(engine.rootRoundingWarmStart?.continuation)
+                } finally {
+                    first?.close()
+                }
+                stopped = false
+                val resumed = LpPrimalHandoff.open(engine, token)
+                try {
+                    assertNull(engine.lpRoundingProbe(objective, token, handoff = resumed, accept = { null }))
+                    val owners = factory.calls.size
+
+                    val sample = engine.lpFeasibilityPump(objective, token, handoff = resumed)
+
+                    assertEquals(6L, assertNotNull(sample).ints.sum())
+                    assertTrue(factory.calls.size > owners)
+                    val phases = sink.snapshot().lp.phases
+                    assertEquals(if (reuse) 1L else 2L,
+                        phases.getValue("PRIMAL_LP_ASSEMBLY_ROOT").outcomes["COMPLETE"])
+                    if (reuse) {
+                        assertEquals(1L, phases.getValue("PRIMAL_LP_CONTINUATION_ROOT").outcomes["VALIDATED"])
+                        assertTrue(phases.getValue("PRIMAL_LP_PUMP_REUSE_ROOT").calls > 0L)
+                    } else assertNull(phases["PRIMAL_LP_PUMP_REUSE_ROOT"])
+                } finally {
+                    resumed?.close()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `cancelled continuation validation should withhold the next numerical owner`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, (1..6).map {
+            Linear(intArrayOf(1, it, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6)
+        }).bake(FactorProjectionProviders.Default)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val sink = SolveStatsSink("continued-source-cancelled")
+        val factory = RecordingLpEngineFactory()
+        var stopped = false
+        var armed = false
+        var charged = 0L
+        val token = Cancellation { stopped }
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
+            LpSolveContext(factory), reusePumpPreparation = true, containingWork = {
+                if (armed) {
+                    charged += it
+                    stopped = true
+                }
+            }).use { engine ->
+            assertNotNull(LpPrimalHandoff.open(engine, token)).use { first ->
+                assertNull(engine.lpRoundingProbe(objective, token, handoff = first, accept = {
+                    stopped = true
+                    null
+                }))
+                assertNotNull(engine.rootRoundingWarmStart?.continuation)
+            }
+            stopped = false
+            assertNotNull(LpPrimalHandoff.open(engine, token)).use { resumed ->
+                val owners = factory.calls.size
+                armed = true
+
+                val sample = engine.lpRoundingProbe(objective, token, handoff = resumed, accept = { null })
+
+                assertNull(sample)
+                assertEquals(owners, factory.calls.size)
+                assertEquals(1L, charged)
+                assertEquals(1L, sink.snapshot().lp.phases.getValue("PRIMAL_LP_CONTINUATION_ROOT")
+                    .outcomes["CANCELLED"])
+            }
+        }
+    }
+
+    @Test
+    fun `closing the engine should retire paused canonical provenance`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, (1..6).map {
+            Linear(intArrayOf(1, it, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6)
+        }).bake(FactorProjectionProviders.Default)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val sink = SolveStatsSink("retired-canonical-source")
+        var stopped = false
+        val token = Cancellation { stopped }
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
+            reusePumpPreparation = true).use { engine ->
+            assertNotNull(LpPrimalHandoff.open(engine, token)).use { handoff ->
+                assertNull(engine.lpRoundingProbe(objective, token, handoff = handoff, accept = {
+                    stopped = true
+                    null
+                }))
+            }
+            val source = assertNotNull(engine.rootRoundingWarmStart?.continuation)
+
+            engine.close()
+
+            assertEquals(0L, source.paidWorkFor(engine))
+            assertNull(engine.rootRoundingWarmStart)
+            assertEquals(1L, sink.snapshot().lp.phases.getValue("PRIMAL_LP_CONTINUATION_ROOT").outcomes["RETIRED"])
+        }
+    }
+
+    @Test
     fun `rounding preparation should serve the pump with a fresh numerical owner`() {
         for (reuse in listOf(false, true)) {
             val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, listOf(

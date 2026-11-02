@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.snapshotAssignment
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.RootPrimalContinuation
 import com.eignex.klause.lp.bounding.RootRoundingWarmStart
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -40,6 +41,7 @@ internal fun LpEngine.lpRoundingProbe(
     val started = TimeSource.Monotonic.markNow()
     var outcome = "RELAXATION_DECLINED"
     rootRoundingInterrupted = false
+    var continuation: RootPrimalContinuation? = null
     val session = PropagationSession(problem, cancellation)
     try {
         if (cancellation()) {
@@ -61,9 +63,25 @@ internal fun LpEngine.lpRoundingProbe(
             outcome = "EMPTY_RELAXATION"
             return null
         }
-        if (retained == null && handoff != null) {
+        continuation = retained?.continuation
+        if (handoff != null) {
             try {
-                handoff.capture(this, relaxation, cancellation)
+                val domains = SessionDomains(session)
+                val onWork: (Long) -> Unit = { handoff.includeSourceWork(this, it) }
+                val currentSource = if (retained == null) {
+                    continuation = LpPrimalContinuation.capture(this, relaxation, domains, cancellation,
+                        handoff.setupWorkFor(this) + 2L, onWork)
+                    true
+                } else {
+                    continuation?.let {
+                        handoff.includeSourceWork(this, it.paidWorkFor(this))
+                        it.matches(this, relaxation, domains, cancellation, onWork)
+                    } == true
+                }
+                if (currentSource) {
+                    handoff.attachContinuation(this, continuation)
+                    handoff.capture(this, relaxation, cancellation)
+                }
             } catch (_: LpAssemblyCancelled) {
                 rootRoundingInterrupted = true
                 outcome = "CANCELLED"
@@ -85,13 +103,14 @@ internal fun LpEngine.lpRoundingProbe(
                         rootRoundingInterrupted = true
                     }
                     if (iterate != null && (iterate.optimal || termination == LpFloatTermination.CANCELLED)) {
-                        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, iterate.basis)
+                        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, iterate.basis,
+                            continuation = continuation)
                     }
                 }
             } catch (_: CheckedLongOverflowException) {
                 return null
             } ?: return null
-            retainRoundingPrimalGuidance(relaxation, result, objective)
+            retainRoundingPrimalGuidance(relaxation, result, objective, continuation)
             result.primal
         }
         val reals = if (toleranceReals && problem.numRealVars > 0) relaxation.floatReals(primal, problem) else null
@@ -155,6 +174,7 @@ internal fun LpEngine.lpRoundingProbe(
         primalPropagationWork += session.work
         if (cancellation()) rootRoundingInterrupted = true
         if (!rootRoundingInterrupted) rootRoundingWarmStart = null
+        if (rootRoundingWarmStart?.continuation !== continuation) continuation?.close()
         sink.lp.observePrimalPhase("PRIMAL_ROUNDING", outcome, started.elapsedNow().inWholeNanoseconds)
     }
 }

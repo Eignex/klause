@@ -1,0 +1,219 @@
+package com.eignex.klause.backtrack.lp
+
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.values
+import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.RootPrimalContinuation
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.LpEmissionScope
+import com.eignex.klause.lp.relaxation.LpEmissionTemplates
+import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.RelaxationDomains
+import com.eignex.klause.lp.relaxation.checkLpAssembly
+import com.eignex.klause.lp.rootDomainOf
+import com.eignex.klause.lp.statesLowerBound
+import com.eignex.klause.lp.statesUpperBound
+import com.eignex.klause.util.Cancellation
+import kotlin.time.TimeSource
+
+// Domain values are immutable; references preserve interior holes without expanding a wide interval.
+internal class LpPrimalContinuation private constructor(
+    private var owner: LpEngine?,
+    private var model: LpModel?,
+    private var factors: Array<Factor>,
+    private var roots: Array<IntDomain>,
+    private var live: Array<IntDomain>,
+    private var sides: ByteArray,
+    private var booleans: ByteArray,
+    private val honorsOpenSides: Boolean,
+    private val scope: LpEmissionScope,
+    private var paidWork: Long,
+    private val validationWork: Long,
+) : RootPrimalContinuation {
+    override fun paidWorkFor(engine: LpEngine): Long = if (owner === engine) paidWork else 0L
+
+    override fun includeSetupWork(engine: LpEngine, work: Long) {
+        require(work >= 0L)
+        if (owner !== engine) return
+        paidWork = if (work > LpEmissionTemplates.MAX_UNITS - paidWork) {
+            LpEmissionTemplates.MAX_UNITS + 1L
+        } else paidWork + work
+    }
+
+    override fun matches(
+        engine: LpEngine,
+        root: LpRelaxation,
+        domains: RelaxationDomains,
+        cancellation: Cancellation,
+        onWork: (Long) -> Unit,
+    ): Boolean {
+        if (owner !== engine) return false
+        engine.requireOpen()
+        val accounting = LpPrimalAssembly(engine, cancellation)
+        val token = accounting.token
+        val started = TimeSource.Monotonic.markNow()
+        var outcome = "DECLINED"
+        try {
+            token.charge(1L)
+            token.checkLpAssembly()
+            val selection = engine.projections ?: return false
+            if (model !== root.model || !scope.matches(selection.lpEmissionNamespace, engine.problem) ||
+                honorsOpenSides != domains.honorsOpenSides || factors.size != engine.problem.numFactors ||
+                !LpPumpPreparation.hasAffordableShape(engine, root, paidWork + validationWork + 4L)
+            ) return false
+            for (index in factors.indices) {
+                token.charge(1L)
+                token.checkLpAssembly()
+                if (factors[index] !== engine.problem.factors[index]) return false
+            }
+            for (variable in roots.indices) {
+                token.charge(2L)
+                token.checkLpAssembly()
+                if (sides[variable] != statedSides(engine, variable) ||
+                    !sameDomain(roots[variable], engine.problem.rootDomainOf(variable), token) ||
+                    !sameDomain(live[variable], domains.intDomain(variable), token)
+                ) return false
+            }
+            for (variable in booleans.indices) {
+                token.charge(1L)
+                token.checkLpAssembly()
+                if (booleans[variable] != pin(domains.boolValue(variable))) return false
+            }
+            token.checkLpAssembly()
+            outcome = "VALIDATED"
+            return true
+        } catch (cancelled: LpAssemblyCancelled) {
+            outcome = "CANCELLED"
+            throw cancelled
+        } catch (failure: Throwable) {
+            outcome = "FAILED"
+            throw failure
+        } finally {
+            paidWork += accounting.work
+            onWork(accounting.work)
+            engine.sink.lp.observePrimalPhase("PRIMAL_LP_CONTINUATION", outcome,
+                started.elapsedNow().inWholeNanoseconds, accounting.work)
+            if (outcome != "VALIDATED") close()
+        }
+    }
+
+    override fun close() {
+        val engine = owner ?: return
+        val started = TimeSource.Monotonic.markNow()
+        owner = null
+        model = null
+        factors = emptyArray()
+        roots = emptyArray()
+        live = emptyArray()
+        sides = byteArrayOf()
+        booleans = byteArrayOf()
+        engine.sink.lp.observePrimalPhase("PRIMAL_LP_CONTINUATION", "RETIRED",
+            started.elapsedNow().inWholeNanoseconds)
+    }
+
+    companion object {
+        fun capture(
+            engine: LpEngine,
+            root: LpRelaxation,
+            domains: RelaxationDomains,
+            cancellation: Cancellation,
+            setupWork: Long,
+            onWork: (Long) -> Unit,
+        ): LpPrimalContinuation? {
+            if (!engine.reusePumpPreparation) return null
+            engine.requireOpen()
+            val accounting = LpPrimalAssembly(engine, cancellation)
+            val token = accounting.token
+            val started = TimeSource.Monotonic.markNow()
+            var outcome = "DECLINED"
+            var captured: LpPrimalContinuation? = null
+            return try {
+                token.charge(1L)
+                token.checkLpAssembly()
+                val problem = engine.problem
+                val selection = engine.projections ?: return null
+                val captureWork = 2L + problem.numFactors + problem.numIntVars * 5L + problem.numBoolVars
+                var validationWork = 1L + problem.numFactors + problem.numIntVars * 2L + problem.numBoolVars
+                var units = 64L + problem.numFactors + problem.numIntVars * 3L + problem.numBoolVars
+                if (units > LpEmissionTemplates.MAX_UNITS ||
+                    !LpPumpPreparation.hasAffordableShape(engine, root, setupWork + captureWork + validationWork)
+                ) return null
+                // Reserve arrays, their reads, and constant retirement before retaining source values.
+                token.charge(1L + problem.numFactors + problem.numIntVars * 5L + problem.numBoolVars)
+                token.checkLpAssembly()
+                val factors = problem.factors.copyOf()
+                val roots = Array(problem.numIntVars) { problem.rootDomainOf(it) }
+                val live = Array(problem.numIntVars) { domains.intDomain(it) }
+                val sides = ByteArray(problem.numIntVars) { statedSides(engine, it) }
+                val booleans = ByteArray(problem.numBoolVars) { pin(domains.boolValue(it)) }
+                for (variable in roots.indices) {
+                    token.checkLpAssembly()
+                    for (part in 0..1) {
+                        val domain = if (part == 0) roots[variable] else live[variable]
+                        val count = if (domain.holeCount == 0L) 0L else domain.valueCount
+                        if (count > LpEmissionTemplates.MAX_UNITS) return null
+                        units += 8L + count * 3L
+                        validationWork += count * 3L
+                        if (units > LpEmissionTemplates.MAX_UNITS ||
+                            !LpPumpPreparation.hasAffordableShape(engine, root,
+                                setupWork + accounting.work + validationWork)
+                        ) return null
+                    }
+                }
+                token.checkLpAssembly()
+                captured = LpPrimalContinuation(engine, root.model, factors, roots, live, sides, booleans,
+                    domains.honorsOpenSides, LpEmissionScope(selection.lpEmissionNamespace, problem),
+                    accounting.work, validationWork)
+                token.checkLpAssembly()
+                outcome = "CAPTURED"
+                captured
+            } catch (cancelled: LpAssemblyCancelled) {
+                outcome = "CANCELLED"
+                captured?.close()
+                throw cancelled
+            } catch (failure: Throwable) {
+                captured?.close()
+                outcome = "FAILED"
+                throw failure
+            } finally {
+                onWork(accounting.work)
+                engine.sink.lp.observePrimalPhase("PRIMAL_LP_CONTINUATION", outcome,
+                    started.elapsedNow().inWholeNanoseconds, accounting.work)
+            }
+        }
+
+        private fun sameDomain(expected: IntDomain, current: IntDomain, token: Cancellation): Boolean {
+            token.checkLpAssembly()
+            if (expected === current) return true
+            if (expected.min != current.min || expected.max != current.max) return false
+            if (expected.holeCount == 0L && current.holeCount == 0L) return true
+            val count = expected.valueCount
+            if (count > LpEmissionTemplates.MAX_UNITS || count != current.valueCount) return false
+            token.charge(count)
+            token.checkLpAssembly()
+            val values = LongArray(count.toInt())
+            var index = 0
+            expected.values.forEach { value ->
+                token.charge(1L)
+                token.checkLpAssembly()
+                values[index++] = value
+            }
+            index = 0
+            var equal = true
+            current.values.forEach { value ->
+                token.charge(1L)
+                token.checkLpAssembly()
+                if (values[index++] != value) equal = false
+            }
+            return equal
+        }
+
+        private fun statedSides(engine: LpEngine, variable: Int): Byte =
+            ((if (engine.problem.statesLowerBound(variable)) 1 else 0) +
+                (if (engine.problem.statesUpperBound(variable)) 2 else 0)).toByte()
+
+        private fun pin(value: Boolean?): Byte = when (value) { true -> 1; false -> -1; null -> 0 }
+    }
+}
