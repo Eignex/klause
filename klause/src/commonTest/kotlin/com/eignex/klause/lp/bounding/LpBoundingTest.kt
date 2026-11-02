@@ -83,7 +83,7 @@ class LpBoundingTest {
         }
 
         assertEquals(listOf(17L, 17L), observed)
-        assertEquals(0.0, sink.lp.solves.sum)
+        assertEquals(0.0, sink.snapshot().lp.solves.sum)
     }
 
     @Test
