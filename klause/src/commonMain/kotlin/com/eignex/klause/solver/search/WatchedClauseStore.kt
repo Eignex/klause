@@ -5,11 +5,10 @@ import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.SharingMemoryObservation
 
 /**
- * Assignment view and consequence sink a [WatchedClauseStore] propagates through.
+ * Assignment view and consequence sink for a clause store.
  *
  * The store owns the watch invariant; the host owns what an implication or a conflict means. That
- * split is what lets one mechanism serve both the model's own clauses and the clauses a session has
- * learned, instead of each keeping its own copy of the same loop.
+ * split lets source and shared learned stores use the same assignment and consequence boundary.
  */
 internal interface ClauseWatchHost {
     /** Truth of [literal] under the current assignment, or null when its variable is unassigned. */
@@ -50,52 +49,6 @@ internal class WatchedClauseStore {
     private val attached = IntArrayList()
 
     internal val literalCount: Long get() = clauses.literalCount
-
-    internal val memoryScanWork: Long get() = size.toLong() + watchers.referenceCapacity + signatures.referenceCapacity
-
-    internal val replacementWorkBound: Long
-        // Primitive hash indexes can collide; the reservation covers probing and growth as well as visits.
-        get() = literalCount * 2L + size.toLong() * size * 64L + memoryScanWork * 4L + 256L
-
-    internal val replacementScratchBound: Long get() = 4096L + size.toLong() * 512L
-
-    internal fun prepareRetained(keep: BooleanArray, step: () -> Unit): WatchedClauseStore {
-        val replacement = WatchedClauseStore()
-        replacement.watchVisits = watchVisits
-        for (index in 0 until size) {
-            step()
-            if (!keep[index]) continue
-            val literals = clauses[index]
-            var signature = 0
-            for (literal in literals) { step(); signature += avalanche(literal) }
-            signature = signature * SIGNATURE_SIZE_FACTOR + literals.size
-            val next = replacement.size
-            replacement.clauses.add(literals)
-            replacement.lbds.add(lbds[index])
-            replacement.used.add(used[index])
-            replacement.attached.add(0)
-            replacement.signatures.getOrPut(signature) { IntArrayList(1) }.add(next)
-            if (attached[index] != 0) replacement.watch(next)
-        }
-        return replacement
-    }
-
-    internal fun ownedBytes(step: () -> Unit): Long {
-        var bytes = clauses.literalCount * Int.SIZE_BYTES + clauses.capacity.toLong() * MODELED_REFERENCE_BYTES +
-            used.backingData.size.toLong() * Int.SIZE_BYTES +
-            (lbds.backingData.size.toLong() + unitClauses.backingData.size + attached.backingData.size) * Int.SIZE_BYTES
-        bytes += watchers.primitiveCapacityBytes + signatures.primitiveCapacityBytes +
-            (watchers.referenceCapacity.toLong() + signatures.referenceCapacity) * MODELED_REFERENCE_BYTES
-        for (value in watchers.valuesInternal) {
-            step()
-            if (value != null) bytes += (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES
-        }
-        for (value in signatures.valuesInternal) {
-            step()
-            if (value != null) bytes += (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES
-        }
-        return bytes
-    }
 
     internal fun memory(sample: SharingMemoryObservation, protectedClause: (Int) -> Boolean = { false }): Boolean {
         var watchBytes = 0L
@@ -401,7 +354,6 @@ internal class WatchedClauseStore {
     }
 
     private companion object {
-        const val MODELED_REFERENCE_BYTES = 8L
         /** Watch preference for an unassigned literal; below a satisfied one, above any level. */
         const val UNASSIGNED_WATCH_RANK = Int.MAX_VALUE - 1
 

@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
@@ -9,6 +10,108 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SearchLearningTest {
+    @Test
+    fun `production count caps should retire eligible clauses within funded windows`() {
+        for ((cap, grant) in listOf(4_000 to 512L, 20_000 to 65_536L)) {
+            val learning = SearchLearning(SearchLearnedDbParams(maxClauses = cap, glueLbd = 0,
+                reclamationWork = grant))
+            val host = SearchSession(emptyList())
+            host.push(SearchDecision.Bool(0))
+            repeat(3) { learning.learn(intArrayOf(0, (it + 1) * 2), host) }
+            assertIs<ComponentResult.Consistent>(learning.propagate(host, IntArrayList()))
+            repeat(cap) { learning.learn(intArrayOf((it + 4) * 2), host) }
+
+            repeat(40) {
+                var charged = 0L
+                learning.onRestart({ false }) { charged++ }
+                assertTrue(charged <= grant)
+            }
+
+            assertEquals(cap, learning.size)
+            assertEquals(3L, learning.snapshot().dropped)
+        }
+    }
+
+    @Test
+    fun `count windows should preserve retirement progress across appended clauses`() {
+        val learning = SearchLearning(SearchLearnedDbParams(maxClauses = 4, glueLbd = 0,
+            reclamationWork = 512L))
+        val host = SearchSession(emptyList())
+        repeat(10) { learning.learn(intArrayOf(it * 4, it * 4 + 2), host) }
+        learning.propagate(host, IntArrayList())
+
+        repeat(20) {
+            learning.onRestart()
+            learning.learn(intArrayOf((it + 10) * 4, (it + 10) * 4 + 2), host)
+            learning.propagate(host, IntArrayList())
+        }
+        val duringGrowth = learning.snapshot().dropped
+        repeat(128) { learning.onRestart() }
+
+        assertTrue(duringGrowth > 0L)
+        assertEquals(4, learning.size)
+    }
+
+    @Test
+    fun `small grants should resume physical release without unrelated ownership changes`() {
+        val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(glueLbd = 0,
+            softLimitBytes = 0L, reclamationWork = 512L))
+        repeat(8) { session.learn(SearchExplanation(intArrayOf(it * 4, it * 4 + 2))) }
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        val first = requireNotNull(session.reclaimLearningMemory())
+        var result = first
+
+        repeat(128) { result = requireNotNull(session.reclaimLearningMemory()) }
+
+        assertEquals(SharedLearningReclamationStatus.Deferred, first.status)
+        assertEquals(SharedLearningReclamationStatus.ProtectedFloor, result.status)
+        assertEquals(0, session.learnedClauseCount)
+        assertTrue(requireNotNull(result.afterBytes) < requireNotNull(first.beforeBytes))
+        val sample = SharingMemoryObservation(100_000L, 1024, { false }, {})
+        val values = requireNotNull(sample.snapshot { session.retainedLearningMemory(sample) }.completeValues)
+        assertEquals(result.afterBytes,
+            values.getValue("ownedPrimitiveBytes") + values.getValue("ownedReferenceSlots") * 8L)
+        assertEquals(0L, values.getValue("sharedLearnedRetiredObjects"))
+    }
+
+    @Test
+    fun `a retired clause should be relearnable before its old payload release finishes`() {
+        val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(maxClauses = 0,
+            glueLbd = 0, reclamationWork = 512L))
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.propagate()
+        session.restart()
+
+        session.learn(SearchExplanation(intArrayOf(2, 0)))
+        session.push(SearchDecision.Bool(1))
+
+        assertEquals(1, session.learnedClauseCount)
+        assertEquals(0L, session.learnedClauseStats().relearned)
+        assertEquals(true, session.boolValue(1))
+    }
+
+    @Test
+    fun `cancellation after retirement should retain owners until resumed physical release`() {
+        val learning = SearchLearning(SearchLearnedDbParams(maxClauses = 0, glueLbd = 0,
+            reclamationWork = 512L))
+        val host = SearchSession(emptyList())
+        repeat(8) { learning.learn(intArrayOf(it * 4, it * 4 + 2), host) }
+        learning.propagate(host, IntArrayList())
+
+        learning.onRestart({ learning.size < 8 })
+        val partial = SharingMemoryObservation(100_000L, 1024, { false }, {})
+        val partialValues = requireNotNull(partial.snapshot { learning.retainedMemory(partial) }.completeValues)
+        repeat(128) { learning.onRestart() }
+        val complete = SharingMemoryObservation(100_000L, 1024, { false }, {})
+        val completeValues = requireNotNull(complete.snapshot { learning.retainedMemory(complete) }.completeValues)
+
+        assertEquals(1L, partialValues.getValue("sharedLearnedRetiredObjects"))
+        assertEquals(0L, completeValues.getValue("sharedLearnedRetiredObjects"))
+        assertEquals(0L, completeValues.getValue("sharedLearnedPayloadBytes"))
+        assertTrue(completeValues.getValue("sharedLearnedIndexCapacityBytes") <
+            partialValues.getValue("sharedLearnedIndexCapacityBytes"))
+    }
+
     @Test
     fun `protected shared clauses should protect their stage and queue allocations`() {
         val session = SearchSession(emptyList(), learnedDb = SearchLearnedDbParams(glueLbd = 0))
