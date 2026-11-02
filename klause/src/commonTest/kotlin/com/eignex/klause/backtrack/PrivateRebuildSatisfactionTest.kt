@@ -76,6 +76,34 @@ class PrivateRebuildSatisfactionTest {
     }
 
     @Test
+    fun `mixed parity rows should reach a consumer with a checked source witness`() {
+        for (native in listOf(false, true)) {
+            val rows = listOf(intArrayOf(0, 1, 2, 0), intArrayOf(1, 2, 3, 1))
+            val clauses = rows.flatMap { row ->
+                (0..7).filter { it.countOneBits() % 2 != row[3] }.map { mask ->
+                    Clause(IntArray(3) { Lit.make(row[it], mask and (1 shl it) == 0) })
+                }
+            } + Clause(intArrayOf(Lit.make(0, false), Lit.make(3, true)))
+            val source = Problem(4, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+
+            val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+                nativeSat = native, privateRebuildWork = 65_536L,
+            )))
+
+            assertTrue(clauses.all { clause ->
+                clause.literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+            })
+            val learning = result.stats.search.learning
+            assertEquals(0L, learning["privateRebuildParityPins"])
+            assertEquals(2L, learning["privateRebuildParityReducedRows"])
+            assertEquals(8L, learning["privateRebuildParityCoveredClauses"])
+            assertEquals(1L, learning["privateRebuildConsumers"])
+            assertEquals(1L, learning["privateRebuildSourceAccepted"])
+            assertEquals(1L, learning["privateRebuildRetired"])
+        }
+    }
+
+    @Test
     fun `parity discovery should remain in the complete private charged ledger`() {
         val clauses = (0..3).flatMap { excluded ->
             val columns = (0..3).filter { it != excluded }

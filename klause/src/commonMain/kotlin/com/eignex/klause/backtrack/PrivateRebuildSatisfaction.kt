@@ -167,6 +167,8 @@ internal class PrivateRebuildSatisfaction(
         pendingParity = captured
         root = session
         note("ParityRows", captured.rows.toLong())
+        note("ParityBasisColumns", captured.basis?.rank?.toLong() ?: 0L)
+        note("ParityCoveredSourceClauses", captured.coveredClauses.toLong())
         note("ParityPins", captured.newPins.toLong())
         note("ParityAffineColumns", captured.affine?.rank?.toLong() ?: 0L)
         note("ParityAffineFreeColumns", captured.affine?.freeColumns?.toLong() ?: 0L)
@@ -294,6 +296,9 @@ internal class PrivateRebuildSatisfaction(
         note("ParityGenerationPins", prepared.parityPins.toLong())
         note("AffineGenerationColumns", prepared.affineColumns.toLong())
         note("AffineGenerationFreeColumns", prepared.affineFreeColumns.toLong())
+        note("ParityReducedRows", prepared.parityReducedRows.toLong())
+        note("ParityReducedLiterals", prepared.parityReducedLiterals)
+        note("ParityCoveredClauses", prepared.parityCoveredClauses.toLong())
         note("AdmittedColumns", prepared.admittedColumns.toLong())
         note("ModeledPrivateBytes", prepared.modeledBytes + attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong())
         note("WarmClausesRetained", session.learnedClauseCount.toLong())

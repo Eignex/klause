@@ -147,6 +147,12 @@ separate from canonical root propagation and later `PreparationWork`.
 captured affine basis. `AffineGenerationColumns` and `AffineGenerationFreeColumns`
 count its coordinates in a prepared model. These private pivot slots require
 affine reconstruction and cannot receive unprojected canonical learned clauses.
+`ParityBasisColumns` and `ParityCoveredSourceClauses` describe the captured
+linear subsystem. `ParityReducedRows`, `ParityReducedLiterals` and
+`ParityCoveredClauses` identify a prepared mixed Clause/Xor view with original
+coordinate meanings; they do not count eliminated columns. Coverage declines name
+incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
+larger widths). Such a miss can retain proved global pins or a mixed view.
 `ParityWorkspaceBytes` is the maximum modeled table/matrix/snapshot workspace
 within one private coordinator, rather than RSS or cumulative allocation.
 `ParityDeclinedPartial`, `Memory`, `NoRows`, `NoPins` and

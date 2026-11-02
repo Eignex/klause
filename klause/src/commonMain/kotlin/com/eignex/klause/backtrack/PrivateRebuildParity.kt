@@ -11,8 +11,12 @@ internal class PrivateRebuildParity private constructor(
     val newPins: Int,
     val rows: Int,
     val modeledBytes: Long,
-    val affine: PrivateRebuildAffine?,
+    val basis: PrivateRebuildAffine?,
+    val coveredSource: BooleanArray,
+    val coveredClauses: Int,
 ) {
+    val affine: PrivateRebuildAffine? get() = basis.takeIf { coveredClauses == source.numFactors }
+
     companion object {
         private const val MAX_FACTORS = 32_768
         private const val COLUMN_BITS = 21
@@ -37,11 +41,11 @@ internal class PrivateRebuildParity private constructor(
             }
             var size = 2
             while (size < source.numFactors * 2) size *= 2
-            val tableBytes = size * 16L + source.numBoolVars * 16L
+            val tableBytes = size * 20L + source.numFactors * 8L + source.numBoolVars * 16L
             if (tableBytes > byteLimit) { onDecline("Memory"); return null }
-            if (!funded(size * 3L)) return null
+            if (!funded(size * 4L + source.numFactors)) return null
             onWorkspace(tableBytes)
-            val table = Cubes(size, funded, onDecline)
+            val table = Cubes(size, source.numFactors, funded, onDecline)
             if (!table.collect(source, session)) return null
             val rowCount = table.countRows() ?: return null
             if (rowCount == 0) { onDecline("NoRows"); return null }
@@ -53,10 +57,12 @@ internal class PrivateRebuildParity private constructor(
             val fixed = Array(source.numBoolVars) { session.boolValue(it) }
             val matrix = Matrix(rowCount, source.numBoolVars, words, fixed, funded)
             if (!table.populate(matrix)) return null
-            val pins = matrix.derive(onDecline, table.completeSource) ?: return null
-            if (pins == 0 && matrix.affine == null) { onDecline("NoPins"); return null }
-            if (!funded(8L)) return null
-            return PrivateRebuildParity(source, fixed, pins, rowCount, bytes, matrix.affine)
+            val pins = matrix.derive(onDecline) ?: return null
+            if (pins == 0 && matrix.basis == null) { onDecline("NoPins"); return null }
+            val covered = table.coverage() ?: return null
+            if (!funded(16L)) return null
+            return PrivateRebuildParity(source, fixed, pins, rowCount, bytes, matrix.basis, covered,
+                table.coveredClauses)
         }
 
         private fun pattern(key: Long, parity: Int): Int {
@@ -72,36 +78,44 @@ internal class PrivateRebuildParity private constructor(
 
         private class Cubes(
             size: Int,
+            factors: Int,
             private val visit: (Long) -> Boolean,
             private val onDecline: (String) -> Unit,
         ) {
             private val keys = LongArray(size) { EMPTY }
             private val masks = IntArray(size)
+            private val coveredMasks = IntArray(size)
+            private val tags = IntArray(factors) { -1 }
             var entries = 0L
                 private set
 
-            var completeSource = true
+            var coveredClauses = 0
                 private set
 
             fun collect(source: BakedProblem, session: PropagationSession): Boolean {
                 entries = source.numBoolVars.toLong() + source.numFactors + 1L
-                for (factor in source.factors) {
-                    if (!visit(2L)) return false
+                for (index in source.factors.indices) {
+                    if (!visit(4L)) return false
+                    val factor = source.factors[index]
                     if (factor !is Clause) { onDecline("Scope"); return false }
                     val literals = factor.literals
                     entries += literals.size
-                    if (factor.tautological) continue
+                    if (factor.tautological) { tags[index] = -2; continue }
                     if (literals.size == 1) {
-                        if (!visit(3L)) return false
+                        if (!visit(5L)) return false
                         val literal = literals[0]
                         val variable = Lit.variable(literal)
-                        if (variable >= source.numBoolVars ||
-                            session.boolValue(variable)?.let { Lit.evaluate(literal, it) } != true) {
-                            completeSource = false
-                        }
+                        if (variable >= source.numBoolVars) { onDecline("Scope"); return false }
+                        if (session.boolValue(variable)?.let { Lit.evaluate(literal, it) } == true) tags[index] = -2
+                        else onDecline("AffineCoverageUnfixedUnit")
                         continue
                     }
-                    if (literals.size !in 2..3) { completeSource = false; continue }
+                    if (literals.size !in 2..3) {
+                        if (!visit(literals.size + 1L)) return false
+                        if (!factor.allLiteralsBool(source.numBoolVars)) { onDecline("Scope"); return false }
+                        onDecline("AffineCoverageWidth${literals.size.coerceAtMost(8)}")
+                        continue
+                    }
                     if (!visit(24L)) return false
                     var a = literals[0]
                     var b = literals[1]
@@ -112,8 +126,9 @@ internal class PrivateRebuildParity private constructor(
                     val left = Lit.variable(a)
                     val middle = Lit.variable(b)
                     val right = if (literals.size == 3) Lit.variable(c) else COLUMN_MASK
-                    if (left == middle || middle == right) { completeSource = false; continue }
-                    if (middle >= source.numBoolVars || (literals.size == 3 && right >= source.numBoolVars)) {
+                    if (left == middle || middle == right) { onDecline("AffineCoverageRepeatedColumn"); continue }
+                    if (left >= source.numBoolVars || middle >= source.numBoolVars ||
+                        (literals.size == 3 && right >= source.numBoolVars)) {
                         onDecline("Scope")
                         return false
                     }
@@ -129,9 +144,10 @@ internal class PrivateRebuildParity private constructor(
                         if (keys[slot] == EMPTY || keys[slot] == key) break
                         slot = (slot + 1) and (keys.size - 1)
                     }
-                    if (!visit(2L)) return false
+                    if (!visit(3L)) return false
                     keys[slot] = key
                     masks[slot] = masks[slot] or (1 shl forbidden)
+                    tags[index] = (slot shl 3) or forbidden
                 }
                 return true
             }
@@ -139,16 +155,36 @@ internal class PrivateRebuildParity private constructor(
             fun countRows(): Int? {
                 var count = 0
                 for (slot in keys.indices) {
-                    if (!visit(8L)) return null
+                    if (!visit(12L)) return null
                     if (keys[slot] == EMPTY) continue
                     var covered = 0
                     for (parity in 0..1) if (complete(keys[slot], masks[slot], parity)) {
                         count++
                         covered = covered or pattern(keys[slot], parity)
                     }
-                    if (masks[slot] and covered != masks[slot]) completeSource = false
+                    coveredMasks[slot] = covered
+                    if (masks[slot] and covered != masks[slot]) {
+                        val binary = keys[slot] and COLUMN_MASK.toLong() == COLUMN_MASK.toLong()
+                        val kind = if (binary) "Binary" else "Ternary"
+                        onDecline("AffineCoverage${if (covered == 0) "Incomplete" else "Extra"}$kind")
+                    }
                 }
                 return count
+            }
+
+            fun coverage(): BooleanArray? {
+                if (!visit(tags.size * 4L + 8L)) return null
+                val result = BooleanArray(tags.size)
+                var count = 0
+                for (index in tags.indices) {
+                    val tag = tags[index]
+                    val covered = tag == -2 || (tag >= 0 &&
+                        (coveredMasks[tag ushr 3] and (1 shl (tag and 7))) != 0)
+                    result[index] = covered
+                    if (covered) count++
+                }
+                coveredClauses = count
+                return result
             }
 
             fun populate(matrix: Matrix): Boolean {
@@ -174,7 +210,7 @@ internal class PrivateRebuildParity private constructor(
             private val rhs = IntArray(rows)
             private val pivotColumns = IntArray(rows)
             private var added = 0
-            var affine: PrivateRebuildAffine? = null
+            var basis: PrivateRebuildAffine? = null
                 private set
 
             fun add(key: Long, parity: Int): Boolean {
@@ -196,7 +232,7 @@ internal class PrivateRebuildParity private constructor(
                 return true
             }
 
-            fun derive(onDecline: (String) -> Unit, completeSource: Boolean): Int? {
+            fun derive(onDecline: (String) -> Unit): Int? {
                 var pivot = 0
                 for (column in 0 until columns) {
                     if (!visit(1L)) return null
@@ -220,7 +256,7 @@ internal class PrivateRebuildParity private constructor(
                     pivot++
                     if (pivot == masks.size) break
                 }
-                return pins(pivot, onDecline, completeSource)
+                return pins(pivot, onDecline)
             }
 
             private fun eliminate(pivot: Int, column: Int): Boolean {
@@ -237,7 +273,7 @@ internal class PrivateRebuildParity private constructor(
                 return true
             }
 
-            private fun pins(rank: Int, onDecline: (String) -> Unit, completeSource: Boolean): Int? {
+            private fun pins(rank: Int, onDecline: (String) -> Unit): Int? {
                 for (row in rank until masks.size) {
                     if (!visit(2L)) return null
                     if (rhs[row] != 0) { onDecline("RefutationDeferred"); return null }
@@ -268,9 +304,9 @@ internal class PrivateRebuildParity private constructor(
                     fixed[column] = rhs[row] != 0
                     pins++
                 }
-                if (completeSource && rank > 0) {
+                if (rank > 0) {
                     if (!visit(16L)) return null
-                    affine = PrivateRebuildAffine(fixed, coordinates, pivotColumns, rhs, dependencies, rank, free)
+                    basis = PrivateRebuildAffine(fixed, coordinates, pivotColumns, rhs, dependencies, rank, free)
                 }
                 return pins
             }

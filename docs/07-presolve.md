@@ -309,10 +309,20 @@ pivot slot is fixed to a placeholder and has no canonical literal authority.
 Reconstruction evaluates the owned affine basis from the private free-coordinate
 values, preserving every source solution rather than choosing a source constant.
 The complete coverage proof is required before dropping any encoded clause.
-Uncovered clauses retain the fixed-value path. Canonical learned clauses are
+Uncovered clauses prevent the placeholder view. Canonical learned clauses are
 withheld from the affine view because their pivot literals lack a supported
 projection. The containing grants cover the basis and reconstruction; every
 consumer point still reconstructs and checks the complete canonical source.
+
+A mixed source can retain its uncovered clauses and replace only proved parity
+encodings with an independent reduced XOR basis. Coverage records each original
+clause's excluded assignment, so extra exclusions in an otherwise complete group
+remain constraints. Each replacement row has at most 64 distinct coordinates;
+unsupported widths decline the row view. Row arrays, coefficient projections and
+fresh worker indexes share the containing work and modeled-memory grants.
+The mixed view preserves original coordinate meanings, including its live pivots,
+and can retain supported canonical warm clauses through the fixed-value projection.
+Its reduced rows and covered clauses are counted separately from eliminated columns.
 
 A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker

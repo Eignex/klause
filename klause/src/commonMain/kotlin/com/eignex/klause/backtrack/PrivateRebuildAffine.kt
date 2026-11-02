@@ -1,6 +1,10 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.Cancellation
 
 internal class PrivateRebuildAffine(
     private val fixed: Array<Boolean?>,
@@ -42,5 +46,50 @@ internal class PrivateRebuildAffine(
             point[pivots[row]] = value != 0
         }
         return Sample(point, longArrayOf())
+    }
+
+    fun rowLiteralCount(cancellation: Cancellation, onDecline: (String) -> Unit): Long? {
+        var result = 0L
+        for (row in 0 until rank) {
+            cancellation.charge(words * 2L + 4L)
+            if (cancellation()) return null
+            val width = 1 + dependencies[row].sumOf { it.countOneBits() }
+            if (width > 64) { onDecline("ParityRowWidth"); return null }
+            result += width
+        }
+        return result
+    }
+
+    fun materializeRows(cancellation: Cancellation): Array<Factor>? {
+        cancellation.charge(coordinates.size * 2L + rank + 8L)
+        if (cancellation()) return null
+        val free = IntArray(freeColumns)
+        for (column in coordinates.indices) {
+            val coordinate = coordinates[column]
+            if (coordinate < 0 && coordinate != Int.MIN_VALUE) free[-coordinate - 1] = column
+        }
+        val result = ArrayList<Factor>(rank)
+        for (row in 0 until rank) {
+            cancellation.charge(words * 2L + 4L)
+            if (cancellation()) return null
+            val width = 1 + dependencies[row].sumOf { it.countOneBits() }
+            if (width > 64) return null
+            // The factor and its shared projection build their distinct-coordinate coefficient lookup.
+            cancellation.charge(width * width * 2L + width * 16L + 16L)
+            if (cancellation()) return null
+            val literals = IntArray(width)
+            literals[0] = Lit.make(pivots[row], true)
+            var next = 1
+            for (word in 0 until words) {
+                var bits = dependencies[row][word]
+                while (bits != 0L) {
+                    val index = word * 64 + bits.countTrailingZeroBits()
+                    literals[next++] = Lit.make(free[index], true)
+                    bits = bits and (bits - 1)
+                }
+            }
+            result.add(Xor(literals, rhs[row]))
+        }
+        return result.toTypedArray()
     }
 }

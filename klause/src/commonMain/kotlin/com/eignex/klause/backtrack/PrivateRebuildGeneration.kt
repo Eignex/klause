@@ -36,6 +36,9 @@ internal class PrivateRebuildGeneration private constructor(
     val parityPins: Int,
     val affineColumns: Int,
     val affineFreeColumns: Int,
+    val parityReducedRows: Int,
+    val parityReducedLiterals: Long,
+    val parityCoveredClauses: Int,
 ) {
     fun reconstruct(sample: Sample): Sample = mapping.reconstructFrom(problem, sample)
 
@@ -63,7 +66,10 @@ internal class PrivateRebuildGeneration private constructor(
                 return null
             }
             var entries = source.numBoolVars.toLong() + source.numFactors + 1L
-            for (factor in source.factors) {
+            var retainedEntries = 0L
+            var retainedFactors = 0
+            for (index in source.factors.indices) {
+                val factor = source.factors[index]
                 cancellation.charge(1L)
                 if (cancellation()) return null
                 if (factor !is Clause) {
@@ -71,14 +77,29 @@ internal class PrivateRebuildGeneration private constructor(
                     return null
                 }
                 entries += factor.literals.size
+                if (parity != null && !parity.coveredSource[index]) {
+                    retainedEntries += factor.literals.size + 1L
+                    retainedFactors++
+                }
             }
             entries += learnedBinary?.clauses?.sumOf { it.literals.size + 1L } ?: 0L
             if (parity != null) entries += source.numBoolVars * 2L
+            val affine = parity?.affine
+            val basis = parity?.basis
+            val rowLiterals = if (affine == null && basis != null) {
+                basis.rowLiteralCount(cancellation, onDecline)
+            } else null
+            if (cancellation()) return null
+            val rowView = rowLiterals != null
+            if (parity != null && affine == null && !rowView && parity.newPins == 0) return null
+            val modelEntries = if (rowView) {
+                source.numBoolVars * 3L + checkNotNull(basis).rank + checkNotNull(rowLiterals) + retainedEntries + 1L
+            } else entries
             // This admission model covers simultaneous primitive buffers and reference slots,
-            // including admission, the BVE database, source copies, reconstruction and a fresh native worker.
+            // including admission, the BVE database, source copies, reconstruction and a fresh worker.
             // Object headers, the retained canonical worker and allocator overhead are separate.
             val binaryBytes = if (learnedBinary == null) 0L else PrivateRebuildBinaryLearning.SCRATCH_BYTES
-            val bytes = entries * 512L + binaryBytes + (parity?.modeledBytes ?: 0L)
+            val bytes = modelEntries * 512L + binaryBytes + (parity?.modeledBytes ?: 0L)
             if (bytes > byteLimit) {
                 onDecline("Memory")
                 return null
@@ -103,19 +124,29 @@ internal class PrivateRebuildGeneration private constructor(
                     return null
                 }
             }
-            val affine = parity?.affine
             if (affine != null) {
                 cancellation.charge(source.numBoolVars * 2L)
                 if (cancellation()) return null
             }
             val privateFixed = if (affine == null) fixed else Array(source.numBoolVars) { affine.privateValue(it) }
-            val residual = ArrayList<Factor>(if (affine == null) source.numFactors else source.numBoolVars)
+            val capacity = when {
+                rowView -> retainedFactors + checkNotNull(basis).rank + source.numBoolVars
+                affine != null -> source.numBoolVars
+                else -> source.numFactors
+            }
+            if (rowView) {
+                cancellation.charge(capacity.toLong())
+                if (cancellation()) return null
+            }
+            val residual = ArrayList<Factor>(capacity)
             var reused = 0
-            if (affine == null) for (factor in source.factors) {
+            if (affine == null) for (index in source.factors.indices) {
+                val factor = source.factors[index]
                 if (cancellation()) return null
                 val literals = (factor as Clause).literals
                 cancellation.charge(literals.size * 2L + 1L)
                 if (cancellation()) return null
+                if (rowView && checkNotNull(parity).coveredSource[index]) continue
                 var changed = false
                 var satisfied = false
                 for (literal in literals) {
@@ -136,6 +167,9 @@ internal class PrivateRebuildGeneration private constructor(
                     if (remaining.isEmpty()) return null
                     residual.add(Clause(remaining))
                 }
+            }
+            if (rowView) {
+                residual.addAll(checkNotNull(basis).materializeRows(cancellation) ?: return null)
             }
             if (parity != null) {
                 cancellation.charge(source.numBoolVars * 16L)
@@ -246,7 +280,9 @@ internal class PrivateRebuildGeneration private constructor(
                 passStopped, admission?.candidates ?: 0,
                 warm, warmNanos, bakeWork, descriptorWork, reused, neighborhood?.indexedFactors ?: 0,
                 neighborhood?.sourceFactors ?: 0, rebuild.steps.count { it is RebuildStep.CopyLiteral },
-                parity?.newPins ?: 0, affine?.rank ?: 0, affine?.freeColumns ?: 0)
+                parity?.newPins ?: 0, affine?.rank ?: 0, affine?.freeColumns ?: 0,
+                if (rowView) checkNotNull(basis).rank else 0, rowLiterals ?: 0L,
+                if (rowView) checkNotNull(parity).coveredClauses else 0)
         }
     }
 }
