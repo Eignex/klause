@@ -29,7 +29,9 @@ internal object CorpusStagingSuite : BenchSuite {
     override fun describe() = BenchDescriptor("corpus-staging", "Source IO diagnostics without solver execution")
 
     override fun plan(request: BenchRequest): List<BenchCase> {
-        require(request.parameters.keys == setOf("inputs", "timeout-ms"))
+        require(request.parameters.keys - "order" == setOf("inputs", "timeout-ms"))
+        val order = request.parameters["order"] ?: "forward"
+        require(order in setOf("forward", "reverse"))
         val budget = request.parameters.getValue("timeout-ms").toLong().also { require(it in 1..10_000) }
         val inputs = BenchProtocol.json.decodeFromString<List<FrozenStagingInput>>(
             request.parameters.getValue("inputs"),
@@ -38,8 +40,9 @@ internal object CorpusStagingSuite : BenchSuite {
         return inputs.map { input ->
             require(input.suite.isNotBlank() && input.problem.isNotBlank() && input.path.endsWith(".zst"))
             require(input.plainSha256.matches(Regex("[a-f0-9]{64}")))
-            BenchCase("${input.suite}/${input.problem}/staging",
-                parameters = mapOf("timeout-ms" to budget.toString(), "plain-sha256" to input.plainSha256),
+            BenchCase("${input.suite}/${input.problem}/staging/$order",
+                parameters = mapOf("timeout-ms" to budget.toString(),
+                    "plain-sha256" to input.plainSha256, "order" to order),
                 resources = BenchResources(1, 4096, 280),
                 inputs = listOf(BenchInput(input.path, BenchInputRoot.CORPUS, "model", input.packedSha256)),
                 attributes = mapOf("suite" to input.suite, "problem" to input.problem, "format" to input.format,
@@ -60,6 +63,7 @@ internal object CorpusStagingSuite : BenchSuite {
                 out,
                 case.parameters.getValue("timeout-ms").toLong(),
                 expectedHash = case.parameters.getValue("plain-sha256"),
+                order = case.parameters.getValue("order"),
             )
         }.exceptionOrNull()
         return BenchResult(case.id, if (failure == null) BenchStatus.SUCCESS else BenchStatus.FAILED,

@@ -35,4 +35,19 @@ class CorpusStagingAdapterTest {
                 "inputs" to BenchProtocol.json.encodeToString(listOf(input)), "timeout-ms" to "10000")))
         }
     }
+
+    @Test
+    fun `reversed controls retain the same frozen source comparison identity`() {
+        val input = FrozenStagingInput("offline", "tiny", "DIMACS", "offline/tiny.cnf.zst",
+            "1".repeat(64), "2".repeat(64))
+        val parameters = mapOf("inputs" to BenchProtocol.json.encodeToString(listOf(input)), "timeout-ms" to "10000")
+
+        val forward = CorpusStagingSuite.plan(BenchRequest(parameters + ("order" to "forward"))).single()
+        val reverse = CorpusStagingSuite.plan(BenchRequest(parameters + ("order" to "reverse"))).single()
+
+        assertEquals(forward.inputs, reverse.inputs)
+        assertEquals(forward.attributes["comparisonKey"], reverse.attributes["comparisonKey"])
+        assertEquals("forward", forward.parameters["order"])
+        assertEquals("reverse", reverse.parameters["order"])
+    }
 }

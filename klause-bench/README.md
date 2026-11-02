@@ -415,9 +415,12 @@ recording options. After installing the bench, `scripts/draw-sets.sh <features-d
 `bench.profile.CorpusStagingProfile` accepts `suite=ID problem=NAME sha256=HEX
 budget-ms=N repeats=2`. It compares packed reads, decoding with hashing, temporary
 staging and plain reads in separate fresh JVMs, with repeated operations in each.
+An additional `stage-uninstrumented` child omits JFR. `order=forward|reverse`
+counterbalances control order across lab configurations.
 The parent verifies the original plain-byte hash and records materialization,
 filesystem and build identities. OS cache state is uncontrolled and preceded by
-identity reads/materialization; the first operation is only JVM-cold. Per-operation
+identity reads/materialization. Each first operation uses a fresh JVM; JFR can
+precondition runtime facilities in instrumented controls. Per-operation
 wall/thread CPU, staging, verification and cleanup timings, failed attempts and
 child JFR captures diagnose source costs. The profile runs no solver and makes no
 throughput or useful-solve-time claim. Use ordinary same-machine paired lab rows
@@ -428,6 +431,9 @@ Submit `timeout-ms` (at most 10,000) and `inputs`, a JSON array of `suite`, `pro
 `format`, `path`, `packedSha256` and `plainSha256` objects copied from retained source
 records. The planner declares those exact corpus paths and hashes; it performs no
 catalog discovery. Each accepted row retains all modes on its one worker attempt.
+An optional `order` request selects `forward` or `reverse`; both retain the same
+source comparison identity. Child samples and JVM launcher output use separate
+files.
 This manifest omits MiniZinc provisioning and supports compressed file-backed
 sources only.
 IO event extracts are written after all trials on the lab worker. They retain
