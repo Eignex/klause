@@ -7,6 +7,7 @@ import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.bench.source.SourceStaging
 import com.eignex.klause.bench.tools.CliProfile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -43,6 +44,7 @@ internal object SolverInvocation {
         val captureDirectory: File? = null,
         val measureResources: Boolean = false,
         val completeAssignment: Boolean = false,
+        val sourceStaging: SourceStaging = SourceStaging.CACHE,
     )
 
     /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
@@ -89,7 +91,7 @@ internal object SolverInvocation {
         } else {
             emptyMap()
         }
-        return withSourceInput(file, budget) { plain, remaining ->
+        return withSourceInput(file, budget, staging = settings.sourceStaging) { plain, remaining ->
             val cmd = klauseCommand(entry, settings, remaining, optimize, plain)
             try {
                 invoke(
@@ -109,9 +111,11 @@ internal object SolverInvocation {
         file: File,
         budget: Budget,
         nanoTime: () -> Long = System::nanoTime,
+        staging: SourceStaging = SourceStaging.CACHE,
         solve: (File, Budget) -> Result,
     ): Result {
         val start = nanoTime()
+        val stagingDirectory = staging.directory
         var preparationNanos: Long? = null
         var cleanupNanos = 0L
         var cliNanos = 0L
@@ -119,7 +123,8 @@ internal object SolverInvocation {
             rawOutput = "", command = "SOURCE_PREPARATION")
         fun checkActive() = checkSourceActive(nanoTime() - start, budget)
         val failure = runCatching {
-            CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it }, nanoTime = nanoTime) { plain ->
+            CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it },
+                stagingDirectory = stagingDirectory, nanoTime = nanoTime) { plain ->
                 checkActive()
                 val cliStart = nanoTime()
                 preparationNanos = cliStart - start
@@ -138,6 +143,8 @@ internal object SolverInvocation {
         }
         val totalNanos = nanoTime() - start
         result = result.copy(stats = result.stats + mapOf(
+            "sourceStaging" to if (CorpusFiles.isCompressed(file)) staging.key else "plain",
+            "sourceStagingDirectory" to if (CorpusFiles.isCompressed(file)) stagingDirectory.absolutePath else "",
             "sourceDecodeMs" to ((preparationNanos ?: (totalNanos - cleanupNanos)) / NANOS_PER_MILLI).toString(),
             "sourceCleanupMs" to (cleanupNanos / NANOS_PER_MILLI).toString(),
             "sourceCliMs" to (cliNanos / NANOS_PER_MILLI).toString(),

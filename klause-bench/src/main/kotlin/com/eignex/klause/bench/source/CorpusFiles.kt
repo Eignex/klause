@@ -34,7 +34,7 @@ internal object CorpusFiles {
 
     /** Where [withPlainFile] stages decompressed copies: under the cache root (so inside `$HOME`, which a
      *  colima docker VM mounts) and outside every collection directory, so discovery never walks into it. */
-    private val stagingRoot: File get() = File(CorpusFetcher.cacheRoot, ".plain")
+    val stagingRoot: File get() = File(CorpusFetcher.cacheRoot, ".plain")
 
     fun isCompressed(file: File): Boolean = file.name.endsWith(SUFFIX)
 
