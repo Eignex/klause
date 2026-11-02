@@ -12,6 +12,9 @@ or newer; native executables need no JVM. Build commands live in the
 [repository README](../README.md#build), and runtime numerical options in
 [numerical dependencies](18-exact-arithmetic.md#runtime-support).
 
+Repository JVM compilation emits explicit lambda and SAM adapter classes,
+ordinary type checks for `when`, and `StringBuilder` concatenation.
+
 ## Formats and dispatch
 
 | Format name | Extensions | Output |
