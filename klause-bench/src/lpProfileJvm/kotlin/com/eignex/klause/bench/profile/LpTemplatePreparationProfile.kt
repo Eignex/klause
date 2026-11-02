@@ -45,6 +45,7 @@ internal object LpTemplatePreparationProfile {
         }
         val floatingPrimal = route == "pump-primal"
         val pumpRoute = route == "pump" || floatingPrimal
+        val sharedPrimal = route == "primal"
         val file = if (args[0].startsWith("selection=")) {
             val line = File(args[0].removePrefix("selection=")).readLines().single { it.isNotBlank() }
             val selected = Json.parseToJsonElement(line).jsonObject
@@ -85,7 +86,7 @@ internal object LpTemplatePreparationProfile {
         val compilation = ManagementFactory.getCompilationMXBean()?.takeIf { it.isCompilationTimeMonitoringSupported }
         val modes = listOf("disabled", "object", "index", "candidate")
         val changes = listOf("cold", "unchanged", "bound", "objective", "row", "cancel") +
-            if (pumpRoute) listOf("affine", "namespace", "finite") else emptyList()
+            if (pumpRoute || sharedPrimal) listOf("affine", "namespace", "finite") else emptyList()
         out.resolve("runs.jsonl").bufferedWriter().use { writer ->
             repeat(repeats + 1) { round ->
                 for (change in changes) {
@@ -169,6 +170,9 @@ internal object LpTemplatePreparationProfile {
                         var sourceCacheUnits = 0L
                         var wholeModelsReused = 0L
                         var wholeModelsPublished = 0L
+                        var rawSourceAttempts = 0L
+                        var finiteSourceAttempts = 0L
+                        var alternateNamespaceAttempts = 0L
                         var coldNs = 0L
                         var cancelledCallerWork = 0L
                         var maxCancelledCallerWork = 0L
@@ -179,7 +183,9 @@ internal object LpTemplatePreparationProfile {
                             repeat(steps) consumers@{ step ->
                                 check(!stop())
                                 val view = (if (step % 2 == 1) changedSource else source)
-                                    .let { if (pumpRoute) it else it.withFactors(it.factors.copyOf()) }
+                                    .let {
+                                        if (pumpRoute || it is BakedProblem) it else it.withFactors(it.factors.copyOf())
+                                    }
                                 val cost = if (step % 2 == 1) changedObjective else objective
                                 val opening = System.nanoTime()
                                 val openingBytes = readAllocatedBytes()
@@ -194,9 +200,13 @@ internal object LpTemplatePreparationProfile {
                                 val selectedView = if (change == "cold") {
                                     FactorProjectionProviders.Default.prepare(view)
                                 } else if (step % 2 == 1 && changedSelection != null) {
-                                    changedSelection
+                                    changedSelection.forEngineView(view)
                                 } else {
                                     selected.forEngineView(view)
+                                }
+                                if (view is BakedProblem) finiteSourceAttempts++ else rawSourceAttempts++
+                                if (selectedView.lpEmissionNamespace !== selected.lpEmissionNamespace) {
+                                    alternateNamespaceAttempts++
                                 }
                                 var consumerWork = 0L
                                 val consumerToken = if (change == "cancel" && step % 2 == 1) {
@@ -290,6 +300,9 @@ internal object LpTemplatePreparationProfile {
                                             )
                                         }
                                         envelopeConstant = relaxation.objectiveConstant
+                                        if (pumpRoute || sharedPrimal) {
+                                            check(envelopeConstant == cost.constant)
+                                        }
                                         finishAssembly()
                                         val solving = System.nanoTime()
                                         if (floatingPrimal) {
@@ -346,7 +359,7 @@ internal object LpTemplatePreparationProfile {
                                     checkNotNull(result)
                                     results.add(
                                         "${result.verdict}:${result.lowerBound}:${result.witness?.objective}" +
-                                            if (pump != null) ":constant=$envelopeConstant" else "",
+                                            if (pumpRoute || sharedPrimal) ":constant=$envelopeConstant" else "",
                                     )
                                 }
                                 if (step == 0) coldNs = System.nanoTime() - start
@@ -487,6 +500,9 @@ internal object LpTemplatePreparationProfile {
                             )
                             put("wholeModelsReused", wholeModelsReused)
                             put("wholeModelsPublished", wholeModelsPublished)
+                            put("rawSourceAttempts", rawSourceAttempts)
+                            put("finiteSourceAttempts", finiteSourceAttempts)
+                            put("alternateNamespaceAttempts", alternateNamespaceAttempts)
                             put("sourceSha256", hash)
                             put("parseNs", parseNs)
                             put("round", round)
