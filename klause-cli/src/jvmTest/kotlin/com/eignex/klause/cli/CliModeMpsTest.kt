@@ -166,7 +166,9 @@ class CliModeMpsTest {
                 )
             }
 
-            assertTrue("c frontendRoutingOutcome=finite" in kept.lines(), kept)
+            assertTrue("s OPTIMUM FOUND" in kept.lines(), kept)
+            assertTrue("o -5" in kept.lines(), kept)
+            assertTrue("v x=5" in kept.lines(), kept)
             assertTrue("c frontendRoutingOutcome=native-formula" in declined.lines(), declined)
             assertTrue("c reportedBackend=numerical-mip" in declined.lines(), declined)
             assertTrue("s OPTIMUM FOUND" in declined, declined)
