@@ -310,7 +310,7 @@ class PrivateRebuildSatisfactionTest {
 
     @Test
     fun `an established root refutation should retain its canonical verdict after cancellation`() {
-        for (work in listOf(0L, 65_536L)) {
+        for (work in listOf(0L, 65_536L, -1L)) {
             val source = Problem(1, 0, emptyArray(), arrayOf(
                 Clause(intArrayOf(0)), Clause(intArrayOf(1)),
             )).bake()
@@ -396,5 +396,124 @@ class PrivateRebuildSatisfactionTest {
             assertNull(stopped.stats.search.learning["privateRebuildSourceAccepted"])
             assertEquals(stopped, search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
         }
+    }
+
+    @Test
+    fun `automatic parity admission should publish a checked source point and release its consumer`() {
+        for (native in listOf(false, true)) {
+            val clauses = (0 until 128).flatMap { row ->
+                listOf(1, 2, 4, 7).map { mask ->
+                    Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
+                }
+            } + Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))
+            val source = Problem(130, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+
+            val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+                nativeSat = native, privateRebuildWork = -1L, variableSelector = InputOrder,
+                valueSelector = IndomainMin,
+            )))
+
+            assertTrue(clauses.all { clause ->
+                clause.literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+            })
+            val learning = result.stats.search.learning
+            assertEquals(1L, learning["privateRebuildAutomaticAdmitted"])
+            assertEquals(1L, learning["privateRebuildConsumers"])
+            assertEquals(1L, learning["privateRebuildSourceAccepted"])
+            assertEquals(1L, learning["privateRebuildRetired"])
+            assertEquals(1_048_576L, learning["privateRebuildAutomaticWorkLimit"])
+            val stages = listOf("RootScanWork", "ParityDiscoveryWork", "BinaryScanWork", "BinaryHistoryWork",
+                "PreparationWork", "OpeningConstructionWork", "TrialWork", "ReconstructionWork", "SourceCheckWork")
+            assertEquals(stages.sumOf { learning["privateRebuild$it"] ?: 0L },
+                learning.getValue("privateRebuildChargedWork"))
+            assertTrue(learning.getValue("privateRebuildChargedWork") <= 1_048_576L)
+        }
+    }
+
+    @Test
+    fun `automatic low rank misses should retain canonical search without other private attempts`() {
+        val clauses = (0 until 128).flatMap {
+            listOf(1, 2, 4, 7).map { mask ->
+                Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })
+            }
+        }.toTypedArray<Factor>()
+        val source = Problem(128, 0, emptyArray(), clauses).bake()
+
+        val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+            privateRebuildWork = -1L,
+        )))
+
+        assertTrue(clauses.all { factor ->
+            (factor as Clause).literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+        })
+        val learning = result.stats.search.learning
+        assertEquals(1L, learning["privateRebuildAutomaticAttempts"])
+        assertEquals(1L, learning["privateRebuildAutomaticDeclinedStructure"])
+        assertNull(learning["privateRebuildAttempts"])
+        assertNull(learning["privateRebuildConsumers"])
+        assertNull(learning["privateRebuildRootScanWork"])
+        assertNull(learning["privateRebuildBinaryScanWork"])
+        assertTrue(learning.getValue("privateRebuildParityDiscoveryWork") > 0L)
+        assertEquals(learning.getValue("privateRebuildParityDiscoveryWork"),
+            learning.getValue("privateRebuildChargedWork"))
+    }
+
+    @Test
+    fun `explicit zero should disable discovery on an automatically sized source`() {
+        val clauses = (0 until 128).flatMap {
+            listOf(1, 2, 4, 7).map { mask ->
+                Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })
+            }
+        }.toTypedArray<Factor>()
+        val source = Problem(128, 0, emptyArray(), clauses).bake()
+        val automatic = BacktrackParams(privateRebuildWork = -1L)
+
+        val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(
+            automatic.copy(privateRebuildWork = 0L),
+        ))
+
+        assertNull(result.stats.search.learning["privateRebuildAutomaticAttempts"])
+        assertNull(result.stats.search.learning["privateRebuildParityDiscoveryWork"])
+        assertNull(result.stats.search.learning["privateRebuildConsumers"])
+    }
+
+    @Test
+    fun `automatic admission should respect an exhausted scratch grant`() {
+        val clauses = (0 until 128).flatMap { row ->
+            listOf(1, 2, 4, 7).map { mask ->
+                Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
+            }
+        } + Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))
+        val source = Problem(130, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+
+        val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+            privateRebuildWork = -1L, learnedMemoryScratchBytes = 0L, variableSelector = InputOrder,
+            valueSelector = IndomainMin,
+        )))
+
+        assertTrue(clauses.all { clause ->
+            clause.literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+        })
+        val learning = result.stats.search.learning
+        assertEquals(1L, learning["privateRebuildAutomaticAttempts"])
+        assertEquals(1L, learning["privateRebuildParityDeclinedMemory"])
+        assertNull(learning["privateRebuildConsumers"])
+        assertEquals(0L, learning["privateRebuildChargedWork"])
+    }
+
+    @Test
+    fun `small automatic requests should retain canonical search without discovery`() {
+        val clauses = listOf(1, 2, 4, 7).map { mask ->
+            Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })
+        }.toTypedArray<Factor>()
+        val source = Problem(3, 0, emptyArray(), clauses).bake()
+
+        val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+            privateRebuildWork = -1L,
+        )))
+
+        assertNull(result.stats.search.learning["privateRebuildAutomaticAttempts"])
+        assertNull(result.stats.search.learning["privateRebuildParityDiscoveryWork"])
+        assertNull(result.stats.search.learning["privateRebuildConsumers"])
     }
 }

@@ -55,4 +55,11 @@ class BacktrackParamsTest {
             assertFailsWith<IllegalArgumentException> { BacktrackParams(inprocessingWarmupWork = work) }
         }
     }
+
+    @Test
+    fun `private work should reject values outside automatic or bounded modes`() {
+        for (work in listOf(Long.MIN_VALUE, -2L, 1_048_577L, Long.MAX_VALUE)) {
+            assertFailsWith<IllegalArgumentException> { BacktrackParams(privateRebuildWork = work) }
+        }
+    }
 }

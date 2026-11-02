@@ -69,6 +69,12 @@ diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
+`param.private-rebuild-work=-1` requests automatic parity admission within a
+1,048,576-work cap and the configured scratch grant. It makes one initial-root
+attempt on the structurally admitted Boolean cohort; see the
+[admission contract](../docs/07-presolve.md#private-worker-qualification).
+Use explicit zero as the canonical control. The production default remains zero.
+
 `param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
 trial after new global root pins or an owned learned equivalence, with source reduction and a fresh consuming
 worker. Zero is the default. `ProgressPins` excludes baked-root facts;
