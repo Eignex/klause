@@ -529,9 +529,12 @@ class PropagationState private constructor(
 
     /** Per-literal bool watcher index (watch lists, blockers, back-pointers) —
      *  see [BoolWatcherIndex]. Mutated by `Watches.kt` and the [forgetLearnedClauses] compaction. */
-    internal val watches: BoolWatcherIndex by lazy(LazyThreadSafetyMode.NONE) {
+    private val watchIndex = lazy(LazyThreadSafetyMode.NONE) {
         prepared?.watches ?: BoolWatcherIndex(problem.numBoolVars)
     }
+    internal val watches: BoolWatcherIndex get() = watchIndex.value
+    internal val initializedWatches: BoolWatcherIndex?
+        get() = if (watchIndex.isInitialized()) watchIndex.value else null
 
     /**
      * Reasons for implied Boolean pins, stored as eager antecedent literals or [lazyReason] markers.

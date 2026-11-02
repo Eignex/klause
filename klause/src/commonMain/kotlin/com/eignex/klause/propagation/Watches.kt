@@ -18,7 +18,15 @@ internal fun PropagationState.moveBoolWatcher(factorId: Int, oldLit: Int, newLit
     if (oldV < problem.numBoolVars) {
         removeBoolWatch(factorId, oldLit)
     } else {
-        atoms.watchersByLit[atomLitWatchIndex(oldLit)]?.removeValue(factorId)
+        val index = atomLitWatchIndex(oldLit)
+        val posting = atoms.watchersByLit[index]
+        if (posting != null) {
+            val position = posting.indexOf(factorId)
+            if (position >= 0) {
+                posting.removeAt(position)
+                rewindWatchCleanup(problem.numBoolVars * 2 + index, position)
+            }
+        }
     }
     // Install on new, carrying the blocking literal supplied by the watcher-using factor.
     // Defaults to NO_BLOCKER for factors that don't track blockers.
@@ -46,7 +54,10 @@ internal fun PropagationState.removeBoolWatch(factorId: Int, lit: Int) {
                 break
             }
         }
-        if (pos >= 0) swapPopWatch(list, blockers, pos)
+        if (pos >= 0) {
+            swapPopWatch(list, blockers, pos)
+            rewindWatchCleanup(lit, pos)
+        }
         resyncBoolWatchPos(lit)
         return
     }
@@ -56,6 +67,7 @@ internal fun PropagationState.removeBoolWatch(factorId: Int, lit: Int) {
         watches.pos.put(packWatch(movedFid, lit), recorded)
     }
     swapPopWatch(list, blockers, recorded)
+    rewindWatchCleanup(lit, recorded)
 }
 
 /** Swap-pop index [pos] from a watcher list and its parallel blocker list in lockstep,
@@ -68,6 +80,10 @@ internal fun PropagationState.swapPopWatch(list: IntArrayList, blockers: IntArra
     }
     list.truncateTo(last)
     blockers.truncateTo(last)
+}
+
+internal fun PropagationState.rewindWatchCleanup(lit: Int, index: Int) {
+    if (lit == learned.watchCleanupLiteral && index < learned.watchCleanupIndex) learned.watchCleanupIndex = index
 }
 
 /** Recompute every recorded position for [lit]'s watcher list (used by the self-heal
