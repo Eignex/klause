@@ -6,7 +6,7 @@ import jdk.jfr.Name
 import jdk.jfr.StackTrace
 
 internal object SourcePreparationCapture {
-    private val enabled = java.lang.Boolean.getBoolean("klause.bench.source-events")
+    private val enabled = System.getProperty("klause.bench.source-events").toBoolean()
     private val disabled = AutoCloseable { }
 
     fun <T> measure(phase: String, block: () -> T): T = span(phase).use { block() }

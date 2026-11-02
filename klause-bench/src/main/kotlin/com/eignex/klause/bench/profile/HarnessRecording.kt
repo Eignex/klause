@@ -26,7 +26,8 @@ internal object HarnessRecording {
                     put("overlapPolicy", "nested phases and JVM events overlap; durations are not additive")
                     put("failurePolicy", "aborted source-preparation may include cleanup before its phase closes")
                     put("stackDepthLimit", 32)
-                    put("fieldPolicy", "scalar fields only; nested objects remain in raw capture; timespans in nanoseconds")
+                    put("fieldPolicy",
+                        "scalar fields only; nested objects remain in raw capture; timespans in nanoseconds")
                     put("ioPolicy", "IO call duration includes scheduling and GC; it does not prove device wait")
                 }.toString())
                 RecordingFile(recording).use { input ->
@@ -56,7 +57,8 @@ internal object HarnessRecording {
         put("event", event.eventType.name)
         put("start", event.startTime.toString())
         put("durationNanos", event.duration.toNanos())
-        put("thread", (if (event.hasField("sampledThread")) event.getThread("sampledThread") else event.thread)?.javaName)
+        val thread = if (event.hasField("sampledThread")) event.getThread("sampledThread") else event.thread
+        put("thread", thread?.javaName)
         put("stackTruncated", event.stackTrace?.isTruncated)
         put("stackDepthLimited", (event.stackTrace?.frames?.size ?: 0) > 32)
         putJsonArray("stack") {
