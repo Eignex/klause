@@ -1760,33 +1760,35 @@ class LinearAuthorityAggregateCutsTest {
 
     @Test
     fun `reused incidence buckets should leave production allocation for a checked cut`() {
-        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
-        val premises = linkedMapOf(
-            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                real to BigFraction.ONE), BigFraction.ofLong(3))),
-            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
-                real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        )
-        repeat(1200) { index ->
-            premises["loose $index"] = SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE,
-                real to BigFraction.ONE, otherReal to BigFraction.ONE), BigFraction.ofLong(100)))
+        for (rowCount in listOf(1200, 1800)) {
+            val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+            val premises = linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    real to BigFraction.ONE), BigFraction.ofLong(3))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            )
+            repeat(rowCount) { index ->
+                premises["loose $index"] = SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE,
+                    real to BigFraction.ONE, otherReal to BigFraction.ONE), BigFraction.ofLong(100)))
+            }
+            val source = SourceProofContext(scope, setOf(x, y, real, otherReal), premises)
+            val observations = mutableMapOf<String, Long>()
+            val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                maximumCandidates = 1, limits = limits,
+                point = mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 0.0)).single()
+
+            assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
+                cut.inequality)
+            assertEquals(setOf(0, 1), cut.owners)
+            assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+            assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
         }
-        val source = SourceProofContext(scope, setOf(x, y, real, otherReal), premises)
-        val observations = mutableMapOf<String, Long>()
-        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
-
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
-            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
-            maximumCandidates = 1, limits = limits,
-            point = mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 0.0)).single()
-
-        assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
-            cut.inequality)
-        assertEquals(setOf(0, 1), cut.owners)
-        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
-        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
     }
 
     @Test

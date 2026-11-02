@@ -25,6 +25,24 @@ class SourceEvidenceVerifierTest {
     private val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE))
 
     @Test
+    fun `premise traversal should retain captured source order after external mutation`() {
+        val upper = SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(2)))
+        val original = linkedMapOf("lower" to SourcePremise(lower), "upper" to upper)
+        val source = SourceProofContext(scope, setOf(x), original)
+        val snapshot = source.premises as MutableMap<String, SourcePremise>
+
+        original.clear()
+        snapshot.clear()
+        val visited = mutableListOf<Pair<String, SourcePremise>>()
+        source.forEachPremise { name, premise -> visited += name to premise }
+
+        assertEquals(listOf("lower", "upper"), visited.map { it.first })
+        assertEquals(listOf(lower, upper.inequality), visited.map { it.second.inequality })
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower"))))
+    }
+
+    @Test
     fun `batched consequences should share one proof allowance`() {
         val evidence = SourceEvidence(scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower"))
 

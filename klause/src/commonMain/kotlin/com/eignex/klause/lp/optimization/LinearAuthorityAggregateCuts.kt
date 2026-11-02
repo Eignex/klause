@@ -7,7 +7,6 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceInequality
-import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRoundingLimit
 import com.eignex.klause.solver.evidence.mixedIntegerRounding
@@ -68,8 +67,7 @@ internal object LinearAuthorityAggregateCuts {
         val candidates = ArrayList<LinearAuthorityCut>()
         var eligibilityKnown = true
         try {
-            meter.reserve(source.premiseCount.toLong(), source.premiseCount * 128L)
-            val premises = source.premises
+            meter.reserve(source.premiseCount.toLong(), 512L)
             val rows = ArrayList<ProbeRow>()
             val integerRows = if (point == null) null else {
                 meter.reserve(1L, 128L)
@@ -77,17 +75,19 @@ internal object LinearAuthorityAggregateCuts {
             }
             val bounds = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
             val incidence = HashMap<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>()
-            for ((owner, entry) in premises.entries.withIndex()) {
-                meter.reserve(1L, 128L + entry.key.length * 2L)
-                val term = LinearAuthorityAggregateTerm(owner, entry.key, entry.value.inequality)
+            var ordinal = 0
+            source.forEachPremise { name, premise ->
+                val owner = ordinal++
+                meter.reserve(1L, 128L + name.length * 2L)
+                val term = LinearAuthorityAggregateTerm(owner, name, premise.inequality)
                 if (term.inequality.supportSize > limits.support) {
                     eligibilityKnown = false
                     observe("AggregatePairSourceSupportLimit", 1L)
-                    continue
+                    return@forEachPremise
                 }
                 meter.reserve(term.inequality.supportSize * 3L, 96L + term.inequality.supportSize * 64L)
                 val coefficients = term.inequality.coefficients
-                if (coefficients.keys.any { it.kind == SourceCoordinate.Kind.Boolean }) continue
+                if (coefficients.keys.any { it.kind == SourceCoordinate.Kind.Boolean }) return@forEachPremise
                 val row = ProbeRow(term, coefficients)
                 if (row.realCount == 0) {
                     if (integerRows != null && row.hasInteger && coefficients.size > 1) {
@@ -99,7 +99,7 @@ internal object LinearAuthorityAggregateCuts {
                             observe("AggregateIntegerRowLimit", 1L)
                         }
                     }
-                    continue
+                    return@forEachPremise
                 }
                 rows += row
                 for ((id, coefficient) in coefficients) {
@@ -138,7 +138,7 @@ internal object LinearAuthorityAggregateCuts {
             val selectedBounds = if (point == null) bounds else pointBounds(bounds, point, meter, observe)
             val integerBounds = if (point == null) null else {
                 meter.reserve(1L, 64L)
-                IntegerBoundIndex(premises)
+                IntegerBoundIndex(source)
             }
             val extension = if (point == null) null else {
                 meter.reserve(1L, 320L)
@@ -429,7 +429,7 @@ internal object LinearAuthorityAggregateCuts {
         }
     }
 
-    private class IntegerBoundIndex(private val premises: Map<String, SourcePremise>) {
+    private class IntegerBoundIndex(private val source: SourceProofContext) {
         private class CompletedBatch(
             val coordinates: Set<SourceCoordinate>,
             val bounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
@@ -459,29 +459,32 @@ internal object LinearAuthorityAggregateCuts {
             val pending = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
             val saved = singletonCoefficients
             val snapshot = saved ?: run {
-                meter.reserve(premises.size.toLong(), 128L + premises.size * 8L)
-                arrayOfNulls<Pair<SourceCoordinate, BigFraction>>(premises.size)
+                meter.reserve(source.premiseCount.toLong(), 128L + source.premiseCount * 8L)
+                arrayOfNulls<Pair<SourceCoordinate, BigFraction>>(source.premiseCount)
             }
             if (saved != null) observe("AggregateIntegerBoundSnapshotReuseAttempts", 1L)
-            for ((owner, entry) in premises.entries.withIndex()) {
+            meter.reserve(1L, 64L)
+            var ordinal = 0
+            source.forEachPremise { name, premise ->
+                val owner = ordinal++
                 meter.reserve(1L)
-                val inequality = entry.value.inequality
+                val inequality = premise.inequality
                 val singleton = if (saved != null) {
-                    saved[owner] ?: continue
+                    saved[owner] ?: return@forEachPremise
                 } else {
-                    if (inequality.supportSize != 1) continue
+                    if (inequality.supportSize != 1) return@forEachPremise
                     meter.reserve(1L, 64L)
                     val inspected = checkNotNull(inequality.singleCoefficient())
                     snapshot[owner] = inspected
                     inspected
                 }
                 val (id, coefficient) = singleton
-                if (id.kind != SourceCoordinate.Kind.Integer || id !in missing) continue
+                if (id.kind != SourceCoordinate.Kind.Integer || id !in missing) return@forEachPremise
                 meter.reserve(1L, 64L)
                 val side = id to (coefficient > BigFraction.ZERO)
-                if (side in pending) continue
-                meter.reserve(1L, 256L + entry.key.length * 2L)
-                pending[side] = LinearAuthorityAggregateTerm(owner, entry.key, inequality)
+                if (side in pending) return@forEachPremise
+                meter.reserve(1L, 256L + name.length * 2L)
+                pending[side] = LinearAuthorityAggregateTerm(owner, name, inequality)
                 observe("AggregateIntegerBoundRetained", 1L)
             }
             observe("AggregateIntegerBoundSourceScanComplete", 1L)

@@ -479,7 +479,9 @@ opposite signs on a shared continuous coordinate. Each pair uses its first index
 pivot and positive exact weights to cancel that coordinate; singleton source bounds
 participate in the same recipe. At least one row has integer activity. Checked
 rounding uses the first source bound sides for remaining continuous coordinates.
-Each source row's coefficient snapshot is shared across its generation's pair
+Preparation traverses consumer-owned immutable premises in source order without
+copying their map. Iterator and callback setup, row visits and retained indexing
+spend the generation's allowance. Each source row's coefficient snapshot is shared across its generation's pair
 attempts; each weighted combination owns a separate accumulator.
 Incidence indexing funds each lookup key and reference/list growth, reserving bucket
 storage when the bucket is created. Reused buckets retain their source-ordered lists.
@@ -504,7 +506,7 @@ allocation, capped at 16,384 work and 256 KiB, leaving capacity for continuous-r
 aggregation. Its scans, scalar normalization, failed attempts, proof references and
 retained rows debit the same containing generation and source funding. A shared
 immutable-generation index supplies stated integer endpoints to both recipe kinds.
-It reuses the funded premise snapshot and retains endpoints only for coordinates
+It traverses the same consumer-owned premises and retains endpoints only for coordinates
 requested by completed aggregates. A fully funded scan records both present and
 missing sides; interrupted scans publish no partial cache. Singleton coefficient
 inspection reads an immutable pair without copying a coefficient map. The first
