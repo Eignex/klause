@@ -221,6 +221,15 @@ internal class LpHints(
     ): List<SearchDecision> {
         val advice = activeSide ?: return alternatives
         activeSide = null
+        return applySide(variable, alternatives, advice, allowBasis)
+    }
+
+    private fun applySide(
+        variable: VarRef,
+        alternatives: List<SearchDecision>,
+        advice: SideAdvice,
+        allowBasis: Boolean,
+    ): List<SearchDecision> {
         charge(12L)
         if (advice.variable != variable || alternatives.size != 2) {
             observe("SIDE_FALLBACK")
