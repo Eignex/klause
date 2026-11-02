@@ -15,6 +15,7 @@ internal data class MiniZincIdentityEvidence(
     val outcome: String,
     val elapsedNs: Long,
     val startupNs: Long? = null,
+    val waitNs: Long? = null,
     val cleanupNs: Long = 0,
     val timeoutNs: Long,
     val executableSha256: String? = null,
@@ -65,6 +66,7 @@ internal class MiniZincIdentityQuery(
         var log: File? = null
         var process: Process? = null
         var startupNs: Long? = null
+        var waitNs: Long? = null
         var cpuNs: Long? = null
         var outcome = "start-failed"
         var cause: Throwable? = null
@@ -85,12 +87,17 @@ internal class MiniZincIdentityQuery(
                     pid = runCatching { child.pid() }.getOrNull(),
                 ))
                 val remaining = timeoutNs - startupNs
-                outcome = if (remaining <= 0 || !child.waitFor(remaining, TimeUnit.NANOSECONDS)) {
-                    "timed-out"
-                } else if (child.exitValue() == 0) {
-                    "completed"
-                } else {
-                    "exited"
+                val waitStart = clock()
+                try {
+                    outcome = if (remaining <= 0 || !child.waitFor(remaining, TimeUnit.NANOSECONDS)) {
+                        "timed-out"
+                    } else if (child.exitValue() == 0) {
+                        "completed"
+                    } else {
+                        "exited"
+                    }
+                } finally {
+                    waitNs = clock() - waitStart
                 }
             } catch (failure: InterruptedException) {
                 cause = failure
@@ -125,11 +132,15 @@ internal class MiniZincIdentityQuery(
             val bytes = log?.takeIf(File::isFile)?.length() ?: 0
             val diagnostic = log?.takeIf(File::isFile)?.inputStream()?.use { it.readNBytes(OUTPUT_LIMIT) }
                 ?.toString(Charsets.UTF_8).orEmpty()
+            val deleteStart = clock()
+            log?.delete()
+            cleanupNs += clock() - deleteStart
             val alive = process?.isAlive == true
             val evidence = initial.copy(
                 outcome = if (outcome == "completed" && bytes > OUTPUT_LIMIT) "output-truncated" else outcome,
                 elapsedNs = clock() - began,
                 startupNs = startupNs,
+                waitNs = waitNs,
                 cleanupNs = cleanupNs,
                 pid = process?.let { runCatching { it.pid() }.getOrNull() },
                 exitCode = process?.takeUnless { it.isAlive }?.exitValue(),
