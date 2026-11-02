@@ -13,6 +13,7 @@ import com.eignex.klause.portfolio.PortfolioProgress
 import com.eignex.klause.portfolio.PortfolioRewardPolicy
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
@@ -31,6 +32,76 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class FiniteNumericalCompanionsTest {
+    @Test
+    fun `checked companion repair should retain root guidance after numerical search closes`() {
+        val model = Problem(0, 3, Array(3) { IntDomain(0, 1) }, emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val params = TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 1, maxFlips = 1)
+        val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+            objective, params).requirements.construction
+        val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
+            Cancellation.Never, cost, incumbentCompletionCheck = { _, _, _ -> true }).companions)
+        val center = Sample(booleanArrayOf(), longArrayOf(0, 0, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+        companions.incumbents.exchange.offer(center, BigFraction.ONE)
+        var result: MinimizeResult? = null
+
+        PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+            val factories = companions.factories(plan, 0)
+            factories.first().materialize(plan, resources.slots[0]).use { worker ->
+                assertNotNull(worker.newResumableSearch { 1.0 }).use { search ->
+                    repeat(32) {
+                        if (!search.isDone) search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5_000) { }
+                    }
+                    assertEquals(1L, search.stats.smt.completeSearchStages?.get("numericalRepairGuidancePublished"))
+                }
+            }
+            factories.last().materialize(plan, resources.slots[1]).use { worker ->
+                assertNotNull(worker.newResumableSearch { 1.0 }).use { search ->
+                    repeat(32) {
+                        if (!search.isDone) result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5_000) { }
+                    }
+                    assertEquals(1L, search.stats.smt.completeSearchStages?.get("jointRepairSharedGuidanceQueries"))
+                }
+            }
+        }
+
+        assertEquals(0.0, assertIs<MinimizeResult.WithSample>(result).objective)
+    }
+
+    @Test
+    fun `checked companion repair should escape a center requiring three simultaneous integer changes`() {
+        val model = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val params = TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 3, maxFlips = 3)
+        val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+            objective, params).requirements.construction
+        val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
+            Cancellation.Never, cost).companions)
+        val center = Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+        companions.incumbents.exchange.offer(center, BigFraction.ofLong(3))
+        var result: MinimizeResult? = null
+
+        PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+            companions.factories(plan, 0).last().materialize(plan, resources.slots[1]).use { worker ->
+                assertNotNull(worker.newResumableSearch { 3.0 }).use { search ->
+                    repeat(32) {
+                        if (!search.isDone) result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5_000) { }
+                    }
+                }
+            }
+        }
+
+        assertEquals(0.0, assertIs<MinimizeResult.WithSample>(result).objective)
+    }
+
     @Test
     fun `funded companions should avoid capture when cancellation precedes every query`() {
         for (unavailable in listOf(false, true)) {

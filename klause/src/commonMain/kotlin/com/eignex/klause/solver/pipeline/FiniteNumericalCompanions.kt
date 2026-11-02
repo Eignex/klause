@@ -96,6 +96,7 @@ internal class FiniteNumericalCompanions private constructor(
     val incumbents = PortfolioIncumbents.exact(objective)
     private val completionSharing = if (params.sourceIncumbentCompletion && incumbentCompletionCheck != null)
         LinearIncumbentSharing() else null
+    private val repairGuidance = if (completionSharing != null) LinearRepairGuidance() else null
 
     fun factories(plan: PreparedSourcePlan, firstArm: Int): List<PortfolioArmFactory> {
         val identity = ModelIdentity.of(model, objective)
@@ -112,6 +113,7 @@ internal class FiniteNumericalCompanions private constructor(
         )
         return listOf(
             factory(firstArm, ArmFamily.Backtrack) { slot ->
+                repairGuidance?.let(slot::own)
                 lateinit var worker: PortfolioWorker
                 worker = PortfolioWorker.ofMinimize("numerical/finite-companion", firstArm, resumable = {
                     val limits = local(slot)
@@ -162,11 +164,11 @@ internal class FiniteNumericalCompanions private constructor(
                 companion().observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
             }, publicationLifetime = limits.cancellation or limits.timeout, observeExternalIncumbents = true,
             sharedCompletions = completionSharing,
-            incumbentCompletionCheck = incumbentCompletionCheck))
+            incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance))
         return exactNeighborhoodWorker("ls/finite-joint-companion", arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
             pendingIncumbentTrial = { repair.incumbentTrialPending },
-            open = { repair.search(adaptive = false, seed = slot.seed) })
+            open = { repair.search(adaptive = limits.sourceIncumbentCompletion, seed = slot.seed) })
     }
 
     private fun sharedIncumbent(worker: PortfolioWorker, onVersion: (Long) -> Unit) =
@@ -187,7 +189,7 @@ internal class FiniteNumericalCompanions private constructor(
                 }, onIncumbentUse = {
                     worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
                 }, observeExternalIncumbents = true, sharedCompletions = completionSharing,
-                incumbentCompletionCheck = incumbentCompletionCheck)
+                incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance)
             private var result: MinimizeResult? = null
             override val isDone: Boolean get() = result != null
             override val stats get() = search.stats

@@ -1,9 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
 import kotlin.math.abs
 import kotlin.math.round
 
@@ -27,6 +29,35 @@ internal class JointRepairNeighborhood private constructor(
             val value = point[SourceCoordinate(SourceCoordinate.Kind.Integer, id)]
             if (value == null || !value.isFinite()) 0.0 else abs(value - round(value))
         }
+    }
+
+    fun guide(hint: LinearRepairGuidance.Hint, centers: List<BigFraction>,
+        budget: SourceLpBudget, token: Cancellation): Boolean {
+        if (token() || centers.size < integers || centers.size > LinearRepairGuidance.MAX_COLUMNS) return false
+        val funding = budget.funding ?: return false
+        val work = 1L + 16L * seeds.size
+        val bytes = 256L + 128L * seeds.size
+        if (funding.availableWork <= work || funding.remainingAllocation <= bytes) return false
+        budget.observe(preparation = work)
+        funding.charge(0L, bytes)
+        val distances = HashMap<Int, Double>()
+        for (id in seeds) {
+            if (token()) return false
+            val center = centers[id]
+            val bits = center.num.magnitudeBitLength().toLong() + center.den.magnitudeBitLength()
+            if (bits > MAX_GUIDANCE_SCALAR_BITS) return false
+            val conversion = 1L + bits * bits / 64L
+            if (funding.availableWork <= conversion || funding.remainingAllocation <= 8L * bits) return false
+            budget.observe(preparation = conversion)
+            funding.charge(0L, 8L * bits)
+            val value = center.toDouble()
+            if (!value.isFinite()) return false
+            distances[id] = hint.integer(id)?.let { abs(it - value) } ?: 0.0
+        }
+        val ranked = seeds.sortedByDescending { distances.getValue(it) }
+        if (token()) return false
+        seeds = ranked
+        return true
     }
 
     override fun propose(
@@ -117,3 +148,4 @@ internal class JointRepairNeighborhood private constructor(
 private const val MAX_FREE_INTEGERS = 32
 private const val MAX_SELECTION_VISITS = 8192
 private const val MAX_INDEX_ENTRIES = 1_048_576
+private const val MAX_GUIDANCE_SCALAR_BITS = 4096

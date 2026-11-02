@@ -143,7 +143,20 @@ repair query enters companion discovery publication and original-source rechecki
 If that first proposal pauses, it receives continuation after owed complete-worker
 coverage until the proposal finishes or the companion's existing allowance retires
 it. This trial grants no incumbent reward and does not renew work, allocation or
-active time. Later proposals use ordinary selection.
+active time. Completion-enabled companion repair uses adaptive connected neighborhood
+widths after the small first proposal, within the same integer selection, proposal
+and funding ceilings. Later proposals use ordinary worker selection.
+
+The numerical companion can retain one completed root relaxation point for checked
+handoff repair. A private snapshot belongs to the same captured source context and
+survives numerical search retirement until its invocation slot closes. It ranks
+integer neighborhood seeds by their distance from the checked center; continuous
+columns stay free. Retention, scalar conversion and ranking spend the producing or
+consuming companion's existing work and allocation. Missing, cancelled, foreign or
+oversized guidance keeps ordinary neighborhood selection. No extra root query is
+opened to obtain guidance. `numericalRepairGuidancePublished` counts retained points;
+`jointRepairSharedGuidanceQueries` counts opened repair queries using that ranking.
+The point carries no witness, cutoff, completion-cache or proof authority.
 
 Each companion owns at most sixteen source/point attempts without eviction. Identity
 includes the full source restrictions, rows, coordinates, objective, interpretation
