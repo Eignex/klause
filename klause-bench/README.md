@@ -150,7 +150,8 @@ affine reconstruction and cannot receive unprojected canonical learned clauses.
 `ParityBasisColumns` and `ParityCoveredSourceClauses` describe the captured
 linear subsystem. `ParityReducedRows`, `ParityReducedLiterals` and
 `ParityCoveredClauses` identify a prepared mixed Clause/Xor view with original
-coordinate meanings; they do not count eliminated columns. Coverage declines name
+coordinate meanings; they do not count eliminated columns.
+`ParityPreferredFreeColumns` reports the admitted free-coordinate selection list. Coverage declines name
 incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
 larger widths). Such a miss can retain proved global pins or a mixed view.
 `ParityWorkspaceBytes` is the maximum modeled table/matrix/snapshot workspace

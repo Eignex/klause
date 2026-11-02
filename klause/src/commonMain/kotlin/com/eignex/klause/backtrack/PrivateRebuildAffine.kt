@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.EmptyIntArray
 
 internal class PrivateRebuildAffine(
     private val fixed: Array<Boolean?>,
@@ -46,6 +47,18 @@ internal class PrivateRebuildAffine(
             point[pivots[row]] = value != 0
         }
         return Sample(point, longArrayOf())
+    }
+
+    fun preferredFreeCoordinates(cancellation: Cancellation): IntArray? {
+        if (coordinates.size * 2L > PROPAGATION_WORK_PER_NODE) return EmptyIntArray
+        cancellation.charge(coordinates.size * 2L + freeColumns + 8L)
+        if (cancellation()) return null
+        val result = IntArray(freeColumns)
+        for (column in coordinates.indices) {
+            val coordinate = coordinates[column]
+            if (coordinate < 0 && coordinate != Int.MIN_VALUE) result[-coordinate - 1] = column
+        }
+        return result
     }
 
     fun rowLiteralCount(cancellation: Cancellation, onDecline: (String) -> Unit): Long? {

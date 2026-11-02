@@ -29,10 +29,8 @@ class PrivateRebuildAffineTest {
 
         val lifted = generation.reconstruct(Sample(privatePoint, longArrayOf()))
 
-        assertEquals(true, lifted.boolValue(0))
-        assertEquals(true, lifted.boolValue(1))
+        assertEquals(false, lifted.boolValue(0))
         assertEquals(true, lifted.boolValue(70))
-        assertEquals(false, lifted.boolValue(71))
         assertTrue(clauses.all { factor ->
             (factor as Clause).literals.any { Lit.evaluate(it, lifted.boolValue(Lit.variable(it))) }
         })

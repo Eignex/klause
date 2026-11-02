@@ -285,7 +285,8 @@ A bounded source scan can recognize two- and three-column parity equations from
 their complete two- and four-clause Boolean encodings. Each clause excludes one assignment;
 the complete parity class of exclusions entails the opposite parity equation.
 A preparation-only GF(2) matrix substitutes the canonical global pins and uses
-forward elimination followed by affine back substitution over its free coordinates.
+forward elimination from higher source slots followed by affine back substitution
+over its free coordinates. This ordering favors earlier slots as free coordinates.
 A pivot is globally forced only when its complete free-coordinate dependency
 cancels. Additional Boolean pins are emitted only after complete elimination.
 Incomplete clause groups, duplicate exclusions and partial matrix work grant no
@@ -323,6 +324,10 @@ fresh worker indexes share the containing work and modeled-memory grants.
 The mixed view preserves original coordinate meanings, including its live pivots,
 and can retain supported canonical warm clauses through the fixed-value projection.
 Its reduced rows and covered clauses are counted separately from eliminated columns.
+For source spans fitting two scans inside the normalized per-decision charge, the
+private consumer branches on free coordinates in source order before its pivots.
+Pivots retain their original meanings and propagation still decides their values.
+Larger spans retain the configured selector.
 
 A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker
