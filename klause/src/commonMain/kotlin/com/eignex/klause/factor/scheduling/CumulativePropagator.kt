@@ -112,13 +112,19 @@ internal class CumulativePropagator(
         domainOf(v)
     }
 
-    private fun tightenMin(state: PropagationState, v: Int, bound: Long, payload: IntArray): Boolean =
-        bound <= state.intDomains[v].min || state.tightenIntMin(v, bound, reasonFor(state, payload)) ||
-            failTighten(state, v, payload)
+    private inline fun tightenMin(state: PropagationState, v: Int, bound: Long, payload: () -> IntArray): Boolean {
+        if (bound <= state.intDomains[v].min) return true
+        val recorded = if (state.currentLevel == 0) null else payload()
+        val reason = recorded?.let { reasonFor(state, it) }
+        return state.tightenIntMin(v, bound, reason) || failTighten(state, v, recorded ?: payload())
+    }
 
-    private fun tightenMax(state: PropagationState, v: Int, bound: Long, payload: IntArray): Boolean =
-        bound >= state.intDomains[v].max || state.tightenIntMax(v, bound, reasonFor(state, payload)) ||
-            failTighten(state, v, payload)
+    private inline fun tightenMax(state: PropagationState, v: Int, bound: Long, payload: () -> IntArray): Boolean {
+        if (bound >= state.intDomains[v].max) return true
+        val recorded = if (state.currentLevel == 0) null else payload()
+        val reason = recorded?.let { reasonFor(state, it) }
+        return state.tightenIntMax(v, bound, reason) || failTighten(state, v, recorded ?: payload())
+    }
 
     private fun effectiveSnapshot(state: PropagationState): CumulativeEff? {
         val dur = LongArray(n)
@@ -211,7 +217,7 @@ internal class CumulativePropagator(
                     break
                 }
             }
-            if (newMin != oldMin && !tightenMin(state, v, newMin, packed(TIME_TABLE, i, 1, newMin))) return false
+            if (newMin != oldMin && !tightenMin(state, v, newMin) { packed(TIME_TABLE, i, 1, newMin) }) return false
             var newMax = state.intDomains[v].max
             while (newMax >= state.intDomains[v].min) {
                 state.checkFiniteWork()
@@ -221,7 +227,7 @@ internal class CumulativePropagator(
                     break
                 }
             }
-            if (newMax != oldMax && !tightenMax(state, v, newMax, packed(TIME_TABLE, i, 0, newMax))) return false
+            if (newMax != oldMax && !tightenMax(state, v, newMax) { packed(TIME_TABLE, i, 0, newMax) }) return false
         }
         val subset = unarySubset?.takeIf { state.cumulativeUnarySubsets } ?: return true
         subset.clearFailure(state)
@@ -288,18 +294,21 @@ internal class CumulativePropagator(
                 if (availSurf < 0L) return fail(state) { energyReason(-1, OVERLOAD, xMin, xMax) }
                 val md = minDur(state, i)
                 if (resourceVars.isNotEmpty() && md > 0) {
-                    val payload = packed(ENERGY, i, RESOURCE, xMin, xMax)
-                    if (!tightenMax(state, resourceVars[i], availSurf / md, payload)) return false
+                    if (!tightenMax(state, resourceVars[i], availSurf / md) {
+                            packed(ENERGY, i, RESOURCE, xMin, xMax)
+                        }) return false
                 }
                 val mh = minHeight(state, i)
                 if (durationVars.isNotEmpty() && mh > 0) {
-                    val payload = packed(ENERGY, i, DURATION, xMin, xMax)
-                    if (!tightenMax(state, durationVars[i], availSurf / mh, payload)) return false
+                    if (!tightenMax(state, durationVars[i], availSurf / mh) {
+                            packed(ENERGY, i, DURATION, xMin, xMax)
+                        }) return false
                 }
                 if (capacityVar >= 0) {
-                    val payload = packed(ENERGY, -1, CAPACITY, xMin, xMax)
                     val required = surface / len + if (surface % len == 0L) 0L else 1L
-                    if (!tightenMin(state, capacityVar, required, payload)) return false
+                    if (!tightenMin(state, capacityVar, required) {
+                            packed(ENERGY, -1, CAPACITY, xMin, xMax)
+                        }) return false
                 }
             }
             surface = addExact(surface, mulExact(minDur(state, i), minHeight(state, i)))
@@ -338,7 +347,7 @@ internal class CumulativePropagator(
             val ect = state.intDomains[starts[i]].min + minDur(state, i)
             if (lst >= ect) continue
             val newUb = cap - (profile.maxLevelOver(lst, ect) - minHeight(state, i))
-            if (!tightenMax(state, resourceVars[i], newUb, intArrayOf(HEIGHT, i))) return false
+            if (!tightenMax(state, resourceVars[i], newUb) { intArrayOf(HEIGHT, i) }) return false
         }
         return true
     }
@@ -451,9 +460,9 @@ internal class CumulativePropagator(
                     } catch (_: CheckedLongOverflowException) {
                         continue
                     }
-                    if (!tightenMax(state, starts[task], newMax, intArrayOf(REVERSE_EDGE))) return false
+                    if (!tightenMax(state, starts[task], newMax) { intArrayOf(REVERSE_EDGE) }) return false
                 } else {
-                    if (!tightenMin(state, starts[task], newEst, packed(EDGE, task, tau))) return false
+                    if (!tightenMin(state, starts[task], newEst) { packed(EDGE, task, tau) }) return false
                 }
             }
         }

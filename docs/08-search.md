@@ -565,6 +565,10 @@ closing releases the cursor without exposing partial state. See
 Cumulative edge-finding runs in both time directions over fixed durations, demands
 and capacity, declining the reversed pass when its arithmetic is not safely
 representable.
+Bound filtering packs an explanation only for a changing non-root deduction or
+a failed tightening. Successful root deductions need no packed payload. A branch
+deduction captures its payload before mutation, and a failed tightening reuses
+that payload when constructing its conflict reason.
 
 Range-aware cumulative prefix energy also declines unrepresentable completions,
 window widths, areas and energy sums. Capacity ceilings use quotient and remainder

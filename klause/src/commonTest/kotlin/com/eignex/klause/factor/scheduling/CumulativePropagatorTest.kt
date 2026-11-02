@@ -480,6 +480,19 @@ class CumulativePropagatorTest {
     }
 
     @Test
+    fun `time table should reject a root domain blocked at both ends`() {
+        val problem = Problem(0, 3, arrayOf(
+            IntDomain(0, 4), IntDomain(3, 3), IntDomain(5, 5),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2), longArrayOf(5, 1, 1), longArrayOf(2, 3, 3), 4,
+        )))
+
+        val session = PropagationSession(PropagationProblem(problem))
+
+        assertTrue(session.isUnsatAtRoot)
+    }
+
+    @Test
     fun `profile-overload reason should be a sound witness that omits non-covering tasks`() {
         val factor = Cumulative(
             starts = intArrayOf(0, 1, 2),
