@@ -34,6 +34,8 @@ internal class LpHints(
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
 ) : LpHintSink {
+    override val initialOptimumOnly = true
+
     private data class SideAdvice(val variable: VarRef, val split: Long, val up: Boolean, val basis: Boolean)
 
     private val collect = numIntVars.toLong() + numBoolVars <= 8192L
