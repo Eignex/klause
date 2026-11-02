@@ -182,7 +182,7 @@ internal class LpPumpProfileConsumer(
                 floatingDualFallbackCalls++
                 simplex.solve()
             }
-            check(result == null || result.objective.isFinite() && result.primal.all { it.isFinite() })
+            check(result == null || (result.objective.isFinite() && result.primal.all { it.isFinite() }))
             if (result?.optimal == true) floatingOptimalIterates++
             val outcome = if (result?.optimal == true) LpFloatingProfileResult.OPTIMAL else {
                 "NO_OPTIMAL_FLOAT_ITERATE_" + (simplex.lastTermination?.name ?: "OTHER")
