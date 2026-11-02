@@ -1133,9 +1133,6 @@ class PropagationSession private constructor(
         return published
     }
 
-    internal fun isLearnedConstraintActive(index: Int): Boolean =
-        state.nativeEngine?.let { !it.retiredOf(index) } ?: !state.learned.retiredOf(index)
-
     internal val activeLearnedClauseCount: Int
         get() = retainedState?.let { it.nativeEngine?.activeCount ?: it.learned.activeCount } ?: 0
 

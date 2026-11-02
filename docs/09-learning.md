@@ -287,7 +287,7 @@ cursor per clause. Reductions compact their handle and reference columns without
 copying surviving literal arrays. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
 
-When complete cap selection cannot be funded, a bounded window over non-permanent
+A bounded window over non-permanent
 learned clauses retains the lowest LBD and stable-handle keys after permanent and
 tier-protected ownership. Its max-heap shares the candidate index with retained
 survivors. Funded heap steps, cursors and pending retirement survive later restarts
@@ -492,17 +492,9 @@ ranking by LBD. [ClauseDb](../klause/src/commonMain/kotlin/com/eignex/klause/bac
 and [SearchLearning](../klause/src/commonMain/kotlin/com/eignex/klause/solver/search/SearchLearning.kt)
 own the respective stores.
 
-Restart-cap candidate preparation admits its complete candidate arrays, tier columns
-and worst-case ranking work against `learnedMemoryWork` and
-`learnedMemoryScratchBytes` before allocating. Candidate scans and heap ranking
-poll cancellation; unfinished preparation publishes no tier changes or sweep event.
-Insufficient work or scratch safely defers the cap sweep. Completed selection keeps
-the same LBD priorities and tier lifetimes; a sweep event requires actual retirement.
-
-If complete candidate preparation cannot be funded, native clauses and general learned constraints use
-the bounded handle-preserving window. The candidate index retains the best eligible
-LBD keys as a max-heap; each funded step can resume without a whole-store selection
-buffer. Permanent clauses, protected reasons and policy survivors
+Restart-cap selection uses the bounded handle-preserving window. The candidate index
+retains the best eligible LBD keys as a max-heap; each funded step can resume without
+a whole-store selection buffer. Permanent clauses, protected reasons and policy survivors
 reduce the heap quota. A pending eviction that gains protection also consumes that
 quota before the next heap step. Mid rows
 survive their demotion window, and classification clears survivor reuse flags.
@@ -514,8 +506,10 @@ publication still defer the window.
 General retirement replaces its payload with an inert stable-ID slot and releases
 its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
 aliases. Stale watches skip that slot; their allocated capacity and policy columns
-remain owned until compaction. Arithmetic reason snapshots and native/general full
-physical compaction still require their complete funding.
+remain owned until compaction. Selection and subsequent retired-slot compaction share
+one work grant; compaction keeps every active row and receives only its remainder.
+Tier classification publishes within each funded row transaction. Arithmetic reason
+snapshots and native/general full physical compaction require their complete funding.
 
 Shared learning uses stable handles and bounded-height owned indexes for clauses,
 LBD ranking, watches, signatures and live reasons. Count-cap windows retire eligible

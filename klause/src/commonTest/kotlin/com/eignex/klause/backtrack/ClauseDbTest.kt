@@ -20,6 +20,21 @@ import kotlin.test.assertTrue
 class ClauseDbTest {
 
     @Test
+    fun `cap selection and physical cleanup should share one work grant`() {
+        for (native in listOf(false, true)) for (tiered in listOf(false, true)) {
+            val session = PropagationSession(chainProblem().bake(), nativeSat = native)
+            assertEquals(native, session.usesNativeSat)
+            for (lbd in listOf(9, 8, 7, 1)) session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), lbd)
+            val before = session.work
+
+            forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 2, tieredLearnedDb = tiered,
+                learnedMemoryWork = 128L))
+
+            assertTrue(session.work - before <= 128L)
+        }
+    }
+
+    @Test
     fun `retired slots should not consume full cap survivor quotas`() {
         for (native in listOf(false, true)) for (tiered in listOf(false, true)) {
             val session = PropagationSession(chainProblem().bake(), nativeSat = native)
@@ -51,7 +66,7 @@ class ClauseDbTest {
             forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 3, tieredLearnedDb = tiered,
                 onEvent = { events.add(it) }))
 
-            assertEquals(listOf(SearchEvent.LearnedDbSweep(kept = 3, dropped = 1)), events)
+            assertEquals(listOf<SearchEvent>(SearchEvent.LearnedDbSweep(kept = 3, dropped = 1)), events)
         }
     }
 
@@ -266,7 +281,7 @@ class ClauseDbTest {
                         learnedMemoryWork = if (mode == "work") 0L else 10_000L,
                         learnedMemoryScratchBytes = if (mode == "scratch") 0L else 10_000L,
                         cancellation = Cancellation {
-                            mode == "cancelled" || (mode == "scan" && session.work - before >= 28L)
+                            mode == "cancelled" || (mode == "scan" && session.work - before >= 4L)
                         },
                         onEvent = { events.add(it) },
                     )
@@ -276,7 +291,7 @@ class ClauseDbTest {
                     assertEquals(9, session.learnedClauseCount)
                     assertEquals(tiers, List(9) { session.learnedClauseTier(it) })
                     assertTrue(events.isEmpty())
-                    assertTrue(session.work - before <= 28L)
+                    assertTrue(session.work - before <= 4L)
                 }
             }
         }

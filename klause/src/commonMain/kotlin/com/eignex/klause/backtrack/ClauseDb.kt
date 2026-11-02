@@ -20,51 +20,12 @@ internal fun forgetIfOverCap(
 ) {
     if (protectedPublication) return
     val cap = params.maxLearnedClauses ?: return
-    val learnedSize = session.activeLearnedClauseCount
-    if (learnedSize <= cap) {
-        if (session.learnedClauseCount > cap) {
-            session.compactLearnedClauses(params.learnedMemoryWork, params.learnedMemoryScratchBytes,
-                { params.cancellation() }) { _, _ -> true }
-        }
-        return
-    }
     val startWork = session.work
-    val prepared = prepareCapReduction(session, params, session.learnedClauseCount, params.tieredLearnedDb)
-    if (prepared == null) {
-        forgetWindow(session, params, cap, startWork)
-        return
-    }
-    if (params.tieredLearnedDb) {
-        forgetTiered(session, params, cap, learnedSize, prepared)
-        return
-    }
-    val glueThreshold = params.lbdGlueThreshold
-    val remaining = (cap - (learnedSize - prepared.count)).coerceAtLeast(0)
-    if (prepared.count <= remaining) return
-    if (!prepared.select(remaining)) return
-    session.forgetLearnedClauses { index, lbd ->
-        lbd <= glueThreshold || session.learnedClausePermanent(index) || prepared.kept[index]
-    }
-    val dropped = learnedSize - session.activeLearnedClauseCount
-    if (dropped > 0) params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropped, dropped = dropped))
-}
-
-private fun forgetTiered(
-    session: PropagationSession,
-    params: BacktrackParams,
-    cap: Int,
-    learnedSize: Int,
-    prepared: CapReductionPreparation,
-) {
-    val residual = (cap - (learnedSize - prepared.count)).coerceAtLeast(0)
-    if (prepared.count > residual && !prepared.select(residual)) return
-    if (!prepared.publishTiers()) return
-    if (prepared.count > residual) {
-        session.forgetLearnedClauses { index, _ -> prepared.kept[index] }
-        val retired = learnedSize - session.activeLearnedClauseCount
-        if (retired > 0) {
-            params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = session.activeLearnedClauseCount, dropped = retired))
-        }
+    if (session.activeLearnedClauseCount > cap) forgetWindow(session, params, cap, startWork)
+    if (session.learnedClauseCount > session.activeLearnedClauseCount) {
+        session.compactLearnedClauses(
+            (params.learnedMemoryWork - (session.work - startWork)).coerceAtLeast(0L),
+            params.learnedMemoryScratchBytes, { params.cancellation() }) { _, _ -> true }
     }
 }
 
@@ -99,121 +60,6 @@ private fun forgetWindow(session: PropagationSession, params: BacktrackParams, c
     }
     if (retired > 0) {
         params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = session.activeLearnedClauseCount, dropped = retired))
-    }
-}
-
-private fun prepareCapReduction(
-    session: PropagationSession,
-    params: BacktrackParams,
-    count: Int,
-    tiered: Boolean,
-): CapReductionPreparation? {
-    val levels = Int.SIZE_BITS - count.countLeadingZeroBits()
-    val work = count.toLong() * (levels * 4L + 16L)
-    val scratch = count.toLong() * if (tiered) 13L else 9L
-    if (work > params.learnedMemoryWork || scratch > params.learnedMemoryScratchBytes ||
-        params.cancellation() || session.cancelRequested
-    ) return null
-    session.chargeSharingWork(count.toLong() * 3L)
-    if (params.cancellation() || session.cancelRequested) return null
-    val prepared = CapReductionPreparation(session, params, count, tiered)
-    return prepared.takeIf { it.scan(tiered) }
-}
-
-private class CapReductionPreparation(
-    private val session: PropagationSession,
-    private val params: BacktrackParams,
-    size: Int,
-    tiered: Boolean,
-) {
-    private val candidates = LongArray(size)
-    val kept = BooleanArray(size) { true }
-    val tiers = IntArray(if (tiered) size else 0)
-    var count = 0
-        private set
-    private var work = size.toLong() * 3L
-
-    private fun step(): Boolean {
-        if (work >= params.learnedMemoryWork || params.cancellation() || session.cancelRequested) return false
-        session.chargeSharingWork(1L)
-        work++
-        return !params.cancellation() && !session.cancelRequested
-    }
-
-    fun scan(tiered: Boolean): Boolean {
-        for (index in candidates.indices) {
-            if (!step()) return false
-            if (!session.isLearnedConstraintActive(index)) continue
-            val lbd = session.learnedClauseLbd(index)
-            if (!tiered) {
-                if (lbd > params.lbdGlueThreshold && !session.learnedClausePermanent(index)) add(index, lbd)
-                continue
-            }
-            val used = session.learnedClauseUsedSinceReduction(index)
-            val tier = session.learnedClauseTier(index).takeUnless { it == ClauseTier.UNSET } ?: when {
-                lbd <= params.lbdGlueThreshold -> ClauseTier.CORE
-                lbd <= params.midLbdThreshold -> ClauseTier.MID
-                else -> ClauseTier.LOCAL
-            }
-            val permanent = session.learnedClausePermanent(index)
-            tiers[index] = when {
-                permanent || tier == ClauseTier.CORE -> tier
-                tier == ClauseTier.MID -> if (used) ClauseTier.MID else ClauseTier.LOCAL
-                used -> ClauseTier.MID
-                else -> {
-                    add(index, lbd)
-                    ClauseTier.LOCAL
-                }
-            }.ordinal
-        }
-        return true
-    }
-
-    private fun add(index: Int, lbd: Int) {
-        candidates[count++] = (lbd.toLong() shl Int.SIZE_BITS) or index.toLong()
-        kept[index] = false
-    }
-
-    fun select(remaining: Int): Boolean {
-        fun sift(start: Int, end: Int): Boolean {
-            var root = start
-            while (root * 2 + 1 < end) {
-                if (!step()) return false
-                var child = root * 2 + 1
-                if (child + 1 < end && candidates[child] < candidates[child + 1]) child++
-                if (candidates[root] >= candidates[child]) break
-                val value = candidates[root]
-                candidates[root] = candidates[child]
-                candidates[child] = value
-                root = child
-            }
-            return true
-        }
-        for (index in count / 2 - 1 downTo 0) if (!sift(index, count)) return false
-        for (end in count - 1 downTo 1) {
-            if (!step()) return false
-            val value = candidates[0]
-            candidates[0] = candidates[end]
-            candidates[end] = value
-            if (!sift(0, end)) return false
-        }
-        for (index in 0 until remaining) {
-            if (!step()) return false
-            kept[candidates[index].toInt()] = true
-        }
-        return step()
-    }
-
-    fun publishTiers(): Boolean {
-        if (!step()) return false
-        session.chargeSharingWork(tiers.size.toLong() * 3L)
-        if (params.cancellation() || session.cancelRequested) return false
-        for (index in tiers.indices) {
-            if (!session.isLearnedConstraintActive(index)) continue
-            session.setLearnedClauseTier(index, ClauseTier.entries[tiers[index]])
-            session.clearLearnedClauseUsed(index)
-        }
-        return true
     }
 }
 
