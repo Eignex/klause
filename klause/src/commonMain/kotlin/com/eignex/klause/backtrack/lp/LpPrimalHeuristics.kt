@@ -204,16 +204,21 @@ private fun LpEngine.validatedRoundingWarmStart(
         return null
     }
     val source = retained.continuation ?: return retained
-    handoff?.includeSourceWork(this, source.paidWorkFor(this))
+    var sourceWork = source.paidWorkFor(this)
     return try {
         val valid = source.matches(this, retained.relaxation, SessionDomains(session), cancellation) {
-            handoff?.includeSourceWork(this, it)
+            sourceWork += it
         }
-        if (valid) retained else {
+        if (valid) {
+            handoff?.includeSourceWork(this, sourceWork)
+            retained
+        } else {
+            handoff?.includeDiscardedWork(this, sourceWork)
             rootRoundingWarmStart = null
             null
         }
     } catch (cancelled: LpAssemblyCancelled) {
+        handoff?.includeDiscardedWork(this, sourceWork)
         rootRoundingWarmStart = null
         throw cancelled
     }

@@ -31,6 +31,11 @@ internal class LpPrimalHandoff private constructor(
         }
     }
 
+    fun includeDiscardedWork(engine: LpEngine, work: Long) {
+        require(work >= 0L)
+        if (owner === engine) setupWork += work
+    }
+
     fun attachContinuation(engine: LpEngine, source: RootPrimalContinuation?) {
         if (owner === engine) continuation = source
     }

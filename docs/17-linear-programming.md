@@ -244,18 +244,17 @@ A freshly assembled rounding source may attach bounded provenance to its private
 warm continuation before numerical solving. A cancelled solve with no iterate can
 retain that completed definition without a basis or point. On resume, a fresh
 propagation root must match the same model, engine, source namespace, semantics,
-dimensions, ordered factors, stated sides,
-complete root and live integer domains, Boolean pins and open-side policy before
+dimensions, ordered factors, stated sides, complete root and live integer domains,
+Boolean pins and open-side policy before
 that definition supplies another numerical call or handoff. A refused guard
 discards the continuation and rebuilds from the current source. Immutable domain
 values preserve interior holes; changed representations receive bounded, paid
-value comparison. Wide
-uncarved intervals need no enumeration. The guard bounds retained domain storage
+value comparison. Wide uncarved intervals need no enumeration. The guard bounds retained domain storage
 and validation work, retires on refusal or cancellation, and keeps no predecessor.
 Guidance from other producers has no canonical provenance and supplies no handoff.
 
 Provenance retains no propagation session, basis, iterate or cancellation token.
-Its capture, validation, prior discarded handoff work and reserved retirement
+Its capture, validation, discarded predecessor work and reserved retirement
 join the current handoff setup, capture and lookup costs in admission's comparison
 without being charged twice. All spend the current containing and LP allowance.
 Factory-witness checks or unmarked source-cohort inspection run at the actual

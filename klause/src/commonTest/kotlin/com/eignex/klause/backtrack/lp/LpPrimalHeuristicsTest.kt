@@ -166,28 +166,45 @@ class LpPrimalHeuristicsTest {
 
     @Test
     fun `changed root domains should rebuild a definition without an iterate`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, (1..6).map {
-            Linear(intArrayOf(1, it, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6)
-        }).bake(FactorProjectionProviders.Default)
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
-        val sink = SolveStatsSink("changed-definition-only-source")
-        val domains = SessionDomains(PropagationSession(problem, Cancellation.Never))
-        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
-            reusePumpPreparation = true).use { engine ->
-            val root = buildPrimalSource(problem, objective, domains, Cancellation.Never, {}, engine.projections,
-                reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
-            val source = assertNotNull(LpPrimalContinuation.capture(engine, root, domains, Cancellation.Never, 4L) {})
-            engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, root, basis = null,
-                continuation = source)
-            problem.foldedIntDomains[0] = IntDomain(8, 10)
+        for (withHandoff in listOf(false, true)) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, (1..12).map {
+                Linear(intArrayOf(1, it, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6)
+            }).bake(FactorProjectionProviders.Default)
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+            val sink = SolveStatsSink("changed-definition-only-source")
+            val domains = SessionDomains(PropagationSession(problem, Cancellation.Never))
+            var stopped = false
+            val token = Cancellation { stopped }
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
+                reusePumpPreparation = true).use { engine ->
+                val root = buildPrimalSource(problem, objective, domains, Cancellation.Never, {}, engine.projections,
+                    reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+                val source = assertNotNull(LpPrimalContinuation.capture(engine, root, domains,
+                    Cancellation.Never, 4L) {})
+                val priorWork = source.paidWorkFor(engine)
+                engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, root, basis = null,
+                    continuation = source)
+                problem.foldedIntDomains[0] = IntDomain(8, 10)
+                val handoff = if (withHandoff) assertNotNull(LpPrimalHandoff.open(engine, token)) else null
+                val sample = try {
+                    engine.lpRoundingProbe(objective, token, handoff = handoff, accept = {
+                        stopped = withHandoff
+                        it
+                    })
+                } finally {
+                    handoff?.close()
+                }
 
-            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
-
-            assertEquals(8L, assertNotNull(sample).ints.sum())
-            val phases = sink.snapshot().lp.phases
-            assertEquals(1L, phases.getValue("PRIMAL_LP_CONTINUATION_ROOT").outcomes["DECLINED"])
-            assertEquals(1L, phases.getValue("PRIMAL_LP_ASSEMBLY_ROOT").outcomes["COMPLETE"])
-            assertEquals(0L, source.paidWorkFor(engine))
+                assertEquals(8L, assertNotNull(sample).ints.sum())
+                val phases = sink.snapshot().lp.phases
+                assertEquals(1L, phases.getValue("PRIMAL_LP_CONTINUATION_ROOT").outcomes["DECLINED"])
+                assertEquals(1L, phases.getValue("PRIMAL_LP_ASSEMBLY_ROOT").outcomes["COMPLETE"])
+                assertEquals(0L, source.paidWorkFor(engine))
+                if (withHandoff) {
+                    val replacement = assertNotNull(engine.rootRoundingWarmStart?.continuation)
+                    assertTrue(replacement.paidWorkFor(engine) > priorWork * 2L)
+                }
+            }
         }
     }
 
