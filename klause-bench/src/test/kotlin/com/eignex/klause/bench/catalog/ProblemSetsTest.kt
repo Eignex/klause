@@ -2,12 +2,45 @@ package com.eignex.klause.bench.catalog
 
 import java.io.File
 import java.nio.file.Files
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class ProblemSetsTest {
+    @ParameterizedTest
+    @ValueSource(strings = ["bench.json", "bench-linux.json"])
+    fun `declared private workspaces should retain every frozen set`(manifest: String) {
+        val inputs = Json.parseToJsonElement(File("lab/$manifest").readText()).jsonObject
+            .getValue("workspaceInputs").jsonArray.map { it.jsonPrimitive.content.trimEnd('/') }
+        val source = File("sets")
+        val expected = ProblemSets.names(source).associateWith { ProblemSets.load(listOf(it), source) }
+        val workspace = Files.createTempDirectory("sets-workspace").toFile()
+        try {
+            for (file in source.listFiles().orEmpty()) {
+                val relative = "klause-bench/sets/${file.name}"
+                if (inputs.any { relative == it || relative.startsWith("$it/") }) {
+                    val target = workspace.resolve(relative)
+                    target.parentFile.mkdirs()
+                    file.copyTo(target)
+                }
+            }
+
+            val sets = workspace.resolve("klause-bench/sets")
+            assertTrue(expected.getValue("sweep").isNotEmpty())
+            assertEquals(expected.keys.toList(), ProblemSets.names(sets))
+            assertEquals(expected, expected.keys.associateWith { ProblemSets.load(listOf(it), sets) })
+        } finally {
+            workspace.deleteRecursively()
+        }
+    }
+
     @Test
     fun `a set should read its problems and includes in order each once`() {
         val root = Files.createTempDirectory("sets").toFile()
