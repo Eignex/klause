@@ -309,8 +309,11 @@ Before its first incumbent, an integer-only traversal can visit declared factor
 components of its undetermined columns contiguously while using these coordinates. Preparation admits at least
 two coupled components, charges its graph work to the remaining LP allowance and
 keeps primitive membership arrays inside the same guide storage cap. Prior paid LP
-work also reduces the graph's remaining preparation ceiling. Membership
-walks charge ordinary CP work and revisit retracted variables. Declined preparation
+work also reduces the graph's remaining preparation ceiling. Within each component,
+known fractional coordinates precede integral and unknown coordinates, with source
+order breaking ties. The stable primitive sort reuses graph scratch and charges
+its passes and comparisons to the same preparation allowance. Membership walks
+charge ordinary CP work and revisit retracted variables. Declined preparation
 keeps ordinary branching; guide replacement, restart, reseed and close discard the
 ordering. An attempt stopped before spending work can retry in a fresh consultation;
 a paid decline retains its charge. These choices supply no directional-history, bound or proof authority.
