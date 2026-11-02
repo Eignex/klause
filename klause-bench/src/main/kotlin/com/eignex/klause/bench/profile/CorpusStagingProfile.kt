@@ -13,7 +13,10 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.HexFormat
 import java.util.concurrent.TimeUnit
+import jdk.jfr.consumer.RecordingFile
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -98,6 +101,10 @@ internal object CorpusStagingProfile {
                     put("exit", if (process.isAlive) null else process.exitValue())
                 }.toString())
             }
+            for (mode in modes) {
+                val recording = out.resolve("$mode.jfr")
+                if (recording.isFile) summarizeIo(recording, out.resolve("$mode-io.jsonl"))
+            }
         } finally {
             try {
                 check(!plain.exists() || plain.delete()) { "Cannot remove plain control: $plain" }
@@ -175,6 +182,34 @@ internal object CorpusStagingProfile {
             digest.update(buffer, 0, count)
         }
         HexFormat.of().formatHex(digest.digest())
+    }
+
+    private fun summarizeIo(recording: File, output: File) {
+        val ioEvents = setOf("jdk.FileRead", "jdk.FileWrite")
+        output.bufferedWriter().use { writer ->
+            writer.appendLine(buildJsonObject {
+                put("scope", "Recorded JFR IO events only; recording thresholds can omit short operations")
+                put("overlapPolicy", "Event durations are observations, not disjoint source cost totals")
+            }.toString())
+            RecordingFile(recording.toPath()).use { events ->
+                while (events.hasMoreEvents()) {
+                    val event = events.readEvent()
+                    if (event.eventType.name !in ioEvents) continue
+                    writer.appendLine(buildJsonObject {
+                        put("event", event.eventType.name)
+                        put("start", event.startTime.toString())
+                        put("durationNanos", event.duration.toNanos())
+                        put("path", event.getString("path"))
+                        put("thread", event.thread?.javaName)
+                        put("bytes", event.getLong(if (event.eventType.name == "jdk.FileRead")
+                            "bytesRead" else "bytesWritten"))
+                        put("stack", JsonArray(event.stackTrace?.frames.orEmpty().take(16).map {
+                            JsonPrimitive("${it.method.type.name}.${it.method.name}")
+                        }))
+                    }.toString())
+                }
+            }
+        }
     }
 
     private const val NANOS_PER_MILLI = 1_000_000L

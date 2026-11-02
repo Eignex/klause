@@ -427,6 +427,9 @@ and cleanup along with declared cache conditions.
 hash-verified corpus inputs. Submit standard catalog selections and `timeout-ms`;
 each accepted row retains all modes on its one worker attempt. This manifest omits
 MiniZinc provisioning and supports compressed file-backed sources only.
+IO event extracts are written after all trials on the lab worker. They retain
+recording-threshold omissions and overlapping event scopes explicitly; absent
+events do not establish zero IO cost.
 
 The planner accepts `selections`, a JSON-encoded list of independent selector maps,
 merged without duplicate catalog identities. Paired experiments use lab `configs`,
