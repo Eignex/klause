@@ -45,7 +45,7 @@ class IntegerConflictLearnerTest {
     @Test
     fun `the latest historical endpoint should yield a reusable cut within the source allowance`() {
         val fixedVariables = IntArray(22) { it + 10 }
-        val reasons = Array(8) { index ->
+        val reasons = List(8) { index ->
             Linear(intArrayOf(2, -1) + IntArray(22) { -1 },
                 intArrayOf(0, index + 2) + fixedVariables, LinearOp.LE, 0)
         }
