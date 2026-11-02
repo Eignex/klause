@@ -139,13 +139,21 @@ internal class NativeLearnedPayloads {
             (directory.size * 2L + pages * PAGE_SIZE * 2L) * Long.SIZE_BYTES + pages * 20L)
     }
 
-    fun sharingMemory(sample: SharingMemoryObservation, protectedRows: Boolean, protected: (Int) -> Boolean) {
+    fun sharingMemory(
+        sample: SharingMemoryObservation,
+        protectedRows: Boolean,
+        allPermanent: Boolean,
+        protected: (Int) -> Boolean,
+    ) {
         for (index in directory.indices) {
             sample.step()
             val page = directory[index] ?: continue
             var retained = false
             var protectedWords = 0L
-            if (protectedRows) {
+            if (allPermanent) {
+                retained = page.live > 0
+                protectedWords = page.words
+            } else if (protectedRows) {
                 for (slot in page.rows.indices) {
                     sample.step()
                     val literals = page.rows[slot]

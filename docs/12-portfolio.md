@@ -358,7 +358,10 @@ reduction window, rather than exports or checks. The retained peer-import and
 consumed-peer-import counts describe retained objects, including logically retired
 slots awaiting compaction, so repeated window uses do not imply additional imports.
 Native totals update at admission, first consumption and physical removal; ownership
-snapshots read these totals without traversing the policy columns.
+snapshots read these totals without traversing the policy columns. When every
+retained Native row is permanent, payload-page word totals also determine the
+protected payload capacity without a row scan. Mixed stores inspect protection
+for their retained payload rows.
 
 Learned-store observations include native arena capacity or general clause/PB/row
 payload, policy columns, session watch/queue capacity, pending attachments and

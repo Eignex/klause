@@ -389,7 +389,7 @@ internal class NativeSatState(private val state: PropagationState) {
             sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
             sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
         }
-        learnedPayloads.sharingMemory(sample, protectedRows) { index ->
+        learnedPayloads.sharingMemory(sample, protectedRows, permanentCount == learnedCount) { index ->
             learnedPermanent[index] == 1 || sample.contains(protected, index)
         }
         sample.owned(arena.lits, arena.lits.size.toLong() * Int.SIZE_BYTES, true, shared = true)
