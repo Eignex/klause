@@ -4,8 +4,6 @@ import com.eignex.klause.util.SharingMemoryObservation
 
 internal class NativeLearnedPayloads {
     private var rows = arrayOfNulls<IntArray>(1)
-    private val protectedOwner = Any()
-    private val unprotectedOwner = Any()
     var size = 0
         private set
     private var words = 0L
@@ -42,12 +40,15 @@ internal class NativeLearnedPayloads {
         budget.atomic(rows.size * 2L + size, rows.size.toLong() * Long.SIZE_BYTES * 2L)
     }
 
-    fun sharingMemory(sample: SharingMemoryObservation, protectedBytes: Long, protectedRows: Boolean) {
-        // Admission copies every array; these disjoint pools cannot alias another observer's payload.
-        sample.owned(protectedOwner, protectedBytes, true)
-        sample.owned(unprotectedOwner, capacityBytes - protectedBytes)
+    fun sharingMemory(sample: SharingMemoryObservation, protected: SharingMemoryObservation.Seen<Int>,
+        protectedRows: Boolean) {
+        for (index in 0 until size) {
+            sample.step()
+            val literals = rows[index] ?: continue
+            sample.owned(literals, literals.size.toLong() * Int.SIZE_BYTES, sample.contains(protected, index))
+        }
         sample.owned(this, 12L, protectedRows)
-        sample.ownedReferences(this, 3L, protectedRows)
+        sample.ownedReferences(this, 1L, protectedRows)
         sample.ownedReferences(rows, referenceCapacity, protectedRows)
     }
 }

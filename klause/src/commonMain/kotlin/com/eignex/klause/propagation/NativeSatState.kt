@@ -321,15 +321,11 @@ internal class NativeSatState(private val state: PropagationState) {
         var peerImports = 0L
         var consumedPeerImports = 0L
         var consumed = 0L
-        var protectedPayloadBytes = 0L
         for (i in 0 until learnedCount) {
             sample.step()
             val peer = learnedOrigin[i] >= 0
             val used = lifecycleStages[i] and 1 != 0
             if (learnedPermanent[i] == 1) sample.retain(protected, i)
-            if (sample.contains(protected, i)) {
-                protectedPayloadBytes += learnedPayloads.length(i).toLong() * Int.SIZE_BYTES
-            }
             if (peer) peerImports++
             if (peer && used) consumedPeerImports++
             if (used) consumed++
@@ -337,9 +333,7 @@ internal class NativeSatState(private val state: PropagationState) {
         for (i in recheckHead until rechecks.size) {
             sample.step()
             val index = rechecks[i] - baseCount
-            if (lifecycleStages[index] and 1 == 0 && sample.retain(protected, index)) {
-                protectedPayloadBytes += learnedPayloads.length(index).toLong() * Int.SIZE_BYTES
-            }
+            if (lifecycleStages[index] and 1 == 0) sample.retain(protected, index)
         }
         val protectedRows = protected.size > 0
         capRanking.sharingMemory(sample, protectedRows)
@@ -358,7 +352,7 @@ internal class NativeSatState(private val state: PropagationState) {
             sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
             sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
         }
-        learnedPayloads.sharingMemory(sample, protectedPayloadBytes, protectedRows)
+        learnedPayloads.sharingMemory(sample, protected, protectedRows)
         sample.owned(arena.lits, arena.lits.size.toLong() * Int.SIZE_BYTES, true, shared = true)
         sample.owned(arena.starts, arena.starts.size.toLong() * Int.SIZE_BYTES, true, shared = true)
         sample.owned(watchSizes, watchSizes.size.toLong() * Int.SIZE_BYTES, true)
@@ -501,7 +495,8 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         if (index !in 0 until learnedCount) return LearnedRetirementResult(LearnedRetirementStatus.AlreadyGone,
             payloadReleased = true, physicalReleased = true)
-        if (retiredOf(index)) return LearnedRetirementResult(LearnedRetirementStatus.AlreadyGone, payloadReleased = true)
+        if (retiredOf(index)) return LearnedRetirementResult(LearnedRetirementStatus.AlreadyGone,
+            payloadReleased = true)
         budget.visit(16L)
         if (learnedPermanent[index] == 1 || literalCountOf(index) <= 1 || learnedBoolReasons[index] > 0 ||
             lifecycleStages[index] and 2 != 0
