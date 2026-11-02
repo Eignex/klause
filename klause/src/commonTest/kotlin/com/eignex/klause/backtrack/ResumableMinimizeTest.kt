@@ -227,11 +227,17 @@ class ResumableMinimizeTest {
             lpConfig = LpConfig.parse("default,+sparse-trial"),
             lpPlan = LpPlan(probe = true, rootCutHarvest = false))
         val offered = ArrayList<Sample>()
+        val stopAtWitness = Cancellation { offered.isNotEmpty() }
+        val accept: (MinimizeResult.WithSample) -> Unit = {
+            assertEquals(1, queries)
+            assertEquals(1, constructions)
+            offered += it.sample
+        }
 
         BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5_000L) { offered += it.sample }
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, 100_000L) { offered += it.sample }
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, 100_000L) { offered += it.sample }
+            search.runSlice(stopAtWitness, Long.MAX_VALUE, 5_000L, accept)
+            search.runSlice(stopAtWitness, Long.MAX_VALUE, 100_000L, accept)
+            search.runSlice(stopAtWitness, Long.MAX_VALUE, 100_000L, accept)
         }
 
         assertEquals(listOf(1L, 0L), offered.single().ints.toList())

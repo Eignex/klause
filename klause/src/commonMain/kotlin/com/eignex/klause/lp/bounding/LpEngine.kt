@@ -169,6 +169,12 @@ internal class LpEngine(
             field = value
         }
     internal var rootRoundingInterrupted: Boolean = false
+    internal val rootRoundingQueryPaused: Boolean
+        get() {
+            val guidance = rootRoundingWarmStart ?: return false
+            return guidance.primal == null && ownsRootPrimalModel(guidance.relaxation.model) &&
+                propagator.floatPaused
+        }
     private val selectedSourceRelaxation: CpToLpRelaxation? by lazy {
         if (projections?.builtInRelaxation == false) {
             CpToLpRelaxation(problem, objective, realResidual = true, projections = null)
