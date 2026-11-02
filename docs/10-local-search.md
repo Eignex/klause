@@ -6,6 +6,11 @@ outputs consistent. Candidates require [source validation](07-presolve.md#source
 and arithmetic completion before publication. Unsuccessful search supplies no
 refutation or optimum proof.
 
+Optional phase timing partitions active preparation, seeding, selection,
+application, publication and other time. Publication includes synchronous offers
+to the verified incumbent exchange and its verifier. Pauses in the result consumer
+remain outside active time.
+
 This chapter describes strategies, preparation and definitions.
 [Neighborhoods and restarts](11-neighborhoods.md) covers scoring probes, structured
 moves and continuous completion. Sessions and containing resources follow

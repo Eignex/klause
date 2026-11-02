@@ -12,6 +12,7 @@ internal class LocalSearchPhaseTimer(
         "seeding" to 0L,
         "selection" to 0L,
         "application" to 0L,
+        "publication" to 0L,
         "other" to 0L,
     )
     private var phase: String = "other"

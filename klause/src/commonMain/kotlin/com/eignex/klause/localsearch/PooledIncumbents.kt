@@ -28,13 +28,15 @@ internal class PooledIncumbents(
     private val exchange: IncumbentExchange<Sample, Double>?,
     private val importEnabled: Boolean,
     private val evaluate: (Sample) -> Double,
+    private val timing: LocalSearchPhaseTimer? = null,
 ) {
     private val incumbents = exchange?.subscribe()
 
     /** Offer [sample], scored [objective] by the caller's own view, as a candidate incumbent. Inert
      *  without an exchange. */
     fun publish(sample: Sample, objective: Double) {
-        exchange?.offer(sample, objective)
+        val target = exchange ?: return
+        timing.inPhase("publication") { target.offer(sample, objective) }
     }
 
     /**

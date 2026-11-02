@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.Verification
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -69,5 +70,30 @@ class PooledIncumbentsTest {
         port(exchange).publish(sample, 7.0)
         val installed = assertNotNull(exchange.current())
         assertEquals(7.0, installed.objective)
+    }
+
+    @Test
+    fun `pooled publication timing should include accepted and rejected verification`() {
+        for (accepted in listOf(false, true)) {
+            var clock = 0L
+            val timer = LocalSearchPhaseTimer { clock }
+            val exchange = IncumbentExchange<Sample, Double>(
+                improves = { candidate, standing -> candidate < standing },
+                verifier = { candidate ->
+                    clock += 7L
+                    if (accepted) Verification.Accepted(candidate) else Verification.Rejected("refuted")
+                },
+            )
+            val port = PooledIncumbents(exchange, importEnabled = true, evaluate = { 7.0 }, timing = timer)
+
+            timer.resume()
+            port.publish(sample, 7.0)
+            timer.pause()
+            clock += 1000L
+
+            assertEquals(7L, timer.snapshot().getValue("publication"))
+            assertEquals(7L, timer.snapshot().values.sum())
+            assertEquals(accepted, exchange.current() != null)
+        }
     }
 }
