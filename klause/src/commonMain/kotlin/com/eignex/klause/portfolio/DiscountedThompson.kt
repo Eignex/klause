@@ -48,8 +48,10 @@ internal class DiscountedThompson(
     /** The arm among [arms], which must not be empty, that a Thompson draw over their evidence favours. */
     fun chooseAmong(arms: Collection<Int>): Int {
         require(arms.isNotEmpty()) { "no arm to choose among" }
-        val evidence = inner.snapshot()
-        return arms.maxBy { random.nextBeta(evidence[it].successes, evidence[it].trials - evidence[it].successes) }
+        return arms.maxBy {
+            val evidence = inner.armResult(it)
+            random.nextBeta(evidence.successes, evidence.trials - evidence.successes)
+        }
     }
 
     /**
@@ -59,14 +61,16 @@ internal class DiscountedThompson(
         require(retained in 0.0..1.0) { "retained must be in [0, 1]" }
         if (retained == 1.0) return
         // Snapshots carry the prior, and merging drops the copy the reset arm already holds.
-        val evidence = inner.snapshot().map {
-            BernoulliSumResult(
-                PRIOR + (it.successes - PRIOR) * retained,
-                2 * PRIOR + (it.trials - 2 * PRIOR) * retained,
+        for (arm in 0 until nbrArms) {
+            val stat = inner.armStat(arm)
+            val evidence = stat.read(0L)
+            val faded = BernoulliSumResult(
+                PRIOR + (evidence.successes - PRIOR) * retained,
+                2 * PRIOR + (evidence.trials - 2 * PRIOR) * retained,
             )
+            stat.reset()
+            stat.merge(faded, 0L)
         }
-        inner.reset()
-        inner.merge(evidence)
     }
 
     private companion object {

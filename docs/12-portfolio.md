@@ -557,6 +557,10 @@ The scheduler assigns bounded slices, revisits pending preparation and reseeds s
 workers under the containing [allowance](06-sessions.md#resource-allowances).
 Scheduling changes work order, never publication authority.
 
+The worker sampler retains private reward accumulators across evidence fading.
+Restricted selection reads only its candidate arms; fading preserves each arm's
+prior and the seeded posterior draws.
+
 The opt-in `portfolio-reward=source` ablation retains ordinary feasibility rewards.
 After a source incumbent exists, only an accepted strict incumbent or terminal
 closure earns reward. Violation reductions, created deductions and delayed sharing

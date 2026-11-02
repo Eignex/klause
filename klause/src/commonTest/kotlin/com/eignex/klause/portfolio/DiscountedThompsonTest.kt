@@ -1,10 +1,53 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.kumulant.bandit.univariate.BetaBernoulliTS
+import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
+import com.eignex.kumulant.stat.summary.BernoulliSumResult
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DiscountedThompsonTest {
+
+    @Test
+    fun `weighted rewards and phase fading should preserve seeded posterior choices`() {
+        val bandit = DiscountedThompson(4, Random(7), Double.POSITIVE_INFINITY)
+        val reference = MultiArmedBandit(4, BetaBernoulliTS(), Random(7))
+        val candidates = listOf(0, 2, 3)
+        for (retained in listOf(0.25, 1.0, 0.0, 0.5)) {
+            repeat(16) { step ->
+                val arm = step % 4
+                val value = (step % 5) / 4.0
+                val weight = (step % 3) / 2.0
+                bandit.update(arm, value, weight)
+                reference.update(arm, value, weight)
+            }
+
+            bandit.fade(retained)
+            val evidence = reference.snapshot().map {
+                BernoulliSumResult(1.0 + (it.successes - 1.0) * retained,
+                    2.0 + (it.trials - 2.0) * retained)
+            }
+            reference.reset()
+            reference.merge(evidence)
+
+            repeat(16) {
+                assertEquals(reference.choose(), bandit.choose())
+                val snapshot = reference.snapshot()
+                val expected = candidates.maxBy { arm ->
+                    reference.random.nextBeta(snapshot[arm].successes,
+                        snapshot[arm].trials - snapshot[arm].successes)
+                }
+                assertEquals(expected, bandit.chooseAmong(candidates))
+            }
+        }
+
+        bandit.reset()
+        reference.reset()
+
+        repeat(16) { assertEquals(reference.choose(), bandit.choose()) }
+    }
 
     private fun choicesOf(bandit: DiscountedThompson, arm: Int, rounds: Int): Int =
         (0 until rounds).count { bandit.choose() == arm }
