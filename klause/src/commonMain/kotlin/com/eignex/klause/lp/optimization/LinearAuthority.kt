@@ -197,8 +197,7 @@ internal class LinearAuthority(
                 currentRows.all { it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR }
             if (!generatedRecipe && !checkNotNull(family.cuts).pointDirected && directedFamily !== family &&
                 pointMask == null &&
-                ((aggregateCuts && prepared.coordinates.any { it.kind == SourceCoordinate.Kind.Real }) ||
-                    checkNotNull(family.cuts).rows.any { it.mixed })) {
+                (aggregateCuts || checkNotNull(family.cuts).rows.any { it.mixed })) {
                 directedFamily = family
                 cutLifecycle.families = checkNotNull(family.cuts).rows.mapTo(HashSet()) { it.family }
                 val refined = cutLifecycle.containing("POINT_SELECTION") {

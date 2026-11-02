@@ -491,6 +491,18 @@ nonterminal point can prepare aggregates alongside point-directed row alternativ
 under 65,536 work and 1 MiB modeled allocation. Ordinary aggregate-only queries keep
 their 500,000-work and 8 MiB limits. An installed aggregate recipe with at most 64
 fully checked rows can enter aging without replacing its query.
+Pure-integer point discovery uses the existing integer-row producer limits of
+48 multi-coordinate source rows and 16 proposals. It tries half rounding on each
+row and positive two-row combinations, retaining only finite separating proposals.
+A direct-row proof cites that row and its required singleton endpoint premises;
+the aggregate API retains its two-to-four-original-row requirement. The integer
+recipe slice takes at most one quarter of the generation's remaining work and
+allocation, capped at 16,384 work and 256 KiB, leaving capacity for continuous-row
+aggregation. Its scans, scalar normalization, failed attempts, proof references and
+retained rows debit the same containing generation and source funding. A shared
+immutable-generation index supplies stated integer endpoints to both recipe kinds.
+Input truncation or a stopped slice withholds complete eligibility coverage.
+A pure-integer nonterminal point enters this discovery under the aggregate policy.
 When both source endpoints are stated, aggregate rounding selects the endpoint
 nearest the point independently for each continuous coordinate. One-sided coordinates
 retain their stated side; unavailable finite distances retain the ordinary choice.
