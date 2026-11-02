@@ -80,10 +80,18 @@ internal object CorpusStagingProfile {
                 out.resolve("$mode-command.json").writeText(Reports.json.encodeToString(command))
                 val process = ProcessBuilder(command).redirectOutput(out.resolve("$mode.jsonl"))
                     .redirectError(out.resolve("$mode.stderr")).start()
-                val completed = process.waitFor(budget * repeats + 30_000, TimeUnit.MILLISECONDS)
-                if (!completed) {
-                    process.destroyForcibly()
-                    process.waitFor(5000, TimeUnit.MILLISECONDS)
+                var interrupted = false
+                val completed = try {
+                    process.waitFor(budget * repeats + 30_000, TimeUnit.MILLISECONDS)
+                } catch (failure: InterruptedException) {
+                    interrupted = true
+                    throw failure
+                } finally {
+                    if (process.isAlive) {
+                        process.destroyForcibly()
+                        process.waitFor(5000, TimeUnit.MILLISECONDS)
+                    }
+                    if (interrupted) Thread.currentThread().interrupt()
                 }
                 out.resolve("$mode-exit.json").writeText(buildJsonObject {
                     put("completed", completed)

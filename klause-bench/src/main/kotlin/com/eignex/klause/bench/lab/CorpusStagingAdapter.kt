@@ -13,6 +13,7 @@ import com.eignex.lab.bench.BenchSuite
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+/** Selective corpus IO diagnostics using the lab's verified input plan. */
 fun main(args: Array<String>) {
     val protocolOutput = System.out
     System.setOut(System.err)
