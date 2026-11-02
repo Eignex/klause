@@ -55,6 +55,7 @@ internal object CorpusFetcher {
         get() = if (getBoolean("klause.bench.corpus.shared")) defaultCacheRoot() else cacheRoot
 
     private val downloads = CorpusDownload()
+    private val zipCollections = mutableMapOf<ExternalCollection, CorpusZipCollection>()
     private val mirror: CorpusMirror?
         get() {
             val address = System.getenv("LAB_CORPUS_MIRROR") ?: System.getenv("KLAUSE_BENCH_CORPUS_MIRROR")
@@ -93,25 +94,47 @@ internal object CorpusFetcher {
     /** The root to discover [collection]'s instances under: its index listing when [indexed], else its fetched tree. */
     fun listing(collection: ExternalCollection): File = indexed(collection)?.root ?: ensure(collection)
 
+    fun selectivePaths(collection: ExternalCollection): List<String>? =
+        if (collection.fetch is FetchMethod.SelectiveZip && indexed(collection) == null) {
+            selectiveZip(collection)?.paths
+        } else {
+            null
+        }
+
+    private fun selectiveZip(collection: ExternalCollection): CorpusZipCollection? {
+        val method = collection.fetch as? FetchMethod.SelectiveZip ?: return null
+        if (present(collection.id)) return null
+        return zipCollections.getOrPut(collection) {
+            CorpusZipCollection(
+                URI(collection.url), method.extension,
+                requireNotNull(collection.maxFileMb).toLong() * 1024 * 1024, downloads,
+            )
+        }
+    }
+
     private fun present(id: String): Boolean = listOf(storageRoot, cacheRoot).any { root ->
-        File(root, id).let { it.isDirectory && it.list()?.isNotEmpty() == true }
+        File(root, id).let {
+            it.isDirectory && !File(it, CorpusStore.SELECTIVE).exists() && it.list()?.isNotEmpty() == true
+        }
     }
 
     /** Resolve [source] to a file, fetching an external collection if needed. [root] locates a collection's tree; an
      *  index listing ([IndexedCollection.root]) resolves the same relative path without the collection's bytes. */
-    fun resolve(source: ProblemSource, root: (ExternalCollection) -> File = ::ensure): File = when (source) {
+    fun resolve(source: ProblemSource, root: ((ExternalCollection) -> File)? = null): File = when (source) {
         is ProblemSource.Prepared -> source.file.also { require(it.isFile) }
 
         is ProblemSource.Vendored -> File(workspaceRoot(), source.workspaceRelPath).also {
             require(it.isFile) { "vendored file missing: ${source.workspaceRelPath}" }
         }
 
-        is ProblemSource.External -> stored(File(root(source.collection), source.relPath)).also {
+        is ProblemSource.External -> (if (root == null && selectiveZip(source.collection) != null) {
+            member(source.collection, source.relPath)
+        } else stored(File((root ?: ::ensure)(source.collection), source.relPath))).also {
             require(it.isFile) { "instance '${source.relPath}' not found in collection '${source.collection.id}'" }
         }
 
         is ProblemSource.ExternalIndexed -> {
-            val files = root(source.collection).walkTopDown()
+            val files = (root ?: ::ensure)(source.collection).walkTopDown()
                 .filter { it.isFile && CorpusFiles.formatExtension(it) == source.ext }
                 .sortedBy { CorpusFiles.plainPath(it.name) }
                 .distinctBy { CorpusFiles.plainPath(it.path) }
@@ -131,7 +154,7 @@ internal object CorpusFetcher {
     /** The MiniZinc include directories [source]'s collection ships, which `minizinc -I` needs beside the model. */
     fun includeDirs(source: ProblemSource): List<File> = if (source is ProblemSource.Prepared) {
         source.includes
-    } else if (source is ProblemSource.External) {
+    } else if (source is ProblemSource.External && source.collection.includeDirs.isNotEmpty()) {
         val root = ensure(source.collection)
         source.collection.includeDirs.map { File(root, it) }.filter { it.isDirectory }
     } else {
@@ -161,6 +184,10 @@ internal object CorpusFetcher {
     /** The root directory of [collection] in the cache, fetching it if not already present. A fetch first
      *  evicts least recently used collections to fit the cache cap, and again once the new one has landed. */
     fun ensure(collection: ExternalCollection): File {
+        selectiveZip(collection)?.let { zip ->
+            zip.paths.forEach { member(collection, it) }
+            return File(cacheRoot, collection.id)
+        }
         val cache = cache()
         cache.markUsed(collection.id)
         var fetched = false
@@ -180,6 +207,7 @@ internal object CorpusFetcher {
                 FetchMethod.Tar -> tar(collection, dir)
                 FetchMethod.TarballZst -> tarballZst(collection, dir)
                 FetchMethod.Zip -> zip(collection, dir)
+                is FetchMethod.SelectiveZip -> zip(collection, dir)
                 is FetchMethod.ZipMember -> {
                     CorpusZipSelection(downloads).fetch(URI(collection.url), method, dir)
                     compress(dir)
@@ -210,6 +238,22 @@ internal object CorpusFetcher {
             cache.enforce()
         }
         return directory
+    }
+
+    private fun member(collection: ExternalCollection, relative: String): File {
+        val zip = requireNotNull(selectiveZip(collection))
+        val cache = cache()
+        cache.markUsed(collection.id)
+        var fetched = false
+        val file = CorpusStore(storageRoot, cacheRoot).member(collection.id, relative) { directory ->
+            cache.enforce()
+            zip.fetch(relative, directory).also { fetched = true }
+        }
+        if (fetched) {
+            cache.recordSize(collection.id)
+            cache.enforce()
+        }
+        return file
     }
 
     private fun gitClone(c: ExternalCollection, m: FetchMethod.GitClone, dir: File) {

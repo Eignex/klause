@@ -16,6 +16,8 @@ import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.formats.xcsp3.UnsupportedXcsp3Exception
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import java.io.File
 import java.time.Instant
 
@@ -71,6 +73,8 @@ internal data class SolveRecord(
     /** Bytes supplied to the CLI and output renderer; absent for historical or uncompiled inputs. */
     val compiledInputHashes: Map<String, String> = emptyMap(),
     val comparisonControls: Map<String, String> = emptyMap(),
+    /** Actual declared and effective MPS policy emitted by the installed CLI; absent on historical records. */
+    val numericalSemantics: JsonObject? = null,
 )
 
 internal object SolveMetric {
@@ -269,6 +273,9 @@ internal object SolveMetric {
             feasible = r.feasible,
             objective = r.objective,
             exactObjective = r.exactObjective,
+            numericalSemantics = r.stats["numericalSemantics"]?.let {
+                runCatching { Json.parseToJsonElement(it) as? JsonObject }.getOrNull()
+            },
             timeToBestMs = bestMs,
             timeToFirstFeasibleMs = firstFeasibleMs,
             processTimeToFirstFeasibleMs = processFirstMs,

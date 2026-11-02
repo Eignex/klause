@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import java.io.File
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
@@ -104,35 +105,56 @@ internal object SolverInvocation {
         }.copy(buildProvenance = InstalledBuild.current)
     }
 
-    internal fun withSourceInput(file: File, budget: Budget, solve: (File, Budget) -> Result): Result {
-        if (!CorpusFiles.isCompressed(file)) return solve(file, budget)
-        val start = System.nanoTime()
-        var preparationMs = 0L
-        val result = CorpusFiles.withPlainFile(file) { plain ->
-            preparationMs = (System.nanoTime() - start) / 1_000_000L
-            val remaining = budget.timeoutMillis - preparationMs
-            val result = if (remaining <= 0L) {
-                Result(
-                    null,
-                    null,
-                    null,
-                    proven = false,
-                    stats = mapOf("sourcePreparationBudgetExhausted" to "true"),
-                    rawOutput = "",
-                    command = "SOURCE_PREPARATION",
-                )
-            } else {
-                solve(plain, Budget(remaining))
+    internal fun withSourceInput(
+        file: File,
+        budget: Budget,
+        nanoTime: () -> Long = System::nanoTime,
+        solve: (File, Budget) -> Result,
+    ): Result {
+        val start = nanoTime()
+        var preparationNanos: Long? = null
+        var cleanupNanos = 0L
+        var cliNanos = 0L
+        var result = Result(null, null, null, proven = false, stats = emptyMap(),
+            rawOutput = "", command = "SOURCE_PREPARATION")
+        fun checkActive() = checkSourceActive(nanoTime() - start, budget)
+        val failure = runCatching {
+            CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it }, nanoTime = nanoTime) { plain ->
+                checkActive()
+                val cliStart = nanoTime()
+                preparationNanos = cliStart - start
+                val remaining = budget.timeoutMillis - (cliStart - start) / NANOS_PER_MILLI
+                if (remaining <= 0L) throw SourcePreparationTimeout()
+                try {
+                    result = solve(plain, Budget(remaining))
+                } finally {
+                    cliNanos = nanoTime() - cliStart
+                }
             }
-            result
+        }.exceptionOrNull()
+        if (failure is Failure) result = failure.result
+        if (failure is SourcePreparationTimeout) {
+            result = result.copy(stats = result.stats + ("sourcePreparationBudgetExhausted" to "true"))
         }
-        return result.copy(
-            stats = result.stats + mapOf(
-            "sourceDecodeMs" to preparationMs.toString(),
-            "sourceInvocationMs" to ((System.nanoTime() - start) / 1_000_000L).toString(),
-        )
-        )
+        val totalNanos = nanoTime() - start
+        result = result.copy(stats = result.stats + mapOf(
+            "sourceDecodeMs" to ((preparationNanos ?: (totalNanos - cleanupNanos)) / NANOS_PER_MILLI).toString(),
+            "sourceCleanupMs" to (cleanupNanos / NANOS_PER_MILLI).toString(),
+            "sourceCliMs" to (cliNanos / NANOS_PER_MILLI).toString(),
+            "sourceInvocationMs" to (totalNanos / NANOS_PER_MILLI).toString(),
+        ))
+        if (failure != null && (failure !is SourcePreparationTimeout || failure.suppressed.isNotEmpty())) {
+            throw Failure(result, failure.message.orEmpty(), failure)
+        }
+        return result
     }
+
+    private fun checkSourceActive(elapsedNanos: Long, budget: Budget) {
+        if (Thread.currentThread().isInterrupted) throw InterruptedIOException("Source staging interrupted")
+        if (elapsedNanos / NANOS_PER_MILLI >= budget.timeoutMillis) throw SourcePreparationTimeout()
+    }
+
+    private class SourcePreparationTimeout : IOException("Source preparation budget exhausted")
 
     /** The provisioned klause-cli launcher. */
     fun klauseCliBin(): File = File(CorpusFetcher.workspaceRoot(), KLAUSE_CLI_BIN)

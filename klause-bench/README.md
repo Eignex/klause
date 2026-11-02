@@ -412,6 +412,36 @@ The recipe declares build tasks; the script owns CLI paths, corpus properties an
 recording options. After installing the bench, `scripts/draw-sets.sh <features-dir>
 <references.csv> <sets-dir> [set,...]` runs the migrated seeded named-set generator.
 
+`bench.profile.CorpusStagingProfile` accepts `suite=ID problem=NAME sha256=HEX
+budget-ms=N repeats=2`. It compares packed reads, decoding with hashing, temporary
+staging and plain reads in separate fresh JVMs, with repeated operations in each.
+Additional `stage-uninstrumented` and `stage-prehashed` children omit JFR. The latter
+hashes the source before staging, matching the ordinary bench's identity preparation;
+`prehashNanos` and `iterationTotalNanos` retain that cost separately from the source
+span. `order=forward|reverse` counterbalances control order across lab configurations.
+The parent verifies the original plain-byte hash and records materialization,
+filesystem and build identities. OS cache state is uncontrolled and preceded by
+identity reads/materialization. Each first operation uses a fresh JVM; JFR can
+precondition runtime facilities in instrumented controls. Per-operation
+wall/thread CPU, staging, verification and cleanup timings, failed attempts and
+child JFR captures diagnose source costs. The profile runs no solver and makes no
+throughput or useful-solve-time claim. Use ordinary same-machine paired lab rows
+at the same whole-source allowance for qualification, retaining setup, failures
+and cleanup along with declared cache conditions.
+`lab/staging.json` uses the same diagnostic with frozen lab-published inputs.
+Submit `timeout-ms` (at most 10,000) and `inputs`, a JSON array of `suite`, `problem`,
+`format`, `path`, `packedSha256` and `plainSha256` objects copied from retained source
+records. The planner declares those exact corpus paths and hashes; it performs no
+catalog discovery. Each accepted row retains all modes on its one worker attempt.
+An optional `order` request selects `forward` or `reverse`; both retain the same
+source comparison identity. Child samples and JVM launcher output use separate
+files.
+This manifest omits MiniZinc provisioning and supports compressed file-backed
+sources only.
+IO event extracts are written after all trials on the lab worker. They retain
+recording-threshold omissions and overlapping event scopes explicitly; absent
+events do not establish zero IO cost.
+
 The planner accepts `selections`, a JSON-encoded list of independent selector maps,
 merged without duplicate catalog identities. Paired experiments use lab `configs`,
 `grid` and `repeats`: `ref` selects a revision and `param.<key>` overrides an adapter
@@ -1240,6 +1270,16 @@ The CLI deadline includes frontend construction/preparation/search; compressed
 source decoding reduces its remaining allowance. MiniZinc compilation, preflight,
 artifact hashing and output reconstruction are outside that deadline and inside
 the containing case/job allowance. Independent checking is separate lab work.
+Staging checks the containing deadline and thread interruption between bounded
+read/write chunks and before invoking the CLI. It closes streams and removes
+partial files on cancellation, exhausted preparation, decoding failure and CLI
+failure. Cleanup runs even after the deadline and its cost remains charged.
+`sourceDecodeMs`, `sourceCliMs`, `sourceCleanupMs` and `sourceInvocationMs` retain
+preparation, the invocation callback, retirement and the whole source scope on
+successful and failed attempts. `elapsedMs` remains the subprocess measurement.
+An exhausted preparation records no solver verdict and zero CLI time. Plain inputs
+retain the same source ledger without decompression or temporary files. Staging cooperates between
+IO calls; a blocked filesystem call can delay observation of cancellation.
 JFR measurements retain phase, caller and allocation summaries in `solve.log`.
 Summary analysis runs after CLI exit, outside its elapsed time and inside the
 containing case/job allowance. Sample shares and estimated allocations diagnose
