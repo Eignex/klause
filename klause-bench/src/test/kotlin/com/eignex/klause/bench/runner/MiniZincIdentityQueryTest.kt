@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.runner
 
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.TimeUnit
@@ -84,7 +85,7 @@ class MiniZincIdentityQueryTest {
         var output: File? = null
         val query = MiniZincIdentityQuery(start = { _, log ->
             output = log
-            error("cannot start")
+            throw IOException("cannot start")
         }, retain = {})
 
         val failure = assertFailsWith<MiniZincIdentityFailure> { query.query(File("minizinc"), "--version") }

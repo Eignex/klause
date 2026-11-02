@@ -3,7 +3,9 @@ package com.eignex.klause.bench.runner
 import com.eignex.klause.bench.report.Reports
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.File
+import java.io.IOException
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
@@ -50,7 +52,7 @@ internal class MiniZincIdentityQuery(
         ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log).start()
     },
     private val retain: (MiniZincIdentityEvidence) -> Unit = {
-        System.err.println(Reports.json.encodeToString(it))
+        System.err.println(receiptsJson.encodeToString(it))
     },
 ) {
     fun query(executable: File, option: String): String {
@@ -107,7 +109,9 @@ internal class MiniZincIdentityQuery(
                 outcome = "cancelled"
                 // Cleanup must still be able to wait after a cancellation before restoring the flag.
                 Thread.interrupted()
-            } catch (failure: Exception) {
+            } catch (failure: IOException) {
+                cause = failure
+            } catch (failure: SecurityException) {
                 cause = failure
             } finally {
                 val cleanupStart = clock()
@@ -146,12 +150,14 @@ internal class MiniZincIdentityQuery(
             log?.delete()
             cleanupNs += clock() - deleteStart
             val alive = process?.isAlive == true
-            // Reading the binary before spawning it would change a cold-start observation.
+            // Successful discovery hashes the binary with its complete identity; avoid another cold file read.
             val hashStart = clock()
-            val executableHash = if (cancelled || alive || Thread.currentThread().isInterrupted) null else {
+            val hashAttempted = (outcome != "completed" || bytes > OUTPUT_LIMIT) &&
+                !cancelled && !alive && !Thread.currentThread().isInterrupted
+            val executableHash = if (hashAttempted) {
                 runCatching { MiniZincCompatibility.hash(executable) }.getOrNull()
-            }
-            val hashNs = clock() - hashStart
+            } else null
+            val hashNs = if (hashAttempted) clock() - hashStart else null
             if (Thread.currentThread().isInterrupted) {
                 cancelled = true
                 outcome = "cancelled"
@@ -186,5 +192,6 @@ internal class MiniZincIdentityQuery(
 
     private companion object {
         const val OUTPUT_LIMIT = 16384
+        val receiptsJson = Json(Reports.json) { prettyPrint = false }
     }
 }
