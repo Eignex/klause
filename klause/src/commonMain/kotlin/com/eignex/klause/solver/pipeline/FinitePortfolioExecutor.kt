@@ -99,7 +99,9 @@ internal fun FinitePipeline.portfolioExecutor(
     }
     if (bufferedPublications && (!curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
             cancellation.deadline() == null || problem.numRealVars != 0)) {
-        pipelineConfigError("portfolio-publications requires curated elapsed single-core mixed finite integer optimization")
+        pipelineConfigError(
+            "portfolio-publications requires curated elapsed single-core mixed finite integer optimization",
+        )
     }
     if (probePolicy != InitialProbePolicy.ORDINARY && (!curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
             cancellation.deadline() == null)) {

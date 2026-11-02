@@ -88,7 +88,9 @@ class IncumbentExchange<A, V>(
         try {
             val result = action()
             bufferedOffers = null
-            buffered.flush(cancellation, measure) { assignment, objective -> offer(assignment, objective, cancellation) }
+            buffered.flush(cancellation, measure) { assignment, objective ->
+                offer(assignment, objective, cancellation)
+            }
             return result
         } finally {
             bufferedOffers = null

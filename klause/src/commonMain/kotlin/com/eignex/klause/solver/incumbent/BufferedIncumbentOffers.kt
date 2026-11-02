@@ -22,9 +22,9 @@ internal class BufferedIncumbentOffers<A, V>(
         val previous = pending
         if (previous == null) pending = Pending(assignment, objective, measure)
         else {
-            val replace = try {
+            val replace = runCatching {
                 improves(objective, previous.objective)
-            } catch (failure: Throwable) {
+            }.getOrElse { failure ->
                 observe(IncumbentOfferEvent.Dropped)
                 throw failure
             }
@@ -46,7 +46,7 @@ internal class BufferedIncumbentOffers<A, V>(
         }
         pending = null
         observe(IncumbentOfferEvent.Checked)
-        try {
+        runCatching {
             measure {
                 candidate.measure {
                     val event = when (offer(candidate.assignment, candidate.objective)) {
@@ -59,10 +59,9 @@ internal class BufferedIncumbentOffers<A, V>(
                     observe(event)
                 }
             }
-        } catch (failure: Throwable) {
+        }.onFailure {
             observe(IncumbentOfferEvent.Failed)
-            throw failure
-        }
+        }.getOrThrow()
     }
 
     fun discard() {
