@@ -525,6 +525,7 @@ class PreparedFactorProjectionsTest {
 
         assertEquals(ComponentCheck.Indeterminate, result)
         assertEquals(work, session.work)
+        assertTrue(session.learnedLifecycle().getValue("propagationPreparationIndexWork") > 0L)
     }
 
     @Test

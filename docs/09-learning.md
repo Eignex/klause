@@ -272,10 +272,15 @@ Boolean back-pointer deletion and swap-pop publication share one funded transact
 Watcher movement rewinds the current scan prefix. Small posting arrays trim within
 the same work and scratch limits. Posting and blocker arrays trim in separate funded
 transactions, so their combined copy need not fit one grant. The Boolean
-back-pointer index releases entries individually from a balanced tree. Deletion and
-a swapped watch's position update publish together after height-bounded funding.
+back-pointer index uses a bounded factor directory, two inline positions per factor
+and a balanced overflow for additional positions. Empty rows and directory branches
+release their primitive and reference allocations. Deletion and a swapped watch's
+position update publish together after bounded funding.
 Primitive node fields and reference slots remain separately owned; live and saved
-reasons protect the index. Ordinary index mutations retain their work charges. Deferred
+reasons protect the index. Ordinary index mutations retain their work charges. Initial
+source-index construction records `propagationPreparationIndexWork` separately from
+propagation work, including private source-check construction. Its CPU and elapsed
+cost remain within the containing source invocation. Deferred
 array trims retain their minimum grant requirements and retry when a later grant
 can fund them, independently of further logical retirements.
 Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,

@@ -38,13 +38,14 @@ internal fun PropagationState.moveBoolWatcher(factorId: Int, oldLit: Int, newLit
  *  Verifies the recorded position actually holds `[factorId]`; on any miss/mismatch falls
  *  back to the linear swap-remove and self-heals the index, so a stale back-pointer can
  *  never remove the wrong watcher. */
-internal fun PropagationState.removeBoolWatch(factorId: Int, lit: Int) {
+internal fun PropagationState.removeBoolWatch(factorId: Int, lit: Int, onlyIndexed: Boolean = false) {
     val list = watches.byLit[lit]
     val blockers = watches.blockersByLit[lit]
     val key = packWatch(factorId, lit)
     // Remove-and-read in a single table walk; the key is gone from the index either way.
     val recorded = watches.pos.removeAndGet(key, -1)
-    work += watches.pos.lastMutationWork
+    work += watches.pos.lastWork
+    if (recorded < 0 && onlyIndexed) return
     if (recorded < 0 || recorded >= list.size || list[recorded] != factorId) {
         // Index miss/desync — fall back to a linear scan, swap-pop both lists in lockstep
         // at the found index, and resync this lit's positions.

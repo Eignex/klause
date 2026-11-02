@@ -2,7 +2,6 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableLongIntIndex
 
 /**
  * Per-literal wakeup index for factors opting into [Propagator.initialBoolWatchers], plus the
@@ -17,7 +16,7 @@ internal class BoolWatcherIndex(
     numBoolVars: Int,
     preparedWatches: Array<IntArrayList>? = null,
     preparedBlockers: Array<IntArrayList>? = null,
-    preparedPositions: MutableLongIntIndex? = null,
+    preparedPositions: BoolWatchPositionIndex? = null,
 ) {
     /**
      * Slot `byLit[lit]` lists factor ids that should fire when literal `lit` transitions to false.
@@ -41,7 +40,7 @@ internal class BoolWatcherIndex(
         preparedBlockers ?: Array(2 * numBoolVars) { IntArrayList(initialCapacity = 2) }
 
     /**
-     * Balanced back-pointer index for direct watch removal: maps `pack(fid, lit)` to
+     * Factor-indexed back pointers for direct watch removal: maps `pack(fid, lit)` to
      * `fid`'s position inside `byLit[lit]`, so removing a moved watch is a swap-pop at a known
      * index instead of a linear scan of a possibly-long popular-literal list.
      *
@@ -53,7 +52,7 @@ internal class BoolWatcherIndex(
      * falls back to the linear scan on any mismatch — a desynced index can never silently remove
      * the wrong watcher.
      */
-    var pos: MutableLongIntIndex = preparedPositions ?: MutableLongIntIndex()
+    var pos: BoolWatchPositionIndex = preparedPositions ?: BoolWatchPositionIndex()
     companion object {
         fun preparation(numBoolVars: Int): Sequence<BoolWatcherIndex?> = sequence {
             val watches = arrayOfNulls<IntArrayList>(2 * numBoolVars)
@@ -65,7 +64,7 @@ internal class BoolWatcherIndex(
                 blockers[lit] = IntArrayList(initialCapacity = 2)
                 if ((lit + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
-            val positions = MutableLongIntIndex()
+            val positions = BoolWatchPositionIndex()
             yield(null)
             @Suppress("UNCHECKED_CAST")
             yield(BoolWatcherIndex(

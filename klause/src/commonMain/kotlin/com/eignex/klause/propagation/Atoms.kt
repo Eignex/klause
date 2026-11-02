@@ -671,11 +671,17 @@ private fun PropagationState.channelingReasonAtWake(atomId: Int, newT: Boolean):
 
 /** Install [fid] as a watcher of [lit]. Dispatches between [BoolWatcherIndex.byLit]
  *  (bool var space) and [AtomStore.watchersByLit] (atom var space). */
-internal fun PropagationState.installLitWatch(lit: Int, fid: Int, blocker: Int = NO_BLOCKER) {
+internal fun PropagationState.installLitWatch(
+    lit: Int,
+    fid: Int,
+    blocker: Int = NO_BLOCKER,
+    preparation: Boolean = false,
+) {
     val v = Lit.variable(lit)
     if (v < problem.numBoolVars) {
         val list = watches.byLit[lit]
-        work += watches.pos.put(packWatch(fid, lit), list.size) // position of the about-to-append entry
+        val indexWork = watches.pos.put(packWatch(fid, lit), list.size)
+        if (preparation) preparationIndexWork += indexWork else work += indexWork
         list.add(fid)
         watches.blockersByLit[lit].add(blocker) // index-aligned with the watcher just appended
     } else {

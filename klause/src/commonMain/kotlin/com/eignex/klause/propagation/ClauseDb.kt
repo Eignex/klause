@@ -359,7 +359,7 @@ internal fun PropagationState.forgetLearnedClauses(
 
     // Renumbering learned fids and shifting list positions invalidates every back pointer.
     work++
-    watches.pos = com.eignex.klause.util.MutableLongIntIndex()
+    watches.pos = BoolWatchPositionIndex()
     for (lit in watches.byLit.indices) {
         work++
         val list = watches.byLit[lit]

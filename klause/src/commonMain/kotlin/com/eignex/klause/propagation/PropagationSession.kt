@@ -90,6 +90,7 @@ class PropagationSession private constructor(
 
     internal fun recordProjectionCheck(checker: PropagationSession) {
         state.work += checker.work
+        state.preparationIndexWork += checker.state.preparationIndexWork
         state.propagationNanos += checker.propagationNanos
     }
 
@@ -291,12 +292,7 @@ class PropagationSession private constructor(
         retired.add(factor)
         val native = state.nativeEngine
         if (native != null) native.retireRootSource(factor)
-        else for (literal in literals) {
-            state.work += state.watches.pos.readWork
-            if (state.watches.pos.getOrDefault(state.packWatch(factor, literal), -1) >= 0) {
-                state.removeBoolWatch(factor, literal)
-            }
-        }
+        else for (literal in literals) state.removeBoolWatch(factor, literal, onlyIndexed = true)
         if (pendingRootSourceRetirement?.factor == factor) pendingRootSourceRetirement = null
     }
 
@@ -1384,7 +1380,8 @@ class PropagationSession private constructor(
 
     internal fun learnedLifecycle(): Map<String, Long> = retainedState?.let {
         it.learned.lifecycle.snapshot() + (it.nativeEngine?.capWindowStatistics() ?: it.learned.capWindowStatistics()) +
-            (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap())
+            (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap()) +
+            it.preparationStatistics()
     } ?: retiredLifecycle
 
     internal fun configureAttribution(

@@ -7,7 +7,7 @@ import com.eignex.klause.util.SharingMemoryObservation
 
 internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
     selectedRetirements.sharingMemory(sample)
-    sample.owned(this, Long.SIZE_BYTES.toLong(), true)
+    sample.owned(this, Long.SIZE_BYTES * 2L, true)
     val protected = protectedLearnedMemory(sample)
     nativeEngine?.sharingMemory(sample, protected) ?: learnedSharingMemory(sample, protected)
     factorAttribution?.sharingMemory(sample)
