@@ -49,16 +49,30 @@ retract with the search scope while definitions stay available to siblings. Thes
 definitions supply no witness authority: publication checks the original rows.
 
 Compatible discrete preparation views retain immutable source-row templates and exact
-integer endpoint metadata through their selected projections. Compact integer rows
-reuse their source-coordinate and coefficient buffers in presolve harvest and later
-LP assembly; guarded rows read the current pin on every emission. Each build maps
-those definitions into its own columns, bounds, premises and numerical owner.
+integer endpoint metadata through their selected projections. Compact rows retain
+canonical integer memberships and reusable coefficient buffers, reading primitive
+source constants at their declared width. Each build maps source coordinates into
+its own columns; the numerical builder copies coefficients into its private rows.
+Guarded rows read the current pin on every emission. Bounds, premises and numerical
+owners belong to the current build.
 Templates retain neither a basis nor a checked claim.
+Exact bound columns materialize only when an import needs them. Each endpoint
+definition retains one completed normalized column; changing an open upper side
+replaces the cached column without linking prior versions. Preparation reserves
+pending construction work and retained storage inside its existing ceilings;
+actual construction charges the consuming import. An already exact import retains
+its matching column directly, without constructing a duplicate definition.
+Completed and interrupted template preparation and import work also debit the owning
+LP allowance. Import reports its actual charges before publishing authority and
+rechecks cancellation after that debit.
 Retained-source assembly and fixed-layout installation adopt the same immutable exact bound objects after a
 complete match against the current normalized column, including its origin, tag,
 integrality and both bound sides.
 
-Factor identity preserves a row definition; row rewrites replace it. Component
+Factor identity preserves a row definition; row rewrites replace it. Factor
+memberships retain their source integer and Boolean arrays without rebuilding a
+tagged list. Component construction folds repeated factor roles, and integer and
+Boolean coordinates remain distinct even when their numeric IDs coincide. Component
 snapshots retain their row definitions, exact endpoints, stated bound sides and
 objective coefficients. Unchanged row incidence retains the component partition.
 Bound or objective changes replace affected snapshots;
@@ -67,7 +81,7 @@ remaps, changed dimensions or semantics and source-to-finite transitions reject 
 prior binding. A foreign source cannot use a prepared template index. Continuous,
 custom and unsupported projections retain their ordinary emission paths.
 
-An unchanged preparation validates ordered factor identities, integer endpoints,
+Ordinary unchanged preparation validates ordered factor identities, integer endpoints,
 stated bound sides, the objective constant and every component cost before sharing
 the completed collections. Source-factor order indexes rows directly, and the
 integer-bound map indexes exact endpoints without component lookup maps.
@@ -77,21 +91,28 @@ authorize reuse. The new source binding owns no predecessor snapshot, so repeate
 compatible preparations retain no generation chain.
 
 An internal selective-metadata preparation mode validates row identity and exact
-bound sides before retaining the row index. A selected view whose handoff checked
+bound sides before retaining the row index. Explicit component-owned and admitted
+sparse-trial engines select this mode and own their numerical component partitions.
+Other node engines keep the ordinary mode. A selected view whose handoff checked
 ordered factor identities carries the same immutable layout token, so subsequent
 template preparations need no duplicate row scan. Other rewrites and explicit
 namespace remaps carry fresh tokens and validate their actual factor identities.
-Bound changes replace their exact
-objects and component metadata. Its source definitions carry no objective authority:
+Bound changes replace their exact objects and retain unrelated row and bound definitions.
+This mode retains no duplicate component partition or component-bound maps; numerical
+consumers assemble those definitions in their own layout. Template component observations
+therefore describe only the ordinary mode. Switching back to that mode constructs its
+partition before complete-index reuse. The selective mode's source definitions carry no objective authority:
 every assembly reads costs and the objective constant from its current objective,
 so changing that objective requires no source-template cost scan or replacement.
-Compact integer import can adopt exact bound columns during construction after
+Every templated mode can adopt compact integer bound columns during construction after
 checking the normalized origin, width, stated sides, integrality and source tag.
-It creates no temporary exact column for a matching template. IEEE and retained
-exact-state imports keep the full exact-column compatibility check.
-Bound endpoints are checked even on the same finite
-view, whose domains can follow its owning presolve session. The ordinary mode
-retains its complete-match check. Both modes publish only completed immutable
+Fixed-layout imports and retained source-fragment imports create no temporary exact
+column for a matching template. IEEE and retained exact-state imports keep the
+full exact-column compatibility check.
+An identical stable source-domain table authorizes endpoint metadata reuse without
+a repeated scan. Shared domain arrays require endpoint checks, including raw views
+carrying a finite session's table; model identity or type alone supplies no such proof.
+The ordinary mode retains its complete-match check. Both modes publish only completed immutable
 snapshots within the same containing allowance and storage cap.
 
 Template construction polls and charges the containing token, including failed
@@ -101,6 +122,9 @@ publication slot per source/finite scope, including temporary presolve bakes.
 Preparation and
 actual row/bound emission have separate observations in the existing LP phase ledger;
 they do not establish numerical result reuse or certified deduction consumption.
+Template observations accumulate fixed scalar totals per owning sink; immutable
+phase maps materialize at snapshot, retaining declined preparation work and observed
+zero emissions without a map allocation per consumer.
 Sparse-trial assembly uses the same source templates and keeps its own admission,
 factorization and certification allowances.
 
@@ -204,15 +228,38 @@ expanded hulls stay outside its allowance. Root rounding preserves the ordinary
 admission's probe intent; sources declined by that guard gain no automatic probe.
 The initial root bound and subsequent root propagation share the existing scoped numerical owner;
 handoff requires matching source identities and root scopes, and live bound adoption
-rechecks authority before reusing its basis. A declined retained source layout
+rechecks authority before reusing its basis. Consultations without selected root cuts install
+source-root domain views without constructing a propagation session. They read no live search restriction;
+the compact immutable layout remains available for later node adoption, while other layouts
+retain their source emissions. Cut-bearing consultations keep propagation-derived root bounds,
+preserving completed cut-owner results across later node adoption.
+Completed cold layout construction and template imports debit the containing LP allowance.
+Fixed-layout installation uses the supplied root preparation token; the installed
+owner keeps its ordinary invocation cancellation for subsequent operations.
+An interrupted cold base charges its materialized columns, rows and coefficient entries before
+discarding them; that charge adds no retained authority.
+Retained source fragments charge each fresh emission before preparing the next region,
+including partial materialization on interruption. Exact-import refusal and abandoned
+publication keep those charges. Unchanged fragments add no assembly fee; restored cached
+fragments retain their source-mapping fee without another emission charge.
+The containing worker token and remaining root work cap bound their preparation. The
+root-local clock gates numerical queries and checking. A completed source layout can
+remain private for later node queries after that consultation expires; a containing-phase
+interruption withholds an incomplete installation. A declined retained source layout
 retires that attempt and uses the existing standalone numerical route within the
 same remaining work and storage limits.
+
+Private construction can pause under [root preparation](#root-preparation), without
+publishing partial numerical authority.
 
 An admitted sparse root advances the scoped owner's floating cursor in adaptive
 work quanta. Pauses publish no point or bound and charge only the new work. A
 pivoting pause can grow the next quantum under the existing adaptive ceiling;
 the operation keeps its original cumulative work and pivot limits. Consultations
 continue only within the remaining root, invocation and cancellation allowances.
+Each advance binds the current consultation token while retaining the owner lifetime
+and original cumulative limits. A paused original-objective query keeps root rounding
+pending; the worker yields before discrete traversal can invalidate its root state.
 Authority edits discard the cursor before adoption. Completed floating results
 enter the existing exact bound check, independently of dense exact continuation.
 The sparse root charges its last numerical delta before admitting bound-only
@@ -226,11 +273,18 @@ objective identity. A live root owner copies at most one MiB within the remainin
 root and LP allowance. A closed auxiliary rounding solver transfers its completed
 output array into the same private storage cap after its work is charged. The
 constant-size handoff can preserve a completed point across a slice interruption;
-later pinning still polls its fresh token. Rounding uses the stored coordinates
-without another numerical solve; its propagation and source-publication checks
-still run. An incomplete or differently optimized point supplies no retained guidance.
+later pinning still polls its fresh token. The first pinning attempt and its resumes
+use the same private coordinate array, so a completed pin prefix belongs to that
+guide. Rounding uses the stored coordinates without another numerical solve; its
+propagation and source-publication checks still run. An incomplete or differently
+optimized point supplies no retained guidance.
 Rounding pins use probe fixpoints without materializing implication lists;
 an interrupted pin restores the last complete propagation state and withholds its proposal.
+Pure discrete nearest rounding keeps at most one private propagation session with
+that exact stored guide and objective. Later slices replace the probe token and
+reuse completed pins, charging only new propagation work. Interrupted initial
+propagation, a changed guide, a finished or rejected pinning attempt, and engine
+close discard the session. Retention renews no root, worker or invocation allowance.
 
 Preparation is capped at eight million modeled work units; root and node LP work
 stop at 150 million units or the containing invocation's smaller allowance.
@@ -266,6 +320,9 @@ children; identical exact authority retains their factors and completed evidence
 An ordinary component root uses the same scoped owner for its initial bound and later
 node queries. Selected global cuts enter through the retained cut adapter before the
 root solve; the passed selection also governs an empty cut list.
+The fixed layout starts from source-root boxes and adopts the query's propagated
+bounds, without a second root fixpoint for that layout.
+Noncompact exact layouts use retained source emissions instead of the compact base adapter.
 When no numerical owner exists, preparation partitions the complete source and cut
 layout together. A declined live component append falls back to the ordinary owner.
 The original node-depth and cut policies remain in force. This root-bound operation
@@ -297,8 +354,9 @@ optima alone supply no global optimum or conflict authority.
 
 Completed exact integer components can retain node deductions separately from their
 numerical results. A query uses the parent's common dual-rounding scale and reuses
-compatible child deductions. The aggregate maps multipliers and reduced costs back
-to the current parent authority; each child alternative is combined with the other
+compatible child deductions. Parent scale inspection charges the shared checking
+meter without materializing parent multipliers. The aggregate maps multipliers and
+reduced costs back to the current parent authority; each child alternative is combined with the other
 children's strongest bounds for fixing. An alternative visits only its changed
 child's columns; its other reduced costs are already covered by the stronger
 primary deduction. Retained deduction payloads occupy at most eight
@@ -313,9 +371,30 @@ unfinished blocks contribute freshly checked zero-dual box bounds. Missing
 minimizing sides decline the aggregate. Every contribution uses the current
 child authority, and only their exact sum is projected to source units. This
 bound supplies no complete point, cut tableau or attainment claim.
+Root consumers lift available child dual candidates with zero multipliers on blocks
+without a result, reserving their copied vector inside the existing checking allocation. The whole-model
+bound-only checker verifies the candidate under the remaining root work and cancellation
+allowance before source projection. A refused check publishes no bound or point; the numerical
+query still yields after its adaptive quantum.
+Closed integral authority first checks rounded integer multipliers in fixed-width
+arithmetic with bounded work, scratch and cancellation polling. Rational reconstruction
+receives only the remaining checking work and allocation after a declined integer attempt.
 Node consumers can prune against the existing source-objective cutoff after
 charging aggregation and certificate work; they do not publish branching coordinates
 or train directional history from the partial aggregate.
+Root rounding can copy finite returned child coordinates into a separate masked
+guide before bound checking. Unknown columns keep ordinary domain choices.
+A later rounding consultation can snapshot existing results from its current scoped
+owner before another numerical query. The read uses the fresh consultation token
+and requires matching retained guide, objective, root model and current exact-state
+identities. Invalidating the active search view preserves this read when the scoped
+owner still holds that root state. Numerical queries retain their active-view requirement.
+After parent cancellation, a fresh read keeps only earlier returned children with
+optimal, WORK or PIVOTS stops. Cancelled or failed child coordinates stay unknown.
+This supplies no additional bound, certificate or complete-point authority.
+The private coordinate and availability buffers spend the existing guidance byte
+limit and root work before allocation. This guide carries no complete LP point or
+proof authority; every proposed source assignment remains fully pinned and checked.
 
 The same explicit setting dispatches root tableau separation to the owning block.
 Lifted cuts retain all row multipliers, bound substitutions, integrality premises
@@ -448,14 +527,34 @@ Aggregation is disabled by default.
 
 Finite satisfaction and optimization share root hull pruning and cut harvesting;
 objective shaving and incumbent-relative fixings are optimization work. Root
-preparation runs once, under a common time and work allowance, before shared
-initialization publishes its bounds; a cancelled phase contributes only completed
-deductions. Interrupted root rounding retains its relaxation layout and basis for
-later slices. A completed rounding LP can retain its coordinates under the same
-bounded guidance allowance after charging the solve, avoiding another LP solve
+preparation runs once under its containing time and work allowance; a cancelled
+phase contributes only completed deductions. Interrupted root rounding retains its
+relaxation layout and basis for later slices. A completed rounding LP can retain its
+coordinates under the same bounded guidance allowance after charging the solve, avoiding another LP solve
 when pinning resumes. Every retry consumes the remaining root and LP allowances.
 Root rounding and pumping propose discrete assignments for mixed
 models, but a relaxation point supplies a target, never witness authority.
+An original-objective rounding probe can reuse a prepared retained root owner while
+its exact model and root scope remain current. Its query adopts the current token
+and spends the smaller of the remaining primal, root and worker grants. Incomplete
+numerical work retains the private owner for an eligible later rounding slice;
+queries with changed authority or objective use ordinary construction. Complete points and
+masked child-coordinate guides can steer rounding; every proposed assignment
+still requires source verification.
+
+Retained discrete root layouts prepare in private chunks before the first numerical
+consultation. Objective-column batches and factor batches charge materialized construction
+before yielding to the worker's slice. A paused builder retains only its source-root
+assembly buffers; no partial layout, point or certificate is available to consumers.
+Resumption keeps the same builder and cumulative root and LP funding. Containing
+cancellation or spent cumulative funding retires it. Completion prepares the source
+layout, private exact state and numerical owner before the consultation-local numerical clock starts.
+Numerical construction uses the same remaining cumulative root and LP allowance; completed
+and declined preparation charges that allowance before a query. Only a complete private owner
+survives a pause. Each query adopts its own cancellation token before using that owner's basis.
+The consultation adopts that state only while its source-root model, exact state and root scope remain current.
+Incumbent validation can retire pending construction, and engine closure releases its private buffers.
+Atomic projection and row emission retain the worker's ordinary overspend accounting.
 
 The internal root-only preparation policy can give source projection and numerical
 owner construction the remaining cumulative LP allowance while keeping each

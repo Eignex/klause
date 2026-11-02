@@ -311,12 +311,18 @@ internal interface LpSolver : AutoCloseable {
     override fun close() {}
 }
 
+internal class LpPrimalGuidance(val coordinates: DoubleArray, val known: BooleanArray)
+
 /**
  * An [LpSolver] whose independent component results can be certified without reconstructing one
  * monolithic exact problem. Factories return this capability explicitly so a decorator around a
  * component engine cannot accidentally hide the certification routes from its consumers.
  */
 internal interface ComponentLpSolverCapability : LpSolver {
+    fun partialBoundDuals(cancellation: Cancellation = Cancellation.Never): DoubleArray? = null
+
+    fun partialPrimalGuidance(cancellation: Cancellation = Cancellation.Never): LpPrimalGuidance? = null
+
     fun nodeDeductions(
         duals: DoubleArray,
         observer: LpCertificationObserver? = null,

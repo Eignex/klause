@@ -18,6 +18,7 @@ import com.eignex.klause.lp.engine.LpExactSupport
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpPrimalGuidance
 import com.eignex.klause.lp.engine.LpScopedMetrics
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpScopedSolver
@@ -120,6 +121,8 @@ internal class LpPropagator(
     val floatTermination get() = owner?.lastFloatTermination
     val floatPaused: Boolean get() = owner?.floatPaused == true
 
+    val primalGuidanceState: String get() = withOwner { it.primalGuidanceState } ?: "ABSENT_OWNER"
+
     fun boundPremise(witness: Long): SearchAtomPremise = witnesses[witness] ?: SearchAtomPremise.Unavailable
 
     fun activeBoundPremise(column: Int, upper: Boolean): SearchAtomPremise? {
@@ -165,8 +168,8 @@ internal class LpPropagator(
         )
     }
 
-    fun install(key: Any, model: ExactLpModel): Boolean {
-        if (closed || cancellation()) return false
+    fun install(key: Any, model: ExactLpModel, token: Cancellation = cancellation): Boolean {
+        if (closed || token()) return false
         if (modelKey === key && owner != null) return true
         val context = proofContext
         reset()
@@ -400,26 +403,47 @@ internal class LpPropagator(
         }
     } == true
 
+    fun prepare(token: Cancellation, workAllowance: Long): Boolean = withOwner { current ->
+        try {
+            current.prepare(token, workAllowance)
+        } finally {
+            lastMetrics = takePreparationMetrics(current)
+            onPreparation?.invoke(lastMetrics)
+        }
+    } == true
+
+    fun partialPrimalGuidance(token: Cancellation): LpPrimalGuidance? =
+        withOwner { it.partialPrimalGuidance(token) }
+
     fun solveFloat(
         warm: Basis? = null,
         token: Cancellation = cancellation,
         continuationWorkAllowance: (() -> Long?)? = null,
+        queryAllowance: (() -> Long?)? = null,
     ): Pair<LpSolver, FloatLpResult?>? =
         solveOwned(token.takeIf { onPreparation != null }) { current ->
-            val offered = queryWorkAllowance()
+            val standard = queryWorkAllowance()
+            val requested = queryAllowance?.invoke()
+            val offered = when {
+                requested == null -> standard
+                standard == null || standard == 0L -> requested
+                else -> minOf(standard, requested)
+            }
+            val spent = (requested != null && requested <= 0L) || (standard != null && standard < 0L)
+            val queryToken = if (spent) token or Cancellation { true } else token
             val continuation = (continuationWorkAllowance ?: continuationAllowance)()
             if (continuation != null && current.state.depth == 0) {
                 val profile = effort()
                 return@solveOwned current.advanceFloat(
                     (offered ?: profile.work).coerceAtLeast(1L),
-                    LpFloatAllowance(continuation.coerceAtLeast(1L), profile.iterations), token,
+                    LpFloatAllowance(continuation.coerceAtLeast(1L), profile.iterations), queryToken,
                 ).also { solved = true }
             }
             val allowance = if (solved || offered != null) {
-                effort().let { LpFloatAllowance(offered ?: it.work, it.iterations) }
+                effort().let { LpFloatAllowance((offered ?: it.work).coerceAtLeast(0L), it.iterations) }
             } else null
             // An explicit query allowance uses the scoped owner's retained basis and factors.
-            current.solveFloat(if (allowance != null) null else warm, token, allowance).also { solved = true }
+            current.solveFloat(if (allowance != null) null else warm, queryToken, allowance).also { solved = true }
         }
 
     fun solve(

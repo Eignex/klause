@@ -33,6 +33,7 @@ import com.eignex.klause.lp.cut.ImpliedBoundSeparator
 import com.eignex.klause.lp.cut.KnapsackCoverSeparator
 import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.engine.Basis
+import com.eignex.klause.lp.engine.ComponentLpSolverCapability
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -43,8 +44,11 @@ import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpCounterResults
 import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpPhaseTimer
 import com.eignex.klause.lp.engine.LpPricingOptions
+import com.eignex.klause.lp.engine.LpPrimalGuidance
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolveSession
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
@@ -59,6 +63,7 @@ import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.exactLeafResult
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.relaxation.gatedEnforcement
@@ -78,6 +83,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.validation.floatingOptimumAcceptance
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
@@ -105,9 +111,12 @@ internal class GatedResidual(
 internal class RootRoundingWarmStart(
     val objective: LinearObjective,
     val relaxation: LpRelaxation,
-    val basis: Basis,
+    val basis: Basis? = null,
     val primal: DoubleArray? = null,
-)
+    val knownColumns: BooleanArray? = null,
+) {
+    var pinning: PropagationSession? = null
+}
 
 internal enum class LpRootQueryPolicy {
     SHARED_WORK,
@@ -155,7 +164,17 @@ internal class LpEngine(
     internal var primalPropagationWork: Long = 0L
     internal var primalSearchWork: Long = 0L
     internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
+        set(value) {
+            if (field !== value) field?.pinning?.releaseRetainedState()
+            field = value
+        }
     internal var rootRoundingInterrupted: Boolean = false
+    internal val rootRoundingQueryPaused: Boolean
+        get() {
+            val guidance = rootRoundingWarmStart ?: return false
+            return guidance.primal == null && ownsRootPrimalModel(guidance.relaxation.model) &&
+                propagator.floatPaused
+        }
     private val selectedSourceRelaxation: CpToLpRelaxation? by lazy {
         if (projections?.builtInRelaxation == false) {
             CpToLpRelaxation(problem, objective, realResidual = true, projections = null)
@@ -194,6 +213,10 @@ internal class LpEngine(
     override fun close() {
         if (closed) return
         closed = true
+        discardRootLayoutPreparation()
+        preparedRootRelaxation = null
+        persistentRelaxation = null
+        persistentRelaxer = null
         rootRoundingWarmStart = null
         rootRoundingInterrupted = false
         val observed = sink.lp.cutLifecycle
@@ -285,6 +308,100 @@ internal class LpEngine(
         if (cancellation()) return
         rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
+    }
+
+    internal fun ownsRootPrimalModel(model: LpModel): Boolean = retainedRootEnabled &&
+        cpAdapter.currentModel === model && model.exactState != null &&
+        propagator.state === model.exactState && model.exactState.depth == 0
+
+    private fun retainedRootPrimalStateMatches(relaxation: LpRelaxation): Boolean {
+        val retained = rootRoundingWarmStart ?: return false
+        val state = relaxation.model.exactState ?: return false
+        return retainedRootEnabled && retained.objective === objective && retained.relaxation === relaxation &&
+            propagator.state === state && state.depth == 0
+    }
+
+    internal fun retainRootPrimalOwner(relaxation: LpRelaxation) {
+        if (!params.lpPlan.probe || !ownsRootPrimalModel(relaxation.model) ||
+            rootRoundingWarmStart?.primal != null || lpWorkAllowanceSpent(1L)
+        ) return
+        noteNodeOverhead(1L)
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation)
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "OWNER_RETAINED", 0L)
+    }
+
+    internal fun retainRootPartialPrimalGuidance(
+        relaxation: LpRelaxation,
+        component: ComponentLpSolverCapability?,
+        cancellation: Cancellation,
+    ) {
+        if (component == null) return
+        retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_RETAINED") {
+            component.partialPrimalGuidance(cancellation)
+        }
+    }
+
+    internal fun retainRootPartialPrimalGuidance(relaxation: LpRelaxation, cancellation: Cancellation) {
+        if (!params.lpPlan.componentOwnership) return
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "PARTIAL_OWNER_ATTEMPTED", 0L)
+        var ownerState = "NOT_READ"
+        val outcome = retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_OWNER_RETAINED",
+            retainedOwnerRead = true) {
+            ownerState = propagator.primalGuidanceState
+            propagator.partialPrimalGuidance(cancellation)
+        }
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "PARTIAL_OWNER_${outcome.name}_$ownerState", 0L)
+    }
+
+    private enum class PartialPrimalRead {
+        DISABLED,
+        CONTINUOUS_SOURCE,
+        STALE_OWNER,
+        CANCELLED,
+        COMPLETE_GUIDANCE,
+        NO_ALLOWANCE,
+        NO_COORDINATES,
+        INVALID_SHAPE,
+        RETAINED,
+    }
+
+    private inline fun retainPartialPrimalGuidance(
+        relaxation: LpRelaxation,
+        cancellation: Cancellation,
+        outcome: String,
+        retainedOwnerRead: Boolean = false,
+        read: () -> LpPrimalGuidance?,
+    ): PartialPrimalRead {
+        if (!params.lpPlan.probe) return PartialPrimalRead.DISABLED
+        if (problem.numRealVars != 0) return PartialPrimalRead.CONTINUOUS_SOURCE
+        val currentOwner = ownsRootPrimalModel(relaxation.model) ||
+            (retainedOwnerRead && retainedRootPrimalStateMatches(relaxation))
+        if (!currentOwner) return PartialPrimalRead.STALE_OWNER
+        if (cancellation()) return PartialPrimalRead.CANCELLED
+        val previous = rootRoundingWarmStart
+        if (previous?.primal != null && previous.knownColumns == null) return PartialPrimalRead.COMPLETE_GUIDANCE
+        val model = relaxation.model
+        val work = partialPrimalGuidanceWork(model) ?: return PartialPrimalRead.NO_ALLOWANCE
+        val started = TimeSource.Monotonic.markNow()
+        noteNodeOverhead(work)
+        val guidance = read() ?: return PartialPrimalRead.NO_COORDINATES
+        if (guidance.coordinates.size != model.n || guidance.known.size != model.n) {
+            return PartialPrimalRead.INVALID_SHAPE
+        }
+        if (cancellation()) return PartialPrimalRead.CANCELLED
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
+            primal = guidance.coordinates, knownColumns = guidance.known)
+        sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", outcome, started.elapsedNow().inWholeNanoseconds)
+        return PartialPrimalRead.RETAINED
+    }
+
+    private fun partialPrimalGuidanceWork(model: LpModel): Long? {
+        val work = 8L * model.n + 2L * model.m
+        val bytes = model.n.toLong() * (Double.SIZE_BYTES + 1L)
+        if (bytes > ROOT_PRIMAL_GUIDANCE_BYTES || lpWorkAllowanceSpent(work) ||
+            retainedRootRemainingWork() <= work
+        ) return null
+        return work
     }
 
     internal fun retainRoundingPrimalGuidance(
@@ -415,6 +532,8 @@ internal class LpEngine(
                 elementIndexes = elementIndexes,
                 templateStats = sink.lp,
                 preparationCancellation = params.cancellation,
+                reuseTemplateMetadata = retainedRootEnabled,
+                onTemplateWork = ::noteNodeOverhead,
             )
         } else {
             null
@@ -565,11 +684,35 @@ internal class LpEngine(
      * floor does not already get.
      */
     internal fun retainedRootRemainingWork(): Long {
+        var remaining = retainedRootCumulativeWork()
+        val offered = nodeWorkAllowance()
+        lastRootWorkOffer = offered
+        offered?.let { remaining = minOf(remaining, it.coerceAtLeast(0L)) }
+        return remaining
+    }
+
+    internal fun rootQueryStopView(): String {
+        val rootCap = minOf(params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
+            SPARSE_LP_MAX_WORK)
+        val rootSpent = totalSolveOps >= rootCap ||
+            workSpentExceeds(params.lpPlan.rootMaxWork, sink.lp.standaloneWork)
+        val lpState = if (lpWorkAllowanceSpent(sink.lp.standaloneWork)) "LP_SPENT" else "LP_OPEN"
+        val rootState = if (rootSpent) "ROOT_SPENT" else "ROOT_OPEN"
+        val offered = lastRootWorkOffer
+        val offerState = when {
+            offered == null -> "OFFER_NONE"
+            offered <= 0L -> "OFFER_SPENT"
+            else -> "OFFER_OPEN"
+        }
+        val cursorState = if (propagator.floatPaused) "PAUSED" else "UNPAUSED"
+        return "${lpState}_${rootState}_${offerState}_$cursorState"
+    }
+
+    private fun retainedRootCumulativeWork(): Long {
         val cap = minOf(params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
             SPARSE_LP_MAX_WORK)
         var remaining = (cap - minOf(cap, totalSolveOps)).coerceAtLeast(0L)
         lpEffortGovernor.remainingWork()?.let { remaining = minOf(remaining, it) }
-        nodeWorkAllowance()?.let { remaining = minOf(remaining, it.coerceAtLeast(0L)) }
         return remaining
     }
 
@@ -618,6 +761,8 @@ internal class LpEngine(
             else -> minOf(root, remaining)
         }
     }
+
+    private var lastRootWorkOffer: Long? = null
 
     // Work the current node's LP has charged, across its base, cut-augmented and recovery solves.
     private var pendingSolveOps = 0L
@@ -755,6 +900,9 @@ internal class LpEngine(
     // A fixed source layout allows bound-only adoption without rebuilding its factorization.
     private var persistentRelaxer: CpToLpRelaxation? = null
     private var persistentRelaxation: LpRelaxation? = null
+    private var preparedRootRelaxation: LpRelaxation? = null
+    private var layoutPreparation: Iterator<Unit>? = null
+    private var layoutPreparationRelaxer: CpToLpRelaxation? = null
 
     // The fallback node solver stays live for metrics until it is replaced or the engine closes.
     internal var nodeSimplex: PersistentLpSolver? = null
@@ -800,21 +948,136 @@ internal class LpEngine(
     }
 
     private fun buildNodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? {
-        if (persistentRelaxer !== relaxer) {
-            cpAdapter.reset()
-            persistentRelaxation = null
-            val base = relaxer.build(PropagationSession(problem), cancellation = params.cancellation)
-            if (base.persistentEligible && (!sparseTrialActive || !base.model.hasContinuous)) {
-                persistentRelaxation = base
-            }
-            persistentRelaxer = relaxer
-        }
+        if (!preparePersistentLayout(relaxer, params.cancellation)) return null
+        preparedRootRelaxation = null
         persistentRelaxation?.let {
             return cpAdapter.relaxation(it, session)?.also { rebound ->
                 noteNodeOverhead(rebound.model.numVars.toLong() * LpNodeOverhead.EDIT)
             }
         }
         return cpAdapter.relaxation(relaxer, session)
+    }
+
+    internal fun sourceRootRelaxation(
+        relaxer: CpToLpRelaxation,
+        selectedCuts: List<Cut>,
+        cancellation: Cancellation,
+    ): LpRelaxation? {
+        if (!preparePersistentLayout(relaxer, cancellation)) return null
+        val fixed = persistentRelaxation
+        val prepared = preparedRootRelaxation?.takeIf(cpAdapter::isSourceRoot)
+        preparedRootRelaxation = null
+        val base = prepared ?: if (fixed != null) cpAdapter.sourceRootRelaxation(fixed, cancellation)
+            else cpAdapter.sourceRootRelaxation(relaxer, cancellation)
+        return base?.let { cpAdapter.sourceRootCuts(it, selectedCuts, cancellation) }
+            ?.also { it.sourceMap?.let(cutPool::remap) }
+    }
+
+    internal fun discardRootLayoutPreparation() {
+        layoutPreparation = null
+        layoutPreparationRelaxer = null
+    }
+
+    internal fun prepareRootLayout(lifetime: Cancellation, pause: Cancellation): Boolean {
+        check(!closed) { "LP engine is closed" }
+        val relaxer = lpRelaxer ?: return true
+        if (!retainedRootEnabled || !relaxer.persistentLayoutCandidate) return true
+        if (persistentRelaxer === relaxer) return !pause()
+        val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.ROOT), LpSolvePhase.ROOT_LAYOUT_PREPARATION)
+        val before = totalSolveWork()
+        var outcome = "PAUSED"
+        return try {
+            if (layoutPreparationRelaxer !== relaxer) startRootLayoutPreparation(relaxer, lifetime)
+            val pending = checkNotNull(layoutPreparation)
+            while (!pause() && pending.hasNext()) pending.next()
+            if (persistentRelaxer === relaxer) {
+                discardRootLayoutPreparation()
+                outcome = when {
+                    preparedRootRelaxation != null -> "READY"
+                    persistentRelaxation != null -> "STATE_DECLINED"
+                    else -> "DECLINED"
+                }
+                !pause()
+            } else false
+        } catch (_: LpAssemblyCancelled) {
+            discardRootLayoutPreparation()
+            persistentRelaxer = relaxer
+            persistentRelaxation = null
+            preparedRootRelaxation = null
+            outcome = "CANCELLED"
+            true
+        } catch (_: CheckedLongOverflowException) {
+            discardRootLayoutPreparation()
+            persistentRelaxer = relaxer
+            persistentRelaxation = null
+            preparedRootRelaxation = null
+            outcome = "SCALAR_WIDTH"
+            true
+        } finally {
+            timer.finish(outcome, totalSolveWork() - before)
+        }
+    }
+
+    private fun startRootLayoutPreparation(relaxer: CpToLpRelaxation, lifetime: Cancellation) {
+        discardRootLayoutPreparation()
+        cpAdapter.reset()
+        persistentRelaxation = null
+        preparedRootRelaxation = null
+        var charged = 0L
+        val token = lifetime or Cancellation {
+            retainedRootCumulativeWork() <= 0L ||
+                workSpentExceeds(params.lpPlan.rootMaxWork, sink.lp.standaloneWork) ||
+                lpWorkAllowanceSpent(sink.lp.standaloneWork)
+        }
+        layoutPreparationRelaxer = relaxer
+        layoutPreparation = relaxer.prepareBuild(RootDomains(problem), token,
+            onWork = {
+                charged += it
+                noteNodeOverhead(it * LpNodeOverhead.BUILD)
+            },
+            onComplete = { base ->
+                noteNodeOverhead((base.model.extent() - charged).coerceAtLeast(0L) * LpNodeOverhead.BUILD)
+                if (!token() && base.persistentEligible && !base.model.hasContinuous) {
+                    persistentRelaxation = base
+                    preparedRootRelaxation = cpAdapter.sourceRootRelaxation(base, token)
+                    if (preparedRootRelaxation == null) cpAdapter.reset() else prepareRootNumericalOwner(token)
+                }
+                persistentRelaxer = relaxer
+            })
+    }
+
+    private fun prepareRootNumericalOwner(cancellation: Cancellation) {
+        val timer = LpPhaseTimer(sink.lp.certificationObserver(LpRoute.ROOT),
+            LpSolvePhase.ROOT_NUMERICAL_PREPARATION)
+        val before = totalSolveWork()
+        var outcome = "DECLINED"
+        try {
+            if (propagator.prepare(cancellation, retainedRootCumulativeWork())) {
+                outcome = "READY"
+                preparedRootRelaxation?.let(::retainRootPrimalOwner)
+            }
+        } finally {
+            timer.finish(outcome, totalSolveWork() - before)
+        }
+    }
+
+    private fun preparePersistentLayout(relaxer: CpToLpRelaxation, cancellation: Cancellation): Boolean {
+        if (layoutPreparationRelaxer === relaxer && !prepareRootLayout(params.cancellation, cancellation)) return false
+        if (persistentRelaxer !== relaxer) {
+            discardRootLayoutPreparation()
+            cpAdapter.reset()
+            persistentRelaxation = null
+            preparedRootRelaxation = null
+            val base = relaxer.build(RootDomains(problem), emptyList(), cancellation) {
+                noteNodeOverhead(it * LpNodeOverhead.BUILD)
+            }
+            noteNodeOverhead(base.model.extent() * LpNodeOverhead.BUILD)
+            if (base.persistentEligible && !base.model.hasContinuous) {
+                persistentRelaxation = base
+            }
+            persistentRelaxer = relaxer
+        }
+        return true
     }
 
     internal var lpCounterResults = LpCounterResults()

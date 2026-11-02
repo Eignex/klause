@@ -401,6 +401,13 @@ class PropagationSession private constructor(
         operation,
     )
 
+    internal fun <T> withProbeInvocation(token: Cancellation, operation: () -> T): T {
+        check(!fixpointCancelled)
+        // A rolled-back probe keeps its completed prefix; its caller supplies the full current scope.
+        probeCancelled = false
+        return usingCancellation(token, operation)
+    }
+
     private fun <T> usingCancellation(token: Cancellation, operation: () -> T): T {
         val previous = cancellation
         val finite = state.finiteWork.cancellation

@@ -69,6 +69,71 @@ import kotlin.test.assertTrue
 
 class LpPropagatorTest {
     @Test
+    fun `installation honors its supplied construction token and preserves the default scope`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
+            .build(PropagationSession(problem))
+        val exact = assertNotNull(base.model.authoritativeModel())
+        for ((storedStopped, requested, expected) in listOf(
+            Triple(true, null, false), Triple(false, null, true),
+            Triple(true, false, true), Triple(false, true, false),
+        )) {
+            LpPropagator(object : LpSearchPolicy {}, cancellation = Cancellation { storedStopped },
+                effort = { LpEffortProfile(work = 100_000L) }).use { lp ->
+                val installed = if (requested == null) lp.install(base, exact)
+                    else lp.install(base, exact, Cancellation { requested })
+
+                assertEquals(expected, installed)
+                assertEquals(expected, lp.prepare(Cancellation.Never, 100_000L))
+            }
+        }
+    }
+
+    @Test
+    fun `consumer query grants respect bounded and unbounded containing allowances`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
+            .build(PropagationSession(problem))
+        for ((containing, requested, expected) in listOf(
+            Triple(100_000L, 50_000L, 50_000L),
+            Triple(100_000L, 200_000L, 100_000L),
+            Triple(0L, 50_000L, 50_000L),
+            Triple(0L, null, 0L),
+        )) {
+            val factory = RecordingLpEngineFactory()
+            LpPropagator(object : LpSearchPolicy {},
+                effort = { LpEffortProfile(work = 100_000L) },
+                solveContext = LpSolveContext(factory),
+                queryWorkAllowance = { containing },
+            ).use { lp ->
+                assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+
+                assertNotNull(lp.solveFloat(queryAllowance = { requested }))
+
+                assertEquals(expected, assertNotNull(factory.floatAllowances.single()).work)
+            }
+        }
+    }
+
+    @Test
+    fun `spent consumer query grants supply no floating work`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))
+            .build(PropagationSession(problem))
+        LpPropagator(object : LpSearchPolicy {},
+            effort = { LpEffortProfile(work = 100_000L) },
+            queryWorkAllowance = { 100_000L },
+        ).use { lp ->
+            assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
+
+            val result = lp.solveFloat(queryAllowance = { 0L })
+
+            assertNull(result)
+            assertEquals(0L, lp.lastMetrics.workOps - assertNotNull(lp.metrics).preparationWork)
+        }
+    }
+
+    @Test
     fun `cold preparation is charged before query and continuation grants are read`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
         val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1L)))

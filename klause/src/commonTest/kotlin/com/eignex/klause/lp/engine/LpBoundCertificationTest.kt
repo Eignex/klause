@@ -351,6 +351,57 @@ class LpBoundCertificationTest {
         assertEquals("REFUSED", phase?.outcome)
     }
 
+    @Test
+    fun `integer bound checking should certify current authority without a primal`() {
+        val source = model()
+
+        val result = certifyLpIntegerBoundOnly(source, doubleArrayOf(-1.0), ReconstructionLimits())
+
+        val bound = assertNotNull(result.bound)
+        assertEquals(BigFraction.ofLong(-5L), bound.value)
+        assertTrue(assertNotNull(bound.certificate).belongsTo(source))
+        assertNull(result.witness)
+        assertEquals(0, result.metrics.pointChecks)
+    }
+
+    @Test
+    fun `integer bound checking should stop at the caller resource limit`() {
+        val cases = listOf(
+            ReconstructionLimits(maxCoordinates = 1) to ReconstructionDecline.DIMENSION,
+            ReconstructionLimits(maxEntries = 1) to ReconstructionDecline.DIMENSION,
+            ReconstructionLimits(maxBits = 64) to ReconstructionDecline.BITS,
+            ReconstructionLimits(maxWork = 0L) to ReconstructionDecline.WORK,
+            ReconstructionLimits(maxWork = 1L) to ReconstructionDecline.WORK,
+            ReconstructionLimits(maxAllocation = 0L) to ReconstructionDecline.ALLOCATION,
+        )
+        for ((limits, reason) in cases) {
+            val result = certifyLpIntegerBoundOnly(model(), doubleArrayOf(-1.0), limits)
+
+            assertNull(result.bound)
+            assertEquals(reason, result.metrics.decline)
+            assertTrue(result.metrics.work <= limits.maxWork)
+            assertTrue(result.metrics.allocation <= limits.maxAllocation)
+        }
+    }
+
+    @Test
+    fun `integer bound checking should withhold a proof after cancellation during policy review`() {
+        var cancelled = false
+        val token = Cancellation { cancelled }
+        val policy = LpCertificationPolicy { _, success ->
+            assertTrue(success)
+            cancelled = true
+            success
+        }
+
+        val result = certifyLpIntegerBoundOnly(model(), doubleArrayOf(-1.0), ReconstructionLimits(), token,
+            policy = policy)
+
+        assertNull(result.bound)
+        assertEquals(ReconstructionDecline.CANCELLED, result.metrics.decline)
+        assertTrue(result.metrics.work > 0L)
+    }
+
     private fun model(upper: Long? = 10L, coefficient: Long = 1L, rhs: Long = 5L): LpModel {
         val zero = ExactLpNumber.of(0L)
         return assertNotNull(LpExactState(ExactLpModel(

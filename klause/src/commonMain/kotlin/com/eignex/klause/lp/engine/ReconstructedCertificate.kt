@@ -141,6 +141,10 @@ internal class ReconstructionMeter(
         work += units
     }
 
+    fun require(condition: Boolean, reason: ReconstructionDecline) {
+        if (!condition) throw ReconstructionStop(reason)
+    }
+
     fun poll() {
         if (cancellation()) throw ReconstructionStop(ReconstructionDecline.CANCELLED)
     }
@@ -1049,6 +1053,87 @@ private fun certifyLpConflictOnlyWithin(
     timer.finish(metrics.decline?.name ?: if (accepted != null) "CONFLICT" else "REFUSED", metrics.work)
     return ReconstructedCertificate(null, null, accepted, checked.conflictSupport.takeIf { accepted != null },
         false, false, metrics)
+}
+
+internal fun certifyLpIntegerBoundOnly(
+    model: LpModel,
+    duals: DoubleArray,
+    limits: ReconstructionLimits,
+    cancellation: Cancellation = Cancellation.Never,
+    observer: LpCertificationObserver? = null,
+    policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
+): ReconstructedCertificate {
+    val observation = observer?.takeUnless { it is LpClaimObservation }?.let {
+        LpClaimObservation(LpClaim.BOUND, it)
+    }
+    val checked = certifyLpIntegerBoundWithin(model, duals, limits, cancellation, observation ?: observer, policy)
+    observation?.finish(CertifiedLpResult(null, checked.bound, null, null, null,
+        false, { null }, reconstruction = checked.metrics))
+    return checked
+}
+
+private fun admitIntegerBoundInput(model: LpModel, duals: DoubleArray, meter: ReconstructionMeter) {
+    meter.poll()
+    meter.step()
+    val source = model.exactState?.model ?: throw ReconstructionStop(ReconstructionDecline.INVALID_INPUT)
+    meter.require(duals.size == model.m && model.finiteExactInput(), ReconstructionDecline.INVALID_INPUT)
+    val limits = meter.limits
+    meter.require(model.n.toLong() + model.m <= limits.maxCoordinates, ReconstructionDecline.DIMENSION)
+    meter.require(limits.maxBits >= 128, ReconstructionDecline.BITS)
+    var entries = model.m.toLong()
+    for (column in 0 until model.n) {
+        meter.step()
+        meter.require(source.column(column).integral, ReconstructionDecline.INVALID_INPUT)
+        entries += source.columnEntries(column).size
+    }
+    meter.require(entries <= limits.maxEntries, ReconstructionDecline.DIMENSION)
+    val vectorEntries = model.numVars.toLong() + 2L * model.m
+    meter.step(vectorEntries)
+    val vectorBytes = vectorEntries * Long.SIZE_BYTES
+    val scanBytes = model.numVars.toLong() * 64L + 512L
+    meter.storage(vectorBytes + scanBytes)
+}
+
+private fun certifyLpIntegerBoundWithin(
+    model: LpModel,
+    duals: DoubleArray,
+    limits: ReconstructionLimits,
+    cancellation: Cancellation,
+    observer: LpCertificationObserver?,
+    policy: LpCertificationPolicy,
+): ReconstructedCertificate {
+    val timer = LpPhaseTimer(observer, LpSolvePhase.BOUND_CERTIFICATE)
+    val meter = ReconstructionMeter(limits, cancellation)
+    var bound: CertifiedLpBound? = null
+    var decline: ReconstructionDecline? = null
+    try {
+        admitIntegerBoundInput(model, duals, meter)
+        meter.phase = ReconstructionPhase.DUAL
+        meter.dualChecks++
+        val certificate = integerCertifyUnchecked(model, duals, DEFAULT_SCALE_BITS, scan = { meter.step(4L) })
+        if (certificate == null) {
+            decline = ReconstructionDecline.CANDIDATE
+        } else {
+            meter.step(4L)
+            bound = CertifiedLpBound(meter.fraction(certificate.exactObjectiveBound()), certificate)
+            meter.dualSuccesses++
+        }
+        meter.poll()
+    } catch (stopped: ReconstructionStop) {
+        bound = null
+        decline = stopped.reason
+    }
+    val accepted = policy.acceptNullable(LpCertifier.INTEGER, bound)
+    if (bound != null && accepted == null) (observer as? LpClaimObservation)?.refuse("POLICY_REFUSED")
+    val result = if (cancellation()) {
+        decline = ReconstructionDecline.CANCELLED
+        (observer as? LpClaimObservation)?.refuse("CANCELLED")
+        null
+    } else accepted
+    val metrics = meter.snapshot(decline)
+    observer?.observe(LpCertifier.INTEGER, bound != null, LpCertifierCost.Metered(metrics.work))
+    timer.finish("INTEGER_${decline?.name ?: if (result != null) "BOUND" else "REFUSED"}", metrics.work)
+    return ReconstructedCertificate(null, result, null, null, false, false, metrics)
 }
 
 // Dual evidence has its own admission and spending; exact-primal reconstruction is not a prerequisite.

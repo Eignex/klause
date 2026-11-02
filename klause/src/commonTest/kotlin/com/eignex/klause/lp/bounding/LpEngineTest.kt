@@ -2,17 +2,20 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpCertificationPolicy
+import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.engine.LpFloatTermination
@@ -26,22 +29,272 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LpEngineTest {
+    @Test
+    fun `numerical root preparation finishes before the bounded root query`() {
+        val sink = SolveStatsSink("paid-numerical-root-preparation")
+        LpEngine(boundedProblem().bake(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)), sink).use { engine ->
+            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            val prepared = assertNotNull(engine.propagator.metrics)
+            val paid = prepared.preparationWork
+            val query = Cancellation { engine.propagator.metrics?.preparationSuccesses == 0L }
+
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), query)
+
+            assertTrue(paid > 0L)
+            assertEquals(3.0, bound)
+            assertEquals(paid, assertNotNull(engine.propagator.metrics).preparationWork)
+            assertEquals(1L, sink.snapshot().lp.phases["ROOT_NUMERICAL_PREPARATION_ROOT"]?.outcomes?.get("READY"))
+        }
+    }
+
+    @Test
+    fun `paused root layout preparation retains charged construction`() {
+        val problem = boundedProblem().bake()
+        val sink = SolveStatsSink("paused-root-layout")
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)), sink,
+            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+            val before = engine.totalSolveWork()
+
+            val readyInFirstSlice = engine.prepareRootLayout(Cancellation.Never, Cancellation {
+                engine.totalSolveWork() > before
+            })
+            val paid = engine.totalSolveWork()
+            val prepared = sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls
+            val ready = engine.prepareRootLayout(Cancellation.Never, Cancellation.Never)
+            val imported = sink.snapshot().lp.phases["TEMPLATE_ASSEMBLY_NODE"]?.outcomes?.get("EXACT_BOUND_OBJECTS")
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            assertFalse(readyInFirstSlice)
+            assertTrue(paid > before)
+            assertTrue(ready)
+            assertNotNull(prepared)
+            assertEquals(prepared, sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls)
+            assertNotNull(imported)
+            assertEquals(imported,
+                sink.snapshot().lp.phases["TEMPLATE_ASSEMBLY_NODE"]?.outcomes?.get("EXACT_BOUND_OBJECTS"))
+            assertEquals(3.0, bound)
+        }
+    }
+
+    @Test
+    fun `containing cancellation retires a paused root layout`() {
+        var cancelled = false
+        val lifetime = Cancellation { cancelled }
+        val sink = SolveStatsSink("cancelled-root-layout")
+        LpEngine(boundedProblem(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)), sink).use { engine ->
+            val before = engine.totalSolveWork()
+            assertFalse(engine.prepareRootLayout(lifetime, Cancellation { engine.totalSolveWork() > before }))
+            val paid = engine.totalSolveWork()
+            cancelled = true
+
+            engine.prepareRootLayout(lifetime, Cancellation.Never)
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), lifetime)
+
+            assertTrue(bound.isNaN())
+            assertTrue(engine.totalSolveWork() >= paid)
+            assertEquals(1L, sink.snapshot().lp.phases["ROOT_LAYOUT_PREPARATION_ROOT"]?.outcomes?.get("CANCELLED"))
+        }
+    }
+
+    @Test
+    fun `root layout resumption does not renew spent construction work`() {
+        LpEngine(boundedProblem(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true, rootMaxWork = 1L,
+                probe = false, rootCutHarvest = false)), SolveStatsSink("spent-root-layout")).use { engine ->
+            engine.prepareRootLayout(Cancellation.Never, Cancellation.Never)
+            val spent = engine.totalSolveWork()
+
+            engine.prepareRootLayout(Cancellation.Never, Cancellation.Never)
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            assertTrue(spent > 0L)
+            assertEquals(spent, engine.totalSolveWork())
+            assertTrue(bound.isNaN())
+        }
+    }
+
+    @Test
+    fun `root query cancellation preserves completed preparation for node queries`() {
+        val problem = boundedProblem().bake()
+        val sink = SolveStatsSink("retained-root-preparation")
+        var rootPolls = 0
+        val rootToken = Cancellation { rootPolls++ > 0 }
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)), sink,
+            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            SearchSession(listOf(cp, engine.propagator)).initialize()
+            val relaxer = assertNotNull(engine.lpRelaxer)
+
+            val root = engine.rootLpRelaxationBound(relaxer, emptyList(), rootToken,
+                preparationCancellation = Cancellation.Never)
+            val prepared = sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls ?: 0L
+            val node = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
+            val bound = assertNotNull(engine.solveNode(node.model, null, Cancellation.Never)?.second).objective
+
+            assertTrue(root.isNaN())
+            assertTrue(prepared > 0L)
+            assertEquals(prepared, sink.snapshot().lp.phases["TEMPLATE_PREPARATION_NODE"]?.calls)
+            assertEquals(3.0, bound)
+        }
+    }
+
+    @Test
+    fun `source root bounds exclude live search restrictions`() {
+        val problem = boundedProblem()
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)),
+            SolveStatsSink("unconditional-source-root")).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            shared.push(SearchDecision.IntAtLeast(0, 1L))
+
+            val root = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            val child = assertNotNull(engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), cp.session))
+            val childBound = assertNotNull(engine.solveNode(child.model, null, Cancellation.Never)?.second).objective
+
+            assertEquals(3.0, root)
+            assertEquals(4.0, childBound)
+        }
+    }
+
+    @Test
+    fun `source root bounds accept noncompact exact rows`() {
+        val coefficient = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, (0 until 2).map { block ->
+            ExactLinear.of(intArrayOf(Term.ofIntVar(2 * block), Term.ofIntVar(2 * block + 1)),
+                listOf(coefficient, coefficient + BigFraction.ONE), LinearOp.GE, coefficient)
+        })
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(4) { 1L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)),
+            SolveStatsSink("noncompact-source-root")).use { engine ->
+
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            assertTrue(bound in 1.0..2.0)
+        }
+    }
+
+    @Test
+    fun `retained layouts accept noncompact exact source rows`() {
+        val coefficient = BigFraction.ofLong(Long.MAX_VALUE) + BigFraction.ONE
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, (0 until 2).map { block ->
+            ExactLinear.of(intArrayOf(Term.ofIntVar(2 * block), Term.ofIntVar(2 * block + 1)),
+                listOf(coefficient, coefficient + BigFraction.ONE), LinearOp.GE, coefficient)
+        })
+        val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
+        assertNotNull(CpToLpRelaxation(problem, objective).build(RootDomains(problem)).model.doubleView)
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)),
+            SolveStatsSink("exact-retained-layout")).use { engine ->
+
+            val relaxation = engine.nodeRelaxation(assertNotNull(engine.lpRelaxer), PropagationSession(problem))
+
+            assertNotNull(assertNotNull(relaxation).model.exactState)
+        }
+    }
+
+    @Test
+    fun `cancelled template preparation charges the containing LP allowance`() {
+        val problem = boundedProblem().bake()
+        var work = 0L
+        val token = object : Cancellation {
+            private val meter = WorkMeter { work += it }
+            override fun isCancelled(): Boolean = work >= 3L
+            override fun workMeter(): WorkMeter = meter
+        }
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true), cancellation = token),
+            SolveStatsSink("cancelled-template-charge"),
+            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+            val before = engine.totalSolveWork()
+            work = 0L
+
+            assertFailsWith<LpAssemblyCancelled> {
+                assertNotNull(engine.lpRelaxer).build(RootDomains(problem), cancellation = token)
+            }
+
+            assertTrue(work >= 3L)
+            assertEquals(work, engine.totalSolveWork() - before)
+        }
+    }
+
+    @Test
+    fun `retained root layouts adopt propagated source bounds`() {
+        val source = boundedProblem()
+        val problem = source.withFactors(source.factors +
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1))
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false)),
+            SolveStatsSink("root-layout-propagation")).use { engine ->
+
+            val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+            assertEquals(4.0, bound)
+        }
+    }
+
+    @Test
+    fun `root query observations distinguish work cancellation and checked bounds`() {
+        val cases = listOf(
+            Triple(0L, false, "NO_INITIAL_WORK"),
+            Triple(100_000L, true, "CANCELLED_INITIAL"),
+            Triple(100_000L, false, "BOUND"),
+        )
+        for ((grant, cancelled, outcome) in cases) {
+            val sink = SolveStatsSink("root-query-admission")
+            LpEngine(boundedProblem(), LinearObjective(intCoefficients = LongArray(3) { 2L }),
+                LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                    probe = false, rootCutHarvest = false)), sink,
+                nodeWorkAllowance = { grant }).use { engine ->
+
+                val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(),
+                    Cancellation { cancelled })
+
+                if (outcome == "BOUND") assertEquals(3.0, bound) else assertTrue(bound.isNaN())
+                assertEquals(1L, sink.snapshot().lp.phases["ROOT_QUERY_ROOT"]?.outcomes?.get("COMPONENT_$outcome"))
+            }
+        }
+    }
+
     @Test
     fun `complete component node deductions honor the injected proof policy`() {
         for (accepted in listOf(false, true)) {
@@ -67,7 +320,7 @@ class LpEngineTest {
     }
 
     @Test
-    fun `ordinary component roots yield after their adaptive numerical query`() {
+    fun `ordinary component roots yield checked partial bounds after their adaptive query`() {
         val problem = Problem(0, 120, Array(120) { IntDomain(0, 1) }, (0 until 120).map { variable ->
             val next = (variable / 60) * 60 + (variable + 1) % 60
             Linear(intArrayOf(1, 1), intArrayOf(variable, next), LinearOp.GE, 1)
@@ -80,9 +333,34 @@ class LpEngineTest {
 
             val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
 
-            assertTrue(bound.isNaN())
+            assertTrue(bound > 0.0 && bound <= 60.0)
             assertEquals(LpFloatTermination.WORK, engine.propagator.floatTermination)
             assertFalse(engine.propagator.floatPaused)
+        }
+    }
+
+    @Test
+    fun `fixed root installation completes under its preparation token after slice expiry`() {
+        val problem = boundedProblem().bake()
+        val factory = RecordingLpEngineFactory()
+        var sliceStopped = false
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                probe = false, rootCutHarvest = false), cancellation = Cancellation { sliceStopped },
+                solveBudgetMillis = 30_000L),
+            SolveStatsSink("root-installation-token"), LpSolveContext(factory)).use { engine ->
+            val base = assertNotNull(engine.lpRelaxer).build(RootDomains(problem))
+            sliceStopped = true
+            val installed = assertNotNull(engine.cpAdapter.sourceRootRelaxation(base, Cancellation.Never))
+            assertTrue(engine.propagator.prepare(Cancellation.Never, 100_000L))
+            val prepared = factory.calls.size
+            assertTrue(prepared > 0)
+            sliceStopped = false
+
+            val result = assertNotNull(engine.solveNode(installed.model, null, Cancellation.Never)?.second)
+
+            assertEquals(3.0, result.objective)
+            assertEquals(prepared, factory.calls.size)
         }
     }
 
@@ -200,6 +478,50 @@ class LpEngineTest {
             assertEquals(2L, sink.snapshot().lp.phases["COMPONENT_LIFECYCLE_NODE"]?.outcomes?.get("REUSED"))
             assertEquals(Int.MAX_VALUE, engine.params.lpPlan.boundMaxDepth)
             assertFalse(engine.sparseTrialActive)
+        }
+    }
+
+    @Test
+    fun `partial component root bounds honor the injected proof policy`() {
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 5) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
+        ))
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
+                )
+                return object : PersistentLpSolver by delegate {
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(if (model.m == 2) LpFloatAllowance(1L, 0) else allowance)
+                }
+            }
+        }
+        for (allowed in listOf(emptySet(), setOf(LpCertifier.INTEGER), setOf(LpCertifier.RATIONAL))) {
+            val sink = SolveStatsSink("partial-component-root-policy")
+            val context = LpSolveContext(factory, LpCertificationPolicy { certifier, success ->
+                success && certifier in allowed
+            })
+            LpEngine(problem, LinearObjective(intCoefficients = LongArray(6) { 1L }, constant = 7L),
+                LpParams(lpPlan = LpPlan(bounding = true, componentOwnership = true,
+                    probe = false, rootCutHarvest = false)), sink, context).use { engine ->
+
+                val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+                if (allowed.isNotEmpty()) assertEquals(9.0, bound) else assertTrue(bound.isNaN())
+                assertEquals(LpFloatTermination.WORK, engine.propagator.floatTermination)
+                assertFalse(engine.propagator.floatPaused)
+                if (allowed.isNotEmpty()) {
+                    assertEquals(1L,
+                        sink.snapshot().lp.phases["ROOT_QUERY_ROOT"]?.outcomes?.get("COMPONENT_PARTIAL_BOUND"))
+                }
+            }
         }
     }
 

@@ -15,6 +15,187 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `partial guidance marks only returned child coordinates`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNull(owner.resolveBounds(LpFloatAllowance(work = 0L, iterations = 2)))
+
+            val guide = assertNotNull(owner.partialPrimalGuidance())
+
+            assertEquals(listOf(false, true, true), guide.known.toList())
+            assertTrue(guide.coordinates.filterIndexed { index, _ -> guide.known[index] }.all { it.isFinite() })
+        }
+    }
+
+    @Test
+    fun `fresh guidance retains returned children after parent cancellation`() {
+        for (completed in listOf(false, true)) {
+            val builder = LpBuilder()
+            repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+            builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+            builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+            builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+            builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+            val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            var queryCancelled = false
+            var queries = 0
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                    workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                        refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                    return object : PersistentLpSolver by delegate {
+                        private var bounded = false
+                        override val lastTermination: LpFloatTermination?
+                            get() = if (bounded) LpFloatTermination.PIVOTS else delegate.lastTermination
+
+                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                            if (++queries == 3) queryCancelled = true
+                            val result = delegate.resolveBounds(allowance) ?: return null
+                            if (completed) return result
+                            bounded = true
+                            return FloatLpResult(result.basis, result.objective, result.duals, result.primal,
+                                pivots = result.pivots, optimal = false, exactState = result.exactState)
+                        }
+                    }
+                }
+            }
+            assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+                Cancellation { queryCancelled }, factory = factory)).use { owner ->
+                assertNull(owner.resolveBounds())
+                assertEquals(LpFloatTermination.CANCELLED, owner.lastTermination)
+                assertNull(owner.partialPrimalGuidance(Cancellation { true }))
+
+                val guide = assertNotNull(owner.partialPrimalGuidance())
+
+                assertEquals(listOf(false, true, true), guide.known.toList())
+                assertTrue(guide.coordinates.filterIndexed { index, _ -> guide.known[index] }.all { it.isFinite() })
+                assertNull(owner.partialBoundDuals(Cancellation.Never))
+                assertNull(owner.exactBound())
+            }
+        }
+    }
+
+    @Test
+    fun `fresh parent guidance excludes a cancelled child result`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        var queryCancelled = false
+        var queries = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate {
+                    private var cancelledResult = false
+                    override val lastTermination: LpFloatTermination?
+                        get() = if (cancelledResult) LpFloatTermination.CANCELLED else delegate.lastTermination
+
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                        val ordinal = ++queries
+                        if (ordinal == 3) queryCancelled = true
+                        val result = delegate.resolveBounds(allowance) ?: return null
+                        if (ordinal != 1) return result
+                        cancelledResult = true
+                        return FloatLpResult(result.basis, result.objective, result.duals, result.primal,
+                            pivots = result.pivots, optimal = false, exactState = result.exactState)
+                    }
+                }
+            }
+        }
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            Cancellation { queryCancelled }, factory = factory)).use { owner ->
+            assertNull(owner.resolveBounds())
+            assertEquals(LpFloatTermination.CANCELLED, owner.lastTermination)
+
+            val guide = assertNotNull(owner.partialPrimalGuidance())
+
+            assertEquals(listOf(false, false, true), guide.known.toList())
+        }
+    }
+
+    @Test
+    fun `partial guidance snapshots own their coordinate buffers`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNull(owner.resolveBounds(LpFloatAllowance(work = 0L, iterations = 2)))
+            val first = assertNotNull(owner.partialPrimalGuidance())
+            val coordinates = first.coordinates.toList()
+            val known = first.known.toList()
+            first.coordinates.fill(5.0)
+            first.known.fill(false)
+
+            val next = assertNotNull(owner.partialPrimalGuidance())
+
+            assertEquals(known, next.known.toList())
+            assertEquals(coordinates, next.coordinates.toList())
+        }
+    }
+
+    @Test
+    fun `cancelled partial guidance withholds coordinates`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            assertNull(owner.resolveBounds(LpFloatAllowance(work = 0L, iterations = 2)))
+            for (stopAt in listOf(1, 4)) {
+                var polls = 0
+
+                val guide = owner.partialPrimalGuidance(Cancellation { ++polls >= stopAt })
+
+                assertNull(guide)
+            }
+        }
+    }
+
+    @Test
+    fun `partial guidance is withheld after a bound authority edit`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(trail.state.ownerWorkingModel()))).use { owner ->
+            assertNull(owner.resolveBounds(LpFloatAllowance(work = 0L, iterations = 2)))
+            assertNotNull(owner.partialPrimalGuidance())
+            assertTrue(trail.assertBound(1, false, ExactLpSide(ExactLpNumber.of(1L)), 7L))
+
+            assertTrue(owner.adopt(trail.state))
+
+            assertNull(owner.partialPrimalGuidance())
+        }
+    }
+
+    @Test
     fun `a completed logical child withholds a point on a strict boundary`() {
         val builder = LpBuilder()
         repeat(2) {

@@ -18,6 +18,42 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `reading child guidance does not construct a numerical owner`() {
+        val builder = LpBuilder()
+        val column = builder.addVar(0L, 5L, cost = 1L)
+        builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val factory = RecordingLpEngineFactory()
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(factory), componentSplit = true).use { owner ->
+
+            val guidance = owner.partialPrimalGuidance(Cancellation.Never)
+
+            assertNull(guidance)
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
+
+    @Test
+    fun `spent construction funding should not repeat declined preparation`() {
+        val builder = LpBuilder()
+        val column = builder.addVar(0L, 5L, cost = 1L)
+        builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val state = LpExactState(source)
+        assertNotNull(state.ownerWorkingModel())
+        LpScopedSolver(state).use { owner ->
+            assertFalse(owner.prepare(Cancellation.Never, 1L))
+            val paid = owner.metrics.preparationWork
+
+            val ready = owner.prepare(Cancellation.Never, 0L)
+
+            assertFalse(ready)
+            assertTrue(paid > 0L)
+            assertEquals(paid, owner.metrics.preparationWork)
+        }
+    }
+
+    @Test
     fun `retained queries can finish after an earlier invocation token expires`() {
         val builder = LpBuilder()
         repeat(2) {
@@ -320,6 +356,35 @@ class LpScopedSolverTest {
             assertEquals(expected.second.pivots, work.pivots)
             assertFalse(owner.floatPaused)
             assertEquals(1L, owner.metrics.createdOwners)
+        }
+    }
+
+    @Test
+    fun `fresh consultations resume the same cursor after the earlier query token expires`() {
+        val state = LpExactState(lowerBoundModel())
+        val expected = LpScopedSolver(state).use { owner ->
+            assertNotNull(owner.solveFloat()).second to owner.lastMetrics
+        }
+        var expired = false
+        LpScopedSolver(state).use { owner ->
+            val allowance = LpFloatAllowance(100_000L, 100)
+            assertNull(owner.advanceFloat(1L, allowance, Cancellation { expired }))
+            var work = owner.lastMetrics
+            assertTrue(owner.floatPaused)
+            expired = true
+            var result: FloatLpResult? = null
+            var attempts = 0
+
+            while (result == null && attempts++ < 64) {
+                result = owner.advanceFloat(1L, allowance, Cancellation.Never)?.second
+                work += owner.lastMetrics
+            }
+
+            assertEquals(assertNotNull(expected.first).objective, assertNotNull(result).objective)
+            assertEquals(expected.second.workOps, work.workOps)
+            assertFalse(owner.floatPaused)
+            assertEquals(1L, owner.metrics.createdOwners)
+            assertEquals(0L, owner.metrics.closedOwners)
         }
     }
 
