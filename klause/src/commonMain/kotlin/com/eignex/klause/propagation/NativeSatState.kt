@@ -4,7 +4,6 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -80,17 +79,17 @@ internal class NativeSatState(private val state: PropagationState) {
     private val watchPos = IntArray(2 * baseCount)
     private val learnedWatchPos = IntArrayList()
 
-    // Pack each handle and blocker into one word. Exact initial capacities avoid millions of empty
-    // list objects and growth copies; literals with no watcher share the empty array.
+    // Pack each handle and blocker into one word. Empty literals own no posting container;
+    // page boundaries release retired posting capacity without moving factor handles.
     private val watchSizes = IntArray(2 * numBoolVars)
-    private val watchEntries: Array<LongArray> = run {
+    private val watchEntries: Array<NativeWatchEntries?> = run {
         for (h in 0 until baseCount) {
             if (arena.length(h) < 2) continue
             watchSizes[arena.lits[arena.start(h)]]++
             watchSizes[arena.lits[arena.start(h) + 1]]++
         }
         Array(watchSizes.size) { lit ->
-            if (watchSizes[lit] == 0) EmptyLongArray else LongArray(watchSizes[lit])
+            if (watchSizes[lit] == 0) null else NativeWatchEntries(watchSizes[lit])
         }.also { watchSizes.fill(0) }
     }
 
@@ -150,23 +149,46 @@ internal class NativeSatState(private val state: PropagationState) {
         if (h < baseCount) watchPos[2 * h + slot] = position else learnedWatchPos[2 * (h - baseCount) + slot] = position
     }
 
+    private var watchCleanupLiteral = 0
+    private var watchCleanupIndex = 0
+
     private fun addWatch(lit: Int, handle: Int, blocker: Int) {
-        var entries = watchEntries[lit]
-        val size = watchSizes[lit]
-        if (size == entries.size) {
-            entries = entries.copyOf((entries.size * 2).coerceAtLeast(2))
-            watchEntries[lit] = entries
-        }
-        entries[size] = packWatch(handle, blocker)
-        watchSizes[lit] = size + 1
+        val entries = watchEntries[lit] ?: NativeWatchEntries().also { watchEntries[lit] = it }
+        state.work += entries.appendWork
+        entries.add(packWatch(handle, blocker))
+        watchSizes[lit] = entries.size
     }
 
-    /** Swap-pop the watcher at [idx] in literal [lit]'s lists. The caller re-processes [idx]. */
+    private fun watchRemovalWork(lit: Int): Long = checkNotNull(watchEntries[lit]).removalWork + 4L
+
+    /** Swap-pop the watcher at [idx] in literal [lit]'s lists. The caller funds the removal. */
     private fun removeWatchAt(lit: Int, idx: Int) {
-        val entries = watchEntries[lit]
-        val last = watchSizes[lit] - 1
-        entries[idx] = entries[last]
-        watchSizes[lit] = last
+        val entries = checkNotNull(watchEntries[lit])
+        entries[idx] = entries[entries.size - 1]
+        entries.removeLast()
+        watchSizes[lit] = entries.size
+        if (entries.size == 0) watchEntries[lit] = null
+        if (lit == watchCleanupLiteral && idx < watchCleanupIndex) watchCleanupIndex = idx
+    }
+
+    internal fun sweepRetiredWatches(budget: ReclamationPreparation) {
+        if (retiredCount == 0) return
+        while (watchCleanupLiteral < watchEntries.size) {
+            budget.visit(4L)
+            budget.visit(0L)
+            val entries = watchEntries[watchCleanupLiteral]
+            if (entries == null || watchCleanupIndex >= entries.size) {
+                watchCleanupLiteral++
+                watchCleanupIndex = 0
+            } else if (entries[watchCleanupIndex].toInt() >= baseCount &&
+                retiredOf(entries[watchCleanupIndex].toInt() - baseCount)) {
+                budget.visit(watchRemovalWork(watchCleanupLiteral))
+                budget.visit(0L)
+                removeWatchAt(watchCleanupLiteral, watchCleanupIndex)
+            } else watchCleanupIndex++
+        }
+        watchCleanupLiteral = 0
+        watchCleanupIndex = 0
     }
 
     /** The clause's literals as a fresh array (the seed reason for conflict analysis). */
@@ -362,20 +384,17 @@ internal class NativeSatState(private val state: PropagationState) {
         sample.owned(baseUnits.backingData, baseUnits.backingData.size.toLong() * Int.SIZE_BYTES, true)
         sample.ownedReferences(watchEntries, watchEntries.size.toLong(), true)
         var watchBytes = 0L
-        for (literal in watchEntries.indices) {
-            val entries = watchEntries[literal]
-            sample.step(); watchBytes += entries.size.toLong() * Long.SIZE_BYTES
-            var retained = false
-            for (i in 0 until watchSizes[literal]) {
-                sample.step()
-                val handle = entries[i].toInt()
-                if (handle < baseCount || learnedPermanent[handle - baseCount] == 1 ||
-                    sample.contains(protected, handle - baseCount)) {
-                    retained = true
-                    break
-                }
+        var watchPostings = 0L
+        sample.owned(this, 8L, watchCleanupLiteral > 0 || watchCleanupIndex > 0)
+        for (entries in watchEntries) {
+            sample.step()
+            if (entries == null) continue
+            watchPostings += entries.size
+            watchBytes += entries.sharingMemory(sample) { entry ->
+                val handle = entry.toInt()
+                handle < baseCount || learnedPermanent[handle - baseCount] == 1 ||
+                    sample.contains(protected, handle - baseCount)
             }
-            sample.owned(entries, entries.size.toLong() * Long.SIZE_BYTES, retained)
         }
         sample.record(mapOf(
             "learnedObjects" to learnedCount.toLong(),
@@ -386,6 +405,7 @@ internal class NativeSatState(private val state: PropagationState) {
             "learnedPayloadDirectoryCapacity" to learnedPayloads.directoryCapacity,
             "learnedMetadataCapacityBytes" to metadata,
             "learnedCapIndexStateBytes" to capRanking.modeledBytes + state.learned.capRanking.modeledBytes,
+            "sessionWatchEntries" to watchPostings,
             "sessionWatchCapacityBytes" to watchBytes +
                 (watchSizes.size.toLong() + watchPos.size) * Int.SIZE_BYTES +
                 baseUnits.backingData.size.toLong() * Int.SIZE_BYTES,
@@ -543,7 +563,7 @@ internal class NativeSatState(private val state: PropagationState) {
     fun variableOf(i: Int, k: Int): Int = Lit.variable(litOf(baseCount + i, k))
 
     fun forEachBinaryPartner(lit: Int, action: (Int) -> Unit) {
-        val entries = watchEntries[lit]
+        val entries = watchEntries[lit] ?: return
         for (i in 0 until watchSizes[lit]) {
             state.work++
             val h = entries[i].toInt()
@@ -590,7 +610,9 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         for (entries in watchEntries) {
             budget.visit()
-            budget.atomic(entries.size.toLong() + 1L, entries.size.toLong() * Long.SIZE_BYTES)
+            if (entries == null) continue
+            budget.atomic(entries.primitiveBytes + entries.referenceSlots,
+                entries.primitiveBytes + entries.referenceSlots * Long.SIZE_BYTES)
         }
         budget.ready()
     }
@@ -626,7 +648,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
         for (lit in watchEntries.indices) {
             state.work++
-            val entries = watchEntries[lit]
+            val entries = watchEntries[lit] ?: continue
             var w = 0
             for (r in 0 until watchSizes[lit]) {
                 state.work++
@@ -637,8 +659,13 @@ internal class NativeSatState(private val state: PropagationState) {
                 entries[w++] = packWatch(newH, (entry ushr 32).toInt())
             }
             watchSizes[lit] = w
-            if (entries.size > w) watchEntries[lit] = entries.copyOf(w)
+            state.work += entries.truncationWork(w)
+            entries.truncateTo(w)
+            if (w == 0) watchEntries[lit] = null
         }
+
+        watchCleanupLiteral = 0
+        watchCleanupIndex = 0
 
         // A survivor's destination precedes its source, so moving references cannot overwrite unread rows.
         permanentCount = 0
@@ -820,13 +847,14 @@ internal class NativeSatState(private val state: PropagationState) {
 
     /** Process every clause watching [falseLit] (which just became false). Returns false on conflict. */
     private fun propagateFalse(falseLit: Int): Boolean {
-        val entries = watchEntries[falseLit]
+        val entries = watchEntries[falseLit] ?: return true
         var wi = 0
         while (wi < watchSizes[falseLit]) {
             state.work++
             val entry = entries[wi]
             val h = entry.toInt()
             if (isRetired(h)) {
+                state.work += watchRemovalWork(falseLit)
                 removeWatchAt(falseLit, wi)
                 continue
             }
@@ -856,6 +884,7 @@ internal class NativeSatState(private val state: PropagationState) {
                 if (!baseClause) learnedScanPos[h - baseCount] = if (replacement + 1 == len) 0 else replacement + 1
                 val newLit = lits[start + replacement]
                 setWatchPosition(h, if (slot0IsFalse) 0 else 1, replacement)
+                state.work += watchRemovalWork(falseLit)
                 removeWatchAt(falseLit, wi) // swap-pop; re-process wi without advancing
                 addWatch(newLit, h, otherLit)
                 continue

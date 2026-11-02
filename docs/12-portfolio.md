@@ -364,7 +364,12 @@ active or historical antecedent arrays and their factor/position indexes, undo
 journal and bound/hole histories. Typed event subscriptions/deltas, pending atom
 channeling and root-source retirement indexes retain their own observations. The immutable source clause arena belongs to the prepared problem and is shared
 across workers. Session watch capacity includes base
-watches and cannot be added to a separate base-watch estimate. Reason arrays are
+watches and cannot be added to a separate base-watch estimate. Native posting pages
+report their allocated primitive capacity as one private pool per literal. A protected
+posting protects its page and the containing directory, while unrelated pages remain
+outside the protected floor. `sessionWatchEntries` includes retained stale postings;
+`sessionWatchCapacityBytes` includes posting headers and allocated page capacity.
+Native posting reference slots count allocated directory capacity and its owning link. Reason arrays are
 identity-deduplicated within their observation, including saved integer/atom reasons
 and lazy markers/memo results; they can alias learned payload. Reference-slot
 counts describe live entries unless explicitly named capacity. Object headers,
