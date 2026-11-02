@@ -28,7 +28,7 @@ internal object CorpusStagingSuite : BenchSuite {
     ).map { it.copy(attributes = it.attributes + ("recordSchema" to "corpus-staging-v1")) }
 
     override fun run(case: BenchCase, context: BenchContext): BenchResult {
-        val out = context.outputDirectory.toFile().apply { mkdirs() }
+        val out = context.outputDirectory.resolve("report").toFile().apply { mkdirs() }
         out.resolve("input.json").writeText(BenchProtocol.json.encodeToString(BenchCase.serializer(), case))
         val failure = runCatching {
             LabInputs.verify(case, context)
