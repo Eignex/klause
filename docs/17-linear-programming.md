@@ -507,8 +507,12 @@ available. Even coefficients require no bound. A positive combination of those
 premises gives integral activity, and integer rounding supplies the conclusion.
 The proposal retains every supporting owner and uses the aggregation-MIR family.
 Missing stated sides decline the attempt; scoped domains do not supply premises.
-The singleton index, exact arithmetic and nested proof share the same generation
-allowance. A nonseparating seed or continuation tries these alternatives before
+An unproductive half-scaled aggregate can score single substitutions to a stated
+upper side on odd integer coordinates. Exact RHS changes and supporting strictness
+determine each rounded endpoint; finite normalized violation chooses at most one
+additional proof. That proof rebuilds its positive combination with the selected
+source side and is checked before admission. The singleton index, side scoring,
+exact arithmetic and nested proofs share the same generation allowance. A nonseparating seed or continuation tries these alternatives before
 following one opposite-sign continuous incidence path through
 at most four distinct original source rows. Exact positive rescaling preserves
 the earlier combination while cancelling the next coordinate. Singleton continuous bounds remain part of mixed

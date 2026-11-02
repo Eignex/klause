@@ -430,6 +430,241 @@ class LinearAuthorityAggregateCutsTest {
 
 
     @Test
+    fun `integer side substitution should strengthen the checked numerical bound`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                    real to BigFraction.ONE), BigFraction.ofLong(2))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+                "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE)),
+            ), mapOf(x to BigFraction.ofLong(-2), y to BigFraction.MINUS_ONE))
+
+        val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithPointCuts(source, Cancellation.Never)
+        }
+
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(-2)),
+            assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+        assertTrue(CutFamily.AGGREGATION_MIR in result.cutBoundFamilies)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+    }
+
+    @Test
+    fun `integer side substitution should separate either sign of an odd coefficient`() {
+        for (sign in listOf(-1L, 1L)) {
+            val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3L * sign),
+                    real to BigFraction.ONE), BigFraction.ofLong(2))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(if (sign > 0) 2 else 1))),
+                "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE),
+                    BigFraction.ofLong(if (sign > 0) 0 else 1))),
+                "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE),
+                    BigFraction.ofLong(if (sign > 0) 1 else 0))),
+            ))
+
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                point = mapOf(x to 0.75 * sign, y to (if (sign > 0) 0.875 else 0.375), real to -0.25)).single()
+
+            assertEquals(SourceInequality(mapOf(x to BigFraction.ofLong(if (sign > 0) 2 else -1),
+                y to BigFraction.ONE), BigFraction.ofLong(if (sign > 0) 2 else 1)), cut.inequality)
+            assertEquals(setOf(0, 1, 3), cut.owners)
+            assertEquals(CutFamily.AGGREGATION_MIR, cut.family)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+    }
+
+    @Test
+    fun `integer side scoring should remove strictness belonging only to the replaced lower bound`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                real to BigFraction.ONE), BigFraction.ofLong(2))),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE),
+                BigFraction.ZERO, strict = true)),
+            "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(4))),
+        ))
+        val observations = mutableMapOf<String, Long>()
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            point = mapOf(x to 3.5, y to -3.25, real to -8.5))
+
+        assertTrue(cuts.isEmpty())
+        assertEquals(1L, observations["AggregateHalfSideScans"])
+        assertNull(observations["AggregateHalfSideAttempts"])
+    }
+
+    @Test
+    fun `integer side substitution should retain upper premise guards and pins`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val pin = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val source = SourceProofContext(scope, setOf(x, y, real, bool, pin), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                real to BigFraction.ONE), BigFraction.ofLong(2))),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                mapOf(0 to true), mapOf(pin to BigFraction.ONE)),
+        ))
+        val established = SourceCondition(bools = mapOf(0 to true),
+            lower = mapOf(pin to BigFraction.ONE), upper = mapOf(pin to BigFraction.ONE))
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            point = mapOf(x to 0.75, y to 0.875, real to -0.25)).single()
+
+        for (condition in listOf(established, SourceCondition(lower = established.lower, upper = established.upper),
+            SourceCondition(bools = established.bools, lower = established.lower), established)) {
+            val context = source.atScope(scope.copy(condition = condition))
+            val check = SourceEvidenceVerifier(context).verify(
+                SourceEvidence(context.scope, SourceClaim.Consequence(cut.inequality), cut.derivation))
+
+            if (condition == established) assertEquals(SourceEvidenceCheck.Checked, check)
+            else assertIs<SourceEvidenceCheck.Rejected>(check)
+        }
+    }
+
+    @Test
+    fun `integer side substitution should release the replaced lower premise`() {
+        val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val source = SourceProofContext(scope.copy(condition = SourceCondition(bools = mapOf(0 to false))),
+            setOf(x, y, real, bool), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                    real to BigFraction.ONE), BigFraction.ofLong(2))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+                "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO, strict = true), mapOf(0 to true)),
+                "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(3))),
+            ))
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            point = mapOf(x to 2.75, y to -2.125, real to -6.25)).single()
+
+        assertEquals(setOf(0, 1, 3), cut.owners)
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ofLong(2), y to BigFraction.ONE),
+            BigFraction.ofLong(3)), cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `integer side substitution should rebuild a changed upper premise`() {
+        for (upper in listOf(1L, 2L, 1L)) {
+            val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                    real to BigFraction.ONE), BigFraction.ofLong(2))),
+                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+                "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(upper))),
+            ))
+
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                point = mapOf(x to 0.75, y to 0.875, real to -0.25))
+
+            if (upper == 1L) {
+                val cut = cuts.single()
+                assertEquals(BigFraction.ofLong(2), cut.inequality.rhs)
+                assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                    SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+            } else assertTrue(cuts.isEmpty())
+        }
+    }
+
+    @Test
+    fun `integer side interruption should withhold its partial proof`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                real to BigFraction.ONE), BigFraction.ofLong(2))),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE)),
+        ))
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, _ -> if (name == "AggregateHalfSideAttempts") stopped = true },
+            point = mapOf(x to 0.75, y to 0.875, real to -0.25))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+    }
+
+    @Test
+    fun `integer side substitution should share spent generation work and allocation`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                real to BigFraction.ONE), BigFraction.ofLong(2))),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(2),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE)),
+        ))
+        val point = mapOf(x to 0.75, y to 0.875, real to -0.25)
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+        var work = 0L
+        var allocation = 0L
+        var beforeWork = 0L
+        var beforeAllocation = 0L
+        val complete = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count ->
+                if (name == "AggregateWork") work += count
+                if (name == "AggregateAllocation") allocation += count
+                if (name == "AggregateHalfSideAttempts") {
+                    beforeWork = work
+                    beforeAllocation = allocation
+                }
+            }, point = point)
+        assertEquals(1, complete.size)
+        assertTrue(beforeWork > 0L && beforeAllocation > 0L)
+
+        for (limited in listOf(limits.copy(work = beforeWork), limits.copy(allocation = beforeAllocation))) {
+            val observations = mutableMapOf<String, Long>()
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                limits = limited, point = point)
+
+            assertTrue(cuts.isEmpty())
+            assertTrue((observations["AggregateWork"] ?: 0L) <= limited.work)
+            assertTrue((observations["AggregateAllocation"] ?: 0L) <= limited.allocation)
+        }
+    }
+
+    @Test
+    fun `integer side scoring should build one separating substitution among several coordinates`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val source = SourceProofContext(scope, setOf(x, y, z, real), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                z to BigFraction.ofLong(2), real to BigFraction.ONE), BigFraction.ofLong(2))),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+            "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "x upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE)),
+            "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y upper" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE)),
+        ))
+        val observations = mutableMapOf<String, Long>()
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            point = mapOf(x to 0.8, y to 0.6, z to -0.1, real to -0.2)).single()
+
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ofLong(2), y to BigFraction.ONE,
+            z to BigFraction.ONE), BigFraction.ofLong(2)), cut.inequality)
+        assertEquals(setOf(0, 1, 3, 4), cut.owners)
+        assertEquals(1L, observations["AggregateHalfSideAttempts"])
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `half aggregation should strengthen the checked numerical bound`() {
         val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
             setOf(x, y, real), linkedMapOf(
