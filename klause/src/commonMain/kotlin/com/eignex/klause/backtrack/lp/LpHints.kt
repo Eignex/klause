@@ -92,22 +92,23 @@ internal class LpHints(
             return
         }
         charge(2L * relaxation.colVarId.size + 3L + cutoffComparisonWork())
-        val incompatibleModel = scopeModel !== state.baseModel ||
-            !scopeVariables.contentEquals(relaxation.colVarId) || !scopeBooleans.contentEquals(relaxation.colIsBool) ||
-            scopeConstant != relaxation.objectiveConstant || scopeChecked != checked
-        val changedContext = scopeRows !== state.rows || scopeCutoff != cutoff ||
+        val incompatibleModel = !scopeVariables.contentEquals(relaxation.colVarId) ||
+            !scopeBooleans.contentEquals(relaxation.colIsBool) ||
+            scopeConstant != relaxation.objectiveConstant || scopeChecked != checked ||
+            (scopeModel !== state.baseModel && !rowExtension(state.baseModel))
+        val changedContext = scopeModel !== state.baseModel || scopeRows !== state.rows || scopeCutoff != cutoff ||
             scopeIncumbentVersion != incumbentVersion || scopeExternalExact != externalExact
         if (incompatibleModel || changedContext) {
             if (scopeModel != null) observe("INCOMPATIBLE")
-            charge(if (incompatibleModel) 2L * relaxation.colVarId.size + 9L else 4L)
+            charge(if (incompatibleModel) 2L * relaxation.colVarId.size + 9L else 5L)
             if (incompatibleModel) {
                 history.clear(report = scopeModel != null)
-                scopeModel = state.baseModel
                 scopeVariables = relaxation.colVarId.copyOf()
                 scopeBooleans = relaxation.colIsBool.copyOf()
                 scopeConstant = relaxation.objectiveConstant
                 scopeChecked = checked
             } else history.clearComparisons()
+            scopeModel = state.baseModel
             scopeRows = state.rows
             scopeCutoff = cutoff
             scopeIncumbentVersion = incumbentVersion
@@ -117,6 +118,57 @@ internal class LpHints(
         boundRecorded = bound.isFinite()
         if (boundRecorded) observe(if (checked) "BOUND_RECORDED" else "OPTIMUM_RECORDED")
         history.record(bound)
+    }
+
+    private fun rowExtension(model: ExactLpModel): Boolean {
+        val previous = scopeModel ?: return false
+        charge(10L)
+        if (model.n != previous.n || model.m <= previous.m) return false
+        if (!sameObjectiveUnits(model, previous)) return false
+        val objective = model.objective
+        val oldObjective = previous.objective
+        val layoutWork = 3L * previous.numVars + 2L * (model.numVars - previous.numVars) +
+            2L * previous.m + 2L * previous.n
+        val remaining = 8192L
+        if (layoutWork > remaining) return false
+        charge(layoutWork)
+        for (column in 0 until previous.numVars) {
+            if (model.column(column) !== previous.column(column) ||
+                objective.cost(column) !== oldObjective.cost(column)
+            ) return false
+        }
+        for (column in previous.numVars until model.numVars) {
+            if (objective.cost(column).legacyLong() != 0L) return false
+        }
+        for (row in 0 until previous.m) {
+            if (model.row(row) !== previous.row(row) || model.rhs(row) !== previous.rhs(row)) return false
+        }
+        if (!unchangedMatrixPrefix(model, previous, remaining - layoutWork)) return false
+        charge(1L)
+        observe("ROW_EXTENSION")
+        return true
+    }
+
+    private fun sameObjectiveUnits(model: ExactLpModel, previous: ExactLpModel): Boolean =
+        model.objective.constant === previous.objective.constant &&
+            model.objective.scale === previous.objective.scale &&
+            model.objective.externalConstant === previous.objective.externalConstant &&
+            model.objective.sense == previous.objective.sense
+
+    private fun unchangedMatrixPrefix(model: ExactLpModel, previous: ExactLpModel, allowance: Long): Boolean {
+        var remaining = allowance
+        for (column in 0 until previous.n) {
+            val before = previous.columnEntries(column)
+            val after = model.columnEntries(column)
+            val work = 3L * before.size + 3L
+            if (work > remaining) return false
+            charge(work)
+            remaining -= work
+            if (after.size < before.size) return false
+            for (entry in before.indices) if (after[entry] !== before[entry]) return false
+            if (after.size > before.size && after[before.size].row < previous.m) return false
+        }
+        return true
     }
 
     private fun cutoffComparisonWork(): Long {
@@ -136,13 +188,14 @@ internal class LpHints(
     fun finishNode(state: LpExactState? = null) {
         history.finishNode(unavailable.name)
         if (scopeModel != null && state != null) {
-            if (scopeModel !== state.baseModel) {
+            if (scopeModel !== state.baseModel && !rowExtension(state.baseModel)) {
                 observe("INCOMPATIBLE")
                 resetHistory()
-            } else if (scopeRows !== state.rows) {
+            } else if (scopeModel !== state.baseModel || scopeRows !== state.rows) {
                 observe("INCOMPATIBLE")
-                charge(7L)
+                charge(8L)
                 history.clearComparisons()
+                scopeModel = state.baseModel
                 scopeRows = state.rows
                 freshRecord = false
                 pointRelaxation = null

@@ -284,7 +284,8 @@ floor/ceil partition. Guidance swaps those alternatives without adding, removing
 replacing a decision. Tied gains, insufficient allowance, pruned alternatives and changed partitions retain the existing
 heuristics. Preferences expire at the next node, point replacement or history reset.
 History and basis side consumption, changed order and unavailable advice are recorded
-separately. The readiness check and all analysis spend the existing LP work allowance. Ancestor
+separately. Accepted row-extension compatibility checks have their own outcome.
+The readiness check and all analysis spend the existing LP work allowance. Ancestor
 observations use a bounded depth-indexed buffer. Initial buffer preparation and visited
 slot ranges are funded before allocation or clearing, including across scope resets.
 Committed observation attempts retain their branch direction. Missing immediate-child
@@ -299,14 +300,20 @@ The cutoff context includes the local incumbent publication version and exact ex
 bound. Changes hidden by floating precision still discard unmatched comparisons, and
 exact comparison work spends the existing allowance.
 
-Completed per-variable averages are advisory priors within the same base model,
-variable layout, objective mapping and estimate kind. Changing the cutoff context or
+Completed per-variable averages are advisory priors within the same variable layout,
+objective mapping and estimate kind. Changing the cutoff context or
 which existing rows are active discards pending comparisons and ancestor splits while
 retaining those completed averages. Fresh current-point and partition checks are still
 required before an average can order a child. A row change after the last recorded
-point invalidates that point and its preferences. New matrix rows change the base model
-and clear the averages, as do layout or objective changes, switching between checked
-bounds and floating optima, restart and assumption reseeding.
+point invalidates that point and its preferences. A row-only matrix extension can retain
+completed averages when the old immutable matrix, row metadata, bounds, coordinate
+origins and objective coefficients remain its exact shared prefix. Added logical
+columns must have zero cost, and objective scale, sense and constants must retain
+their identities. Verification spends at most 8,192 entry-work units plus fixed
+bookkeeping from the existing LP allowance; an incomplete check clears the averages.
+Every base change still discards unmatched comparisons and requires a fresh point.
+Other model, layout or objective changes, switching between checked bounds and
+floating optima, restart and assumption reseeding clear the averages.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable

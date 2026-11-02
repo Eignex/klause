@@ -14,6 +14,7 @@ import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpDirectionalCost
 import com.eignex.klause.lp.engine.LpScopedRow
+import com.eignex.klause.lp.engine.LpStructuralColumn
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
@@ -594,12 +595,13 @@ class LpHintsTest {
     @Test
     fun `only comparable completed gains survive context changes`() {
         val changes = listOf("cutoff" to true, "incumbent" to true, "external" to true,
-            "rows" to true, "finished rows" to true, "append" to false, "objective" to false,
+            "rows" to true, "finished rows" to true, "append" to true, "finished append" to true,
+            "costed append" to false, "column append" to false, "rewritten prefix" to false, "objective" to false,
             "constant" to false, "layout" to false, "kind" to false, "reset" to false, "clear" to false)
         for ((change, retained) in changes) {
             val builder = LpBuilder()
             repeat(2) { builder.addVar(0, 10, cost = 1) }
-            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            var trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
             assertTrue(trail.push())
             assertTrue(trail.append(
                 LpScopedRow(1L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(8L),
@@ -634,10 +636,21 @@ class LpHintsTest {
                     assertTrue(trail.pop(0))
                     if (change == "finished rows") hints.finishNode(trail.state)
                 }
-                "append" -> assertTrue(trail.append(
-                    LpScopedRow(2L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(9L),
-                        ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))), scoped = false,
-                ))
+                "append", "finished append", "costed append", "column append", "rewritten prefix" -> {
+                    if (change == "rewritten prefix") {
+                        val base = trail.state.baseModel
+                        trail = LpBoundTrail(base.copy(rhs = List(base.m) { ExactLpNumber.of(7L) }))
+                    }
+                    val addedColumns = if (change == "column append") {
+                        listOf(LpStructuralColumn(ExactLpColumn(ExactLpBounds())))
+                    } else emptyList()
+                    assertTrue(trail.append(addedColumns, listOf(
+                        LpScopedRow(2L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(9L),
+                            ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L)))),
+                            cost = ExactLpNumber.of(if (change == "costed append") 1L else 0L)),
+                    ), scoped = false))
+                    if (change == "finished append") hints.finishNode(trail.state)
+                }
                 "objective" -> {
                     val old = trail.state.model.objective
                     assertTrue(trail.replaceObjective(ExactLpObjective(List(old.size) { old.cost(it) },
@@ -665,43 +678,50 @@ class LpHintsTest {
 
     @Test
     fun `current row changes discard prepared side preferences`() {
-        val builder = LpBuilder()
-        builder.addVar(0, 10, cost = 1)
-        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        assertTrue(trail.push())
-        assertTrue(trail.append(
-            LpScopedRow(1L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(8L),
-                ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))), scoped = true,
-        ))
-        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
-            BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
-        val hints = LpHints(1, 0, directionalGains = true)
-        val variable = VarRef.IntVar(0)
-        val domain = IntDomain(0, 10)
-        repeat(2) {
+        for (append in listOf(false, true)) {
+            val builder = LpBuilder()
+            builder.addVar(0, 10, cost = 1)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            assertTrue(trail.push())
+            assertTrue(trail.append(
+                LpScopedRow(1L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(8L),
+                    ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))), scoped = true,
+            ))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+            val hints = LpHints(1, 0, directionalGains = true)
+            val variable = VarRef.IntVar(0)
+            val domain = IntDomain(0, 10)
+            repeat(2) {
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
+                hints.recordBound(relaxation, 10.0)
+                hints.branch(variable, domain)
+                for (up in listOf(false, true)) {
+                    hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(relaxation.model.m))
+                    hints.recordBound(relaxation, if (up) 13.0 else 11.0)
+                }
+            }
             hints.beginNode(0, 100.0)
             hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
             hints.recordBound(relaxation, 10.0)
+            assertTrue(hints.prepareSide(variable, domain, allowBasis = false) { _, _ -> null })
+            val existing = listOf(SearchDecision.IntAtMost(0, 2), SearchDecision.IntAtLeast(0, 3))
+
+            if (append) {
+                assertTrue(trail.append(
+                    LpScopedRow(2L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(9L),
+                        ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))), scoped = false,
+                ))
+            } else assertTrue(trail.pop(0))
+            hints.finishNode(trail.state)
             hints.branch(variable, domain)
-            for (up in listOf(false, true)) {
-                hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
-                hints.beginNode(1, 100.0)
-                hints.record(relaxation, doubleArrayOf(if (up) 3.0 else 2.0), DoubleArray(relaxation.model.m))
-                hints.recordBound(relaxation, if (up) 13.0 else 11.0)
-            }
+            val ordered = hints.orderAlternatives(variable, existing, allowBasis = false)
+
+            assertEquals(existing, ordered)
         }
-        hints.beginNode(0, 100.0)
-        hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(relaxation.model.m))
-        hints.recordBound(relaxation, 10.0)
-        assertTrue(hints.prepareSide(variable, domain, allowBasis = false) { _, _ -> null })
-        val existing = listOf(SearchDecision.IntAtMost(0, 2), SearchDecision.IntAtLeast(0, 3))
-
-        assertTrue(trail.pop(0))
-        hints.finishNode(trail.state)
-        hints.branch(variable, domain)
-        val ordered = hints.orderAlternatives(variable, existing, allowBasis = false)
-
-        assertEquals(existing, ordered)
     }
 
     @Test
