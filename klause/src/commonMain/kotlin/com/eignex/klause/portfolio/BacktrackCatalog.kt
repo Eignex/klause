@@ -135,7 +135,6 @@ object BacktrackCatalog {
         BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(
             lpConfig = LpConfig(emphasis),
             lpDirectionalGains = emphasis != LpEmphasis.CONSERVATIVE,
-            lpDirectionalRootBasis = emphasis != LpEmphasis.CONSERVATIVE,
         )
     }
 

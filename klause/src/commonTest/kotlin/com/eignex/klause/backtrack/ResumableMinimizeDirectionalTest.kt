@@ -41,7 +41,8 @@ class ResumableMinimizeDirectionalTest {
             lpDirectionalGains = true,
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L))
-        ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
+        ResumableMinimize(BacktrackSolver(problem), objective, params,
+            rootBasisGuidance = false).use { search ->
             var slices = 0
             while (slices++ < 8 && !search.isDone) search.runSlice(Cancellation.Never, 1000L, 8L) {}
 
@@ -59,7 +60,7 @@ class ResumableMinimizeDirectionalTest {
         )).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(2L, 3L, 4L))
         val params = BacktrackParams(randomSeed = 3L, maxDecisions = 64L, objectiveBoundSupplier = { 10.0 },
-            lpDirectionalGains = true, lpDirectionalRootBasis = true,
+            lpDirectionalGains = true,
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L))
         ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
@@ -111,7 +112,8 @@ class ResumableMinimizeDirectionalTest {
         )
 
         val objective = LinearObjective(intCoefficients = LongArray(variables) { 2L + it % 3 })
-        ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
+        ResumableMinimize(BacktrackSolver(problem), objective, params,
+            rootBasisGuidance = false).use { search ->
             var slices = 0
             while (slices++ < 128 && !search.isDone) {
                 val outcomes = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
@@ -140,7 +142,8 @@ class ResumableMinimizeDirectionalTest {
         val params = BacktrackParams(randomSeed = 3L, lpDirectionalGains = true,
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false))
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 1L))
-        ResumableMinimize(BacktrackSolver(problem), objective, params, rebindable = true).use { search ->
+        ResumableMinimize(BacktrackSolver(problem), objective, params, rebindable = true,
+            rootBasisGuidance = false).use { search ->
             assertNotNull(search.runSlice(Cancellation.Never, 1000L, 1000L) {})
             val before = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes["RESET"] ?: 0L
 
