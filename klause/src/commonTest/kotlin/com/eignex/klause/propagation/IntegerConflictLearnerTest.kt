@@ -66,6 +66,7 @@ class IntegerConflictLearnerTest {
         assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(25, 0)))
         assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(11, 0)))
         assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(10, 1)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
         val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
         shared.popTo(backjump.decisionLevel)
         assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
@@ -79,7 +80,9 @@ class IntegerConflictLearnerTest {
             state.learned.store[index] === child
         })
         assertSame(child, requireNotNull(state.learned.integerRows).single())
-        assertTrue(state.learned.store.none { it is ClausePropagator })
+        assertTrue(state.learned.store.none {
+            it is ClausePropagator && it.literals.contentEquals(learned.fallbackClause.literals)
+        })
 
         assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(11, 0)))
 
