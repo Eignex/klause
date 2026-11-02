@@ -75,7 +75,9 @@ class IntegerConflictLearnerTest {
         shared.popTo(0)
         assertEquals(1L, shared.intUpperBound(10))
         assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtLeast(25, 1)))
-        native.forgetLearnedClauses { index, _ -> state.learned.store[index] === child }
+        assertTrue(native.compactLearnedClauses(1_000_000L, 1_048_576L, { false }) { index, _ ->
+            state.learned.store[index] === child
+        })
         assertSame(child, requireNotNull(state.learned.integerRows).single())
         assertTrue(state.learned.store.none { it is ClausePropagator })
 
