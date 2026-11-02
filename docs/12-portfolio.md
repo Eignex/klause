@@ -267,7 +267,9 @@ protection. Reference allocations retain their own protection granularity.
 Owner deduplication follows platform identity-hash bits through a binary tree.
 Each owner uses one scratch entry; lookups charge each visited node and never invoke
 user equality or hash functions. After the 32 hash bits, identity collisions follow
-a charged chain. New owners fund their allocation before publication. Exhausting
+a charged chain. Protected-ID sets use value equality; copied-reason and payload
+sets use identity. These sets follow the same hash-bit traversal and fund one
+scratch entry per retained value. New owners fund their allocation before publication. Exhausting
 either observation limit leaves a partial sample without complete byte totals.
 Private clause-reference,
 global-flag, origin, key and payload-owner array capacities are modeled separately.

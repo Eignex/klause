@@ -35,7 +35,7 @@ internal class SearchTrail {
     }
     fun levelOf(literal: Int): Int = boolLevels.getOrDefault(literal ushr 1, 0)
     internal fun reasonMemory(sample: SharingMemoryObservation) {
-        val arrays = sample.seen<IntArray>()
+        val arrays = sample.seenIdentities<IntArray>()
         var payload = 0L
         for (value in boolReasons.valuesInternal) {
             sample.step()

@@ -120,7 +120,7 @@ internal class WatchedClauseStore {
             "sharedLearnedReferenceSlots" to clauses.capacity.toLong() + watchers.referenceCapacity +
                 signatures.referenceCapacity,
         ))
-        val protectedIds = sample.seen<Int>()
+        val protectedIds = sample.seenIds()
         for (index in 0 until size) {
             val clause = clauses[index]
             val protected = protectedClause(index)
