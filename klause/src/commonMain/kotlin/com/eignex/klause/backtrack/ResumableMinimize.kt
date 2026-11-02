@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.lp.LpHints
+import com.eignex.klause.backtrack.lp.LpPrimalHandoff
 import com.eignex.klause.backtrack.lp.lbTreeSearch
 import com.eignex.klause.backtrack.lp.lpBranchPick
 import com.eignex.klause.backtrack.lp.lpFeasibilityPump
@@ -1198,17 +1199,23 @@ internal class ResumableMinimize(
                 sink.lp.observePrimalPhase("PRIMAL_PROPOSAL", outcome, started.elapsedNow().inWholeNanoseconds)
             }
         }
-        val rounded = lpEngine.lpRoundingProbe(objective, rootToken,
-            initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
-            toleranceReals = params.toleranceCheck != null,
-            accept = ::accept)
-        rootRoundingPending = rounded == null && canResumeRootRounding()
-        if (rootRoundingPending) return null
-        lpEngine.rootRoundingWarmStart = null
-        val seed = rounded ?: lpEngine.lpFeasibilityPump(objective, rootToken,
-            initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
-            accept = ::accept)
-        if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
+        val handoff = LpPrimalHandoff.open(lpEngine, rootToken)
+        try {
+            val rounded = lpEngine.lpRoundingProbe(objective, rootToken,
+                initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
+                toleranceReals = params.toleranceCheck != null, handoff = handoff,
+                accept = ::accept)
+            rootRoundingPending = rounded == null && canResumeRootRounding()
+            if (rootRoundingPending) return null
+            lpEngine.rootRoundingWarmStart = null
+            val seed = rounded ?: lpEngine.lpFeasibilityPump(objective, rootToken,
+                handoff = handoff,
+                initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
+                accept = ::accept)
+            if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
+        } finally {
+            handoff?.close()
+        }
         return null
     }
 

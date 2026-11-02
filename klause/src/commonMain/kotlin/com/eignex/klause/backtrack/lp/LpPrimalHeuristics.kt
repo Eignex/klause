@@ -34,6 +34,7 @@ internal fun LpEngine.lpRoundingProbe(
     cancellation: Cancellation,
     initial: Sample? = null,
     toleranceReals: Boolean = false,
+    handoff: LpPrimalHandoff? = null,
     accept: (Sample) -> Sample? = { it },
 ): Sample? {
     val started = TimeSource.Monotonic.markNow()
@@ -59,6 +60,15 @@ internal fun LpEngine.lpRoundingProbe(
         if (relaxation.model.n == 0) {
             outcome = "EMPTY_RELAXATION"
             return null
+        }
+        if (retained == null && handoff != null) {
+            try {
+                handoff.capture(this, relaxation, cancellation)
+            } catch (_: LpAssemblyCancelled) {
+                rootRoundingInterrupted = true
+                outcome = "CANCELLED"
+                return null
+            }
         }
         val primal = retained?.primal?.also {
             sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "REUSED", started.elapsedNow().inWholeNanoseconds)
@@ -242,15 +252,21 @@ internal fun LpEngine.lpFeasibilityPump(
     objective: LinearObjective,
     cancellation: Cancellation,
     initial: Sample? = null,
+    handoff: LpPrimalHandoff? = null,
     accept: (Sample) -> Sample? = { it },
 ): Sample? {
     val seed = initial?.takeIf { it.numIntVars == problem.numIntVars && it.numBoolVars == problem.numBoolVars }
-    var solved = solveRelaxation(objective, cancellation) ?: return null
+    var preparation: LpPumpPreparation? = null
+    var preparationAttempted = reusePumpPreparation && handoff?.hasDefinitionFor(this) == true
+    var solved = try {
+        if (preparationAttempted) preparation = handoff?.prepareFor(this, cancellation)
+        solveRelaxation(objective, cancellation, preparation)
+    } catch (_: LpAssemblyCancelled) {
+        null
+    } ?: return null
     val seen = HashSet<String>()
     val rng = Random(params.randomSeed ?: 0L)
     var restarts = 0
-    var preparation: LpPumpPreparation? = null
-    var preparationAttempted = false
     repeat(PUMP_ROUNDS) { step ->
         if (cancellation()) return null
         val (relaxation, primal) = solved
@@ -294,7 +310,8 @@ internal fun LpEngine.lpFeasibilityPump(
         solved = try {
             if (reusePumpPreparation && !preparationAttempted) {
                 preparationAttempted = true
-                preparation = LpPumpPreparation.create(this, relaxation, cancellation)
+                preparation = LpPumpPreparation.create(this, relaxation, cancellation,
+                    handoff?.setupWorkFor(this) ?: 0L)
             }
             solveRelaxation(distance, cancellation, preparation)
         } catch (_: LpAssemblyCancelled) {

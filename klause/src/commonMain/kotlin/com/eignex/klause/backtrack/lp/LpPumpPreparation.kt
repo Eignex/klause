@@ -83,7 +83,24 @@ internal class LpPumpPreparation private constructor(
     }
 
     companion object {
-        fun create(engine: LpEngine, root: LpRelaxation, cancellation: Cancellation): LpPumpPreparation? {
+        fun hasAffordableShape(engine: LpEngine, root: LpRelaxation, setupWork: Long = 0L): Boolean {
+            require(setupWork in 0L..LpEmissionTemplates.MAX_UNITS)
+            val model = root.model
+            val bindingWork = 1L + engine.problem.numIntVars + engine.problem.numBoolVars +
+                model.n * 3L + model.numVars
+            val construction = (model.n.toLong() + model.m + model.csc.rowIdx.size) * LpNodeOverhead.BUILD
+            val inspection = bindingWork + engine.problem.numFactors + 1L + setupWork
+            return engine.projections?.builtInRelaxation == true && engine.projections.nativePropagation &&
+                engine.problem.numRealVars == 0 && model.exactState == null && model.doubleView == null &&
+                model.n > 0 && inspection <= LpEmissionTemplates.MAX_UNITS && inspection < construction
+        }
+
+        fun create(
+            engine: LpEngine,
+            root: LpRelaxation,
+            cancellation: Cancellation,
+            setupWork: Long = 0L,
+        ): LpPumpPreparation? {
             engine.requireOpen()
             val accounting = LpPrimalAssembly(engine, cancellation)
             val token = accounting.token
@@ -92,15 +109,7 @@ internal class LpPumpPreparation private constructor(
             return try {
                 token.charge(1L)
                 token.checkLpAssembly()
-                val model = root.model
-                val bindingWork = 1L + engine.problem.numIntVars + engine.problem.numBoolVars +
-                    model.n * 3L + model.numVars
-                val construction = (model.n.toLong() + model.m + model.csc.rowIdx.size) * LpNodeOverhead.BUILD
-                var eligible = engine.projections?.builtInRelaxation == true &&
-                    engine.projections.nativePropagation && engine.problem.numRealVars == 0 &&
-                    model.exactState == null && model.doubleView == null && model.n > 0 &&
-                    bindingWork + engine.problem.numFactors + 1L <= LpEmissionTemplates.MAX_UNITS &&
-                    bindingWork + engine.problem.numFactors + 1L < construction
+                var eligible = hasAffordableShape(engine, root, setupWork)
                 if (eligible) {
                     for (factor in engine.problem.factors) {
                         token.charge(1L)

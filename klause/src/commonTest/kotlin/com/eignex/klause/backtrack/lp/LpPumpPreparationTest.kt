@@ -31,6 +31,20 @@ class LpPumpPreparationTest {
     private val objective = LinearObjective(boolWeights = longArrayOf(1), intCoefficients = longArrayOf(1, 1, 1))
 
     @Test
+    fun `paid setup should count against private preparation admission`() {
+        val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
+            .build(RootDomains(problem))
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("paid-pump-setup"),
+            projections = selected).use { engine ->
+            assertNotNull(LpPumpPreparation.create(engine, root, Cancellation.Never))
+
+            val prepared = LpPumpPreparation.create(engine, root, Cancellation.Never, setupWork = 100L)
+
+            assertNull(prepared)
+        }
+    }
+
+    @Test
     fun `private objective views should preserve earlier model costs and current constants`() {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(RootDomains(problem))

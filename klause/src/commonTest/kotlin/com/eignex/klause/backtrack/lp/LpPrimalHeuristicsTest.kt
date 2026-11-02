@@ -36,6 +36,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -43,6 +44,94 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
+    @Test
+    fun `rounding preparation should serve the pump with a fresh numerical owner`() {
+        for (reuse in listOf(false, true)) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, listOf(
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6),
+            )).bake(FactorProjectionProviders.Default)
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+            val sink = SolveStatsSink("rounding-pump-handoff")
+            val factory = RecordingLpEngineFactory()
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+                LpSolveContext(factory), reusePumpPreparation = reuse).use { engine ->
+                val handoff = LpPrimalHandoff.open(engine, Cancellation.Never)
+                try {
+                    assertNull(engine.lpRoundingProbe(objective, Cancellation.Never,
+                        handoff = handoff, accept = { null }))
+                    val previousOwners = factory.calls.size
+
+                    val sample = engine.lpFeasibilityPump(objective, Cancellation.Never, handoff = handoff)
+
+                    assertEquals(6L, assertNotNull(sample).ints.sum())
+                    assertTrue(factory.calls.size > previousOwners)
+                    val phases = sink.snapshot().lp.phases
+                    val builds = phases.getValue("PRIMAL_LP_ASSEMBLY_ROOT").outcomes["COMPLETE"]
+                    assertEquals(if (reuse) 1L else 2L, builds)
+                    if (reuse) assertTrue(phases.getValue("PRIMAL_LP_PUMP_REUSE_ROOT").calls > 0L)
+                    else assertNull(phases["PRIMAL_LP_PUMP_REUSE_ROOT"])
+                } finally {
+                    handoff?.close()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a cancelled handoff lookup should not open a fallback numerical owner`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6),
+        )).bake(FactorProjectionProviders.Default)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val sink = SolveStatsSink("cancelled-handoff-consumer")
+        val factory = RecordingLpEngineFactory()
+        var armed = false
+        var stopped = false
+        var charged = 0L
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+            LpSolveContext(factory), reusePumpPreparation = true, containingWork = {
+                if (armed) {
+                    charged += it
+                    stopped = true
+                }
+            }).use { engine ->
+            assertNotNull(LpPrimalHandoff.open(engine, Cancellation.Never)).use { handoff ->
+                assertNull(engine.lpRoundingProbe(objective, Cancellation.Never,
+                    handoff = handoff, accept = { null }))
+                val previousOwners = factory.calls.size
+                armed = true
+
+                val sample = engine.lpFeasibilityPump(objective, Cancellation { stopped }, handoff = handoff)
+
+                assertNull(sample)
+                assertEquals(1L, charged)
+                assertEquals(previousOwners, factory.calls.size)
+                assertEquals(1L, sink.snapshot().lp.phases.getValue("PRIMAL_LP_HANDOFF_ROOT")
+                    .outcomes["CANCELLED"])
+            }
+        }
+    }
+
+    @Test
+    fun `retained rounding guidance should not become a fresh root handoff`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6),
+        )).bake(FactorProjectionProviders.Default)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val sink = SolveStatsSink("retained-guidance-handoff")
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+            reusePumpPreparation = true).use { engine ->
+            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            assertNotNull(engine.rootRoundingWarmStart)
+            assertNotNull(LpPrimalHandoff.open(engine, Cancellation.Never)).use { handoff ->
+                assertNull(engine.lpRoundingProbe(objective, Cancellation.Never,
+                    handoff = handoff, accept = { null }))
+
+                assertFalse(handoff.hasDefinitionFor(engine))
+            }
+        }
+    }
+
     @Test
     fun `objective only pump iterations should reuse their completed root preparation`() {
         for (reuse in listOf(false, true)) {

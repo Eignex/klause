@@ -224,6 +224,17 @@ Admission and rebinding spend the current containing and LP allowance. Their cos
 and actual numerical consumption have separate observations from shared-source reuse;
 optimal floating iterates provide no certificate or source-acceptance authority.
 
+One uninterrupted root-primal call can hand its freshly assembled canonical
+rounding definition to the pump's initial query. The handoff belongs to one engine
+and closes on return or pause. Retained rounding guidance supplies no fresh
+handoff. Capture detaches build-specific source maps and preparation metadata;
+no propagation session, basis, iterate or cancellation token is retained. Setup,
+capture and lookup debit the current allowance, with constant retirement work
+reserved before retaining a definition. The paid setup joins admission's work
+comparison without being charged twice. A declined handoff keeps ordinary
+construction; cancellation withholds the next numerical owner. Proposals still
+require the caller's complete source verification.
+
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.
 Cold preparation first checks a necessary work lower bound within the same cap.
