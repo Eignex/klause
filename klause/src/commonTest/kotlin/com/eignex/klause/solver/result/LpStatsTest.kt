@@ -19,6 +19,51 @@ import kotlin.test.assertTrue
 
 class LpStatsTest {
     @Test
+    fun `template preparation should retain declined work on its owning route`() {
+        val sink = LpStatsSink(LpRoute.ROOT)
+        sink.observeTemplatePreparation(7L, 11L, prepared = true, factorsReused = 2,
+            sourceRebound = true, indexesReused = true, boundsReused = 3,
+            componentsReused = 1, componentsDirty = 1, retainedUnits = 17L)
+        sink.observeTemplatePreparation(13L, 19L, prepared = false)
+
+        val phase = sink.snapshot().phases.getValue("TEMPLATE_PREPARATION_ROOT")
+
+        assertEquals(LpPhaseStats(calls = 2L, nanos = 20L, work = 30L, outcomes = mapOf(
+            "DECLINED" to 1L, "PREPARED" to 1L, "FACTORS_REUSED" to 2L, "SOURCE_REBOUND" to 1L,
+            "INDEXES_REUSED" to 1L, "BOUNDS_REUSED" to 3L, "COMPONENTS_REUSED" to 1L,
+            "COMPONENTS_DIRTY" to 1L, "RETAINED_UNITS_SUM" to 17L,
+        )), phase)
+    }
+
+    @Test
+    fun `template emission snapshots should remain immutable after further consumers`() {
+        val sink = LpStatsSink()
+        sink.observeTemplateUse(rows = 2, bounds = 3, exactBounds = 1)
+        val before = sink.snapshot()
+
+        sink.observeTemplateUse(rows = 5, exactBounds = 7)
+        val after = sink.snapshot()
+
+        assertEquals(mapOf("ROWS" to 2L, "BOUNDS" to 3L, "EXACT_BOUND_OBJECTS" to 1L),
+            before.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes)
+        assertEquals(mapOf("ROWS" to 7L, "BOUNDS" to 3L, "EXACT_BOUND_OBJECTS" to 8L),
+            after.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes)
+    }
+
+    @Test
+    fun `zero template emissions should remain distinct from an unobserved phase`() {
+        val sink = LpStatsSink()
+        val before = sink.snapshot()
+
+        sink.observeTemplateUse()
+        val after = sink.snapshot()
+
+        assertFalse(before.phases.containsKey("TEMPLATE_ASSEMBLY_NODE"))
+        assertEquals(mapOf("ROWS" to 0L, "BOUNDS" to 0L, "EXACT_BOUND_OBJECTS" to 0L),
+            after.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes)
+    }
+
+    @Test
     fun `source residual timing should include component costs on the component route`() {
         val sink = LpStatsSink()
         val metrics = LpSolveMetrics(
