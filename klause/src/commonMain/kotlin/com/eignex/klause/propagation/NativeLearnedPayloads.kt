@@ -140,7 +140,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     fun release(index: Int) {
         val page = pageAt(index ushr PAGE_SHIFT) ?: return
         val slot = index and PAGE_MASK
-        val literals = page.rows[slot] ?: return
+        val literals = page.rows.getOrNull(slot) ?: return
         words -= literals.size
         page.words -= literals.size
         page.rows[slot] = null
