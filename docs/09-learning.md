@@ -117,6 +117,10 @@ consumption follows the learned lifecycle below, while later events exclude the
 synchronous admission fixpoint. Several contributing families may receive credit
 for one learned object; these counters cannot be summed as disjoint total costs.
 They describe participation and consumption, without asserting causal benefit.
+Retained integer-row propagation and delivered reasons have a separate
+`factorLearnedInteger` owner aggregate alongside their contributing families. These
+costs overlap the contributors. Ownership credit does not travel through a reason
+into subsequently learned objects.
 
 One state owns at most 1,024 reason identities of at most 64 words each and 1,024
 learned provenance entries. Reason eviction and provenance exhaustion affect only
@@ -145,6 +149,11 @@ other nonconstant binary inequalities remain separate. Arithmetic overflow withh
 that shape classification. At most 64 live factor identities retain
 use flags, with no row or premise payloads. Admission-fixpoint use, later use and use
 after an actual variable-trail rewind have separate event and distinct-row totals.
+Bound pins distinguish root and nonroot deductions; conflict-seed citations count
+separately, including citations of earlier row reasons when another factor fails.
+Admission and post-undo bound pins and seed citations retain separate totals, even
+after payload capture truncates. A seed citation does not establish a fresh row
+deduction or reason construction.
 Post-undo use identifies retraction followed by a deduction or conflict, without
 claiming a sibling branch, causal benefit or source validation. Compaction remaps
 identities and retirement releases them; saturation and untracked admissions remain

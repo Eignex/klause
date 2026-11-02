@@ -129,9 +129,62 @@ class ArithmeticLearningTraceTest {
         assertEquals(1L, admission["learningIntegerCensusAdmissionUseEvents"])
         assertEquals(0L, admission["learningIntegerCensusPostUndoUseEvents"])
         assertEquals(1L, later["learningIntegerCensusPostUndoUsedRows"])
+        assertTrue(later.getValue("learningIntegerCensusPostUndoBoundPinEvents") > 0)
+        assertEquals(later.getValue("learningIntegerCensusUseEvents"),
+            later.getValue("learningIntegerCensusBoundPinEvents") + later.getValue("learningIntegerCensusSeedUseEvents"))
         assertEquals(2L, native.intDomain(0).max)
         native.releaseRetainedState()
         assertEquals(later, native.learnedLifecycle())
+    }
+
+    @Test
+    fun `integer census should separate bound deductions from conflict seeds after trace truncation`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 2),
+        ))
+        val session = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+        session.enableIntegerRowLearning()
+        val trace = requireNotNull(session.explanationState.arithmeticLearningTrace)
+        trace.record("observation", 1, 2)
+        assertTrue(trace.truncated)
+        val row = requireNotNull(IntegerConflictRow.normalized(mapOf(0 to 1L, 1 to 1L, 2 to -1L), 0L, Lit.NONE))
+        session.addLearnedIntegerRow(row, 1)
+
+        assertIs<PropagationResult.Implied>(session.pinIntAtLeast(0, 1))
+        val pins = session.learnedLifecycle()
+        assertIs<PropagationResult.Unsat>(session.pinIntAtLeast(1, 1))
+
+        val after = session.learnedLifecycle()
+        assertEquals(2L, pins["learningIntegerCensusBoundPinEvents"])
+        assertEquals(2L, pins["learningIntegerCensusNonrootBoundPinEvents"])
+        assertEquals(0L, pins["learningIntegerCensusRootBoundPinEvents"])
+        assertEquals(0L, pins["learningIntegerCensusSeedUseEvents"])
+        assertEquals(pins["learningIntegerCensusBoundPinEvents"], after["learningIntegerCensusBoundPinEvents"])
+        assertTrue(after.getValue("learningIntegerCensusSeedUseEvents") > 0)
+        assertEquals(after.getValue("learningIntegerCensusUseEvents"),
+            after.getValue("learningIntegerCensusBoundPinEvents") + after.getValue("learningIntegerCensusSeedUseEvents"))
+        assertEquals(0L, after["learningIntegerCensusBoolPinEvents"])
+        assertEquals(0L, after["learningIntegerCensusOtherPinEvents"])
+    }
+
+    @Test
+    fun `integer row propagation should retain owner and contributing family costs`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 2),
+        ))
+        val session = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+        session.enableIntegerRowLearning()
+        val row = requireNotNull(IntegerConflictRow.normalized(mapOf(0 to 1L, 1 to 1L, 2 to -1L), 0L, Lit.NONE))
+        session.withAttribution(1 shl FactorFamily.Linear.ordinal) { session.addLearnedIntegerRow(row, 1) }
+
+        assertIs<PropagationResult.Implied>(session.pinIntAtLeast(0, 1))
+
+        val costs = session.learnedLifecycle()
+        assertTrue(costs.getValue("factorLearnedIntegerFires") > 0)
+        assertTrue(costs.getValue("factorLearnedIntegerWork") > 0)
+        assertEquals(2L, costs["factorLearnedIntegerDeductions"])
+        assertTrue(costs.getValue("factorLinearDeductions") >= costs.getValue("factorLearnedIntegerDeductions"))
+        assertEquals(1L, costs["factorLinearLearned"])
     }
 
     @Test

@@ -606,6 +606,7 @@ internal fun PropagationState.excludeInteriorIntValues(
 internal fun PropagationState.seedConflictFactor(fid: Int) {
     if (fid < 0) return
     noteLearnedUse(fid) // a learned clause that detects a conflict counts as reused
+    arithmeticLearningTrace?.integerCensus?.seed(fid)
     conflictSeedFactors.add(fid)
 }
 

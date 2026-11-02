@@ -240,6 +240,7 @@ internal class ArithmeticLearningTrace(
     }
 
     fun pin(factorId: Int, variable: Int, bound: Long, kind: String, level: Int) {
+        integerCensus?.pin(factorId, kind, level)
         if (!accepting) return
         val id = storedIds[factorId] ?: return
         record("consumer.$kind", id.toLong(), factorId.toLong(), variable.toLong(), bound, level.toLong())

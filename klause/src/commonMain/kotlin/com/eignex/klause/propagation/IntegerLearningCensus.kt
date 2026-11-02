@@ -17,7 +17,8 @@ internal class IntegerLearningCensus {
     private enum class Count {
         Admitted, Guarded, Binary, BinaryClause, BinaryNonclausal, BinaryTautology, BinaryImpossible, ShapeUnavailable,
         UseEvents, AdmissionUseEvents, LaterUseEvents, PostUndoUseEvents, UsedRows, LaterUsedRows, PostUndoUsedRows,
-        Untracked, Retired,
+        BoundPinEvents, RootBoundPinEvents, NonrootBoundPinEvents, AdmissionBoundPinEvents, PostUndoBoundPinEvents,
+        BoolPinEvents, OtherPinEvents, SeedUseEvents, AdmissionSeedUseEvents, PostUndoSeedUseEvents, Untracked, Retired,
     }
     private val counts = LongArray(Count.entries.size)
     private val widths = LongArray(INTEGER_LEARNING_TERMS + 1)
@@ -114,6 +115,27 @@ internal class IntegerLearningCensus {
                 increment(Count.PostUndoUsedRows)
             }
         }
+    }
+
+    fun pin(factor: Int, kind: String, level: Int) {
+        val row = rows[factor] ?: return
+        when (kind) {
+            "lower", "upper" -> {
+                increment(Count.BoundPinEvents)
+                increment(if (level == 0) Count.RootBoundPinEvents else Count.NonrootBoundPinEvents)
+                if (row.admitting) increment(Count.AdmissionBoundPinEvents)
+                else if (undo > row.undo) increment(Count.PostUndoBoundPinEvents)
+            }
+            "bool" -> increment(Count.BoolPinEvents)
+            else -> increment(Count.OtherPinEvents)
+        }
+    }
+
+    fun seed(factor: Int) {
+        val row = rows[factor] ?: return
+        increment(Count.SeedUseEvents)
+        if (row.admitting) increment(Count.AdmissionSeedUseEvents)
+        else if (undo > row.undo) increment(Count.PostUndoSeedUseEvents)
     }
 
     fun retracted() { if (undo == Long.MAX_VALUE) saturated = true else undo++ }
