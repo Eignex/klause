@@ -246,9 +246,15 @@ internal class NativeSatState(private val state: PropagationState) {
      * already false, or just install watches when two or more literals are still open. The trailing
      * [propagate] call continues BCP from any pin this makes.
      */
-    fun addLearned(lits: IntArray, lbd: Int, permanent: Boolean, origin: Int = OWN_ORIGIN): Int {
+    fun addLearned(
+        lits: IntArray,
+        lbd: Int,
+        permanent: Boolean,
+        origin: Int = OWN_ORIGIN,
+        ownedLiterals: Boolean = false,
+    ): Int {
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Constructed)
-        val h = appendLearned(lits, lbd, permanent, origin)
+        val h = appendLearned(lits, lbd, permanent, origin, ownedLiterals)
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Admitted)
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Asserted)
         val len = lits.size
@@ -314,11 +320,13 @@ internal class NativeSatState(private val state: PropagationState) {
         return best
     }
 
-    private fun appendLearned(lits: IntArray, lbd: Int, permanent: Boolean, origin: Int): Int {
+    private fun appendLearned(
+        lits: IntArray, lbd: Int, permanent: Boolean, origin: Int, ownedLiterals: Boolean,
+    ): Int {
         val i = learnedCount
         lifecycleStages.add(0)
-        state.work += learnedPayloads.admissionWork(lits.size)
-        learnedPayloads.add(lits)
+        state.work += learnedPayloads.admissionWork(lits.size, ownedLiterals)
+        learnedPayloads.add(lits, ownedLiterals)
         learnedLbd.add(lbd)
         learnedPermanent.add(if (permanent) 1 else 0)
         state.work++

@@ -266,10 +266,12 @@ class PropagationSession private constructor(
         lbd: Int,
         origin: Int,
         sourceReplacement: Boolean,
+        ownedLiterals: Boolean = false,
     ): PropagationResult = withRequiredInprocessingCancellation {
         check(canSimplifyRoot)
         val base = state.undoTop
-        val fid = state.addLearnedClause(clause, lbd, permanent = sourceReplacement, origin = origin)
+        val fid = state.addLearnedClause(clause, lbd, permanent = sourceReplacement, origin = origin,
+            ownedLiterals = ownedLiterals)
         state.factorAttribution?.let {
             if (state.nativeEngine == null) it.admit(state.factorAt(fid))
             else if (it.admissionFamilies != 0) it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)

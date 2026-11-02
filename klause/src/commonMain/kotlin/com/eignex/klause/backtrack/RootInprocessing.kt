@@ -197,7 +197,7 @@ internal class RootSimplificationPass : InprocessingPass {
                 val lbd = if (source) residual.size else minOf(session.learnedClauseLbd(index), residual.size)
                 if (!budget.visit(residual.size * 2 + 1)) break
                 val before = session.work
-                session.addRootDerivedClause(Clause(residual.toIntArray()), lbd, origin, source)
+                session.addRootDerivedClause(Clause(residual.toIntArray()), lbd, origin, source, ownedLiterals = true)
                 pending = null
                 if (source) session.retainRootSourceRetirement(factor, literals)
                 else retirement.markSelected()

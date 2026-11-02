@@ -11,8 +11,8 @@ internal class NativeWatchEntries(initialCapacity: Int = 0) {
     val referenceSlots: Long get() = pages.size + 1L
 
     init {
-        // A base posting can admit one replacement without copying its established page.
-        val reserved = if (initialCapacity == 0) 0L else initialCapacity.toLong() + 1L
+        // A base posting can admit replacement watches without copying its established page.
+        val reserved = if (initialCapacity == 0) 0L else initialCapacity.toLong() + 2L
         for (index in 0 until reservedPageSlots(initialCapacity)) {
             val remaining = reserved - (index.toLong() shl PAGE_SHIFT)
             val capacity = minOf(PAGE_SIZE.toLong(), remaining).toInt()
@@ -108,7 +108,7 @@ internal class NativeWatchEntries(initialCapacity: Int = 0) {
 
     private fun reservedPageSlots(count: Int): Int {
         require(count >= 0)
-        return if (count == 0) 0 else ((count.toLong() + 1L + PAGE_MASK) ushr PAGE_SHIFT).toInt()
+        return if (count == 0) 0 else ((count.toLong() + 2L + PAGE_MASK) ushr PAGE_SHIFT).toInt()
     }
 
     private fun pageSlots(count: Int): Int = ((count.toLong() + PAGE_MASK) ushr PAGE_SHIFT).toInt()
