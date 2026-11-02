@@ -263,21 +263,34 @@ class PortfolioSchedulingTest {
     }
 
     @Test
-    fun `useless arms should take a small share of the run however many there are`() {
-        for (useless in listOf(1, 4, 12)) {
-            val slices = IntArray(useless + 1)
-            val workers = List(useless + 1) { arm ->
-                trackingWorker("arm$arm", arm, ScriptedSearch({ arm == 0 }) { slices[arm]++ })
-            }
-            var polls = 0
+    fun `one useless arm should take a small share of the run`() {
+        assertUselessArmShare(1)
+    }
 
-            Portfolio.thompson(workers).also { it.runTimeSource = TestTimeSource() }.use {
-                it.minimize(Cancellation { ++polls > 2_000 })
-            }
+    @Test
+    fun `four useless arms should take a small share of the run`() {
+        assertUselessArmShare(4)
+    }
 
-            val share = slices.drop(1).sum().toDouble() / slices.sum()
-            assertTrue(share < 0.05, "$useless useless arms took $share of the slices")
+    @Test
+    fun `twelve useless arms should take a small share of the run`() {
+        assertUselessArmShare(12)
+    }
+
+    private fun assertUselessArmShare(useless: Int) {
+        val slices = IntArray(useless + 1)
+        val workers = List(useless + 1) { arm ->
+            trackingWorker("arm$arm", arm, ScriptedSearch({ arm == 0 }) { slices[arm]++ })
         }
+        var polls = 0
+
+        Portfolio.thompson(workers).also { it.runTimeSource = TestTimeSource() }.use {
+            it.minimize(Cancellation { ++polls > 2_000 })
+        }
+
+        val share = slices.drop(1).sum().toDouble() / slices.sum()
+        assertTrue(slices.sum() > workers.size)
+        assertTrue(share < 0.05, "$useless useless arms took $share of the slices")
     }
 
     @Test
