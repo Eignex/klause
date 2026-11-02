@@ -15,13 +15,16 @@ internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellatio
     val targets = rootPrimalTargets ?: return null
     if (problem.numBoolVars != 0 || problem.numRealVars != 0 || params.lpPlan.lbTreeSearch) return null
     if (!targets.componentOrderAttempted) {
-        targets.componentOrderAttempted = true
         val bytes = rootComponentPreparationBytes(problem.numIntVars)
-        val work = rootComponentPreparationWork(targets, bytes)
+        val minimumWork = 8L * problem.numIntVars + 2L
+        val allowed = rootComponentPreparationAllowed(targets, bytes, minimumWork)
+        val work = if (allowed) rootComponentPreparationWork(targets, bytes) else 0L
         val started = TimeSource.Monotonic.markNow()
-        var outcome = "ALLOWANCE_DECLINED"
+        var outcome = if (allowed) "PENDING" else "ALLOWANCE_DECLINED"
         var preparationWork = 0L
-        if (work > 0L) {
+        targets.componentOrderAttempted = !allowed
+        if (work >= minimumWork && !cancellation()) {
+            targets.componentOrderAttempted = true
             val meter = LpProjectionMeter(work, bytes, cancellation)
             try {
                 val prepared = rootComponentOrder(problem, meter, session)
@@ -30,7 +33,8 @@ internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellatio
                     outcome = if (prepared == null) "CONNECTED_DECLINED" else "RETAINED"
                 } else outcome = "EXPIRED_OR_CANCELLED"
             } catch (_: LpProjectionStop) {
-                outcome = "PREPARATION_STOPPED"
+                targets.componentOrderAttempted = meter.work > 0L
+                outcome = if (meter.work == 0L) "PENDING" else "PREPARATION_STOPPED"
             } finally {
                 preparationWork = meter.work
                 noteNodeOverhead(preparationWork)

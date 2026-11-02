@@ -340,6 +340,11 @@ internal class LpEngine(
         return roundingBytes + maskBytes + targetBytes + additionalBytes <= ROOT_PRIMAL_GUIDANCE_BYTES
     }
 
+    internal fun rootComponentPreparationAllowed(targets: RootPrimalTargets, bytes: Long, minimumWork: Long): Boolean =
+        rootPrimalTargets === targets && rootGuidanceFits(bytes) && !lpWorkAllowanceSpent(minimumWork) &&
+            retainedRootCumulativeWork() >= minimumWork &&
+            SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalSolveOps) >= minimumWork
+
     internal fun rootComponentPreparationWork(targets: RootPrimalTargets, bytes: Long): Long =
         if (rootPrimalTargets !== targets || !rootGuidanceFits(bytes) || lpWorkAllowanceSpent(1L)) 0L
         else minOf(retainedRootRemainingWork(),
