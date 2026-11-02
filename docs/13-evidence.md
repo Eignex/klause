@@ -108,6 +108,8 @@ attestations and reference agreement stay distinct from checked derivations.
 Internal producers traverse the context's captured premise keys and immutable values
 in source order without receiving its map or entries. Public context views remain
 independent snapshots; traversal and producer retention use the caller's allowance.
+Internal singleton lookups expose captured coordinates and scalar values without
+returning map entries; iterator storage and lookup work use the caller's allowance.
 Each verification run lazily captures the immutable context's coordinate, premise
 and objective views once, so individual proof lookups do not copy the full source.
 

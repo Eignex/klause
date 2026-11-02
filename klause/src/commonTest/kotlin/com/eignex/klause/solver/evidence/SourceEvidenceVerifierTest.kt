@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 class SourceEvidenceVerifierTest {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
@@ -40,6 +41,22 @@ class SourceEvidenceVerifierTest {
         assertEquals(listOf(lower, upper.inequality), visited.map { it.second.inequality })
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
             SourceEvidence(scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower"))))
+    }
+
+    @Test
+    fun `singleton lookup should retain captured coefficients after caller mutation`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val original = linkedMapOf(x to BigFraction.ONE, other to BigFraction.ZERO)
+        val inequality = SourceInequality(original, BigFraction.ofLong(2))
+        val snapshot = inequality.coefficients.toMutableMap()
+
+        original.clear()
+        original[other] = BigFraction.MINUS_ONE
+        snapshot.clear()
+
+        assertEquals(x, inequality.singleCoordinate())
+        assertEquals(BigFraction.ONE, inequality.coefficient(x))
+        assertNull(inequality.coefficient(other))
     }
 
     @Test

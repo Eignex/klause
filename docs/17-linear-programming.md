@@ -508,12 +508,14 @@ retained rows debit the same containing generation and source funding. A shared
 immutable-generation index supplies stated integer endpoints to both recipe kinds.
 It traverses the same consumer-owned premises and retains endpoints only for coordinates
 requested by completed aggregates. A fully funded scan records both present and
-missing sides; interrupted scans publish no partial cache. Singleton coefficient
-inspection reads an immutable pair without copying a coefficient map. The first
-funded scan captures those pairs in a source-ordered array, including singleton
-rows outside the requested coordinates. Its initialization and storage debit the
-requesting recipe's allowance, and it publishes only with a completed endpoint
-batch. Later scans charge each indexed probe and reuse the captured pairs.
+missing sides; interrupted scans publish no partial cache. Singleton coordinate
+inspection reads immutable keys without copying a coefficient map. The first
+funded scan captures coordinates in a source-ordered array, including singleton
+rows outside the requested coordinates. Iterator storage, array initialization and
+scalar lookups debit the requesting recipe's allowance. The coordinate index
+publishes only with a completed endpoint batch. Later scans charge each indexed
+probe and read coefficients only for requested integer coordinates; the index
+retains no coefficient pairs.
 Endpoint storage and cache extension debit the same requesting allowance.
 Completed batches retain their funded coordinate sets and endpoint maps without
 copying prior batches. Each lookup charges every batch probe, and batch publication

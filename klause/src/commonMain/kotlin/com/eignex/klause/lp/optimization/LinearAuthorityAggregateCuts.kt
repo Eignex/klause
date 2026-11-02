@@ -435,7 +435,7 @@ internal object LinearAuthorityAggregateCuts {
             val bounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
         )
         private var completed: MutableList<CompletedBatch>? = null
-        private var singletonCoefficients: Array<Pair<SourceCoordinate, BigFraction>?>? = null
+        private var singletonCoordinates: Array<SourceCoordinate?>? = null
 
         fun prepare(
             coefficients: Map<SourceCoordinate, BigFraction>, meter: AggregateMeter,
@@ -457,10 +457,10 @@ internal object LinearAuthorityAggregateCuts {
             observe("AggregateIntegerBoundScanAttempts", 1L)
             meter.reserve(1L, 128L)
             val pending = HashMap<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>()
-            val saved = singletonCoefficients
+            val saved = singletonCoordinates
             val snapshot = saved ?: run {
                 meter.reserve(source.premiseCount.toLong(), 128L + source.premiseCount * 8L)
-                arrayOfNulls<Pair<SourceCoordinate, BigFraction>>(source.premiseCount)
+                arrayOfNulls<SourceCoordinate>(source.premiseCount)
             }
             if (saved != null) observe("AggregateIntegerBoundSnapshotReuseAttempts", 1L)
             meter.reserve(1L, 64L)
@@ -469,17 +469,18 @@ internal object LinearAuthorityAggregateCuts {
                 val owner = ordinal++
                 meter.reserve(1L)
                 val inequality = premise.inequality
-                val singleton = if (saved != null) {
+                val id = if (saved != null) {
                     saved[owner] ?: return@forEachPremise
                 } else {
                     if (inequality.supportSize != 1) return@forEachPremise
-                    meter.reserve(1L, 64L)
-                    val inspected = checkNotNull(inequality.singleCoefficient())
+                    meter.reserve(1L, 48L)
+                    val inspected = checkNotNull(inequality.singleCoordinate())
                     snapshot[owner] = inspected
                     inspected
                 }
-                val (id, coefficient) = singleton
                 if (id.kind != SourceCoordinate.Kind.Integer || id !in missing) return@forEachPremise
+                meter.reserve(1L)
+                val coefficient = checkNotNull(inequality.coefficient(id))
                 meter.reserve(1L, 64L)
                 val side = id to (coefficient > BigFraction.ZERO)
                 if (side in pending) return@forEachPremise
@@ -494,7 +495,7 @@ internal object LinearAuthorityAggregateCuts {
             batches.add(CompletedBatch(missing, pending))
             completed = batches
             if (saved == null) {
-                singletonCoefficients = snapshot
+                singletonCoordinates = snapshot
                 observe("AggregateIntegerBoundSnapshotComplete", 1L)
             }
             observe("AggregateIntegerBoundCoordinates", missing.size.toLong())

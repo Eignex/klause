@@ -488,36 +488,38 @@ class LinearAuthorityAggregateCutsTest {
 
     @Test
     fun `integer endpoint lookup should ignore unrelated bounds within the production allowance`() {
-        val premises = linkedMapOf(
-            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                y to BigFraction.ofLong(3)), BigFraction.ofLong(3))),
-            "lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        )
-        val coordinates = mutableSetOf(x, y)
-        repeat(700) { index ->
-            val id = SourceCoordinate(SourceCoordinate.Kind.Integer, index + 2)
-            coordinates += id
-            premises["unrelated $index"] = SourcePremise(SourceInequality(
-                mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        for (unrelatedCount in listOf(700, 1800)) {
+            val premises = linkedMapOf(
+                "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                    y to BigFraction.ofLong(3)), BigFraction.ofLong(3))),
+                "lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            )
+            val coordinates = mutableSetOf(x, y)
+            repeat(unrelatedCount) { index ->
+                val id = SourceCoordinate(SourceCoordinate.Kind.Integer, index + 2)
+                coordinates += id
+                premises["unrelated $index"] = SourcePremise(SourceInequality(
+                    mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            }
+            val source = SourceProofContext(scope, coordinates, premises)
+            val observations = mutableMapOf<String, Long>()
+            val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                limits = limits, point = mapOf(x to 0.75, y to 0.5)).single()
+
+            assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
+                cut.inequality)
+            assertEquals(setOf(0, 1), cut.owners)
+            assertEquals(1L, observations["AggregateIntegerRowNormalized"])
+            assertEquals(1L, observations["AggregateIntegerBoundScanComplete"])
+            assertEquals(2L, observations["AggregateIntegerBoundCoordinates"])
+            assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+            assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
         }
-        val source = SourceProofContext(scope, coordinates, premises)
-        val observations = mutableMapOf<String, Long>()
-        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
-
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
-            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
-            limits = limits, point = mapOf(x to 0.75, y to 0.5)).single()
-
-        assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
-            cut.inequality)
-        assertEquals(setOf(0, 1), cut.owners)
-        assertEquals(1L, observations["AggregateIntegerRowNormalized"])
-        assertEquals(1L, observations["AggregateIntegerBoundScanComplete"])
-        assertEquals(2L, observations["AggregateIntegerBoundCoordinates"])
-        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
-        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
-        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
     }
 
     @Test

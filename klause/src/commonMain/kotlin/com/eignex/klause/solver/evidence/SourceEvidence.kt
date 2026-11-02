@@ -16,11 +16,9 @@ class SourceInequality(
     /** Nonzero coefficients in original source coordinates. */
     val coefficients: Map<SourceCoordinate, BigFraction> get() = captured.toMap()
 
-    internal fun singleCoefficient(): Pair<SourceCoordinate, BigFraction>? {
-        if (captured.size != 1) return null
-        val entry = captured.entries.single()
-        return entry.key to entry.value
-    }
+    internal fun singleCoordinate(): SourceCoordinate? = captured.keys.singleOrNull()
+
+    internal fun coefficient(coordinate: SourceCoordinate): BigFraction? = captured[coordinate]
 
     internal fun contradicts(): Boolean = captured.isEmpty() && (rhs < BigFraction.ZERO || (rhs.isZero && strict))
 
