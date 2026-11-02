@@ -60,8 +60,8 @@ internal class ReclamationPreparation(
 }
 
 internal fun PropagationState.sweepRetiredLearnedMemory(budget: ReclamationPreparation) {
-    nativeEngine?.sweepRetiredWatches(budget)
     nativeEngine?.sweepRetiredMetadata(budget)
+    nativeEngine?.sweepRetiredWatches(budget)
     sweepRetiredGeneralIntegerRows(budget)
     sweepRetiredGeneralMetadata(budget)
     sweepRetiredGeneralWatches(budget)

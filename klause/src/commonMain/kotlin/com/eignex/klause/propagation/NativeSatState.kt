@@ -150,9 +150,9 @@ internal class NativeSatState(private val state: PropagationState) {
     private var sweptRetirements = 0
     private var sweepingRetirements = -1
 
-    private var metadataCleanupIndex = 0
-    private var metadataSweptRetirements = 0
-    private var metadataSweepingRetirements = -1
+    private var retiredMetadataHead = -1
+    private var retiredMetadataTail = -1
+    private var retiredMetadataCount = 0
 
     internal fun sweepRetiredMetadata(budget: ReclamationPreparation) {
         if (metadata.hasEmptyReservation) {
@@ -161,28 +161,26 @@ internal class NativeSatState(private val state: PropagationState) {
             metadata.releaseEmptyReservation()
             budget.advanced()
         }
-        if (retiredCount == 0) return
-        if (metadataSweepingRetirements < 0) {
-            if (metadataSweptRetirements == retiredCount) return
-            budget.visit(4L)
+        while (retiredMetadataHead >= 0) {
+            budget.visit(32L, 16L)
             budget.visit(0L)
-            metadataSweepingRetirements = retiredCount
-        }
-        while (metadataCleanupIndex < learnedCount) {
-            budget.visit(4L)
-            if (retiredOf(metadataCleanupIndex)) {
-                budget.visit(16L, 16L)
-                budget.visit(0L)
-                metadata.release(metadataCleanupIndex)
-            } else budget.visit(0L)
-            metadataCleanupIndex++
+            val index = retiredMetadataHead
+            val next = metadata[index, NativeLearnedMetadata.SCAN]
+            metadata.release(index)
+            retiredMetadataHead = next
+            if (next < 0) retiredMetadataTail = -1
+            retiredMetadataCount--
             budget.advanced()
         }
-        budget.visit(4L)
-        budget.visit(0L)
-        metadataSweptRetirements = metadataSweepingRetirements
-        metadataSweepingRetirements = -1
-        metadataCleanupIndex = 0
+    }
+
+    private fun enqueueRetiredMetadata(index: Int) {
+        // Retired clauses do not resume literal scans, so the same slot links their release queue.
+        metadata[index, NativeLearnedMetadata.SCAN] = -1
+        if (retiredMetadataTail < 0) retiredMetadataHead = index
+        else metadata[retiredMetadataTail, NativeLearnedMetadata.SCAN] = index
+        retiredMetadataTail = index
+        retiredMetadataCount++
     }
 
     private fun addWatch(lit: Int, handle: Int, blocker: Int) {
@@ -386,7 +384,7 @@ internal class NativeSatState(private val state: PropagationState) {
         state.learned.capRanking.sharingMemory(sample, protectedRows)
         val columns = listOf(learnedUnits, rechecks, capCandidates,
             state.learned.capCandidates)
-        var metadataBytes = 64L + capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
+        var metadataBytes = 92L + capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
             learnedPayloads.primitiveBytes + metadata.primitiveBytes
         metadata.sharingMemory(sample, protectedRows) { index ->
             metadata[index, NativeLearnedMetadata.PERMANENT] == 1 || sample.contains(protected, index)
@@ -413,7 +411,7 @@ internal class NativeSatState(private val state: PropagationState) {
         var watchPostings = 0L
         sample.ownedPool(this, 40L, (if (protectedRows) 12L else 0L) +
             (if (sweepingRetirements >= 0) 16L else 0L) +
-            (if (metadataSweepingRetirements >= 0) 12L else 0L))
+            (if (retiredMetadataHead >= 0) 12L else 0L))
         for (entries in watchEntries) {
             sample.step()
             if (entries == null) continue
@@ -520,12 +518,13 @@ internal class NativeSatState(private val state: PropagationState) {
             if (!mayDrop(index)) return false
             val pinned = if (index == prepared) protected else capProtected(index, budget, 0L)
             if (pinned) return false
-            budget.visit(24L)
+            budget.visit(32L)
             budget.visit(0L)
             learnedPayloads.release(index)
             metadata[index, NativeLearnedMetadata.STAGES] = metadata[index, NativeLearnedMetadata.STAGES] or RETIRED
             state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
             retiredCount++
+            enqueueRetiredMetadata(index)
             return true
         }
     }
@@ -560,18 +559,20 @@ internal class NativeSatState(private val state: PropagationState) {
             metadata[index, NativeLearnedMetadata.BOOL_REASONS] > 0 ||
             metadata[index, NativeLearnedMetadata.STAGES] and 2 != 0
         ) return LearnedRetirementResult(LearnedRetirementStatus.ProtectedFloor)
-        budget.visit(40L)
+        budget.visit(48L)
         budget.visit(0L)
         learnedPayloads.release(index)
         metadata[index, NativeLearnedMetadata.STAGES] = metadata[index, NativeLearnedMetadata.STAGES] or RETIRED
         state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
         retiredCount++
+        enqueueRetiredMetadata(index)
         capRanking.invalidateRetiredHandles()
         return LearnedRetirementResult(LearnedRetirementStatus.Retired, payloadReleased = true)
     }
 
     internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) emptyMap() else mapOf(
         "learnedCapNativeBackend" to 1L,
+        "learnedMetadataPendingRows" to retiredMetadataCount.toLong(),
         "learnedCapCalls" to capCalls,
         "learnedCapWork" to capWork,
         "learnedCapVisits" to capVisits,
@@ -710,9 +711,9 @@ internal class NativeSatState(private val state: PropagationState) {
         consumedPeerImports = 0
         consumed = 0
         retiredCount = 0
-        metadataCleanupIndex = 0
-        metadataSweptRetirements = 0
-        metadataSweepingRetirements = -1
+        retiredMetadataHead = -1
+        retiredMetadataTail = -1
+        retiredMetadataCount = 0
         capCandidates.clear()
         capRanking.reset()
         for (i in 0 until learnedCount) {
@@ -728,8 +729,11 @@ internal class NativeSatState(private val state: PropagationState) {
                 if (peer) consumedPeerImports++
             }
             if (metadata[target, NativeLearnedMetadata.PERMANENT] == 1) permanentCount++
-            if (retiredOf(target)) retiredCount++
-            else if (metadata[target, NativeLearnedMetadata.PERMANENT] == 0) {
+            if (retiredOf(target)) {
+                retiredCount++
+                state.work += 8L
+                enqueueRetiredMetadata(target)
+            } else if (metadata[target, NativeLearnedMetadata.PERMANENT] == 0) {
                 state.work++
                 capCandidates.add(target)
             }

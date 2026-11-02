@@ -548,10 +548,12 @@ another learned retirement requires a scan. Native policy and admission metadata
 pages with at most sixteen rows. A small startup reservation and later page growth
 retain their preparation/admission work; pressure can drop an unused reservation.
 Capacity changes replace the disjoint
-pool allocation identity. A separate resumable pass releases retired slots and drops empty
+pool allocation identity. An intrusive queue releases retired slots and drops empty
 pages without remapping live handles; a protected row retains its page allocation.
-Appended rows enter the current scan or a later retirement epoch. Ownership observations
-retain unfinished pages and use a disjoint metadata pool rather than per-row scratch.
+A retired row uses its inactive literal-scan slot as the queue link. Queue publication
+and release are funded transactions. Metadata release precedes watch scanning, so
+permanent postings cannot delay its progress. Appended retirements extend the queue.
+Ownership observations retain unfinished pages and use a disjoint metadata pool rather than per-row scratch.
 Full generation remapping retains its separate funding requirement.
 Tier classification publishes within each funded row transaction. Arithmetic reason
 snapshots and native/general full physical compaction require their complete funding.
