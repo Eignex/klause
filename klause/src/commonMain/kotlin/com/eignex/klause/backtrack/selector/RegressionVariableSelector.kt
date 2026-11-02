@@ -7,7 +7,7 @@ import com.eignex.klause.solver.search.VarRef
 import com.eignex.koblas.DenseVector
 import com.eignex.kumulant.bandit.contextual.RegressionContextualBandit
 import com.eignex.kumulant.core.Concurrency
-import com.eignex.kumulant.stat.StatDefaults
+import com.eignex.kumulant.schema.spec.BayesianRegression
 import com.eignex.kumulant.stat.regression.glm.BayesianRegressionStat
 import com.eignex.kumulant.stat.regression.glm.LinUcb
 import kotlin.math.ln
@@ -242,14 +242,12 @@ class RegressionVariableSelector private constructor(
             scoreCap: Int = 64,
         ): RegressionVariableSelector {
             val newBandit = {
-                val link = StatDefaults.regressionLink
-                val regression = BayesianRegressionStat(
-                    FEATURE_SIZE, priorVariance, link, Concurrency.None, null, null,
+                val specification = BayesianRegression(FEATURE_SIZE, priorVariance)
+                fun newRegression() = BayesianRegressionStat(
+                    specification.featureSize, specification.priorVariance, specification.link,
+                    Concurrency.None, specification.priorMean, specification.priorCovariance,
                 )
-                val globalRegression = BayesianRegressionStat(
-                    FEATURE_SIZE, priorVariance, link, Concurrency.None, null, null,
-                )
-                RegressionContextualBandit(1, regression, LinUcb, exploration, globalRegression, Random(seed))
+                RegressionContextualBandit(1, newRegression(), LinUcb, exploration, newRegression(), Random(seed))
             }
             return RegressionVariableSelector(newBandit, scoreCap)
         }
