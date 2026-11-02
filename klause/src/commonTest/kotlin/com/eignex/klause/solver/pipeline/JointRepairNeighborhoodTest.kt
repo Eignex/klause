@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.simplex.exact.BigFraction
@@ -17,79 +16,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class JointRepairNeighborhoodTest {
-    @Test
-    fun `full signed integer ranges should retain their scaled disagreement`() {
-        val columns = (0..1).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
-        val source = SourceProofContext(SourceScope(SourceRevision("signed-width", "exact")),
-            columns.toSet(), emptyMap())
-        val bounds = IntBounds.fromModelBounds(longArrayOf(Long.MIN_VALUE, 0),
-            longArrayOf(Long.MAX_VALUE, 1), null, null)
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 2, 0, Cancellation.Never,
-            integerBounds = bounds))
-        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
-        val budget = SourceLpBudget(funding = funding)
-        val guidance = LinearRepairGuidance()
-        guidance.remember(source, mapOf(columns[0] to Long.MAX_VALUE.toDouble(), columns[1] to 0.75),
-            budget, Cancellation.Never)
-        val centers = listOf(BigFraction.ofLong(Long.MIN_VALUE), BigFraction.ZERO)
-
-        repair.guide(assertNotNull(guidance.find(source)), centers, budget, Cancellation.Never)
-        val condition = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
-
-        assertEquals(mapOf(1 to BigFraction.ZERO), condition.lower)
-    }
-
-    @Test
-    fun `shared guidance should compare displacements in integer range units`() {
-        val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
-        val source = SourceProofContext(SourceScope(SourceRevision("scaled-disagreement", "exact")),
-            columns.toSet(), emptyMap())
-        val bounds = IntBounds.fromModelBounds(LongArray(3), longArrayOf(1000, 1, 1), null, null)
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never,
-            integerBounds = bounds))
-        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
-        val budget = SourceLpBudget(funding = funding)
-        val guidance = LinearRepairGuidance()
-        guidance.remember(source, mapOf(columns[0] to 0.0, columns[1] to 0.0, columns[2] to 0.5),
-            budget, Cancellation.Never)
-        val centers = listOf(BigFraction.ofLong(500), BigFraction.ONE, BigFraction.ZERO)
-
-        repair.guide(assertNotNull(guidance.find(source)), centers, budget, Cancellation.Never)
-        val condition = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
-
-        assertEquals(mapOf(0 to BigFraction.ofLong(500), 2 to BigFraction.ZERO), condition.lower)
-    }
-
-    @Test
-    fun `fixed columns should not attract shared guidance through numerical drift`() {
-        val columns = (0..1).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
-        val source = SourceProofContext(SourceScope(SourceRevision("fixed-disagreement", "exact")),
-            columns.toSet(), emptyMap())
-        val bounds = IntBounds.fromModelBounds(LongArray(2), longArrayOf(0, 1), null, null)
-        val repair = assertNotNull(JointRepairNeighborhood.prepare(source, 2, 0, Cancellation.Never,
-            integerBounds = bounds))
-        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
-        val budget = SourceLpBudget(funding = funding)
-        val guidance = LinearRepairGuidance()
-        guidance.remember(source, mapOf(columns[0] to 0.5, columns[1] to 0.25), budget, Cancellation.Never)
-        val centers = List(2) { BigFraction.ZERO }
-
-        repair.guide(assertNotNull(guidance.find(source)), centers, budget, Cancellation.Never)
-        val condition = repair.propose(centers, booleanArrayOf(), 2, 1, BigFraction.ONE, null)
-
-        assertEquals(mapOf(0 to BigFraction.ZERO), condition.lower)
-    }
-
-    @Test
-    fun `foreign integer bound dimensions should decline before neighborhood preparation`() {
-        val columns = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
-        val source = SourceProofContext(SourceScope(SourceRevision("foreign-bounds", "exact")),
-            columns.toSet(), emptyMap())
-        val bounds = IntBounds.fromModelBounds(LongArray(2), LongArray(2) { 1 }, null, null)
-
-        assertNull(JointRepairNeighborhood.prepare(source, 3, 0, Cancellation.Never, integerBounds = bounds))
-    }
-
     @Test
     fun `shared guidance should rank source inputs by their distance from the checked center`() {
         val columns = (0..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }

@@ -245,7 +245,7 @@ internal class JointLinearRepair(
                 }
             }
             selection = JointRepairNeighborhood.prepare(source, model.numIntVars, model.numRealVars, construction,
-                sourceIntegers, integerBounds = model.intBounds)
+                sourceIntegers)
             if (selection == null) {
                 declined = !stop() && !cancellation()
                 return false
@@ -337,10 +337,7 @@ internal class JointLinearRepair(
                 }
             }
             pending = condition
-            if (condition === guidedProposal) {
-                observe("jointRepairSharedGuidanceQueries")
-                if (selection?.rangeScaledGuidance == true) observe("jointRepairRangeScaledGuidanceQueries")
-            }
+            if (condition === guidedProposal) observe("jointRepairSharedGuidanceQueries")
             query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)),
                 params.copy(sourceIncumbentCompletion = false),
                 external = { externalIncumbent() ?: anchor }, state = state, borrowedAuthority = authority,

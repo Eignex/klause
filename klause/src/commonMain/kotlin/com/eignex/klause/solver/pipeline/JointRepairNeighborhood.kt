@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -15,7 +14,6 @@ internal class JointRepairNeighborhood private constructor(
     private val rows: List<IntArray>,
     private val occurrences: Array<IntArray>,
     private val inputs: IntArray?,
-    private val integerBounds: IntBounds?,
 ) : ExactNeighborhoodProposal {
     private val eligible = inputs?.let { indices ->
         BooleanArray(integers).also { mask -> indices.forEach { mask[it] = true } }
@@ -24,8 +22,6 @@ internal class JointRepairNeighborhood private constructor(
     var selectedIntegers: Long = 0
         private set
     var visitedEntries: Long = 0
-        private set
-    var rangeScaledGuidance: Boolean = false
         private set
 
     fun guide(point: Map<SourceCoordinate, Double>) {
@@ -39,12 +35,11 @@ internal class JointRepairNeighborhood private constructor(
         budget: SourceLpBudget, token: Cancellation): Boolean {
         if (token() || centers.size < integers || centers.size > LinearRepairGuidance.MAX_COLUMNS) return false
         val funding = budget.funding ?: return false
-        val work = 1L + 16L * seeds.size + 2L * (integerBounds?.size ?: 0)
+        val work = 1L + 16L * seeds.size
         val bytes = 256L + 128L * seeds.size
         if (funding.availableWork <= work || funding.remainingAllocation <= bytes) return false
         budget.observe(preparation = work)
         funding.charge(0L, bytes)
-        if (integerBounds?.hasOpenSides == true) return false
         val distances = HashMap<Int, Double>()
         for (id in seeds) {
             if (token()) return false
@@ -57,24 +52,12 @@ internal class JointRepairNeighborhood private constructor(
             funding.charge(0L, 8L * bits)
             val value = center.toDouble()
             if (!value.isFinite()) return false
-            distances[id] = disagreement(id, hint.integer(id), value)
+            distances[id] = hint.integer(id)?.let { abs(it - value) } ?: 0.0
         }
         val ranked = seeds.sortedByDescending { distances.getValue(it) }
         if (token()) return false
         seeds = ranked
-        rangeScaledGuidance = integerBounds != null
         return true
-    }
-
-    private fun disagreement(id: Int, point: Double?, center: Double): Double {
-        val distance = point?.let { abs(it - center) } ?: 0.0
-        val bounds = integerBounds ?: return distance
-        if (!bounds.hasLower(id) || !bounds.hasUpper(id)) return distance
-        val lower = bounds.lower(id)
-        val upper = bounds.upper(id)
-        val width = if (lower >= 0 || upper < 0) (upper - lower).toDouble()
-            else upper.toDouble() - lower.toDouble()
-        return if (width > 0.0) distance / width else 0.0
     }
 
     override fun propose(
@@ -120,9 +103,7 @@ internal class JointRepairNeighborhood private constructor(
         fun prepare(
             source: SourceProofContext, integers: Int, reals: Int, cancellation: Cancellation,
             sourceIntegers: IntArray? = null,
-            integerBounds: IntBounds? = null,
         ): JointRepairNeighborhood? {
-            if (integerBounds != null && integerBounds.size != integers) return null
             if (cancellation() || integers.toLong() + reals > MAX_INDEX_ENTRIES) return null
             cancellation.charge(integers.toLong() + reals)
             if (cancellation()) return null
@@ -159,7 +140,7 @@ internal class JointRepairNeighborhood private constructor(
             }
             return if (cancellation()) null else
                 JointRepairNeighborhood(integers, rows,
-                    Array(occurrences.size) { occurrences[it].toIntArray() }, inputs, integerBounds)
+                    Array(occurrences.size) { occurrences[it].toIntArray() }, inputs)
         }
     }
 }
