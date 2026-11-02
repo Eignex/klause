@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.lp.lbTreeSearch
 import com.eignex.klause.backtrack.lp.lpBranchPick
 import com.eignex.klause.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.backtrack.lp.lpRoundingProbe
+import com.eignex.klause.backtrack.lp.orderRootValues
 import com.eignex.klause.backtrack.selector.IndomainBest
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
@@ -141,10 +142,11 @@ internal class ResumableMinimize(
 ) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
-        get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending &&
+        get() = !preparationPending && clausePrimal?.isDone != false && !rootRoundingPending && !rootLayoutPending &&
             pendingRealLeaf == null && pendingRealResult == null
     override val canContinuePreparation: Boolean get() = clausePrimal?.isDone == false
     private var initialCandidate = initialCandidate
+    private var initialPoolVersion = 0L
     private var replaced = false
 
     // Unproved leaf coverage cannot become infeasibility or optimality, including under shared cutoffs.
@@ -267,6 +269,7 @@ internal class ResumableMinimize(
     private var pendingRealLeaf: LpSolveCursor<LeafRealResult>? = null
     private var pendingRealResult: LeafRealResult? = null
     private val rootLpDutyCycle = RootLpDutyCycle()
+    private var rootLayoutPending = false
 
     private fun completeLeaf(
         sample: Sample,
@@ -529,7 +532,7 @@ internal class ResumableMinimize(
         slice.inheritPreparation(preparation)
     }
 
-    override val preparationPending: Boolean get() = installation != null && !closed
+    override val preparationPending: Boolean get() = !closed && (installation != null || rootLayoutPending)
 
     internal fun advanceInstallation(): Boolean {
         check(!closed) { "search is closed" }
@@ -696,8 +699,11 @@ internal class ResumableMinimize(
         learnedMemory.reset()
         firstRun = true
         rootRoundingPending = false
+        rootLayoutPending = false
+        lpEngine.discardRootLayoutPreparation()
         lpEngine.rootRoundingWarmStart = null
         lpEngine.rootRoundingInterrupted = false
+        lpEngine.clearRootPrimalTargets()
         treeBudgetExhausted = false
         incumbents = minimizingSampleExchange(problem, params.toleranceCheck)
         objVarBest = null
@@ -752,10 +758,12 @@ internal class ResumableMinimize(
                 if (primal.isDone) primal.close()
             }
             if (firstRun) {
-                firstRun = false
-                firstRunWork()?.let {
+                val initial = firstRunWork()
+                if (!rootLayoutPending) firstRun = false
+                initial?.let {
                     return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
                 }
+                if (rootLayoutPending) return StepEvent.Paused
             } else if (rootRoundingPending && !rootRoundingAttempted) {
                 rootPrimalWork(rootLpBudget())?.let {
                     return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
@@ -763,7 +771,7 @@ internal class ResumableMinimize(
             }
             if (rootRoundingPending) {
                 slice.charge()
-                if (sliceExpired()) return StepEvent.Paused
+                if (lpEngine.rootRoundingQueryPaused || sliceExpired()) return StepEvent.Paused
             }
             unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
             if (treeBudgetExhausted) return terminal(terminalBudget())
@@ -1038,7 +1046,7 @@ internal class ResumableMinimize(
      * the remaining root and LP work allowances.
      */
     private fun firstRunWork(): MinimizeResult.WithSample? {
-        if (!hasPreparation) sink.start()
+        if (!hasPreparation && !rootLayoutPending) sink.start()
         return firstRunWorkBody()
     }
 
@@ -1083,19 +1091,34 @@ internal class ResumableMinimize(
     }
 
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
+        rootLayoutPending = false
         if (initialCandidate == null && pausable && !rebindable && externalShared && restart === NoRestartSchedule) {
-            initialCandidate = params.pooledIncumbents?.current()?.assignment
+            params.pooledIncumbents?.current()?.takeIf { it.version > initialPoolVersion }?.let {
+                initialPoolVersion = it.version
+                initialCandidate = it.assignment
+            }
         }
         revalidateInitialCandidate()?.let {
+            lpEngine.discardRootLayoutPreparation()
             if (applyObjectiveBound() == SearchRunDisposition.Exhausted) rootIsExhausted = true
             return it
         }
         if (unboundedLeaf != null) return null
+        rootLayoutPending = !lpEngine.prepareRootLayout(runEndToken(),
+            if (pausable) params.cancellation else Cancellation.Never)
+        if (rootLayoutPending) return null
         val rootToken = rootLpBudget()
+        val admissionStarted = if (lpEngine.lpRelaxer != null || lpEngine.retainedRootEnabled) {
+            TimeSource.Monotonic.markNow()
+        } else null
+        var admissionOutcome = "DUTY_SKIPPED"
         if (rootLpDutyCycle.allows(lpEngine.totalSolveWork())) {
             val before = lpEngine.totalSolveWork()
-            initRootLp(rootToken)
+            admissionOutcome = if (initRootLp(rootToken)) "QUERIED" else "RELAXER_DECLINED"
             rootLpDutyCycle.record(before, lpEngine.totalSolveWork())
+        }
+        admissionStarted?.let {
+            sink.lp.observePrimalPhase("ROOT_ADMISSION", admissionOutcome, it.elapsedNow().inWholeNanoseconds)
         }
         // Objective shaving: raise the objective's proven lower bound before search when the LP +
         // propagation prove lower values infeasible. Sound — every raise is a proof.
@@ -1196,10 +1219,17 @@ internal class ResumableMinimize(
 
     private fun canResumeRootRounding(): Boolean {
         val plan = lpEngine.params.lpPlan
-        return pausable && lpEngine.rootRoundingInterrupted && !solveCancelled() &&
-            (plan.rootBudgetFraction <= 0.0 ||
-                !lpEngine.workSpentExceeds(plan.rootMaxWork, sink.lp.standaloneWork)) &&
-            !lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork)
+        val outcome = when {
+            !pausable -> "NOT_PAUSABLE"
+            !lpEngine.rootRoundingInterrupted -> "NOT_INTERRUPTED"
+            solveCancelled() -> "RUN_CANCELLED"
+            !(plan.rootBudgetFraction <= 0.0 ||
+                !lpEngine.workSpentExceeds(plan.rootMaxWork, sink.lp.standaloneWork)) -> "ROOT_WORK_SPENT"
+            lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork) -> "LP_WORK_SPENT"
+            else -> "PENDING"
+        }
+        sink.lp.observePrimalPhase("PRIMAL_CONTINUATION", outcome, 0L)
+        return outcome == "PENDING"
     }
 
     /**
@@ -1208,14 +1238,16 @@ internal class ResumableMinimize(
      * capture). [token] is the shared root-LP budget — the slice/global cancellation time-boxed to
      * `LpPlan.rootBudgetFraction`.
      */
-    private fun initRootLp(token: Cancellation) {
-        val relaxer = lpEngine.harvestRootRelaxation(token) ?: return
-        val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token)
+    private fun initRootLp(token: Cancellation): Boolean {
+        val relaxer = lpEngine.harvestRootRelaxation(token) ?: return false
+        val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token,
+            preparationCancellation = rootLpPreparationBudget())
         sink.lp.observeRootBound(0, rootBound)
         // Publish the root LP bound to the portfolio's shared lower-bound manager: a sound global lower
         // bound on the optimum, so a peer arm can pair it with its own incumbent to prove optimality. A
         // NaN (no LP structure) carries no information and the sink ignores it.
         if (!rootBound.isNaN()) params.objectiveLowerBoundSink?.invoke(rootBound)
+        return true
     }
 
     /**
@@ -1240,14 +1272,17 @@ internal class ResumableMinimize(
         // run, and the search inherits them, so nothing downstream is comparable to itself; bounding it
         // by work makes the harvest a property of the model. The deadline stays as the backstop for
         // cost the meter cannot see.
-        val opsBudget = lpEngine.params.lpPlan.rootMaxWork
-        // The shared LP work allowance caps it too, so an expensive-but-useless root relaxation cannot spend
-        // more than the whole LP subsystem is allotted before search starts.
-        return params.cancellation or
-            Cancellation { lpEngine.workSpentExceeds(opsBudget, sink.lp.standaloneWork) ||
-                lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork) } or
+        return rootLpPreparationBudget() or
             if (params.cancellation.workScheduled()) Cancellation.Never else
                 Cancellation.after(budgetMillis.coerceAtLeast(0).milliseconds)
+    }
+
+    private fun rootLpPreparationBudget(): Cancellation {
+        if (params.lpPlan.rootBudgetFraction <= 0.0) return params.cancellation
+        val opsBudget = lpEngine.params.lpPlan.rootMaxWork
+        return params.cancellation or
+            Cancellation { lpEngine.workSpentExceeds(opsBudget, sink.lp.standaloneWork) ||
+                lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork) }
     }
 
     /** Milliseconds left until the effective deadline: the armed slice end (pausable portfolio path),
@@ -1281,12 +1316,17 @@ internal class ResumableMinimize(
 
         override fun onCommit(decision: SearchDecision, depth: Int) { lpHints?.commit(decision, depth) }
 
-        override fun onRestart() { lpHints?.resetHistory() }
+        override fun onRestart() {
+            lpHints?.resetHistory()
+            lpEngine.clearRootPrimalTargets()
+        }
 
         override fun pick(session: PropagationSession): VarRef? = lpEngine.lpBranchPick(session, lpHints)
 
-        override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> =
-            lpHints?.order(variable, values) ?: values
+        override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> {
+            val rooted = lpEngine.orderRootValues(variable, values)
+            return lpHints?.order(variable, rooted) ?: rooted
+        }
 
         override fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> =
             lpHints?.orderAlternatives(variable, alternatives, allowBasis = rootBasisGuidance)

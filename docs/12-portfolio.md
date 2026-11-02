@@ -691,6 +691,10 @@ without restarting completed steps. A paused cursor cannot publish an assignment
 an incomplete fixpoint as a refutation; a completed root conflict can. The packed
 native-SAT path and public satisfaction constructors stay eager. See [finite propagation](08-search.md#finite-propagation).
 
+An unfinished retained LP root layout remains pending private preparation through the
+construction wrapper, so the same bounded preparation-revisit policy can resume it.
+Completed construction retains its charged work when the worker enters numerical queries.
+
 #### Polynomial root preparation
 
 Polynomial complete workers defer component initialization into their retained
