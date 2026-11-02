@@ -689,6 +689,15 @@ simplification so proved facts can refresh binaries in the same safe-root opport
 the invocation token. A completed root conflict proves the complementary unit, which is attached and
 propagated through ordinary search. A completed consistent pure-Boolean probe can retain
 one newly implied Boolean literal as a binary clause conditional on its probe literal.
+Pure-Boolean scopes alternate ordinary opportunities with failed-pair opportunities.
+A completed first probe can spend the second attempt of the same batch on a distinct
+unassigned Boolean literal. A completed child conflict proves the binary excluding
+both assumptions; a consistent or interrupted child proves no such binary. Child
+selection inspects at most 64 coordinates and shares the containing and probe grants.
+The child also shares the first probe's remaining work ceiling. Both decisions unwind
+before admission, and a proved single-literal consequence retains priority after root
+progress. Independent parent cursors and child polarities survive optional buffer
+release and reset with the scope. A one-attempt batch retains ordinary probing.
 Capture is prepaid before propagation and reads only the final trail entry. After
 rollback, a funded lookup skips a matching direct binary reason and the bounded
 history prevents repeated admissions. At most 64 binaries enter per search scope;

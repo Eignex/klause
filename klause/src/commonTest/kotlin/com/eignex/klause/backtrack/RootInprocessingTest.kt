@@ -462,6 +462,97 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `failed pair probes should install a consumed binary when individual probes are consistent`() {
+        for (native in listOf(false, true)) for (positive in listOf(false, true)) {
+            val literal = Lit.make(1, positive)
+            val source = problem(intArrayOf(1, literal, 4), intArrayOf(1, literal, 5))
+            val session = PropagationSession(source, nativeSat = native)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 2)
+            val stats = SearchStatsSink()
+            pass.run(session, params, stats)
+            assertEquals(0, session.learnedClauseCount)
+
+            repeat(4 * source.numBoolVars + 4) {
+                if (session.learnedClauseCount == 0) pass.run(session, params, stats)
+            }
+
+            assertEquals(1, session.learnedClauseCount)
+            assertEquals(setOf(1, literal), session.learnedClauseLiterals(0).toSet())
+            assertEquals(1L, stats.snapshot().learning.getValue("inprocessProbePairBinaries"))
+            assertEquals(0, session.decisionLevel)
+            assertNull(session.boolValue(0))
+            assertNull(session.boolValue(1))
+            assertEquals(0L, session.learnedLifecycle()["learningClauseConsumed"] ?: 0L)
+            session.pinBool(0, true)
+            assertEquals(positive, session.boolValue(1))
+            assertEquals(1L, session.learnedLifecycle().getValue("learningClauseConsumed"))
+            assertEquals(listOf(1, literal, 4), (source.factors[0] as Clause).literals.toList())
+        }
+    }
+
+    @Test
+    fun `buffer release should preserve the failed pair frontier`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 3, 4), intArrayOf(1, 3, 5)), nativeSat = native)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 2)
+            val stats = SearchStatsSink()
+            pass.run(session, params, stats)
+            val probes = stats.snapshot().learning.getValue("inprocessProbeProbes")
+
+            pass.releaseRetainedBuffers()
+            pass.run(session, params, stats)
+
+            assertEquals(2L, stats.snapshot().learning.getValue("inprocessProbeProbes") - probes)
+            assertEquals(1L, stats.snapshot().learning.getValue("inprocessProbePairEligible"))
+            assertEquals(1, session.learnedClauseCount)
+            assertEquals(setOf(1, 3), session.learnedClauseLiterals(0).toSet())
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `scope reset should restore the ordinary probe opportunity before failed pairs`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 3, 4), intArrayOf(1, 3, 5)), nativeSat = native)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 2)
+            pass.run(session, params, null)
+
+            pass.reset()
+            pass.run(session, params, null)
+
+            assertEquals(0, session.learnedClauseCount)
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `cancelled child probes should leave no retained failed pair`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 3, 4), intArrayOf(1, 3, 5)), nativeSat = native)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 2)
+            pass.run(session, params, null)
+            var cancelled = false
+            val token = Cancellation {
+                if (session.boolValue(1) == true) cancelled = true
+                cancelled
+            }
+
+            pass.run(session, params.copy(cancellation = token), null)
+
+            assertTrue(cancelled)
+            assertEquals(0, session.learnedClauseCount)
+            assertEquals(0, session.decisionLevel)
+            assertNull(session.boolValue(0))
+            assertNull(session.boolValue(1))
+            assertFalse(pass.hasContinuation(session))
+        }
+    }
+
+    @Test
     fun `consistent root probes should install a consumed conditional binary`() {
         for ((native, positive) in listOf(false to false, false to true, true to false, true to true)) {
             val a = Lit.make(0, positive)

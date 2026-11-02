@@ -306,11 +306,13 @@ internal class RootProbingPass : InprocessingPass {
     private var preferNeighborhood = true
     private var preparationLeft = 0
     private val implications = RootProbeImplications()
+    private val pairs = RootProbePairs()
     override val spending = InprocessingSpending(InprocessingKind.Probe)
 
     override fun reset() {
         resetCursors()
         implications.reset()
+        pairs.reset()
     }
 
     override fun releaseRetainedBuffers() {
@@ -333,8 +335,9 @@ internal class RootProbingPass : InprocessingPass {
     }
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
-        sample.ownedReferences(this, if (neighborhood == null) 1L else 2L, protected)
+        sample.ownedReferences(this, if (neighborhood == null) 2L else 3L, protected)
         implications.retainedMemory(sample, protected)
+        pairs.retainedMemory(sample, protected)
         neighborhood?.let { sample.owned(it, it.size.toLong() * Int.SIZE_BYTES, protected) }
     }
 
@@ -393,7 +396,9 @@ internal class RootProbingPass : InprocessingPass {
         if (!session.canSimplifyRoot || params.rootProbeWork <= 0L) return
         spending.run(session, params, stats, containingWork = containingWork) { budget ->
             if (implications.advance(session, params, budget) && !budget.stopped()) {
+                val before = session.explanationState.boolPinOrder.size
                 probe(session, params, budget)
+                if (session.explanationState.boolPinOrder.size > before) pairs.preferSingle()
             }
         }
     }
@@ -404,6 +409,7 @@ internal class RootProbingPass : InprocessingPass {
         val endpointCandidates = 2L * session.problem.numIntVars
         val candidates = literalCandidates + endpointCandidates
         if (candidates == 0L) return
+        val paired = pairs.begin(session, params, implications.canCapture(params))
         preparationLeft = PROBE_NEIGHBORHOOD_CLAUSES
         var attempted = 0
         var examined = 0
@@ -429,8 +435,8 @@ internal class RootProbingPass : InprocessingPass {
                     next
                 }
                 else -> {
-                    val next = literalCursor % literalCandidates
-                    literalCursor = (next + 1L) % literalCandidates
+                    val next = if (paired) pairs.nextLiteral(literalCandidates) else literalCursor % literalCandidates
+                    if (!paired) literalCursor = (next + 1L) % literalCandidates
                     literalsExamined++
                     preferEndpoint = true
                     next
@@ -461,8 +467,17 @@ internal class RootProbingPass : InprocessingPass {
             attempted++
             budget.note("Eligible")
             budget.probe()
+            val start = session.work
             val result = probe(session, params.rootProbeWork, {
-                if (capture && !params.cancellation()) implications.capture(session, literal, pins, budget)
+                if (capture && !params.cancellation()) {
+                    val child = if (paired && attempted < params.rootProbeBatch) {
+                        pairs.conflict(session, params, literal, budget, start) { attempted++ }
+                    } else null
+                    if (!params.cancellation()) {
+                        if (child == null) implications.capture(session, literal, pins, budget)
+                        else implications.captureConflict(literal, child, budget)
+                    }
+                }
             }) {
                 if (endpoint) session.probeRootBound(variable, bound, atMost) else session.probeRootLiteral(literal)
             }

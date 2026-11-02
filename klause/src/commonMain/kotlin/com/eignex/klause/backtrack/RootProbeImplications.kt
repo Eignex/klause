@@ -8,6 +8,7 @@ import com.eignex.klause.util.SharingMemoryObservation
 
 internal class RootProbeImplications {
     private var pending = 0L
+    private var pendingPair = false
     private var reason = -1
     private var reasonGeneration = -1L
     private var reasonChecked = false
@@ -17,6 +18,8 @@ internal class RootProbeImplications {
     private var admissions = 0
 
     val hasContinuation: Boolean get() = pending != 0L
+
+    fun canCapture(params: BacktrackParams): Boolean = admissions < ADMISSION_LIMIT && fundable(params)
 
     fun reserve(params: BacktrackParams, budget: InprocessingBudget): Boolean {
         if (admissions >= ADMISSION_LIMIT) return false
@@ -42,11 +45,23 @@ internal class RootProbeImplications {
         }
         val value = session.boolValue(variable) ?: return
         pending = key(Lit.negate(literal), Lit.make(variable, value))
+        pendingPair = false
         reason = session.explanationState.boolReason[variable]
         reasonGeneration = session.learnedRetirementGeneration
         reasonChecked = false
         lookup = 0
         budget.note("ImplicationCandidates")
+    }
+
+    fun captureConflict(parent: Int, child: Int, budget: InprocessingBudget) {
+        check(Lit.variable(parent) != Lit.variable(child))
+        pending = key(Lit.negate(parent), Lit.negate(child))
+        pendingPair = true
+        reason = -1
+        reasonGeneration = -1L
+        reasonChecked = true
+        lookup = 0
+        budget.note("PairProofs")
     }
 
     fun advance(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget): Boolean {
@@ -88,6 +103,7 @@ internal class RootProbeImplications {
         }
         if (budget.remaining < ADMISSION_WORK || !budget.visit(ADMISSION_WORK)) return false
         val pair = pending
+        val fromPair = pendingPair
         keys[historySize++] = pair
         admissions++
         clearPending()
@@ -96,6 +112,7 @@ internal class RootProbeImplications {
             2, OWN_ORIGIN, false, ownedLiterals = true)
         budget.note("AttachmentWork", session.work - before + ADMISSION_WORK)
         budget.note("Binaries")
+        if (fromPair) budget.note("PairBinaries")
         return true
     }
 
@@ -121,6 +138,7 @@ internal class RootProbeImplications {
 
     private fun clearPending() {
         pending = 0L
+        pendingPair = false
         reason = -1
         reasonGeneration = -1L
         reasonChecked = false
@@ -142,6 +160,6 @@ internal class RootProbeImplications {
         private const val REASON_WORK = 5
         private const val ADMISSION_WORK = 8
         private const val HISTORY_BYTES = ADMISSION_LIMIT * Long.SIZE_BYTES * 1L
-        private const val BOOKKEEPING_BYTES = 2L * Long.SIZE_BYTES + 4L * Int.SIZE_BYTES + 1L
+        private const val BOOKKEEPING_BYTES = 2L * Long.SIZE_BYTES + 4L * Int.SIZE_BYTES + 2L
     }
 }
