@@ -38,7 +38,8 @@ class FinitePortfolioExecutorTest {
         val source = Problem(0, 3, Array(3) { IntDomain(0, 1) }, emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3))
         val prepared = source.prepareExecutionPlan(objective, preferFinite = true)
-        val scenario = PortfolioScenario(cores = 1, kind = Kind.COP, engine = EngineMix.MIXED)
+        val scenario = PortfolioScenario(cores = 1, arms = PortfolioScenario.DEFAULT_ARMS,
+            kind = Kind.COP, engine = EngineMix.MIXED)
         val schedules = listOf(InitialProbePolicy.FAMILY_WORK, InitialProbePolicy.HEURISTIC_WORK).map { policy ->
             val invocation = FinitePipeline.portfolioExecutor(source.bake(), scenario, objective, null, null,
                 null, null, prepared, Cancellation.after(1.seconds), numericalCompletion = false,
