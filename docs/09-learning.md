@@ -299,9 +299,9 @@ Admission, reference-array growth and release debit the containing work ledger.
 A short retirement slice suspends before publication and resumes with its stable handle.
 Policy columns, payload reference slots and watch postings remain owned until funded
 full compaction reclaims them. Ownership reports include those capacities and report
-`learnedRetiredSlots` separately from active clause count. Protected and unprotected
-payload pools aggregate disjoint copied arrays; their primitive bytes exclude reference
-capacity, which is observed separately.
+`learnedRetiredSlots` separately from active clause count. Ownership observes each
+copied array by identity with its row protection; upgrading protection preserves the
+owned-byte total. Reference capacity is observed separately.
 Window calls, charged work, visits and permanent, active and retained counts remain
 available in the released session's lifecycle totals.
 
