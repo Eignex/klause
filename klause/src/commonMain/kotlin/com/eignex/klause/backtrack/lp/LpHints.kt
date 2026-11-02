@@ -123,6 +123,7 @@ internal class LpHints(
     private fun rowExtension(model: ExactLpModel): Boolean {
         val previous = scopeModel ?: return false
         charge(10L)
+        if (!history.hasObservations) return false
         if (model.n != previous.n || model.m <= previous.m) return false
         if (!sameObjectiveUnits(model, previous)) return false
         val objective = model.objective
