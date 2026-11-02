@@ -305,9 +305,20 @@ internal class RootProbingPass : InprocessingPass {
     private var neighborhoodPosition = 0
     private var preferNeighborhood = true
     private var preparationLeft = 0
+    private val implications = RootProbeImplications()
     override val spending = InprocessingSpending(InprocessingKind.Probe)
 
     override fun reset() {
+        resetCursors()
+        implications.reset()
+    }
+
+    override fun releaseRetainedBuffers() {
+        resetCursors()
+        implications.releaseRetainedBuffers()
+    }
+
+    private fun resetCursors() {
         literalCursor = 0L
         endpointCursor = 0L
         preferEndpoint = false
@@ -320,9 +331,23 @@ internal class RootProbingPass : InprocessingPass {
     }
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
-        neighborhood?.let {
-            sample.ownedReferences(this, 1L, protected)
-            sample.owned(it, it.size.toLong() * Int.SIZE_BYTES, protected)
+        sample.ownedReferences(this, if (neighborhood == null) 1L else 2L, protected)
+        implications.retainedMemory(sample, protected)
+        neighborhood?.let { sample.owned(it, it.size.toLong() * Int.SIZE_BYTES, protected) }
+    }
+
+    override fun hasContinuation(session: PropagationSession): Boolean =
+        session.canSimplifyRoot && implications.hasContinuation
+
+    override fun continueAtRoot(
+        session: PropagationSession,
+        params: BacktrackParams,
+        stats: SearchStatsSink?,
+        containingWork: Long,
+    ) {
+        if (!session.canSimplifyRoot) return
+        spending.run(session, params, stats, containingWork = containingWork) { budget ->
+            implications.advance(session, params, budget)
         }
     }
 
@@ -365,7 +390,9 @@ internal class RootProbingPass : InprocessingPass {
     ) {
         if (!session.canSimplifyRoot || params.rootProbeWork <= 0L) return
         spending.run(session, params, stats, containingWork = containingWork) { budget ->
-            probe(session, params, budget)
+            if (implications.advance(session, params, budget) && !budget.stopped()) {
+                probe(session, params, budget)
+            }
         }
     }
 
@@ -426,10 +453,15 @@ internal class RootProbingPass : InprocessingPass {
                 } else if (!session.canProbeRootAtom(variable) || budget.truth(literal) != null) continue
                 0L
             }
+            val capture = !endpoint && variable < session.problem.numBoolVars &&
+                implications.reserve(params, budget)
+            val pins = session.explanationState.boolPinOrder.size
             attempted++
             budget.note("Eligible")
             budget.probe()
-            val result = probe(session, params.rootProbeWork) {
+            val result = probe(session, params.rootProbeWork, {
+                if (capture && !params.cancellation()) implications.capture(session, literal, pins, budget)
+            }) {
                 if (endpoint) session.probeRootBound(variable, bound, atMost) else session.probeRootLiteral(literal)
             }
             when (result) {
@@ -448,7 +480,10 @@ internal class RootProbingPass : InprocessingPass {
                     if (endpoint) budget.note("EndpointUnits")
                     if (nearby != null) neighborhood = null
                 }
-                else -> budget.note("Consistent")
+                else -> {
+                    budget.note("Consistent")
+                    if (!implications.advance(session, params, budget)) return
+                }
             }
         }
     }
@@ -475,6 +510,7 @@ internal class RootProbingPass : InprocessingPass {
     private inline fun probe(
         session: PropagationSession,
         limit: Long,
+        crossinline completed: () -> Unit,
         crossinline action: () -> PropagationResult?,
     ): PropagationResult? {
         val start = session.work
@@ -486,7 +522,13 @@ internal class RootProbingPass : InprocessingPass {
             session.withCancellation(token) {
                 action()
             }.also {
-                if (it != null && it !is PropagationResult.Unsat) session.popLast()
+                if (it != null && it !is PropagationResult.Unsat) {
+                    try {
+                        completed()
+                    } finally {
+                        session.popLast()
+                    }
+                }
             }
         } finally {
             session.retractingListener = retracting
