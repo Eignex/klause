@@ -14,8 +14,11 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,7 +28,7 @@ import kotlin.test.assertTrue
 class ResumableMinimizeDirectionalTest {
     @Test
     fun `finite search consumes observed child advice across cooperative slices`() {
-        val blocks = 2
+        val blocks = 3
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
@@ -35,6 +38,7 @@ class ResumableMinimizeDirectionalTest {
             }
         }
         val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
+        var completionAttempt = false
         val params = BacktrackParams(
             variableSelector = InputOrder,
             valueSelector = IndomainMin,
@@ -43,7 +47,22 @@ class ResumableMinimizeDirectionalTest {
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L),
             lpDirectionalGains = true,
+            branchObserver = object : SearchBranchAttemptObserver {
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    completionAttempt = when (decision) {
+                        is SearchDecision.IntAtMost -> decision.variable % 3 != 0
+                        is SearchDecision.IntAtLeast -> decision.variable % 3 != 0
+                        else -> false
+                    }
+                }
+            },
             componentFactory = { listOf(object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                    if (!completionAttempt) return ComponentResult.Consistent
+                    completionAttempt = false
+                    return ComponentResult.Conflict()
+                }
+                override fun retract(decisionLevel: Int) { completionAttempt = false }
                 override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
             }) },
         )
