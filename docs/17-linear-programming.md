@@ -308,7 +308,8 @@ work, guide identity and root-state guards as a completed rounding attempt.
 Before its first incumbent, an integer-only traversal can visit declared factor
 components contiguously while using these coordinates. Preparation admits at least
 two coupled components, charges its graph work to the remaining LP allowance and
-keeps primitive membership arrays inside the same guide storage cap. Membership
+keeps primitive membership arrays inside the same guide storage cap. Prior paid LP
+work also reduces the graph's remaining preparation ceiling. Membership
 walks charge ordinary CP work and revisit retracted variables. Declined preparation
 keeps ordinary branching; guide replacement, restart, reseed and close discard the
 ordering. These choices supply no directional-history, bound or proof authority.

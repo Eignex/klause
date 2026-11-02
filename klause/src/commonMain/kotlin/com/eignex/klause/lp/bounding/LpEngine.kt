@@ -342,7 +342,8 @@ internal class LpEngine(
 
     internal fun rootComponentPreparationWork(targets: RootPrimalTargets, bytes: Long): Long =
         if (rootPrimalTargets !== targets || !rootGuidanceFits(bytes) || lpWorkAllowanceSpent(1L)) 0L
-        else retainedRootRemainingWork()
+        else minOf(retainedRootRemainingWork(),
+            SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalSolveOps))
 
     internal fun retainRootPrimalTargets(cancellation: Cancellation): Boolean {
         val guide = rootRoundingWarmStart ?: return false
