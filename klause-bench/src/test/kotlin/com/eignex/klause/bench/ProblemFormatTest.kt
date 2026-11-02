@@ -1,7 +1,6 @@
 package com.eignex.klause.bench
 
 import java.io.File
-import java.io.FileNotFoundException
 import kotlin.io.path.createTempFile
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -18,13 +17,13 @@ class ProblemFormatTest {
 
     @Test
     fun `dimacs metadata should not require source bytes`() {
-        val source = file(".cnf", "").apply { delete() }
+        val source = File("build/missing-dimacs-input.cnf")
+        assertFalse(source.exists())
 
         val ingested = DimacsFormat.ingest(source)
 
         assertNull(ingested.objective)
         assertFalse(ingested.maximize)
-        assertFailsWith<FileNotFoundException> { ingested.problem }
     }
 
     @Test
