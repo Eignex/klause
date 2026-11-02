@@ -1098,7 +1098,11 @@ private fun executePortfolio(
         null, "ordinary" -> InitialProbePolicy.ORDINARY
         "leader-half" -> InitialProbePolicy.LEADER_HALF
         "lp-transfer" -> InitialProbePolicy.LP_TRANSFER
-        else -> pipelineConfigError("portfolio-probes expects ordinary|leader-half|lp-transfer, got `$probes`")
+        "heuristic-second" -> InitialProbePolicy.HEURISTIC_SECOND
+        "family-work" -> InitialProbePolicy.FAMILY_WORK
+        else -> pipelineConfigError(
+            "portfolio-probes expects ordinary|leader-half|lp-transfer|heuristic-second|family-work, " +
+                "got `$probes`")
     }
     if (probePolicy != InitialProbePolicy.ORDINARY &&
         (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {

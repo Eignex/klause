@@ -233,7 +233,26 @@ internal fun FinitePipeline.portfolioExecutor(
         }
         PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes,
             probeWeights = probeWeights,
+            probeRanks = if (probePolicy == InitialProbePolicy.HEURISTIC_SECOND)
+                heuristicSecondProbeRanks(workers) else intArrayOf(),
+            initialHeuristics = if (probePolicy == InitialProbePolicy.FAMILY_WORK) workers.indices.filter { arm ->
+                arm < scenario.arms && workers[arm].family == ArmFamily.LocalSearch &&
+                    !workers[arm].startAfterIncumbent && !workers[arm].improvementOnly && !workers[arm].auxiliaryProof
+            }.toSet() else emptySet(),
             onProgress = deferred)
+    }
+}
+
+internal fun heuristicSecondProbeRanks(workers: List<PortfolioWorker>): IntArray {
+    val initial = workers.indices.filter {
+        !workers[it].startAfterIncumbent && !workers[it].improvementOnly && !workers[it].auxiliaryProof
+    }
+    val leader = initial.firstOrNull() ?: return intArrayOf()
+    if (workers[leader].family != ArmFamily.Backtrack || !workers[leader].permitsSourceProofs) return intArrayOf()
+    val heuristic = initial.firstOrNull { workers[it].family == ArmFamily.LocalSearch } ?: return intArrayOf()
+    val order = listOf(leader, heuristic) + workers.indices.filter { it != leader && it != heuristic }
+    return IntArray(workers.size).also { ranks ->
+        order.forEachIndexed { rank, arm -> ranks[arm] = rank }
     }
 }
 

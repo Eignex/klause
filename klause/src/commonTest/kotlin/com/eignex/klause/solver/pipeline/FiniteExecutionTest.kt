@@ -222,8 +222,8 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `leading probe budgets should require a containing time deadline`() {
-        for (policy in listOf("leader-half", "lp-transfer")) {
+    fun `initial probe policies should require a containing time deadline`() {
+        for (policy in listOf("leader-half", "lp-transfer", "heuristic-second", "family-work")) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -240,13 +240,19 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `typed and parsed leading probe budgets should execute curated integer optimization`() {
+    fun `typed and parsed initial probe policies should execute curated integer optimization`() {
         for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProbes("leader-half")),
             ExecutionOptions.parse(listOf("portfolio-probes=leader-half")),
             ExecutionOptions.parse(listOf("portfolio-probes=leader-half", "portfolio-lp-start=after-probes")),
             ExecutionOptions(ExecutionOption.portfolioProbes("lp-transfer")),
             ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer")),
-            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer", "portfolio-lp-start=after-probes")))) {
+            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer", "portfolio-lp-start=after-probes")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-second")),
+            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second")),
+            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second", "portfolio-lp-start=after-probes")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("family-work")),
+            ExecutionOptions.parse(listOf("portfolio-probes=family-work")),
+            ExecutionOptions.parse(listOf("portfolio-probes=family-work", "portfolio-lp-start=after-probes")))) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -263,14 +269,20 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `leading probe budgets should reject unknown policies explicit recipes and work schedules`() {
+    fun `initial probe policies should reject unknown policies explicit recipes and work schedules`() {
         for (settings in listOf(listOf("portfolio-probes=never"),
             listOf("portfolio-probes=leader-half", "arms=2"),
             listOf("portfolio-probes=leader-half", "bt-arm=satOptimized"),
             listOf("portfolio-probes=leader-half", "portfolio-work=100"),
             listOf("portfolio-probes=lp-transfer", "arms=2"),
             listOf("portfolio-probes=lp-transfer", "bt-arm=satOptimized"),
-            listOf("portfolio-probes=lp-transfer", "portfolio-work=100"))) {
+            listOf("portfolio-probes=lp-transfer", "portfolio-work=100"),
+            listOf("portfolio-probes=heuristic-second", "arms=2"),
+            listOf("portfolio-probes=heuristic-second", "bt-arm=satOptimized"),
+            listOf("portfolio-probes=heuristic-second", "portfolio-work=100"),
+            listOf("portfolio-probes=family-work", "arms=2"),
+            listOf("portfolio-probes=family-work", "bt-arm=satOptimized"),
+            listOf("portfolio-probes=family-work", "portfolio-work=100"))) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -306,8 +318,8 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `leading probe budgets should reject Boolean sources`() {
-        for (policy in listOf("leader-half", "lp-transfer")) {
+    fun `initial probe policies should reject Boolean sources`() {
+        for (policy in listOf("leader-half", "lp-transfer", "heuristic-second", "family-work")) {
             val shape = FiniteSolveShape(Problem(1, 0, emptyArray(), emptyArray()), true, false, null,
                 LinearObjective(longArrayOf(1)), 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(

@@ -22,6 +22,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.BooleanProofStats
+import com.eignex.klause.solver.result.HeuristicStartStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
@@ -178,6 +179,17 @@ class Portfolio(
             require(value.isEmpty() || value.size == workers.size)
             require(value.all { it > 0 })
             field = value.copyOf()
+        }
+    internal var initialProbeRanks: IntArray = intArrayOf()
+        set(value) {
+            require(value.isEmpty() || value.size == workers.size)
+            require(value.all { it in workers.indices } && value.distinct().size == value.size)
+            field = value.copyOf()
+        }
+    internal var initialHeuristicArms: Set<Int> = emptySet()
+        set(value) {
+            require(value.all { it in workers.indices && workers[it].family == ArmFamily.LocalSearch })
+            field = value.toSet()
         }
     internal var improvementProofShare: Double = 0.5
         set(value) {
@@ -930,6 +942,9 @@ class Portfolio(
         private val firstWitnessArms = workers.indices.filter { workers[it].firstWitnessOnly }
         private var remaining = workers.size
         private val probed = BooleanArray(workers.size)
+        private val initialHeuristics = initialHeuristicArms.toSet()
+        private val heuristicSampleWork = if (initialHeuristics.isEmpty()) LongArray(0) else LongArray(workers.size)
+        private var heuristicSampled = initialHeuristics.isEmpty()
         private val productive = BooleanArray(workers.size)
         private val trialStarted = BooleanArray(workers.size)
         private val trialPreparationTime = Array(workers.size) { Duration.ZERO }
@@ -1088,12 +1103,20 @@ class Portfolio(
             }
             if (remaining == 0) return@locked null
             val dedicated = diagnostics == null && lanes == workers.size && workers.none { it.startAfterIncumbent }
-            val eligible = eligibleArms().let { arms -> availability?.let { arms.filter(it) } ?: arms }
+            val available = eligibleArms().let { arms -> availability?.let { arms.filter(it) } ?: arms }
+            val eligible = initialHeuristicEligibility(available)
             val earlyCore = if (dedicated) null else earlyCoreTrials.firstOrNull {
                 it in eligible && !busy[it] && !retired[it]
             }
             val probe = if (dedicated) null else eligible.filter { !probed[it] && !busy[it] && !retired[it] }
-                .minByOrNull { if (workers[it].auxiliaryProof) 1 else 0 }
+                .let { candidates ->
+                    if (initialProbeRanks.isEmpty()) {
+                        candidates.minByOrNull { if (workers[it].auxiliaryProof) 1 else 0 }
+                    } else {
+                        candidates.minWithOrNull(compareBy<Int> { if (workers[it].auxiliaryProof) 1 else 0 }
+                            .thenBy { initialProbeRanks[it] })
+                    }
+                }
             val unprobed = eligible.any { !probed[it] && !retired[it] }
             val revisit = if (dedicated || earlyCore != null || improving || unprobed) {
                 null
@@ -1143,7 +1166,7 @@ class Portfolio(
                 if (auxiliary) minOf(allowance, trialWorkLimit - trialSearchWork[arm]) else allowance,
                 whole = dedicated,
                 probeFraction = if (probing) initialProbeFraction(arm,
-                    eligible.filter { !workers[it].auxiliaryProof }, initialProbeWeights) else 1.0,
+                    available.filter { !workers[it].auxiliaryProof }, initialProbeWeights) else 1.0,
                 preparationRevisit = revisiting,
                 segment = segmentIndex++,
             ).also { claim ->
@@ -1152,6 +1175,12 @@ class Portfolio(
                 diagnostics?.onEvent?.invoke(PortfolioEvent.Selected(claim.segment, arm, workers[arm].label,
                     claim.sliceWork))
             }
+        }
+
+        private fun initialHeuristicEligibility(eligible: List<Int>): List<Int> {
+            if (heuristicSampled || diagnostics != null || lanes != 1) return eligible
+            val first = eligible.firstOrNull { it in initialHeuristics && !retired[it] } ?: return eligible
+            return eligible.filter { it !in initialHeuristics || it == first }
         }
 
         private fun eligibleArms(): List<Int> {
@@ -1309,6 +1338,11 @@ class Portfolio(
         ) {
             val arm = claim.arm
             val account = ledgerFor(arm)
+            if (!heuristicSampled && arm in initialHeuristics) {
+                heuristicSampleWork[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - heuristicSampleWork[arm])
+                if (!failed && claim.fault == null && failure !is SearchInitializationCancelled &&
+                    heuristicSampleWork[arm] >= baseSliceWork) heuristicSampled = true
+            }
             if (claim.closedProof) account.credit(arm, Signal.ProofClosure, 1.0)
             siblingWork[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - siblingWork[arm])
             initialCoreCoverage[arm] += minOf(work.coerceAtLeast(0L), Long.MAX_VALUE - initialCoreCoverage[arm])
@@ -1447,6 +1481,11 @@ class Portfolio(
                     profile = profile, reseedStaleThreshold = reseedStaleThreshold,
                     baseSliceWork = baseSliceWork, maxSliceWork = maxSliceWork, sliceGrowth = sliceGrowth,
                     invocationNanos = epoch.elapsedNow().inWholeNanoseconds,
+                    heuristicStarts = if (initialHeuristics.isEmpty()) emptyList() else listOf(
+                        HeuristicStartStats(baseSliceWork,
+                            initialHeuristics.associate { workers[it].label to heuristicSampleWork[it] },
+                            heuristicSampled),
+                    ),
                 ),
             )
         }

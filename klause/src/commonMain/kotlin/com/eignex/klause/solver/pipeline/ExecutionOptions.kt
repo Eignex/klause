@@ -547,7 +547,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Select ordinary LP probes or defer them until the other initial probes finish or find an incumbent. */
         val portfolioLpStart: ExecutionOption<String> = ExecutionOption("portfolio-lp-start", ValueKind.STRING)
 
-        /** Select ordinary initial probes or give the leading complete worker half their shared budget. */
+        /** Select ordinary probes, weighted budgets or an early heuristic probe. */
         val portfolioProbes: ExecutionOption<String> = ExecutionOption("portfolio-probes", ValueKind.STRING)
 
         /** The `reseed-stale-threshold` execution setting. */
