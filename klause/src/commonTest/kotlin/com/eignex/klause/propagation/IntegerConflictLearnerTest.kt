@@ -44,6 +44,50 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `a composed temporary child should propagate in another branch after its parents retire`() {
+        val padding = IntArray(13) { it + 7 }
+        val problem = Problem(0, 21, Array(21) {
+            if (it < 7 || it == 20) IntDomain(0, 1) else IntDomain(0, 0)
+        }, arrayOf(
+            Linear(intArrayOf(1, 1, -1), intArrayOf(0, 3, 2), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(5, 0), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(5, 4), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1, -1) + IntArray(13) { 1 },
+                intArrayOf(4, 1, 6) + padding, LinearOp.LE, 0),
+        ))
+        val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+            .apply { enableIntegerRowLearning() }
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(0 to 1L, 1 to 1L, 2 to -1L), 0L, Lit.NONE)), 1)
+        val cp = CpSearchComponent(native, IntArray(21) { it + 5 })
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(25, 0)))
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(11, 0)))
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(10, 1)))
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+        val state = native.explanationState
+        val child = requireNotNull(state.learned.integerRows).single { it.row.retainedSources > 0 }
+        assertEquals(2, child.row.transientSteps)
+        shared.popTo(0)
+        assertEquals(1L, shared.intUpperBound(10))
+        native.forgetLearnedClauses { index, _ -> state.learned.store[index] === child }
+        assertSame(child, requireNotNull(state.learned.integerRows).single())
+        assertTrue(state.learned.store.none { it is ClausePropagator })
+
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtLeast(25, 1)))
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtMost(11, 0)))
+
+        assertEquals(0L, shared.intUpperBound(10))
+        assertSame(child, state.factorAt(state.intMaxReason[5]))
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerRetired"])
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerChainedTransientConsumed"])
+    }
+
+    @Test
     fun `a compact owned derivation should cross temporary width before asserting in mapped coordinates`() {
         val padding = IntArray(14) { it + 6 }
         val problem = Problem(0, 20, Array(20) { if (it < 6) IntDomain(0, 1) else IntDomain(0, 0) }, arrayOf(
