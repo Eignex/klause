@@ -35,6 +35,7 @@ internal class LpHints(
     private val directionalGains: Boolean = false,
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
+    private val rootBasis: Boolean = false,
 ) : LpHintSink {
     private data class SideAdvice(val variable: VarRef, val split: Long, val up: Boolean, val basis: Boolean)
 
@@ -45,6 +46,7 @@ internal class LpHints(
     private var pointPrimal: DoubleArray? = null
     private var pendingSide: SideAdvice? = null
     private var activeSide: SideAdvice? = null
+    private var rootBasisAttempted = false
     private var boundRecorded = false
     private var unavailable = LpHintUnavailable.UNOBSERVED
     private var scopeModel: ExactLpModel? = null
@@ -306,10 +308,17 @@ internal class LpHints(
         return if (history.mayHaveScores) history.prediction(variable, value) else null
     }
 
+    fun prepareSelectedSide(
+        variable: VarRef?,
+        domain: IntDomain?,
+        estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>?,
+    ): Boolean = prepareSide(variable, domain, allowBasis = rootBasis, rootOnly = true, estimate = estimate)
+
     fun prepareSide(
         variable: VarRef?,
         domain: IntDomain?,
         allowBasis: Boolean = true,
+        rootOnly: Boolean = false,
         estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>?,
     ): Boolean {
         pendingSide = null
@@ -322,11 +331,12 @@ internal class LpHints(
             return prediction.score > 1e-9 &&
                 rememberSide(variable, value, prediction.down, prediction.up, basis = false)
         }
-        if (!allowBasis) return false
+        if (!allowBasis || (rootOnly && (!history.isRootNode || rootBasisAttempted))) return false
         val relaxation = pointRelaxation ?: return false
         val column = relaxation.column(variable)
         if (column < 0) return false
-        charge(4L)
+        charge(if (rootOnly) 5L else 4L)
+        if (rootOnly) rootBasisAttempted = true
         observe("BASIS_ATTEMPT")
         val costs = estimate(relaxation.model, intArrayOf(column))
         if (costs == null || costs.size != 1) {

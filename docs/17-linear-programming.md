@@ -192,7 +192,9 @@ query or certification, and publishes neither a point nor a new pruning bound.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
 history lifetime. An optional numerical capability estimates directional objective
 costs from a retained optimal basis for at most two structural columns; finite child
-guidance requests only its selected column. Each basis-row
+guidance can request only its selected root column, at most once per hint owner
+while reliable history is absent. It retains that attempt limit across restarts and
+reseeding. Each basis-row
 solve scans oriented reduced costs, including logical columns, and converts its ratios
 to source-coordinate objective units. It neither pivots nor requests another LP solve
 or certificate. Analysis reserves its work before allocation, within the node's unspent

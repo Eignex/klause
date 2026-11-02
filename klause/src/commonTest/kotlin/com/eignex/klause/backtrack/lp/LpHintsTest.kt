@@ -13,6 +13,7 @@ import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpBoundTrail
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpDirectionalCost
+import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpStructuralColumn
 import com.eignex.klause.lp.engine.Relation
@@ -201,6 +202,86 @@ class LpHintsTest {
         hints.recordBound(relaxation, 11.0)
 
         assertEquals(1, observations.count { it == "DOWN" })
+    }
+
+    @Test
+    fun `selected side basis opportunity is confined to one root attempt across resets`() {
+        for (enabled in listOf(false, true)) for (available in listOf(false, true)) {
+            val builder = LpBuilder()
+            builder.addVar(0, 2)
+            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0),
+                BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+            val hints = LpHints(1, 0, directionalGains = true, rootBasis = enabled)
+            val variable = VarRef.IntVar(0)
+            val domain = IntDomain(0, 2)
+            var queries = 0
+            val estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>? = { _, columns ->
+                assertEquals(listOf(0), columns.toList())
+                queries++
+                if (available) listOf(LpDirectionalCost(1.0, 4.0)) else null
+            }
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+            assertFalse(hints.prepareSelectedSide(variable, domain, estimate))
+            assertEquals(0, queries)
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+
+            val prepared = hints.prepareSelectedSide(variable, domain, estimate)
+            hints.branch(variable, domain)
+            val existing = listOf(SearchDecision.IntAtMost(0, 0), SearchDecision.IntAtLeast(0, 1))
+            val ordered = hints.orderAlternatives(variable, existing)
+
+            assertEquals(enabled && available, prepared)
+            assertEquals(if (enabled && available) existing.reversed() else existing, ordered)
+            assertFalse(hints.prepareSelectedSide(variable, domain, estimate))
+            hints.resetHistory()
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+            assertFalse(hints.prepareSelectedSide(variable, domain, estimate))
+            assertEquals(if (enabled) 1 else 0, queries)
+        }
+    }
+
+    @Test
+    fun `reliable history preserves the root basis opportunity`() {
+        val builder = LpBuilder()
+        builder.addVar(0, 10, cost = 1)
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+        val hints = LpHints(1, 0, directionalGains = true, rootBasis = true)
+        val variable = VarRef.IntVar(0)
+        val domain = IntDomain(0, 10)
+        repeat(2) {
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            hints.branch(variable, domain)
+            for (up in listOf(false, true)) {
+                hints.commit(if (up) SearchDecision.IntAtLeast(0, 3) else SearchDecision.IntAtMost(0, 2), 1)
+                hints.beginNode(1, 100.0)
+                hints.recordFiniteBound(trail.state, if (up) 13L else 11L)
+                hints.finishNode(trail.state)
+            }
+        }
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+        hints.recordBound(relaxation, 10.0)
+        var queries = 0
+        val estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>? = { _, _ ->
+            queries++
+            listOf(LpDirectionalCost(1.0, 4.0))
+        }
+
+        assertTrue(hints.prepareSelectedSide(variable, domain, estimate))
+        assertEquals(0, queries)
+        hints.resetHistory()
+        hints.beginNode(0, 100.0)
+        hints.record(relaxation, doubleArrayOf(2.25), DoubleArray(0))
+        hints.recordBound(relaxation, 10.0)
+        assertTrue(hints.prepareSelectedSide(variable, domain, estimate))
+        assertEquals(1, queries)
     }
 
     @Test

@@ -352,6 +352,8 @@ data class BacktrackParams(
     val lpPlan: LpPlan = LpPlan(),
     /** Use reliable, recent directional LP gains for finite variable and child ordering; otherwise keep LP scoring. */
     val lpDirectionalGains: Boolean = false,
+    /** One root child-order estimate from a retained optimal basis when [lpDirectionalGains] lacks reliable history. */
+    val lpDirectionalRootBasis: Boolean = false,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     /**

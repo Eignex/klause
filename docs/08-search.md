@@ -291,8 +291,14 @@ before visiting candidates. It performs no numerical query.
 Two recent samples in each direction supply that variable's predicted child gains,
 using each direction's mean cost per unit of fractional movement. The balanced
 `min + max / 6` score ranks finite positive predictions in the shortlist.
-Missing or unreliable history retains the existing variable and child order without
-querying the retained basis. History preparation and ordering share the existing LP allowance.
+Missing or unreliable history retains the existing variable order. With
+`lpDirectionalRootBasis`, the selected variable at the root can request one child-order
+estimate from its retained optimal basis. This attempt is limited to one column and
+one attempt per hint owner, including across slices, restarts and assumption reseeding.
+An unsupported or unfunded attempt consumes that opportunity and retains the existing
+child order. Reliable history takes precedence and consumes no basis opportunity.
+The LP recipes enable this setting alongside directional gains; direct parameters opt in.
+History preparation and ordering share the existing LP allowance.
 
 The larger predicted objective increase is tried first, after value and incumbent
 guidance, only when both existing alternatives match the estimated Boolean or integer

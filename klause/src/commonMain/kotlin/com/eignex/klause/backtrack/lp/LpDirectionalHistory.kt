@@ -46,6 +46,8 @@ internal class LpDirectionalHistory(
 
     val hasPendingChild: Boolean get() = pending != null
 
+    val isRootNode: Boolean get() = depth == 0
+
     val mayHaveScores: Boolean get() = reliableStamp >= 0L && stamp - reliableStamp <= maxAge
 
     fun clear(report: Boolean = true) {
