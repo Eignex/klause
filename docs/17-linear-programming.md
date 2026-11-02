@@ -547,7 +547,12 @@ additional proof. That proof rebuilds its positive combination with the selected
 source side and is checked before admission. The singleton index, side scoring,
 exact arithmetic and nested proofs share the same generation allowance. A nonseparating seed or continuation tries these alternatives before
 following one opposite-sign continuous incidence path through
-at most four distinct original source rows. Exact positive rescaling preserves
+at most four distinct original source rows. For the next residual coordinate,
+continuation ranks unvisited rows by finite source slack divided by the absolute
+pivot coefficient at the current point. Ties retain source order. If no score is
+available, the first eligible row is the fallback. The full scoring scan and scalar
+projections debit the same generation allowance; a stopped scan publishes no
+choice. Ranking only chooses premises: exact positive rescaling preserves
 the earlier combination while cancelling the next coordinate. Singleton continuous bounds remain part of mixed
 rounding. Residual capture, continuation scans, term weights, failed derivations
 and projection share the generation's existing allowance. Each attempt retains

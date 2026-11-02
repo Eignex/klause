@@ -538,14 +538,48 @@ internal object LinearAuthorityAggregateCuts {
                 meter.reserve(1L)
                 if (id.kind != SourceCoordinate.Kind.Real) continue
                 meter.reserve(1L, 64L)
+                var first: ProbeRow? = null
+                var selected: ProbeRow? = null
+                var best = Double.POSITIVE_INFINITY
                 for (other in incidence[id to (value < BigFraction.ZERO)].orEmpty()) {
                     meter.reserve(1L + terms.size)
                     if (other.coefficients.size <= 1 || terms.any { it.owner == other.term.owner }) continue
-                    meter.reserve(1L, 128L)
-                    return Continuation(other, value, other.coefficients.getValue(id))
+                    if (first == null) first = other
+                    attempted = true
+                    val score = continuationScore(other, other.coefficients.getValue(id))
+                    if (score == null) {
+                        observe("AggregateContinuationPointUnavailable", 1L)
+                    } else {
+                        observe("AggregateContinuationScored", 1L)
+                        if (score < best) {
+                            best = score
+                            selected = other
+                        }
+                    }
                 }
+                val row = selected ?: first ?: continue
+                meter.reserve(1L, 128L)
+                observe("AggregateContinuationComplete", 1L)
+                return Continuation(row, value, row.coefficients.getValue(id))
             }
             return null
+        }
+
+        private fun continuationScore(row: ProbeRow, pivot: BigFraction): Double? {
+            meter.reserve(4L, 128L)
+            val divisor = abs(meter.number(pivot).toDouble())
+            if (!divisor.isFinite() || divisor == 0.0) return null
+            var slack = meter.number(row.term.inequality.rhs).toDouble()
+            for ((id, value) in row.coefficients) {
+                meter.reserve(4L)
+                val coordinate = point[id]?.takeIf { it.isFinite() } ?: return null
+                val coefficient = meter.number(value).toDouble()
+                if (!coefficient.isFinite()) return null
+                slack -= coefficient * coordinate
+            }
+            meter.reserve(4L)
+            val score = slack / divisor
+            return score.takeIf { it.isFinite() }
         }
 
         fun integerRows(rows: List<ProbeRow>, candidates: MutableList<LinearAuthorityCut>, maximum: Int) {

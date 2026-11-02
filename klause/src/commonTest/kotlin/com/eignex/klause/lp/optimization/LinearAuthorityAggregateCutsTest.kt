@@ -1632,6 +1632,69 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `a tight continuation should separate before loose rows exhaust the production allowance`() {
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val premises = linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "demand" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                otherReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+        )
+        repeat(512) { index ->
+            premises["loose $index"] = SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ofLong(100)))
+        }
+        premises["tight"] = SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+            y to BigFraction.ofLong(-2)), BigFraction.ZERO))
+        val source = SourceProofContext(scope, setOf(x, y, real, otherReal), premises)
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            maximumCandidates = 1, limits = limits,
+            point = mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 1.5)).single()
+
+        assertEquals(SourceInequality(mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE),
+            BigFraction.ofLong(-2)), cut.inequality)
+        assertEquals(setOf(0, 1, 514), cut.owners)
+        assertTrue((observations["AggregateContinuationScored"] ?: 0L) > 0L)
+        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `cancelling continuation scoring should withhold its unfinished choice`() {
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(x, y, real, otherReal), linkedMapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "demand" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                otherReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "loose" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ofLong(100))),
+            "tight" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+        ))
+        val observations = mutableMapOf<String, Long>()
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, count ->
+                observations[name] = (observations[name] ?: 0L) + count
+                if (name == "AggregateContinuationScored") stopped = true
+            }, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            point = mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 1.5))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+        assertNull(observations["AggregateContinuationComplete"])
+        assertNull(observations["AggregateExtendedAttempts"])
+    }
+
+    @Test
     fun `point separation should require a fourth original row when three leave a continuous residual`() {
         val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
