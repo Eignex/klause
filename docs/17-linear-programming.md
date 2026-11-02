@@ -257,6 +257,9 @@ work quanta. Pauses publish no point or bound and charge only the new work. A
 pivoting pause can grow the next quantum under the existing adaptive ceiling;
 the operation keeps its original cumulative work and pivot limits. Consultations
 continue only within the remaining root, invocation and cancellation allowances.
+Each advance binds the current consultation token while retaining the owner lifetime
+and original cumulative limits. A paused original-objective query keeps root rounding
+pending; the worker yields before discrete traversal can invalidate its root state.
 Authority edits discard the cursor before adoption. Completed floating results
 enter the existing exact bound check, independently of dense exact continuation.
 The sparse root charges its last numerical delta before admitting bound-only

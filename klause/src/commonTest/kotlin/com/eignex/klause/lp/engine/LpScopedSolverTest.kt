@@ -360,6 +360,35 @@ class LpScopedSolverTest {
     }
 
     @Test
+    fun `fresh consultations resume the same cursor after the earlier query token expires`() {
+        val state = LpExactState(lowerBoundModel())
+        val expected = LpScopedSolver(state).use { owner ->
+            assertNotNull(owner.solveFloat()).second to owner.lastMetrics
+        }
+        var expired = false
+        LpScopedSolver(state).use { owner ->
+            val allowance = LpFloatAllowance(100_000L, 100)
+            assertNull(owner.advanceFloat(1L, allowance, Cancellation { expired }))
+            var work = owner.lastMetrics
+            assertTrue(owner.floatPaused)
+            expired = true
+            var result: FloatLpResult? = null
+            var attempts = 0
+
+            while (result == null && attempts++ < 64) {
+                result = owner.advanceFloat(1L, allowance, Cancellation.Never)?.second
+                work += owner.lastMetrics
+            }
+
+            assertEquals(assertNotNull(expected.first).objective, assertNotNull(result).objective)
+            assertEquals(expected.second.workOps, work.workOps)
+            assertFalse(owner.floatPaused)
+            assertEquals(1L, owner.metrics.createdOwners)
+            assertEquals(0L, owner.metrics.closedOwners)
+        }
+    }
+
+    @Test
     fun `fixed lifetime consultations should retain their cursor as remaining work shrinks`() {
         LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
             assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))

@@ -766,7 +766,7 @@ internal class ResumableMinimize(
             }
             if (rootRoundingPending) {
                 slice.charge()
-                if (sliceExpired()) return StepEvent.Paused
+                if (lpEngine.propagator.floatPaused || sliceExpired()) return StepEvent.Paused
             }
             unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
             if (treeBudgetExhausted) return terminal(terminalBudget())

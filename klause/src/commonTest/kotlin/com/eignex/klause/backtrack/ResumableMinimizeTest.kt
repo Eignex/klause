@@ -15,6 +15,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
@@ -27,10 +29,12 @@ import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveCursor
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.engine.ResumableLpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
@@ -185,6 +189,56 @@ internal object FiniteCutoffKnapsackFixture {
 }
 
 class ResumableMinimizeTest {
+    @Test
+    fun `paused root queries finish before the worker starts discrete traversal`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        var constructions = 0
+        var queries = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                constructions++
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate, ResumableLpSolver {
+                    private var pausedWork = 0L
+                    override val currentWork: Long get() = pausedWork + delegate.lastMetrics.workOps
+                    override val lastMetrics: LpSolveMetrics get() =
+                        delegate.lastMetrics.copy(workOps = currentWork)
+                    override fun openSolve(
+                        allowance: LpFloatAllowance?, retainFundingStop: Boolean,
+                    ): LpSolveCursor<FloatLpResult?> = LpSolveCursor {
+                        queries++
+                        repeat(2) {
+                            pausedWork += 5_000L * LP_WORK_PER_NODE
+                            pauseAt(pausedWork)
+                        }
+                        delegate.resolveBounds(allowance)
+                    }
+                }
+            }
+        }
+        val params = BacktrackParams(maxDecisions = 0L,
+            lpConfig = LpConfig.parse("default,+sparse-trial"),
+            lpPlan = LpPlan(probe = true, rootCutHarvest = false))
+        val offered = ArrayList<Sample>()
+
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5_000L) { offered += it.sample }
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, 100_000L) { offered += it.sample }
+            search.runSlice(Cancellation.Never, Long.MAX_VALUE, 100_000L) { offered += it.sample }
+        }
+
+        assertEquals(listOf(1L, 0L), offered.single().ints.toList())
+        assertEquals(1, queries)
+        assertEquals(1, constructions)
+    }
+
     @Test
     fun `sliced root rounding should resume only while its LP allowance remains`() {
         val charged = 5_000L * LP_WORK_PER_NODE
