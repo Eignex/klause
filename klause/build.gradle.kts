@@ -5,7 +5,7 @@ plugins {
 
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     val recording = layout.buildDirectory.file("reports/tests/plain-jvm-profile/worker.jfr").get().asFile
-    val recordingSettings = java.io.File(recording.parentFile, "events.jfc")
+    val recordingSettings = layout.buildDirectory.file("reports/tests/plain-jvm-profile/events.jfc").get().asFile
     jvmArgs("-XX:FlightRecorderOptions=stackdepth=256", "-XX:StartFlightRecording=filename=" +
         recording.absolutePath + ",settings=" + recordingSettings.absolutePath + ",dumponexit=true")
     doFirst {
