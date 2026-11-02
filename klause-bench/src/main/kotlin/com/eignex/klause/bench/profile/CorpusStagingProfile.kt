@@ -28,7 +28,7 @@ internal object CorpusStagingProfile {
             trial(request)
             return
         }
-        require(request.keys - setOf("order", "staging-target") ==
+        require(request.keys - setOf("order", "staging-target", "staging-buffer-kib") ==
             setOf("suite", "problem", "sha256", "budget-ms", "repeats"))
         val budget = request.getValue("budget-ms").toLong().also { require(it in 1..60_000) }
         val repeats = request.getValue("repeats").toInt().also { require(it in 2..4) }
@@ -36,7 +36,8 @@ internal object CorpusStagingProfile {
         val reference = Catalog.uncapped(request.getValue("suite")).problems
             .single { it.name == request.getValue("problem") }
         capture(CorpusFetcher.resolve(reference.source), out, budget, repeats, request.getValue("sha256"),
-            CorpusStagingControls(request["order"] ?: "forward", request["staging-target"] ?: "cache"))
+            CorpusStagingControls(request["order"] ?: "forward", request["staging-target"] ?: "cache",
+                (request["staging-buffer-kib"] ?: "8").toInt()))
     }
 
     internal fun capture(
@@ -57,6 +58,7 @@ internal object CorpusStagingProfile {
             put("repeats", repeats)
             put("order", controls.order)
             put("stagingTarget", controls.stagingTarget)
+            put("stagingBufferBytes", controls.bufferKiB * 1024)
             put("stagingDirectory", stagingRoot.absolutePath)
             put("instrumentation", "stage-uninstrumented and stage-prehashed have no JFR")
             put("prehash", "stage-prehashed matches canonical source hashing before the source deadline")
@@ -103,6 +105,7 @@ internal object CorpusStagingProfile {
                         "trial-path=${if (mode == "plain-hash") plain else packed}", "mode=$mode",
                         "sha256=$sourceHash", "budget-ms=$budget", "repeats=$repeats",
                         "samples=${out.resolve("$mode.jsonl")}", "staging-target=${controls.stagingTarget}",
+                        "staging-buffer-bytes=${controls.bufferKiB * 1024}",
                         "staging-directory=${stagingRoot.absolutePath}"))
                 }
                 out.resolve("$mode-command.json").writeText(Reports.json.encodeToString(command))
@@ -177,6 +180,7 @@ internal object CorpusStagingProfile {
                         "stage", "stage-uninstrumented", "stage-prehashed" -> CorpusFiles.withPlainFile(
                             source, ::checkActive, { cleanupNanos = it },
                             stagingDirectory = File(request.getValue("staging-directory")),
+                            bufferBytes = request.getValue("staging-buffer-bytes").toInt(),
                         ) { plain ->
                             stagingNanos = System.nanoTime() - start
                             val verifyStart = System.nanoTime()
@@ -200,6 +204,7 @@ internal object CorpusStagingProfile {
                     put("osCache", "uncontrolled; parent read and materialization completed before child startup")
                     put("sourcePath", source.absolutePath)
                     put("stagingTarget", request.getValue("staging-target"))
+                    put("stagingBufferBytes", request.getValue("staging-buffer-bytes").toInt())
                     put("stagingDirectory", request.getValue("staging-directory"))
                     put("sourceFileBytes", source.length())
                     put("stagedBytes", stagedBytes)

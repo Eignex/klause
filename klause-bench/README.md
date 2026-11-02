@@ -441,6 +441,10 @@ for diagnostic staging. Cross this control with both mode orders in paired rows.
 Parent identity preparation uses the cache for either target; its cost and filesystem
 remain separate from the trial destination. Trial samples retain the selected path,
 and filesystem identities describe the actual source, control and staging stores.
+`staging-buffer-kib=8|64` varies the diagnostic IO chunk size while keeping parent
+identity preparation and hash verification unchanged. The default is 8 KiB.
+Both sizes check the containing deadline between bounded reads and writes and
+retain partial-output cleanup; every sample records the actual byte count.
 This manifest omits MiniZinc provisioning and supports compressed file-backed
 sources only.
 IO event extracts are written after all trials on the lab worker. They retain

@@ -38,20 +38,25 @@ class CorpusStagingAdapterTest {
     }
 
     @ParameterizedTest
-    @CsvSource("forward, cache", "reverse, cache", "forward, temporary", "reverse, temporary")
-    fun `staging controls retain the same frozen source comparison identity`(order: String, target: String) {
+    @CsvSource("forward, cache, 8", "reverse, cache, 64", "forward, temporary, 64", "reverse, temporary, 8")
+    fun `staging controls retain the same frozen source comparison identity`(
+        order: String,
+        target: String,
+        bufferKiB: Int,
+    ) {
         val input = FrozenStagingInput("offline", "tiny", "DIMACS", "offline/tiny.cnf.zst",
             "1".repeat(64), "2".repeat(64))
         val parameters = mapOf("inputs" to BenchProtocol.json.encodeToString(listOf(input)), "timeout-ms" to "10000")
 
         val baseline = CorpusStagingSuite.plan(BenchRequest(parameters)).single()
         val control = CorpusStagingSuite.plan(BenchRequest(parameters +
-            mapOf("order" to order, "staging-target" to target))).single()
+            mapOf("order" to order, "staging-target" to target, "staging-buffer-kib" to bufferKiB.toString()))).single()
 
         assertEquals(baseline.inputs, control.inputs)
         assertEquals(baseline.attributes["comparisonKey"], control.attributes["comparisonKey"])
         assertEquals(baseline.parameters["timeout-ms"], control.parameters["timeout-ms"])
         assertEquals(order, control.parameters["order"])
         assertEquals(target, control.parameters["staging-target"])
+        assertEquals(bufferKiB.toString(), control.parameters["staging-buffer-kib"])
     }
 }
