@@ -3,6 +3,53 @@ plugins {
     kotlin("plugin.serialization")
 }
 
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    val recording = layout.buildDirectory.file("reports/tests/plain-jvm-profile/worker.jfr").get().asFile
+    val recordingSettings = layout.buildDirectory.file("reports/tests/plain-jvm-profile/events.jfc").get().asFile
+    jvmArgs("-XX:FlightRecorderOptions=stackdepth=256", "-XX:StartFlightRecording=filename=" +
+        recording.absolutePath + ",settings=" + recordingSettings.absolutePath + ",dumponexit=true")
+    doFirst {
+        recording.parentFile.mkdirs()
+        recordingSettings.writeText(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <configuration version="2.0" label="Ordinary worker costs" description="Execution and allocation cost diagnosis" provider="Klause">
+              <event name="jdk.ExecutionSample">
+                <setting name="enabled">true</setting>
+                <setting name="period">5 ms</setting>
+              </event>
+              <event name="jdk.NativeMethodSample">
+                <setting name="enabled">true</setting>
+                <setting name="period">20 ms</setting>
+              </event>
+              <event name="jdk.ObjectAllocationSample">
+                <setting name="enabled">true</setting>
+                <setting name="throttle">300/s</setting>
+                <setting name="stackTrace">true</setting>
+              </event>
+              <event name="jdk.ClassLoad">
+                <setting name="enabled">true</setting>
+                <setting name="threshold">0 ms</setting>
+                <setting name="stackTrace">true</setting>
+              </event>
+              <event name="jdk.Compilation">
+                <setting name="enabled">true</setting>
+                <setting name="threshold">100 ms</setting>
+              </event>
+              <event name="jdk.ActiveSetting">
+                <setting name="enabled">true</setting>
+              </event>
+              <event name="jdk.InitialEnvironmentVariable"><setting name="enabled">false</setting></event>
+              <event name="jdk.InitialSystemProperty"><setting name="enabled">false</setting></event>
+              <event name="jdk.JVMInformation"><setting name="enabled">false</setting></event>
+              <event name="jdk.SystemProcess"><setting name="enabled">false</setting></event>
+              <event name="jdk.ProcessStart"><setting name="enabled">false</setting></event>
+            </configuration>
+            """.trimIndent() + "\n",
+        )
+    }
+}
+
 kover {
     currentProject {
         instrumentation {
