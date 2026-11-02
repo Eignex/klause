@@ -675,7 +675,7 @@ internal fun PropagationState.installLitWatch(lit: Int, fid: Int, blocker: Int =
     val v = Lit.variable(lit)
     if (v < problem.numBoolVars) {
         val list = watches.byLit[lit]
-        watches.pos.put(packWatch(fid, lit), list.size) // position of the about-to-append entry
+        work += watches.pos.put(packWatch(fid, lit), list.size) // position of the about-to-append entry
         list.add(fid)
         watches.blockersByLit[lit].add(blocker) // index-aligned with the watcher just appended
     } else {

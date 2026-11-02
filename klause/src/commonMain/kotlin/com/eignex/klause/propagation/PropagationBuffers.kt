@@ -151,13 +151,8 @@ internal class PropagationBuffers(
             yield(null)
             val atoms = AtomStore(problem.numIntVars)
             yield(null)
-            var watcherCount = 0
-            for (fid in projection.propagators.indices) {
-                watcherCount += projection.propagators[fid].initialBoolWatchers?.size ?: 0
-                if ((fid + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
-            }
             var watcherIndex: BoolWatcherIndex? = null
-            for (next in BoolWatcherIndex.preparation(problem.numBoolVars, watcherCount)) {
+            for (next in BoolWatcherIndex.preparation(problem.numBoolVars)) {
                 if (next != null) watcherIndex = next
                 yield(null)
             }

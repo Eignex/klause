@@ -253,6 +253,7 @@ class SharingMemoryTest {
                 state.learned.store.sharingMemory(sample, true) { true }
                 sample.ownedReferences(state.refPayloadStore, state.refPayloadStore.size.toLong(), true)
                 sample.owned(state.watches.pos, state.watches.pos.primitiveCapacityBytes, true)
+                sample.ownedReferences(state.watches.pos, state.watches.pos.referenceCapacity, true)
                 for (literal in listOf(0, 2)) {
                     for (posting in listOf(state.watches.byLit[literal], state.watches.blockersByLit[literal])) {
                         sample.owned(posting.backingData, posting.backingData.size.toLong() * Int.SIZE_BYTES, true)
@@ -264,7 +265,9 @@ class SharingMemoryTest {
             assertEquals(before.getValue("ownedReferenceSlots"), after.getValue("ownedReferenceSlots"))
             assertEquals(if (permanent) 0L else dependencies,
                 after.getValue("protectedPrimitiveBytes") - before.getValue("protectedPrimitiveBytes"))
-            assertEquals(if (permanent) 0L else state.learned.store.referenceCapacity + state.refPayloadStore.size + 4L,
+            val references = state.learned.store.referenceCapacity + state.refPayloadStore.size +
+                state.watches.pos.referenceCapacity + 4L
+            assertEquals(if (permanent) 0L else references,
                 after.getValue("protectedReferenceSlots") - before.getValue("protectedReferenceSlots"))
         }
     }

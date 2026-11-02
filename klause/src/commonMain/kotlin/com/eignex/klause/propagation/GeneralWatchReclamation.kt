@@ -1,7 +1,6 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableLongIntMap
 
 internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPreparation) {
     if (incremental || nativeEngine != null || learned.retiredCount == 0) return
@@ -10,7 +9,6 @@ internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPrep
             (learned.deferredWatchTrimWork == 0L ||
                 !budget.supports(learned.deferredWatchTrimWork, learned.deferredWatchTrimScratch))
         ) {
-            trimEmptyWatchPositions(budget)
             return
         }
         budget.visit(8L)
@@ -44,7 +42,6 @@ internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPrep
         } else learned.watchCleanupIndex++
         budget.advanced()
     }
-    trimEmptyWatchPositions(budget)
     budget.visit(4L)
     budget.visit(0L)
     learned.sweptRetirements = learned.sweepingRetirements
@@ -102,14 +99,5 @@ private fun PropagationState.trimPostingArray(posting: IntArrayList, budget: Rec
     budget.visit(work, scratch)
     budget.visit(0L)
     posting.trim()
-    budget.advanced()
-}
-
-private fun PropagationState.trimEmptyWatchPositions(budget: ReclamationPreparation) {
-    val index = initializedWatches ?: return
-    if (index.pos.size != 0 || index.pos.primitiveCapacityBytes <= 104L || !budget.supports(64L, 192L)) return
-    budget.visit(64L, 192L)
-    budget.visit(0L)
-    index.pos = MutableLongIntMap()
     budget.advanced()
 }

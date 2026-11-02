@@ -88,7 +88,8 @@ internal fun PropagationState.prepareReclamation(
     if (factorAttribution != null) budget.atomic(count.toLong() * count)
     budget.atomic(propQueue.size.toLong() * 3L + atoms.dirtyFactors.size * 3L + learned.pendingAttach.size,
         (propQueue.size.toLong() + atoms.dirtyFactors.size) * Int.SIZE_BYTES)
-    budget.atomic(watches.pos.primitiveCapacityBytes, watches.pos.primitiveCapacityBytes * 2L)
+    budget.atomic(watches.pos.primitiveCapacityBytes,
+        (watches.pos.primitiveCapacityBytes + watches.pos.referenceCapacity * Long.SIZE_BYTES) * 2L)
     budget.atomic(watches.pos.size.toLong() * watches.pos.size)
     for (lists in listOf(watches.byLit.asList(), watches.blockersByLit.asList(), atoms.watchersByLit)) {
         for (list in lists) {

@@ -204,6 +204,7 @@ private fun PropagationState.learnedSharingMemory(
         sample.owned(blockers.backingData, blockers.backingData.size.toLong() * Int.SIZE_BYTES, retained)
     }
     sample.owned(watches.pos, watches.pos.primitiveCapacityBytes, protectedWatchIndex)
+    sample.ownedReferences(watches.pos, watches.pos.referenceCapacity, protectedWatchIndex)
     for (posting in atoms.watchersByLit) {
         sample.step()
         if (posting == null) continue
@@ -262,6 +263,7 @@ private fun PropagationState.learnedSharingMemory(
         "learnedIntegerRowCacheCapacityBytes" to (learned.integerRows?.capacity?.toLong() ?: 0L) * Long.SIZE_BYTES,
         "learnedIntegerRowIndexBytes" to (learned.integerRows?.size?.toLong() ?: 0L) * Int.SIZE_BYTES,
         "sessionWatchCapacityBytes" to watchers,
+        "sessionWatchIndexReferenceSlots" to watches.pos.referenceCapacity,
         "sessionQueueCapacityBytes" to propQueue.allocatedBytes + atoms.dirtyFactors.allocatedBytes,
         "propagationScheduleCapacityBytes" to (propagationSchedule?.capacityBytes ?: 0L),
         "pendingAttachments" to learned.pendingAttach.size.toLong(),

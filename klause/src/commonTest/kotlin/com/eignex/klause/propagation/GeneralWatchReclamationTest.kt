@@ -88,6 +88,8 @@ class GeneralWatchReclamationTest {
             repeat(8) { session.maintainCapWindow(0, 32_768L, 4096L, { false }) { false } }
             val generation = session.learnedRetirementGeneration
             val before = session.explanationState.watches.byLit[0].backingData.size
+            val indexBytes = session.explanationState.watches.pos.primitiveCapacityBytes
+            val indexReferences = session.explanationState.watches.pos.referenceCapacity
 
             repeat(24) {
                 val work = session.work
@@ -98,6 +100,9 @@ class GeneralWatchReclamationTest {
             assertEquals(permanentCount, session.activeLearnedClauseCount)
             assertEquals(0, session.explanationState.watches.byLit[0].size)
             assertTrue(session.explanationState.watches.byLit[0].backingData.size < before)
+            assertTrue(session.explanationState.watches.pos.size > 0)
+            assertTrue(session.explanationState.watches.pos.primitiveCapacityBytes < indexBytes)
+            assertTrue(session.explanationState.watches.pos.referenceCapacity < indexReferences)
             assertEquals(generation, session.learnedRetirementGeneration)
             session.pinBool(4, false)
             assertEquals(true, session.boolValue(5))

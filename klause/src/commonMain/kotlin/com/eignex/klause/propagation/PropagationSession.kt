@@ -292,6 +292,7 @@ class PropagationSession private constructor(
         val native = state.nativeEngine
         if (native != null) native.retireRootSource(factor)
         else for (literal in literals) {
+            state.work += state.watches.pos.readWork
             if (state.watches.pos.getOrDefault(state.packWatch(factor, literal), -1) >= 0) {
                 state.removeBoolWatch(factor, literal)
             }

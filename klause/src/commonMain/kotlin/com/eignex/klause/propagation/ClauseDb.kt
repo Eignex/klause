@@ -358,14 +358,14 @@ internal fun PropagationState.forgetLearnedClauses(
     }
 
     // Renumbering learned fids and shifting list positions invalidates every back pointer.
-    work += watches.pos.size.toLong() * watches.pos.size
-    watches.pos = com.eignex.klause.util.MutableLongIntMap()
+    work++
+    watches.pos = com.eignex.klause.util.MutableLongIntIndex()
     for (lit in watches.byLit.indices) {
         work++
         val list = watches.byLit[lit]
         for (i in 0 until list.size) {
             work++
-            watches.pos.put(packWatch(list[i], lit), i)
+            work += watches.pos.put(packWatch(list[i], lit), i)
         }
     }
 

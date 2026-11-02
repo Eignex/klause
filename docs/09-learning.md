@@ -271,8 +271,11 @@ learned handles. Retired Boolean and bound-atom postings are removed independent
 Boolean back-pointer deletion and swap-pop publication share one funded transaction.
 Watcher movement rewinds the current scan prefix. Small posting arrays trim within
 the same work and scratch limits. Posting and blocker arrays trim in separate funded
-transactions, so their combined copy need not fit one grant. An empty Boolean
-back-pointer index drops excess capacity in its own funded transaction. Deferred
+transactions, so their combined copy need not fit one grant. The Boolean
+back-pointer index releases entries individually from a balanced tree. Deletion and
+a swapped watch's position update publish together after height-bounded funding.
+Primitive node fields and reference slots remain separately owned; live and saved
+reasons protect the index. Ordinary index mutations retain their work charges. Deferred
 array trims retain their minimum grant requirements and retry when a later grant
 can fund them, independently of further logical retirements.
 Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,

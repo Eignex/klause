@@ -9,8 +9,8 @@ internal fun PropagationState.packWatch(fid: Int, lit: Int): Long =
 /**
  * Move factor `[factorId]`'s registration from [oldLit] to [newLit] in
  * [BoolWatcherIndex.byLit]. Called by watcher-using factors when they relocate a watch
- * during propagation. The removal scans [oldLit]'s slot (typically a handful of
- * entries) and swap-and-pops; the insert is O(1).
+ * during propagation. Removal swaps the tail posting into the indexed slot;
+ * insertion retains its balanced back pointer.
  */
 internal fun PropagationState.moveBoolWatcher(factorId: Int, oldLit: Int, newLit: Int, blocker: Int = NO_BLOCKER) {
     if (oldLit == newLit) return
@@ -33,7 +33,7 @@ internal fun PropagationState.moveBoolWatcher(factorId: Int, oldLit: Int, newLit
     installLitWatch(newLit, factorId, blocker)
 }
 
-/** O(1) removal of `[factorId]` from `watches.byLit[lit]` via the [BoolWatcherIndex.pos]
+/** Indexed removal of `[factorId]` from `watches.byLit[lit]` via the [BoolWatcherIndex.pos]
  *  back-pointer: swap the tail entry into the freed slot and fix its recorded position.
  *  Verifies the recorded position actually holds `[factorId]`; on any miss/mismatch falls
  *  back to the linear swap-remove and self-heals the index, so a stale back-pointer can
@@ -44,6 +44,7 @@ internal fun PropagationState.removeBoolWatch(factorId: Int, lit: Int) {
     val key = packWatch(factorId, lit)
     // Remove-and-read in a single table walk; the key is gone from the index either way.
     val recorded = watches.pos.removeAndGet(key, -1)
+    work += watches.pos.lastMutationWork
     if (recorded < 0 || recorded >= list.size || list[recorded] != factorId) {
         // Index miss/desync — fall back to a linear scan, swap-pop both lists in lockstep
         // at the found index, and resync this lit's positions.
@@ -64,7 +65,7 @@ internal fun PropagationState.removeBoolWatch(factorId: Int, lit: Int) {
     val last = list.size - 1
     if (recorded != last) {
         val movedFid = list[last]
-        watches.pos.put(packWatch(movedFid, lit), recorded)
+        work += watches.pos.put(packWatch(movedFid, lit), recorded)
     }
     swapPopWatch(list, blockers, recorded)
     rewindWatchCleanup(lit, recorded)
@@ -90,5 +91,7 @@ internal fun PropagationState.rewindWatchCleanup(lit: Int, index: Int) {
  *  fallback in [removeBoolWatch]). */
 internal fun PropagationState.resyncBoolWatchPos(lit: Int) {
     val list = watches.byLit[lit]
-    for (i in 0 until list.size) watches.pos.put(packWatch(list[i], lit), i)
+    for (i in 0 until list.size) {
+        work += watches.pos.put(packWatch(list[i], lit), i)
+    }
 }
