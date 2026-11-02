@@ -12,6 +12,7 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.LpEmissionTemplates
 import com.eignex.klause.lp.relaxation.LpPrimalDefinition
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.buildPrimalSource
@@ -29,7 +30,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class LpPumpPreparationTest {
-    private val problem = Problem(1, 3, Array(3) { IntDomain(0, 10) }, (1..6).map {
+    private val problem = Problem(1, 3, Array(3) { IntDomain(0, 10) }, (1..7).map {
         Linear(intArrayOf(1, it, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6)
     })
     private val selected = FactorProjectionProviders.Default.prepare(problem)
@@ -270,6 +271,86 @@ class LpPumpPreparationTest {
         assertFailsWith<IllegalArgumentException> {
             root.withModel(changed, primalDefinition = root.primalDefinition)
         }
+    }
+
+    @Test
+    fun `captured objectives should bind within a constant allowance with shifted columns`() {
+        val view = Problem(1, 3, Array(3) { IntDomain(2, 10) }, problem.factors)
+        val selection = FactorProjectionProviders.Default.prepare(view)
+        val cost = objective.copy(constant = 7)
+        val root = buildPrimalSource(view, cost, RootDomains(view), Cancellation.Never, {}, selection,
+            reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+        var charged = 0L
+        val meter = WorkMeter { charged += it }
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 6L
+            override fun workMeter(): WorkMeter = meter
+        }
+        LpEngine(view, cost, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("captured-objective"),
+            projections = selection).use { engine ->
+            val prepared = assertNotNull(LpPumpPreparation.create(engine, root, Cancellation.Never))
+
+            val rebound = assertNotNull(prepared.rebind(cost, token))
+
+            assertEquals(BigFraction.ofLong(6), solveAndCertify(rebound.model).lowerBound)
+            assertEquals(7L, rebound.objectiveConstant)
+            assertNull(rebound.sourceMap)
+            assertEquals(1L, engine.sink.snapshot().lp.phases.getValue("PRIMAL_LP_PUMP_PREPARATION_ROOT")
+                .outcomes["COSTS_REUSED"])
+        }
+    }
+
+    @Test
+    fun `caller coefficient edits should preserve a captured objective binding`() {
+        val coefficients = longArrayOf(1, 1, 1)
+        val cost = LinearObjective(boolWeights = longArrayOf(1), intCoefficients = coefficients)
+        val root = buildPrimalSource(problem, cost, RootDomains(problem), Cancellation.Never, {}, selected,
+            reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+        LpEngine(problem, cost, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("owned-objective-costs"),
+            projections = selected).use { engine ->
+            val prepared = assertNotNull(LpPumpPreparation.create(engine, root, Cancellation.Never))
+            coefficients.fill(9)
+            cost.intCoefficients.fill(9)
+
+            val rebound = assertNotNull(prepared.rebind(cost, Cancellation.Never))
+
+            assertEquals(BigFraction.ofLong(6), solveAndCertify(rebound.model).lowerBound)
+        }
+    }
+
+    @Test
+    fun `different coefficient buffers should require the ordinary binding allowance`() {
+        val root = buildPrimalSource(problem, objective, RootDomains(problem), Cancellation.Never, {}, selected,
+            reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("different-costs"),
+            projections = selected).use { engine ->
+            val prepared = assertNotNull(LpPumpPreparation.create(engine, root, Cancellation.Never))
+            for (coefficient in listOf(1L, 2L)) {
+                var charged = 0L
+                val meter = WorkMeter { charged += it }
+                val token = object : Cancellation {
+                    override fun isCancelled(): Boolean = charged >= 6L
+                    override fun workMeter(): WorkMeter = meter
+                }
+                val changed = objective.copy(intCoefficients = LongArray(3) { coefficient })
+
+                assertFailsWith<LpAssemblyCancelled> { prepared.rebind(changed, token) }
+
+                val restored = assertNotNull(prepared.rebind(objective, Cancellation.Never))
+                assertEquals(BigFraction.ofLong(6), solveAndCertify(restored.model).lowerBound)
+            }
+        }
+    }
+
+    @Test
+    fun `oversized coefficient buffers should withhold factory preparation metadata`() {
+        val coefficients = LongArray(LpEmissionTemplates.MAX_UNITS.toInt()) { if (it < 3) 1L else 0L }
+        val cost = LinearObjective(boolWeights = longArrayOf(1), intCoefficients = coefficients)
+
+        val root = buildPrimalSource(problem, cost, RootDomains(problem), Cancellation.Never, {}, selected,
+            reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
+
+        assertNull(root.primalDefinition)
     }
 
     @Test

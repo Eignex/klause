@@ -1614,7 +1614,9 @@ internal class CpToLpRelaxation(
                 gatedWhenTrue = BooleanArray(gatedWhenTrueList.size) { gatedWhenTrueList[it] == 1 },
                 realUpperRows = realUpperRows.toMap(),
                 preparationTemplates = preparationTemplates,
-                primalDefinition = primalDefinitionFactory?.capture(problem, projections, model, cancellation),
+                primalDefinition = primalDefinitionFactory?.capture(
+                    problem, objective, projections, model, cancellation,
+                ),
             ).also { templateStats?.observeTemplateUse(templateRows, templateBounds) }
         }
 

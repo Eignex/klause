@@ -213,20 +213,27 @@ A private feasibility-pump scope can reuse its completed root layout for subsequ
 objectives. Its problem and selected built-in propagation and relaxation mechanisms
 stay fixed; proposal pinning runs in separate sessions. The default primal factory
 can attach an immutable witness that its native rows are independent of the objective.
-The witness binds the exact source, model, selected namespace and semantics. Its
+The witness binds the exact source, model, selected namespace and semantics. It also
+retains the objective's owned coefficient buffers within the storage ceiling. An
+unchanged buffer identity reuses the model's validated costs and affine shift;
+different buffers take the fully checked binding path. Observations distinguish
+reused costs from a fully rebound vector. Only primitive buffer
+references are retained, without an objective's source-pairing graph. Its
 bounded capture and reserved release spend the current allowance, and only layouts
 whose construction extent exceeds that fee retain it. Admission includes the paid
 capture fee once, alongside objective-binding and setup work, when comparing with
 completed construction. Unmarked models instead require the audited linear and
 Boolean source cohort and pay its factor inspection. A cheaper binding retains only
 the current immutable model view, with no predecessor chain or shared numerical
-basis. Nonzero objective coordinates must already exist in that layout; new costs and checked affine shifts receive private arrays. Build-specific
+basis. Nonzero objective coordinates must already exist in that layout; new costs
+and checked affine shifts receive private arrays. Build-specific
 source maps are detached. An unchanged-model handoff may explicitly retain the
 witness; model replacement, remapping and shared preparation publication drop it.
 The witness supplies no domain-lifetime guarantee: continued definitions still
 require the complete source and domain guard. Exact-state, IEEE, continuous and
 unsupported selections keep ordinary construction. Cancellation withholds a view
-before publication or a numerical owner opens; an unrepresentable objective uses the funded ordinary path.
+before publication or a numerical owner opens; an unrepresentable objective uses
+the funded ordinary path.
 Admission and rebinding spend the current containing and LP allowance. Their costs
 and actual numerical consumption have separate observations from shared-source reuse;
 optimal floating iterates provide no certificate or source-acceptance authority.

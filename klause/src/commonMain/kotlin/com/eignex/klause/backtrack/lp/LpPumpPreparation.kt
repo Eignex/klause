@@ -29,7 +29,11 @@ internal class LpPumpPreparation private constructor(
             token.checkLpAssembly()
             val rebound = bind(objective, token)
             token.checkLpAssembly()
-            outcome = if (rebound == null) "DECLINED" else "REBOUND"
+            outcome = when {
+                rebound == null -> "DECLINED"
+                rebound.model === current.model -> "COSTS_REUSED"
+                else -> "REBOUND"
+            }
             if (rebound != null) current = rebound
             rebound
         } catch (cancelled: LpAssemblyCancelled) {
@@ -47,6 +51,13 @@ internal class LpPumpPreparation private constructor(
             objective.intCoefficientValues.size > problem.numIntVars ||
             objective.boolWeightValues.size > problem.numBoolVars
         ) return null
+        val model = current.model
+        if (current.primalDefinition?.matchesObjective(model, objective) == true) {
+            token.charge(1L)
+            token.checkLpAssembly()
+            return current.withModel(model, sources = null, reboundObjectiveConstant = objective.constant,
+                primalDefinition = current.primalDefinition)
+        }
         for (variable in objective.intCoefficientValues.indices) {
             token.charge(1L)
             token.checkLpAssembly()
@@ -57,7 +68,6 @@ internal class LpPumpPreparation private constructor(
             token.checkLpAssembly()
             if (objective.boolWeightValues[variable] != 0L && current.boolColOf[variable] < 0) return null
         }
-        val model = current.model
         token.charge(model.n * 3L + model.numVars)
         token.checkLpAssembly()
         val columns = IntArray(model.n) { it }
