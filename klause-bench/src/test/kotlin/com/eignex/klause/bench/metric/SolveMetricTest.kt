@@ -5,10 +5,15 @@ import com.eignex.klause.bench.catalog.Expected
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.corpus
+import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.NullSource
 import org.junit.jupiter.params.provider.ValueSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -161,6 +166,46 @@ class SolveMetricTest {
         assertEquals(true, result.feasible)
         assertEquals(true, result.proven)
         assertNull(result.stats["sourceValidation"])
+    }
+
+    @Test
+    fun `serialized solve records should preserve the subprocess numerical declaration`() {
+        val declaration = """
+            {"schema":"mps-decimal-semantics-v1","effective":{"numericAuthority":"DECIMAL_LITERALS"}}
+        """.trimIndent()
+        val (result, _) = SolveMetric.solve(
+            entry(), SolverInvocation.Settings(), Budget(), "now", "fixture",
+            installedBuild = { null },
+            invoke = { _, _, _, _ ->
+                SolverInvocation.Result(
+                    null, null, null, proven = false, stats = mapOf("numericalSemantics" to declaration),
+                    rawOutput = "", command = "cli",
+                )
+            },
+        )
+
+        val serialized = Json.parseToJsonElement(Reports.json.encodeToString(result)).jsonObject
+
+        assertEquals(Json.parseToJsonElement(declaration), serialized["numericalSemantics"])
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = ["not json", "[]", "null", "42"])
+    fun `absent or unusable subprocess numerical declarations should remain unavailable`(declaration: String?) {
+        val (result, _) = SolveMetric.solve(
+            entry(), SolverInvocation.Settings(), Budget(), "now", "fixture",
+            installedBuild = { null },
+            invoke = { _, _, _, _ ->
+                SolverInvocation.Result(
+                    null, null, null, proven = false,
+                    stats = declaration?.let { mapOf("numericalSemantics" to it) }.orEmpty(),
+                    rawOutput = "", command = "cli",
+                )
+            },
+        )
+
+        assertNull(result.numericalSemantics)
     }
 
     private fun entry(): ResolvedProblem {

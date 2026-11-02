@@ -51,6 +51,7 @@ internal object MpsMode : CliMode {
                     if (stop()) TerminationReason.Timeout else TerminationReason.Cancelled,
                     start.elapsedNow().inWholeMilliseconds,
                 )
+                println("c numericalSemantics=${mpsNumericalSemantics(source.semantics)}")
                 val state = MpsOutputState(
                     source.semantics.declared.undeclaredIntegers != source.semantics.effective.undeclaredIntegers ||
                         source.semantics.declared.undeclaredReals != source.semantics.effective.undeclaredReals,
