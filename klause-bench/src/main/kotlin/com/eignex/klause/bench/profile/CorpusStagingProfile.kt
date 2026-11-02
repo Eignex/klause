@@ -55,7 +55,8 @@ internal object CorpusStagingProfile {
             put("budgetMs", budget)
             put("repeats", repeats)
             put("order", order)
-            put("instrumentation", "stage-uninstrumented has no JFR; other modes start JFR before source IO")
+            put("instrumentation", "stage-uninstrumented and stage-prehashed have no JFR")
+            put("prehash", "stage-prehashed matches canonical source hashing before the source deadline")
             put("osCache", "uncontrolled; parent identity reads and plain materialization precede trials")
             put("jvmCache", "fresh child per mode; first operation then repeated operations in that child")
             put("solverExecuted", false)
@@ -81,14 +82,15 @@ internal object CorpusStagingProfile {
                 put("stagingFileStore", Files.getFileStore(File(CorpusFetcher.cacheRoot, ".plain").toPath()).toString())
                 put("setupNanos", System.nanoTime() - setupStart)
             }.toString())
-            val modes = listOf("packed-read", "decode-hash", "stage", "stage-uninstrumented", "plain-hash")
+            val modes = listOf("packed-read", "decode-hash", "stage", "stage-uninstrumented",
+                "stage-prehashed", "plain-hash")
                 .let { if (order == "reverse") it.reversed() else it }
             for (mode in modes) {
                 val command = buildList {
                     addAll(listOf(File(System.getProperty("java.home"), "bin/java").absolutePath,
                         "-Xmx512m", "-XX:ActiveProcessorCount=1", "--enable-native-access=ALL-UNNAMED",
                         "-Dklause.bench.corpusCache=${CorpusFetcher.cacheRoot}"))
-                    if (mode != "stage-uninstrumented") {
+                    if (mode !in setOf("stage-uninstrumented", "stage-prehashed")) {
                         add("-XX:StartFlightRecording=filename=${out.resolve("$mode.jfr")}," +
                             "settings=profile,dumponexit=true")
                     }
@@ -134,11 +136,25 @@ internal object CorpusStagingProfile {
     private fun trial(request: Map<String, String>) {
         val source = File(request.getValue("trial-path"))
         val mode = request.getValue("mode")
-        require(mode in setOf("packed-read", "decode-hash", "stage", "stage-uninstrumented", "plain-hash"))
+        require(mode in setOf("packed-read", "decode-hash", "stage", "stage-uninstrumented",
+            "stage-prehashed", "plain-hash"))
         val budget = request.getValue("budget-ms").toLong()
         val cpu = ManagementFactory.getThreadMXBean()
         File(request.getValue("samples")).printWriter().use { samples ->
             repeat(request.getValue("repeats").toInt()) { index ->
+                val iterationStart = System.nanoTime()
+                val prehash = runCatching {
+                    if (mode == "stage-prehashed") {
+                        val hash = digest(CorpusFiles.open(source)) {
+                            check(!Thread.currentThread().isInterrupted) { "Interrupted" }
+                            check((System.nanoTime() - iterationStart) / NANOS_PER_MILLI < budget) {
+                                "Source identity preparation exhausted"
+                            }
+                        }
+                        require(hash == request.getValue("sha256")) { "Prehash source identity mismatch" }
+                    }
+                }
+                val prehashNanos = if (mode == "stage-prehashed") System.nanoTime() - iterationStart else 0L
                 val start = System.nanoTime()
                 val cpuStart = if (cpu.isCurrentThreadCpuTimeSupported) cpu.currentThreadCpuTime else -1L
                 var stagingNanos: Long? = null
@@ -150,9 +166,9 @@ internal object CorpusStagingProfile {
                     check(!Thread.currentThread().isInterrupted) { "Interrupted" }
                     check((System.nanoTime() - start) / NANOS_PER_MILLI < budget) { "Source allowance exhausted" }
                 }
-                val failure = runCatching {
+                val failure = prehash.exceptionOrNull()?.toString() ?: runCatching {
                     when (mode) {
-                        "stage", "stage-uninstrumented" -> CorpusFiles.withPlainFile(
+                        "stage", "stage-uninstrumented", "stage-prehashed" -> CorpusFiles.withPlainFile(
                             source, ::checkActive, { cleanupNanos = it },
                         ) { plain ->
                             stagingNanos = System.nanoTime() - start
@@ -171,7 +187,7 @@ internal object CorpusStagingProfile {
                 val cpuEnd = if (cpu.isCurrentThreadCpuTimeSupported) cpu.currentThreadCpuTime else -1L
                 samples.println(buildJsonObject {
                     put("mode", mode)
-                    put("instrumented", mode != "stage-uninstrumented")
+                    put("instrumented", mode !in setOf("stage-uninstrumented", "stage-prehashed"))
                     put("operation", index)
                     put("jvmCache", if (index == 0) "fresh-first-operation" else "same-process-repeated-operation")
                     put("osCache", "uncontrolled; parent read and materialization completed before child startup")
@@ -181,10 +197,12 @@ internal object CorpusStagingProfile {
                     put("sha256", observedHash)
                     put("matchesPlainSource", observedHash?.let { it == request.getValue("sha256") })
                     put("sourceAllowanceMs", budget)
+                    put("prehashNanos", prehashNanos)
                     put("stagingNanos", stagingNanos)
                     put("cleanupNanos", cleanupNanos)
                     put("verificationNanos", verificationNanos)
                     put("totalNanos", total)
+                    put("iterationTotalNanos", System.nanoTime() - iterationStart)
                     put("threadCpuNanos", if (cpuStart >= 0L && cpuEnd >= 0L) cpuEnd - cpuStart else null)
                     put("failure", failure)
                 })
