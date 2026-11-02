@@ -11,25 +11,47 @@ import kotlin.test.assertTrue
 
 class SearchLearningTest {
     @Test
-    fun `production count caps should retire eligible clauses within funded windows`() {
-        for ((cap, grant) in listOf(4_000 to 512L, 20_000 to 65_536L)) {
-            val learning = SearchLearning(SearchLearnedDbParams(maxClauses = cap, glueLbd = 0,
-                reclamationWork = grant))
-            val host = SearchSession(emptyList())
-            host.push(SearchDecision.Bool(0))
-            repeat(3) { learning.learn(intArrayOf(0, (it + 1) * 2), host) }
-            assertIs<ComponentResult.Consistent>(learning.propagate(host, IntArrayList()))
-            repeat(cap) { learning.learn(intArrayOf((it + 4) * 2), host) }
+    fun `default count cap should retire eligible clauses across small funded windows`() {
+        val cap = 4_000
+        val grant = 512L
+        val learning = SearchLearning(SearchLearnedDbParams(maxClauses = cap, glueLbd = 0,
+            reclamationWork = grant))
+        val host = SearchSession(emptyList())
+        host.push(SearchDecision.Bool(0))
+        repeat(3) { learning.learn(intArrayOf(0, (it + 1) * 2), host) }
+        assertIs<ComponentResult.Consistent>(learning.propagate(host, IntArrayList()))
+        repeat(cap) { learning.learn(intArrayOf((it + 4) * 2), host) }
 
-            repeat(40) {
-                var charged = 0L
-                learning.onRestart({ false }) { charged++ }
-                assertTrue(charged <= grant)
-            }
-
-            assertEquals(cap, learning.size)
-            assertEquals(3L, learning.snapshot().dropped)
+        repeat(40) {
+            var charged = 0L
+            learning.onRestart({ false }) { charged++ }
+            assertTrue(charged <= grant)
         }
+
+        assertEquals(cap, learning.size)
+        assertEquals(3L, learning.snapshot().dropped)
+    }
+
+    @Test
+    fun `large count cap should retire eligible clauses within the production grant`() {
+        val cap = 20_000
+        val grant = 65_536L
+        val learning = SearchLearning(SearchLearnedDbParams(maxClauses = cap, glueLbd = 0,
+            reclamationWork = grant))
+        val host = SearchSession(emptyList())
+        host.push(SearchDecision.Bool(0))
+        repeat(3) { learning.learn(intArrayOf(0, (it + 1) * 2), host) }
+        assertIs<ComponentResult.Consistent>(learning.propagate(host, IntArrayList()))
+        repeat(cap) { learning.learn(intArrayOf((it + 4) * 2), host) }
+
+        repeat(40) {
+            var charged = 0L
+            learning.onRestart({ false }) { charged++ }
+            assertTrue(charged <= grant)
+        }
+
+        assertEquals(cap, learning.size)
+        assertEquals(3L, learning.snapshot().dropped)
     }
 
     @Test
