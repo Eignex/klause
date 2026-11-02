@@ -9,11 +9,19 @@ internal fun PropagationState.sweepRetiredGeneralIntegerRows(budget: Reclamation
         intEvents.overflow = null
         budget.advanced()
     }
-    if (rows.capacity <= rows.size) return
     val scratch = rows.size.toLong() * Long.SIZE_BYTES
-    if (!budget.supports(rows.trimmingWork, scratch)) return
-    budget.visit(rows.trimmingWork, scratch)
-    budget.visit(0L)
-    rows.trim()
-    budget.advanced()
+    if (rows.capacity > rows.size && budget.supports(rows.trimmingWork, scratch)) {
+        budget.visit(rows.trimmingWork, scratch)
+        budget.visit(0L)
+        rows.trim()
+        budget.advanced()
+    }
+    val overflow = intEvents.overflow ?: return
+    if (learned.retiredCount > 0) overflow.sweep(learned.retiredCount, budget) { retiredLearnedFactor(it) }
+    if (overflow.size == 0) {
+        budget.visit(4L)
+        budget.visit(0L)
+        intEvents.overflow = null
+        budget.advanced()
+    }
 }

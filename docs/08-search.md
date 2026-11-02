@@ -384,8 +384,14 @@ failure context, and fresh presolve rebuilds keep the originating cancellation t
 see [presolve](07-presolve.md).
 
 Learned integer rows subscribe to lower/upper bound events in the dynamic watch
-index. Learned-store compaction removes retired subscriptions and remaps surviving
-factor identities; static event and delta-consumer indexes retain their source ids.
+index. A compressed binary index owns one posting per event; its branch masks
+strictly decrease, bounding lookups by the integer key width. A funded removal
+unlinks its leaf and parent without a whole-table copy. Retired subscriptions are
+swap-removed across bounded cleanup slices; surviving subscription order can change.
+Empty event entries release their primitive and reference ownership while other
+integer rows remain live. Learned-store compaction remaps surviving factor identities;
+static event and delta-consumer indexes retain their source ids. Index admission,
+lookup, traversal and remapping retain their work charges.
 
 Boolean-only models journal each pin without integer-state padding. Integer undo
 replays saved domains and interior carves. Unconditional root carves are kept in

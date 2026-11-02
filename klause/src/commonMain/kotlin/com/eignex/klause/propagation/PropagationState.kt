@@ -900,7 +900,7 @@ class PropagationState private constructor(
         // Base factors' int-event subscriptions are prebuilt into the CSR at [IntEventMachinery]
         // construction; only mid-life factors (fid past the base count) subscribe here, into the overflow.
         if (intEvents.on && fid >= baseFactorCount) {
-            propagator.initialIntEventWatches?.let { for (packed in it) intEvents.subscribeMidlife(packed, fid) }
+            propagator.initialIntEventWatches?.let { for (packed in it) work += intEvents.subscribeMidlife(packed, fid) }
         }
         if (intEvents.deltaOn && propagator.consumesIntEventDelta) {
             intEvents.dirtyVars[fid] = IntArrayList()
@@ -1517,7 +1517,7 @@ class PropagationState private constructor(
         var kind = 0
         while (kind < IntEvent.COUNT) {
             if (mask and (1 shl kind) != 0) {
-                intEvents.forEachWatcher(IntEvent.pack(v, kind)) { fid ->
+                intEvents.forEachWatcher(IntEvent.pack(v, kind), { work += it }) { fid ->
                     work++
                     propEnq(fid)
                     accumulateDirtyVar(fid, v)

@@ -219,16 +219,12 @@ private fun PropagationState.learnedSharingMemory(
         sample.owned(array, array.size.toLong() * Int.SIZE_BYTES, true)
     }
     var protectedEvents = false
-    if (overflow != null) for (value in overflow.valuesInternal) {
-        sample.step()
-        if (value != null) {
-            val posting = value as IntArrayList
-            val array = posting.backingData
-            val retained = protectedPosting(sample, posting, protected)
-            protectedEvents = protectedEvents || retained
-            eventBytes += array.size.toLong() * Int.SIZE_BYTES
-            sample.owned(array, array.size.toLong() * Int.SIZE_BYTES, retained)
-        }
+    overflow?.forEach({ units -> repeat(units.toInt()) { sample.step() } }) { _, posting ->
+        val array = posting.backingData
+        val retained = protectedPosting(sample, posting, protected)
+        protectedEvents = protectedEvents || retained
+        eventBytes += array.size.toLong() * Int.SIZE_BYTES
+        sample.owned(array, array.size.toLong() * Int.SIZE_BYTES, retained)
     }
     eventBytes += overflow?.primitiveCapacityBytes ?: 0L
     if (overflow != null) {

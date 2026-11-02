@@ -8,7 +8,6 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.SharingMemoryStatus
 import kotlin.test.Test
@@ -339,8 +338,8 @@ class SharingMemoryTest {
             val rows = assertNotNull(state.learned.integerRows)
             val overflow = assertNotNull(state.intEvents.overflow)
             var dependencies = overflow.primitiveCapacityBytes
-            for (value in overflow.valuesInternal) {
-                if (value != null) dependencies += (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES
+            overflow.forEach { _, posting ->
+                dependencies += posting.backingData.size.toLong() * Int.SIZE_BYTES
             }
             val sample = SharingMemoryObservation(1_000_000L, 4096, { false }, {})
             val before = assertNotNull(sample.snapshot { state.sharingMemory(sample) }.completeValues)
@@ -349,12 +348,9 @@ class SharingMemoryTest {
                 sample.ownedReferences(rows, rows.size.toLong(), true)
                 sample.owned(overflow, overflow.primitiveCapacityBytes, true)
                 sample.ownedReferences(overflow, overflow.referenceCapacity.toLong(), true)
-                for (value in overflow.valuesInternal) {
-                    sample.step()
-                    if (value != null) {
-                        val array = (value as IntArrayList).backingData
-                        sample.owned(array, array.size.toLong() * Int.SIZE_BYTES, true)
-                    }
+                overflow.forEach({ units -> repeat(units.toInt()) { sample.step() } }) { _, posting ->
+                    val array = posting.backingData
+                    sample.owned(array, array.size.toLong() * Int.SIZE_BYTES, true)
                 }
             }.completeValues)
 

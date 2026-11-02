@@ -540,7 +540,13 @@ freezing unrelated retirement. Incomplete trail propagation, conflicts and root
 publication still defer the window.
 An empty General integer-row cache detaches its obsolete event overflow index in a
 funded transaction. A surviving cache trims its reference array when the copy fits
-the work and scratch grant.
+the work and scratch grant. Nonempty event cleanup retains its event and posting
+cursors across grants. It removes retired subscriptions and empty index entries
+without remapping live handles; posting arrays trim in separately funded transactions.
+A retained entry avoids repeating its lookup before an affordable copy. Deferred
+trims retry when later grants can fund them. A completed pass exposes a continuation
+before testing newly appended retirements. Unfinished cursors, postings and index
+nodes remain in owned primitive and reference totals.
 General retirement replaces its payload with an inert stable-ID slot and releases
 its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
 aliases. Stable paged rows own policy, admission, propagator and mutable-payload

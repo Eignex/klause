@@ -159,7 +159,7 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     rows.admit(propagator)
     arithmeticLearningTrace?.stored(factor, "integer")
 
-    for (watch in propagator.initialIntEventWatches) intEvents.subscribeMidlife(watch, factor)
+    for (watch in propagator.initialIntEventWatches) work += intEvents.subscribeMidlife(watch, factor)
     if (row.guard != Lit.NONE) installLitWatch(row.guard xor 1, factor)
     return factor
 }
@@ -394,9 +394,7 @@ internal fun PropagationState.forgetLearnedClauses(
     learned.pendingAttach.truncateTo(pending)
     remapQueue(atoms.dirtyFactors, remap, refBase)
     if (intEvents.overflow != null) {
-        val overflow = intEvents.overflow
-        work += (overflow?.primitiveCapacityBytes ?: 0L) + (overflow?.size?.toLong() ?: 0L) * (overflow?.size ?: 0)
-        intEvents.remapLearned(remap, refBase)
+        work += intEvents.remapLearned(remap, refBase)
     }
 
     // The per-variable reason fields record which factor forced each currently-implied

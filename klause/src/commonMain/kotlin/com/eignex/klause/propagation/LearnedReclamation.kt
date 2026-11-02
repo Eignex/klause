@@ -2,7 +2,6 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
-import com.eignex.klause.util.IntArrayList
 
 internal enum class ReclamationStatus { WITHIN_LIMIT, RECLAIMED, PROTECTED_FLOOR, DEFERRED, CANCELLED }
 
@@ -102,12 +101,9 @@ internal fun PropagationState.prepareReclamation(
         intEvents.overflow?.let { overflow ->
             budget.atomic(overflow.primitiveCapacityBytes + overflow.size.toLong() * overflow.size,
                 overflow.primitiveCapacityBytes * 2L + overflow.referenceCapacity.toLong() * Long.SIZE_BYTES * 2L)
-            for (value in overflow.valuesInternal) {
-                budget.visit()
-                if (value != null) {
-                    val capacity = (value as IntArrayList).backingData.size.toLong()
-                    budget.atomic(capacity, capacity * Int.SIZE_BYTES)
-                }
+            overflow.forEach({ budget.visit(it) }) { _, posting ->
+                val capacity = posting.backingData.size.toLong()
+                budget.atomic(capacity, capacity * Int.SIZE_BYTES)
             }
         }
     }

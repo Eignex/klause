@@ -1,5 +1,7 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.LearnedMemoryMaintenance
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.bool.Clause
@@ -11,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class GeneralIntegerReclamationTest {
     @Test
@@ -89,5 +92,85 @@ class GeneralIntegerReclamationTest {
         assertEquals(1, rows.size)
         assertNotNull(session.explanationState.intEvents.overflow)
         assertEquals(generation, session.learnedRetirementGeneration)
+    }
+
+    @Test
+    fun `nonempty integer event cleanup should release retired entries beside a permanent floor`() {
+        val session = PropagationSession(Problem(6, 66, Array(66) { IntDomain(0, 10) },
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
+        val live = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
+            longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 8), useLo = true))
+        session.addLearnedIntegerRow(live, 2)
+        val state = session.explanationState
+        val events = assertNotNull(state.intEvents.overflow)
+        val bytes = events.primitiveCapacityBytes
+        val references = events.referenceCapacity
+        val reason = state.intMaxReason[0]
+        repeat(64) { variable ->
+            val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(variable + 2),
+                longArrayOf(1), intArrayOf(variable + 2), LinearOp.LE, 10), useLo = true))
+            session.addLearnedIntegerRow(row, 9)
+        }
+        repeat(8) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false } }
+        val floor = Clause(intArrayOf(8, 10))
+        repeat(4000) { session.addLearnedClause(floor, 2, permanent = true) }
+        val generation = session.learnedRetirementGeneration
+
+        repeat(256) {
+            val work = session.work
+            session.compactLearnedClauses(256L, 256L, { false }) { _, _ -> true }
+            assertTrue(session.work - work <= 256L)
+        }
+
+        assertEquals(4, events.size)
+        assertEquals(bytes, events.primitiveCapacityBytes)
+        assertEquals(references, events.referenceCapacity)
+        assertEquals(reason, state.intMaxReason[0])
+        assertEquals(generation, session.learnedRetirementGeneration)
+        session.pinInt(1, 7L)
+        assertEquals(IntDomain(0, 1), session.intDomain(0))
+    }
+
+    @Test
+    fun `growing integer retirements should release event ownership at an unchanged root`() {
+        val session = PropagationSession(Problem(6, 66, Array(66) { IntDomain(0, 10) },
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
+        val live = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0, 1),
+            longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 8), useLo = true))
+        session.addLearnedIntegerRow(live, 2)
+        val state = session.explanationState
+        val events = assertNotNull(state.intEvents.overflow)
+        val bytes = events.primitiveCapacityBytes
+        val references = events.referenceCapacity
+        val floor = Clause(intArrayOf(8, 10))
+        repeat(20_000) { session.addLearnedClause(floor, 2, permanent = true) }
+        val generation = session.learnedRetirementGeneration
+        val maintenance = LearnedMemoryMaintenance()
+        val params = BacktrackParams(learnedMemoryBytes = 0L,
+            learnedMemoryWork = 32_768L, learnedMemoryScratchBytes = 4096L)
+
+        repeat(3) {
+            repeat(64) { variable ->
+                val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(),
+                    intArrayOf(variable + 2), longArrayOf(1), intArrayOf(variable + 2), LinearOp.LE, 10),
+                    useLo = true))
+                session.addLearnedIntegerRow(row, 9)
+            }
+            repeat(8) { session.maintainCapWindow(0, 32_768L, 4096L, { false }) { false } }
+            repeat(64) {
+                val work = session.work
+                maintenance.run(session, params, null, null)
+                assertTrue(session.work - work <= 32_768L)
+            }
+            assertEquals(4, events.size)
+            assertEquals(bytes, events.primitiveCapacityBytes)
+            assertEquals(references, events.referenceCapacity)
+            assertEquals(20_001, session.activeLearnedClauseCount)
+            assertEquals(generation, session.learnedRetirementGeneration)
+        }
+        session.pinInt(1, 7L)
+        assertEquals(IntDomain(0, 1), session.intDomain(0))
+        session.releaseRetainedState()
+        assertEquals(com.eignex.klause.util.SharingMemoryStatus.STALE, session.sharingMemory().status)
     }
 }
