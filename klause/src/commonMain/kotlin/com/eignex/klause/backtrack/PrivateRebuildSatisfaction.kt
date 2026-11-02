@@ -26,6 +26,8 @@ internal class PrivateRebuildSatisfaction(
     private val solver: BacktrackSolver,
     private val params: BacktrackParams,
 ) : ResumableSolve {
+    private val automatic = params.privateRebuildWork < 0L
+    private val privateWorkLimit = if (automatic) AUTOMATIC_WORK else params.privateRebuildWork
     private val lifetime = params.cancellation.lifetimeCancellation()
     private val sharedParams = params.copy(nodeBudget = params.nodeBudget ?: NodeBudget(
         minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE),
@@ -76,6 +78,13 @@ internal class PrivateRebuildSatisfaction(
 
     private fun atRoot(session: PropagationSession): Boolean {
         if (!session.canSimplifyRoot) return false
+        if (automatic) {
+            if (parityAttempted) return false
+            parityAttempted = true
+            note("AutomaticAttempts")
+            note("AutomaticWorkLimit", privateWorkLimit)
+            return captureParity(session)
+        }
         if (!parityAttempted) {
             parityAttempted = true
             if (captureParity(session)) return true
@@ -83,7 +92,7 @@ internal class PrivateRebuildSatisfaction(
         val mark = session.explanationState.undoTop
         val scanWork = solver.problem.numBoolVars.toLong()
         if (mark != rootMark) {
-            if (scanWork > params.privateRebuildWork - trialSpent()) return false
+            if (scanWork > privateWorkLimit - trialSpent()) return false
             rootMark = mark
             val start = TimeSource.Monotonic.markNow()
             val pins = session.rootFixedVariableCount()
@@ -106,7 +115,7 @@ internal class PrivateRebuildSatisfaction(
         if (params.learnedMemoryScratchBytes < PrivateRebuildBinaryLearning.SCRATCH_BYTES + historyBytes) return false
         var spent = 0L
         val allowance = minOf(PrivateRebuildBinaryLearning.SCAN_WORK,
-            (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L))
+            (privateWorkLimit - trialSpent()).coerceAtLeast(0L))
         val start = TimeSource.Monotonic.markNow()
         val captured = PrivateRebuildBinaryLearning.capture(
             session, attemptedBinaryPairs, attemptedBinaryCount,
@@ -123,7 +132,7 @@ internal class PrivateRebuildSatisfaction(
         if (captured == null || rootCancellation()) return false
         if (attemptedBinaryPairs.isEmpty()) {
             val entries = PrivateRebuildBinaryLearning.MAX_RELATIONS.toLong()
-            if (entries > params.privateRebuildWork - trialSpent()) return false
+            if (entries > privateWorkLimit - trialSpent()) return false
             charge(entries)
             note("BinaryHistoryWork", entries)
             note("BinaryHistoryBytes", historyBytes)
@@ -137,12 +146,12 @@ internal class PrivateRebuildSatisfaction(
     }
 
     private fun captureParity(session: PropagationSession): Boolean {
-        if (parityUnavailable || params.privateRebuildWork - trialSpent() < 2L) return false
+        if (parityUnavailable || privateWorkLimit - trialSpent() < 2L) return false
         val mark = session.explanationState.undoTop
         if (mark == parityRootMark) return false
         parityRootMark = mark
         var spent = 0L
-        val allowance = (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L)
+        val allowance = (privateWorkLimit - trialSpent()).coerceAtLeast(0L)
         val start = TimeSource.Monotonic.markNow()
         val captured = PrivateRebuildParity.capture(session,
             params.learnedMemoryScratchBytes - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(),
@@ -164,14 +173,20 @@ internal class PrivateRebuildSatisfaction(
         note("ParityDiscoveryWork", spent)
         note("ParityDiscoveryNanos", start.elapsedNow().inWholeNanoseconds)
         if (captured == null || rootCancellation()) return false
-        pendingParity = captured
-        root = session
         note("ParityRows", captured.rows.toLong())
         note("ParityBasisColumns", captured.basis?.rank?.toLong() ?: 0L)
         note("ParityCoveredSourceClauses", captured.coveredClauses.toLong())
         note("ParityPins", captured.newPins.toLong())
         note("ParityAffineColumns", captured.affine?.rank?.toLong() ?: 0L)
         note("ParityAffineFreeColumns", captured.affine?.freeColumns?.toLong() ?: 0L)
+        if (automatic && ((captured.basis?.rank ?: 0) < MIN_AUTOMATIC_RANK ||
+                captured.coveredClauses * 2L < solver.problem.numFactors)) {
+            note("AutomaticDeclinedStructure")
+            return false
+        }
+        if (automatic) note("AutomaticAdmitted")
+        pendingParity = captured
+        root = session
         return true
     }
 
@@ -204,12 +219,12 @@ internal class PrivateRebuildSatisfaction(
             val search = consumer
             if (search != null && !token()) {
                 val trialToken = token or Cancellation {
-                    trialSpent() >= params.privateRebuildWork
+                    trialSpent() >= privateWorkLimit
                 }
                 val trialStart = TimeSource.Monotonic.markNow()
                 val result = try {
                     search.runSlice(lifetime or global or Cancellation {
-                        trialSpent() >= params.privateRebuildWork
+                        trialSpent() >= privateWorkLimit
                     }, millis(), nodes())
                 } finally {
                     note("TrialNanos", trialStart.elapsedNow().inWholeNanoseconds)
@@ -234,8 +249,8 @@ internal class PrivateRebuildSatisfaction(
                         throw UnsoundnessException("private rebuild witness failed its canonical clauses")
                     }
                     note("SourceUnavailable")
-                    if (trialSpent() >= params.privateRebuildWork) retire()
-                } else if (result != null || trialSpent() >= params.privateRebuildWork) {
+                    if (trialSpent() >= privateWorkLimit) retire()
+                } else if (result != null || trialSpent() >= privateWorkLimit) {
                     note(if (result is SolveResult.Unsat) "RefutationDeferred" else "TrialStopped")
                     retire()
                 }
@@ -268,7 +283,7 @@ internal class PrivateRebuildSatisfaction(
         note("Attempts")
         val meter = WorkMeter(::charge)
         val token = object : Cancellation {
-            override fun isCancelled(): Boolean = containing() || trialSpent() >= params.privateRebuildWork
+            override fun isCancelled(): Boolean = containing() || trialSpent() >= privateWorkLimit
             override fun deadline() = containing.deadline()
             override fun workMeter(): WorkMeter = meter
         }
@@ -280,7 +295,7 @@ internal class PrivateRebuildSatisfaction(
         val prepared = PrivateRebuildGeneration.prepare(session,
             params.learnedMemoryScratchBytes - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(), token,
             onDecline = { note("Declined$it") }, learnedBinary = binary, parity = parity) {
-            (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L) / 2L
+            (privateWorkLimit - trialSpent()).coerceAtLeast(0L) / 2L
         }
         note("PreparationNanos", start.elapsedNow().inWholeNanoseconds)
         note("PreparationWork", chargedPrivateWork - preparationStart)
@@ -328,11 +343,11 @@ internal class PrivateRebuildSatisfaction(
         // cannot attach to it without a supported translation, so its cursor stays with canonical.
         val privateParams = sharedParams.copy(
             privateRebuildWork = 0L, clauseExchange = null, cutExchange = null, pooledIncumbents = null,
-            cancellation = containing or Cancellation { trialSpent() >= params.privateRebuildWork },
+            cancellation = containing or Cancellation { trialSpent() >= privateWorkLimit },
             variableSelector = if (prepared.preferredFreeColumns.isEmpty()) sharedParams.variableSelector
             else PrivateRebuildFreeSelector(prepared.preferredFreeColumns),
             onEvent = null, branchObserver = null, maxDecisions = params.maxDecisions.coerceAtMost(
-                (params.privateRebuildWork - trialSpent()).coerceAtLeast(0L) / PROPAGATION_WORK_PER_NODE,
+                (privateWorkLimit - trialSpent()).coerceAtLeast(0L) / PROPAGATION_WORK_PER_NODE,
             ),
             maxLearnedClauses = minOf(params.maxLearnedClauses ?: 256, 256),
         )
@@ -423,8 +438,17 @@ internal class PrivateRebuildSatisfaction(
     }
 
     companion object {
+        private const val AUTOMATIC_WORK = 1_048_576L
+        private const val MIN_AUTOMATIC_RANK = 128
+        private const val MIN_AUTOMATIC_FACTORS = 512
+        private const val MAX_AUTOMATIC_FACTORS = 32_768
+
         fun eligible(problem: BakedProblem, params: BacktrackParams): Boolean =
-            params.privateRebuildWork > 0L && problem.numIntVars == 0 && problem.numRealVars == 0 &&
+            params.privateRebuildWork != 0L &&
+                (params.privateRebuildWork > 0L || (problem.numBoolVars >= MIN_AUTOMATIC_RANK &&
+                    problem.numBoolVars * 2L <= PROPAGATION_WORK_PER_NODE &&
+                    problem.numFactors in MIN_AUTOMATIC_FACTORS..MAX_AUTOMATIC_FACTORS)) &&
+                problem.numIntVars == 0 && problem.numRealVars == 0 &&
                 problem.rootDeductions is PropagationResult.Implied &&
                 params.assumptions.isEmpty && params.assumptions.deductions.isEmpty &&
                 params.componentFactory == null && params.lpConfig in listOf(null, LpConfig.OFF) &&

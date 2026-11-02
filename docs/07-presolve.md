@@ -248,6 +248,15 @@ An unsupported or partial observation cannot establish absence of opportunities.
 Qualification of a replacement worker requires the following authority and ownership
 contract. The diagnostic itself creates no replacement or publication authority.
 
+The default private work setting is zero. An explicit `privateRebuildWork=-1`
+selects automatic parity admission with a cumulative 1,048,576-work cap and the
+configured scratch grant. It considers only Boolean satisfaction sources with
+128–2,000 columns and 512–32,768 factors. Its first unconditional root performs one
+funded source scan; admission requires a completed basis of rank at least 128 and
+coverage of at least half the source clauses. A miss retains canonical traversal
+without root-pin BVE or learned-equivalence retries. Explicit zero disables this
+mode; positive work settings retain their bounded manual trials.
+
 `privateRebuildWork` funds bounded private Boolean satisfaction trials. An
 unconditional consistent root pauses its canonical traversal, simplifies a private
 copy with global pins and applies bounded source reductions with typed reconstruction.
