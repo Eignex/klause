@@ -58,12 +58,13 @@ internal class IntegerLearningCensus {
                 if (coefficient < 0L) negative = addExact(negative, weight)
             }
             val bound = addExact(row.bound, negative)
-            increment(when {
-                bound < 0L -> Count.BinaryImpossible
-                bound >= maximum -> Count.BinaryTautology
-                bound >= subExact(maximum, smallest) -> Count.BinaryClause
-                else -> Count.BinaryStronger
-            })
+            if (bound < 0L) {
+                increment(Count.BinaryImpossible)
+            } else if (bound >= maximum) {
+                increment(Count.BinaryTautology)
+            } else {
+                classifyBinaryClause(row, maximum, bound)
+            }
         } catch (_: CheckedLongOverflowException) {
             increment(Count.ShapeUnavailable)
         }
