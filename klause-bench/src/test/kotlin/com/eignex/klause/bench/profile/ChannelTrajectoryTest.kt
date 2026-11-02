@@ -75,9 +75,9 @@ class ChannelTrajectoryTest {
             synchronize = { left.assignment.setBool(0, left.assignment.intValue(0) <= 0L) })
         val searched = TrajectoryView("searched", right, coordinates)
 
-        val pair = trajectoryPair(Sample(booleanArrayOf(false), longArrayOf(-1)), emptyList(), maintained, searched)
+        val source = Sample(booleanArrayOf(false), longArrayOf(-1))
 
-        assertEquals("source-round-trip", pair.getValue("leftLoad").jsonPrimitive.content)
-        assertEquals("paired", pair.getValue("rightLoad").jsonPrimitive.content)
+        assertEquals("source-round-trip", maintained.load(source))
+        assertNull(searched.load(source))
     }
 }
