@@ -36,8 +36,8 @@ object FactorPropagationOracle {
             for (s in samples) {
                 assertEquals(
                     b,
-                    s.bools[v],
-                    "$label: propagate pinned bool $v=$b but a satisfying assignment has ${s.bools[v]}",
+                    s.boolValue(v),
+                    "$label: propagate pinned bool $v=$b but a satisfying assignment has ${s.boolValue(v)}",
                 )
             }
         }
@@ -45,38 +45,38 @@ object FactorPropagationOracle {
             for (s in samples) {
                 assertEquals(
                     value,
-                    s.ints[v],
-                    "$label: propagate pinned int $v=$value but a satisfying assignment has ${s.ints[v]}",
+                    s.intValue(v),
+                    "$label: propagate pinned int $v=$value but a satisfying assignment has ${s.intValue(v)}",
                 )
             }
         }
         result.forEachIntMin { v, lo ->
             for (s in samples) {
                 assertTrue(
-                    s.ints[v] >= lo,
-                    "$label: propagate tightened min of int $v to $lo but a satisfying assignment has ${s.ints[v]}",
+                    s.intValue(v) >= lo,
+                    "$label: propagate tightened min of int $v to $lo but a satisfying assignment has ${s.intValue(v)}",
                 )
             }
         }
         result.forEachIntMax { v, hi ->
             for (s in samples) {
                 assertTrue(
-                    s.ints[v] <= hi,
-                    "$label: propagate tightened max of int $v to $hi but a satisfying assignment has ${s.ints[v]}",
+                    s.intValue(v) <= hi,
+                    "$label: propagate tightened max of int $v to $hi but a satisfying assignment has ${s.intValue(v)}",
                 )
             }
         }
         result.forEachIntHole { v, value ->
             for (s in samples) {
                 assertTrue(
-                    s.ints[v] != value,
-                    "$label: propagate declared hole int $v != $value but a satisfying assignment has ${s.ints[v]}",
+                    s.intValue(v) != value,
+                    "$label: propagate declared hole int $v != $value but a satisfying assignment has ${s.intValue(v)}",
                 )
             }
         }
     }
 
-    fun sourceAssignments(problem: Problem, reuseBuffers: Boolean = false): Sequence<Sample> {
+    fun sourceAssignments(problem: Problem): Sequence<Sample> {
         require(problem !is BakedProblem) { "Pass the original source Problem, before root domains are folded." }
         require(problem.numRealVars == 0) { "The oracle requires a finite Boolean/integer assignment space." }
         require((0 until problem.numIntVars).all { problem.intBounds.hasLower(it) && problem.intBounds.hasUpper(it) }) {
@@ -95,23 +95,19 @@ object FactorPropagationOracle {
         domains.forEach { include(it.valueCount) }
         val radices = LongArray(domains.size) { domains[it].valueCount }
         val spans = Array(domains.size) { domains[it].values }
-        return sequence {
-            // Reused samples are borrowed until advance; retained witnesses require owned copies.
-            val reused = if (reuseBuffers) Sample(BooleanArray(problem.numBoolVars), LongArray(domains.size)) else null
-            for (ordinal in 0 until space.toInt()) {
-                var remaining = ordinal.toLong()
-                val bools = reused?.bools ?: BooleanArray(problem.numBoolVars)
-                for (v in bools.indices) {
-                    bools[v] = remaining % 2L == 1L
-                    remaining /= 2L
-                }
-                val ints = reused?.ints ?: LongArray(domains.size)
-                for (v in ints.indices) {
-                    ints[v] = spans[v].valueAt((remaining % radices[v]).toInt())
-                    remaining /= radices[v]
-                }
-                yield(reused ?: Sample(bools, ints))
+        return (0 until space.toInt()).asSequence().map { ordinal ->
+            var remaining = ordinal.toLong()
+            val bools = BooleanArray(problem.numBoolVars) {
+                val value = remaining % 2L == 1L
+                remaining /= 2L
+                value
             }
+            val ints = LongArray(problem.numIntVars) { v ->
+                val value = spans[v].valueAt((remaining % radices[v]).toInt())
+                remaining /= radices[v]
+                value
+            }
+            Sample.fromOwned(bools, ints)
         }
     }
 
@@ -188,8 +184,8 @@ object FactorPropagationOracle {
     }
 
     private fun load(state: LocalSearchState, sample: Sample) {
-        sample.bools.forEachIndexed { v, value -> state.assignment.setBool(v, value) }
-        sample.ints.forEachIndexed { v, value -> state.assignment.setInt(v, value) }
+        for (v in 0 until sample.numBoolVars) state.assignment.setBool(v, sample.boolValue(v))
+        for (v in 0 until sample.numIntVars) state.assignment.setInt(v, sample.intValue(v))
         state.recompute()
     }
 
@@ -197,30 +193,26 @@ object FactorPropagationOracle {
         problem: Problem,
         label: String,
         satisfies: ((Sample) -> Boolean)?,
-        relevant: ((Sample) -> Boolean)? = null,
+        relevant: (Sample) -> Boolean = { true },
     ): List<Sample> {
         val samples = ArrayList<Sample>()
-        val assignments = sourceAssignments(problem, reuseBuffers = relevant != null)
+        val assignments = sourceAssignments(problem)
         val state = declaredState(problem)
         for (sample in assignments) {
-            if (relevant?.invoke(sample) == false) continue
+            if (!relevant(sample)) continue
             load(state, sample)
-            val accepted = if (satisfies == null) {
-                state.cost == 0L
+            if (satisfies == null) {
+                if (state.cost == 0L) samples.add(sample)
             } else {
-                val expected = satisfies(sample)
+                val accepted = satisfies(sample)
                 assertEquals(
-                    expected,
+                    accepted,
                     state.cost == 0L,
                     "$label: invariant disagrees with direct semantics at bools=${sample.bools.toList()}, " +
                         "ints=${sample.ints.toList()}",
                 )
-                expected
+                if (accepted) samples.add(sample)
             }
-            if (accepted) samples.add(
-                if (relevant == null) sample
-                else sample.copy(bools = sample.bools.copyOf(), ints = sample.ints.copyOf()),
-            )
         }
         return samples
     }

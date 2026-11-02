@@ -43,7 +43,7 @@ object PropagationReasonOracle {
             val reason = state.reasonOf(state.boolAntecedents[b])?.copyOf()
             implications.add(
                 { s: Sample ->
-                    s.bools[b] == value || reason?.any { lit -> litTrueUnder(problem, state, lit, s) } == true
+                    s.boolValue(b) == value || reason?.any { lit -> litTrueUnder(problem, state, lit, s) } == true
                 } to {
                     "$label: pinning b$b=$value rests on ${reason?.map { describe(state, problem, it) }}, " +
                         "which is falsified"
@@ -57,15 +57,15 @@ object PropagationReasonOracle {
                 val (recorded, holds) = when {
                     k < after.min -> {
                         if (k != before[v].min) continue
-                        state.intMinAntecedents[v] to { s: Sample -> s.ints[v] >= after.min }
+                        state.intMinAntecedents[v] to { s: Sample -> s.intValue(v) >= after.min }
                     }
 
                     k > after.max -> {
                         if (k != before[v].max) continue
-                        state.intMaxAntecedents[v] to { s: Sample -> s.ints[v] <= after.max }
+                        state.intMaxAntecedents[v] to { s: Sample -> s.intValue(v) <= after.max }
                     }
 
-                    else -> state.holeReasonFor(v, k) to { s: Sample -> s.ints[v] != k }
+                    else -> state.holeReasonFor(v, k) to { s: Sample -> s.intValue(v) != k }
                 }
                 val reason = state.reasonOf(recorded)?.copyOf()
                 implications.add(

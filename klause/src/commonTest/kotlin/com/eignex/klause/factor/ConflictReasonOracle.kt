@@ -29,9 +29,9 @@ object ConflictReasonOracle {
     internal fun litTrueUnder(problem: Problem, state: PropagationState, lit: Int, s: Sample): Boolean {
         val v = Lit.variable(lit)
         val pos = Lit.isPositive(lit)
-        if (v < problem.numBoolVars) return if (pos) s.bools[v] else !s.bools[v]
+        if (v < problem.numBoolVars) return if (pos) s.boolValue(v) else !s.boolValue(v)
         val atomId = v - problem.numBoolVars
-        val value = s.ints[state.atoms.intVar[atomId]]
+        val value = s.intValue(state.atoms.intVar[atomId])
         val k = state.atoms.threshold[atomId]
         val holds = when (state.atoms.kind[atomId]) {
             AtomKind.GE -> value >= k
