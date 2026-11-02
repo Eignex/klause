@@ -27,16 +27,16 @@ internal class NativeLearnedPayloads {
     val directoryCapacity: Long get() = directory.size.toLong()
     val primitiveBytes: Long get() = 24L + pageCount * 12L
 
-    fun admissionWork(literals: Int): Long {
+    fun admissionWork(literals: Int, ownedLiterals: Boolean = false): Long {
         val index = size ushr PAGE_SHIFT
         val required = (size and PAGE_MASK) + 1
         val page = directory.getOrNull(index)
         val growth = if (index >= directory.size) directory.size * 3L + 1L else 0L
         val allocation = page?.growthWork(required) ?: (capacityFor(required) * 2L + 8L)
-        return literals * 2L + 12L + growth + allocation
+        return (if (ownedLiterals) 0L else literals * 2L) + 12L + growth + allocation
     }
 
-    fun add(literals: IntArray) {
+    fun add(literals: IntArray, ownedLiterals: Boolean = false) {
         val index = size ushr PAGE_SHIFT
         val slot = size and PAGE_MASK
         if (index >= directory.size) directory = directory.copyOf(maxOf(directory.size * 2, index + 1))
@@ -48,7 +48,7 @@ internal class NativeLearnedPayloads {
         val capacity = page.rows.size
         page.growTo(slot + 1)
         referenceSlots += page.rows.size - capacity
-        page.rows[slot] = literals.copyOf()
+        page.rows[slot] = if (ownedLiterals) literals else literals.copyOf()
         page.words += literals.size
         page.live++
         words += literals.size
@@ -155,7 +155,7 @@ internal class NativeLearnedPayloads {
                     }
                 }
             }
-            // Admission copies every array; the page owns one disjoint payload and reference pool.
+            // Each array is copied or transferred exclusively into one disjoint payload and reference pool.
             sample.ownedPool(page, 12L + page.words * Int.SIZE_BYTES,
                 if (retained) 12L + protectedWords * Int.SIZE_BYTES else 0L)
             sample.ownedReferences(page, page.rows.size + 1L, retained)

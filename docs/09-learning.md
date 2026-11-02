@@ -518,7 +518,9 @@ its watch-position payload, integer-row cache entry and applicable deferred/diag
 aliases. Stale watches skip that slot; their allocated capacity and policy columns
 remain owned until compaction. Selection and subsequent retired-slot compaction share
 one work grant; compaction keeps every active row and receives only its remainder.
-Native learned-watch cleanup scans resumably before whole-store preparation under
+Root simplification transfers its fresh residual literal array into the learned store;
+other admissions copy borrowed literal arrays. Native learned-watch cleanup scans
+resumably before whole-store preparation under
 the same grant. Sixteen-entry posting pages release at tail boundaries, and an empty
 posting list releases its directory. Posting mutations rewind an affected scan prefix;
 no learned handle or reason is remapped by this scan. A completed pass is reused until
