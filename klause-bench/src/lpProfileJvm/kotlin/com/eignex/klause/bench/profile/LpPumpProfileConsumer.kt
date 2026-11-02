@@ -102,8 +102,10 @@ internal class LpPumpProfileConsumer(
         val owner = engine ?: LpEngine(
             problem,
             objective,
-            LpParams(lpPlan = LpPlan(bounding = true),
-                solveBudgetMillis = if (floatingPrimal) FLOATING_SOLVE_BUDGET_MILLIS else null),
+            LpParams(
+                lpPlan = LpPlan(bounding = true),
+                solveBudgetMillis = if (floatingPrimal) FLOATING_SOLVE_BUDGET_MILLIS else null,
+            ),
             sink,
             projections = projections,
             containingWork = { ownerTotalWork += it },
@@ -154,7 +156,9 @@ internal class LpPumpProfileConsumer(
         check(floatingPrimal)
         val primal = consumeFloating(cancellation, primal = true)
         observeFloating("PRIMAL", primal)
-        val result = if (primal.outcome == LpFloatingProfileResult.OPTIMAL) primal else {
+        val result = if (primal.outcome == LpFloatingProfileResult.OPTIMAL) {
+            primal
+        } else {
             consumeFloating(cancellation, primal = false).also { observeFloating("DUAL_FALLBACK", it) }
         }
         if (result.outcome == LpFloatingProfileResult.OPTIMAL) completedConsumer()
@@ -169,9 +173,13 @@ internal class LpPumpProfileConsumer(
         if (owner.lpWorkAllowanceSpent() || owner.workSpentExceeds(owner.params.lpPlan.rootMaxWork)) {
             return LpFloatingProfileResult("CURRENT_ALLOWANCE_SPENT", null)
         }
-        val simplex = newTableauCutSolver(relaxation.model, cancellation,
+        val simplex = newTableauCutSolver(
+            relaxation.model,
+            cancellation,
             workLimit = owner.rootPrimalWorkBudget(),
-            factory = owner.solveContext.engineFactory, pricing = owner.pricingOptions)
+            factory = owner.solveContext.engineFactory,
+            pricing = owner.pricingOptions,
+        )
         numericalOwnersOpened++
         try {
             floatingNumericalCalls++
@@ -184,11 +192,15 @@ internal class LpPumpProfileConsumer(
             }
             check(result == null || (result.objective.isFinite() && result.primal.all { it.isFinite() }))
             if (result?.optimal == true) floatingOptimalIterates++
-            val outcome = if (result?.optimal == true) LpFloatingProfileResult.OPTIMAL else {
+            val outcome = if (result?.optimal == true) {
+                LpFloatingProfileResult.OPTIMAL
+            } else {
                 "NO_OPTIMAL_FLOAT_ITERATE_" + (simplex.lastTermination?.name ?: "OTHER")
             }
-            return LpFloatingProfileResult(outcome,
-                result?.objective?.plus(relaxation.objectiveConstant.toDouble()))
+            return LpFloatingProfileResult(
+                outcome,
+                result?.objective?.plus(relaxation.objectiveConstant.toDouble()),
+            )
         } finally {
             numericalPreparationOps += simplex.lastMetrics.preparationOps
             val before = owner.totalSolveWork()

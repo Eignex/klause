@@ -405,23 +405,40 @@ internal object LpTemplatePreparationProfile {
                             put("numericalOwnersRetired", if (floatingPrimal) pump?.numericalOwnersRetired else null)
                             put("floatingNumericalCalls", if (floatingPrimal) pump?.floatingNumericalCalls else null)
                             put("floatingPrimalCalls", if (floatingPrimal) pump?.floatingPrimalCalls else null)
-                            put("floatingDualFallbackCalls",
-                                if (floatingPrimal) pump?.floatingDualFallbackCalls else null)
+                            put(
+                                "floatingDualFallbackCalls",
+                                if (floatingPrimal) pump?.floatingDualFallbackCalls else null,
+                            )
                             put("floatingOptimalIterates", if (floatingPrimal) pump?.floatingOptimalIterates else null)
-                            put("logicalSolveBudgetMillis",
-                                if (floatingPrimal) LpPumpProfileConsumer.FLOATING_SOLVE_BUDGET_MILLIS else null)
-                            put("floatingObjectiveRelativeTolerance",
-                                if (floatingPrimal) LpFloatingProfileResult.OBJECTIVE_RELATIVE_TOLERANCE else null)
+                            put(
+                                "logicalSolveBudgetMillis",
+                                if (floatingPrimal) LpPumpProfileConsumer.FLOATING_SOLVE_BUDGET_MILLIS else null,
+                            )
+                            put(
+                                "floatingObjectiveRelativeTolerance",
+                                if (floatingPrimal) LpFloatingProfileResult.OBJECTIVE_RELATIVE_TOLERANCE else null,
+                            )
                             if (floatingPrimal) {
-                                put("floatingOutcomes", buildJsonObject {
-                                    for ((outcome, count) in checkNotNull(pump).floatingOutcomes()) put(outcome, count)
-                                })
-                                put("floatingResults", buildJsonArray {
-                                    for (point in floatingResults) add(buildJsonObject {
-                                        put("outcome", point.outcome)
-                                        put("objective", point.objective)
-                                    })
-                                })
+                                put(
+                                    "floatingOutcomes",
+                                    buildJsonObject {
+                                        val outcomes = checkNotNull(pump).floatingOutcomes()
+                                        for ((outcome, count) in outcomes) put(outcome, count)
+                                    },
+                                )
+                                put(
+                                    "floatingResults",
+                                    buildJsonArray {
+                                        for (point in floatingResults) {
+                                            add(
+                                                buildJsonObject {
+                                                    put("outcome", point.outcome)
+                                                    put("objective", point.objective)
+                                                },
+                                            )
+                                        }
+                                    },
+                                )
                             }
                             put("cancelledOwnerPreparationWork", pump?.cancelledOwnerPreparationWork)
                             put("maxCancelledOwnerPreparationWork", pump?.maxCancelledOwnerPreparationWork)
@@ -451,12 +468,22 @@ internal object LpTemplatePreparationProfile {
                             put("privateCancelled", pumpPreparation?.outcomes?.get("CANCELLED"))
                             put("privatePreparationNs", pumpPreparation?.nanos)
                             put("privatePreparationWork", pumpPreparation?.work)
-                            put("numericalConsumer", if (floatingPrimal) {
-                                "fresh production floating primal owner with cumulative LP work and retirement"
-                            } else "fresh exact LP import, solve, certification and owner retirement")
-                            put("handoffScope", if (floatingPrimal) {
-                                "fixed uninterrupted pump root; cross-pause continuation handoff not exercised"
-                            } else null)
+                            put(
+                                "numericalConsumer",
+                                if (floatingPrimal) {
+                                    "fresh production floating primal owner with cumulative LP work and retirement"
+                                } else {
+                                    "fresh exact LP import, solve, certification and owner retirement"
+                                },
+                            )
+                            put(
+                                "handoffScope",
+                                if (floatingPrimal) {
+                                    "fixed uninterrupted pump root; cross-pause continuation handoff not exercised"
+                                } else {
+                                    null
+                                },
+                            )
                             put("wholeModelsReused", wholeModelsReused)
                             put("wholeModelsPublished", wholeModelsPublished)
                             put("sourceSha256", hash)
@@ -519,11 +546,13 @@ internal object LpTemplatePreparationProfile {
                     }
                     if (floatingPrimal) {
                         val expected = floatingSignatures.getValue("disabled")
-                        check(floatingSignatures.values.all { points ->
-                            points.size == expected.size && points.zip(expected).all { (point, reference) ->
-                                point.matches(reference)
-                            }
-                        }) { "floating consumer results differ across reuse modes" }
+                        check(
+                            floatingSignatures.values.all { points ->
+                                points.size == expected.size && points.zip(expected).all { (point, reference) ->
+                                    point.matches(reference)
+                                }
+                            },
+                        ) { "floating consumer results differ across reuse modes" }
                     } else {
                         check(signatures.values.distinct().size == 1) { "consumer results differ across reuse modes" }
                     }
