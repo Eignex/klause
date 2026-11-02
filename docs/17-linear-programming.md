@@ -967,6 +967,11 @@ column copies; an unscaled fallback refreshes those arrays with its matrix and
 retires the basis backend. Stored zeros and current coefficient values retain
 stored-entry arithmetic.
 
+Sparse accumulation skips empty columns and treats a zero multiplier as a no-op.
+A singleton with a nonzero multiplier updates its stored row directly from the
+current CSC arrays; larger columns use the validated backend. Work charges belong
+to the calling solve operation.
+
 Dual leaving selection uses verified Devex, reselecting when a maintained weight
 falls below `0.25 * norm(rho)^2`. Entering selection uses a scaled Harris window,
 a ministep floor and a breakpoint walk. Zero-objective solves choose between

@@ -16,6 +16,40 @@ import kotlin.test.assertTrue
 
 class RevisedSimplexPricingTest {
     @Test
+    fun `column accumulation should retain empty columns zero multipliers and stored zero arithmetic`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addRealVar(0.0, 10.0) }
+        builder.addRealRow(intArrayOf(0, 1), doubleArrayOf(2.0, 1.0), Relation.LE, 10.0)
+        builder.addRealRow(intArrayOf(0), doubleArrayOf(-4.0), Relation.LE, 10.0)
+        val model = builder.build(Sense.MINIMIZE)
+        val view = assertNotNull(model.doubleView)
+        view.colVal[view.colPtr[1]] = 0.0
+        val cases = listOf(
+            Triple(2, Double.NaN, doubleArrayOf(-0.0, 1.0)),
+            Triple(1, 0.0, doubleArrayOf(-0.0, 1.0)),
+            Triple(1, -0.0, doubleArrayOf(-0.0, 1.0)),
+            Triple(1, Double.POSITIVE_INFINITY, doubleArrayOf(Double.NaN, 1.0)),
+            Triple(1, Double.NaN, doubleArrayOf(Double.NaN, 1.0)),
+            Triple(1, 1.0, doubleArrayOf(0.0, 1.0)),
+            Triple(0, 2.0, doubleArrayOf(4.0, -7.0)),
+            Triple(0, -2.0, doubleArrayOf(-4.0, 9.0)),
+        )
+
+        RevisedSimplex(model, scalingOptions = LpScalingOptions(enabled = false)).use { solver ->
+            for ((column, alpha, expected) in cases) {
+                val destination = doubleArrayOf(-0.0, 1.0)
+
+                solver.sparseAxpy(destination, alpha, column)
+
+                for (row in destination.indices) {
+                    assertEquals(expected[row].toBits(), destination[row].toBits(),
+                        "column $column alpha $alpha row $row")
+                }
+            }
+        }
+    }
+
+    @Test
     fun `column pricing should match stored entry arithmetic including empty and zero columns`() {
         val builder = LpBuilder()
         repeat(3) { builder.addRealVar(0.0, 10.0) }

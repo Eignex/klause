@@ -830,7 +830,16 @@ internal class RevisedSimplex(
         )
     }
 
-    private fun sparseAxpy(destination: DoubleArray, alpha: Double, column: Int) {
+    internal fun sparseAxpy(destination: DoubleArray, alpha: Double, column: Int) {
+        if (alpha == 0.0) return
+        val from = colPtr[column]
+        val until = colPtr[column + 1]
+        if (from == until) return
+        if (until == from + 1) {
+            val row = rowIdx[from]
+            destination[row] += alpha * colVal[from]
+            return
+        }
         koblas.sparseKernels.axpy(
             destination,
             alpha,
