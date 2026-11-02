@@ -468,6 +468,7 @@ internal object LinearAuthorityAggregateCuts {
                     val terms = listOf(first.term, second.term)
                     val snapshots = listOf(first.coefficients, second.coefficients)
                     var cut = deriveWithCoefficients(terms, cancellation, charge, limits,
+                        allowMixed = false, continuousBounds = emptyMap(),
                         coefficientSnapshots = snapshots, capture = capture)
                     val separating = if (cut == null) false else separates(cut, point, meter, observe)
                     if (separating == null) continue
