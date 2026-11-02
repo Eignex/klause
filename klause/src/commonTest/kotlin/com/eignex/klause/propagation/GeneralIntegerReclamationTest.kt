@@ -204,4 +204,30 @@ class GeneralIntegerReclamationTest {
         assertEquals(IntDomain(0, 6), session.intDomain(0))
     }
 
+
+    @Test
+    fun `cancellation after funding should preserve paged integer cache capacity`() {
+        val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 10)),
+            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10))), nativeSat = false)
+        val live = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 8), useLo = true))
+        val unused = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
+        session.addLearnedIntegerRow(live, 2)
+        repeat(255) { session.addLearnedIntegerRow(unused, 9) }
+        session.maintainCapWindow(1, 65_536L, 1_048_576L, { false }) { it == 0 }
+        val rows = assertNotNull(session.explanationState.learned.integerRows)
+        assertEquals(1, rows.size)
+        assertEquals(256, rows.capacity)
+        val stopAt = session.work + 7L
+
+        session.compactLearnedClauses(7L, 8L, { session.work >= stopAt }) { _, _ -> true }
+
+        assertEquals(stopAt, session.work)
+        assertEquals(256, rows.capacity)
+        session.compactLearnedClauses(7L, 8L, { false }) { _, _ -> true }
+        assertEquals(1, rows.capacity)
+        assertEquals(IntDomain(0, 8), session.intDomain(0))
+    }
+
 }
