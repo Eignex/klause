@@ -35,10 +35,17 @@ class CliModeMpsTest {
         }
 
         var code = -1
-        val out = capture { code = runCli(arrayOf(mps.absolutePath)) }
+        val out = capture {
+            code = runCli(arrayOf("-s", "-e", "fixed", "-p", "1",
+                "--param", "presolve-work-limit=0",
+                "--param", "source-lp-work-limit=65536", mps.absolutePath))
+        }
 
         assertEquals(0, code, out)
         assertTrue("o 1.5" in out, out)
+        assertTrue("s OPTIMUM FOUND" in out.lines(), out)
+        assertTrue("v X=3" in out.lines(), out)
+        assertTrue("c reportedBackend=numerical-mip" in out.lines(), out)
     }
 
     @Test
@@ -60,8 +67,8 @@ class CliModeMpsTest {
             deleteOnExit()
         }
         val out = capture {
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1",
-                "--param", "presolve-work-limit=4096",
+            assertEquals(0, runCli(arrayOf("-s", "-e", "cp", "-p", "1",
+                "--param", "presolve-work-limit=0",
                 "--param", "source-lp-work-limit=65536", mps.absolutePath)))
         }
 
@@ -70,6 +77,8 @@ class CliModeMpsTest {
         assertTrue("v X=0.333333333333333314829616256247390992939472198486328125" in out.lines(), out)
         assertTrue("c optimizationStatus=tolerance-optimum" in out.lines(), out)
         assertFalse("tolerance-accepted optimality unproved" in out, out)
+        assertTrue("c frontendRoutingOutcome=finite" in out.lines(), out)
+        assertTrue("c reportedBackend=backtrack" in out.lines(), out)
     }
 
     @Test
@@ -98,7 +107,10 @@ class CliModeMpsTest {
             deleteOnExit()
         }
 
-        val out = capture { main(arrayOf(mps.absolutePath)) }
+        val out = capture {
+            main(arrayOf("-e", "fixed", "-p", "1",
+                "--param", "presolve-work-limit=0", mps.absolutePath))
+        }
 
         assertTrue("s OPTIMUM FOUND" in out, out)
         assertTrue("o 7" in out.lines(), out)
