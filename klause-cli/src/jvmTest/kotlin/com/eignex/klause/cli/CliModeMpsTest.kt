@@ -3,6 +3,8 @@ package com.eignex.klause.cli
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
+import java.time.Duration
+import jdk.jfr.Recording
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -35,7 +37,7 @@ class CliModeMpsTest {
         }
 
         var code = -1
-        val out = capture {
+        val out = capture("file-units") {
             code = runCli(arrayOf("-s", "-e", "fixed", "-p", "1",
                 "--param", "presolve-work-limit=0",
                 "--param", "source-lp-work-limit=65536", mps.absolutePath))
@@ -66,7 +68,7 @@ class CliModeMpsTest {
             )
             deleteOnExit()
         }
-        val out = capture {
+        val out = capture("rounded-row") {
             assertEquals(0, runCli(arrayOf("-s", "-e", "cp", "-p", "1",
                 "--param", "presolve-work-limit=0",
                 "--param", "source-lp-work-limit=65536", mps.absolutePath)))
@@ -153,14 +155,35 @@ class CliModeMpsTest {
         assertTrue("label=mixed-max objective=3 continuousObjective=63.5 time=40" in out, out)
     }
 
-    private fun capture(block: () -> Unit): String {
+    private fun capture(profile: String? = null, block: () -> Unit): String {
+        val recording = profile?.let {
+            Recording().apply {
+                enable("jdk.ExecutionSample").withPeriod(Duration.ofMillis(5))
+                enable("jdk.ObjectAllocationSample").withStackTrace()
+                enable("jdk.ClassLoad").withThreshold(Duration.ZERO).withStackTrace()
+                enable("jdk.ClassDefine").withStackTrace()
+                enable("jdk.Compilation").withThreshold(Duration.ZERO)
+            }
+        }
         val buf = ByteArrayOutputStream()
         val old = System.out
         System.setOut(PrintStream(buf))
         try {
+            recording?.start()
             block()
         } finally {
             System.setOut(old)
+            if (recording != null) {
+                try {
+                    recording.stop()
+                    val workspace = requireNotNull(System.getenv("GITHUB_WORKSPACE"))
+                    val directory = File(workspace, "klause-cli/build/reports/tests/mps-ci-profile")
+                    directory.mkdirs()
+                    recording.dump(File(directory, profile + ".jfr").toPath())
+                } finally {
+                    recording.close()
+                }
+            }
         }
         return buf.toString()
     }
