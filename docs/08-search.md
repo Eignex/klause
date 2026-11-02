@@ -124,7 +124,10 @@ layout as pending private preparation. Construction completion, cancellation and
 Eligible retained LP root coordinates can pass directly to the ordinary finite
 traversal as value preferences. Its existing backtracking completes the assignment,
 and complete source checks retain publication authority. This transfer carries no
-LP point, bound or proof authority into a leaf.
+LP point, bound or proof authority into a leaf. Before its first incumbent, a retained
+integer guide can keep decisions within one declared factor component at a time.
+The same frame stack handles conflicts and retraction; all source constraints stay
+active and every component still belongs to complete source checking.
 
 Numerical frontier traversal orders alternatives by inherited checked objective
 bounds, visiting unbounded alternatives first. It keeps both children of every

@@ -193,6 +193,40 @@ internal object FiniteCutoffKnapsackFixture {
 
 class ResumableMinimizeTest {
     @Test
+    fun `retained guides complete one declared component before starting another`() {
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.GE, 1),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(6) { 1L })
+        val attempts = ArrayList<Int>()
+        val offered = ArrayList<Sample>()
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
+            phaseSaving = false, targetPhasing = false, solutionPhasing = false,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false, boundMaxDepth = -1),
+            branchObserver = object : SearchBranchAttemptObserver {
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    when (decision) {
+                        is SearchDecision.IntAtMost -> attempts.add(decision.variable)
+                        is SearchDecision.IntAtLeast -> attempts.add(decision.variable)
+                        else -> error("Expected an integer decision")
+                    }
+                }
+            })
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
+            search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
+
+            assertEquals(listOf(0, 2), attempts.take(2))
+            val sample = offered.single()
+            assertTrue(sample.ints[0] + sample.ints[2] + sample.ints[4] >= 1L)
+            assertTrue(sample.ints[1] + sample.ints[3] + sample.ints[5] >= 1L)
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_COMPONENT_ORDER_ROOT"]
+                ?.outcomes?.get("COMPONENT_PICK_OFFERED"))
+        }
+    }
+
+    @Test
     fun `ordinary search backtracks from root value targets without another node lp query`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, listOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
