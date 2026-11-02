@@ -5,14 +5,50 @@ import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IntegerDualBoundTest {
+
+    @Test
+    fun `common dual scale inspection honors the remaining checking allowance`() {
+        val meter = MixedCertificateMeter(Cancellation.Never)
+        meter.reserve(8L * 249_998L)
+
+        assertFailsWith<LpProjectionStop> {
+            dualRoundingScaleBits(doubleArrayOf(1.0, 2.0), inspect = meter::step)
+        }
+    }
+
+    @Test
+    fun `common dual scales preserve the exact multiplier range`() {
+        val cases = listOf(
+            doubleArrayOf() to 40,
+            doubleArrayOf(0.0, 1.0, -2.0) to 40,
+            doubleArrayOf(1_073_741_824.0, -0.5) to 22,
+            doubleArrayOf(4_503_599_627_370_496.0) to 0,
+            doubleArrayOf(9_007_199_254_740_991.0) to 0,
+            doubleArrayOf(9_007_199_254_740_992.0) to null,
+            doubleArrayOf(Double.NaN) to null,
+            doubleArrayOf(Double.POSITIVE_INFINITY) to null,
+            doubleArrayOf(Double.NEGATIVE_INFINITY) to null,
+        )
+        for ((duals, expected) in cases) {
+            val builder = LpBuilder()
+            val column = builder.addVar(0L, 1L)
+            repeat(duals.size) { builder.addRow(intArrayOf(column), longArrayOf(1L), Relation.LE, 1L) }
+            val model = builder.build(Sense.MINIMIZE)
+
+            assertEquals(expected, dualRoundingScaleBits(duals))
+            assertEquals(expected, roundDuals(model, duals)?.scaleBits)
+        }
+    }
 
     @Test
     fun `legacy certificates should reject mutations to numeric authority and source premises`() {

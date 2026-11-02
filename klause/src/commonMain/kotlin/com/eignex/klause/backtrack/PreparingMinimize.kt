@@ -57,7 +57,7 @@ internal class PreparingMinimize(
     override val canContinuePreparation: Boolean get() = search?.canContinuePreparation == true
 
     override val isDone: Boolean get() = terminal != null || search?.isDone == true
-    override val preparationPending: Boolean get() = search == null && !closed
+    override val preparationPending: Boolean get() = !closed && (search?.preparationPending ?: true)
     override val stats: SolveStats get() = search?.stats ?: sink.snapshot()
     override val work: Long get() = search?.work ?: budget.spent()
 
