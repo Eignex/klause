@@ -1122,7 +1122,10 @@ It accepts:
 `suite=ID problem=NAME sha256=HEX timeout-ms=10000 nodes=4096 lp=auto|off
 trace=first-integer|initial|none samples=false|true models=true|false attribution=false|true
 recipe=source|satOptimized|conflictDriven seed=3 worker-seed=3 route=single|portfolio
-learning-placement=automatic|observed`.
+learning-placement=automatic|observed shared-node-limit=4096|unlimited`.
+`nodes` limits each search slice. Portfolio runs also share that many decisions
+unless `shared-node-limit` supplies a separate invocation allowance. Use `unlimited`
+to match an ordinary CLI invocation without `node-limit`; its deadline still applies.
 
 `recipe=source` uses the source search hints or the conflict-driven preset.
 Preparation uses `seed`. Single-worker traversal defaults `worker-seed` to `seed`;
