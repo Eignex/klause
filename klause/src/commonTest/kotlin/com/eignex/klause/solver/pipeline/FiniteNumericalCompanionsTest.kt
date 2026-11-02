@@ -35,6 +35,30 @@ import kotlin.time.TestTimeSource
 
 class FiniteNumericalCompanionsTest {
     @Test
+    fun `deferred numerical admission should preserve the requested incumbent gate`() {
+        for (after in listOf(false, true)) {
+            val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1))
+            val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+            val params = TheoryParams(sourceIncumbentCompletion = true)
+            val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+                objective, params).requirements.construction
+            val stop = Cancellation.after(30.seconds)
+            val admission = FiniteNumericalCompanions.admission(model, objective, stop, cost)
+            val companions = FiniteNumericalCompanions.deferred(model, objective, params, stop, cost, admission,
+                incumbentCompletionCheck = { _, _, _ -> true }, afterIncumbent = after)
+
+            PortfolioInvocationResources(2, 1, 0, stop, null).use { resources ->
+                companions.factories(plan, 0).first().materialize(plan, resources.slots[0]).use { worker ->
+                    assertEquals(after, worker.startAfterIncumbent)
+                    assertEquals(0L, admission.stages()["finiteCompanionPreparationAttempts"])
+                }
+            }
+        }
+    }
+
+    @Test
     fun `guided admission should reject missing funding or checked completion contracts`() {
         for (missing in listOf("funding", "completion", "original")) {
             val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,

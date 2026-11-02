@@ -106,8 +106,11 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionEligibility = numericalCompanions?.let {
         finiteNumericalCompanionEligibility(problem, scenario, objective, it)
     }
-    if (fundedCompanions && (!scenario.companionAfterIncumbent || cancellation.deadline() == null)) {
-        pipelineConfigError("companion-admission=funded requires companion-after-incumbent and a solve deadline")
+    if (fundedCompanions && cancellation.deadline() == null) {
+        pipelineConfigError("funded companion admission requires a solve deadline")
+    }
+    if (fundedCompanions && !guidedCompanions && !scenario.companionAfterIncumbent) {
+        pipelineConfigError("companion-admission=funded requires companion-after-incumbent")
     }
     if (guidedCompanions && (!fundedCompanions || numericalCompanions?.sourceIncumbentCompletion != true)) {
         pipelineConfigError("companion-admission=guided requires funded starts and source-incumbent-completion")
@@ -128,7 +131,7 @@ internal fun FinitePipeline.portfolioExecutor(
     val companions = if (companionAdmission?.initiallyFunded == true) {
         FiniteNumericalCompanions.deferred(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, requireNotNull(companionEligibility).requirements.construction, companionAdmission,
-            incumbentCompletionCheck)
+            incumbentCompletionCheck, afterIncumbent = scenario.companionAfterIncumbent)
     } else companionPreparation?.companions
     companionEligibility?.let { eligibility ->
         val declines = if (companionAdmission?.initiallyFunded == false) listOf("companion-lifetime-unfunded")
@@ -243,7 +246,9 @@ internal fun FinitePipeline.portfolioExecutor(
         PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes,
             probeWeights = probeWeights,
             deferredStart = if (guidedCompanions && companions != null) {
-                workers.indexOfFirst { it.label == "ls/finite-joint-companion" } to companions::repairReady
+                workers.indexOfFirst { it.label == "ls/finite-joint-companion" } to {
+                    companions.incumbents.exchange.current() != null && companions.repairReady()
+                }
             } else null,
             onProgress = deferred)
     }

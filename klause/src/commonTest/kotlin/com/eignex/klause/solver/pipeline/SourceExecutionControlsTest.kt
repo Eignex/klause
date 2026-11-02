@@ -25,10 +25,13 @@ import kotlin.time.Duration.Companion.seconds
 class SourceExecutionControlsTest {
     @Test
     fun `typed and parsed guided admission should reach checked source execution`() {
-        for (options in listOf(ExecutionOptions(ExecutionOption.companionAdmission("guided"),
-            ExecutionOption.companionAfterIncumbent(true), ExecutionOption.sourceIncumbentCompletion(true)),
-            ExecutionOptions.parse(listOf("companion-admission=guided", "companion-after-incumbent=true",
-                "source-incumbent-completion=true")))) {
+        val settings = listOf(false, true).flatMap { after ->
+            listOf(ExecutionOptions(ExecutionOption.companionAdmission("guided"),
+                ExecutionOption.companionAfterIncumbent(after), ExecutionOption.sourceIncumbentCompletion(true)),
+                ExecutionOptions.parse(listOf("companion-admission=guided", "companion-after-incumbent=$after",
+                    "source-incumbent-completion=true")))
+        }
+        for (options in settings) {
             val source = LinearSourceProblem(listOf(
                 LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
                 LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),

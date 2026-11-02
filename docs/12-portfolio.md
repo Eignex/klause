@@ -112,9 +112,10 @@ unavailable capture retires without a source verdict. Finite recipes, indices an
 seed positions remain intact, including explicit selections.
 
 `companion-admission=guided` adds a start dependency for the witness-only repair
-worker. It requires funded incumbent-gated admission and checked source completion.
-Repair waits for a retained numerical root point in the same captured context before
-constructing its private neighborhood or LP state. Availability reads the paid
+worker. It requires funded construction, a containing deadline and checked source
+completion. The numerical worker follows `companion-after-incumbent`; repair waits
+for both an incumbent and a retained numerical root point in the same captured
+context before constructing its private neighborhood or LP state. Availability reads the paid
 snapshot without opening a root query or completing a seed. The opening attempt
 still rechecks its remaining lifetime; waiting grants no active time, work or
 allocation. Complete workers retain their ordinary eligibility and coverage.

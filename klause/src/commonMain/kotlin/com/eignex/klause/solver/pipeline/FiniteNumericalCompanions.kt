@@ -234,8 +234,9 @@ internal class FiniteNumericalCompanions private constructor(
 
         fun deferred(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: Cancellation, cost: WorkerConstructionCost, admission: FiniteCompanionAdmission,
-            incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?): FiniteNumericalCompanions =
-            FiniteNumericalCompanions(model, objective, null, params, cancellation, cost, true,
+            incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?,
+            afterIncumbent: Boolean = true): FiniteNumericalCompanions =
+            FiniteNumericalCompanions(model, objective, null, params, cancellation, cost, afterIncumbent,
                 incumbentCompletionCheck, admission)
 
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
