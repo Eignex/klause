@@ -109,6 +109,11 @@ Incremental initialization advances each component's iterator with that componen
 as the active publisher. Synchronous initializers run inside the iterator too.
 Root refresh retains the same ownership: facts already established by CP reach
 peers without returning to CP as extra private decisions.
+The trail retains each queued assertion and its next unfinished recipient until
+delivery completes. An indeterminate recipient resumes before later recipients;
+accepted peers receive no duplicate delivery. Retraction discards queued deliveries
+with their abandoned trail state, and pending recipient cursors remain protected
+modeled ownership.
 
 Numerical frontier traversal orders alternatives by inherited checked objective
 bounds, visiting unbounded alternatives first. It keeps both children of every

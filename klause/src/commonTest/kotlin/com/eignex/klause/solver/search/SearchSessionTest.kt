@@ -14,6 +14,67 @@ import kotlin.test.assertTrue
 class SearchSessionTest {
 
     @Test
+    fun `an interrupted publication should resume at its first unfinished peer`() {
+        var blocked = true
+        var accepted = 0
+        var attempts = 0
+        val publisher = object : SearchComponent {
+            override fun initialize(context: SearchContext): ComponentResult = context.publish(0)
+        }
+        val first = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                assertEquals(SearchDecision.Bool(0), decision)
+                accepted++
+                return ComponentResult.Consistent
+            }
+        }
+        val last = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                assertEquals(SearchDecision.Bool(0), decision)
+                attempts++
+                return if (blocked) ComponentResult.Indeterminate else ComponentResult.Consistent
+            }
+        }
+        val session = SearchSession(listOf(publisher, first, last))
+        assertIs<ComponentResult.Indeterminate>(session.initialize())
+
+        blocked = false
+        val result = session.propagate()
+
+        assertIs<ComponentResult.Consistent>(result)
+        assertEquals(1, accepted)
+        assertEquals(2, attempts)
+        assertEquals(true, session.boolValue(0))
+        assertEquals(0, session.decisionLevel)
+    }
+
+    @Test
+    fun `retraction should discard an interrupted publication from the abandoned level`() {
+        var attempts = 0
+        val publisher = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                if (decision == SearchDecision.Bool(0)) context.publish(2) else ComponentResult.Consistent
+        }
+        val peer = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                if (decision != SearchDecision.Bool(2)) return ComponentResult.Consistent
+                attempts++
+                return ComponentResult.Indeterminate
+            }
+        }
+        val session = SearchSession(listOf(publisher, peer))
+        assertIs<ComponentResult.Indeterminate>(session.push(SearchDecision.Bool(0)))
+
+        session.popTo(0)
+        val result = session.propagate()
+
+        assertIs<ComponentResult.Consistent>(result)
+        assertEquals(1, attempts)
+        assertEquals(null, session.boolValue(1))
+        assertEquals(0, session.decisionLevel)
+    }
+
+    @Test
     fun `open work should count each committed public decision kind`() {
         val decisions = listOf(
             SearchDecision.Bool(0) to Triple(1L, 0L, 0L),

@@ -430,31 +430,31 @@ class SearchSession(
         while (true) {
             selfPublicationsPending = false
             while (trail.pendingAssertions.isNotEmpty()) {
-                val pending = trail.pendingAssertions.removeFirst()
+                val pending = trail.pendingAssertions.first()
                 val registered = (pending.decision as? SearchDecision.Theory)?.decision as? RegisteredTheoryDecision
                 val integer = (registered?.payload as? SearchIntegerBound)?.decision()
                 val asserted = integer ?: pending.decision
                 if (integer != null) {
                     val result = updateIntFact(integer, SearchAtomPremise.Asserted(pending.decision))
-                    if (result !is ComponentResult.Consistent) return result
+                    if (result !is ComponentResult.Consistent) {
+                        if (result is ComponentResult.Conflict) trail.pendingAssertions.removeFirst()
+                        return result
+                    }
                 }
-                if (singleComponent != null) {
-                    val component = singleComponent
+                while (pending.nextComponent < components.size) {
+                    val component = components[pending.nextComponent]
                     if (component !== pending.source) {
                         activeComponent = component
                         val result = component.assert(asserted, this)
                         activeComponent = null
-                        if (result !is ComponentResult.Consistent) return recordConflict(component, result)
+                        if (result !is ComponentResult.Consistent) {
+                            if (result is ComponentResult.Conflict) trail.pendingAssertions.removeFirst()
+                            return recordConflict(component, result)
+                        }
                     }
-                } else {
-                    for (component in components) {
-                        if (component === pending.source) continue
-                        activeComponent = component
-                        val result = component.assert(asserted, this)
-                        activeComponent = null
-                        if (result !is ComponentResult.Consistent) return recordConflict(component, result)
-                    }
+                    pending.nextComponent++
                 }
+                trail.pendingAssertions.removeFirst()
             }
             val result = runComponents { it.propagate(this) }
             if (result !is ComponentResult.Consistent) return result

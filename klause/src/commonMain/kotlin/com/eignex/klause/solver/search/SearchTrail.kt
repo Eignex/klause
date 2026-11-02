@@ -54,6 +54,7 @@ internal class SearchTrail {
         sample.ownedReferences(pendingAssertions, pendingAssertions.capacity.toLong(), protected = true)
         for (assertion in pendingAssertions) {
             sample.step()
+            sample.owned(assertion, Int.SIZE_BYTES.toLong(), protected = true)
             sample.ownedReferences(assertion, 2L, protected = true)
         }
     }
@@ -212,7 +213,9 @@ internal class SearchTrail {
     )
 }
 
-internal data class PendingSearchAssertion(val decision: SearchDecision, val source: SearchComponent?)
+internal data class PendingSearchAssertion(val decision: SearchDecision, val source: SearchComponent?) {
+    var nextComponent: Int = 0
+}
 
 internal class SearchAssertionQueue : Iterable<PendingSearchAssertion> {
     private var data: Array<PendingSearchAssertion?> = arrayOfNulls(8)
@@ -242,6 +245,10 @@ internal class SearchAssertionQueue : Iterable<PendingSearchAssertion> {
         size--
         ownershipRevision++
         return assertion
+    }
+    fun first(): PendingSearchAssertion {
+        check(size > 0)
+        return checkNotNull(data[head])
     }
     fun clear() {
         ownershipRevision++
