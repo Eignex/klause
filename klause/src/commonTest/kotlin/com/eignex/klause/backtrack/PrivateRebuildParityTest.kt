@@ -359,21 +359,23 @@ class PrivateRebuildParityTest {
 
     @Test
     fun `cancelled mixed row construction should withhold its private generation`() {
-        val clauses = listOf(0, 3, 5, 6).map { mask ->
-            Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })
-        } + Clause(IntArray(3) { Lit.make(it, false) })
-        val session = PropagationSession(Problem(3, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake())
-        val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
-        var work = 0L
-        val token = object : Cancellation {
-            override fun isCancelled(): Boolean = work >= 64L
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+        for (allowance in listOf(64L, 128L)) {
+            val clauses = listOf(0, 3, 5, 6).map { mask ->
+                Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })
+            } + Clause(IntArray(3) { Lit.make(it, false) })
+            val session = PropagationSession(Problem(3, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake())
+            val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
+            var work = 0L
+            val token = object : Cancellation {
+                override fun isCancelled(): Boolean = work >= allowance
+                override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            }
+
+            val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L, token, parity = captured)
+
+            assertNull(generation)
+            for (variable in 0..2) assertNull(session.boolValue(variable))
         }
-
-        val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L, token, parity = captured)
-
-        assertNull(generation)
-        for (variable in 0..2) assertNull(session.boolValue(variable))
     }
 
     @Test

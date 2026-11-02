@@ -40,6 +40,8 @@ internal class PrivateRebuildGeneration private constructor(
     val parityReducedRows: Int,
     val parityReducedLiterals: Long,
     val parityCoveredClauses: Int,
+    val paritySourceRows: Int,
+    val paritySourceLiterals: Long,
     val preferredFreeColumns: IntArray,
 ) {
     fun reconstruct(sample: Sample): Sample = mapping.reconstructFrom(problem, sample)
@@ -93,9 +95,12 @@ internal class PrivateRebuildGeneration private constructor(
             } else null
             if (cancellation()) return null
             val rowView = rowLiterals != null
+            val sourceRows = if (rowView) checkNotNull(parity).sourceRowCount else 0
+            val sourceRowLiterals = if (rowView) checkNotNull(parity).sourceRowLiterals else 0L
             if (parity != null && affine == null && !rowView && parity.newPins == 0) return null
             val modelEntries = if (rowView) {
-                source.numBoolVars * 3L + checkNotNull(basis).rank + checkNotNull(rowLiterals) + retainedEntries + 1L
+                source.numBoolVars * 3L + checkNotNull(basis).rank + checkNotNull(rowLiterals) +
+                    sourceRows + sourceRowLiterals + retainedEntries + 1L
             } else entries
             // This admission model covers simultaneous primitive buffers and reference slots,
             // including admission, the BVE database, source copies, reconstruction and a fresh worker.
@@ -132,7 +137,7 @@ internal class PrivateRebuildGeneration private constructor(
             }
             val privateFixed = if (affine == null) fixed else Array(source.numBoolVars) { affine.privateValue(it) }
             val capacity = when {
-                rowView -> retainedFactors + checkNotNull(basis).rank + source.numBoolVars
+                rowView -> retainedFactors + checkNotNull(basis).rank + sourceRows + source.numBoolVars
                 affine != null -> source.numBoolVars
                 else -> source.numFactors
             }
@@ -171,6 +176,7 @@ internal class PrivateRebuildGeneration private constructor(
                 }
             }
             if (rowView) {
+                residual.addAll(checkNotNull(parity).materializeSourceRows(cancellation) ?: return null)
                 residual.addAll(checkNotNull(basis).materializeRows(cancellation) ?: return null)
             }
             val preferred = if (rowView) {
@@ -287,7 +293,7 @@ internal class PrivateRebuildGeneration private constructor(
                 neighborhood?.sourceFactors ?: 0, rebuild.steps.count { it is RebuildStep.CopyLiteral },
                 parity?.newPins ?: 0, affine?.rank ?: 0, affine?.freeColumns ?: 0,
                 if (rowView) checkNotNull(basis).rank else 0, rowLiterals ?: 0L,
-                if (rowView) checkNotNull(parity).coveredClauses else 0, preferred)
+                if (rowView) checkNotNull(parity).coveredClauses else 0, sourceRows, sourceRowLiterals, preferred)
         }
     }
 }

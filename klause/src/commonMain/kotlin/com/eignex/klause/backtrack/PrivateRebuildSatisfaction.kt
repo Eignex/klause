@@ -314,6 +314,8 @@ internal class PrivateRebuildSatisfaction(
         note("ParityReducedRows", prepared.parityReducedRows.toLong())
         note("ParityReducedLiterals", prepared.parityReducedLiterals)
         note("ParityCoveredClauses", prepared.parityCoveredClauses.toLong())
+        note("ParitySourceRows", prepared.paritySourceRows.toLong())
+        note("ParitySourceLiterals", prepared.paritySourceLiterals)
         note("ParityPreferredFreeColumns", prepared.preferredFreeColumns.size.toLong())
         note("AdmittedColumns", prepared.admittedColumns.toLong())
         note("ModeledPrivateBytes", prepared.modeledBytes + attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong())

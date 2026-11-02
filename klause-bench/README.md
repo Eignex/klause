@@ -147,6 +147,9 @@ it is a subset of transfer and preparation work, rather than another total to ad
 Private parity discovery reports `ParityDiscoveryWork`, `ParityDiscoveryNanos`,
 `ParityRows` and `ParityPins`. Discovery work is a subset of `ChargedWork`,
 separate from canonical root propagation and later `PreparationWork`.
+`ParitySourceRows` and `ParitySourceLiterals` count short source equations posted
+beside the reduced basis in mixed consumers. Their storage and propagation spend
+the existing private grants.
 `ParityGenerationPins` counts proved pins in a prepared private model;
 `Consumers` confirms that its worker opened.
 `ParityAffineColumns` and `ParityAffineFreeColumns` describe a fully covered

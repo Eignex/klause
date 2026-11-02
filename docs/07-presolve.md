@@ -325,7 +325,10 @@ projection. The containing grants cover the basis and reconstruction; every
 consumer point still reconstructs and checks the complete canonical source.
 
 A mixed source can retain its uncovered clauses and replace only proved parity
-encodings with an independent reduced XOR basis. Coverage records each original
+encodings with their short source equations and an independent reduced XOR basis.
+The source equations retain local unit propagation that expansion over free coordinates
+can weaken. Their compact captured encodings and materialized rows spend the same
+private byte and work grants. Coverage records each original
 clause's excluded assignment, so extra exclusions in an otherwise complete group
 remain constraints. Each replacement row has at most 64 distinct coordinates;
 unsupported widths decline the row view. Row arrays, coefficient projections and
