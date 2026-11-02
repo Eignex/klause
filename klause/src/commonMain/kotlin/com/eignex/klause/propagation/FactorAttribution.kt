@@ -32,6 +32,8 @@ internal fun Propagator.propagationFamily(): FactorFamily = when (this) {
 
 internal class FactorAttribution(private val capacity: Int = 1024) {
     private val counts = Array(FactorFamily.entries.size) { LongArray(Metric.entries.size) }
+    private val integerOwnerMask = 1 shl FactorFamily.entries.size
+    private val integerOwnerCounts = LongArray(Metric.entries.size)
     private data class RetainedReason(val families: Int, val slot: Int)
     private val reasons = HashMap<IntArray, RetainedReason>()
     private val reasonRing = arrayOfNulls<IntArray>(capacity)
@@ -53,14 +55,21 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
 
     fun note(mask: Int, metric: Metric, value: Long = 1) {
         for (family in FactorFamily.entries) if (mask and (1 shl family.ordinal) != 0) {
-            val row = counts[family.ordinal]
-            val i = metric.ordinal
-            row[i] = if (metric == Metric.MaxSupport) maxOf(row[i], value)
-            else row[i] + value.coerceIn(0, Long.MAX_VALUE - row[i])
+            note(counts[family.ordinal], metric, value)
         }
+        if (mask and integerOwnerMask != 0) note(integerOwnerCounts, metric, value)
     }
 
-    fun family(propagator: Propagator): Int = learned[propagator] ?: (1 shl propagator.propagationFamily().ordinal)
+    private fun note(row: LongArray, metric: Metric, value: Long) {
+        val i = metric.ordinal
+        row[i] = if (metric == Metric.MaxSupport) maxOf(row[i], value)
+        else row[i] + value.coerceIn(0, Long.MAX_VALUE - row[i])
+    }
+
+    fun family(propagator: Propagator): Int {
+        val mask = learned[propagator] ?: (1 shl propagator.propagationFamily().ordinal)
+        return if (propagator is LearnedIntegerPropagator) mask or integerOwnerMask else mask
+    }
 
     fun remember(reason: IntArray?, mask: Int, eager: Boolean = false) {
         if (reason == null) return
@@ -72,7 +81,8 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
         if (reasons.containsKey(reason)) return
         reasonRing[nextReason]?.let { reasons.remove(it) }
         reasonRing[nextReason] = reason
-        reasons[reason] = RetainedReason(mask, nextReason)
+        // Ownership measures this delivery; descendants retain contributing source families only.
+        reasons[reason] = RetainedReason(mask and integerOwnerMask.inv(), nextReason)
         nextReason = (nextReason + 1) % capacity
     }
 
@@ -123,6 +133,7 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
     }
 
     fun sharingMemory(sample: SharingMemoryObservation) {
+        sample.owned(integerOwnerCounts, integerOwnerCounts.size.toLong() * Long.SIZE_BYTES, false)
         sample.ownedReferences(reasonRing, reasonRing.size.toLong(), false)
         sample.ownedReferences(reasons, reasons.size.toLong() * 2L, false)
         sample.ownedReferences(learned, learned.size.toLong() * 2L, false)
@@ -136,6 +147,10 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
         for (family in FactorFamily.entries) for (metric in Metric.entries) {
             val value = counts[family.ordinal][metric.ordinal]
             if (value != 0L) put("factor${family.name}${metric.name}", value)
+        }
+        for (metric in Metric.entries) {
+            val value = integerOwnerCounts[metric.ordinal]
+            if (value != 0L) put("factorLearnedInteger${metric.name}", value)
         }
         put("factorTrackedReasons", reasons.size.toLong())
         put("factorTrackedLearning", learned.size.toLong())
