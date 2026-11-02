@@ -25,6 +25,19 @@ import kotlin.test.assertTrue
 
 class LpRootComponentsTest {
     @Test
+    fun `fixed endpoints do not join otherwise independent live components`() {
+        val problem = Problem(0, 5, Array(5) { IntDomain(0, if (it == 4) 0 else 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 4), LinearOp.GE, 1),
+        ))
+        val session = PropagationSession(problem)
+
+        val order = assertNotNull(rootComponentOrder(problem, LpProjectionMeter(), session))
+
+        assertEquals(listOf(0, 2, 1, 3, 4), order.members.toList())
+    }
+
+    @Test
     fun `paid lp work withholds a fresh component preparation grant`() {
         val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
             Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.GE, 1),
