@@ -119,7 +119,7 @@ internal class MiniZincRunner(
         }
     }
 
-    private fun outputFile(fzn: File): File = File(fzn.parentFile, "${fzn.nameWithoutExtension}.ozn")
+    fun outputFile(fzn: File): File = File(fzn.parentFile, "${fzn.nameWithoutExtension}.ozn")
 
     private fun compile(root: File, mzn: File, dzn: File?, out: File, includes: List<File>) {
         val sourceHashes = buildMap {
