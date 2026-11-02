@@ -47,34 +47,39 @@ class RevisedSimplexTest {
 
     @Test
     fun `two basis columns require their combined analysis allowance`() {
-        val builder = LpBuilder()
-        val columns = IntArray(2)
-        for ((index, costs) in listOf(3L to 5L, 7L to 11L).withIndex()) {
-            val x = builder.addVar(0, 2)
-            columns[index] = x
-            val down = builder.addVar(0, 1, cost = costs.first)
-            val up = builder.addVar(0, 1, cost = costs.second)
-            builder.addRow(intArrayOf(x, down, up), longArrayOf(2, 2, -2), Relation.EQ, 1)
-        }
-        val model = builder.build(Sense.MINIMIZE)
-        RevisedSimplex(model).use { solver ->
-            assertNotNull(solver.solve())
-            var work = 0L
-            val costs = assertNotNull(solver.directionalCosts(model, columns, 100_000L,
-                Cancellation.Never) { work += it })
-            assertEquals(3.0, assertNotNull(costs[0]).down, 1e-7)
-            assertEquals(5.0, assertNotNull(costs[0]).up, 1e-7)
-            assertEquals(7.0, assertNotNull(costs[1]).down, 1e-7)
-            assertEquals(11.0, assertNotNull(costs[1]).up, 1e-7)
-            assertTrue(work in 1L..100_000L)
-            val required = work
-            work = 0L
+        for (exact in listOf(false, true)) {
+            val builder = LpBuilder()
+            val columns = IntArray(2)
+            for ((index, costs) in listOf(3L to 5L, 7L to 11L).withIndex()) {
+                val x = builder.addVar(0, 2)
+                columns[index] = x
+                val down = builder.addVar(0, 1, cost = costs.first)
+                val up = builder.addVar(0, 1, cost = costs.second)
+                builder.addRow(intArrayOf(x, down, up), longArrayOf(2, 2, -2), Relation.EQ, 1)
+            }
+            val built = builder.build(Sense.MINIMIZE)
+            val model = if (exact) {
+                assertNotNull(LpExactState(assertNotNull(built.authoritativeModel())).ownerWorkingModel())
+            } else built
+            RevisedSimplex(model).use { solver ->
+                assertNotNull(solver.solve())
+                var work = 0L
+                val costs = assertNotNull(solver.directionalCosts(model, columns, 100_000L,
+                    Cancellation.Never) { work += it })
+                assertEquals(3.0, assertNotNull(costs[0]).down, 1e-7)
+                assertEquals(5.0, assertNotNull(costs[0]).up, 1e-7)
+                assertEquals(7.0, assertNotNull(costs[1]).down, 1e-7)
+                assertEquals(11.0, assertNotNull(costs[1]).up, 1e-7)
+                assertTrue(work in 1L..100_000L)
+                val required = work
+                work = 0L
 
-            val unavailable = solver.directionalCosts(model, columns, required - 1L,
-                Cancellation.Never) { work += it }
+                val unavailable = solver.directionalCosts(model, columns, required - 1L,
+                    Cancellation.Never) { work += it }
 
-            assertNull(unavailable)
-            assertEquals(0L, work)
+                assertNull(unavailable)
+                assertEquals(0L, work)
+            }
         }
     }
 

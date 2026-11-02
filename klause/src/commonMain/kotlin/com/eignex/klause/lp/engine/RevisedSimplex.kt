@@ -2828,7 +2828,7 @@ internal class RevisedSimplex(
         var up = Double.POSITIVE_INFINITY
         for (j in 0 until numVars) {
             if (j % 256 == 0 && token()) return null
-            if (status[j] == VarStatus.BASIC || status[j] == VarStatus.FIXED) continue
+            if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
             var coefficient = 0.0
             for (k in colPtr[j] until colPtr[j + 1]) coefficient += row[rowIdx[k]] * colVal[k]
             val reducedCost = cost(j) - columnDot(dualValues, j)
