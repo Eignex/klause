@@ -458,6 +458,19 @@ The recipe declares build tasks; the script owns CLI paths, corpus properties an
 recording options. After installing the bench, `scripts/draw-sets.sh <features-dir>
 <references.csv> <sets-dir> [set,...]` runs the migrated seeded named-set generator.
 
+Compiler input comparisons use `profile.script=klause-bench/scripts/compare-minizinc-inputs.sh`
+with `:klause-bench:prepareLabRuntime` as the build task. The single JSON argument uses schema
+`minizinc-input-comparison-v1`, compiler seed `1`, a 60-second tool ceiling, and an even `repeats` value
+from `2` to `8`.
+Supply two `compilers` with `name`, `executable`, `executableSha256`, `standardLibrary` and
+`standardLibrarySha256`; relative paths resolve from the worktree. Supply one to eight `sources` with `model` and
+`data` objects containing exact `text` and `sha256`, plus the repository's `solverLibrarySha256` and
+`configurationSha256`. The request fields are `compilerSeed`, `toolTimeoutSeconds` and `repeats`.
+The profile requires `jq`, SHA-256 tooling and `timeout` or `gtimeout`. It retains identity queries,
+original inputs, alternating compiler order, failed commands, raw FZN/OZN and their byte comparisons.
+It runs compilation only; FlatZinc content policy v1 omits only the two generated path comments.
+Query timings are not a startup study, and tool CPU times exclude preparation and containing profile work.
+
 `bench.profile.CorpusStagingProfile` accepts `suite=ID problem=NAME sha256=HEX
 budget-ms=N repeats=2`. It compares packed reads, decoding with hashing, temporary
 staging and plain reads in separate fresh JVMs, with repeated operations in each.
