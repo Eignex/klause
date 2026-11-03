@@ -215,6 +215,8 @@ A private feasibility-pump scope can reuse its completed root layout for subsequ
 objectives. Its problem and selected built-in propagation and relaxation mechanisms
 stay fixed; proposal pinning runs in separate sessions. The default primal factory
 can attach an immutable witness that its native rows are independent of the objective.
+Rounding construction requests this witness when a root handoff is supplied.
+Local pump builds request it through their selected reuse policy.
 The witness binds the exact source, model, selected namespace and semantics. It also
 retains the objective's owned coefficient buffers within the storage ceiling. An
 unchanged buffer identity reuses the model's validated costs and affine shift;

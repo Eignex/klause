@@ -61,7 +61,9 @@ internal fun LpEngine.lpRoundingProbe(
             outcome = "CANCELLED"
             return null
         }
-        var relaxation = retained?.relaxation ?: buildPrimalRelaxation(objective, session, cancellation) ?: run {
+        var relaxation = retained?.relaxation ?: buildPrimalRelaxation(
+            objective, session, cancellation, retainPrivateDefinition = reusePumpPreparation && handoff != null,
+        ) ?: run {
             rootRoundingInterrupted = true
             outcome = "CANCELLED"
             return null
@@ -479,6 +481,7 @@ private fun LpEngine.buildPrimalRelaxation(
     objective: LinearObjective,
     session: PropagationSession,
     cancellation: Cancellation,
+    retainPrivateDefinition: Boolean = reusePumpPreparation,
 ): LpRelaxation? {
     val started = TimeSource.Monotonic.markNow()
     val accounting = LpPrimalAssembly(this, cancellation)
@@ -490,7 +493,7 @@ private fun LpEngine.buildPrimalRelaxation(
         val relaxation = buildPrimalSource(problem, objective, SessionDomains(session), token,
             onWork = accounting::chargeConstruction, selection = projections,
             reuseCompleteTemplates = reusePrimalTemplates,
-            retainPrivateDefinition = reusePumpPreparation,
+            retainPrivateDefinition = retainPrivateDefinition,
             reuseSourceTemplates = reusePrimalTemplates, onDefinition = { definition = it })
         outcome = definition
         relaxation

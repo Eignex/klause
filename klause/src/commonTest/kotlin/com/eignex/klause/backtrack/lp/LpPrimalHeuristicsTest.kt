@@ -366,6 +366,23 @@ class LpPrimalHeuristicsTest {
     }
 
     @Test
+    fun `rounding without a handoff should not fund a pump witness`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, (1..12).map {
+            Linear(intArrayOf(1, it, 1), intArrayOf(0, 1, 2), LinearOp.GE, 6)
+        }).bake(FactorProjectionProviders.Default)
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val work = listOf(false, true).map { reuse ->
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
+                SolveStatsSink("rounding-without-pump-witness"), reusePumpPreparation = reuse).use { engine ->
+                assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+                engine.totalSolveWork()
+            }
+        }
+
+        assertEquals(work[0], work[1])
+    }
+
+    @Test
     fun `objective only pump iterations should reuse their completed root preparation`() {
         for (reuse in listOf(false, true)) {
             val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, listOf(
