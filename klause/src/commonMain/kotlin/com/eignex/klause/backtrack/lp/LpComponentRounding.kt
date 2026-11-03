@@ -68,6 +68,8 @@ private fun LpEngine.fractionalComponentTargets(
         rootComponentPreparationWork(targets, 0L) < maximumWork
     ) {
         sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", "TARGET_SCAN_DECLINED", 0L)
+        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ADMISSION",
+            rootComponentPreparationDecline(targets, 0L, maximumWork) ?: "SLICE_WORK", 0L)
         return false
     }
     val meter = LpProjectionMeter(maximumWork, 0L, cancellation)

@@ -50,6 +50,71 @@ import kotlin.test.assertTrue
 class LpPrimalHeuristicsTest {
 
     @Test
+    fun `component trial admission separates paid numerical work from its preparation limit`() {
+        for (rootLimit in listOf(8_000_000L, 150_000_000L)) {
+            val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+            )).bake()
+            val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
+            var queries = 0
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newPersistentSolver(
+                    model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                    workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+                ): PersistentLpSolver {
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                        refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                    var charged = false
+                    return object : PersistentLpSolver by delegate {
+                        override val lastMetrics: LpSolveMetrics get() = delegate.lastMetrics.copy(
+                            workOps = delegate.lastMetrics.workOps + if (charged) 8_000_000L else 0L)
+
+                        override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                            delegate.resolveBounds(allowance).also {
+                                charged = true
+                                queries++
+                            }
+                    }
+                }
+            }
+            LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                    rootCutHarvest = false, rootMaxWork = rootLimit)),
+                SolveStatsSink("separate-preparation-limit"),
+                LpSolveContext(factory)).use { engine ->
+                assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+                engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+                assertTrue(engine.totalSolveWork() >= 8_000_000L)
+                val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+                val guide = RootRoundingWarmStart(objective, relaxation,
+                    primal = DoubleArray(relaxation.model.n) { 0.5 },
+                    sourceProblem = problem, auxiliaryPoint = true)
+                engine.rootRoundingWarmStart = guide
+                val before = engine.totalSolveWork()
+                val previousQueries = queries
+                val funded = rootLimit > before
+
+                val retained = engine.retainRootPrimalTargets(Cancellation.Never)
+                val prepared = engine.prepareRootComponentTrial(objective, Cancellation.Never)
+
+                assertEquals(funded, retained)
+                assertEquals(funded, prepared)
+                if (funded) {
+                    val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+                    assertTrue(sample.ints.all { it in 0L..1L })
+                    assertTrue(sample.ints[0] + sample.ints[2] >= 1L && sample.ints[1] + sample.ints[3] >= 1L)
+                    assertTrue(engine.totalSolveWork() > before)
+                } else {
+                    assertNull(guide.pinning)
+                    assertEquals(before, engine.totalSolveWork())
+                }
+                assertEquals(previousQueries, queries)
+            }
+        }
+    }
+
+    @Test
     fun `handoff component trials wait for funding without constructing private pinning state`() {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),

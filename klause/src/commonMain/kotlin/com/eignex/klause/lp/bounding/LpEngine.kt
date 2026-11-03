@@ -406,15 +406,28 @@ internal class LpEngine(
         return pending
     }
 
+    // Numerical pivots spend the containing allowance, not the separate transport and construction cap.
     internal fun rootComponentPreparationAllowed(targets: RootPrimalTargets, bytes: Long, minimumWork: Long): Boolean =
-        rootPrimalTargets === targets && rootGuidanceFits(bytes) && !lpWorkAllowanceSpent(minimumWork) &&
-            retainedRootCumulativeWork() >= minimumWork &&
-            SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalSolveOps) >= minimumWork
+        rootComponentPreparationDecline(targets, bytes, minimumWork) == null
+
+    internal fun rootComponentPreparationDecline(
+        targets: RootPrimalTargets,
+        bytes: Long,
+        minimumWork: Long,
+    ): String? = when {
+        rootPrimalTargets !== targets -> "EXPIRED_TARGETS"
+        !rootGuidanceFits(bytes) -> "STORAGE"
+        lpWorkAllowanceSpent(minimumWork) -> "LP_WORK"
+        retainedRootCumulativeWork() < minimumWork -> "ROOT_WORK"
+        SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalOverheadOps) < minimumWork ->
+            "PREPARATION_WORK"
+        else -> null
+    }
 
     internal fun rootComponentPreparationWork(targets: RootPrimalTargets, bytes: Long): Long =
         if (rootPrimalTargets !== targets || !rootGuidanceFits(bytes) || lpWorkAllowanceSpent(1L)) 0L
         else minOf(retainedRootRemainingWork(),
-            SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalSolveOps))
+            SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalOverheadOps))
 
     internal fun retainRootPrimalTargets(cancellation: Cancellation): Boolean {
         val guide = rootRoundingWarmStart ?: return false
@@ -1006,6 +1019,7 @@ internal class LpEngine(
 
     // Work charged since this engine was built, across every solve including the one-shot root work.
     private var totalSolveOps = 0L
+    private var totalOverheadOps = 0L
 
     /** Deterministic cumulative LP work, for policies that compare snapshots without mutating it. */
     internal fun totalSolveWork(): Long = totalSolveOps
@@ -1021,6 +1035,7 @@ internal class LpEngine(
      */
     internal fun noteNodeOverhead(ops: Long) {
         if (ops <= 0L) return
+        totalOverheadOps = saturatingAdd(totalOverheadOps, ops)
         noteSolveOps(ops)
         sink.lp.observeOverhead(ops)
     }

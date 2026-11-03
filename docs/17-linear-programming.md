@@ -638,6 +638,10 @@ If a later component declines every direction, completed earlier integer values
 can remain soft preferences for complete search. No partial assignment is a witness.
 Component progress and its retained order share the existing guidance storage cap;
 all graph, propagation and value-copy work spends the containing allowances.
+The preparation cap counts cumulative LP transport and construction overhead;
+numerical pivot work spends the containing LP and root allowances separately.
+A paid numerical query does not consume the preparation cap. Neither budget
+renews across component-guide replacement or a fresh consultation.
 
 A complete traversal restart expires existing preference readers while retaining
 one generation of the engine's owned coordinate buffers. Fresh root-owner lookup
