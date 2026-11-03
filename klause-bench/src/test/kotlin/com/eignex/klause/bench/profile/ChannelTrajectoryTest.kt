@@ -48,22 +48,18 @@ class ChannelTrajectoryTest {
             arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
         val sweep = assertNotNull(DefinitionalSweep.fromSource(problem,
             listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true)))))
-        val model = LocalSearchModel.open(problem)
-        val left = LocalSearchState(model, Random(0))
-        val right = LocalSearchState(model, Random(0), projection = left.projection)
-        left.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
-        right.invariants = ChannelView.SearchedValues.sweep(sweep, Cancellation.Never)
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.invariants = ChannelView.SearchedValues.sweep(sweep, Cancellation.Never)
             ?.network(problem.numIntVars, problem.numBoolVars)
         val coordinates = VarRemap(intArrayOf(0), intArrayOf(0))
-        val maintained = TrajectoryView("maintained", left, coordinates,
-            synchronize = { sweep.sweep(left.assignment, left.rootDomains) })
-        val searched = TrajectoryView("searched", right, coordinates)
+        val searched = TrajectoryView("searched", state, coordinates)
+        assertNull(searched.load(Sample(booleanArrayOf(false), longArrayOf(0))))
 
-        val pair = trajectoryPair(Sample(booleanArrayOf(false), longArrayOf(0)),
-            listOf(Move.BoolFlip(0)), maintained, searched)
+        val candidate = searched.probe(Move.BoolFlip(0))
 
-        val candidate = pair.getValue("candidates").jsonArray.single().jsonObject
-        assertEquals("false", candidate.getValue("pairedDestination").jsonPrimitive.content)
+        assertNull(candidate["decline"])
+        assertEquals("true", candidate.getValue("source").jsonObject.getValue("bools")
+            .jsonArray.single().jsonPrimitive.content)
     }
 
     @ParameterizedTest
