@@ -20,6 +20,14 @@ costs and report repeated infrastructure losses separately.
 Each requested selection must match at least one source. A selection with no matches
 fails preparation instead of publishing a reduced comparison plan.
 
+Declared-input planning uses the complete corpus-pack index even when only a subset
+of its members is materialized locally. Each solve verifies its planned input bytes.
+
+Use `scripts/plan-inputs.sh` as a lab profile script with one JSON `BenchRequest`
+argument and the `:klause-bench:installDist` build task. It writes `plan.json`
+through the input-only SDK planner, using the lab corpus directory and declared
+input indexes, without executing a solver.
+
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
 copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time
