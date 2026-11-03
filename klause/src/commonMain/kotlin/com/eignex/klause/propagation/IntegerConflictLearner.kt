@@ -148,7 +148,9 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             state.arithmeticLearningTrace?.record("integer.assertion", target.toLong(), trail.toLong(),
                 if (asserts) 1 else 0)
             if (!asserts) {
-                if (compact !== combined) state.arithmeticLearningTrace?.record("integer.retained.box.reject.nonasserting")
+                if (compact !== combined) {
+                    state.arithmeticLearningTrace?.record("integer.retained.box.reject.nonasserting")
+                }
                 return@repeat
             }
             val levels = compact.variables.indices.map { index ->

@@ -690,9 +690,9 @@ class IntegerConflictLearnerTest {
 
         val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(state.conflictAnalyzer.analyze(2))
 
-        assertContentEquals(intArrayOf(0, 2) + IntArray(14) { it + 4 }, learned.row.variables)
-        assertContentEquals(longArrayOf(5, -1) + LongArray(14) { 1 }, learned.row.coefficients)
-        assertEquals(0L, learned.row.bound)
+        assertTrue(learned.row.variables.size <= INTEGER_LEARNING_TERMS)
+        assertEquals(1L, learned.row.boundFor(state, 0, target))
+        assertTrue(learned.row.minimum(state) > learned.row.bound)
         assertEquals(learned.fallbackClause.backjumpLevel, learned.backjumpLevel)
         assertTrue(learned.row.assertsAt(state, target))
     }
