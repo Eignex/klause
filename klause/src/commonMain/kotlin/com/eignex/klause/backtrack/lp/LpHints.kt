@@ -37,19 +37,21 @@ internal class LpHints(
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
     private val rootBasis: Boolean = false,
-    private val rootVariableProbes: Boolean = false,
+    private val reliableVariableProbes: Boolean = false,
 ) : LpHintSink {
     private data class SideAdvice(val variable: VarRef, val split: Long, val up: Boolean, val basis: Boolean)
 
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
     private val history = LpDirectionalHistory(observe, charge = charge)
+    private val probeHistory = LpDirectionalHistory({ observe("PROBE_HISTORY_$it") }, charge = charge)
     private var freshRecord = false
     private var pointRelaxation: LpRelaxation? = null
     private var pointPrimal: DoubleArray? = null
     private var pendingSide: SideAdvice? = null
     private var activeSide: SideAdvice? = null
     private var rootBasisAttempted = false
-    private var rootVariableProbesAttempted = false
+    private var pointProbed = false
+    private var lastProbeState: LpExactState? = null
     private var variableProbeProposal = false
     private var boundRecorded = false
     private var unavailable = LpHintUnavailable.UNOBSERVED
@@ -79,8 +81,10 @@ internal class LpHints(
         activeSide = null
         boundRecorded = false
         variableProbeProposal = false
+        pointProbed = false
         unavailable = LpHintUnavailable.UNOBSERVED
-        if (collect) history.beginNode(depth)
+        history.beginNode(depth)
+        probeHistory.beginNode(depth)
     }
 
     override fun recordBound(relaxation: LpRelaxation, bound: Double) =
@@ -109,6 +113,8 @@ internal class LpHints(
         val changedContext = scopeModel !== state.baseModel || scopeRows !== state.rows || scopeCutoff != cutoff ||
             scopeIncumbentVersion != incumbentVersion || scopeExternalExact != externalExact
         if (incompatibleModel || changedContext) {
+            probeHistory.clear(report = scopeModel != null)
+            lastProbeState = null
             if (scopeModel != null) observe("INCOMPATIBLE")
             charge(if (incompatibleModel) 2L * relaxation.colVarId.size + 9L else 5L)
             if (incompatibleModel) {
@@ -271,7 +277,7 @@ internal class LpHints(
 
     fun prepareVariableComparison(variables: Int): Boolean {
         if (!collect || !freshRecord || variables !in 1..8192 ||
-            (!(boundRecorded && history.mayHaveScores) && !rootVariableChoiceReady)
+            (!(boundRecorded && history.mayHaveScores) && !probeVariableChoiceReady)
         ) return false
         charge(3L * variables + 4L)
         observe("VARIABLE_COMPARISON")
@@ -316,10 +322,13 @@ internal class LpHints(
         return proposal
     }
 
-    val rootVariableChoiceReady: Boolean get() = collect && rootVariableProbes && freshRecord &&
-        history.isRootNode && !rootVariableProbesAttempted
+    val probeVariableChoiceReady: Boolean get() = collect && reliableVariableProbes && freshRecord &&
+        boundRecorded && (probeHistory.mayHaveScores || canProbePoint)
 
-    fun compareRootVariables(
+    private val canProbePoint: Boolean get() = !pointProbed &&
+        pointRelaxation?.model?.exactState?.let { it !== lastProbeState } == true
+
+    fun compareProbeVariables(
         first: VarRef?,
         firstDomain: IntDomain?,
         second: VarRef?,
@@ -327,7 +336,7 @@ internal class LpHints(
         reserve: (Long) -> Boolean,
         estimate: (LpModel, IntArray, LongArray) -> List<LpDirectionalGain>?,
     ): VarRef? {
-        if (!rootVariableChoiceReady || first == null || second == null) return null
+        if (!probeVariableChoiceReady || first == null || second == null) return null
         val relaxation = pointRelaxation ?: return null
         val firstValue = value(first, firstDomain)
         val secondValue = value(second, secondDomain)
@@ -335,7 +344,12 @@ internal class LpHints(
         val firstColumn = relaxation.column(first)
         val secondColumn = relaxation.column(second)
         if (firstColumn < 0 || secondColumn < 0 || firstColumn == secondColumn) return null
-        rootVariableProbesAttempted = true
+        if (probeHistory.hasReliableSamples(first) && probeHistory.hasReliableSamples(second)) {
+            return probeProposal(first, firstValue, second, secondValue)
+        }
+        if (!canProbePoint) return null
+        pointProbed = true
+        lastProbeState = relaxation.model.exactState
         observe("VARIABLE_PROBE_ATTEMPT")
         if (!reserve(20L)) {
             observe("VARIABLE_PROBE_UNFUNDED")
@@ -347,10 +361,23 @@ internal class LpHints(
             observe("VARIABLE_PROBE_DECLINED")
             return null
         }
-        val firstScore = probeScore(costs[0])
-        val secondScore = probeScore(costs[1])
-        if (!firstScore.isFinite() || !secondScore.isFinite()) {
+        if (!probeUsable(costs[0], firstValue) || !probeUsable(costs[1], secondValue)) {
             observe("VARIABLE_PROBE_MISSING_DIRECTION")
+            return null
+        }
+        probeHistory.observePair(first, firstValue, costs[0].down, costs[0].up)
+        probeHistory.observePair(second, secondValue, costs[1].down, costs[1].up)
+        observe("VARIABLE_PROBE_LEARNED")
+        return probeProposal(first, firstValue, second, secondValue)
+    }
+
+    private fun probeProposal(first: VarRef, firstValue: Double, second: VarRef, secondValue: Double): VarRef? {
+        val firstScore = probeHistory.score(first, firstValue)
+        val secondScore = probeHistory.score(second, secondValue)
+        if (!firstScore.isFinite() || !secondScore.isFinite()) {
+            observe(if (probeHistory.hasReliableSamples(first) && probeHistory.hasReliableSamples(second)) {
+                "VARIABLE_PROBE_UNINFORMATIVE"
+            } else "VARIABLE_PROBE_UNRELIABLE")
             return null
         }
         val proposal = when {
@@ -363,9 +390,11 @@ internal class LpHints(
         return proposal
     }
 
-    private fun probeScore(gain: LpDirectionalGain): Double {
-        if (!gain.down.isFinite() || !gain.up.isFinite() || gain.down < 0.0 || gain.up < 0.0) return Double.NaN
-        return minOf(gain.down, gain.up) + maxOf(gain.down, gain.up) / 6.0
+    private fun probeUsable(gain: LpDirectionalGain, value: Double): Boolean {
+        val fraction = value - floor(value)
+        return gain.down.isFinite() && gain.up.isFinite() && gain.down >= 0.0 && gain.up >= 0.0 &&
+            fraction > INT_TOL && fraction < 1.0 - INT_TOL &&
+            (gain.down / fraction).isFinite() && (gain.up / (1.0 - fraction)).isFinite()
     }
 
     private fun basisScore(cost: LpDirectionalCost?, value: Double): Double {
@@ -622,6 +651,7 @@ internal class LpHints(
         if (scopeModel != null) {
             charge(scopeVariables.size.toLong() + scopeBooleans.size)
             history.clear()
+            probeHistory.clear()
         }
         scopeModel = null
         scopeRows = null
@@ -640,6 +670,8 @@ internal class LpHints(
         boundRecorded = false
         unavailable = LpHintUnavailable.UNOBSERVED
         variableProbeProposal = false
+        lastProbeState = null
+        pointProbed = false
     }
 
     override fun clear() {
@@ -656,6 +688,7 @@ internal class LpHints(
     }
 
     override fun recordPoint(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+        pointProbed = false
         pointPrimal = null
         pendingSide = null
         activeSide = null
@@ -679,6 +712,7 @@ internal class LpHints(
      * ([branchScore]) selection, never feasibility or the optimum.
      */
     override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+        pointProbed = false
         recorded = true
         freshRecord = collect
         pointRelaxation = if (collect) relaxation else null

@@ -976,9 +976,10 @@ annotated, or execution is parallel or single-engine. See
 
 The `lp-default` optimization recipe consumes scoped passive checked-bound gains.
 Two recent samples in each direction of both shortlisted variables permit a learned
-variable choice. Incomplete history permits one funded root comparison of the two
-candidates from isolated child LP solves; unavailable advice keeps current scoring.
-History and child probes spend the existing LP allowance; other recipes require an explicit
+variable choice. Incomplete passive history permits separate numerical history from
+bounded child LP probes. Both candidates require two recent observations in each
+direction before that history can change selection; unavailable advice keeps current
+scoring. History and child probes spend the existing LP allowance; other recipes require an explicit
 directional setting. See
 [finite branching](08-search.md#finite-lp-directional-guidance).
 

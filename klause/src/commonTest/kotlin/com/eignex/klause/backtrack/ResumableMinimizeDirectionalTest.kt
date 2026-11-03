@@ -80,7 +80,7 @@ class ResumableMinimizeDirectionalTest {
     }
 
     @Test
-    fun `finite root variable advice uses one complete child probe comparison`() {
+    fun `one finite child probe comparison retains the baseline variable choice`() {
         val factors = Array<Factor>(3) { edge ->
             Linear(longArrayOf(1L, 1L), intArrayOf(edge, (edge + 1) % 3), LinearOp.GE, 1L)
         }
@@ -96,7 +96,8 @@ class ResumableMinimizeDirectionalTest {
 
             val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
             assertEquals(1L, observations["VARIABLE_PROBE_ATTEMPT"] ?: 0L, observations.toString())
-            assertEquals(1L, observations["VARIABLE_PROBE_CONSUMED"] ?: 0L, observations.toString())
+            assertEquals(1L, observations["VARIABLE_PROBE_LEARNED"] ?: 0L, observations.toString())
+            assertEquals(0L, observations["VARIABLE_PROBE_CONSUMED"] ?: 0L, observations.toString())
             assertEquals(0L, observations["SIDE_CONSUMED"] ?: 0L, observations.toString())
             val probes = search.stats.lp.phases.getValue("DIRECTIONAL_PROBES_NODE")
             assertEquals(1L, probes.calls)
@@ -106,7 +107,7 @@ class ResumableMinimizeDirectionalTest {
     }
 
     @Test
-    fun `finite search collects history without child advice across cooperative slices`() {
+    fun `finite search learns separate directional histories across cooperative slices`() {
         val blocks = 4
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
@@ -130,7 +131,7 @@ class ResumableMinimizeDirectionalTest {
             randomSeed = 3L,
             maxDecisions = 1000L,
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
-                boundMaxOpsPerNode = 0L),
+                boundMaxOpsPerNode = 0L, componentSplit = false),
             lpDirectionalGains = true,
             componentFactory = { listOf(object : SearchComponent {
                 override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
@@ -149,7 +150,9 @@ class ResumableMinimizeDirectionalTest {
             var slices = 0
             while (slices++ < 128 && !search.isDone) {
                 val outcomes = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
-                if ((outcomes?.get("DOWN") ?: 0L) >= 2L && (outcomes?.get("UP") ?: 0L) >= 2L) break
+                if ((outcomes?.get("DOWN") ?: 0L) >= 2L && (outcomes?.get("UP") ?: 0L) >= 2L &&
+                    (outcomes?.get("VARIABLE_PROBE_CONSUMED") ?: 0L) > 0L
+                ) break
                 search.runSlice(Cancellation.Never, 1000L, 32L) {}
             }
 
@@ -157,6 +160,8 @@ class ResumableMinimizeDirectionalTest {
             val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}"
             assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
+            assertTrue((observations["VARIABLE_PROBE_LEARNED"] ?: 0L) >= 2L, diagnostic)
+            assertTrue((observations["VARIABLE_PROBE_CONSUMED"] ?: 0L) > 0L, diagnostic)
             assertEquals(0L, observations["SIDE_CONSUMED"] ?: 0L, diagnostic)
             assertEquals(0L, observations["HISTORY_SIDE_CONSUMED"] ?: 0L, diagnostic)
             assertEquals(0L, observations["BASIS_SIDE_CONSUMED"] ?: 0L, diagnostic)

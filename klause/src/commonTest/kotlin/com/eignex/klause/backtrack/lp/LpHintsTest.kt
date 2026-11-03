@@ -243,98 +243,192 @@ class LpHintsTest {
     }
 
     @Test
-    fun `root variable probe comparison has one funded opportunity across resets`() {
-        for (enabled in listOf(false, true)) for (funded in listOf(false, true)) {
-            for (available in listOf(false, true)) {
-                val builder = LpBuilder()
-                repeat(2) { builder.addVar(0, 2) }
-                val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
-                    BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
-                val hints = LpHints(2, 0, directionalGains = true, rootVariableProbes = enabled)
-                val first = VarRef.IntVar(0)
-                val second = VarRef.IntVar(1)
-                val domain = IntDomain(0, 2)
-                var reservations = 0
-                var queries = 0
-                val reserve: (Long) -> Boolean = { reservations++; funded }
-                val estimate: (LpModel, IntArray, LongArray) -> List<LpDirectionalGain>? = { _, columns, splits ->
-                    assertEquals(listOf(0L, 0L), splits.toList())
-                    assertEquals(listOf(0, 1), columns.toList())
-                    queries++
-                    if (available) listOf(LpDirectionalGain(1.0, 4.0), LpDirectionalGain(2.0, 8.0)) else null
-                }
-                hints.beginNode(1, 100.0)
-                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-                assertEquals(null, hints.compareRootVariables(first, domain, second, domain, reserve, estimate))
-                assertEquals(0, queries)
-                hints.beginNode(0, 100.0)
-                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-
-                val proposal = hints.compareRootVariables(first, domain, second, domain, reserve, estimate)
-
-                assertEquals(if (enabled && funded && available) second else null, proposal)
-                assertEquals(null, hints.compareRootVariables(first, domain, second, domain, reserve, estimate))
-                hints.resetHistory()
-                hints.beginNode(0, 100.0)
-                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
-                assertEquals(null, hints.compareRootVariables(first, domain, second, domain, reserve, estimate))
-                assertEquals(if (enabled) 1 else 0, reservations)
-                assertEquals(if (enabled && funded) 1 else 0, queries)
-            }
-        }
-    }
-
-    @Test
-    fun `root variable probe choice requires two usable direction estimates`() {
-        val valid = LpDirectionalGain(1.0, 4.0)
-        val stronger = LpDirectionalGain(2.0, 8.0)
-        val cases: List<Pair<List<LpDirectionalGain>?, Int?>> = listOf(
-            listOf(valid, stronger) to 1,
-            listOf(stronger, valid) to 0,
-            listOf(valid, valid) to 0,
-            null to null,
-            emptyList<LpDirectionalGain>() to null,
-            listOf(valid) to null,
-            listOf(valid, LpDirectionalGain(-1.0, 4.0)) to null,
-            listOf(valid, LpDirectionalGain(Double.NaN, 4.0)) to null,
-            listOf(valid, LpDirectionalGain(1.0, Double.POSITIVE_INFINITY)) to null,
-            listOf(LpDirectionalGain(0.0, 0.0), LpDirectionalGain(0.0, 0.0)) to null,
-        )
-        for (bools in 0..2) for ((costs, expected) in cases) {
+    fun `distinct LP points establish probe history before variable advice`() {
+        for (bools in 0..2) {
             val builder = LpBuilder()
-            repeat(2) { builder.addVar(0, if (it < bools) 1 else 2) }
-            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE),
-                IntArray(2) { if (it < bools) it else it - bools },
-                BooleanArray(2) { it < bools }, 0L, IntArray(2 - bools) { it + bools }, IntArray(bools) { it })
-            val hints = LpHints(2 - bools, bools, directionalGains = true, rootVariableProbes = true)
-            val variables = List(2) { if (it < bools) VarRef.Bool(it) else VarRef.IntVar(it - bools) }
-            hints.beginNode(0, 100.0)
-            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            repeat(3) { builder.addVar(0, if (it < bools) 1 else 3) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val hints = LpHints(2 - bools, bools, directionalGains = true, reliableVariableProbes = true)
+            val first = if (bools > 0) VarRef.Bool(0) else VarRef.IntVar(0)
+            val second = if (bools > 1) VarRef.Bool(1) else VarRef.IntVar(1 - bools)
+            val domain = IntDomain(0, 3)
+            var queries = 0
+            val estimate: (LpModel, IntArray, LongArray) -> List<LpDirectionalGain>? = { _, columns, splits ->
+                assertEquals(listOf(0, 1), columns.toList())
+                assertEquals(listOf(0L, 0L), splits.toList())
+                queries++
+                listOf(LpDirectionalGain(1.0, 4.0), LpDirectionalGain(2.0, 8.0))
+            }
+            repeat(2) { node ->
+                if (node > 0) assertTrue(trail.assertBound(2, true, ExactLpSide(ExactLpNumber.of(2L)), 1L))
+                val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()),
+                    IntArray(3) { if (it == 2) -1 else if (it < bools) it else it - bools },
+                    BooleanArray(3) { it < bools }, 0L, IntArray(2 - bools) { it + bools }, IntArray(bools) { it })
+                hints.beginNode(node, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5, 0.0), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
 
-            val proposal = hints.compareRootVariables(variables[0], if (bools > 0) null else IntDomain(0, 2),
-                variables[1], if (bools > 1) null else IntDomain(0, 2),
-                reserve = { true }, estimate = { _, _, _ -> costs })
+                val proposal = hints.compareProbeVariables(first, domain, second, domain, { true }, estimate)
 
-            assertEquals(expected?.let { variables[it] }, proposal)
+                assertEquals(if (node == 0) null else second, proposal)
+            }
+
+            assertEquals(second, hints.compareProbeVariables(first, domain, second, domain, { true }, estimate))
+            assertEquals(second, hints.applyVariableChoice(second, first))
+            assertEquals(2, queries)
         }
     }
 
     @Test
-    fun `root probe scores compare child gains without repeating fractional normalization`() {
+    fun `numerical probe observations do not train passive bound history`() {
         val builder = LpBuilder()
-        repeat(2) { builder.addVar(0, 2) }
-        val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
-            BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
-        val hints = LpHints(2, 0, directionalGains = true, rootVariableProbes = true)
-        hints.beginNode(0, 100.0)
-        hints.record(relaxation, doubleArrayOf(0.1, 0.5), DoubleArray(0))
+        repeat(3) { builder.addVar(0, 3) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val hints = LpHints(2, 0, directionalGains = true, reliableVariableProbes = true)
+        repeat(2) { node ->
+            if (node > 0) assertTrue(trail.assertBound(2, true, ExactLpSide(ExactLpNumber.of(2L)), 1L))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, -1),
+                BooleanArray(3), 0L, intArrayOf(0, 1), IntArray(0))
+            hints.beginNode(node, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5, 0.0), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            hints.compareProbeVariables(VarRef.IntVar(0), IntDomain(0, 3), VarRef.IntVar(1), IntDomain(0, 3),
+                { true }) { _, _, _ -> listOf(LpDirectionalGain(1.0, 4.0), LpDirectionalGain(2.0, 8.0)) }
+        }
 
-        val proposal = hints.compareRootVariables(VarRef.IntVar(0), IntDomain(0, 2),
-            VarRef.IntVar(1), IntDomain(0, 2), reserve = { true }, estimate = { _, _, _ ->
-                listOf(LpDirectionalGain(4.0, 4.0), LpDirectionalGain(3.0, 3.0))
-            })
+        assertEquals(null, hints.compareVariables(VarRef.IntVar(0), IntDomain(0, 3),
+            VarRef.IntVar(1), IntDomain(0, 3)))
+        assertEquals(VarRef.IntVar(1), hints.compareProbeVariables(VarRef.IntVar(0), IntDomain(0, 3),
+            VarRef.IntVar(1), IntDomain(0, 3), { false }) { _, _, _ -> error("trained history must not query") })
+    }
 
-        assertEquals(VarRef.IntVar(0), proposal)
+    @Test
+    fun `the same retained point cannot supply a second probe observation`() {
+        for (enabled in listOf(false, true)) for (funded in listOf(false, true)) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 2) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val hints = LpHints(2, 0, directionalGains = true, reliableVariableProbes = enabled)
+            var queries = 0
+            val estimate: (LpModel, IntArray, LongArray) -> List<LpDirectionalGain>? = { _, _, _ ->
+                queries++
+                listOf(LpDirectionalGain(1.0, 4.0), LpDirectionalGain(2.0, 8.0))
+            }
+            repeat(2) { node ->
+                hints.beginNode(node, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+
+                val proposal = hints.compareProbeVariables(VarRef.IntVar(0), IntDomain(0, 2),
+                    VarRef.IntVar(1), IntDomain(0, 2), { funded }, estimate)
+
+                assertEquals(null, proposal)
+            }
+            assertEquals(if (enabled && funded) 1 else 0, queries)
+        }
+    }
+
+    @Test
+    fun `context changes and reset withdraw numerical probe reliability`() {
+        for (change in listOf("reset", "cutoff", "incumbent", "scale")) {
+            val builder = LpBuilder()
+            repeat(3) { builder.addVar(0, 3) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val hints = LpHints(2, 0, directionalGains = true, reliableVariableProbes = true)
+            var queries = 0
+            val estimate: (LpModel, IntArray, LongArray) -> List<LpDirectionalGain>? = { _, _, _ ->
+                queries++
+                listOf(LpDirectionalGain(1.0, 4.0), LpDirectionalGain(2.0, 8.0))
+            }
+            repeat(3) { node ->
+                if (node > 0) assertTrue(trail.assertBound(2, true,
+                    ExactLpSide(ExactLpNumber.of(3L - node)), node.toLong()))
+                if (node == 2) {
+                    if (change == "reset") hints.resetHistory()
+                    if (change == "scale") {
+                        val objective = trail.state.model.objective
+                        assertTrue(trail.replaceObjective(ExactLpObjective(
+                            List(objective.size) { objective.cost(it) }, scale = ExactLpNumber.of(2L))))
+                    }
+                }
+                val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, -1),
+                    BooleanArray(3), 0L, intArrayOf(0, 1), IntArray(0))
+                hints.beginNode(node, if (node == 2 && change == "cutoff") 90.0 else 100.0,
+                    incumbentVersion = if (node == 2 && change == "incumbent") 1L else 0L)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5, 0.0), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+
+                val proposal = hints.compareProbeVariables(VarRef.IntVar(0), IntDomain(0, 3),
+                    VarRef.IntVar(1), IntDomain(0, 3), { true }, estimate)
+
+                assertEquals(if (node == 1) VarRef.IntVar(1) else null, proposal, change)
+            }
+            assertEquals(3, queries, change)
+        }
+    }
+
+    @Test
+    fun `unusable comparisons cannot partially train either probe candidate`() {
+        val valid = LpDirectionalGain(1.0, 4.0)
+        val unusable: List<List<LpDirectionalGain>?> = listOf(null, emptyList(), listOf(valid),
+            listOf(valid, LpDirectionalGain(-1.0, 4.0)),
+            listOf(LpDirectionalGain(99.0, 99.0), LpDirectionalGain(Double.NaN, 4.0)),
+            listOf(valid, LpDirectionalGain(1.0, Double.POSITIVE_INFINITY)),
+            listOf(valid, LpDirectionalGain(Double.MAX_VALUE, 1.0)))
+        for (bad in unusable) {
+            val builder = LpBuilder()
+            repeat(3) { builder.addVar(0, 3) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val hints = LpHints(2, 0, directionalGains = true, reliableVariableProbes = true)
+            var queries = 0
+            val estimate: (LpModel, IntArray, LongArray) -> List<LpDirectionalGain>? = { _, _, _ ->
+                queries++
+                if (queries == 1) bad else listOf(valid, LpDirectionalGain(2.0, 8.0))
+            }
+            repeat(3) { node ->
+                if (node > 0) assertTrue(trail.assertBound(2, true,
+                    ExactLpSide(ExactLpNumber.of(3L - node)), node.toLong()))
+                val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, -1),
+                    BooleanArray(3), 0L, intArrayOf(0, 1), IntArray(0))
+                hints.beginNode(node, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5, 0.0), DoubleArray(0))
+                hints.recordBound(relaxation, 10.0)
+
+                val proposal = hints.compareProbeVariables(VarRef.IntVar(0), IntDomain(0, 3),
+                    VarRef.IntVar(1), IntDomain(0, 3), { true }, estimate)
+
+                assertEquals(if (node == 2) VarRef.IntVar(1) else null, proposal)
+            }
+            assertEquals(3, queries)
+        }
+    }
+
+    @Test
+    fun `reliable zero probe history keeps fallback without repeated queries`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 3) }
+        val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val hints = LpHints(2, 0, directionalGains = true, reliableVariableProbes = true)
+        var queries = 0
+        val estimate: (LpModel, IntArray, LongArray) -> List<LpDirectionalGain>? = { _, _, _ ->
+            queries++
+            List(2) { LpDirectionalGain(0.0, 0.0) }
+        }
+        repeat(3) { node ->
+            if (node > 0) assertTrue(trail.assertBound(2, true,
+                ExactLpSide(ExactLpNumber.of(3L - node)), node.toLong()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1, -1),
+                BooleanArray(3), 0L, intArrayOf(0, 1), IntArray(0))
+            hints.beginNode(node, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5, 0.0), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+
+            assertEquals(null, hints.compareProbeVariables(VarRef.IntVar(0), IntDomain(0, 3),
+                VarRef.IntVar(1), IntDomain(0, 3), { true }, estimate))
+        }
+        assertEquals(2, queries)
     }
 
     @Test

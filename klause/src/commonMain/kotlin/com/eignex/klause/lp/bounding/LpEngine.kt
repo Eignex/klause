@@ -1079,7 +1079,8 @@ internal class LpEngine(
     }
 
     internal fun directionalGains(model: LpModel, columns: IntArray, splits: LongArray): List<LpDirectionalGain>? {
-        val allowance = remainingDirectionalWork()
+        // Leave room for pair normalization, history updates and the consuming selection.
+        val allowance = remainingDirectionalWork() - 24L * columns.size
         branchWorkAllowance = 0L
         if (allowance <= 0L) return null
         val started = TimeSource.Monotonic.markNow()

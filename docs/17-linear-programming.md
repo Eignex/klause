@@ -222,14 +222,14 @@ charged at each step. Infinite cutoffs, the large exact-cutoff path and overflow
 supply no retained scalar. The callback performs no extra domain scan, numerical
 query or certification, and publishes neither a point nor a new pruning bound.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
-history lifetime. When passive history cannot compare both shortlisted variables,
-finite search can request [advisory basis costs](#floating-simplex-and-basis-factors)
-for those two root columns, at most once per hint owner. Explicit root child-order
-mode instead requests its selected column. Both modes retain their attempt limit
-across restarts and reseeding. Analysis spends
-the node's unspent query allowance and remaining containing and cumulative allowances;
-work and elapsed time are recorded separately. The estimates never enter directional
-history or certify a branch bound.
+history lifetime. Missing reliable passive observations can request complete child
+LP gains for up to two shortlisted columns. The floating owner stays unchanged;
+scratch solvers spend a positive grant after reserving the caller's normalization
+and history work. Numerical estimates train a separate advisory history, with two
+recent observations per direction before selection. Query work and elapsed time are
+recorded separately, and neither history certifies a branch bound. Explicit root
+child-order mode instead permits one retained-basis consultation for its selected
+column per hint owner, including across restarts and reseeding.
 
 A node query that makes pivots but stops on its work allowance before returning a
 point grows the adaptive request within its existing ceiling and remaining

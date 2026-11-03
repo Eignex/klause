@@ -96,6 +96,33 @@ internal class LpDirectionalHistory(
         return true
     }
 
+    fun observePair(variable: VarRef, value: Double, downGain: Double, upGain: Double): Boolean {
+        charge(14L)
+        if (!value.isFinite() || !downGain.isFinite() || !upGain.isFinite() || downGain < 0.0 || upGain < 0.0) {
+            return false
+        }
+        if (variable is VarRef.Bool && (value < 0.0 || value > 1.0)) return false
+        val fraction = value - floor(value)
+        if (fraction <= DISTANCE_TOL || fraction >= 1.0 - DISTANCE_TOL) return false
+        val down = downGain / fraction
+        val up = upGain / (1.0 - fraction)
+        if (!down.isFinite() || !up.isFinite()) return false
+        val samples = gains.getOrPut(variable, ::Gains)
+        update(samples.down, down)
+        update(samples.up, up)
+        if (recent(samples)) reliableStamp = stamp
+        observe("PAIR")
+        return true
+    }
+
+    fun hasReliableSamples(variable: VarRef): Boolean {
+        charge(2L)
+        val samples = gains[variable] ?: return false
+        expire(samples.down)
+        expire(samples.up)
+        return recent(samples)
+    }
+
     fun branch(variable: VarRef, value: Double) {
         discardParentsFrom(depth)
         if (depth !in 0 until MAX_DEPTH || !objective.isFinite() || !value.isFinite()) return

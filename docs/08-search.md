@@ -311,21 +311,34 @@ LP allowance before visiting candidates.
 Two recent samples in each direction supply that variable's predicted child gains,
 using each direction's mean cost per unit of fractional movement. The balanced
 `min + max / 6` score ranks finite positive predictions in the shortlist.
-Missing or unusable history permits one root comparison of the same two candidates
-from isolated child LP solves at each current floor and ceiling. Every child must
-finish optimally and supply a finite nonnegative objective increase in source units.
-The balanced score compares these complete gains directly; a tie retains the original
-winner. Preparation reserves 20 work units before allocating the column and split
-requests. Projection, scratch construction, scaling, solving, objective scans and
-retirement spend the unspent node allowance and remaining containing and cumulative
-allowances. Unsupported, unfunded and incomplete attempts consume the single
-opportunity. It belongs to the hint owner and survives slices, restarts and assumption
-reseeding. Probes train no history and supply no bound or pruning authority. Missing
-or unavailable advice retains the original winner.
+Missing or unusable passive history permits a separate numerical gain history to
+compare the same shortlist. Each numerical direction needs two recent observations
+in compatible source objective units. An initial complete probe supplies one
+observation and retains the baseline choice. Observed gains are divided by the
+actual fractional movement before averaging; predictions use the current point's
+movement and the same balanced score. Numerical observations never train passive
+checked-bound history.
+
+A missing numerical history can request at most one comparison at a retained LP
+point, including eligible points below the root. Both candidates require complete
+optimal child solves at their current floor and ceiling, finite nonnegative gains
+and finite normalized costs before either history is updated. Unfunded, unsupported
+or incomplete comparisons keep the original winner. Reliable zero predictions keep
+fallback without repeating the query. Numerical histories expire after 256 node
+visits and clear on changed model, active rows, objective units, cutoff or publication
+context, restart and assumption reseeding. There are at most 8,192 histories of each
+kind and one previously probed immutable state per hint owner.
+
+Preparation reserves 20 work units before allocating the column and split requests.
+The numerical grant retains 24 work units per candidate for normalization, history
+updates and consuming selection. Projection, scratch construction, scaling, solving,
+objective scans and retirement share the unspent node allowance and remaining
+containing and cumulative allowances. Numerical estimates supply no bound or pruning
+authority. Missing, tied or unusable advice retains the original winner.
 Ordinary finite workers use value and incumbent guidance to order their children.
 
 Finite-run construction can explicitly enable a root child-order fallback in place
-of the root variable comparison. In that mode the selected root variable can request
+of numerical variable-history initialization. In that mode the selected root variable can request
 one child-order estimate from its retained optimal basis after the actual
 complementary alternatives exist. This attempt is limited to one column and
 one attempt per hint owner, including across slices, restarts and assumption reseeding.
@@ -346,7 +359,7 @@ construction of the two cuts. Boolean branches keep their existing literals.
 Tied gains, insufficient allowance, pruned alternatives and incompatible partitions
 retain the existing heuristics. Preferences expire at the next node, point replacement or history reset.
 History and basis side consumption, changed order and unavailable advice are recorded
-separately. Root probes report completed children, preparation and solve work, and
+separately. Numerical probes report completed children, preparation and solve work, and
 complete or declined comparisons independently of retained-basis analysis. Root observations distinguish a changed partition from an agreed or
 changed complete root choice. Child-order fallback distinguishes a changed variable, an incomplete pair
 and a different partition. Variable proposal preparation is separate from actual selection, with

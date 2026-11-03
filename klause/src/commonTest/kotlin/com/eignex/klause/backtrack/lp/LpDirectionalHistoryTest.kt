@@ -9,6 +9,74 @@ import kotlin.test.assertTrue
 
 class LpDirectionalHistoryTest {
     @Test
+    fun `complete probe pairs require two normalized observations before scoring`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.IntVar(0)
+        history.beginNode(0)
+        assertTrue(history.observePair(variable, 0.25, 1.0, 3.0))
+        assertFalse(history.hasReliableSamples(variable))
+        assertTrue(history.score(variable, 0.5).isNaN())
+        history.beginNode(1)
+
+        assertTrue(history.observePair(variable, 0.75, 3.0, 1.0))
+
+        assertTrue(history.hasReliableSamples(variable))
+        assertEquals(7.0 / 3.0, history.score(variable, 0.5), 1e-9)
+    }
+
+    @Test
+    fun `an unusable probe pair leaves both directional means unchanged`() {
+        for ((down, up) in listOf(99.0 to Double.NaN, Double.NaN to 99.0,
+            -1.0 to 99.0, 99.0 to -1.0, Double.POSITIVE_INFINITY to 99.0,
+            99.0 to Double.POSITIVE_INFINITY)
+        ) {
+            val history = LpDirectionalHistory({})
+            val variable = VarRef.IntVar(0)
+            history.beginNode(0)
+            assertTrue(history.observePair(variable, 0.25, 1.0, 3.0))
+
+            assertFalse(history.observePair(variable, 0.25, down, up))
+
+            assertFalse(history.hasReliableSamples(variable))
+            history.beginNode(1)
+            assertTrue(history.observePair(variable, 0.75, 3.0, 1.0))
+            assertEquals(7.0 / 3.0, history.score(variable, 0.5), 1e-9)
+        }
+    }
+
+    @Test
+    fun `probe pair reliability is withdrawn after aging or reset`() {
+        for (reset in listOf(false, true)) {
+            val history = LpDirectionalHistory({}, maxAge = 1L)
+            val variable = VarRef.Bool(0)
+            repeat(2) {
+                history.beginNode(0)
+                assertTrue(history.observePair(variable, 0.5, 1.0, 1.0))
+            }
+            assertTrue(history.hasReliableSamples(variable))
+
+            if (reset) history.clear() else repeat(2) { history.beginNode(1) }
+
+            assertFalse(history.hasReliableSamples(variable))
+            assertTrue(history.score(variable, 0.5).isNaN())
+            assertFalse(history.mayHaveScores)
+        }
+    }
+
+    @Test
+    fun `reliable zero probe pairs retain the scoring fallback`() {
+        val history = LpDirectionalHistory({})
+        val variable = VarRef.Bool(0)
+        repeat(2) {
+            history.beginNode(0)
+            assertTrue(history.observePair(variable, 0.5, 0.0, 0.0))
+        }
+
+        assertTrue(history.hasReliableSamples(variable))
+        assertTrue(history.score(variable, 0.5).isNaN())
+    }
+
+    @Test
     fun `a child observation does not create another parent bound`() {
         val observations = ArrayList<String>()
         val history = LpDirectionalHistory(observations::add)

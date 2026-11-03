@@ -10,8 +10,8 @@ import com.eignex.klause.solver.search.VarRef
  * the LP gives no fractional signal, or the residual problem is too wide to scan. Purely advisory — the
  * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound
  * branch, so search stays complete and correct regardless. Reliable passive history compares the
- * winner and runner-up. Missing history permits one funded root comparison of isolated child LP gains;
- * unavailable advice retains the score winner.
+ * winner and runner-up. Missing passive history permits separately trained numerical gains;
+ * two recent observations per direction are required, and unavailable advice retains the score winner.
  * `O(unassigned)` per call, capped.
  *
  * Lives in the search layer (not [LpEngine]'s home) because it reads the backtrack [VarRef] selector type
@@ -61,8 +61,8 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
         hints.compareVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
             second, (second as? VarRef.IntVar)?.let { session.intDomain(it.varId) })
     } else null
-    val proposal = historyProposal ?: if (compareHistory && hints.rootVariableChoiceReady) {
-        hints.compareRootVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
+    val proposal = historyProposal ?: if (compareHistory && hints.probeVariableChoiceReady) {
+        hints.compareProbeVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
             second, (second as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
             reserve = ::reserveDirectionalWork, estimate = ::directionalGains)
     } else null
