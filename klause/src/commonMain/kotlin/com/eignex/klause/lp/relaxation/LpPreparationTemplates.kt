@@ -275,7 +275,7 @@ internal class LpPreparationTemplates private constructor(
             var pendingColumnWork = 0L
             try {
                 fun visit(count: Long = 1L): Boolean {
-                    if (workLimit != null && count > workLimit - units - pendingColumnWork) return false
+                    if (workLimit != null && count > workLimit - units) return false
                     units += count
                     token.charge(count)
                     return units + pendingColumnWork <= MAX_UNITS && !token()

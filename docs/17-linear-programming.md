@@ -99,7 +99,8 @@ first completes its LP without speculative metadata and marks the existing
 namespace token. A later completed consumer can allocate a 16-unit source-scoped
 record and accumulate construction work. The marker carries no work credit or
 numerical state. A preparation attempt spends
-no more inspection work than those completed builds supplied, within the existing
+no more inspection work than those completed builds supplied. Deferred exact columns
+debit the consuming LP when materialized; their potential storage remains within the
 262,144-unit ceiling. A failed attempt requires further completed construction
 before retrying; its inspection and replacement record still spend the current
 allowance. Admission work supplies no additional solver grant. Component-owned and

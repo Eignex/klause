@@ -62,6 +62,23 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `earned preparation should admit a fully funded inspection`() {
+        var inspectionWork = 0L
+        assertNotNull(FactorProjectionProviders.Default.prepare(source).prepareLpTemplates(objective,
+            Cancellation.Never, reuseMetadata = true, onWork = { inspectionWork += it }))
+        val funding = inspectionWork + 1L
+        selection.recordLpConstruction(1L, Cancellation.Never) {}
+        selection.recordLpConstruction(funding, Cancellation.Never) {}
+        var charged = 0L
+
+        val prepared = selection.prepareLpTemplates(objective, Cancellation.Never,
+            reuseMetadata = true, earned = true, onWork = { charged += it })
+
+        assertNotNull(prepared)
+        assertTrue(charged <= funding)
+    }
+
+    @Test
     fun `completed LP consumers should earn selective metadata`() {
         var prepared: LpPreparationTemplates? = null
         repeat(32) {

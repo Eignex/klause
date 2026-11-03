@@ -33,8 +33,7 @@ internal class LpPreparationAdmission(
         const val STORAGE_UNITS = 16L
 
         private fun minimumWork(problem: Problem): Long =
-            (problem.numFactors.toLong() + problem.numIntVars.toLong() *
-                (LpIntegerBoundTemplate.COLUMN_WORK + 1L) + problem.numBoolVars)
+            (problem.numFactors.toLong() + problem.numIntVars + problem.numBoolVars)
                 .coerceIn(1L, LpPreparationTemplates.MAX_UNITS)
     }
 }
