@@ -260,6 +260,28 @@ class SparseLpAdmissionTest {
     }
 
     @Test
+    fun `checked paused bounds survive a later root consultation stop`() {
+        val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
+            List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
+        val sink = SolveStatsSink("checked-paused-sparse-root")
+        val stop = Cancellation { (sink.lp.sparseTrial["PausedCertifiedBounds"] ?: 0L) > 0L }
+
+        val (lower, work) = LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
+            LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
+            repeat(3) { engine.observeNodeWork(false, 96, 96, 1) }
+            val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList(), stop)
+            assertTrue(engine.propagator.floatPaused)
+            bound to engine.totalSolveWork()
+        }
+
+        assertTrue(lower > 0.0 && lower <= 48.0)
+        assertEquals(1L, sink.snapshot().lp.sparseTrial["PausedCertifiedBounds"])
+        assertEquals(0.0, sink.snapshot().lp.rootPasses.sum)
+        assertTrue(work <= SPARSE_LP_MAX_WORK)
+    }
+
+    @Test
     fun `cancelled sparse root continuation publishes no partial bound`() {
         val problem = Problem(0, 96, Array(96) { IntDomain(0, 1) },
             List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
