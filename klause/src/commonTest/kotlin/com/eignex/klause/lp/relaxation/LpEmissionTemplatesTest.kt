@@ -75,6 +75,46 @@ class LpEmissionTemplatesTest {
     }
 
     @Test
+    fun `stable source domain tables should reduce repeated fragment inspection`() {
+        repeat(3) {
+            LpEmissionCache(CpToLpRelaxation(source, objective, projections = selected,
+                retainImportedDefinitions = true)).refresh(RootDomains(source), 0)
+        }
+        val unchanged = source.withFactors(source.factors.copyOf())
+        val equivalent = Problem(1, 3, Array(3) { IntDomain(0, 10) }, source.factors)
+
+        val work = listOf(unchanged, equivalent).map { problem ->
+            var charged = 0L
+            assertNotNull(selected.forEngineView(problem).borrowLpEmission(0, objective, RootDomains(problem),
+                Cancellation.Never) { charged += it })
+            charged
+        }
+
+        assertTrue(work[0] < work[1])
+    }
+
+    @Test
+    fun `a shared source domain table should recheck its changed endpoint`() {
+        val finite = source.bake(selected)
+        val view = finite.withFactors(finite.factors.copyOf())
+        val selection = FactorProjectionProviders.Default.prepare(view)
+        val captured = finite.rootIntDomains()
+        val domains = object : RelaxationDomains {
+            override fun intDomain(varId: Int): IntDomain = captured[varId]
+            override fun boolValue(varId: Int): Boolean? = null
+        }
+        repeat(3) {
+            LpEmissionCache(CpToLpRelaxation(view, objective, projections = selection,
+                retainImportedDefinitions = true)).refresh(domains, 0)
+        }
+        finite.rootIntDomainsInPlace[0] = IntDomain(1, 10)
+
+        val borrowed = selection.borrowLpEmission(0, objective, domains, Cancellation.Never) {}
+
+        assertNull(borrowed)
+    }
+
+    @Test
     fun `a new source endpoint should replace its fragment before reuse`() {
         val domains = RootDomains(source)
         repeat(3) {

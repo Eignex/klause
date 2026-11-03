@@ -94,12 +94,15 @@ internal class LpEmissionTemplates private constructor(
         problem: Problem,
     ) {
         private val integers = factor.intVars
+        private val sourceDomains = problem.declaredIntDomains
         private val lower = LongArray(integers.size) { problem.rootDomainOf(integers[it]).min }
         private val upper = LongArray(integers.size) { problem.rootDomainOf(integers[it]).max }
         private val sides = ByteArray(integers.size) { statedSides(problem, integers[it]) }
 
         fun matches(problem: Problem, objective: LinearObjective?, visit: (Long) -> Boolean): Boolean {
-            for (index in integers.indices) {
+            if (!visit(1L)) return false
+            val stableBounds = sourceDomains.stableEndpoints && problem.declaredIntDomains === sourceDomains
+            if (!stableBounds) for (index in integers.indices) {
                 if (!visit(1L)) return false
                 val variable = integers[index]
                 val domain = problem.rootDomainOf(variable)
@@ -178,7 +181,7 @@ internal class LpEmissionTemplates private constructor(
                     return !cancellation()
                 }
                 val units = validatedExtent(emission, minimumUnits, ::visit) ?: return null
-                if (!visit(1L + problem.factors[factorId].intVars.size * 3L +
+                if (!visit(2L + problem.factors[factorId].intVars.size * 3L +
                         emission.dependencies.validationUnits * 4L)
                 ) return null
                 delta = units - (previous?.storageUnits ?: 0L)
@@ -269,7 +272,7 @@ internal class LpEmissionTemplates private constructor(
             if (model.n == 0 || model.m == 0 || model.doubleView != null || model.exactState != null ||
                 relaxation.preparationTemplates != null || relaxation.sourceMap != null || !eligible(factor)
             ) return null
-            val units = 64L + model.n * 40L + model.m * 32L + model.csc.rowIdx.size * 4L +
+            val units = 65L + model.n * 40L + model.m * 32L + model.csc.rowIdx.size * 4L +
                 factor.intVars.size * 3L + emission.dependencies.validationUnits * 8L
             if (units < MIN_ENTRY_UNITS || units + sourceDefinitionUnits(model) > MAX_ENTRY_UNITS) return null
             return units

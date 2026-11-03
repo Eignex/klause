@@ -155,7 +155,10 @@ fragment index. Explicit selective-metadata preparation keeps its selected route
 A fragment borrow checks the source namespace, semantics, dimensions, raw/finite
 scope and identical factor at the same coordinate. It then checks declared integer
 endpoints and stated sides, current column costs, live endpoint dependencies and
-Boolean pins. An objective constant rebinds only the immutable envelope. These
+Boolean pins. An identical immutable source-domain table retains the declared-bound
+check; shared finite tables still require endpoint inspection. Each entry reserves
+its table reference within the existing ceiling. Live dependencies and current costs
+are checked on every borrow. An objective constant rebinds only the immutable envelope. These
 built-in emissions read live integer endpoints, so cached dependencies contain
 bounded endpoint snapshots rather than live domains. Unary reified equalities,
 whose binary hull also depends on interior holes, keep ordinary construction.
