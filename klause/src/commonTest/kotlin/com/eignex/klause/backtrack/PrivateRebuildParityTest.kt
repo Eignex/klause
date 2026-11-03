@@ -410,22 +410,23 @@ class PrivateRebuildParityTest {
     @Test
     fun `sparse parity discovery should return reconstructable bases within its work grant`() {
         val rows = 1_024
+        val columns = rows + rows / 2 + 1
         val clauses = (0 until rows).flatMap { row ->
             (0..7).filter { it.countOneBits() % 2 != row % 2 }.map { mask ->
                 Clause(IntArray(3) {
-                    val column = if (it == 2) rows + 1 else row + it
+                    val column = if (it == 2) rows + 1 + row / 2 else row + it
                     Lit.make(column, mask and (1 shl it) == 0)
                 })
             }
         }.toTypedArray<Factor>()
-        val session = PropagationSession(Problem(rows + 2, 0, emptyArray(), clauses).bake())
+        val session = PropagationSession(Problem(columns, 0, emptyArray(), clauses).bake())
         var spent = 0L
 
         val captured = assertNotNull(PrivateRebuildParity.capture(session, 16_777_216L, { work ->
             if (work > 1_048_576L - spent) false else { spent += work; true }
         }))
         val basis = assertNotNull(captured.basis)
-        val point = basis.reconstruct(Sample(BooleanArray(rows + 2) { it % 2 == 0 }, longArrayOf()))
+        val point = basis.reconstruct(Sample(BooleanArray(columns) { it % 2 == 0 }, longArrayOf()))
 
         assertEquals(rows, basis.rank)
         assertTrue(clauses.all { factor ->
