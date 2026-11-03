@@ -9,18 +9,16 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
     override val expensiveBake: Boolean = true
 
     internal class Cache(seed: AffineXorSeed) {
-        val mask = LongArray(seed.freeColumns * seed.words)
-        val reasons = LongArray(seed.freeColumns * seed.reasonWords)
-        val rhs = IntArray(seed.freeColumns)
-        val pivotRow = IntArray(seed.freeColumns) { -1 }
+        val rows = LongArray(seed.coordinates.size * seed.words)
+        val reasons = LongArray(seed.coordinates.size * seed.reasonWords)
+        val rhs = IntArray(seed.coordinates.size)
+        val nonzeroWords = IntArray(seed.coordinates.size)
         val facts = IntArray(seed.freeColumns + 1)
         val seen = IntArray(seed.coordinates.size) { -1 }
         val query = LongArray(seed.words)
         val support = LongArray(seed.reasonWords)
-        val unitPivots = LongArray(seed.words)
         var value = 0
         var rank = 0
-        var unitBasis = true
         var valid = false
         var queriedRank = -1
         var conflict: IntArray? = null
@@ -31,15 +29,14 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
         var pins = 0L
         var conflicts = 0L
         var wideReasons = 0L
-        var unitQueriesSkipped = 0L
-        var compositeBases = 0L
+        var skippedExpressions = 0L
         val initializationWork = seed.initializationWork
 
         fun observations(): Map<String, Long> = mapOf(
             "Fires" to fires, "Resets" to resets, "InsertedRows" to inserted,
             "Reductions" to reductions, "Pins" to pins, "Conflicts" to conflicts,
             "WideReasons" to wideReasons, "InitializationWork" to initializationWork,
-            "UnitQueriesSkipped" to unitQueriesSkipped, "CompositeBases" to compositeBases,
+            "ExpressionRowsUpdated" to reductions, "ExpressionRowsSkipped" to skippedExpressions,
         )
     }
 
@@ -62,25 +59,7 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
                 break
             }
         }
-        if (!cache.valid) {
-            for (column in cache.pivotRow.indices) {
-                state.checkFiniteWork()
-                cache.pivotRow[column] = -1
-            }
-            for (variable in seed.variables) {
-                state.checkFiniteWork()
-                cache.seen[variable] = -1
-            }
-            for (word in cache.unitPivots.indices) {
-                state.checkFiniteWork()
-                cache.unitPivots[word] = 0L
-            }
-            cache.unitBasis = true
-            cache.rank = 0
-            cache.queriedRank = -1
-            cache.valid = true
-            cache.resets++
-        }
+        if (!cache.valid) reset(state, cache)
         for (variable in seed.variables) {
             state.checkFiniteWork()
             if (seed.coordinates[variable] == Int.MIN_VALUE || cache.seen[variable] != -1 ||
@@ -88,7 +67,7 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
             expression(state, cache, variable)
             cache.value = cache.value xor if (state.boolValueAt(variable)) 1 else 0
             cache.facts[cache.rank] = variable
-            cache.support[cache.rank ushr 6] = 1L shl (cache.rank and 63)
+            cache.support[cache.rank ushr 6] = cache.support[cache.rank ushr 6] xor (1L shl (cache.rank and 63))
             if (!insert(state, cache)) {
                 cache.conflicts++
                 val width = reasonWidth(state, cache)
@@ -101,24 +80,21 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
         if (cache.queriedRank == cache.rank) return true
         for (variable in seed.variables) {
             state.checkFiniteWork()
-            if (seed.coordinates[variable] == Int.MIN_VALUE || state.boolAssignedAt(variable)) continue
-            if (!mayBeDetermined(state, cache, variable)) {
-                cache.unitQueriesSkipped++
-                continue
-            }
-            expression(state, cache, variable)
-            if (!reduce(state, cache)) continue
+            if (seed.coordinates[variable] == Int.MIN_VALUE || state.boolAssignedAt(variable) ||
+                cache.nonzeroWords[variable] != 0) continue
+            support(state, cache, variable)
             val width = reasonWidth(state, cache)
             if (width > 64) {
                 cache.wideReasons++
                 continue
             }
             val explanation = reason(state, cache, width)
-            if (!state.pinBool(variable, cache.value != 0, explanation)) {
+            val value = cache.rhs[variable] != 0
+            if (!state.pinBool(variable, value, explanation)) {
                 cache.conflicts++
                 return false
             }
-            cache.seen[variable] = if (cache.value != 0) 1 else 0
+            cache.seen[variable] = if (value) 1 else 0
             cache.pins++
         }
         cache.queriedRank = cache.rank
@@ -126,96 +102,90 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
     }
 
     override fun interrupted(state: PropagationState, factorId: Int) {
-        // A partial row update cannot become the next fire's linear basis.
+        // A partial row update cannot become the next fire's affine residual system.
         (state.refPayload[factorId] as? Cache)?.valid = false
     }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         (state.refPayload[factorId] as? Cache)?.conflict
 
-    private fun mayBeDetermined(state: PropagationState, cache: Cache, variable: Int): Boolean {
-        if (!cache.unitBasis) return true
-        val coordinate = seed.coordinates[variable]
-        if (coordinate < 0) {
+    private fun reset(state: PropagationState, cache: Cache) {
+        for (variable in seed.variables) {
             state.checkFiniteWork()
-            val free = -coordinate - 1
-            return cache.unitPivots[free ushr 6] and (1L shl (free and 63)) != 0L
-        }
-        for (word in 0 until seed.words) {
-            state.checkFiniteWork()
-            if (seed.dependencies[coordinate][word] and cache.unitPivots[word].inv() != 0L) return false
-        }
-        return true
-    }
-
-    private fun expression(state: PropagationState, cache: Cache, variable: Int) {
-        val coordinate = seed.coordinates[variable]
-        for (word in 0 until seed.words) {
-            state.checkFiniteWork()
-            cache.query[word] = if (coordinate >= 0) seed.dependencies[coordinate][word] else 0L
-        }
-        if (coordinate < 0) {
-            val free = -coordinate - 1
-            cache.query[free ushr 6] = 1L shl (free and 63)
-        }
-        for (word in cache.support.indices) {
-            state.checkFiniteWork()
-            cache.support[word] = 0L
-        }
-        cache.value = if (coordinate >= 0) seed.rhs[coordinate] else 0
-    }
-
-    private fun insert(state: PropagationState, cache: Cache): Boolean {
-        while (true) {
-            val column = firstColumn(state, cache)
-            if (column < 0) return cache.value == 0
-            state.checkFiniteWork()
-            val row = cache.pivotRow[column]
-            if (row >= 0) {
-                combine(state, cache, row)
-                continue
-            }
-            val next = cache.rank
+            cache.seen[variable] = -1
+            val coordinate = seed.coordinates[variable]
+            if (coordinate == Int.MIN_VALUE) continue
+            val free = if (coordinate < 0) -coordinate - 1 else -1
+            var nonzero = 0
             for (word in 0 until seed.words) {
                 state.checkFiniteWork()
-                cache.mask[next * seed.words + word] = cache.query[word]
+                val bits = if (coordinate >= 0) seed.dependencies[coordinate][word]
+                else if (word == (free ushr 6)) 1L shl (free and 63) else 0L
+                cache.rows[variable * seed.words + word] = bits
+                if (bits != 0L) nonzero++
             }
             for (word in 0 until seed.reasonWords) {
                 state.checkFiniteWork()
-                cache.reasons[next * seed.reasonWords + word] = cache.support[word]
+                cache.reasons[variable * seed.reasonWords + word] = 0L
             }
-            cache.rhs[next] = cache.value
-            cache.pivotRow[column] = next
-            if (cache.unitBasis) {
-                for (word in cache.query.indices) {
-                    state.checkFiniteWork()
-                    val expected = if (word == (column ushr 6)) 1L shl (column and 63) else 0L
-                    if (cache.query[word] != expected) {
-                        cache.unitBasis = false
-                        cache.compositeBases++
-                        break
-                    }
-                }
-                if (cache.unitBasis) {
-                    val word = column ushr 6
-                    cache.unitPivots[word] = cache.unitPivots[word] or (1L shl (column and 63))
-                }
-            }
-            cache.rank++
-            cache.inserted++
-            return true
+            cache.rhs[variable] = if (coordinate >= 0) seed.rhs[coordinate] else 0
+            cache.nonzeroWords[variable] = nonzero
+        }
+        cache.rank = 0
+        cache.queriedRank = -1
+        cache.valid = true
+        cache.resets++
+    }
+
+    private fun expression(state: PropagationState, cache: Cache, variable: Int) {
+        for (word in 0 until seed.words) {
+            state.checkFiniteWork()
+            cache.query[word] = cache.rows[variable * seed.words + word]
+        }
+        support(state, cache, variable)
+        cache.value = cache.rhs[variable]
+    }
+
+    private fun support(state: PropagationState, cache: Cache, variable: Int) {
+        for (word in 0 until seed.reasonWords) {
+            state.checkFiniteWork()
+            cache.support[word] = cache.reasons[variable * seed.reasonWords + word]
         }
     }
 
-    private fun reduce(state: PropagationState, cache: Cache): Boolean {
-        while (true) {
-            val column = firstColumn(state, cache)
-            if (column < 0) return true
+    private fun insert(state: PropagationState, cache: Cache): Boolean {
+        val column = firstColumn(state, cache)
+        if (column < 0) return cache.value == 0
+        state.checkFiniteWork()
+        check(cache.rank < seed.freeColumns)
+        cache.rank++
+        cache.inserted++
+        for (variable in seed.variables) {
             state.checkFiniteWork()
-            val row = cache.pivotRow[column]
-            if (row < 0) return false
-            combine(state, cache, row)
+            if (seed.coordinates[variable] == Int.MIN_VALUE) continue
+            val offset = variable * seed.words
+            if (cache.rows[offset + (column ushr 6)] and (1L shl (column and 63)) == 0L) {
+                cache.skippedExpressions++
+                continue
+            }
+            var nonzero = 0
+            for (word in 0 until seed.words) {
+                state.checkFiniteWork()
+                val bits = cache.rows[offset + word] xor cache.query[word]
+                cache.rows[offset + word] = bits
+                if (bits != 0L) nonzero++
+            }
+            for (word in 0 until seed.reasonWords) {
+                state.checkFiniteWork()
+                val index = variable * seed.reasonWords + word
+                cache.reasons[index] = cache.reasons[index] xor cache.support[word]
+            }
+            state.checkFiniteWork()
+            cache.rhs[variable] = cache.rhs[variable] xor cache.value
+            cache.nonzeroWords[variable] = nonzero
+            cache.reductions++
         }
+        return true
     }
 
     private fun firstColumn(state: PropagationState, cache: Cache): Int {
@@ -225,19 +195,6 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
             if (bits != 0L) return word * 64 + bits.countTrailingZeroBits()
         }
         return -1
-    }
-
-    private fun combine(state: PropagationState, cache: Cache, row: Int) {
-        for (word in 0 until seed.words) {
-            state.checkFiniteWork()
-            cache.query[word] = cache.query[word] xor cache.mask[row * seed.words + word]
-        }
-        for (word in 0 until seed.reasonWords) {
-            state.checkFiniteWork()
-            cache.support[word] = cache.support[word] xor cache.reasons[row * seed.reasonWords + word]
-        }
-        cache.value = cache.value xor cache.rhs[row]
-        cache.reductions++
     }
 
     private fun reasonWidth(state: PropagationState, cache: Cache): Int {

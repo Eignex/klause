@@ -354,15 +354,14 @@ clause's excluded assignment, so extra exclusions in an otherwise complete group
 remain constraints. Each replacement row has at most 64 distinct coordinates;
 unsupported widths decline the row view. Row arrays, coefficient projections and
 fresh worker indexes share the containing work and modeled-memory grants.
-A funded mixed consumer also owns a joint affine propagator over the captured
-free-coordinate basis. Assigned source values become equations over those free
-coordinates; a fixed-size state-local matrix combines them and checks other source
-coordinates for implied values. Independent assigned facts supply clause reasons
-with at most 64 literals; wider pin reasons withhold the deduction. Undo or an
-interrupted update invalidates the cache, which rebuilds from the current assignment.
-While every retained row is a coordinate unit, a metered pivot mask rejects queries
-with an unspanned coordinate before copying or reducing their expression. A composite
-row disables that precheck until the cache rebuilds. The mask shares the private grant.
+A funded mixed consumer owns a residual affine expression for every source coordinate.
+Each independent assigned source fact eliminates one free coordinate from all expressions
+that contain it. The state owns flat coefficient and reason buffers with cached nonzero-word
+counts. Zero residuals imply source values; contradictory assigned values supply conflicts.
+Independent assigned facts supply clause reasons with at most 64 literals; wider pin reasons
+withhold the deduction. Undo or an interrupted update invalidates the cache, which rebuilds
+from the immutable seed and current assignments. Expression updates and checks spend the
+containing propagation-work grant.
 The immutable seed owns its snapshot, while each session owns its matrix and
 primitive observations. Buffer initialization and every scan, reduction and reason
 visit debit propagation work. A fresh session exposes its live propagation counter

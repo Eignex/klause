@@ -1409,7 +1409,7 @@ class PropagationSession private constructor(
         return (owner.refPayload[factorId] as? AffineXorPropagator.Cache)?.observations() ?: mapOf(
             "Fires" to 0L, "Resets" to 0L, "InsertedRows" to 0L, "Reductions" to 0L,
             "Pins" to 0L, "Conflicts" to 0L, "WideReasons" to 0L, "InitializationWork" to 0L,
-            "UnitQueriesSkipped" to 0L, "CompositeBases" to 0L,
+            "ExpressionRowsUpdated" to 0L, "ExpressionRowsSkipped" to 0L,
         )
     }
 
