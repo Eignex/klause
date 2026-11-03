@@ -901,9 +901,9 @@ internal object ExternalCollections {
         id = "miplib2017",
         url = "https://miplib.zib.de/downloads/collection.zip",
         license = "MIPLIB 2017 (academic; freely available for research)",
-        reason = "1065-instance MIP library; the full collection.zip (~3.5GB) is fetched once, then " +
-            "filtered to the <=16MB instances (klause solves the bounded/integer subset)",
-        fetch = FetchMethod.Zip,
+        reason = "1065-instance MIP library; the ZIP directory selects the <=16MB instances, " +
+            "and only selected original members are fetched",
+        fetch = FetchMethod.SelectiveZip("mps"),
         maxFileMb = 16,
     )
     val satlibUf20 = ExternalCollection(

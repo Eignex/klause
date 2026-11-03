@@ -13,7 +13,8 @@ Keep failed attempts and all preparation costs. SSH access and lab administratio
 
 Declared-input lab planning uses the corpus-pack index for unmaterialized members.
 Complete local collections retain byte authority. The lab verifies each planned input
-before execution.
+before execution. Selective ZIP collections discover eligible archive members when
+a complete local collection and pack index are absent, then fetch only selected members.
 
 Every requested selection must match a source. Planning resolves all selected sources
 before sealing directory identities; each solve verifies its planned files and directories.

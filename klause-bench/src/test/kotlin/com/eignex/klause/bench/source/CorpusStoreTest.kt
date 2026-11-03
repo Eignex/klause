@@ -7,10 +7,62 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
 class CorpusStoreTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `selected members retain collection paths and reuse only the requested cached bytes`(shared: Boolean) {
+        val root = Files.createTempDirectory("corpusmembers").toFile()
+        try {
+            val cache = File(root, "cache")
+            val workspace = if (shared) File(root, "workspace") else cache
+            val store = CorpusStore(cache, workspace)
+            var fetches = 0
+            for (name in listOf("one", "two", "one")) {
+                val file = store.member("fixture", "nested/$name.mps.zst") { staging ->
+                    fetches++
+                    File(staging, "packed").apply { writeText(name) }
+                }
+                assertEquals(File(workspace, "fixture/nested/$name.mps.zst"), file)
+                assertEquals(name, file.readText())
+            }
+            assertEquals(2, fetches)
+            assertTrue(File(cache, "fixture/${CorpusStore.SELECTIVE}").isFile)
+            assertTrue(File(workspace, "fixture/${CorpusStore.SELECTIVE}").isFile)
+            assertEquals(listOf("one.mps.zst", "two.mps.zst"), File(workspace, "fixture/nested").list()!!.sorted())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `a failed member fetch leaves accepted members unchanged and can be retried`() {
+        val root = Files.createTempDirectory("corpusmembers").toFile()
+        try {
+            val store = CorpusStore(root)
+            val accepted = store.member("fixture", "accepted.mps.zst") { staging ->
+                File(staging, "packed").apply { writeText("accepted") }
+            }
+            assertFailsWith<IOException> {
+                store.member("fixture", "next.mps.zst") { staging ->
+                    File(staging, "partial").writeText("incomplete")
+                    throw IOException("interrupted")
+                }
+            }
+            assertFalse(File(root, "fixture/next.mps.zst").exists())
+            assertEquals("accepted", accepted.readText())
+            val next = store.member("fixture", "next.mps.zst") { staging ->
+                File(staging, "complete").apply { writeText("complete") }
+            }
+            assertEquals("complete", next.readText())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun `fresh workspaces reuse an already fetched collection without fetching again`() {
         val root = Files.createTempDirectory("corpusstore").toFile()

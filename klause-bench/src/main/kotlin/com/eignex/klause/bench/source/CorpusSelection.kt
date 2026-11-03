@@ -119,6 +119,44 @@ internal object CorpusSelection {
             val ext: String,
             val familyOf: (String) -> String = { it.substringBefore('/') },
         ) : Layout {
+            fun discover(paths: List<String>): List<Discovered> {
+                val prefix = if (subDir.isEmpty()) "" else "$subDir/"
+                return paths.filter { it.startsWith(prefix) && CorpusFiles.plainPath(it).endsWith(".$ext") }
+                    .sortedBy(CorpusFiles::plainPath)
+                    .map { path ->
+                        val name = CorpusFiles.plainPath(path.removePrefix(prefix)).removeSuffix(".$ext")
+                        Discovered(name, path, familyKey = familyOf(name))
+                    }.distinctBy { it.name }
+            }
+
+            fun named(paths: List<String>, names: List<String>): List<Discovered> {
+                val available = discover(paths).associateBy { it.name }
+                return names.distinct().mapNotNull { name ->
+                    require(name.isNotBlank() && name.length <= 2048)
+                    require(name.split('/').none { it.isEmpty() || it == "." || it == ".." })
+                    require(name.none { it == '\\' || it.code < 32 || it.code == 127 })
+                    available[name]
+                }
+            }
+
+            /** A fixed set already knows its paths; do not enumerate unrelated corpus members. */
+            fun named(root: File, names: List<String>): List<Discovered> {
+                val base = if (subDir.isEmpty()) root else File(root, subDir)
+                return names.distinct().mapNotNull { name ->
+                    require(name.isNotBlank() && name.length <= 2048)
+                    require(name.split('/').none { it.isEmpty() || it == "." || it == ".." })
+                    require(name.none { it == '\\' || it.code < 32 || it.code == 127 })
+                    val plain = File(base, "$name.$ext")
+                    val compressed = File(base, "$name.$ext${CorpusFiles.SUFFIX}")
+                    val source = when {
+                        plain.isFile -> plain
+                        compressed.isFile -> compressed
+                        else -> return@mapNotNull null
+                    }
+                    Discovered(name, source.relativeTo(root).path, familyKey = familyOf(name))
+                }
+            }
+
             override fun discover(root: File): List<Discovered> {
                 val base = if (subDir.isEmpty()) root else File(root, subDir)
                 if (!base.isDirectory) return emptyList()
@@ -147,15 +185,50 @@ internal object CorpusSelection {
          *  needs the collection's bytes; without it discovery may run on the collection's index listing alone. */
         expected: ((File) -> Expected)? = null,
     ): List<ProblemRef> {
-        val root = if (expected == null) CorpusFetcher.listing(collection) else CorpusFetcher.ensure(collection)
-        val discovered = layout.discover(root)
+        val paths = if (expected == null && layout is Layout.Flat) CorpusFetcher.selectivePaths(collection) else null
+        val root = if (paths == null) {
+            if (expected == null) CorpusFetcher.listing(collection) else CorpusFetcher.ensure(collection)
+        } else {
+            File(CorpusFetcher.cacheRoot, collection.id)
+        }
+        val discovered = if (paths == null) layout.discover(root) else (layout as Layout.Flat).discover(paths)
         // Reject empty discovery so a mismatched archive layout cannot look like a completed measurement.
         require(discovered.isNotEmpty()) {
             "corpus '${collection.id}' yielded no instances under '$layout' in $root: " +
                 "the layout prefix does not match the fetched tree"
         }
         val chosen = applySelection(discovered, selection)
-        return chosen.map { d ->
+        return references(collection, root, chosen, category, format, expected)
+    }
+
+    /** Resolve exact flat-corpus names with the same provenance as full discovery. Missing members
+     * remain absent so the caller's existing missing-set-member check can report them. */
+    fun named(
+        collection: ExternalCollection,
+        layout: Layout.Flat,
+        names: List<String>,
+        category: Category,
+        format: Format,
+    ): List<ProblemRef> {
+        val paths = CorpusFetcher.selectivePaths(collection)
+        val root = if (paths == null) {
+            CorpusFetcher.listing(collection)
+        } else {
+            File(CorpusFetcher.cacheRoot, collection.id)
+        }
+        val discovered = if (paths == null) layout.named(root, names) else layout.named(paths, names)
+        return references(collection, root, discovered, category, format, null)
+    }
+
+    private fun references(
+        collection: ExternalCollection,
+        root: File,
+        discovered: List<Discovered>,
+        category: Category,
+        format: Format,
+        expected: ((File) -> Expected)?,
+    ): List<ProblemRef> =
+        discovered.map { d ->
             ProblemRef(
                 name = d.name,
                 format = format,
@@ -167,7 +240,6 @@ internal object CorpusSelection {
                 family = d.family,
             )
         }
-    }
 
     /** Apply per-family cap (head or seeded sample), interleave, then overall cap. */
     fun applySelection(all: List<Discovered>, sel: Selection): List<Discovered> =
