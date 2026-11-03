@@ -68,6 +68,21 @@ class CorpusFilesTest {
     }
 
     @Test
+    fun `memory staging accepts source exactly at its byte limit`() {
+        val root = Files.createTempDirectory("corpusfiles").toFile()
+        try {
+            val body = ByteArray(16_387) { (it % 251).toByte() }
+            val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeBytes(body) })
+
+            val observed = CorpusFiles.readMemory(packed, body.size) {}
+
+            assertContentEquals(body, observed)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `failed decoding removes the staging directory`() {
         val root = Files.createTempDirectory("corpusfiles").toFile()
         try {

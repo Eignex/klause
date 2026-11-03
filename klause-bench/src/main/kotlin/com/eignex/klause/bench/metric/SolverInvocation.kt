@@ -95,8 +95,10 @@ internal object SolverInvocation {
         }
         val sourceStart = System.nanoTime()
         val owner = Thread.currentThread()
-        return withSourceInput(file, budget, staging = settings.sourceStaging) { plain, remaining ->
-            val piped = CorpusFiles.isCompressed(plain) && settings.sourceStaging == SourceStaging.PIPE
+        return withPreparedInput(file, budget, staging = settings.sourceStaging) { input, remaining ->
+            val plain = input.file
+            val piped = CorpusFiles.isCompressed(plain) &&
+                settings.sourceStaging in setOf(SourceStaging.PIPE, SourceStaging.MEMORY)
             val cmd = klauseCommand(entry, settings, remaining, optimize,
                 if (piped) File("/dev/stdin") else plain)
             try {
@@ -104,9 +106,14 @@ internal object SolverInvocation {
                     cmd, dialectFor(entry.ref.format), remaining.timeoutMillis * 2 + 20_000,
                     settings.captureDirectory, settings.measureResources,
                     produce = { output ->
-                        CorpusFiles.pipe(plain, output) {
+                        fun checkInputActive() {
                             if (owner.isInterrupted) throw InterruptedIOException("Source input interrupted")
                             checkSourceActive(System.nanoTime() - sourceStart, budget)
+                        }
+                        checkInputActive()
+                        val stream = input.bytes?.inputStream() ?: CorpusFiles.open(plain)
+                        stream.use {
+                            CorpusFiles.pipe(it, output, ::checkInputActive)
                         }
                     },
                 ) else invoke(
@@ -131,21 +138,40 @@ internal object SolverInvocation {
         decoderIdentity: ((() -> Unit) -> Map<String, String>) = { SourceDecoder.capture(it) },
         solve: (File, Budget) -> Result,
     ): Result {
+        require(staging != SourceStaging.MEMORY) { "Memory delivery requires prepared input" }
+        return withPreparedInput(file, budget, nanoTime, staging, decoderIdentity) { input, remaining ->
+            solve(input.file, remaining)
+        }
+    }
+
+    internal class PreparedInput(val file: File, val bytes: ByteArray? = null)
+
+    internal fun withPreparedInput(
+        file: File,
+        budget: Budget,
+        nanoTime: () -> Long = System::nanoTime,
+        staging: SourceStaging = SourceStaging.CACHE,
+        decoderIdentity: ((() -> Unit) -> Map<String, String>) = { SourceDecoder.capture(it) },
+        memoryLimitBytes: Int = 32 * 1024 * 1024,
+        solve: (PreparedInput, Budget) -> Result,
+    ): Result {
         val start = nanoTime()
         val cliDecodesInput = CorpusFiles.isCompressed(file) && staging == SourceStaging.CLI
         val pipedInput = CorpusFiles.isCompressed(file) && staging == SourceStaging.PIPE
-        val streamed = staging in setOf(SourceStaging.CLI, SourceStaging.PIPE)
+        val memoryInput = CorpusFiles.isCompressed(file) && staging == SourceStaging.MEMORY
+        val streamed = staging in setOf(SourceStaging.CLI, SourceStaging.PIPE, SourceStaging.MEMORY)
         val stagingDirectory = if (streamed) null else staging.directory
         var decoder = emptyMap<String, String>()
         var preparationNanos: Long? = null
         var cleanupNanos = 0L
         var cliNanos = 0L
+        var memoryBytes: Int? = null
         var result = Result(null, null, null, proven = false, stats = emptyMap(),
             rawOutput = "", command = "SOURCE_PREPARATION")
         fun checkActive() = checkSourceActive(nanoTime() - start, budget)
         val failure = runCatching {
             SourcePreparationCapture.span("source-preparation").use { preparation ->
-                fun invokeSource(input: File): Result {
+                fun invokeSource(input: PreparedInput): Result {
                     preparation.close()
                     checkActive()
                     val cliStart = nanoTime()
@@ -159,17 +185,22 @@ internal object SolverInvocation {
                     }
                     return result
                 }
-                if (pipedInput) {
+                if (memoryInput) {
+                    check(File("/dev/stdin").exists()) { "Memory input requires /dev/stdin" }
+                    val bytes = CorpusFiles.readMemory(file, memoryLimitBytes, ::checkActive)
+                    memoryBytes = bytes.size
+                    invokeSource(PreparedInput(file, bytes))
+                } else if (pipedInput) {
                     check(File("/dev/stdin").exists()) { "Piped input requires /dev/stdin" }
-                    invokeSource(file)
+                    invokeSource(PreparedInput(file))
                 } else if (cliDecodesInput) {
                     checkActive()
                     decoder = decoderIdentity(::checkActive)
-                    invokeSource(file)
+                    invokeSource(PreparedInput(file))
                 } else {
                     CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it },
                         stagingDirectory = stagingDirectory ?: CorpusFiles.stagingRoot,
-                        nanoTime = nanoTime, block = ::invokeSource)
+                        nanoTime = nanoTime) { invokeSource(PreparedInput(it)) }
                 }
             }
         }.exceptionOrNull()
@@ -177,11 +208,16 @@ internal object SolverInvocation {
         if (failure is SourcePreparationTimeout) {
             result = result.copy(stats = result.stats + ("sourcePreparationBudgetExhausted" to "true"))
         }
+        if (failure is CorpusFiles.MemoryLimitExceeded) {
+            result = result.copy(stats = result.stats + ("sourceMemoryLimitExceeded" to "true"))
+        }
         val totalNanos = nanoTime() - start
         val preparationMillis = (preparationNanos ?: (totalNanos - cleanupNanos)) / NANOS_PER_MILLI
         val decoding = if (cliDecodesInput || pipedInput) emptyMap()
             else mapOf("sourceDecodeMs" to preparationMillis.toString())
-        result = result.copy(stats = (result.stats - "sourceDecodeMs") + decoder + decoding + mapOf(
+        val memory = if (memoryInput) mapOf("sourceMemoryLimitBytes" to memoryLimitBytes.toString()) +
+            memoryBytes?.let { mapOf("sourceMemoryBytes" to it.toString()) }.orEmpty() else emptyMap()
+        result = result.copy(stats = (result.stats - "sourceDecodeMs") + decoder + decoding + memory + mapOf(
             "sourceStaging" to if (CorpusFiles.isCompressed(file)) staging.key else "plain",
             "sourceStagingDirectory" to
                 if (CorpusFiles.isCompressed(file)) stagingDirectory?.absolutePath.orEmpty() else "",
@@ -189,6 +225,7 @@ internal object SolverInvocation {
             "sourceDecodeLocation" to when {
                 cliDecodesInput -> "cli-frontend"
                 pipedInput -> "harness-pipe"
+                memoryInput -> "harness-memory"
                 CorpusFiles.isCompressed(file) -> "harness"
                 else -> "none"
             },

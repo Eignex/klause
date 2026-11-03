@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
 
 class FrozenSourceAdapterTest {
     @ParameterizedTest
-    @ValueSource(strings = ["cache", "temporary", "cli", "pipe"])
+    @ValueSource(strings = ["cache", "temporary", "cli", "pipe", "memory"])
     fun `ordinary frozen planning preserves source identity across seeded repeat blocks`(target: String) {
         val input = BenchInput("offline/tiny.cnf.zst", BenchInputRoot.CORPUS, "model", "1".repeat(64))
         val template = BenchCase("original", inputs = listOf(input), attributes = mapOf(

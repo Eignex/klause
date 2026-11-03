@@ -43,7 +43,8 @@ class NativeLpAdapterTest {
     }
 
     @ParameterizedTest
-    @CsvSource("cpus,2", "source-staging,temporary", "source-staging,cli", "source-staging,pipe", "harness-jfr,true")
+    @CsvSource("cpus,2", "source-staging,temporary", "source-staging,cli", "source-staging,pipe",
+        "source-staging,memory", "harness-jfr,true")
     fun `native LP plans should reject unsupported controls`(key: String, value: String) {
         val request = BenchRequest(parameters = mapOf("suite" to "mps-core", "name" to "blend-tiny", key to value))
 

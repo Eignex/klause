@@ -548,6 +548,17 @@ backpressure and producer retirement belong to `sourceCliMs` and
 `sourceDecodeLocation=harness-pipe` identifies this scope. No temporary source is
 created, so harness file cleanup is zero. This control does not guarantee prompt
 cancellation inside a blocked filesystem or pipe call.
+
+`source-staging=memory` decodes up to 32 MiB into an invocation-owned buffer
+before launching the JVM CLI, then feeds the original bytes through `/dev/stdin`.
+Decoding, allocation and input close spend preparation time and reduce the CLI's
+remaining allowance; buffer delivery and producer retirement remain inside the
+CLI and whole-source clocks. `sourceMemoryBytes` and `sourceMemoryLimitBytes`
+retain the body size and limit. Larger inputs record `sourceMemoryLimitExceeded`
+with preparation costs and no solver verdict. Buffer allocation uses the same
+harness heap and containing worker memory grant. The buffer is not reused across
+invocations. `sourceDecodeLocation=harness-memory` identifies this preparation
+scope; `sourceDecodeMs` remains a broad preparation wall span, not decoder CPU.
 Compare full invocation and case/job costs at the same allowance and retain the
 original-source checks, runtime/decoder identities and declared cache conditions.
 

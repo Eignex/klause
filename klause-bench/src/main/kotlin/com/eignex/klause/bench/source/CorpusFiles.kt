@@ -3,7 +3,9 @@ package com.eignex.klause.bench.source
 import com.eignex.klause.bench.profile.SourcePreparationCapture
 import com.github.luben.zstd.ZstdInputStreamNoFinalizer
 import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.io.InterruptedIOException
 import java.io.OutputStream
@@ -54,17 +56,39 @@ internal object CorpusFiles {
 
     fun pipe(file: File, output: OutputStream, checkActive: () -> Unit) {
         checkActive()
-        open(file).use { input ->
+        open(file).use { pipe(it, output, checkActive) }
+    }
+
+    fun pipe(input: InputStream, output: OutputStream, checkActive: () -> Unit) {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            checkActive()
+            val count = input.read(buffer)
+            checkActive()
+            if (count < 0) break
+            output.write(buffer, 0, count)
+        }
+    }
+
+    fun readMemory(file: File, limitBytes: Int, checkActive: () -> Unit): ByteArray {
+        require(limitBytes > 0)
+        checkActive()
+        return open(file).use { input ->
+            val output = ByteArrayOutputStream(minOf(DEFAULT_BUFFER_SIZE, limitBytes))
             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
             while (true) {
                 checkActive()
                 val count = input.read(buffer)
                 checkActive()
                 if (count < 0) break
+                if (count > limitBytes - output.size()) throw MemoryLimitExceeded(limitBytes)
                 output.write(buffer, 0, count)
             }
+            output.toByteArray()
         }
     }
+
+    class MemoryLimitExceeded(limitBytes: Int) : IOException("Source memory staging exceeds $limitBytes bytes")
 
     /** Feed the plain bytes of [file] into [digest], so a compressed and a plain copy hash alike. */
     fun update(digest: MessageDigest, file: File) = open(file).use { it.feed(digest) }

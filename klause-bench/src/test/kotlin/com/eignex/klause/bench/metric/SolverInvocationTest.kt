@@ -19,6 +19,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.stream.Stream
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -237,6 +238,76 @@ class SolverInvocationTest {
         assertNull(failure.result.feasible)
         assertFalse(failure.result.proven)
         assertTrue(assertNotNull(failure.result.stats["sourceInputFailure"]).contains("invalid compressed source"))
+    }
+
+    @Test
+    fun `memory staging preserves original bytes and charges preparation before the solver`() {
+        val root = Files.createTempDirectory("solver-source").toFile()
+        try {
+            val body = "p cnf 2 1\n1 -2 0\n".toByteArray()
+            val packed = CorpusFiles.compress(File(root, "input.cnf").apply { writeBytes(body) })
+            var nanos = 0L
+            var allowance: Long? = null
+
+            val result = SolverInvocation.withPreparedInput(packed, Budget(1000),
+                nanoTime = { nanos += 1_000_000; nanos }, staging = SourceStaging.MEMORY) { input, remaining ->
+                assertEquals(packed, input.file)
+                assertContentEquals(body, input.bytes)
+                allowance = remaining.timeoutMillis
+                SolverInvocation.Result(null, null, null, proven = false,
+                    stats = emptyMap(), rawOutput = "unknown", command = "cli")
+            }
+
+            assertEquals(1000L - result.stats.getValue("sourcePreparationMs").toLong(), allowance)
+            assertEquals("harness-memory", result.stats["sourceDecodeLocation"])
+            assertEquals(result.stats["sourcePreparationMs"], result.stats["sourceDecodeMs"])
+            assertEquals(body.size.toString(), result.stats["sourceMemoryBytes"])
+            assertEquals("0", result.stats["sourceCleanupMs"])
+            assertEquals(listOf(packed), root.listFiles().orEmpty().toList())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `memory staging refuses oversized source before invoking the solver`() {
+        val root = Files.createTempDirectory("solver-source").toFile()
+        try {
+            val packed = CorpusFiles.compress(File(root, "input.cnf").apply { writeText("p cnf 0 0\n") })
+
+            val failure = assertFailsWith<SolverInvocation.Failure> {
+                SolverInvocation.withPreparedInput(packed, Budget(1000), staging = SourceStaging.MEMORY,
+                    memoryLimitBytes = 4) { _, _ -> error("oversized source") }
+            }
+
+            assertNull(failure.result.feasible)
+            assertEquals("true", failure.result.stats["sourceMemoryLimitExceeded"])
+            assertEquals("0", failure.result.stats["sourceCliMs"])
+            assertEquals(listOf(packed), root.listFiles().orEmpty().toList())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `memory staging observes its deadline before handing partial bytes to the solver`() {
+        val root = Files.createTempDirectory("solver-source").toFile()
+        try {
+            val packed = CorpusFiles.compress(File(root, "input.cnf").apply { writeBytes(ByteArray(32 * 1024)) })
+            var nanos = 0L
+
+            val result = SolverInvocation.withPreparedInput(packed, Budget(3),
+                nanoTime = { nanos += 1_000_000; nanos }, staging = SourceStaging.MEMORY) { _, _ ->
+                error("partial source")
+            }
+
+            assertNull(result.feasible)
+            assertEquals("true", result.stats["sourcePreparationBudgetExhausted"])
+            assertEquals("0", result.stats["sourceCliMs"])
+            assertEquals(listOf(packed), root.listFiles().orEmpty().toList())
+        } finally {
+            root.deleteRecursively()
+        }
     }
 
     @Test

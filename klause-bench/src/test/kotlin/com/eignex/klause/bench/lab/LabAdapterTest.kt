@@ -127,7 +127,7 @@ class LabAdapterTest {
     }
 
     @ParameterizedTest
-    @CsvSource("harness-jfr,true", "source-staging,cli", "source-staging,pipe")
+    @CsvSource("harness-jfr,true", "source-staging,cli", "source-staging,pipe", "source-staging,memory")
     fun `input only plans reject execution controls`(key: String, value: String) {
         assertFailsWith<IllegalArgumentException> {
             LabSettings(mapOf("input-only" to "true", key to value))
@@ -187,7 +187,7 @@ class LabAdapterTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["cache", "temporary", "cli", "pipe"])
+    @ValueSource(strings = ["cache", "temporary", "cli", "pipe", "memory"])
     fun `source staging choice remains explicit in comparison controls`(target: String) {
         val settings = LabSettings(mapOf("source-staging" to target))
         val case = BenchCase("case", settings.caseParameters("cp", 3), settings.resources())
