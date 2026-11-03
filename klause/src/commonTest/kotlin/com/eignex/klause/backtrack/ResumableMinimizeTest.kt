@@ -251,7 +251,8 @@ class ResumableMinimizeTest {
             assertTrue(problem.factors.all { factor ->
                 val linear = factor as Linear
                 val row = assertNotNull(linear.integerConstants)
-                linear.vars.indices.sumOf { row.coeff(it) * sample.ints[linear.vars[it]] } >= row.bound
+                assertEquals(LinearOp.LE, linear.op)
+                linear.vars.indices.sumOf { row.coeff(it) * sample.ints[linear.vars[it]] } <= row.bound
             })
             assertEquals(2, queries)
             assertEquals(0.0, search.stats.lp.nodePasses.sum)
