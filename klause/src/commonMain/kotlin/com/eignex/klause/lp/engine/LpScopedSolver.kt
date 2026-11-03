@@ -62,6 +62,12 @@ internal class LpScopedSolver(
         override val workScheduled: Boolean get() = floatInvocation.workScheduled()
     }
     val floatPaused: Boolean get() = pendingFloat != null
+    val pausedTrialProgress: Map<String, Long>
+        get() {
+            requireAvailable()
+            if (closed || pendingFloat == null) return emptyMap()
+            return solver?.trialProgress.orEmpty()
+        }
     val floatFundingStopped: Boolean get() = floatPaused &&
         (lastFloatTermination == LpFloatTermination.WORK || lastFloatTermination == LpFloatTermination.PIVOTS)
     private var closed = false
@@ -138,6 +144,13 @@ internal class LpScopedSolver(
         }
         solver = prepared(state, token, workBudget = available)?.first ?: return false
         return true
+    }
+
+    fun pausedDualProposal(token: Cancellation): DoubleArray? {
+        requireAvailable()
+        val pending = pendingFloat ?: return null
+        if (closed || pending.cursor.isAdvancing || token()) return null
+        return solver?.pausedDualProposal(token)
     }
 
     fun partialPrimalGuidance(token: Cancellation): LpPrimalGuidance? {

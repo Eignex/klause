@@ -18,6 +18,173 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `reading paused dual proposals does not construct a numerical owner`() {
+        val factory = RecordingLpEngineFactory()
+        LpScopedSolver(LpExactState(lowerBoundModel()), context = LpSolveContext(factory)).use { owner ->
+
+            val proposal = owner.pausedDualProposal(Cancellation.Never)
+
+            assertNull(proposal)
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
+
+    @Test
+    fun `paused row multipliers admit exact checking without completing the query`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            var proposal: DoubleArray? = null
+            repeat(8) {
+                if (proposal == null) {
+                    assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+                    proposal = owner.pausedDualProposal(Cancellation.Never)
+                }
+            }
+            val first = assertNotNull(proposal)
+            val paid = owner.lastMetrics
+
+            val checked = certifyLpBoundOnly(assertNotNull(owner.state.ownerWorkingModel()), first,
+                ReconstructionLimits())
+
+            val bound = assertNotNull(checked.bound)
+            assertTrue(bound.value > BigFraction.ZERO)
+            assertTrue(bound.value <= BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal())
+            assertEquals(paid, owner.lastMetrics)
+            assertTrue(owner.floatPaused)
+            assertNull(owner.lastResult)
+        }
+    }
+
+    @Test
+    fun `paused dual proposals own their row buffers`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            var proposal: DoubleArray? = null
+            repeat(8) {
+                if (proposal == null) {
+                    assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+                    proposal = owner.pausedDualProposal(Cancellation.Never)
+                }
+            }
+            val first = assertNotNull(proposal)
+            val expected = first.toList()
+            first.fill(0.0)
+
+            val next = assertNotNull(owner.pausedDualProposal(Cancellation.Never))
+
+            assertEquals(expected, next.toList())
+        }
+    }
+
+    @Test
+    fun `changed bounds retire paused dual proposals`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            var proposal: DoubleArray? = null
+            repeat(8) {
+                if (proposal == null) {
+                    assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+                    proposal = owner.pausedDualProposal(Cancellation.Never)
+                }
+            }
+            assertNotNull(proposal)
+
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 7L))
+
+            assertNull(owner.pausedDualProposal(Cancellation.Never))
+            assertFalse(owner.floatPaused)
+        }
+    }
+
+    @Test
+    fun `cancelled paused dual reads withhold copied values`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            var proposal: DoubleArray? = null
+            repeat(8) {
+                if (proposal == null) {
+                    assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+                    proposal = owner.pausedDualProposal(Cancellation.Never)
+                }
+            }
+            assertNotNull(proposal)
+            for (stopAt in listOf(1, 4)) {
+                var polls = 0
+
+                val declined = owner.pausedDualProposal(Cancellation { ++polls >= stopAt })
+
+                assertNull(declined)
+            }
+        }
+    }
+
+    @Test
+    fun `paused component guidance reads returned children without advancing`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        val factory = RecordingLpEngineFactory()
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(factory), componentSplit = true).use { owner ->
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+            assertTrue(owner.floatPaused)
+            val paid = owner.lastMetrics
+            val queries = factory.floatAllowances.size
+
+            val guidance = assertNotNull(owner.partialPrimalGuidance(Cancellation.Never))
+
+            assertEquals(listOf(true, false, false), guidance.known.toList())
+            assertEquals(0.5, guidance.coordinates[0])
+            assertEquals(paid, owner.lastMetrics)
+            assertEquals(queries, factory.floatAllowances.size)
+            assertTrue(owner.floatPaused)
+            assertNull(owner.lastResult)
+        }
+    }
+
+    @Test
+    fun `a bound edit retires paused component guidance`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(RecordingLpEngineFactory()),
+            componentSplit = true).use { owner ->
+            assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
+            assertNotNull(owner.partialPrimalGuidance(Cancellation.Never))
+
+            assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 7L))
+
+            assertNull(owner.partialPrimalGuidance(Cancellation.Never))
+            assertFalse(owner.floatPaused)
+        }
+    }
+
+    @Test
     fun `basis costs reject the point after a bound edit`() {
         val builder = LpBuilder()
         val x = builder.addVar(0, 2)
@@ -359,6 +526,49 @@ class LpScopedSolverTest {
             assertNotNull(guide.primal)
             assertNull(guide.bound)
             assertEquals(LpRootGuidancePhase.CERTIFICATE, guide.phase)
+        }
+    }
+
+    @Test
+    fun `reading paused progress does not prepare a numerical owner`() {
+        val factory = RecordingLpEngineFactory()
+        LpScopedSolver(LpExactState(lowerBoundModel()), context = LpSolveContext(factory)).use { owner ->
+
+            val progress = owner.pausedTrialProgress
+
+            assertTrue(progress.isEmpty())
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
+
+    @Test
+    fun `paused numerical progress is observable without advancing the cursor`() {
+        LpScopedSolver(LpExactState(lowerBoundModel()),
+            pricing = LpPricingOptions(basisEntryLimit = 100_000L)).use { owner ->
+            val allowance = LpFloatAllowance(100_000L, 100)
+            assertNull(owner.advanceFloat(1L, allowance))
+            assertNull(owner.advanceFloat(1L, allowance))
+            val before = owner.lastMetrics
+
+            val progress = owner.pausedTrialProgress
+
+            assertTrue(owner.floatPaused)
+            assertTrue(progress.getValue("ProgressSamples") > 0L)
+            assertEquals(1L, progress["ProgressPhaseDUAL"])
+            assertEquals(before, owner.lastMetrics)
+            assertNull(owner.lastResult)
+        }
+    }
+
+    @Test
+    fun `completed numerical solves withhold paused progress`() {
+        LpScopedSolver(LpExactState(lowerBoundModel()),
+            pricing = LpPricingOptions(basisEntryLimit = 100_000L)).use { owner ->
+            assertNotNull(owner.solveFloat())
+
+            val progress = owner.pausedTrialProgress
+
+            assertTrue(progress.isEmpty())
         }
     }
 
