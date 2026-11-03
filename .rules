@@ -73,6 +73,10 @@ Read `klause-bench/README.md` before benchmarking. In short:
 - A normal A/B row runs all arms for one workload, seed and repetition on the same machine in one worker attempt.
   Different rows, preparation and replacement attempts may use different compatible machines. Keep automatic
   placement; do not pin the whole job or reject completed pairs merely because the job's node changed.
+- Planning (`plan`, `select`) makes no network requests and finishes in seconds. Select from committed metadata —
+  `klause-bench/sets` and the committed `klause-bench/corpus-index` — and declare corpus inputs by sha256 so the lab
+  fetches each case's bytes at execution. Never fetch, clone, download or compile candidates while planning; refresh
+  the committed indexes with `CommittedCorpusIndexes` when a collection changes.
 - klause-bench provides what the lab calls: `select` names problems and resolves their files, `solve-one` solves one
   problem with klause-cli and writes its record, and the `bench.profile` mains run as `lab profile` jobs.
 - `solve-one` runs the installed CLI as a subprocess, so rebuild it with `:klause-cli:installJvmDist` first.
