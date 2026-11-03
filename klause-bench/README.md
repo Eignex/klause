@@ -23,6 +23,9 @@ fails preparation instead of publishing a reduced comparison plan.
 Planning stages every selected source before sealing include-directory identities.
 Execution verifies the planned file and directory identities before each solve.
 
+Declared-input planning uses the complete corpus-pack index even when only a subset
+of its members is materialized locally. Each solve verifies its planned input bytes.
+
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
 copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time
