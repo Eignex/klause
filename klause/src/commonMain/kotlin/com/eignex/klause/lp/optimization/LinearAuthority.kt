@@ -414,9 +414,9 @@ internal class LinearAuthority(
     ): LinearAuthorityQuery? {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return null
         if ((source.scope.condition.lower.keys + source.scope.condition.upper.keys).any {
-                it !in source.coordinates
+                !source.containsCoordinate(it)
             } || source.scope.condition.bools.keys.any {
-                SourceCoordinate(SourceCoordinate.Kind.Boolean, it) !in source.coordinates
+                !source.containsCoordinate(SourceCoordinate(SourceCoordinate.Kind.Boolean, it))
             }
         ) return null
         if (source.scope.objective == null || source.coordinates.any {
@@ -426,13 +426,15 @@ internal class LinearAuthority(
         if (budget.funding != null) {
             val condition = source.scope.condition
             budget.funding.charge(0L, condition.integerRows.sumOf { 128L + 64L * it.supportSize })
-            var work = source.coordinates.size.toLong() + condition.bools.size + condition.lower.size +
+            var work = source.coordinateCount.toLong() + condition.bools.size + condition.lower.size +
                 condition.upper.size + condition.integerRows.sumOf { it.supportSize.toLong() + 1L }
             try {
-                for (premise in source.premises.values) {
-                    if (cancellation()) return null
-                    work += 1L + premise.inequality.coefficients.size + premise.guards.size + premise.integerPins.size
+                val complete = source.allPremises { _, premise ->
+                    if (cancellation()) return@allPremises false
+                    work += 1L + premise.inequality.supportSize + premise.guardCount + premise.integerPinCount
+                    true
                 }
+                if (!complete) return null
             } finally {
                 budget.observe(preparation = work)
             }

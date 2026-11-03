@@ -1305,7 +1305,10 @@ Complementary endpoint mode retains an adopted current template; its mask refers
 to the installed definitions. Integer-only templates also share endpoint modes
 because they add no continuous bound alternatives.
 The current baseline, candidate preparation and any replacement keep their
-separate containing costs. The score combines normalized violation,
+separate containing costs. Query matching compares immutable source data without
+copying public snapshots. Funding preparation traverses the captured premises and
+charges each visited row, coefficient, guard and integer pin; cancellation retains
+the visited prefix's charge. The score combines normalized violation,
 inverse square-root support and objective parallelism. The model-facing cut pool
 and source selector share the greedy parallelism filter. Floating scores guide
 selection; source inequalities and their derivations remain exact rationals.

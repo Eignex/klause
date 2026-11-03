@@ -88,6 +88,18 @@ class SourceProofContext(
         for ((name, premise) in capturedPremises) action(name, premise)
     }
 
+    internal fun allPremises(predicate: (String, SourcePremise) -> Boolean): Boolean {
+        for ((name, premise) in capturedPremises) if (!predicate(name, premise)) return false
+        return true
+    }
+
+    internal fun containsCoordinate(coordinate: SourceCoordinate): Boolean = coordinate in capturedCoordinates
+
+    internal fun hasSameLinearData(other: SourceProofContext): Boolean =
+        capturedCoordinates == other.capturedCoordinates && capturedPremises == other.capturedPremises &&
+            capturedObjective.orEmpty() == other.capturedObjective.orEmpty() &&
+            objectiveConstant == other.objectiveConstant
+
     init {
         require(capturedPremises.keys.none { it.isBlank() })
         require(capturedObjective.orEmpty().keys.all { it in capturedCoordinates })

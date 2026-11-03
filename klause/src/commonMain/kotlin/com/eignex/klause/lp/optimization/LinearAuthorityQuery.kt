@@ -49,10 +49,8 @@ internal class LinearAuthorityQuery private constructor(
         this.checkUnselectedCuts == checkUnselectedCuts && this.retainMaskedCuts == retainMaskedCuts &&
         (source === other ||
         (source.scope == other.scope &&
-            source.coordinates == other.coordinates &&
-            source.premises == other.premises &&
+            source.hasSameLinearData(other) &&
             source.affineObjectiveAvailable == other.affineObjectiveAvailable &&
-            source.objective == other.objective && source.objectiveConstant == other.objectiveConstant &&
             source.semantics == other.semantics && source.semanticsChecker === other.semanticsChecker))
 
     companion object {
