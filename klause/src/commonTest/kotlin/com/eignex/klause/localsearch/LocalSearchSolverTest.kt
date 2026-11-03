@@ -254,7 +254,7 @@ class LocalSearchSolverTest {
         )
         val sample = assertNotNull(result.assignment)
         assertEquals(optimum, objective.evaluate(sample))
-        assertTrue(result.stats.ls.restarts.sum > 0.0)
+        assertTrue(result.stats.search.restarts.sum > 0.0)
     }
 
     @Test
