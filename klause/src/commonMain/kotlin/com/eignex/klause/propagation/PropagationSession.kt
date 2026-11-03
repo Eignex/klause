@@ -1447,6 +1447,11 @@ class PropagationSession private constructor(
             "learningIntegerDuplicateContinuationProduced" to it.integerDuplicateContinuationProduced,
             "learningIntegerDuplicateContinuationAdmitted" to it.integerDuplicateContinuationAdmitted,
             "learningIntegerDuplicateContinuationConsumed" to it.integerDuplicateContinuationConsumed,
+        )
+        val boundImplicationLifecycle = if (it.integerBoundImplicationSources == 0L &&
+            it.integerBoundImplicationAdmitted == 0L) {
+            emptyMap()
+        } else mapOf(
             "learningIntegerBoundImplicationSources" to it.integerBoundImplicationSources,
             "learningIntegerBoundImplicationProduced" to it.integerBoundImplicationProduced,
             "learningIntegerBoundImplicationAdmitted" to it.integerBoundImplicationAdmitted,
@@ -1465,8 +1470,8 @@ class PropagationSession private constructor(
             "learningIntegerDeclaredBoundExtendedConsumed" to it.integerDeclaredBoundExtendedConsumed,
         )
         if (it.integerRowLearning) {
-            counts + diagnostics + transientLifecycle + chainedLifecycle + declaredBoundLifecycle +
-                (attached?.integerCensus?.snapshot() ?: emptyMap()) +
+            counts + diagnostics + transientLifecycle + chainedLifecycle + boundImplicationLifecycle +
+                declaredBoundLifecycle + (attached?.integerCensus?.snapshot() ?: emptyMap()) +
                 ("learningIntegerSessions" to 1L)
         } else counts
     } ?: retiredLifecycle

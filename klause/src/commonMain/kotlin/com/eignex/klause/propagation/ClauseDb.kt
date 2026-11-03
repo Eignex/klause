@@ -156,8 +156,8 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
         if (row.hasNonOwnerOriginalSource) integerNonOwnerOriginalAdmitted++
         if (row.hasSlackOriginalSource) integerSlackOriginalAdmitted++
         if (row.hasDuplicateContinuation) integerDuplicateContinuationAdmitted++
-        if (row.hasBoundImplication) integerBoundImplicationAdmitted++
     }
+    if (row.hasBoundImplication) integerBoundImplicationAdmitted++
     if (row.declaredBoundTerms > 0) integerDeclaredBoundAdmitted++
     if (row.declaredBoundModes != 0) integerDeclaredBoundExtendedAdmitted++
     val propagator = LearnedIntegerPropagator(row)
@@ -544,8 +544,8 @@ private fun PropagationState.noteLearnedStage(index: Int, stage: LearnedStage, b
                 if (propagator.row.hasNonOwnerOriginalSource) integerNonOwnerOriginalConsumed++
                 if (propagator.row.hasSlackOriginalSource) integerSlackOriginalConsumed++
                 if (propagator.row.hasDuplicateContinuation) integerDuplicateContinuationConsumed++
-                if (propagator.row.hasBoundImplication) integerBoundImplicationConsumed++
             }
+            if (propagator.row.hasBoundImplication) integerBoundImplicationConsumed++
             if (propagator.row.declaredBoundTerms > 0) integerDeclaredBoundConsumed++
             if (propagator.row.declaredBoundModes != 0) integerDeclaredBoundExtendedConsumed++
         }

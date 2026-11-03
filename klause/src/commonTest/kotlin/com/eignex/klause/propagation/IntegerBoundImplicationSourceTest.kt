@@ -31,6 +31,68 @@ import kotlin.test.assertTrue
 
 class IntegerBoundImplicationSourceTest {
     @Test
+    fun `original parents should derive a mapped implication without a retained source`() {
+        val problem = Problem(0, 35, Array(35) { IntDomain(0, if (it < 4) 1L else 2L) }, Array(3) { index ->
+            if (index == 2) Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1)
+            else Linear(IntArray(33) { if (it == 1) -1 else 1 },
+                intArrayOf(3, index) + IntArray(31) { it + 4 }, LinearOp.LE, 0)
+        })
+        val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+            .apply { enableIntegerRowLearning() }
+        val cp = CpSearchComponent(native, IntArray(35) { it + 7 })
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertTrue(native.explanationState.learned.integerRows.orEmpty().isEmpty())
+
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(10, 1)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+        assertContentEquals(intArrayOf(2, 3), learned.row.variables)
+        assertContentEquals(longArrayOf(1, 2), learned.row.coefficients)
+        assertEquals(1L, learned.row.bound)
+        assertEquals(0, learned.row.retainedSources)
+        assertTrue(learned.row.hasBoundImplication)
+        assertEquals(0L, shared.intUpperBound(10))
+        val snapshot = native.learnedLifecycle()
+        assertEquals(0L, snapshot["learningIntegerChainedSources"] ?: 0L)
+        assertEquals(2L, snapshot["learningIntegerBoundImplicationSources"])
+        assertEquals(1L, snapshot["learningIntegerBoundImplicationProduced"])
+        assertEquals(1L, snapshot["learningIntegerBoundImplicationAdmitted"])
+        assertEquals(1L, snapshot["learningIntegerBoundImplicationConsumed"])
+        native.releaseRetainedState()
+        assertEquals(snapshot, native.learnedLifecycle())
+    }
+
+    @Test
+    fun `an unavailable root condition should withhold an original implication child`() {
+        val problem = Problem(0, 35, Array(35) { IntDomain(0, 1) }, Array(3) { index ->
+            if (index == 2) Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1)
+            else Linear(IntArray(33) { if (it == 2) -1 else 1 },
+                intArrayOf(3, 4, index) + IntArray(30) { it + 5 }, LinearOp.LE, 1)
+        })
+        val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+            .apply { enableIntegerRowLearning() }
+        val peer = object : SearchComponent {
+            override fun initialize(context: SearchContext): ComponentResult =
+                context.publish(SearchDecision.IntAtLeast(4, 1))
+        }
+        val cp = CpSearchComponent(native)
+        val shared = SearchSession(listOf(peer, cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(3, 1)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+        assertTrue(learned.row.hasBoundImplication)
+        assertEquals(0, learned.row.retainedSources)
+
+        assertFalse(cp.prefersNativeConflictAnalysis)
+
+        assertEquals(0L, native.learnedLifecycle()["learningIntegerBoundImplicationAdmitted"])
+    }
+
+    @Test
     fun `an unavailable mapped endpoint should withhold implication child admission`() {
         val problem = Problem(0, 35, Array(35) { IntDomain(0, 1) }, Array(2) { pivot ->
             Linear(IntArray(33) { if (it == 1) -1 else 1 },

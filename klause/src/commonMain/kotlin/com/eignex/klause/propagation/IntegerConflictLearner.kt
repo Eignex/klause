@@ -195,8 +195,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 if (nonOwnerOriginalSource) state.integerNonOwnerOriginalProduced++
                 if (slackOriginalSource) state.integerSlackOriginalProduced++
                 if (duplicateContinuation) state.integerDuplicateContinuationProduced++
-                if (boundImplication) state.integerBoundImplicationProduced++
             }
+            if (boundImplication) state.integerBoundImplicationProduced++
             if (compact.declaredBoundTerms > 0) state.integerDeclaredBoundProduced++
             if (compact.declaredBoundModes != 0) state.integerDeclaredBoundExtendedProduced++
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
@@ -331,9 +331,9 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
         }
         scannedReason(row, used, target, allowWideSources)?.let { return it }
-        if (selectedRetainedSource && combinations < INTEGER_LEARNING_STEPS) {
+        if (combinations < INTEGER_LEARNING_STEPS) {
             boundImplicationReason(row, used, target)?.let { return it }
-            observeEagerReasons(row, target)
+            if (selectedRetainedSource) observeEagerReasons(row, target)
         }
         return null
     }
