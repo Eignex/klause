@@ -103,6 +103,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         var nonOwnerSource = false
         var nonOwnerOriginalSource = false
         var slackOriginalSource = false
+        var duplicateContinuation = false
         repeat(INTEGER_LEARNING_STEPS) {
             if (combinations == INTEGER_LEARNING_STEPS) return decline("combination-limit")
             state.checkFiniteWork()
@@ -150,6 +151,12 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                     state.arithmeticLearningTrace?.record("integer.retained.box.reject.duplicate")
                     return@repeat
                 }
+                if (retainedSources > 0) {
+                    duplicateContinuation = true
+                    state.integerDuplicateContinuationSteps++
+                    state.arithmeticLearningTrace?.record("integer.retained.duplicate.continued")
+                    return@repeat
+                }
                 return decline("duplicate")
             }
             val assertion = compact.assertionAt(state, trail)
@@ -180,13 +187,14 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 if (nonOwnerSource) state.integerNonOwnerProduced++
                 if (nonOwnerOriginalSource) state.integerNonOwnerOriginalProduced++
                 if (slackOriginalSource) state.integerSlackOriginalProduced++
+                if (duplicateContinuation) state.integerDuplicateContinuationProduced++
             }
             if (compact.declaredBoundTerms > 0) state.integerDeclaredBoundProduced++
             if (compact.declaredBoundModes != 0) state.integerDeclaredBoundExtendedProduced++
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
                 compact.derivedThroughTransient(transientSteps)
                     .derivedFromRetainedSources(retainedSources, nonOwnerSource, nonOwnerOriginalSource,
-                        slackOriginalSource),
+                        slackOriginalSource, duplicateContinuation),
                 target, levels.size, levels, fallback)
         }
         return decline("step-limit-without-assertion")

@@ -45,6 +45,70 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `a duplicate owned consequence should continue to a distinct mapped assertion`() {
+        val native = PropagationSession(PropagationProblem(Problem(0, 5, Array(5) { IntDomain(0, 1) }, arrayOf(
+            Table(intArrayOf(4, 0), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(4, 3), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(4, 1), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(4, 2), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 0), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(4, 1), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(4, 3), LinearOp.LE, 0),
+        ))), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(0 to 1L, 1 to 1L, 2 to 1L), 1L, Lit.NONE)), 1)
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(1 to 1L, 2 to 1L, 3 to 1L), 1L, Lit.NONE)), 1)
+        val cp = CpSearchComponent(native, IntArray(5) { it + 7 })
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(11, 1)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+        assertContentEquals(intArrayOf(2, 4), learned.row.variables)
+        assertContentEquals(longArrayOf(1, 2), learned.row.coefficients)
+        assertEquals(1L, learned.row.bound)
+        assertTrue(learned.row.hasDuplicateContinuation)
+        assertEquals(0L, shared.intUpperBound(11))
+        val snapshot = native.learnedLifecycle()
+        assertEquals(1L, snapshot["learningIntegerDuplicateContinuationSteps"])
+        assertEquals(1L, snapshot["learningIntegerDuplicateContinuationProduced"])
+        assertEquals(1L, snapshot["learningIntegerDuplicateContinuationAdmitted"])
+        assertEquals(1L, snapshot["learningIntegerDuplicateContinuationConsumed"])
+        native.releaseRetainedState()
+        assertEquals(snapshot, native.learnedLifecycle())
+    }
+
+    @Test
+    fun `a duplicate without a later parent should retain clause fallback`() {
+        val native = PropagationSession(PropagationProblem(Problem(0, 5, Array(5) { IntDomain(0, 1) }, arrayOf(
+            Table(intArrayOf(4, 0), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(4, 3), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(4, 1), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(4, 2), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 0), LinearOp.LE, 0),
+        ))), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(0 to 1L, 1 to 1L, 2 to 1L), 1L, Lit.NONE)), 1)
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(1 to 1L, 2 to 1L, 3 to 1L), 1L, Lit.NONE)), 1)
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(4, 1))
+
+        assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
+        val snapshot = native.learnedLifecycle()
+        assertEquals(1L, snapshot["learningIntegerDuplicateContinuationSteps"])
+        assertEquals(0L, snapshot["learningIntegerDuplicateContinuationProduced"])
+        assertEquals(0L, snapshot["learningIntegerDuplicateContinuationAdmitted"])
+        assertEquals(0L, snapshot["learningIntegerDuplicateContinuationConsumed"])
+        assertEquals(2L, snapshot["learningIntegerAdmitted"])
+    }
+
+    @Test
     fun `a non tight original parent should derive a mapped owned consequence`() {
         val native = PropagationSession(PropagationProblem(Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
             Table(intArrayOf(3, 0), longArrayOf(0, 0, 0, 1, 1, 1)),

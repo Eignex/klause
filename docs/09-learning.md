@@ -610,7 +610,14 @@ Assertion checks reconstruct each historical term domain once per combination an
 reuse its exact activity for the candidate bounds. A retained row with the same
 normalized coefficients and a stronger bound suppresses a new consequence only
 when its guard is unconditional or identical; opposite or unrelated guards retain
-separate consequences. Retirement still follows the owning row's live reasons.
+separate consequences. Within an owned derivation, a duplicate compact inequality
+may continue through the remaining combination and source allowances without being
+admitted. The derivation uses its newly proved inequality rather than borrowing a
+stronger stored row. A primitive flag identifies a later distinct asserting child;
+duplicate continuation steps, produced children, admission and first consumption
+have separate lifecycle counts through retirement. A duplicate alone supplies no
+new child. Original-only compact duplicates retain clause fallback.
+Retirement still follows the owning row's live reasons.
 
 Rows retain at most one distinct signed guard; combinations requiring different
 guards retain clause fallback. A guarded row asserts only where its guard already

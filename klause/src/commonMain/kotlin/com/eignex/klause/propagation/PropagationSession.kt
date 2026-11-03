@@ -1443,6 +1443,10 @@ class PropagationSession private constructor(
             "learningIntegerSlackOriginalProduced" to it.integerSlackOriginalProduced,
             "learningIntegerSlackOriginalAdmitted" to it.integerSlackOriginalAdmitted,
             "learningIntegerSlackOriginalConsumed" to it.integerSlackOriginalConsumed,
+            "learningIntegerDuplicateContinuationSteps" to it.integerDuplicateContinuationSteps,
+            "learningIntegerDuplicateContinuationProduced" to it.integerDuplicateContinuationProduced,
+            "learningIntegerDuplicateContinuationAdmitted" to it.integerDuplicateContinuationAdmitted,
+            "learningIntegerDuplicateContinuationConsumed" to it.integerDuplicateContinuationConsumed,
         )
         val declaredBoundLifecycle = if (it.integerDeclaredBoundTerms == 0L && it.integerDeclaredBoundAdmitted == 0L) {
             emptyMap()
