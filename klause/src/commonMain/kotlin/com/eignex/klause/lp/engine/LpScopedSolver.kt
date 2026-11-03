@@ -313,6 +313,20 @@ internal class LpScopedSolver(
         return certified
     }
 
+    fun directionalGains(
+        pointModel: LpModel,
+        columns: IntArray,
+        splits: LongArray,
+        allowance: Long,
+        token: Cancellation,
+        observe: (LpProbeMetrics) -> Unit,
+    ): List<LpDirectionalGain>? {
+        if (closed || workingActive || pendingFloat != null || state !== pointModel.exactState || token()) return null
+        return (solver as? LpDirectionalProbeSolver)?.directionalGains(
+            pointModel, columns, splits, allowance, token, observe,
+        )
+    }
+
     fun directionalCosts(
         pointModel: LpModel,
         columns: IntArray,

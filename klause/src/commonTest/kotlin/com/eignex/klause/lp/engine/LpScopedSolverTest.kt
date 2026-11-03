@@ -206,12 +206,15 @@ class LpScopedSolverTest {
 
             assertNull(costs)
             assertEquals(0L, work)
+            assertNull(owner.directionalGains(pointModel, intArrayOf(x), longArrayOf(0L),
+                100_000L, Cancellation.Never) { work += it.work })
+            assertEquals(0L, work)
         }
     }
 
     @Test
     fun `reading optional guidance does not construct a numerical owner`() {
-        for (directional in listOf(false, true)) {
+        for (kind in listOf("partial", "basis", "probes")) {
             val builder = LpBuilder()
             val column = builder.addVar(0L, 5L, cost = 1L)
             builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
@@ -222,9 +225,13 @@ class LpScopedSolverTest {
             var work = 0L
             LpScopedSolver(state, context = LpSolveContext(factory), componentSplit = true).use { owner ->
 
-                val guidance = if (directional) {
-                    owner.directionalCosts(point, intArrayOf(column), 100_000L, Cancellation.Never) { work += it }
-                } else owner.partialPrimalGuidance(Cancellation.Never)
+                val guidance = when (kind) {
+                    "basis" -> owner.directionalCosts(point, intArrayOf(column),
+                        100_000L, Cancellation.Never) { work += it }
+                    "probes" -> owner.directionalGains(point, intArrayOf(column), longArrayOf(0L),
+                        100_000L, Cancellation.Never) { work += it.work }
+                    else -> owner.partialPrimalGuidance(Cancellation.Never)
+                }
 
                 assertNull(guidance)
                 assertTrue(factory.calls.isEmpty())
