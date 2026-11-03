@@ -27,6 +27,7 @@ import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
@@ -35,12 +36,14 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -805,6 +808,112 @@ class LpPrimalHeuristicsTest {
     }
 
     @Test
+    fun `admitted pump rounds should reuse root assembly with private objective owners`() {
+        for (mode in LpSourcePreparation.entries) {
+            val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf<Factor>(
+                Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.GE, 1),
+                Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.LE, 3))).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3, 4), constant = 17L)
+            val models = ArrayList<LpModel>()
+            val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+                override fun newTableauSolver(
+                    model: LpModel,
+                    cancellation: Cancellation,
+                    iterationLimit: Int,
+                    workLimit: Long,
+                    trackDegeneracy: Boolean,
+                    pricing: LpPricingOptions,
+                ): TableauCutSolver {
+                    models += model
+                    return ProductionLpEngineFactory.newTableauSolver(
+                        model, cancellation, iterationLimit, workLimit, trackDegeneracy, pricing)
+                }
+            }
+            val sink = SolveStatsSink("pump-assembly-reuse")
+            var offered = 0
+
+            val sample = LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, sourcePreparation = mode)), sink,
+                LpSolveContext(factory)).use { engine ->
+                engine.lpFeasibilityPump(objective, Cancellation.Never) { it.takeIf { ++offered == 3 } }
+            }
+
+            assertTrue(assertNotNull(sample).ints.sum() >= 1L)
+            assertEquals(3, models.size)
+            assertNotSame(models[0].cost, models[1].cost)
+            assertNotSame(models[1].cost, models[2].cost)
+            assertEquals(listOf(1L, 2L, 3L, 4L, 0L, 0L), models[0].cost.toList())
+            val assembly = assertNotNull(sink.snapshot().lp.phases["PRIMAL_LP_ASSEMBLY_ROOT"])
+            assertEquals(if (mode == LpSourcePreparation.ADMITTED) 1L else 3L, assembly.outcomes["BUILT"])
+            assertEquals(if (mode == LpSourcePreparation.ADMITTED) 2L else null, assembly.outcomes["REUSED"])
+            assertTrue(assembly.work > 0L)
+            if (mode == LpSourcePreparation.ADMITTED) {
+                val admission = assertNotNull(sink.snapshot().lp.phases["PRIMAL_LP_TEMPLATE_ROOT"])
+                assertEquals(1L, admission.outcomes["ADMITTED"])
+            }
+        }
+    }
+
+    @Test
+    fun `changed shared root domains should retire pump preparation`() {
+        for (hole in listOf(false, true)) {
+            val problem = Problem(0, 4, Array(4) { IntDomain(0, if (hole) 2 else 1) }, arrayOf<Factor>(
+                Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.GE, 1),
+                Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.LE, if (hole) 7 else 3))).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3, 4))
+            val sink = SolveStatsSink("changed-pump-root")
+            var offered = 0
+
+            val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+                engine.lpFeasibilityPump(objective, Cancellation.Never) {
+                    if (++offered == 1) {
+                        problem.rootIntDomainsInPlace[0] = if (hole) {
+                            IntDomain(0, 2).excludeValue(1)
+                        } else IntDomain(0, 0)
+                        null
+                    } else it
+                }
+            }
+
+            val value = assertNotNull(sample).ints[0]
+            if (hole) assertNotEquals(1L, value) else assertEquals(0L, value)
+            val assembly = assertNotNull(sink.snapshot().lp.phases["PRIMAL_LP_ASSEMBLY_ROOT"])
+            assertEquals(1L, assembly.outcomes["SOURCE_CHANGED"])
+            assertEquals(2L, assembly.outcomes["BUILT"])
+        }
+    }
+
+    @Test
+    fun `cancelled pump objective preparation should not open another numerical owner`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf<Factor>(
+            Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3, 4))
+        val factory = RecordingLpEngineFactory()
+        val sink = SolveStatsSink("cancelled-pump-objective")
+        var armed = false
+        var stopped = false
+        val token = object : Cancellation {
+            private val meter = WorkMeter { if (armed) stopped = true }
+            override fun isCancelled(): Boolean = stopped
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+            LpSolveContext(factory)).use { engine ->
+            engine.lpFeasibilityPump(objective, token) {
+                armed = true
+                null
+            }
+        }
+
+        assertNull(sample)
+        assertEquals(1, factory.calls.size)
+        val assembly = assertNotNull(sink.snapshot().lp.phases["PRIMAL_LP_ASSEMBLY_ROOT"])
+        assertEquals(1L, assembly.outcomes["CANCELLED"])
+        assertTrue(assembly.work > 0L)
+    }
+
+    @Test
     fun `the pump should change an integral rounding the consumer declines`() {
         for (coefficient in listOf(1L, -1L)) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
@@ -952,7 +1061,9 @@ class LpPrimalHeuristicsTest {
             assertNotNull(engine.lpFeasibilityPump(objective, Cancellation.Never))
         }
 
-        assertEquals(listOf(12_000L, 7_000L), limits)
+        val assembly = assertNotNull(sink.snapshot().lp.phases["PRIMAL_LP_ASSEMBLY_ROOT"]).work
+        assertTrue(assembly > 0L)
+        assertEquals(listOf(12_000L - assembly, 7_000L - assembly), limits)
     }
 
     @Test

@@ -287,6 +287,8 @@ internal fun LpRelaxation.withModel(
     reboundModel: LpModel,
     sources: CutSourceMap? = sourceMap?.withBounds(reboundModel),
     remap: LpLayoutRemap? = null,
+    objectiveConstant: Long = this.objectiveConstant,
+    preparationTemplates: LpPreparationTemplates? = null,
 ): LpRelaxation {
     require(remap == null || remap.retainedColumns.size == model.n) { "column removal requires source metadata" }
     val gates = remap?.let { gatedRows.indices.filter { index -> it.row(gatedRows[index]) >= 0 } }
@@ -322,6 +324,7 @@ internal fun LpRelaxation.withModel(
         realUpperRows = if (remap == null) realUpperRows else realUpperRows.mapNotNull { (row, variable) ->
             remap.row(row).takeIf { it >= 0 }?.let { it to variable }
         }.toMap(),
+        preparationTemplates = preparationTemplates,
     )
 }
 

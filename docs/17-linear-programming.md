@@ -56,6 +56,16 @@ its own columns; the numerical builder copies coefficients into its private rows
 Guarded rows read the current pin on every emission. Bounds, premises and numerical
 owners belong to the current build.
 Templates retain neither a basis nor a checked claim.
+Within a feasibility-pump invocation, admitted preparation can retain its completed
+root assembly for later distance objectives. Reuse requires a compact discrete
+layout without auxiliary columns or row premises, cheaper objective mapping than
+completed construction, and a combined 262,144-unit storage ceiling. The invocation
+keeps its source and propagated root fixed. Shared finite domain tables require
+contiguous input domains and retain a bounded endpoint snapshot; changed bounds
+or holes retire the assembly before another objective consumes it. Stable source
+declarations need no repeated domain scan. Each objective gets private costs and
+a fresh numerical solver; preparation, declined mapping and interrupted work spend
+the same LP allowance. Pinning and source acceptance still check each proposal.
 Exact bound columns materialize only when an import needs them. Each endpoint
 definition retains one completed normalized column; changing an open upper side
 replaces the cached column without linking prior versions. Preparation reserves

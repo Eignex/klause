@@ -1,7 +1,10 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.snapshotAssignment
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.intdomain.ContiguousDomain
 import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpNodeOverhead
 import com.eignex.klause.lp.bounding.LpRounding
 import com.eignex.klause.lp.bounding.RootRoundingWarmStart
 import com.eignex.klause.lp.engine.Basis
@@ -9,9 +12,15 @@ import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolver
+import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.newTableauCutSolver
+import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.LpPreparationTemplates
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
+import com.eignex.klause.lp.relaxation.SessionDomains
 import com.eignex.klause.lp.relaxation.floatReals
+import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
@@ -348,6 +357,9 @@ internal fun LpEngine.lpFeasibilityPump(
     val seen = HashSet<String>()
     val rng = Random(params.randomSeed ?: 0L)
     var restarts = 0
+    var preparedRoot = if (sourcePreparation == LpSourcePreparation.ADMITTED) {
+        admitPumpPreparation(solved.first, cancellation)
+    } else null
     repeat(PUMP_ROUNDS) { step ->
         if (cancellation()) return null
         val (relaxation, primal) = solved
@@ -388,7 +400,8 @@ internal fun LpEngine.lpFeasibilityPump(
             sink.lp.observePrimalPhase("PRIMAL_PUMP_ROUND", outcome, started.elapsedNow().inWholeNanoseconds)
         }
         val distance = distanceObjective(relaxation, intTarget, boolTarget) ?: return null // nothing to pump
-        solved = solveRelaxation(distance, cancellation) ?: return null
+        solved = solveRelaxation(distance, cancellation, preparedRoot) ?: return null
+        if (preparedRoot?.valid == false) preparedRoot = null
     }
     return null
 }
@@ -456,21 +469,197 @@ private fun LpEngine.perturbRounding(
 private fun LpEngine.solveRelaxation(
     obj: LinearObjective,
     cancellation: Cancellation,
+    previous: PumpPreparation? = null,
 ): Pair<LpRelaxation, DoubleArray>? {
-    val session = PropagationSession(problem, cancellation)
-    try {
-        if (session.isUnsatAtRoot) return null
-        val relaxation = primalRelaxer(obj).build(session)
-        if (relaxation.model.n == 0) return null
-        val result = try {
-            solvePrimalRelaxation(relaxation.model, cancellation, primal = true)
-                ?: solvePrimalRelaxation(relaxation.model, cancellation, primal = false)
-        } catch (_: CheckedLongOverflowException) {
+    val reused = previous?.let { preparePumpObjective(it, obj, cancellation) }
+    if (cancellation() || lpWorkAllowanceSpent()) return null
+    val relaxation = reused ?: run {
+        val started = TimeSource.Monotonic.markNow()
+        val before = totalSolveWork()
+        val session = PropagationSession(problem, cancellation)
+        var outcome = "INTERRUPTED"
+        try {
+            if (session.isUnsatAtRoot) {
+                outcome = "ROOT_INFEASIBLE"
+                return null
+            }
+            var built: LpRelaxation? = null
+            primalRelaxer(obj).prepareBuild(SessionDomains(session), cancellation, onWork = {
+                val work = it * LpNodeOverhead.BUILD
+                noteNodeOverhead(work)
+                cancellation.charge(work)
+            }, onComplete = { built = it }).forEach { }
+            outcome = "BUILT"
+            checkNotNull(built)
+        } catch (_: LpAssemblyCancelled) {
+            outcome = "CANCELLED"
             return null
-        } ?: return null
-        return relaxation to result.primal
+        } catch (_: CheckedLongOverflowException) {
+            outcome = "SCALAR_WIDTH"
+            return null
+        } finally {
+            primalPropagationWork += session.work
+            sink.lp.observePrimalPhase("PRIMAL_LP_ASSEMBLY", outcome,
+                started.elapsedNow().inWholeNanoseconds, totalSolveWork() - before)
+        }
+    }
+    if (relaxation.model.n == 0 || cancellation() || lpWorkAllowanceSpent()) return null
+    val result = try {
+        solvePrimalRelaxation(relaxation.model, cancellation, primal = true)
+            ?: solvePrimalRelaxation(relaxation.model, cancellation, primal = false)
+    } catch (_: CheckedLongOverflowException) {
+        return null
+    } ?: return null
+    return relaxation to result.primal
+}
+
+private class PumpPreparation(
+    val source: Problem,
+    val relaxation: LpRelaxation,
+    val domains: LongArray?,
+) {
+    var valid: Boolean = true
+}
+
+private fun LpEngine.admitPumpPreparation(
+    base: LpRelaxation,
+    cancellation: Cancellation,
+): PumpPreparation? {
+    val model = base.model
+    val started = TimeSource.Monotonic.markNow()
+    var outcome = "LAYOUT"
+    var work = 0L
+    try {
+        if (problem.numRealVars != 0 || model.doubleView != null || model.exactState != null ||
+            model.sense != Sense.MINIMIZE || base.circuitArcs.isNotEmpty() || base.gatedRows.isNotEmpty() ||
+            model.n != base.colVarId.size || model.n != base.colIsBool.size
+        ) return null
+        val construction = (model.n.toLong() + model.m + model.csc.rowIdx.size) * LpNodeOverhead.BUILD
+        val domains = if (problem.declaredIntDomains.stableEndpoints) 0 else problem.numIntVars
+        val admission = model.n.toLong() + model.m + 3L * domains + 1L
+        val objectiveWork = 3L * model.n + model.m + 3L * domains + 1L
+        outcome = "COST"
+        if (construction <= admission + objectiveWork) return null
+        val storage = 128L + 64L * model.n + 32L * model.m + 3L * model.csc.rowIdx.size +
+            base.intColOf.size + base.boolColOf.size + base.hullFactorIds.size + 2L * domains +
+            (base.preparationTemplates?.storageUnits ?: 0L)
+        outcome = "STORAGE"
+        if (storage > LpPreparationTemplates.MAX_UNITS) return null
+        outcome = "ALLOWANCE"
+        if (lpWorkAllowanceSpent(admission + objectiveWork) ||
+            rootPrimalWorkBudget().let { it > 0L && it <= admission + objectiveWork }
+        ) return null
+        work = admission
+        noteNodeOverhead(work)
+        cancellation.charge(work)
+        outcome = "CANCELLED"
+        if (cancellation()) return null
+        outcome = "ALLOWANCE"
+        if (lpWorkAllowanceSpent()) return null
+        outcome = "LAYOUT"
+        for (column in 0 until model.n) {
+            if (base.colVarId[column] < 0 || base.colRealId[column] >= 0 ||
+                base.colReq[column] != null || base.colPresence[column] != null
+            ) return null
+            outcome = "CANCELLED"
+            if (cancellation()) return null
+            outcome = "LAYOUT"
+        }
+        for (row in 0 until model.m) {
+            if (model.rowPremises[row] != null) return null
+            outcome = "CANCELLED"
+            if (cancellation()) return null
+            outcome = "LAYOUT"
+        }
+        val captured = if (domains == 0) null else {
+            val endpoints = LongArray(2 * domains)
+            for (variable in 0 until domains) {
+                val domain = problem.declaredIntDomains.statedOrNull(variable)
+                outcome = "DOMAIN_LAYOUT"
+                if (domain !is ContiguousDomain) return null
+                endpoints[2 * variable] = domain.min
+                endpoints[2 * variable + 1] = domain.max
+                outcome = "CANCELLED"
+                if (cancellation()) return null
+            }
+            endpoints
+        }
+        outcome = "CANCELLED"
+        if (cancellation()) return null
+        outcome = "ADMITTED"
+        return PumpPreparation(problem, base, captured)
     } finally {
-        primalPropagationWork += session.work
+        sink.lp.observePrimalPhase("PRIMAL_LP_TEMPLATE", outcome, started.elapsedNow().inWholeNanoseconds, work)
+    }
+}
+
+private fun LpEngine.preparePumpObjective(
+    prepared: PumpPreparation,
+    objective: LinearObjective,
+    cancellation: Cancellation,
+): LpRelaxation? {
+    val base = prepared.relaxation
+    val model = base.model
+    val work = 3L * model.n + model.m + 3L * (prepared.domains?.size?.div(2) ?: 0) + 1L
+    if (objective.constant != 0L || lpWorkAllowanceSpent(work) ||
+        rootPrimalWorkBudget().let { it > 0L && it <= work } || cancellation()
+    ) return null
+    val started = TimeSource.Monotonic.markNow()
+    var outcome = "ALLOWANCE"
+    try {
+        noteNodeOverhead(work)
+        cancellation.charge(work)
+        if (cancellation()) {
+            outcome = "CANCELLED"
+            return null
+        }
+        if (lpWorkAllowanceSpent()) return null
+        if (!prepared.valid || prepared.source !== problem) {
+            outcome = "SOURCE_CHANGED"
+            prepared.valid = false
+            return null
+        }
+        prepared.domains?.let { domains ->
+            for (variable in 0 until domains.size / 2) {
+                val domain = problem.declaredIntDomains.statedOrNull(variable)
+                if (domain !is ContiguousDomain || domain.min != domains[2 * variable] ||
+                    domain.max != domains[2 * variable + 1]
+                ) {
+                    outcome = "SOURCE_CHANGED"
+                    prepared.valid = false
+                    return null
+                }
+                if (cancellation()) {
+                    outcome = "CANCELLED"
+                    return null
+                }
+            }
+        }
+        val columns = IntArray(model.n) { it }
+        val coefficients = LongArray(model.n) { column ->
+            val variable = base.colVarId[column]
+            when {
+                base.colIsBool[column] && base.boolColOf[variable] == column ->
+                    objective.boolWeightValues.getOrElse(variable) { 0L }
+                !base.colIsBool[column] && base.intColOf[variable] == column ->
+                    objective.intCoefficientValues.getOrElse(variable) { 0L }
+                else -> 0L
+            }
+        }
+        val rebound = model.withRowObjective(columns, coefficients)
+        if (cancellation()) {
+            outcome = "CANCELLED"
+            return null
+        }
+        if (lpWorkAllowanceSpent()) return null
+        outcome = "REUSED"
+        return base.withModel(rebound, sources = base.sourceMap, objectiveConstant = 0L,
+            preparationTemplates = base.preparationTemplates)
+    } catch (_: CheckedLongOverflowException) {
+        outcome = "SCALAR_WIDTH"
+        return null
+    } finally {
+        sink.lp.observePrimalPhase("PRIMAL_LP_ASSEMBLY", outcome, started.elapsedNow().inWholeNanoseconds, work)
     }
 }
 
