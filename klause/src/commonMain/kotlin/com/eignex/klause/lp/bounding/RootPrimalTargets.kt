@@ -24,6 +24,18 @@ internal class RootComponentValues(variables: Int) {
     val retainedBytes: Long get() = rootComponentValueBytes(values.size)
 }
 
+internal class RootComponentRounding(val order: RootComponentOrder) {
+    var group: Int = 0
+    var level: Int = 0
+    var rounding: LpRounding = LpRounding.NEAREST
+
+    fun reset() {
+        group = 0
+        level = 0
+        rounding = LpRounding.NEAREST
+    }
+}
+
 internal class RootComponentOrder(val offsets: IntArray, val members: IntArray, val groups: Int) {
     var offered: Boolean = false
     val retainedBytes: Long get() = 128L + (offsets.size.toLong() + members.size) * Int.SIZE_BYTES

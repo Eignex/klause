@@ -121,6 +121,7 @@ internal class RootRoundingWarmStart(
     var pinning: PropagationSession? = null
     var rounding: LpRounding = LpRounding.NEAREST
     var roundingComplete: Boolean = false
+    var componentRounding: RootComponentRounding? = null
 }
 
 internal enum class LpRounding { NEAREST, UP, DOWN }
@@ -366,8 +367,30 @@ internal class LpEngine(
                 (if (it.knownColumns === rounding?.knownColumns) 0L else it.knownColumns?.size?.toLong() ?: 0L) +
                 (it.components?.retainedBytes ?: 0L)
         } ?: 0L
-        return roundingBytes + maskBytes + targetBytes + (rootComponentValues?.retainedBytes ?: 0L) +
+        val componentRoundingBytes = rounding?.componentRounding?.let {
+            128L + if (it.order === targets?.components) 0L else it.order.retainedBytes
+        } ?: 0L
+        return roundingBytes + maskBytes + targetBytes + componentRoundingBytes +
+            (rootComponentValues?.retainedBytes ?: 0L) +
             additionalBytes <= ROOT_PRIMAL_GUIDANCE_BYTES
+    }
+
+    internal fun prepareRootComponentRounding(
+        targets: RootPrimalTargets,
+        order: RootComponentOrder,
+        cancellation: Cancellation,
+    ): RootComponentRounding? {
+        val guide = rootRoundingWarmStart ?: return null
+        guide.componentRounding?.let { return it }
+        if (targets.coordinates !== guide.primal || targets.components !== order ||
+            !rootComponentPreparationAllowed(targets, 128L, 8L) ||
+            rootComponentPreparationWork(targets, 128L) < 8L || cancellation()
+        ) return null
+        noteNodeOverhead(8L)
+        val pending = RootComponentRounding(order)
+        if (cancellation()) return null
+        guide.componentRounding = pending
+        return pending
     }
 
     internal fun rootComponentPreparationAllowed(targets: RootPrimalTargets, bytes: Long, minimumWork: Long): Boolean =

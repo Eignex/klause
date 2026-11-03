@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.LpRounding
 import com.eignex.klause.lp.bounding.RootRoundingWarmStart
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.engine.Basis
@@ -34,6 +35,7 @@ import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
@@ -45,6 +47,159 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
+
+    @Test
+    fun `component rounding waits for funded progress without another numerical owner`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+        ))
+        val objective = LinearObjective(intCoefficients = LongArray(4))
+        val session = PropagationSession(problem)
+        val relaxation = CpToLpRelaxation(problem, objective).build(session)
+        val guide = RootRoundingWarmStart(objective, relaxation,
+            primal = DoubleArray(relaxation.model.n) { 1.0 }, sourceProblem = problem, auxiliaryPoint = true)
+        val factory = RecordingLpEngineFactory()
+        var offered = 1_000_000L
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),
+            SolveStatsSink("funded-component-rounding"), LpSolveContext(factory),
+            nodeWorkAllowance = { offered }).use { engine ->
+            engine.rootRoundingWarmStart = guide
+            assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+            val order = assertNotNull(engine.prepareRootComponentOrder(session, Cancellation.Never))
+            val targets = assertNotNull(engine.rootPrimalTargets)
+            offered = 0L
+            assertNull(engine.prepareRootComponentRounding(targets, order, Cancellation.Never))
+            offered = 1_000_000L
+
+            assertNotNull(engine.prepareRootComponentRounding(targets, order, Cancellation.Never))
+            val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+
+            assertEquals(List(4) { 1L }, sample.ints.toList())
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
+
+    @Test
+    fun `independent components combine different rounding directions without another lp query`() {
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it == 4) 2 else 1) },
+            (0 until 2).flatMap { group ->
+                (0 until 8).map { mask ->
+                    val coefficients = IntArray(4) { v ->
+                        if (v == 0) { if (group == 0) 1 else -1 }
+                        else if (mask and (1 shl (v - 1)) == 0) 1 else -1
+                    }
+                    Linear(coefficients, IntArray(4) { 4 * group + it }, LinearOp.GE,
+                        (if (group == 0) 1 else -1) - coefficients.drop(1).count { it < 0 })
+                }
+            })
+        val objective = LinearObjective(intCoefficients = LongArray(8))
+        val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+        val primal = DoubleArray(relaxation.model.n)
+        for (v in 0 until 8) primal[relaxation.intColOf[v]] =
+            when (v) { 0 -> 0.25; 4 -> 1.75; in 1..3 -> 0.4; else -> 0.6 }
+        val factory = RecordingLpEngineFactory()
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),
+            SolveStatsSink("independent-rounding"), LpSolveContext(factory)).use { engine ->
+            engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, primal = primal,
+                sourceProblem = problem, auxiliaryPoint = true)
+
+            val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+
+            assertEquals(listOf(1L, 1L, 1L, 1L, 1L, 0L, 0L, 0L), sample.ints.toList())
+            val verifier = ComposedSampleVerifier(problem, objective, Cancellation.Never)
+            assertIs<Verification.Accepted<Sample, Double>>(verifier.verify(Candidate(sample, objective.evaluate(sample))))
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
+
+    @Test
+    fun `interrupted component rounding retains completed earlier pins under a fresh token`() {
+        for (withinDirection in listOf(false, true)) {
+            val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it == 4) 2 else 1) },
+                (0 until 2).flatMap { group ->
+                    (0 until 8).map { mask ->
+                        val coefficients = IntArray(4) { v ->
+                            if (v == 0) { if (group == 0) 1 else -1 }
+                            else if (mask and (1 shl (v - 1)) == 0) 1 else -1
+                        }
+                        Linear(coefficients, IntArray(4) { 4 * group + it }, LinearOp.GE,
+                            (if (group == 0) 1 else -1) - coefficients.drop(1).count { it < 0 })
+                    }
+                })
+            val objective = LinearObjective(intCoefficients = LongArray(8))
+            val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+            val primal = DoubleArray(relaxation.model.n)
+            for (v in 0 until 8) primal[relaxation.intColOf[v]] =
+                when (v) { 0 -> 0.25; 4 -> 1.75; in 1..3 -> 0.4; else -> 0.6 }
+            val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal,
+                sourceProblem = problem, auxiliaryPoint = true)
+            val factory = RecordingLpEngineFactory()
+            var expired = false
+            val slice = Cancellation {
+                val pending = guidance.componentRounding
+                val level = guidance.pinning?.decisionLevel ?: 0
+                if (pending?.group == 1 && level >= (if (withinDirection) 6 else 4) &&
+                    (!withinDirection || pending.rounding == LpRounding.DOWN)
+                ) expired = true
+                expired
+            }
+            LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),
+                SolveStatsSink("resumed-component-rounding"), LpSolveContext(factory)).use { engine ->
+                engine.rootRoundingWarmStart = guidance
+                assertNull(engine.lpRoundingProbe(objective, slice))
+                val prefix = assertNotNull(guidance.pinning)
+                assertTrue(expired)
+                assertEquals(IntDomain(1, 1), prefix.intDomain(0))
+                val paid = engine.primalPropagationWork
+
+                val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+
+                assertEquals(listOf(1L, 1L, 1L, 1L, 1L, 0L, 0L, 0L), sample.ints.toList())
+                assertEquals(prefix.work, engine.primalPropagationWork)
+                assertTrue(engine.primalPropagationWork > paid)
+                assertTrue(factory.calls.isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun `declined later rounding components retain earlier values for complete search`() {
+        val factors = (0 until 8).map { mask ->
+            val coefficients = IntArray(4) { v ->
+                if (v == 0 || mask and (1 shl (v - 1)) == 0) 1 else -1
+            }
+            Linear(coefficients, IntArray(4) { it }, LinearOp.GE, 1 - coefficients.count { it < 0 })
+        } + (0 until 16).map { mask ->
+            val coefficients = IntArray(4) { v -> if (mask and (1 shl v) == 0) 1 else -1 }
+            Linear(coefficients, IntArray(4) { 4 + it }, LinearOp.GE, 1 - coefficients.count { it < 0 })
+        }
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, 1) }, factors)
+        val objective = LinearObjective(intCoefficients = LongArray(8))
+        val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+        val primal = DoubleArray(relaxation.model.n)
+        for (v in 0 until 8) primal[relaxation.intColOf[v]] = when (v) { 0 -> 0.25; in 1..3 -> 0.4; else -> 0.5 }
+        val factory = RecordingLpEngineFactory()
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),
+            SolveStatsSink("declined-component-rounding"), LpSolveContext(factory)).use { engine ->
+            engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, primal = primal,
+                sourceProblem = problem, auxiliaryPoint = true)
+
+            assertNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            engine.restartRootPrimalTargets()
+            val values = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
+
+            assertEquals(listOf(1L, 0L), values)
+            assertTrue(factory.calls.isEmpty())
+            engine.clearRootPrimalTargets()
+            assertEquals(listOf(0L, 1L), engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList())
+        }
+    }
+
     @Test
     fun `ordinary integer rounding keeps nearest targets without a retained root plan`() {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) },
