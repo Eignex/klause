@@ -514,7 +514,7 @@ class ResumableMinimizeTest {
                 }
             })
         BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
-            assertIs<MinimizeResult.Unknown>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {
+            assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {
                 offered += it.sample
             })
 
