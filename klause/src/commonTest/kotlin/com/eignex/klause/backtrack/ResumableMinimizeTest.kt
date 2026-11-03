@@ -215,7 +215,7 @@ class ResumableMinimizeTest {
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
                     refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
-                val unfinished = model.cost.any { it < 0L }
+                val unfinished = (0 until model.numVars).any { model.costD(it) < 0.0 }
                 return object : PersistentLpSolver by delegate {
                     private var charged = 0L
                     override val lastMetrics: LpSolveMetrics get() =
