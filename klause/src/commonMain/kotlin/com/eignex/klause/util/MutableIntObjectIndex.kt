@@ -6,13 +6,13 @@ internal class MutableIntObjectIndex<V : Any> {
         val value: V
     }
 
-    private sealed class Node<V : Any>(var parent: Branch<V>? = null)
-    private class Leaf<V : Any>(
+    internal sealed class Node<V : Any>(var parent: Branch<V>? = null)
+    internal class Leaf<V : Any>(
         override val key: Int,
         override var value: V,
         val owner: MutableIntObjectIndex<V>,
     ) : Node<V>(), Slot<V>
-    private class Branch<V : Any>(
+    internal class Branch<V : Any>(
         val mask: Int,
         val prefix: Int,
         var zero: Node<V>,
@@ -32,7 +32,7 @@ internal class MutableIntObjectIndex<V : Any> {
         return closest(key)?.takeIf { it.key == key }?.value
     }
 
-    inline fun lookup(key: Int, visit: (Long) -> Unit): V? {
+    internal inline fun lookup(key: Int, visit: (Long) -> Unit): V? {
         lastWork = 0L
         return lookupValue(key, visit)
     }
