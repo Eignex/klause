@@ -598,7 +598,10 @@ the existing source-reference allowance without materializing a wider numeric ro
 Original numeric views keep their 16/32-term input limits. The implication uses a
 separate per-analysis source key, and its selected sources, produced children,
 admission and first consumption retain a primitive current-derivation origin through
-retirement, independently of retained-parent counts. Conflict, duplicate and ordinary
+retirement, independently of retained-parent counts. A separate lifecycle group counts
+only implication children with no retained parent, using the same final row origin
+and retained-source count at production, admission and first consumption.
+Conflict, duplicate and ordinary
 native/shared assertion checks still govern the child.
 
 After selecting an owned source, an unconditional derivation may use the same

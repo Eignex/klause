@@ -62,6 +62,10 @@ class IntegerBoundImplicationSourceTest {
         assertEquals(1L, snapshot["learningIntegerBoundImplicationProduced"])
         assertEquals(1L, snapshot["learningIntegerBoundImplicationAdmitted"])
         assertEquals(1L, snapshot["learningIntegerBoundImplicationConsumed"])
+        assertEquals(2L, snapshot["learningIntegerOriginalImplicationSources"])
+        assertEquals(1L, snapshot["learningIntegerOriginalImplicationProduced"])
+        assertEquals(1L, snapshot["learningIntegerOriginalImplicationAdmitted"])
+        assertEquals(1L, snapshot["learningIntegerOriginalImplicationConsumed"])
         native.releaseRetainedState()
         assertEquals(snapshot, native.learnedLifecycle())
     }
@@ -159,6 +163,10 @@ class IntegerBoundImplicationSourceTest {
             assertEquals(1L, snapshot["learningIntegerBoundImplicationProduced"])
             assertEquals(1L, snapshot["learningIntegerBoundImplicationAdmitted"])
             assertEquals(1L, snapshot["learningIntegerBoundImplicationConsumed"])
+            assertEquals(0L, snapshot["learningIntegerOriginalImplicationSources"])
+            assertEquals(0L, snapshot["learningIntegerOriginalImplicationProduced"])
+            assertEquals(0L, snapshot["learningIntegerOriginalImplicationAdmitted"])
+            assertEquals(0L, snapshot["learningIntegerOriginalImplicationConsumed"])
             native.releaseRetainedState()
             assertEquals(snapshot, native.learnedLifecycle())
         }

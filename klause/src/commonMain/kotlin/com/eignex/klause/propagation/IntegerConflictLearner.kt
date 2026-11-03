@@ -134,6 +134,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             if (event.boundImplication) {
                 boundImplication = true
                 state.integerBoundImplicationSources++
+                if (retainedSources == 0) state.integerOriginalImplicationSources++
             }
             val combined = event.combination ?: combine(row, event.row, event.variable,
                 allowWideSources, allowCompactGrowth = retainedSources > 0)
@@ -196,7 +197,10 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 if (slackOriginalSource) state.integerSlackOriginalProduced++
                 if (duplicateContinuation) state.integerDuplicateContinuationProduced++
             }
-            if (boundImplication) state.integerBoundImplicationProduced++
+            if (boundImplication) {
+                state.integerBoundImplicationProduced++
+                if (retainedSources == 0) state.integerOriginalImplicationProduced++
+            }
             if (compact.declaredBoundTerms > 0) state.integerDeclaredBoundProduced++
             if (compact.declaredBoundModes != 0) state.integerDeclaredBoundExtendedProduced++
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(

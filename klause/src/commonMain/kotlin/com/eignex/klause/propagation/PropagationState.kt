@@ -394,6 +394,10 @@ class PropagationState private constructor(
     internal var integerBoundImplicationProduced = 0L
     internal var integerBoundImplicationAdmitted = 0L
     internal var integerBoundImplicationConsumed = 0L
+    internal var integerOriginalImplicationSources = 0L
+    internal var integerOriginalImplicationProduced = 0L
+    internal var integerOriginalImplicationAdmitted = 0L
+    internal var integerOriginalImplicationConsumed = 0L
     internal var integerDeclaredBoundTerms = 0L
     internal var integerDeclaredBoundProduced = 0L
     internal var integerDeclaredBoundAdmitted = 0L
