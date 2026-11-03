@@ -108,7 +108,10 @@ internal class PrivateRebuildGeneration private constructor(
             // including admission, the BVE database, source copies, reconstruction and a fresh worker.
             // Object headers, the retained canonical worker and allocator overhead are separate.
             val binaryBytes = if (learnedBinary == null) 0L else PrivateRebuildBinaryLearning.SCRATCH_BYTES
-            val bytes = modelEntries * 512L + binaryBytes + (parity?.modeledBytes ?: 0L)
+            val selectorBytes = if (rowView && source.numBoolVars * 2L <= PROPAGATION_WORK_PER_NODE) {
+                PrivateRebuildFreeSelector.modeledBytes(source.numBoolVars)
+            } else 0L
+            val bytes = modelEntries * 512L + binaryBytes + (parity?.modeledBytes ?: 0L) + selectorBytes
             if (bytes > byteLimit) {
                 onDecline("Memory")
                 return null

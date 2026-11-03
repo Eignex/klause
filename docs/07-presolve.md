@@ -358,9 +358,14 @@ The mixed view preserves original coordinate meanings, including its live pivots
 and can retain supported canonical warm clauses through the fixed-value projection.
 Its reduced rows and covered clauses are counted separately from eliminated columns.
 For source spans fitting two scans inside the normalized per-decision charge, the
-private consumer branches on free coordinates in source order before its pivots.
-Pivots retain their original meanings and propagation still decides their values.
-Larger spans retain the configured selector.
+private consumer prefers free coordinates with its own VSIDS conflict activity.
+A filtered branching view preserves source IDs and passes conflict and unassign
+notifications to that private heuristic. When no free coordinate needs a decision,
+source-order fallback retains every remaining pivot decision. Pivots retain their
+original meanings and propagation still decides their values. The membership mask
+and activity heap spend the modeled byte grant; their initialization spends opening
+work before allocation. Fresh consumers own fresh activity. Larger spans retain
+the configured selector.
 
 A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker

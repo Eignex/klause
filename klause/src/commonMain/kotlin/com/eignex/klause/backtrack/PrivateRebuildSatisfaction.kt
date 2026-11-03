@@ -337,8 +337,15 @@ internal class PrivateRebuildSatisfaction(
         note("ReusedSourceClauses", prepared.reusedSourceClauses.toLong())
         note("BveIndexedFactors", prepared.indexedFactors.toLong())
         note("BveSourceFactors", prepared.sourceFactors.toLong())
-        charge(prepared.bakeWork.constructionEntries)
-        note("OpeningConstructionWork", prepared.bakeWork.constructionEntries)
+        val selectorWork = if (prepared.preferredFreeColumns.isEmpty()) 0L else {
+            PrivateRebuildFreeSelector.initializationWork(
+                prepared.problem.numBoolVars, prepared.preferredFreeColumns.size,
+            )
+        }
+        val openingWork = prepared.bakeWork.constructionEntries + selectorWork
+        charge(openingWork)
+        note("OpeningConstructionWork", openingWork)
+        note("FreeSelectorInitializationWork", selectorWork)
         if (token()) {
             generation = null
             root = null
