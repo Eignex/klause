@@ -62,7 +62,16 @@ jobs:
 
       # Lint runs separately. Native tests have their own job because Kover instruments JVM tests.
       - name: Run JVM tests with coverage
-        run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist :klause:stageLpProfileJvm
+        run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist :klause-bench:installDist
+
+      - name: Upload JVM distributions
+        uses: actions/upload-artifact@v7
+        with:
+          name: jvm-distributions
+          path: |
+            klause-cli/build/install/klause-cli-jvm/
+            klause-bench/build/install/klause-bench/
+          if-no-files-found: error
 
       - name: Start the installed JVM CLI
         run: klause-cli/build/install/klause-cli-jvm/bin/klause-cli --version
@@ -122,7 +131,7 @@ jobs:
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-konan-
 
       - name: Run Linux native tests
-        run: ./gradlew --refresh-dependencies :klause:linuxX64Test :klause-cli:linkReleaseExecutableLinuxX64 :klause:linkLpProfileReleaseExecutableLinuxX64
+        run: ./gradlew --refresh-dependencies :klause:linuxX64Test :klause-cli:linkReleaseExecutableLinuxX64
 
       - name: Start the Linux native CLI
         run: klause-cli/build/bin/linuxX64/releaseExecutable/klause-cli.kexe --version
