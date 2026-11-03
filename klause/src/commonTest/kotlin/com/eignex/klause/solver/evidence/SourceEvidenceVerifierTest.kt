@@ -25,6 +25,32 @@ class SourceEvidenceVerifierTest {
     private val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE))
 
     @Test
+    fun `context should reject an undeclared inequality coordinate`() {
+        for (kind in SourceCoordinate.Kind.entries) {
+            val undeclared = SourceCoordinate(kind, 1)
+            val row = SourceInequality(mapOf(x to BigFraction.ONE, undeclared to BigFraction.ONE),
+                BigFraction.ONE)
+
+            assertFailsWith<IllegalArgumentException> {
+                SourceProofContext(scope, setOf(x), mapOf("row" to SourcePremise(row)))
+            }
+        }
+    }
+
+    @Test
+    fun `context should ignore zero coefficients outside declared coordinates`() {
+        val undeclared = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val row = SourceInequality(mapOf(x to BigFraction.ONE, undeclared to BigFraction.ZERO),
+            BigFraction.ONE)
+        val source = SourceProofContext(scope, setOf(x), mapOf("row" to SourcePremise(row)))
+
+        val checked = SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(row), SourceDerivation.Premise("row")))
+
+        assertEquals(SourceEvidenceCheck.Checked, checked)
+    }
+
+    @Test
     fun `batched consequences should share one proof allowance`() {
         val evidence = SourceEvidence(scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower"))
 

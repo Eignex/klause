@@ -88,7 +88,7 @@ class SourceProofContext(
         require(capturedPremises.keys.none { it.isBlank() })
         require(capturedObjective.orEmpty().keys.all { it in capturedCoordinates })
         require(capturedPremises.values.all { premise ->
-            premise.inequality.coefficients.keys.all { it in capturedCoordinates } &&
+            premise.inequality.hasOnlyCoordinates(capturedCoordinates) &&
                 premise.guards.keys.all {
                     SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in capturedCoordinates
                 } &&
