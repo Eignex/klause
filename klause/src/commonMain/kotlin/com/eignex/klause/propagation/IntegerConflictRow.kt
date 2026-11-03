@@ -23,6 +23,7 @@ internal class IntegerConflictRow private constructor(
     val declaredBoundModes: Int = 0,
     val hasSlackOriginalSource: Boolean = false,
     val hasDuplicateContinuation: Boolean = false,
+    val hasBoundImplication: Boolean = false,
 ) : IntegerLearningInequality {
     override fun coefficient(variable: Int): Long {
         val index = variables.indexOf(variable)
@@ -32,7 +33,7 @@ internal class IntegerConflictRow private constructor(
     fun derivedThroughTransient(steps: Int): IntegerConflictRow = if (steps == 0) this else
         IntegerConflictRow(variables, coefficients, bound, guard, steps, retainedSources, hasNonOwnerSource,
             hasNonOwnerOriginalSource, declaredBoundTerms, declaredBoundModes, hasSlackOriginalSource,
-            hasDuplicateContinuation)
+            hasDuplicateContinuation, hasBoundImplication)
 
     fun derivedFromRetainedSources(
         sources: Int,
@@ -40,20 +41,21 @@ internal class IntegerConflictRow private constructor(
         nonOwnerOriginalSource: Boolean = false,
         slackOriginalSource: Boolean = false,
         duplicateContinuation: Boolean = false,
+        boundImplication: Boolean = false,
     ): IntegerConflictRow = if (sources == 0 && !nonOwnerSource && !nonOwnerOriginalSource &&
-        !slackOriginalSource && !duplicateContinuation) {
+        !slackOriginalSource && !duplicateContinuation && !boundImplication) {
         this
     } else {
         IntegerConflictRow(variables, coefficients, bound, guard, transientSteps, sources,
             hasNonOwnerSource || nonOwnerSource, hasNonOwnerOriginalSource || nonOwnerOriginalSource,
             declaredBoundTerms, declaredBoundModes, hasSlackOriginalSource || slackOriginalSource,
-            hasDuplicateContinuation || duplicateContinuation)
+            hasDuplicateContinuation || duplicateContinuation, hasBoundImplication || boundImplication)
     }
 
     fun derivedFromDeclaredBounds(terms: Int, modes: Int = 0): IntegerConflictRow = if (terms == 0) this else
         IntegerConflictRow(variables, coefficients, bound, guard, transientSteps, retainedSources,
             hasNonOwnerSource, hasNonOwnerOriginalSource, terms, declaredBoundModes or modes, hasSlackOriginalSource,
-            hasDuplicateContinuation)
+            hasDuplicateContinuation, hasBoundImplication)
 
     fun subsumes(other: IntegerConflictRow): Boolean =
         (guard == Lit.NONE || guard == other.guard) && bound <= other.bound &&

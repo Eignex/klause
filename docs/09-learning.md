@@ -578,6 +578,26 @@ spend the same 4,096 source visits. The selected combination is reused within th
 analysis. A primitive origin flag and separate source, production, admission and
 first-consumption counters identify children from this pass without parent references.
 The ordinary native and mapped shared assertion targets retain their authority.
+A complete historical binary bound implication can supply a final parent after
+these choices fail following an owned source. Its source is a mandatory original
+word-linear constraint with a matching projection and unextended current endpoint
+marker. Both ordinary and exact word-linear forms require every source coordinate
+to have immutable declared bounds 0..1; guards, real coordinates and unsupported
+constants withhold the source. Checked activity over the complete directional
+historical bounds must reconstruct a raw unit request, with its historical member
+and current endpoint intact. The marker's slack is not a requested bound.
+Every historical endpoint stronger than its declared bound becomes an explicit
+condition, including root-level facts. The disjunction of its unit conclusion
+and every negated condition is an exact binary clause and therefore an integer
+inequality. At most 16 literals, including the conclusion, enter this representation;
+an overwide condition set withholds every subset. Source terms are streamed under
+the existing source-reference allowance without materializing a wider numeric row.
+Original numeric views keep their 16/32-term input limits. The implication uses a
+separate per-analysis source key, and its selected sources, produced children,
+admission and first consumption retain a primitive current-derivation origin through
+retirement. Conflict, duplicate and ordinary native/shared assertion checks still
+govern the child.
+
 After selecting an owned source, an unconditional derivation may use the same
 32-term temporary rows even when its original seed is compact. Original historical
 sources keep that compact seed's 16-term input limit; source-reference visits,

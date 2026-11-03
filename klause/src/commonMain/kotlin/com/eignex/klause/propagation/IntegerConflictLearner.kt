@@ -106,6 +106,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         var nonOwnerOriginalSource = false
         var slackOriginalSource = false
         var duplicateContinuation = false
+        var boundImplication = false
         repeat(INTEGER_LEARNING_STEPS) {
             if (combinations == INTEGER_LEARNING_STEPS) return decline("combination-limit")
             state.checkFiniteWork()
@@ -129,6 +130,10 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             if (event.slackOriginalSource) {
                 slackOriginalSource = true
                 state.integerSlackOriginalSources++
+            }
+            if (event.boundImplication) {
+                boundImplication = true
+                state.integerBoundImplicationSources++
             }
             val combined = event.combination ?: combine(row, event.row, event.variable,
                 allowWideSources, allowCompactGrowth = retainedSources > 0)
@@ -190,13 +195,14 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 if (nonOwnerOriginalSource) state.integerNonOwnerOriginalProduced++
                 if (slackOriginalSource) state.integerSlackOriginalProduced++
                 if (duplicateContinuation) state.integerDuplicateContinuationProduced++
+                if (boundImplication) state.integerBoundImplicationProduced++
             }
             if (compact.declaredBoundTerms > 0) state.integerDeclaredBoundProduced++
             if (compact.declaredBoundModes != 0) state.integerDeclaredBoundExtendedProduced++
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
                 compact.derivedThroughTransient(transientSteps)
                     .derivedFromRetainedSources(retainedSources, nonOwnerSource, nonOwnerOriginalSource,
-                        slackOriginalSource, duplicateContinuation),
+                        slackOriginalSource, duplicateContinuation, boundImplication),
                 target, levels.size, levels, fallback)
         }
         return decline("step-limit-without-assertion")
@@ -324,11 +330,56 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 return it
             }
         }
-        val scanned = scannedReason(row, used, target, allowWideSources)
-        if (scanned == null && selectedRetainedSource && combinations < INTEGER_LEARNING_STEPS) {
+        scannedReason(row, used, target, allowWideSources)?.let { return it }
+        if (selectedRetainedSource && combinations < INTEGER_LEARNING_STEPS) {
+            boundImplicationReason(row, used, target)?.let { return it }
             observeEagerReasons(row, target)
         }
-        return scanned
+        return null
+    }
+
+    private fun boundImplicationReason(
+        row: IntegerLearningInequality,
+        used: Set<PivotKey>,
+        target: Int,
+    ): BoundEvent? {
+        var candidates: IntArray? = null
+        var count = 0
+        for (index in row.variables.indices) {
+            sourceWork.visit()
+            if (endpointLevel(row, index) <= target) continue
+            val variable = row.variables[index]
+            val lower = row.coefficients[index] > 0L
+            val marker = endpointMarker(row, index) ?: continue
+            if (!isLazyReason(marker) || marker.size != LAZY_PAYLOAD + 6) continue
+            val key = PivotKey(variable, marker[2], lower, retained = false, implication = true)
+            if (key in used) continue
+            val indices = candidates ?: IntArray(row.variables.size).also { candidates = it }
+            var position = count
+            while (position > 0) {
+                sourceWork.visit()
+                val previous = checkNotNull(endpointMarker(row, indices[position - 1]))
+                if (previous[2] >= marker[2]) break
+                indices[position] = indices[position - 1]
+                position--
+            }
+            indices[position] = index
+            count++
+        }
+        val indices = candidates ?: return null
+        val source = IntegerBoundImplicationSource(state, sourceWork)
+        for (position in 0 until count) {
+            sourceWork.visit()
+            val index = indices[position]
+            val variable = row.variables[index]
+            val lower = row.coefficients[index] > 0L
+            val marker = checkNotNull(endpointMarker(row, index))
+            val parent = source.source(variable, lower, marker) ?: continue
+            val key = PivotKey(variable, marker[2], lower, retained = false, implication = true)
+            state.arithmeticLearningTrace?.record("integer.retained.bound-implication.selected")
+            return BoundEvent(parent, variable, marker[2], key, boundImplication = true)
+        }
+        return null
     }
 
     private fun observeEagerReasons(row: IntegerLearningInequality, target: Int) {
@@ -650,7 +701,13 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         return BoundEvent(sourceRow, variable, marker[2], PivotKey(variable, marker[2], lower, retained = false))
     }
 
-    private data class PivotKey(val variable: Int, val source: Int, val lower: Boolean, val retained: Boolean)
+    private data class PivotKey(
+        val variable: Int,
+        val source: Int,
+        val lower: Boolean,
+        val retained: Boolean,
+        val implication: Boolean = false,
+    )
 
     private class BoundEvent(
         val row: IntegerLearningInequality,
@@ -660,6 +717,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val nonOwnerSource: Boolean = false,
         val nonOwnerOriginalSource: Boolean = false,
         val slackOriginalSource: Boolean = false,
+        val boundImplication: Boolean = false,
         val combination: IntegerLearningInequality? = null,
     )
 }

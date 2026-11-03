@@ -16,6 +16,17 @@ import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
     @Test
+    fun `bound implication origins should survive row view copies`() {
+        val source = requireNotNull(IntegerConflictRow.normalized(mapOf(0 to 1L, 1 to 1L), 1L, Lit.NONE))
+            .derivedFromRetainedSources(1, boundImplication = true)
+
+        val copied = source.derivedThroughTransient(2).derivedFromDeclaredBounds(1, DECLARED_BOUND_EARLY)
+            .derivedFromRetainedSources(2)
+
+        assertTrue(copied.hasBoundImplication)
+    }
+
+    @Test
     fun `a historical conflict should not qualify as an assertion`() {
         val row = requireNotNull(IntegerConflictRow.normalized(mapOf(0 to 1L), 0L, Lit.NONE))
         val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(1, 2)), emptyArray()), Assumptions.None)

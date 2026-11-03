@@ -390,6 +390,10 @@ class PropagationState private constructor(
     internal var integerDuplicateContinuationProduced = 0L
     internal var integerDuplicateContinuationAdmitted = 0L
     internal var integerDuplicateContinuationConsumed = 0L
+    internal var integerBoundImplicationSources = 0L
+    internal var integerBoundImplicationProduced = 0L
+    internal var integerBoundImplicationAdmitted = 0L
+    internal var integerBoundImplicationConsumed = 0L
     internal var integerDeclaredBoundTerms = 0L
     internal var integerDeclaredBoundProduced = 0L
     internal var integerDeclaredBoundAdmitted = 0L
