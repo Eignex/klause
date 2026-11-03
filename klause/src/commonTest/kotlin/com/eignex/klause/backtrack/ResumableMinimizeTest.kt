@@ -192,55 +192,257 @@ internal object FiniteCutoffKnapsackFixture {
 }
 
 class ResumableMinimizeTest {
-    @Test
-    fun `restarted component traversal obtains fresh root preferences before its first point`() {
-        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(2, 4), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(0, 4), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(3, 5), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 5), LinearOp.GE, 1),
-        )).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(2, 2, 2, 2, 3, 3))
-        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
-            phaseSaving = false, targetPhasing = false, solutionPhasing = false, lubyRestartBase = 1,
-            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true, rootCutHarvest = false))
-        BacktrackSolver(problem).resumable(objective, params).use { search ->
-            var firstRefreshes: Long? = null
 
-            search.runSlice(Cancellation { firstRefreshes != null }, Long.MAX_VALUE, -1L) {
-                if (firstRefreshes == null) {
-                    firstRefreshes = search.stats.lp.phases["PRIMAL_RESTART_GUIDANCE_ROOT"]
-                        ?.outcomes?.get("RETAINED") ?: 0L
+    @Test
+    fun `component repair revisits earlier pins before passing root coordinates to search`() {
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it % 4 == 0) 2 else 1) },
+            (0 until 2).flatMap { group ->
+                listOf(1 to 2, 2 to 3, 3 to 1).flatMap { (a, b) ->
+                    val variables = intArrayOf(4 * group, 4 * group + a, 4 * group + b)
+                    listOf(Linear(intArrayOf(1, 1, 1), variables, LinearOp.GE, 2),
+                        Linear(intArrayOf(1, -1, -1), variables, LinearOp.GE, 0))
+                }
+            }).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(8) { if (it % 4 == 0) 1L else 0L })
+        val factory = RecordingLpEngineFactory()
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false, boundMaxDepth = -1))
+        val offered = ArrayList<Sample>()
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+            search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, 100_000L) { offered += it.sample }
+
+            val sample = offered.single()
+            assertEquals(2L, sample.ints[0])
+            assertEquals(2L, sample.ints[4])
+            assertTrue(sample.ints.indices.all { sample.ints[it] in 0L..(if (it % 4 == 0) 2L else 1L) })
+            assertTrue(problem.factors.all { factor ->
+                val linear = factor as Linear
+                val row = assertNotNull(linear.integerConstants)
+                assertEquals(LinearOp.LE, linear.op)
+                linear.vars.indices.sumOf { row.coeff(it) * sample.ints[linear.vars[it]] } <= row.bound
+            })
+            assertEquals(2, factory.floatAllowances.size)
+            assertEquals(0.0, search.stats.lp.nodePasses.sum)
+            assertEquals(2L, search.stats.lp.phases["PRIMAL_COMPONENT_REPAIR_ROOT"]
+                ?.outcomes?.get("COMPLETED"))
+        }
+    }
+
+    @Test
+    fun `returned fractional child targets round before their coordinates pass to search`() {
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it == 4) 2 else 1) },
+            (0 until 2).flatMap { group ->
+                (0 until 8).map { mask ->
+                    val coefficients = IntArray(4) { v ->
+                        if (v == 0) { if (group == 0) 2 else -2 }
+                        else if (mask and (1 shl (v - 1)) == 0) 1 else -1
+                    }
+                    Linear(coefficients, IntArray(4) { 4 * group + it }, LinearOp.GE,
+                        (if (group == 0) 2 else -2) - coefficients.drop(1).count { it < 0 })
+                }
+            }).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0, -1, 0, 0, 0))
+        var queries = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                val unfinished = (0 until model.numVars).any { model.costD(it) < 0.0 }
+                return object : PersistentLpSolver by delegate {
+                    private var charged = 0L
+                    override val lastMetrics: LpSolveMetrics get() =
+                        delegate.lastMetrics.copy(workOps = delegate.lastMetrics.workOps + charged)
+
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(if (unfinished) {
+                            LpFloatAllowance(allowance?.work ?: 0L, 1)
+                        } else allowance).also {
+                            queries++
+                            if (unfinished) charged = 5_000L * LP_WORK_PER_NODE
+                        }
                 }
             }
+        }
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false, boundMaxDepth = -1))
+        val offered = ArrayList<Sample>()
+        val stopAtPoint = Cancellation { offered.isNotEmpty() }
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+            search.runSlice(stopAtPoint, Long.MAX_VALUE, 5_000L) { offered += it.sample }
+            assertTrue(offered.isEmpty())
+            assertEquals(2, queries)
 
-            assertTrue(assertNotNull(firstRefreshes) > 0L)
+            search.runSlice(stopAtPoint, Long.MAX_VALUE, 100_000L) { offered += it.sample }
+
+            val sample = offered.single()
+            assertEquals(listOf(1L, 1L, 1L, 1L), sample.ints.take(4))
+            assertTrue(sample.ints.indices.all {
+                sample.ints[it] in 0L..(if (it == 4) 2L else 1L)
+            })
+            assertTrue(problem.factors.all { factor ->
+                val linear = factor as Linear
+                val row = assertNotNull(linear.integerConstants)
+                assertEquals(LinearOp.LE, linear.op)
+                linear.vars.indices.sumOf { row.coeff(it) * sample.ints[linear.vars[it]] } <= row.bound
+            })
+            assertEquals(2, queries)
+            assertEquals(0.0, search.stats.lp.nodePasses.sum)
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_LP_GUIDANCE_ROOT"]
+                ?.outcomes?.get("PARTIAL_REUSED"))
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_COMPONENT_ROUNDING_ROOT"]
+                ?.outcomes?.get("HANDOFF_TRIAL_PREPARED"))
+            assertEquals(2L, search.stats.lp.phases["PRIMAL_COMPONENT_ROUNDING_ROOT"]
+                ?.outcomes?.get("GROUP_COMPLETED"))
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"]?.outcomes?.get("IMPROVING"))
+        }
+    }
+
+    @Test
+    fun `complete root components round before their coordinates pass to search`() {
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it == 4) 2 else 1) },
+            (0 until 2).flatMap { group ->
+                (0 until 8).map { mask ->
+                    val coefficients = IntArray(4) { v ->
+                        if (v == 0) { if (group == 0) 2 else -2 }
+                        else if (mask and (1 shl (v - 1)) == 0) 1 else -1
+                    }
+                    Linear(coefficients, IntArray(4) { 4 * group + it }, LinearOp.GE,
+                        (if (group == 0) 2 else -2) - coefficients.drop(1).count { it < 0 })
+                }
+            }).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0, -1, 0, 0, 0))
+        val factory = RecordingLpEngineFactory()
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false, boundMaxDepth = -1))
+        val offered = ArrayList<Sample>()
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+
+            search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
+
+            assertEquals(listOf(1L, 1L, 1L, 1L, 1L, 0L, 0L, 0L), offered.single().ints.toList())
+            assertEquals(2, factory.floatAllowances.size)
+            assertEquals(2L, search.stats.lp.phases["PRIMAL_COMPONENT_ROUNDING_ROOT"]
+                ?.outcomes?.get("GROUP_COMPLETED"))
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_COMPONENT_ROUNDING_ROOT"]
+                ?.outcomes?.get("HANDOFF_TRIAL_PREPARED"))
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"]?.outcomes?.get("IMPROVING"))
+        }
+    }
+
+    @Test
+    fun `restarted component traversal obtains fresh root preferences before its first point`() {
+        val factors = (0 until 8).map { mask ->
+            val coefficients = IntArray(4) { v ->
+                if (v == 0) 2 else if (mask and (1 shl (v - 1)) == 0) 1 else -1
+            }
+            Linear(coefficients, IntArray(4) { it }, LinearOp.GE, 2 - coefficients.count { it < 0 })
+        } + listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(6, 7), LinearOp.GE, 1),
+        )
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, 1) }, factors).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0, 1, 2, 1, 2))
+        var queries = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate {
+                    private var charged = 0L
+                    override val lastMetrics: LpSolveMetrics get() =
+                        delegate.lastMetrics.copy(workOps = delegate.lastMetrics.workOps + charged)
+
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(LpFloatAllowance(allowance?.work ?: 0L, 1)).also {
+                            if (++queries == 3) charged = 5_000L * LP_WORK_PER_NODE
+                        }
+                }
+            }
+        }
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+            phaseSaving = false, targetPhasing = false, solutionPhasing = false, lubyRestartBase = 1,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true, rootCutHarvest = false))
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+            var firstRefreshes: Long? = null
+            val stopAtPoint = Cancellation { firstRefreshes != null }
+            search.runSlice(stopAtPoint, Long.MAX_VALUE, 5_000L) {
+                firstRefreshes = 0L
+            }
+            assertNull(firstRefreshes)
+
+            val result = search.runSlice(stopAtPoint, Long.MAX_VALUE, 100_000L) {
+                firstRefreshes = search.stats.lp.phases["PRIMAL_RESTART_GUIDANCE_ROOT"]
+                    ?.outcomes?.get("RETAINED") ?: 0L
+            }
+
+            val diagnostic = if (firstRefreshes == null || firstRefreshes == 0L) {
+                val phases = search.stats.lp.phases.filterKeys {
+                    it.contains("RESTART") || it.contains("COMPONENT") || it.contains("GUIDANCE") ||
+                        it.contains("PRIMAL_CONTINUATION")
+                }.mapValues { it.value.outcomes }
+                "result=${result?.let { it::class.simpleName }}, queries=$queries, " +
+                    "nodes=${search.stats.search.nodes.sum}, nodeLp=${search.stats.lp.nodePasses.sum}, phases=$phases"
+            } else null
+            assertTrue(assertNotNull(firstRefreshes, diagnostic) > 0L, diagnostic)
+            assertTrue((search.stats.lp.phases["PRIMAL_RESTART_REPLAY_ROOT"]
+                ?.outcomes?.get("RETAINED") ?: 0L) > 0L)
         }
     }
 
     @Test
     fun `retained component traversal defers node lp until the first incumbent`() {
-        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+        val problem = Problem(0, 10, Array(10) { IntDomain(0, 1) }, listOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
             Linear(intArrayOf(1, 1), intArrayOf(2, 4), LinearOp.GE, 1),
             Linear(intArrayOf(1, 1), intArrayOf(0, 4), LinearOp.GE, 1),
             Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
             Linear(intArrayOf(1, 1), intArrayOf(3, 5), LinearOp.GE, 1),
             Linear(intArrayOf(1, 1), intArrayOf(1, 5), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(6, 7), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(8, 9), LinearOp.GE, 1),
         )).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(2, 2, 2, 2, 3, 3))
+        val objective = LinearObjective(intCoefficients = longArrayOf(2, 2, 2, 2, 3, 3, 0, 0, 0, 0))
+        var queries = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                return object : PersistentLpSolver by delegate {
+                    private var charged = 0L
+                    override val lastMetrics: LpSolveMetrics get() =
+                        delegate.lastMetrics.copy(workOps = delegate.lastMetrics.workOps + charged)
+
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(LpFloatAllowance(allowance?.work ?: 0L, 1)).also {
+                            if (++queries == 3) charged = 5_000L * LP_WORK_PER_NODE
+                        }
+                }
+            }
+        }
         val samples = ArrayList<Sample>()
-        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
             phaseSaving = false, targetPhasing = false, solutionPhasing = false,
             lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true, rootCutHarvest = false))
-        BacktrackSolver(problem).resumable(objective, params).use { search ->
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
             var firstPasses = Double.NaN
             var firstDeferrals = 0L
-
             val observed = Cancellation { samples.isNotEmpty() && search.stats.lp.nodePasses.sum > 0.0 }
-            search.runSlice(observed, Long.MAX_VALUE, -1L) {
+            search.runSlice(observed, Long.MAX_VALUE, 5_000L) { samples += it.sample }
+            assertTrue(samples.isEmpty())
+
+            search.runSlice(observed, Long.MAX_VALUE, 100_000L) {
                 if (samples.isEmpty()) {
                     firstPasses = search.stats.lp.nodePasses.sum
                     firstDeferrals = search.stats.lp.phases["PRIMAL_COMPONENT_ORDER_ROOT"]

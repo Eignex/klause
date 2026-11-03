@@ -351,8 +351,11 @@ private numerical owner, after rebuilding the current domain and cut view. The
 read requires matching model and exact state at depth zero, preserves child
 invalidation, charges transport and copies only currently available coordinates.
 Completed and interrupted component results share the authority check and private
-snapshot read; no numerical query runs and no earlier guide arrays remain. An
-attempt stopped before spending work can retry in a fresh consultation;
+snapshot read without a numerical query. A declined lookup can replay the same
+engine's owned coordinate buffers as soft preferences under the
+[root preparation contract](#root-preparation). Restart expires existing readers;
+explicit reset releases pending buffers. An attempt stopped before spending work
+can retry in a fresh consultation;
 a paid decline retains its charge. These choices supply no directional-history, bound or proof authority.
 Continuation observations distinguish a pending interruption from a cancelled run,
 spent root or LP work, and a call without an eligible interruption. They record the
@@ -770,6 +773,50 @@ numerical work retains the private owner for an eligible later rounding slice;
 queries with changed authority or objective use ordinary construction. Complete points and
 masked child-coordinate guides can steer rounding; every proposed assignment
 still requires source verification.
+An integer guide with known fractional coordinates can prepare a private component
+probe before its handoff to ordinary traversal. The admission scan charges visited
+columns and reads only coordinates marked known; unknown payloads supply no target.
+The private session charges its root propagation before preparing the partition.
+Guides without known fractional targets retain their direct handoff. A probe over
+independent integer components reuses its charged structural order and tries nearest, upward and
+downward preferences within each component, including after a global nearest
+attempt declines. A failed direction retracts only that component's pins; completed earlier components stay
+in the private propagation session. Interrupted attempts retain their completed
+fixpoint and current component and direction. A fresh session restarts this progress.
+After all three directions decline, a funded private repair can revisit earlier pins
+within the current component. It explores nearest and adjacent target values, or the
+domain endpoints for unknown targets, using an owned bounded frame stack. Completed
+earlier components remain pinned. Interrupted probes roll back to their last complete
+fixpoint; pending alternatives resume under the next invocation token. An eligible
+partial-owner refresh preserves an active private repair with matching source,
+objective, relaxation and target identities instead of copying a replacement guide.
+Owner invalidation and changed identities keep their ordinary retirement behavior. Frames count
+against the same guidance storage cap, and propagation and retraction spend the remaining
+cumulative root and worker work. When both candidates conflict and their reported
+levels map to the private frames, those hints can guide retreat past later choices.
+Missing or foreign levels retain chronological retreat. The
+reason scan and every skipped frame's retraction spend the same work allowance;
+interrupted retreat retains its target and charges. One private support index per
+frame shares the guidance byte cap. These level hints carry no refutation authority;
+ordinary complete search keeps its alternatives.
+Exhausting the candidate choices or allowance supplies
+no infeasibility authority. Completed earlier integer values can remain soft preferences
+for complete search. No partial assignment is a witness.
+Component progress and its retained order share the existing guidance storage cap;
+all graph, propagation and value-copy work spends the containing allowances.
+The preparation cap counts cumulative LP transport and construction overhead;
+numerical pivot work spends the containing LP and root allowances separately.
+A paid numerical query does not consume the preparation cap. Neither budget
+renews across component-guide replacement or a fresh consultation.
+
+A complete traversal restart expires existing preference readers while retaining
+one generation of the engine's owned coordinate buffers. Fresh root-owner lookup
+precedes replay; a declined lookup can expose those buffers through a fresh value
+hint handle without a numerical query. Both pending and replacement storage count
+against the same guidance cap, including their overlap during replacement. Replay
+requires the owning source root, an uncancelled token and remaining funding; it
+transfers no model, basis or certificate authority. Explicit guide retirement and
+engine closure discard the pending generation.
 
 Retained discrete root layouts prepare in private chunks before the first numerical
 consultation. Objective-column batches and factor batches charge materialized construction
