@@ -172,9 +172,11 @@ class EngineParamsTest {
         assertTrue(!base.lpMixedRootTargets)
         for (enabled in listOf(false, true)) {
             val settings = listOf("lp-mixed-root-targets=$enabled")
-            val workerEdit = assertNotNull(scenario(1, settings).btEdit)
-            for (configured in listOf(workerEdit(base),
-                applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true))) {
+            val workers = listOf(pool(settings.single()),
+                resolveBtRecipes(ExecutionOptions.parse(settings).reader(), Kind.COP))
+                .map { assertNotNull(it.edit)(base) }
+            val fixed = applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true)
+            for (configured in workers + fixed) {
                 assertEquals(enabled, configured.lpMixedRootTargets)
                 assertEquals(base, configured.copy(lpMixedRootTargets = false))
             }
