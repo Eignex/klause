@@ -876,8 +876,12 @@ alone supplies no authority; source validation and conditional proof admission s
 
 ## Worker recipes
 
-Recipes select workers from model structure. Explicit pools, backtrack edits and
-source annotations retain their requested composition. Defaults live in
+Recipes select workers from model structure. Explicit pools, heuristic backtrack
+edits and source annotations retain their requested composition. In single-core
+mixed clausal satisfaction, private-rebuild work and learned-memory scratch settings
+alone preserve the default two-worker pool and its complete-search time reservation.
+Captured option keys distinguish these resource settings from heuristic edits;
+custom backtrack edit callbacks retain their selected composition. Defaults live in
 [portfolio construction](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio).
 
 ### Model-specific worker recipes
