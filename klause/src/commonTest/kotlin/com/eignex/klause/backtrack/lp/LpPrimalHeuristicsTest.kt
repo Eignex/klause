@@ -94,12 +94,12 @@ class LpPrimalHeuristicsTest {
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             quantum = 1L
 
-            assertNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNull(engine.lpRoundingProbe(objective, Cancellation.Never, toleranceReals = true))
             assertTrue(engine.propagator.floatPaused)
             var sample: Sample? = null
             var consultations = 0
             while (sample == null && consultations++ < 512) {
-                sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+                sample = engine.lpRoundingProbe(objective, Cancellation.Never, toleranceReals = true)
             }
 
             assertEquals(listOf(1L, 0L), assertNotNull(sample).ints.toList())
