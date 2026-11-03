@@ -146,7 +146,7 @@ class PrivateRebuildGenerationTest {
     }
 
     @Test
-    fun `joint private rows should expose free coordinate cancellations`() {
+    fun `shorter private rows should leave free coordinate cancellations undecided`() {
         for (phase in 0..1) for (native in listOf(false, true)) {
             val rows = listOf(intArrayOf(6, 1, 2) to 0, intArrayOf(8, 6, 0) to 0,
                 intArrayOf(5, 3, 4) to 0, intArrayOf(7, 5, 0) to 0, intArrayOf(9, 8, 7) to phase)
@@ -166,7 +166,7 @@ class PrivateRebuildGenerationTest {
                 assertIs<PropagationResult.Implied>(consumer.pinBool(variable, value))
             }
 
-            assertEquals(phase != 0, consumer.boolValue(9))
+            assertNull(consumer.boolValue(9))
             assertNull(consumer.boolValue(0))
             assertNull(canonical.boolValue(9))
         }
