@@ -284,9 +284,12 @@ class FiniteExecutionTest {
                 Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
             }
         }
-        val contradiction = (0 until 16).map { mask ->
-            Clause(IntArray(4) { Lit.make(it, mask and (1 shl it) == 0) })
-        }
+        val contradiction = listOf(
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+            Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+        )
         val problem = Problem(130, 0, emptyArray(), (parity + contradiction).toTypedArray())
         val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
         val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
