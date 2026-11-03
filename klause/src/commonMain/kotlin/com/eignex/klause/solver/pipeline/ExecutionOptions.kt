@@ -638,6 +638,14 @@ class ExecutionOptions private constructor(
     /** Whether an arm count or engine-mix count was supplied explicitly. */
     val explicitArms: Boolean get() = listOf("arms", "ls", "bt").any { it in values }
 
+    internal val privateRebuildBudgetOnly: Boolean
+        get() {
+            val overrides = values.keys.filter { it in BACKTRACK_OVERRIDE_KEYS }
+            return overrides.isNotEmpty() && overrides.all {
+                it == "private-rebuild-work" || it == "learned-memory-scratch-bytes"
+            }
+        }
+
     internal fun reader(): ExecutionOptionReader {
         malformed?.let { pipelineConfigError(it) }
         return CapturedExecutionOptionReader(values.toMutableMap())

@@ -163,6 +163,39 @@ class FiniteExecutionTest {
     }
 
     @Test
+    fun `private rebuild budgets should preserve the default clausal source pool`() {
+        for (options in listOf(
+            ExecutionOptions(ExecutionOption.privateRebuildWork(0L)),
+            ExecutionOptions.parse(listOf("private-rebuild-work=0")),
+            ExecutionOptions(ExecutionOption.learnedMemoryScratchBytes(4_194_304L)),
+            ExecutionOptions.parse(listOf("learned-memory-scratch-bytes=4194304")),
+            ExecutionOptions(ExecutionOption.privateRebuildWork(0L),
+                ExecutionOption.learnedMemoryScratchBytes(4_194_304L)),
+            ExecutionOptions.parse(listOf("private-rebuild-work=0", "learned-memory-scratch-bytes=4194304")),
+            ExecutionOptions(ExecutionOption.privateRebuildWork(-1L),
+                ExecutionOption.learnedMemoryScratchBytes(4_194_304L)),
+            ExecutionOptions.parse(listOf("private-rebuild-work=-1", "learned-memory-scratch-bytes=4194304")),
+        )) {
+            val problem = Problem(2, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ))
+            val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.SAT, completed.verdict)
+            assertEquals(listOf("ls/probsat/plain", "bt/clausal-balanced"),
+                completed.stats.portfolio.arms.map { it.label })
+            assertTrue(completed.stats.portfolio.arms.all { it.faults == 0L && it.failures == 0L })
+        }
+    }
+
+    @Test
     fun `automatic private rebuilding should reach the source portfolio`() {
         for (options in listOf(
             ExecutionOptions(ExecutionOption.arms(2),
