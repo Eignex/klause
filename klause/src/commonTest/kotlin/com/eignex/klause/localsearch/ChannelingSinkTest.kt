@@ -11,6 +11,18 @@ import kotlin.test.assertEquals
 
 class ChannelingSinkTest {
     @Test
+    fun `indicator contributions should retain their first occurrence order`() {
+        val sink = ChannelingSink(0, 1)
+
+        for (variable in intArrayOf(2, 2, 4, 2, 4, 5, 5)) sink.addIndicatorFlip(variable)
+
+        assertEquals(
+            Move.Compound(listOf(Move.IntSet(0, 1), Move.BoolFlip(2), Move.BoolFlip(4), Move.BoolFlip(5))),
+            sink.toMove(),
+        )
+    }
+
+    @Test
     fun `binary channels should track the final parity of repeated indicator flips`() {
         for (flips in listOf(1, 2, 3)) {
             val problem = Problem(

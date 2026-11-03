@@ -18,6 +18,8 @@ class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
     private val drivingIntVar = intVar
     private var additionalPins: IntHashSet? = null
     private var indicatorFlips: IntHashSet? = null
+    private var firstIndicator: Int = 0
+    private var hasIndicator: Boolean = false
 
     init {
         parts += Move.IntSet(intVar, newValue)
@@ -40,12 +42,36 @@ class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
     }
 
     internal fun addIndicatorFlip(boolVar: Int) {
-        val indicators = indicatorFlips ?: IntHashSet().also { indicatorFlips = it }
+        if (!hasIndicator) {
+            firstIndicator = boolVar
+            hasIndicator = true
+            parts += Move.BoolFlip(boolVar)
+            return
+        }
+        if (boolVar == firstIndicator) return
+        val indicators = indicatorFlips ?: IntHashSet().also {
+            it.add(firstIndicator)
+            indicatorFlips = it
+        }
         if (indicators.add(boolVar)) parts += Move.BoolFlip(boolVar)
     }
 
     internal fun carryBinaryChannels(state: LocalSearchState, eligibility: MoveSink) {
-        if (parts.none { it is Move.BoolFlip }) return
+        var firstFlip: Move.BoolFlip? = null
+        var multipleFlips = false
+        for (part in parts) {
+            if (part !is Move.BoolFlip) continue
+            if (firstFlip != null) {
+                multipleFlips = true
+                break
+            }
+            firstFlip = part
+        }
+        val single = firstFlip ?: return
+        if (!multipleFlips) {
+            if (eligibility.allowsBool(single.varId)) carryBinaryChannels(state, single.varId, eligibility)
+            return
+        }
         val flipped = IntHashSet()
         for (part in parts) {
             if (part is Move.BoolFlip && !flipped.add(part.varId)) flipped.remove(part.varId)

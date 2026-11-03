@@ -70,6 +70,26 @@ class PropagationProblemTest {
     }
 
     @Test
+    fun `partial event subscriptions should retain unwatched occurrences in factor order`() {
+        val full = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3, boundsConsistent = true)
+        val row = AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 3)
+        val partial = object : Factor by row, Propagator {
+            override val initialIntEventWatches: IntArray = intArrayOf(
+                IntEvent.pack(0, IntEvent.LB_RAISED),
+                IntEvent.pack(0, IntEvent.UB_LOWERED),
+            )
+        }
+        val plain = AllDifferent(intArrayOf(1, 2), domainMin = 0, domainSize = 3)
+        val projection = PropagationProblem(Problem(0, 3, Array(3) { IntDomain(0, 2) }, listOf(full, partial, plain)))
+
+        val occurrences = projection.nonIntEventWatcherIntOccurrences
+
+        assertTrue(occurrences[0].isEmpty())
+        assertContentEquals(intArrayOf(1, 2), occurrences[1])
+        assertContentEquals(intArrayOf(2), occurrences[2])
+    }
+
+    @Test
     fun `interleaved CP failures should keep their own premises through peer success and undo`() {
         val cases = listOf(
             Triple<Factor, List<Pair<Int, Long>>, List<Pair<Int, Long>>>(

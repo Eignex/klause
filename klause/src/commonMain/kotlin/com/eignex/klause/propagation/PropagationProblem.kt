@@ -120,14 +120,27 @@ class PropagationProblem private constructor(
                 intOccurrences
             } else {
                 val watchedVarsByFactor = arrayOfNulls<IntHashSet>(problem.numFactors)
+                val fullyWatched = BooleanArray(problem.numFactors)
+                val variableStamps = IntArray(problem.numIntVars)
                 for (fid in propagators.indices) {
                     val watches = propagators[fid].initialIntEventWatches ?: continue
-                    val watched = IntHashSet(watches.size)
-                    for (watch in watches) watched.add(IntEvent.intVarOf(watch))
-                    watchedVarsByFactor[fid] = watched
+                    val stamp = fid + 1
+                    for (watch in watches) {
+                        val variable = IntEvent.intVarOf(watch)
+                        if (variable in variableStamps.indices) variableStamps[variable] = stamp
+                    }
+                    if (problem.factors[fid].intVars.all { variableStamps[it] == stamp }) {
+                        fullyWatched[fid] = true
+                    } else {
+                        val watched = IntHashSet(watches.size)
+                        for (watch in watches) watched.add(IntEvent.intVarOf(watch))
+                        watchedVarsByFactor[fid] = watched
+                    }
                 }
                 Array(problem.numIntVars) { v ->
-                    retain(intOccurrences[v]) { fid -> watchedVarsByFactor[fid]?.contains(v) != true }
+                    retain(intOccurrences[v]) { fid ->
+                        !fullyWatched[fid] && watchedVarsByFactor[fid]?.contains(v) != true
+                    }
                 }
             }
         }

@@ -378,6 +378,9 @@ stateless propagation projections and occurrence indexes; incremental payloads,
 scratch, watchers and failure contexts belong to each state. Undo discards pending
 failure context, and fresh presolve rebuilds keep the originating cancellation token;
 see [presolve](07-presolve.md).
+Lazy occurrence filtering recognizes factors whose typed subscriptions cover every
+declared integer with temporary variable stamps; only partial coverage retains a
+per-factor membership set. Unsubscribed occurrences keep their factor order.
 Built-in linear rows select their real, wide-integer or integer projection before
 loading the remaining factor-family dispatcher. Provider selection remains the
 owner of custom projections.
