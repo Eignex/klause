@@ -163,7 +163,7 @@ object LpAutoConfig {
         cancellation: Cancellation = Cancellation.Never,
         sparseTrialAllowed: Boolean = true,
         sparseTrialWork: Long = SPARSE_LP_MAX_WORK,
-        sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
+        sourcePreparation: LpSourcePreparation = config.sourcePreparation ?: base.sourcePreparation,
         observe: ((LpAdmission) -> Unit)? = null,
     ): LpPlan {
         var visits = 0
@@ -361,6 +361,7 @@ object LpAutoConfig {
         val structuralCuts = cuts && (cutEligible || pseudoBoolean)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         var plan = base.copy(
+            sourcePreparation = sourcePreparation,
             bounding = base.bounding || lpActive,
             cuts = base.cuts || cuts,
             // LP learning rides on the bounding path: the objective-bound reason is built from the
@@ -416,7 +417,7 @@ object LpAutoConfig {
                 rootBudgetFraction = base.rootBudgetFraction, rootBudgetMillis = base.rootBudgetMillis,
                 lpWorkBudgetFraction = base.lpWorkBudgetFraction, boundMaxPivots = base.boundMaxPivots,
                 boundEvery = base.boundEvery, warmStart = base.warmStart, branching = base.branching,
-                componentOwnership = base.componentOwnership,
+                componentOwnership = base.componentOwnership, sourcePreparation = sourcePreparation,
             )
         }
         observe?.invoke(LpAdmission(rows, baseCols, cells, structApplicable,

@@ -120,7 +120,9 @@ this is separate from heap measurements and diagnostic payload-category sums.
   `+/-<pass>` deltas; applies to canonical factor preparation, including polynomial
   routes. `off` is accepted for native formulas without a factor view.
 - `--lp <ceiling>`: relaxation ceiling with the same levels and `+/-<technique>`
-  deltas. Arms choose intensity below it. `--lp-pricing` selects zero-objective
+  deltas. `preparation=disabled|object|index|admitted` selects source-template retention
+  across finite presolve and consuming LP engines independently of that intensity.
+  Arms choose intensity below it. `--lp-pricing` selects zero-objective
   entering policy. Native arithmetic routes reject explicit LP flags.
 - `--exact`: continuous float interpretation and zero source tolerance for the
   format's declared policies. Unsupported exact lowering declines explicitly.

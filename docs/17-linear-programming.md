@@ -90,11 +90,14 @@ order. A failed match uses selective reconstruction; a source revision alone can
 authorize reuse. The new source binding owns no predecessor snapshot, so repeated
 compatible preparations retain no generation chain.
 
-An internal selective-metadata preparation mode validates row identity and exact
+The selective-metadata preparation mode validates row identity and exact
 bound sides before retaining the row index. Node engines select this mode and own
 their numerical component partitions. Ordinary node, primal and shaving consumers
-carry internal disabled, object, complete-index and admitted controls through
-objective-specific engines and standalone sparse admission. Admitted construction
+carry disabled, object, complete-index and admitted controls through
+objective-specific engines and standalone sparse admission. `LpPlan.sourcePreparation`
+selects this policy, and an explicit `LpConfig.sourcePreparation` overrides it
+without enabling numerical techniques. The finite pipeline carries the same choice
+through pre-bake LP checks and harvest before constructing the engine. Admitted construction
 first completes its LP without speculative metadata and marks the existing
 namespace token. A later completed consumer can allocate a 16-unit source-scoped
 record and accumulate construction work. The marker carries no work credit or

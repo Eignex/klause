@@ -396,7 +396,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         FlagGroup.KLAUSE,
         valueLabel = "ceiling",
         help = "LP relaxation ceiling: " + LpEmphasis.ids() +
-            "; append +/-<technique> to toggle one; not available under -e fixed",
+            "; append +/-<technique> or preparation=disabled|object|index|admitted; not available under -e fixed",
         // env-aware: KLAUSE_LP overrides the built-in default, and --help reflects it.
         default = defaultLp() ?: LpEmphasis.AGGRESSIVE.id,
     ) { o.lp = it },

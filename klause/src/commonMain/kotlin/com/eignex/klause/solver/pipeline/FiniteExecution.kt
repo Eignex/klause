@@ -18,6 +18,7 @@ import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.provesUnbounded
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.AttributedImprovement
@@ -697,6 +698,9 @@ private fun FiniteSolveRequest.preparationRequest(
     protectObjective: Boolean = false,
 ): FinitePipelineRequest {
     val preparationStop = if (shape.sourceInvocation == null) presolveCancellation else presolveCancellation or stop
+    val sourcePreparation = (sourceControls as? SourceFiniteControls.Backtrack)?.params?.let {
+        it.lpConfig?.sourcePreparation ?: it.lpPlan.sourcePreparation
+    } ?: lpConfig.sourcePreparation ?: LpSourcePreparation.ADMITTED
     return FinitePipelineRequest(
         problem = shape.finiteProblem, componentPlan = shape.componentPlan, preparedPlan = shape.preparedPlan,
         engine = engine, objective = shape.linearObjective,
@@ -709,6 +713,7 @@ private fun FiniteSolveRequest.preparationRequest(
             presolveBudget?.orSpent(preparationStop or stop) ?: (preparationStop or stop)
         } else stop,
         presolveBudget = presolveBudget, zeroObjectivePricing = zeroObjectivePricing, randomSeed = randomSeed,
+        sourcePreparation = sourcePreparation,
     )
 }
 

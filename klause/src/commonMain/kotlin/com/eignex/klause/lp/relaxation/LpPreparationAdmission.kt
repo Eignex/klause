@@ -3,8 +3,6 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 
-internal enum class LpSourcePreparation { DISABLED, OBJECT, INDEX, ADMITTED }
-
 internal sealed interface LpPreparationState
 
 internal class LpPreparationNamespace : LpPreparationState

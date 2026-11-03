@@ -155,7 +155,8 @@ internal class LpEngine(
     private val nodeWorkAllowance: () -> Long? = { null },
     private val containingWork: (Long) -> Unit = {},
     private val rootQueryPolicy: LpRootQueryPolicy = LpRootQueryPolicy.SHARED_WORK,
-    internal val sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
+    internal val sourcePreparation: LpSourcePreparation =
+        params0.lpConfig?.sourcePreparation ?: params0.lpPlan.sourcePreparation,
     private val eagerSourcePreparation: Boolean = false,
 ) : AutoCloseable {
     init {
