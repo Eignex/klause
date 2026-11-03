@@ -322,29 +322,34 @@ class LpPrimalHeuristicsTest {
                 }
             })
         val objective = LinearObjective(intCoefficients = LongArray(8))
-        val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
-        val primal = DoubleArray(relaxation.model.n)
-        val known = BooleanArray(primal.size)
-        for (v in 0 until 8) {
-            val column = relaxation.intColOf[v]
-            known[column] = v % 4 < 2
-            primal[column] = when (v % 4) { 0 -> 1.0; 1 -> 0.5; else -> 123.75 }
-        }
-        val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal, knownColumns = known,
-            sourceProblem = problem, auxiliaryPoint = true)
-        var expired = false
-        val slice = Cancellation {
-            val pending = guidance.componentRounding
-            val pinning = guidance.pinning
-            if (pending?.group == 1 && pending.repair?.active == true &&
-                pinning?.intDomain(4)?.isFixed == true
-            ) expired = true
-            expired
-        }
         val factory = RecordingLpEngineFactory()
         LpEngine(problem, objective,
-            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)),
             SolveStatsSink("resumed-component-repair"), LpSolveContext(factory)).use { engine ->
+            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
+            val primal = DoubleArray(relaxation.model.n)
+            val known = BooleanArray(primal.size)
+            for (v in 0 until 8) {
+                val column = relaxation.intColOf[v]
+                known[column] = v % 4 < 2
+                primal[column] = when (v % 4) { 0 -> 1.0; 1 -> 0.5; else -> 123.75 }
+            }
+            val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal, knownColumns = known,
+                sourceProblem = problem)
+            var expired = false
+            val slice = Cancellation {
+                val pending = guidance.componentRounding
+                val pinning = guidance.pinning
+                if (pending?.group == 1 && pending.repair?.active == true &&
+                    pinning?.intDomain(4)?.isFixed == true
+                ) expired = true
+                expired
+            }
+            val constructed = factory.calls.size
+            val queries = factory.floatAllowances.size
             engine.rootRoundingWarmStart = guidance
             assertNull(engine.lpRoundingProbe(objective, slice))
             val prefix = assertNotNull(guidance.pinning)
@@ -362,7 +367,8 @@ class LpPrimalHeuristicsTest {
             )
             assertEquals(prefix.work, engine.primalPropagationWork)
             assertTrue(engine.primalPropagationWork > paid)
-            assertTrue(factory.calls.isEmpty())
+            assertEquals(constructed, factory.calls.size)
+            assertEquals(queries, factory.floatAllowances.size)
         }
     }
 
