@@ -226,6 +226,8 @@ class FiniteExecutionTest {
             val learning = completed.stats.search.learning
             assertEquals(expected, learning["privateRebuildAutomaticAttempts"] ?: 0L)
             assertEquals(expected * 4_194_304L, learning["privateRebuildAutomaticByteLimit"] ?: 0L)
+            assertEquals(expected * 1_048_576L,
+                learning["privateRebuildAutomaticCanonicalScratchLimit"] ?: 0L)
             assertEquals(expected, learning["privateRebuildConsumers"] ?: 0L)
             assertEquals(expected, learning["privateRebuildRetired"] ?: 0L)
             assertEquals(listOf("ls/probsat/plain", "bt/clausal-balanced"),

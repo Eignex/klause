@@ -21,7 +21,8 @@ internal fun privateRebuildDefaultScenario(
     ) return scenario
     if (problem.numBoolVars !in 128..2_000 || problem.numFactors !in 512..32_768) return scenario
     val reader = options.reader()
-    if (reader[ExecutionOption.privateRebuildWork] != null) return scenario
+    if (reader[ExecutionOption.privateRebuildWork] != null ||
+        reader[ExecutionOption.booleanProofTasks] == true) return scenario
     val privateBytes = reader[ExecutionOption.privateRebuildBytes]
     val sharedScratch = reader[ExecutionOption.learnedMemoryScratchBytes]
     val edit = scenario.btEdit

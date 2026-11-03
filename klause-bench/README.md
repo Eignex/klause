@@ -82,11 +82,12 @@ unless a private limit is supplied.
 1,048,576-work cap and the configured scratch grant. It makes one initial-root
 attempt on the structurally admitted Boolean cohort; see the
 [admission contract](../docs/07-presolve.md#private-worker-qualification).
-Use explicit zero as the canonical control. The production default remains zero.
+Use explicit zero as the canonical control; ordinary default admission follows the
+source policy above.
 
 `param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
 trial after new global root pins or an owned learned equivalence, with source reduction and a fresh consuming
-worker. Zero is the default. `ProgressPins` excludes baked-root facts;
+worker. Direct backtrack parameters default to zero. `ProgressPins` excludes baked-root facts;
 `RootScanWork` and `RootScanNanos` retain the eligibility cost. An unchanged
 baked root without a captured equivalence keeps its canonical traversal.
 `BinaryScanWork` and `BinaryScanNanos` retain bounded discovery costs;
