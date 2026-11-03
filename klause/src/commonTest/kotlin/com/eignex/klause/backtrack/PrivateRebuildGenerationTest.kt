@@ -52,6 +52,45 @@ class PrivateRebuildGenerationTest {
     }
 
     @Test
+    fun `mixed parity views should propagate free choices within a compact byte grant`() {
+        for (phase in 0..1) for (native in listOf(false, true)) {
+            val rows = listOf(intArrayOf(0, 1, 4) to phase, intArrayOf(2, 4, 5) to 1,
+                intArrayOf(3, 5, 6) to phase)
+            val clauses = rows.flatMap { (variables, target) ->
+                (0 until 8).filter { it.countOneBits() % 2 != target }.map { mask ->
+                    Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                }
+            } + Clause(intArrayOf(Lit.make(7, true), Lit.make(8, true)))
+            val source = Problem(9, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+            val canonical = PropagationSession(source, nativeSat = native)
+            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 30_000L,
+                Cancellation.Never, parity = captured))
+
+            for (mask in 0 until 16) {
+                val consumer = PropagationSession(generation.problem)
+                for (variable in 0..3) assertIs<PropagationResult.Implied>(
+                    consumer.pinBool(variable, mask and (1 shl variable) != 0),
+                )
+                assertIs<PropagationResult.Implied>(consumer.pinBool(7, true))
+                assertIs<PropagationResult.Implied>(consumer.pinBool(8, false))
+
+                val first = (mask and 1 != 0) xor (mask and 2 != 0) xor (phase != 0)
+                val second = first xor (mask and 4 != 0) xor true
+                val third = second xor (mask and 8 != 0) xor (phase != 0)
+                assertEquals(first, consumer.boolValue(4))
+                assertEquals(second, consumer.boolValue(5))
+                assertEquals(third, consumer.boolValue(6))
+                assertTrue(clauses.all { clause ->
+                    clause.literals.any { Lit.evaluate(it, assertNotNull(consumer.boolValue(Lit.variable(it)))) }
+                })
+            }
+            assertTrue(generation.modeledBytes <= 30_000L)
+            for (variable in 0..8) assertNull(canonical.boolValue(variable))
+        }
+    }
+
+    @Test
     fun `learned equivalences should open a reconstructable private consumer without root pins`() {
         for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(
