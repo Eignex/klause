@@ -139,7 +139,7 @@ tasks.register<Sync>("stageRetirementProfileJvm") {
     into(layout.buildDirectory.dir("retirement-profile/jvm"))
     from(jvmTestCompilation.output.allOutputs) { into("classes") }
     from(kotlin.targets.getByName("jvm").compilations.getByName("main").output.allOutputs) { into("classes") }
-    from(jvmTestCompilation.runtimeDependencyFiles) { into("lib") }
+    from(checkNotNull(jvmTestCompilation.runtimeDependencyFiles)) { into("lib") }
 }
 
 tasks.register<JavaExec>("basisTrace") {
