@@ -2834,24 +2834,31 @@ internal class RevisedSimplex(
         token: Cancellation,
         observe: (LpProbeMetrics) -> Unit,
     ): List<LpDirectionalGain>? {
-        val state = model.exactState ?: return null
-        val basis = optimalBasis ?: return null
-        val point = optimalPrimal ?: return null
-        if (allowance <= 0L || token() || activeSolve != null || !basisLifecycle.factorized ||
-            pointModel.exactState !== state || columns.isEmpty() || columns.size > 2 ||
+        fun decline(reason: LpProbeDecline): List<LpDirectionalGain>? {
+            observe(LpProbeMetrics(0L, 0L, 0, reason))
+            return null
+        }
+        val state = model.exactState ?: return decline(LpProbeDecline.OWNER)
+        val basis = optimalBasis ?: return decline(LpProbeDecline.NO_OPTIMUM)
+        val point = optimalPrimal ?: return decline(LpProbeDecline.NO_OPTIMUM)
+        if (token()) return decline(LpProbeDecline.CANCELLED)
+        if (allowance <= 0L) return decline(LpProbeDecline.ALLOWANCE)
+        if (activeSolve != null || !basisLifecycle.factorized) return decline(LpProbeDecline.BUSY)
+        if (pointModel.exactState !== state) return decline(LpProbeDecline.STALE_POINT)
+        if (columns.isEmpty() || columns.size > 2 ||
             columns.size != splits.size || columns.any { it !in 0 until n } ||
             (columns.size == 2 && columns[0] == columns[1])
-        ) return null
+        ) return decline(LpProbeDecline.SPLIT)
         for (index in columns.indices) {
             val split = splits[index]
             if (split == Long.MAX_VALUE || !(split.toDouble() < point[columns[index]] &&
                     point[columns[index]] < (split + 1L).toDouble())
-            ) return null
+            ) return decline(LpProbeDecline.SPLIT)
         }
         val scan = 2L * numVars + m + 1L
-        if (scan >= allowance) return null
+        if (scan >= allowance) return decline(LpProbeDecline.ALLOWANCE)
         observe(LpProbeMetrics(scan, 0L, 0))
-        val parentObjective = probeObjective(token) ?: return null
+        val parentObjective = probeObjective(token) ?: return decline(LpProbeDecline.NO_OPTIMUM)
         return LpDirectionalProbes(state, basis, parentObjective) { child, work, entries ->
             RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
                 basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),

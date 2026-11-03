@@ -12,6 +12,34 @@ import kotlin.test.assertTrue
 
 class LpDirectionalProbesTest {
     @Test
+    fun `a retained child state supplies complete probe gains after bound resolution`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+        val auxiliary = builder.addVar(0, 1)
+        repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        LpScopedSolver(state).use { owner ->
+            assertTrue(assertNotNull(owner.solveFloat()?.second).optimal)
+            assertTrue(owner.push())
+            assertTrue(owner.assertBound(auxiliary, false, ExactLpSide(ExactLpNumber.of(1L)), 1L))
+            assertTrue(assertNotNull(owner.solveFloat()?.second).optimal)
+            val point = assertNotNull(owner.state.ownerWorkingModel())
+            var decline: LpProbeDecline? = null
+            var completed = 0
+
+            val gains = owner.directionalGains(point, intArrayOf(0, 1), longArrayOf(0, 0),
+                1_000_000L, Cancellation.Never) { decline = it.decline; completed += it.completed }
+
+            assertNotNull(gains, decline.toString())
+            assertEquals(4, completed)
+            assertEquals(1.5, gains[0].down, 1e-7)
+            assertEquals(0.5, gains[0].up, 1e-7)
+            assertEquals(2.5, gains[1].down, 1e-7)
+            assertEquals(0.5, gains[1].up, 1e-7)
+        }
+    }
+
+    @Test
     fun `child probes preserve objective units across sense scale and common constants`() {
         for (sense in listOf(Sense.MINIMIZE, Sense.MAXIMIZE)) for (scale in listOf(1L, 4L)) {
             for (origin in listOf(0L, 7L, -3L)) {
@@ -105,7 +133,16 @@ class LpDirectionalProbesTest {
 
     @Test
     fun `unavailable child probes perform no preparation or numerical work`() {
-        for (decline in listOf("unfunded", "cancelled", "stale", "closed", "empty", "duplicate", "shape")) {
+        val declines = listOf(
+            "unfunded" to LpProbeDecline.ALLOWANCE,
+            "cancelled" to LpProbeDecline.CANCELLED,
+            "stale" to LpProbeDecline.STALE_POINT,
+            "closed" to LpProbeDecline.NO_OPTIMUM,
+            "empty" to LpProbeDecline.SPLIT,
+            "duplicate" to LpProbeDecline.SPLIT,
+            "shape" to LpProbeDecline.SPLIT,
+        )
+        for ((decline, expected) in declines) {
             val builder = LpBuilder()
             repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
             repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
@@ -123,13 +160,18 @@ class LpDirectionalProbesTest {
                 }
                 val splits = if (decline == "shape") longArrayOf(0) else LongArray(columns.size)
                 var work = 0L
+                var reason: LpProbeDecline? = null
 
                 val gains = solver.directionalGains(point, columns, splits,
                     if (decline == "unfunded") 1L else 1_000_000L,
-                    if (decline == "cancelled") Cancellation { true } else Cancellation.Never) { work += it.work }
+                    if (decline == "cancelled") Cancellation { true } else Cancellation.Never) {
+                    work += it.work
+                    reason = it.decline
+                }
 
                 assertNull(gains, decline)
                 assertEquals(0L, work, decline)
+                assertEquals(expected, reason, decline)
             }
         }
     }
@@ -186,13 +228,19 @@ class LpDirectionalProbesTest {
             assertNotNull(solver.solve())
             var work = 0L
             var completed = 0
+            var decline: LpProbeDecline? = null
 
             val gains = solver.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                100L, Cancellation.Never) { work += it.work; completed += it.completed }
+                100L, Cancellation.Never) {
+                work += it.work
+                completed += it.completed
+                decline = it.decline
+            }
 
             assertNull(gains)
             assertTrue(work in 1L..100L)
             assertEquals(0, completed)
+            assertEquals(LpProbeDecline.ALLOWANCE, decline)
             assertEquals(4.5, assertNotNull(solver.resolveBounds()).objective, 1e-7)
         }
     }
