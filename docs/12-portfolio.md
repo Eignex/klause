@@ -557,10 +557,11 @@ The scheduler assigns bounded slices, revisits pending preparation and reseeds s
 workers under the containing [allowance](06-sessions.md#resource-allowances).
 Scheduling changes work order, never publication authority.
 
-The worker sampler retains private reward accumulators across evidence fading.
-Restricted selection reads only its candidate arms; fading preserves each arm's
-prior and posterior evidence. Unit Beta shapes use direct inverse-CDF sampling;
-other shapes use Gamma draws.
+The worker sampler owns primitive success and trial totals per arm. Restricted
+selection reads those totals directly; fading preserves the prior and the
+accumulator's arithmetic order. The library selector's snapshots synchronize when
+that selector is used. Unit Beta shapes use direct inverse-CDF sampling; other
+shapes use Gamma draws.
 
 The opt-in `portfolio-reward=source` ablation retains ordinary feasibility rewards.
 After a source incumbent exists, only an accepted strict incumbent or terminal

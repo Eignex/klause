@@ -3,12 +3,46 @@ package com.eignex.klause.portfolio
 import com.eignex.kumulant.bandit.univariate.BetaBernoulliTS
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import com.eignex.kumulant.stat.summary.BernoulliSumResult
+import kotlin.math.pow
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DiscountedThompsonTest {
+
+    @Test
+    fun `automatic decay should preserve seeded posterior choices`() {
+        for (halfLife in listOf(0.5, 4.0, 32.0)) {
+            val bandit = DiscountedThompson(4, Random(3), halfLife)
+            val reference = MultiArmedBandit(4, BetaBernoulliTS(), Random(3))
+            val candidates = listOf(0, 2, 3)
+            val weights = listOf(0.0, 0.25, 1.0, 1e-12)
+            repeat(32) { step ->
+                val arm = step % 4
+                val value = (step % 5) / 4.0
+                val weight = weights[step % weights.size]
+                val retained = 2.0.pow(-weight / halfLife)
+                val evidence = reference.snapshot().map {
+                    BernoulliSumResult(1.0 + (it.successes - 1.0) * retained,
+                        2.0 + (it.trials - 2.0) * retained)
+                }
+                reference.reset()
+                reference.merge(evidence)
+                reference.update(arm, value, weight)
+
+                bandit.update(arm, value, weight)
+
+                if (step % 4 == 0) assertEquals(reference.choose(), bandit.choose())
+                val snapshot = reference.snapshot()
+                val expected = candidates.maxBy { candidate ->
+                    reference.random.nextBeta(snapshot[candidate].successes,
+                        snapshot[candidate].trials - snapshot[candidate].successes)
+                }
+                assertEquals(expected, bandit.chooseAmong(candidates))
+            }
+        }
+    }
 
     @Test
     fun `weighted rewards and phase fading should preserve seeded posterior choices`() {

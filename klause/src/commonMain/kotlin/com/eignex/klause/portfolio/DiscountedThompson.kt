@@ -35,22 +35,45 @@ internal class DiscountedThompson(
     }
 
     private val inner = MultiArmedBandit(nbrArms, BetaBernoulliTS(PRIOR, PRIOR), random)
+    private val successes = DoubleArray(nbrArms)
+    private val trials = DoubleArray(nbrArms)
+    private var selectorDirty = false
 
-    override fun choose(): Int = inner.choose()
+    override fun choose(): Int {
+        if (selectorDirty) {
+            for (arm in 0 until nbrArms) {
+                val stat = inner.armStat(arm)
+                stat.reset()
+                stat.merge(BernoulliSumResult(PRIOR + successes[arm], 2 * PRIOR + trials[arm]), 0L)
+            }
+            selectorDirty = false
+        }
+        return inner.choose()
+    }
 
     override fun update(armIndex: Int, value: Double, weight: Double) {
         fade(2.0.pow(-weight / halfLife))
         inner.update(armIndex, value, weight)
+        if (weight > 0.0 && weight.isFinite()) {
+            trials[armIndex] += weight
+            successes[armIndex] += value * weight
+        }
     }
 
-    override fun reset() = inner.reset()
+    override fun reset() {
+        inner.reset()
+        successes.fill(0.0)
+        trials.fill(0.0)
+        selectorDirty = false
+    }
 
     /** The arm among [arms], which must not be empty, that a Thompson draw over their evidence favours. */
     fun chooseAmong(arms: Collection<Int>): Int {
         require(arms.isNotEmpty()) { "no arm to choose among" }
         return arms.maxBy {
-            val evidence = inner.armResult(it)
-            random.nextBeta(evidence.successes, evidence.trials - evidence.successes)
+            require(it in successes.indices) { "arm index out of bounds" }
+            val success = PRIOR + successes[it]
+            random.nextBeta(success, 2 * PRIOR + trials[it] - success)
         }
     }
 
@@ -60,17 +83,14 @@ internal class DiscountedThompson(
     fun fade(retained: Double) {
         require(retained in 0.0..1.0) { "retained must be in [0, 1]" }
         if (retained == 1.0) return
-        // Snapshots carry the prior, and merging drops the copy the reset arm already holds.
+        // Preserve the prior subtraction and rounding of the accumulator's snapshot and merge.
         for (arm in 0 until nbrArms) {
-            val stat = inner.armStat(arm)
-            val evidence = stat.read(0L)
-            val faded = BernoulliSumResult(
-                PRIOR + (evidence.successes - PRIOR) * retained,
-                2 * PRIOR + (evidence.trials - 2 * PRIOR) * retained,
-            )
-            stat.reset()
-            stat.merge(faded, 0L)
+            val success = PRIOR + successes[arm]
+            val total = 2 * PRIOR + trials[arm]
+            successes[arm] = (PRIOR + (success - PRIOR) * retained) - PRIOR
+            trials[arm] = (2 * PRIOR + (total - 2 * PRIOR) * retained) - 2 * PRIOR
         }
+        selectorDirty = true
     }
 
     private companion object {
