@@ -163,6 +163,16 @@ proposal can release, a refuted small neighborhood keeps the initial trial pendi
 through its first enlarged adaptive proposal. Owed complete-worker coverage still
 precedes continuation. A checked discovery, an unavailable query or completion of
 the enlarged proposal ends the trial; its work and lifetime are cumulative.
+
+For a binary mixed source, the first enlarged guided proposal tries one rounded
+integer tuple before numerical neighborhood traversal. Pinned coordinates stay at
+the checked center; the paid root point guides free binary and continuous values.
+The changed tuple carries no exact payload or certificate. It uses the same
+bounded completion owner, full-context attempt retention and original-source
+checks as imported seeds. An unavailable or non-improving point leaves the
+neighborhood undecided and numerical traversal continues. Only a strictly improving
+checked point is a repair discovery. Construction, completion and checking share
+the proposal's active time, LP work and allocation ceilings.
 Continuation earns no reward and cannot renew the companion's allowance.
 
 The numerical companion can retain one completed root relaxation point for checked

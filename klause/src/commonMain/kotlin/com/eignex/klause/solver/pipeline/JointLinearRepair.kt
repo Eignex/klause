@@ -27,6 +27,7 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.math.round
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 internal data class JointRepairAttempt(
@@ -54,6 +55,14 @@ internal class JointLinearRepair(
     private val repairGuidance: LinearRepairGuidance? = null,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
+    private class GuidedPointTrial(
+        val context: SourceProofContext,
+        val center: Sample,
+        val hint: LinearRepairGuidance.Hint,
+        var prepared: Boolean = false,
+        var seed: Sample? = null,
+        var finished: Boolean = false,
+    )
 
     private val sourceIntegers = sourceIntegers?.copyOf()
     private val stop = params.timeout or params.cancellation
@@ -62,9 +71,11 @@ internal class JointLinearRepair(
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
         onWork = state.smt::observeSourceLp, funding = funding)
     private val stages = linkedMapOf<String, Long>()
+    private var completingGuidedPoint = false
     private val completion = if (params.sourceIncumbentCompletion)
         LinearIncumbentCompletion(budget, incumbentCompletionCheck, sharedCompletions) { stage, count ->
-            val key = "jointRepairExternalCompletion$stage"
+            val key = if (completingGuidedPoint) "jointRepairGuidedPointCompletion$stage"
+                else "jointRepairExternalCompletion$stage"
             stages[key] = combine(key, stages[key] ?: 0L, count)
         } else null
     private var importedCenter: Sample? = null
@@ -83,6 +94,9 @@ internal class JointLinearRepair(
     private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
     private var guidedProposal: ExactNeighborhoodCondition? = null
+    private var guidedCenter: Sample? = null
+    private var guidedHint: LinearRepairGuidance.Hint? = null
+    private var guidedPointTrial: GuidedPointTrial? = null
     private var checkedTrialWidth = 0
     private var enlargedTrialPending = false
     private var enlargedTrialProposal: ExactNeighborhoodCondition? = null
@@ -222,6 +236,8 @@ internal class JointLinearRepair(
                 requireNotNull(selection).propose(from, pooled?.bools ?: bools, width, proposalRound, radius, limit)
                     .also { condition ->
                         guidedProposal = condition.takeIf { guided }
+                        guidedCenter = pooled.takeIf { guided }
+                        guidedHint = hint.takeIf { guided }
                         val freed = (sourceIntegers?.size ?: model.numIntVars) - condition.lower.size
                         if (checkedStart) {
                             checkedTrialWidth = freed
@@ -368,11 +384,31 @@ internal class JointLinearRepair(
             pending = condition
             if (condition === guidedProposal) observe("jointRepairSharedGuidanceQueries")
             if (condition === enlargedTrialProposal) observe("jointRepairEnlargedTrialStarts")
-            query = LinearAuthorityInvocation(source.atScope(source.scope.copy(condition = bounds)),
+            val context = source.atScope(source.scope.copy(condition = bounds))
+            if (condition === enlargedTrialProposal && completion != null && condition.cutoff != null &&
+                model.numRealVars > 0 && guidedCenter != null && guidedHint != null &&
+                funding.remainingAllocation > 128L
+            ) {
+                budget.observe(preparation = 1L)
+                funding.charge(0L, 128L)
+                guidedPointTrial = GuidedPointTrial(context, requireNotNull(guidedCenter), requireNotNull(guidedHint))
+                observe("jointRepairGuidedPointStarts")
+            }
+            query = LinearAuthorityInvocation(context,
                 params.copy(sourceIncumbentCompletion = false),
                 external = { externalIncumbent() ?: anchor }, state = state, borrowedAuthority = authority,
                 boundOrdered = boundOrdered, guidance = true, funding = funding)
             observe("jointRepairCandidates")
+        }
+        guidedPointTrial?.let { trial ->
+            val point = advanceGuidedPoint(trial, condition, cancellation)
+            if (point != null) {
+                retire()
+                anchor = point
+                observe("jointRepairCheckedIncumbents")
+                return JointRepairAttempt(ExactNeighborhoodResult.Witness(point), feasiblePoint = point)
+            }
+            if (!trial.finished) return JointRepairAttempt(ExactNeighborhoodResult.Paused)
         }
         val active = requireNotNull(query)
         val millis = cancellation.deadline()?.let { (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds }
@@ -453,7 +489,47 @@ internal class JointLinearRepair(
         val active = query
         query = null
         pending = null
+        guidedPointTrial = null
         active?.close()
+    }
+
+    private fun advanceGuidedPoint(
+        trial: GuidedPointTrial, condition: ExactNeighborhoodCondition, cancellation: Cancellation,
+    ): Sample? {
+        if (trial.finished) return null
+        funding.grant(QUERY_SLICE_WORK * LP_WORK_PER_NODE)
+        val token = stop or cancellation or Cancellation.after(QUERY_SLICE_MILLIS.milliseconds)
+        if (!trial.prepared) {
+            trial.seed = JointRepairGuidedPoint.propose(model, trial.center, condition, trial.hint, budget, token)
+            if (token()) return null
+            trial.prepared = true
+        }
+        val seed = trial.seed
+        if (seed == null) {
+            trial.finished = true
+            observe("jointRepairGuidedPointUnavailable")
+            return null
+        }
+        completingGuidedPoint = true
+        val point = try {
+            requireNotNull(completion).complete(trial.context, seed, token)
+        } finally {
+            completingGuidedPoint = false
+        }
+        if (point == null && (token() || funding.paused)) return null
+        if (point == null) {
+            trial.finished = true
+            observe("jointRepairGuidedPointUnavailable")
+            return null
+        }
+        budget.observe(boundCertification = 1L + model.numBoolVars + model.numIntVars + model.numRealVars)
+        if (token() || funding.paused) return null
+        val improving = requireNotNull(objective).evaluateExact(point) < requireNotNull(condition.cutoff)
+        if (token()) return null
+        trial.finished = true
+        observe("jointRepairGuidedPointChecked")
+        observe(if (improving) "jointRepairGuidedPointImprovements" else "jointRepairGuidedPointNonImproving")
+        return point.takeIf { improving }
     }
 
     private fun publicationChecking(cancellation: Cancellation): Cancellation = object : Cancellation {

@@ -12,6 +12,7 @@ internal class LinearRepairGuidance : AutoCloseable {
     ) {
         fun matches(context: SourceProofContext): Boolean = source === context
         fun integer(id: Int): Double? = point[SourceCoordinate(SourceCoordinate.Kind.Integer, id)]
+        fun real(id: Int): Double? = point[SourceCoordinate(SourceCoordinate.Kind.Real, id)]
     }
 
     private var hint: Hint? = null

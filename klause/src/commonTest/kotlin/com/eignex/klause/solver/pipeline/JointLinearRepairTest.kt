@@ -45,6 +45,79 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `an original rejected guided point should remain unpublished`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+        val guidance = LinearRepairGuidance()
+        assertTrue(guidance.remember(source, (0..2).associate {
+            SourceCoordinate(SourceCoordinate.Kind.Integer, it) to 0.0
+        }, SourceLpBudget(funding = funding), Cancellation.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 8, maxFlips = 3),
+            external = { seed }, repairGuidance = guidance,
+            incumbentCompletionCheck = { _, _, _ -> false }).use { repair ->
+            repair.search(adaptive = true).use { search ->
+                var done = false
+                repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1_000) }
+
+                assertFalse(search.minimizeResult(TerminationReason.BudgetExhausted) is MinimizeResult.WithSample)
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairGuidedPointCompletionRejected"))
+                assertNull(repair.stats.smt.completeSearchStages?.get("jointRepairGuidedPointImprovements"))
+            }
+        }
+    }
+
+    @Test
+    fun `an enlarged guided point should publish only after exact continuous and original checks`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+        val guidance = LinearRepairGuidance()
+        assertTrue(guidance.remember(source, (0..2).associate {
+            SourceCoordinate(SourceCoordinate.Kind.Integer, it) to 0.0
+        }, SourceLpBudget(funding = funding), Cancellation.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(0.0),
+            exactReals = listOf(BigFraction.ZERO))
+        var originalChecks = 0
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 8, maxFlips = 4),
+            external = { seed }, repairGuidance = guidance, incumbentCompletionCheck = { point, _, _ ->
+                originalChecks++
+                point.intValue(0) == 0L && point.exactReals == listOf(BigFraction.ONE)
+            }).use { repair ->
+            repair.search(adaptive = true).use { search ->
+                var done = false
+                repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1_000) }
+
+                val result = assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                assertEquals(0L, result.sample.intValue(0))
+                assertEquals(listOf(BigFraction.ONE), result.sample.exactReals)
+                assertTrue(originalChecks > 0)
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairGuidedPointImprovements"))
+                assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+                    SourceEvidence(source.scope, SourceClaim.Witness(result.sample), SourceDerivation.SourceWitness)))
+            }
+        }
+    }
+
+    @Test
     fun `a guided checked trial should continue through its first enlarged neighborhood`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
             factors = arrayOf(
