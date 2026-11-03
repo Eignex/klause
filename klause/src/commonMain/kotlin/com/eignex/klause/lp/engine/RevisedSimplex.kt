@@ -2858,7 +2858,9 @@ internal class RevisedSimplex(
         val scan = 2L * numVars + m + 1L
         if (scan >= allowance) return decline(LpProbeDecline.ALLOWANCE)
         observe(LpProbeMetrics(scan, 0L, 0))
-        val parentObjective = probeObjective(token) ?: return decline(LpProbeDecline.NO_OPTIMUM)
+        val parentObjective = probeObjective(token) ?: return decline(
+            if (token()) LpProbeDecline.CANCELLED else LpProbeDecline.NO_OPTIMUM,
+        )
         return LpDirectionalProbes(state, basis, parentObjective) { child, work, entries ->
             RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
                 basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),

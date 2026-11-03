@@ -63,8 +63,10 @@ internal class LpDirectionalProbes(
             budget.decline = if (token()) LpProbeDecline.CANCELLED else LpProbeDecline.ALLOWANCE
             return null
         } catch (_: BasisArithmeticException) {
+            budget.decline = LpProbeDecline.CHILD
             return null
         } catch (_: ArithmeticException) {
+            budget.decline = LpProbeDecline.CHILD
             return null
         } finally {
             observe(budget.metrics())
@@ -90,7 +92,7 @@ internal class LpDirectionalProbes(
         } finally {
             budget.prepare(projection.work)
         }
-        child ?: return null
+        child ?: return budget.stop(LpProbeDecline.CHILD)
         val workspace = 16L * child.numVars + 40L * child.m + 64L
         val scaling = LpScalingView.constructionWorkBound(child)
         if (workspace >= budget.remaining() || scaling >= budget.remaining() - workspace) {
@@ -123,10 +125,13 @@ internal class LpDirectionalProbes(
                 val scan = 2L * child.numVars + child.m + 1L
                 if (scan > budget.remaining()) return budget.stop(LpProbeDecline.ALLOWANCE)
                 budget.prepare(scan)
-                val objective = solver.probeObjective(token) ?: return null
+                val objective = solver.probeObjective(token) ?: return budget.stop(
+                    if (token()) LpProbeDecline.CANCELLED else LpProbeDecline.CHILD,
+                )
                 val gain = objective - parentObjective
                 if (budget.overspent()) return budget.stop(LpProbeDecline.ALLOWANCE)
-                if (!gain.isFinite() || gain < 0.0 || token()) return null
+                if (token()) return budget.stop(LpProbeDecline.CANCELLED)
+                if (!gain.isFinite() || gain < 0.0) return budget.stop(LpProbeDecline.CHILD)
                 budget.completed++
                 return gain
             } finally {
