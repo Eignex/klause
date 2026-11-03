@@ -74,6 +74,8 @@ internal object LinearAuthorityAggregateCuts {
                 ArrayList<LinearAuthoritySourceRow>()
             }
             var splitRowLimit = false
+            var splitNonintegerSlot = 0
+            var splitAnchorRows = 0
             val integerRows = if (point == null) null else {
                 meter.reserve(1L, 128L)
                 ArrayList<ProbeRow>()
@@ -111,7 +113,23 @@ internal object LinearAuthorityAggregateCuts {
                     if (splitRows.size < LinearAuthoritySplitCuts.MAX_ROWS) {
                         meter.reserve(1L, 16L)
                         splitRows += row
-                    } else splitRowLimit = true
+                        if (row.hasInteger) splitAnchorRows++
+                    } else {
+                        splitRowLimit = true
+                        while (row.hasInteger && splitNonintegerSlot < splitRows.size) {
+                            meter.reserve(1L)
+                            if (splitRows[splitNonintegerSlot].hasInteger) {
+                                splitNonintegerSlot++
+                                continue
+                            }
+                            meter.reserve((splitRows.size - splitNonintegerSlot).toLong())
+                            splitRows.removeAt(splitNonintegerSlot)
+                            splitRows += row
+                            splitAnchorRows++
+                            observe("AggregateSplitAnchorReplacement", 1L)
+                            break
+                        }
+                    }
                 }
                 for ((id, coefficient) in coefficients) {
                     meter.reserve(1L)
@@ -147,6 +165,7 @@ internal object LinearAuthorityAggregateCuts {
                 override fun deadline() = cancellation.deadline()
             }
             if (point != null && !splitRows.isNullOrEmpty()) {
+                observe("AggregateSplitAnchorRows", splitAnchorRows.toLong())
                 if (splitRowLimit) {
                     eligibilityKnown = false
                     observe("AggregateSplitRowLimit", 1L)

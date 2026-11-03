@@ -218,6 +218,35 @@ class LinearAuthoritySplitCutsTest {
     }
 
     @Test
+    fun `a continuous prefix should leave room for checked integer anchor rows`() {
+        val first = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val second = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
+        val loose = SourceInequality(mapOf(first to BigFraction.ONE, second to BigFraction.ONE),
+            BigFraction.ofLong(100))
+        val premises = linkedMapOf<String, SourcePremise>()
+        repeat(1800) { index -> premises["loose $index"] = SourcePremise(loose) }
+        premises["left"] = SourcePremise(left)
+        premises["right"] = SourcePremise(right)
+        val context = SourceProofContext(scope, setOf(x, real, first, second), premises)
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(context, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            maximumCandidates = 1, limits = limits, point = point + mapOf(first to 0.0, second to 0.0))
+
+        assertEquals(1, cuts.size, observations.toString())
+        val cut = cuts.single()
+
+        assertEquals(mapOf(x to BigFraction.ofLong(6), real to BigFraction.ofLong(4)), cut.inequality.coefficients)
+        assertEquals(BigFraction.ofLong(8), cut.inequality.rhs)
+        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `an interrupted endpoint scan should withhold the split proposal`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val changed = SourceInequality(left.coefficients + (residual to BigFraction.ONE), left.rhs)

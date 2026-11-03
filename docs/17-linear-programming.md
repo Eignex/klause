@@ -624,8 +624,11 @@ nonterminal point can prepare aggregates alongside point-directed row alternativ
 under 65,536 work and 1 MiB modeled allocation. Ordinary aggregate-only queries keep
 their 500,000-work and 8 MiB limits. An installed aggregate recipe with at most 64
 fully checked rows can enter aging without replacing its query.
-Mixed point discovery admits at most 48 multi-coordinate source rows in source
-order and pairs same-sign continuous coefficients through a signed slack identity.
+Mixed point discovery retains at most 48 multi-coordinate source rows. Integer-bearing
+rows take precedence over continuous-only rows within that snapshot because each
+signed pair needs an integer anchor. Replacement preserves source order and charges
+the bounded snapshot scan and reference shifts to the generation work allowance.
+Same-sign continuous coefficients are paired through a signed slack identity.
 It shares the generation's row snapshots and incidence index, checking scalar limits
 only on used rows. Immutable source-premise lookup retains guards and integer pins.
 Endpoint lookup scans only for uncanceled coordinates requested by a pair and
