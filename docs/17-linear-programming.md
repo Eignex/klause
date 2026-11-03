@@ -327,7 +327,8 @@ to the remaining preparation and LP allowances inside the same one MiB guidance 
 Interrupted copies retain only visited value preferences and no component result.
 The ordinary frame stack keeps every alternative, and full source checks still own
 assignment acceptance. These values supply no bound, proof or LP-point authority.
-Capture, ordinary value use and the first value use after a restart have separate observations.
+Capture observations retain initialization, completed copy and declined or interrupted work.
+Ordinary value use and the first value use after a restart have separate observations.
 Explicit target reset, reseed and close release them. A restored source root can refresh expired preferences from its current
 private numerical owner, after rebuilding the current domain and cut view. The
 read requires matching model and exact state at depth zero, preserves child

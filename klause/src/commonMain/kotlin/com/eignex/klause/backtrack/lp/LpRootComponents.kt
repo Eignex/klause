@@ -77,25 +77,36 @@ private fun LpEngine.retainRootComponentValues(
     val start = order.offsets[group]
     val end = order.offsets[group + 1]
     if (end - start < 2 || rootComponentValues?.known?.get(order.members[start]) == true) return
-    val work = 8L * (end - start)
-    if (!rootComponentPreparationAllowed(targets, 0L, work) ||
-        rootComponentPreparationWork(targets, 0L) < work || cancellation()
-    ) return
-    noteNodeOverhead(work)
-    for (index in start until end) {
-        if ((index - start) % 256 == 0 && cancellation()) return
-        if (!session.intDomain(order.members[index]).isFixed) return
+    val started = TimeSource.Monotonic.markNow()
+    val before = totalSolveWork()
+    var outcome = "ALLOWANCE_DECLINED"
+    try {
+        val work = 8L * (end - start)
+        if (!rootComponentPreparationAllowed(targets, 0L, work) ||
+            rootComponentPreparationWork(targets, 0L) < work || cancellation()
+        ) return
+        noteNodeOverhead(work)
+        outcome = "CANCELLED_OR_UNFIXED"
+        for (index in start until end) {
+            if ((index - start) % 256 == 0 && cancellation()) return
+            if (!session.intDomain(order.members[index]).isFixed) return
+        }
+        outcome = "INITIALIZATION_DECLINED"
+        val values = prepareRootComponentValues(targets, cancellation) ?: return
+        outcome = "CANCELLED_COPY"
+        for (index in start until end) {
+            if ((index - start) % 256 == 0 && cancellation()) return
+            val variable = order.members[index]
+            values.values[variable] = session.intDomain(variable).min
+            if (index != start) values.known[variable] = true
+        }
+        // The first member marks a completed copy; interrupted copies remain ordinary value preferences.
+        values.known[order.members[start]] = true
+        outcome = "RETAINED"
+    } finally {
+        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_VALUES", outcome,
+            started.elapsedNow().inWholeNanoseconds, totalSolveWork() - before)
     }
-    val values = prepareRootComponentValues(targets, cancellation) ?: return
-    for (index in start until end) {
-        if ((index - start) % 256 == 0 && cancellation()) return
-        val variable = order.members[index]
-        values.values[variable] = session.intDomain(variable).min
-        if (index != start) values.known[variable] = true
-    }
-    // The first member marks a completed copy; interrupted copies remain ordinary value preferences.
-    values.known[order.members[start]] = true
-    sink.lp.observePrimalPhase("PRIMAL_COMPONENT_VALUES", "RETAINED", 0L, work)
 }
 
 internal fun rootComponentPreparationBytes(variables: Int): Long =
