@@ -180,6 +180,8 @@ one invocation; it replaces worker windows rather than summing them. Worker coun
 merge independently, and parallel arm times may overlap. Arm `initMs` measures
 handle opening; deferred preparation belongs to segment time and live counters.
 `maxMs` is the longest segment, and `reseeds` counts arm reseeds.
+Lifecycle snapshots retain the first incumbent-availability time; subscribed
+lifecycle streams retain every accepted incumbent version.
 [Search statistics](09-learning.md#statistics) owns propagation/conflict accounting.
 
 ## Witnesses and proof scope
