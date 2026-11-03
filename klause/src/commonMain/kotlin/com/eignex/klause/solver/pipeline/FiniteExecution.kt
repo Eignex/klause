@@ -1089,6 +1089,15 @@ private fun executePortfolio(
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
     val admission = request.executionOptions.reader()[ExecutionOption.companionAdmission]
+    val bufferedPublications = when (val publications =
+        request.executionOptions.reader()[ExecutionOption.portfolioPublications]) {
+        null, "immediate" -> false
+        "segment" -> true
+        else -> pipelineConfigError("portfolio-publications expects immediate|segment, got `$publications`")
+    }
+    if (bufferedPublications && (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
+        pipelineConfigError("portfolio-publications requires curated single-core mixed optimization")
+    }
     val fundedCompanions = when (admission) {
         null, "ordinary" -> false
         "funded" -> true
@@ -1098,7 +1107,13 @@ private fun executePortfolio(
         null, "ordinary" -> InitialProbePolicy.ORDINARY
         "leader-half" -> InitialProbePolicy.LEADER_HALF
         "lp-transfer" -> InitialProbePolicy.LP_TRANSFER
-        else -> pipelineConfigError("portfolio-probes expects ordinary|leader-half|lp-transfer, got `$probes`")
+        "heuristic-second" -> InitialProbePolicy.HEURISTIC_SECOND
+        "family-work" -> InitialProbePolicy.FAMILY_WORK
+        "heuristic-work" -> InitialProbePolicy.HEURISTIC_WORK
+        "alns-work" -> InitialProbePolicy.ALNS_WORK
+        else -> pipelineConfigError(
+            "portfolio-probes expects ordinary|leader-half|lp-transfer|heuristic-second|family-work|" +
+                "heuristic-work|alns-work, got `$probes`")
     }
     if (probePolicy != InitialProbePolicy.ORDINARY &&
         (!request.optimize || request.cores != 1 || request.engine != FiniteEngine.MIXED)) {
@@ -1141,7 +1156,7 @@ private fun executePortfolio(
             cores = request.cores,
             executionOptions = request.executionOptions.without(
                 "portfolio-proof-share", "portfolio-proof-workers", "portfolio-lp-start", "portfolio-probes",
-                "boolean-proof-tasks", "companion-admission",
+                "boolean-proof-tasks", "companion-admission", "portfolio-publications",
             ),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
@@ -1169,6 +1184,11 @@ private fun executePortfolio(
             plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
             plan.scenario.annotationArm != null)) {
         pipelineConfigError("portfolio-probes requires a curated recipe pool")
+    }
+    if (bufferedPublications && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
+            plan.scenario.annotationArm != null)) {
+        pipelineConfigError("portfolio-publications requires a curated recipe pool")
     }
     when (plan) {
         is PortfolioPlan.LocalSearchDryRun -> return localSearchDryRun(plan.pool)
@@ -1228,6 +1248,7 @@ private fun executePortfolio(
         probePolicy = probePolicy,
         booleanProofTasks = booleanProofTasks,
         fundedCompanions = fundedCompanions,
+        bufferedPublications = bufferedPublications,
         privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly ||
             privateScenario !== baseScenario,
     )

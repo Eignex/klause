@@ -254,6 +254,21 @@ including for direct engine publications. The low-level portfolio API also
 supports caller-trusted unbound workers with an explicit witness checker. Learned
 clauses are exchanged only when at least two backtrack workers exist.
 
+`portfolio-publications=segment` coalesces private local-search offers within one
+query of a curated single-core mixed finite integer optimization with a containing
+deadline. It retains one immutable candidate, ranked by the worker's canonical
+objective, and checks that candidate at the query boundary before sharing it.
+Failed queries discard pending offers; expiration before or during verification
+withholds installation. Direct public exchange offers retain immediate checking.
+Explicit pools, parallel execution and work-driven schedules reject this policy;
+the default is `immediate`. Private-coordinate workers and ALNS retain their own
+publication paths. Query time includes deferred verification, also reported in the
+LS publication phase and incumbent sharing time; these overlapping measures must
+not be added. `ArmSchedule.sharing.incumbents` and CLI `incumbent*` arm fields report
+offers, coalescing, checks, outcomes and dropped pending points. Exports count
+installed incumbents rather than queued offers. No candidate queue or rejected-point
+history survives the query.
+
 Detailed memory sampling requires `sharing-memory=true`, independently of the
 single-lane charged-work schedule (`portfolio-work`). It defaults to false;
 traffic/work/use counters remain inexpensive. Each sample has separate
@@ -525,6 +540,29 @@ The scheduler assigns bounded slices, revisits pending preparation and reseeds s
 workers under the containing [allowance](06-sessions.md#resource-allowances).
 Scheduling changes work order, never publication authority.
 
+`portfolio-probes=heuristic-second` gives the first initially eligible local-search
+worker the probe after the leading complete worker. It applies to curated single-core
+mixed finite integer optimization with a containing deadline. Deferred, improvement-only
+and auxiliary workers keep their admission rules; early core trials keep their priority.
+The remaining probes retain their order, and all workers retain their identities, seeds,
+probe weights and work limits. Initial attempts and silent complete-worker coverage
+remain required. This option changes the state and time available to later probes;
+it grants no additional source allowance.
+
+`portfolio-probes=family-work` delays additional curated local-search starts until
+one available heuristic has spent the existing base work allowance. Complete
+workers retain their initial probes and silent coverage, and probe fractions keep
+the full initial pool as their denominator. Observed failed worker work stays recorded but
+does not complete another worker's sample. An unavailable or retired first worker
+allows the next eligible heuristic to start its own sample. Reaching the allowance
+opens the remaining heuristic starts for the invocation; it grants no work or time.
+The same curated single-core finite integer scope applies. `heuristicStart` statistics
+retain required work, observed work by worker and completion separately per invocation.
+With `portfolio-publications=segment`, pending private offers finish their checks
+before the scheduler settles that query's sample work. Checking contributes time,
+not native sample work. Factory materialization and shared preparation precede
+scheduling; this gate controls queries.
+
 The worker sampler owns primitive success and trial totals per arm. Restricted
 selection reads those totals directly; fading preserves the prior and the
 accumulator's arithmetic order. The library selector's snapshots synchronize when
@@ -757,6 +795,31 @@ offer against remaining time, so they do not fix durations or native work prefix
 Both controls require a containing deadline and curated single-core mixed integer
 optimization without Boolean or real columns. Explicit recipes and work diagnostics
 reject them; `ordinary` is the default. Deferred LP admission retains its separate boundary.
+
+`portfolio-probes=family-work` delays additional initial LS queries until one eligible
+LS worker independently spends the existing base work allowance. The
+`heuristic-work` mode applies that gate to LS and ALNS queries, including workers
+whose ordinary eligibility requires an incumbent. The first eligible retained
+heuristic supplies the sample; retirement or temporary unavailability permits the
+next eligible worker to supply its own sample. Failed workers' work is not combined.
+Both modes retain eager factory construction, worker positions and private seeds,
+the full available probe denominator, ordinary incumbent eligibility, complete-worker
+coverage and all containing allowances. `heuristicStart` observations report each
+invocation's participating workers, work and sample completion. These modes require
+the same curated elapsed scope as the weighted probe controls and can compose with
+query-boundary publication coalescing.
+
+`portfolio-probes=alns-work` keeps the initial LS queries eligible and defers only
+ALNS. Each initial LS worker can supply the sample, but one worker must independently
+reach the existing base allowance; their work is not combined. ALNS keeps its ordinary
+eligibility when no sample provider is available. Sample observations contain the LS
+providers, while ALNS query lifecycle observations report its actual admission.
+Worker construction, complete-worker coverage, probe fractions and allowances follow
+the same rules as the other paid-work modes.
+
+`heuristicStart` completion time uses the portfolio invocation origin shared by
+worker lifecycle times. It is recorded after sampled search and deferred checks,
+before subsequent worker admission, and remains absent when unobserved.
 
 Before the first incumbent, an optimization arm with pending private preparation, or
 a local-search arm that has not executed an instruction, receives preparation

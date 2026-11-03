@@ -73,6 +73,7 @@ internal fun LpEngine.lpRoundingProbe(
             outcome = "EMPTY_RELAXATION"
             return null
         }
+        val sourceProblem = if (retained == null) problem else retained.sourceProblem
         val primal = retained?.primal?.also {
             val guidance = if (knownColumns == null) "REUSED" else "PARTIAL_REUSED"
             sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", guidance, started.elapsedNow().inWholeNanoseconds)
@@ -88,7 +89,8 @@ internal fun LpEngine.lpRoundingProbe(
                         rootRoundingInterrupted = true
                     }
                     if (iterate != null && (iterate.optimal || termination == LpFloatTermination.CANCELLED)) {
-                        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, iterate.basis)
+                        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, iterate.basis,
+                            sourceProblem = sourceProblem)
                     }
                 }
             } catch (_: CheckedLongOverflowException) {
@@ -96,7 +98,7 @@ internal fun LpEngine.lpRoundingProbe(
             } ?: return null
             if (ownsRootPrimalModel(relaxation.model)) {
                 retainRootPrimalGuidance(relaxation, result, cancellation)
-            } else retainRoundingPrimalGuidance(relaxation, result, objective)
+            } else retainRoundingPrimalGuidance(relaxation, result, objective, sourceProblem)
             rootRoundingWarmStart?.takeIf {
                 it.objective === objective && it.relaxation === relaxation && it.knownColumns == null
             }?.primal ?: result.primal
@@ -522,6 +524,7 @@ private fun LpEngine.solveRetainedPrimalRelaxation(
         val attempt = propagator.solveFloat(token = token, queryAllowance = {
             minOf(rootPrimalWorkBudget(), retainedRootRemainingWork()).coerceAtLeast(1L)
         })
+        if (attempt == null) observeSparsePausedProgress()
         val result = attempt?.second
         val termination = propagator.floatTermination
         outcome = if (result?.optimal == true) "RETAINED_OPTIMAL" else {

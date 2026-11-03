@@ -6,13 +6,16 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.PortfolioEvidence
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.portfolio.ScriptedSearch
 import com.eignex.klause.portfolio.SourceWorkerBinding
+import com.eignex.klause.portfolio.trackingWorker
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -24,6 +27,33 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 
 class PortfolioInvocationTest {
+    @Test
+    fun `probe ordering should preserve source factory identities and seeds`() {
+        val source = Problem(0, 0, emptyArray(), emptyArray())
+        val objective = LinearObjective()
+        val plan = source.prepareExecutionPlan(objective)
+        val runtime = EngineInvocation(plan, ModelIdentity.of(source, objective), objective)
+        val seeds = mutableListOf<Long>()
+        val visits = mutableListOf<Int>()
+        val factories = List(4) { arm ->
+            PortfolioArmFactory(plan, arm, if (arm < 2) ArmFamily.Backtrack else ArmFamily.LocalSearch,
+                binding = { SourceWorkerBinding(runtime) }) { slot ->
+                seeds += slot.seed
+                trackingWorker("worker$arm", arm, ScriptedSearch({ false }) { visits += arm })
+            }
+        }
+
+        PortfolioInvocation(plan, factories,
+            PortfolioInvocationControls(seed = 17, cancellation = Cancellation { visits.size >= 4 }),
+            PortfolioEvidence(runtime.model, CandidateVerifier.trusting()), objective,
+        ) { workers ->
+            PortfolioInvocationPolicy(probeRanks = heuristicSecondProbeRanks(workers))
+        }.use { it.minimize(Cancellation.Never, null) }
+
+        assertEquals(listOf(17L, 18L, 19L, 20L), seeds)
+        assertEquals(listOf(0, 2, 1, 3), visits)
+    }
+
     @Test
     fun `parallel construction should create seeded private slots and close them once`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())

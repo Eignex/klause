@@ -437,7 +437,8 @@ class LocalSearchEngineTest {
                 assertEquals(enabled, handle.stats.ls.objectiveScoring.isNotEmpty())
                 if (enabled) {
                     assertEquals(1L, handle.stats.ls.objectiveScoring.getValue("plain"))
-                    assertEquals(setOf("preparation", "seeding", "selection", "application", "other"), paused.keys)
+                    assertEquals(setOf("preparation", "seeding", "selection", "application", "publication", "other"),
+                        paused.keys)
                     assertTrue(paused.values.all { it >= 0L })
                     assertTrue(paused.values.sum() > 0L)
                     assertTrue(paused.getValue("selection") > 0L)

@@ -367,10 +367,16 @@ class PropagationStateTest {
 
     @Test
     fun `install should be declined below the root`() {
-        val p = Problem(2, 0, emptyArray(), emptyList())
-        val s = PropagationSession(p)
-        s.seed(Assumptions.None)
-        s.pinBool(0, true)
-        assertFalse(s.installObjectiveBoolBound(longArrayOf(3, 4)))
+        for (afterBacktrack in listOf(false, true)) {
+            val p = Problem(2, 0, emptyArray(), emptyList())
+            val s = PropagationSession(p)
+            s.seed(Assumptions.None)
+            s.pinBool(0, true)
+            if (afterBacktrack) {
+                s.pinBool(1, true)
+                s.popToLevel(1)
+            }
+            assertFalse(s.installObjectiveBoolBound(longArrayOf(3, 4)))
+        }
     }
 }
