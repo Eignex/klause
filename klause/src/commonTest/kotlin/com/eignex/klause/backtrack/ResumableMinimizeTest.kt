@@ -194,6 +194,42 @@ internal object FiniteCutoffKnapsackFixture {
 class ResumableMinimizeTest {
 
     @Test
+    fun `component repair revisits earlier pins before passing root coordinates to search`() {
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it % 4 == 0) 2 else 1) },
+            (0 until 2).flatMap { group ->
+                listOf(1 to 2, 2 to 3, 3 to 1).flatMap { (a, b) ->
+                    val variables = intArrayOf(4 * group, 4 * group + a, 4 * group + b)
+                    listOf(Linear(intArrayOf(1, 1, 1), variables, LinearOp.GE, 2),
+                        Linear(intArrayOf(1, -1, -1), variables, LinearOp.GE, 0))
+                }
+            }).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(8) { if (it % 4 == 0) 1L else 0L })
+        val factory = RecordingLpEngineFactory()
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false, boundMaxDepth = -1))
+        val offered = ArrayList<Sample>()
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+            search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, 100_000L) { offered += it.sample }
+
+            val sample = offered.single()
+            assertEquals(2L, sample.ints[0])
+            assertEquals(2L, sample.ints[4])
+            assertTrue(sample.ints.indices.all { sample.ints[it] in 0L..(if (it % 4 == 0) 2L else 1L) })
+            assertTrue(problem.factors.all { factor ->
+                val linear = factor as Linear
+                val row = assertNotNull(linear.integerConstants)
+                assertEquals(LinearOp.LE, linear.op)
+                linear.vars.indices.sumOf { row.coeff(it) * sample.ints[linear.vars[it]] } <= row.bound
+            })
+            assertEquals(2, factory.floatAllowances.size)
+            assertEquals(0.0, search.stats.lp.nodePasses.sum)
+            assertEquals(2L, search.stats.lp.phases["PRIMAL_COMPONENT_REPAIR_ROOT"]
+                ?.outcomes?.get("COMPLETED"))
+        }
+    }
+
+    @Test
     fun `returned fractional child targets round before their coordinates pass to search`() {
         val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it == 4) 2 else 1) },
             (0 until 2).flatMap { group ->

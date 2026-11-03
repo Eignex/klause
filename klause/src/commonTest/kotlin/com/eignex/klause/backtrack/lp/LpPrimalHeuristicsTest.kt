@@ -273,6 +273,95 @@ class LpPrimalHeuristicsTest {
     }
 
     @Test
+    fun `component repair declines when its containing root work is spent`() {
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) },
+            (0 until 2).flatMap { group ->
+                listOf(0 to 1, 1 to 2, 2 to 0).map { (a, b) ->
+                    Linear(intArrayOf(1, 1), intArrayOf(3 * group + a, 3 * group + b), LinearOp.EQ, 1)
+                }
+            })
+        val objective = LinearObjective(intCoefficients = LongArray(6))
+        val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+        val guidance = RootRoundingWarmStart(objective, relaxation,
+            primal = DoubleArray(relaxation.model.n) { 0.5 }, sourceProblem = problem, auxiliaryPoint = true)
+        val sink = SolveStatsSink("spent-component-repair")
+        val factory = RecordingLpEngineFactory()
+        var spend: (() -> Unit)? = null
+        val token = Cancellation {
+            if (guidance.componentRounding?.repair?.active == true) {
+                val consume = spend
+                spend = null
+                consume?.invoke()
+            }
+            false
+        }
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootMaxWork = 1_000_000L)), sink, LpSolveContext(factory)).use { engine ->
+            engine.rootRoundingWarmStart = guidance
+            spend = { engine.noteSolveOps(1_000_000L) }
+
+            val sample = engine.lpRoundingProbe(objective, token)
+
+            assertNull(sample)
+            assertNull(spend)
+            assertEquals(1L, sink.snapshot().lp.phases["PRIMAL_COMPONENT_REPAIR_ROOT"]
+                ?.outcomes?.get("WORK_DECLINED"))
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
+
+    @Test
+    fun `interrupted component repair retains earlier component pins under a fresh token`() {
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it % 4 == 0) 2 else 1) },
+            (0 until 2).flatMap { group ->
+                listOf(1 to 2, 2 to 3, 3 to 1).flatMap { (a, b) ->
+                    val variables = intArrayOf(4 * group, 4 * group + a, 4 * group + b)
+                    listOf(Linear(intArrayOf(1, 1, 1), variables, LinearOp.GE, 2),
+                        Linear(intArrayOf(1, -1, -1), variables, LinearOp.GE, 0))
+                }
+            })
+        val objective = LinearObjective(intCoefficients = LongArray(8))
+        val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+        val primal = DoubleArray(relaxation.model.n)
+        for (v in 0 until 8) primal[relaxation.intColOf[v]] = if (v % 4 == 0) 1.0 else 0.5
+        val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal,
+            sourceProblem = problem, auxiliaryPoint = true)
+        var expired = false
+        val slice = Cancellation {
+            val pending = guidance.componentRounding
+            val pinning = guidance.pinning
+            if (pending?.group == 1 && pending.repair?.active == true &&
+                pinning?.intDomain(4)?.isFixed == true
+            ) expired = true
+            expired
+        }
+        val factory = RecordingLpEngineFactory()
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),
+            SolveStatsSink("resumed-component-repair"), LpSolveContext(factory)).use { engine ->
+            engine.rootRoundingWarmStart = guidance
+            assertNull(engine.lpRoundingProbe(objective, slice))
+            val prefix = assertNotNull(guidance.pinning)
+            assertTrue(expired)
+            assertEquals(IntDomain(2, 2), prefix.intDomain(0))
+            val paid = engine.primalPropagationWork
+
+            val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+
+            assertEquals(2L, sample.ints[0])
+            assertEquals(2L, sample.ints[4])
+            assertIs<Verification.Accepted<Sample, Double>>(
+                ComposedSampleVerifier(problem, objective, Cancellation.Never)
+                    .verify(Candidate(sample, objective.evaluate(sample))),
+            )
+            assertEquals(prefix.work, engine.primalPropagationWork)
+            assertTrue(engine.primalPropagationWork > paid)
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
+
+    @Test
     fun `interrupted component rounding retains completed earlier pins under a fresh token`() {
         for (withinDirection in listOf(false, true)) {
             val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it == 4) 2 else 1) },

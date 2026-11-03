@@ -127,6 +127,23 @@ internal fun LpEngine.pinRootComponents(
     }
     while (pending.group < order.groups) {
         if (cancellation() || session.fixpointCancelled || session.probeCancelled) return null
+        if (pending.repair?.active == true) {
+            when (repairRootComponent(session, pending, cancellation, ::target, charge)) {
+                null -> return null
+                false -> {
+                    retainCompletedRoundingComponents(pending, session, cancellation, charge)
+                    return null
+                }
+                true -> {
+                    pending.group++
+                    pending.level = session.decisionLevel
+                    pending.rounding = LpRounding.NEAREST
+                    pending.repair?.reset()
+                    sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", "GROUP_COMPLETED", 0L)
+                    continue
+                }
+            }
+        }
         var complete = true
         try {
             // Reversing the prepared fractionality order visits confident targets first; unknowns follow them.
@@ -154,13 +171,11 @@ internal fun LpEngine.pinRootComponents(
             session.popToLevel(pending.level)
             if (pending.rounding == LpRounding.DOWN) {
                 val targets = rootPrimalTargets?.takeIf { it.components === order }
-                if (targets != null) for (group in 0 until pending.group) {
-                    session.chargeInprocessingWork(1L)
-                    charge()
-                    if (cancellation()) break
-                    retainRootComponentValues(targets, order, group, session, cancellation)
-                }
-                sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", "GROUP_DECLINED", 0L)
+                val repair = targets?.let { prepareRootComponentRepair(it, pending, cancellation) }
+                if (repair != null) continue
+                if (cancellation()) return null
+                sink.lp.observePrimalPhase("PRIMAL_COMPONENT_REPAIR", "ALLOWANCE_DECLINED", 0L)
+                retainCompletedRoundingComponents(pending, session, cancellation, charge)
                 return null
             }
             pending.rounding = if (pending.rounding == LpRounding.NEAREST) LpRounding.UP else LpRounding.DOWN
@@ -173,4 +188,20 @@ internal fun LpEngine.pinRootComponents(
         }
     }
     return snapshotAssignment(session)
+}
+
+private fun LpEngine.retainCompletedRoundingComponents(
+    pending: RootComponentRounding,
+    session: PropagationSession,
+    cancellation: Cancellation,
+    charge: () -> Unit,
+) {
+    val targets = rootPrimalTargets?.takeIf { it.components === pending.order }
+    if (targets != null) for (group in 0 until pending.group) {
+        session.chargeInprocessingWork(1L)
+        charge()
+        if (cancellation()) break
+        retainRootComponentValues(targets, pending.order, group, session, cancellation)
+    }
+    sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", "GROUP_DECLINED", 0L)
 }

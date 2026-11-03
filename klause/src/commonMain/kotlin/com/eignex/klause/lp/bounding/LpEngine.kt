@@ -372,8 +372,9 @@ internal class LpEngine(
         val targetBytes = rootTargetBytes(targets, rounding) +
             if (restartRootTargets === targets) 0L else rootTargetBytes(restartRootTargets, rounding)
         val componentRoundingBytes = rounding?.componentRounding?.let {
-            128L + if (it.order === targets?.components || it.order === restartRootTargets?.components) 0L
-            else it.order.retainedBytes
+            128L + (it.repair?.retainedBytes ?: 0L) +
+                if (it.order === targets?.components || it.order === restartRootTargets?.components) 0L
+                else it.order.retainedBytes
         } ?: 0L
         return roundingBytes + maskBytes + targetBytes + componentRoundingBytes +
             (rootComponentValues?.retainedBytes ?: 0L) +
@@ -405,6 +406,33 @@ internal class LpEngine(
         guide.componentRounding = pending
         return pending
     }
+
+    internal fun prepareRootComponentRepair(
+        targets: RootPrimalTargets,
+        pending: RootComponentRounding,
+        cancellation: Cancellation,
+    ): RootComponentRepair? {
+        val guide = rootRoundingWarmStart ?: return null
+        if (!rootComponentRepairWorkAvailable()) return null
+        if (guide.componentRounding !== pending || targets.components !== pending.order ||
+            targets.coordinates !== guide.primal
+        ) return null
+        val bytes = if (pending.repair == null) rootComponentRepairBytes(problem.numIntVars) else 0L
+        val work = if (pending.repair == null) 8L * problem.numIntVars + 1L else 1L
+        if (!rootComponentPreparationAllowed(targets, bytes, work) ||
+            rootComponentPreparationWork(targets, bytes) < work || cancellation()
+        ) return null
+        noteNodeOverhead(work)
+        val repair = pending.repair ?: RootComponentRepair(problem.numIntVars)
+        if (cancellation()) return null
+        pending.repair = repair
+        repair.active = true
+        return repair
+    }
+
+    internal fun rootComponentRepairWorkAvailable(): Boolean =
+        retainedRootRemainingWork() > 0L &&
+            retainedRootCumulativeWork() > saturatingAdd(primalPropagationWork, sink.lp.standaloneWork)
 
     // Numerical pivots spend the containing allowance, not the separate transport and construction cap.
     internal fun rootComponentPreparationAllowed(targets: RootPrimalTargets, bytes: Long, minimumWork: Long): Boolean =

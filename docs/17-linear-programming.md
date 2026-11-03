@@ -638,8 +638,15 @@ downward preferences within each component, including after a global nearest
 attempt declines. A failed direction retracts only that component's pins; completed earlier components stay
 in the private propagation session. Interrupted attempts retain their completed
 fixpoint and current component and direction. A fresh session restarts this progress.
-If a later component declines every direction, completed earlier integer values
-can remain soft preferences for complete search. No partial assignment is a witness.
+After all three directions decline, a funded private repair can revisit earlier pins
+within the current component. It explores nearest and adjacent target values, or the
+domain endpoints for unknown targets, using an owned bounded frame stack. Completed
+earlier components remain pinned. Interrupted probes roll back to their last complete
+fixpoint; pending alternatives resume under the next invocation token. Frames count
+against the same guidance storage cap, and propagation and retraction spend the remaining
+cumulative root and worker work. Exhausting the candidate choices or allowance supplies
+no infeasibility authority. Completed earlier integer values can remain soft preferences
+for complete search. No partial assignment is a witness.
 Component progress and its retained order share the existing guidance storage cap;
 all graph, propagation and value-copy work spends the containing allowances.
 The preparation cap counts cumulative LP transport and construction overhead;

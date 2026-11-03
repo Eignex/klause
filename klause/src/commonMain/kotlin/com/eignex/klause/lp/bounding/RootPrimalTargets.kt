@@ -30,11 +30,36 @@ internal class RootComponentRounding(val order: RootComponentOrder) {
     var group: Int = 0
     var level: Int = 0
     var rounding: LpRounding = LpRounding.NEAREST
+    var repair: RootComponentRepair? = null
 
     fun reset() {
         group = 0
         level = 0
         rounding = LpRounding.NEAREST
+        repair?.reset()
+    }
+}
+
+internal fun rootComponentRepairBytes(variables: Int): Long = 256L + 33L * variables
+
+internal class RootComponentRepair(variables: Int) {
+    val positions = IntArray(variables)
+    val levels = IntArray(variables)
+    val first = LongArray(variables)
+    val second = LongArray(variables)
+    val undoWork = LongArray(variables)
+    val states = ByteArray(variables)
+    var depth: Int = 0
+    var position: Int = 0
+    var retreat: Boolean = false
+    var active: Boolean = false
+    val retainedBytes: Long get() = rootComponentRepairBytes(positions.size)
+
+    fun reset() {
+        depth = 0
+        position = 0
+        retreat = false
+        active = false
     }
 }
 

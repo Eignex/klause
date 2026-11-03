@@ -127,7 +127,9 @@ can first fund a private component-rounding trial; its progress survives a slice
 boundary within the existing allowance. Known-column masks gate admission and LP
 preferences; unknown variables keep their ordinary fallback values. Guides without
 known fractional targets keep their direct handoff. The private probe prepares its
-partition against its own root domains, and each completed proposal still needs
+partition against its own root domains. After greedy directions decline, its bounded
+repair can revisit an earlier pin within that component while retaining completed
+earlier components and pending alternatives across slices. Every completed proposal still needs
 the ordinary source acceptance check. Its existing backtracking completes the assignment,
 and complete source checks retain publication authority. This transfer carries no
 LP point, bound or proof authority into a leaf. Before its first incumbent, a retained
