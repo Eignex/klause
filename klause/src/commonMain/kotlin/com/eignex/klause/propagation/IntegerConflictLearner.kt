@@ -109,8 +109,9 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         if (pair != null && state.learned.integerRows?.none { it.row.subsumes(pair.row) } != false &&
             pair.row.assertsAt(state, trail)) {
             state.integerOriginalPairProduced++
+            if (pair.nonOwner) state.integerNonOwnerPairProduced++
             state.arithmeticLearningTrace?.record("integer.assertion", target.toLong(), trail.toLong(), 1L)
-            return learnedResult(pair.row.withStreamedPairOrigin(true), fallback)
+            return learnedResult(pair.row.withStreamedPairOrigin(true, pair.nonOwner), fallback)
         }
         val used = mutableSetOf<PivotKey>()
         var transientSteps = 0
@@ -121,6 +122,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         var boundImplication = false
         var boundCover = false
         var streamedPair = pair != null
+        var nonOwnerPair = pair?.nonOwner == true
         repeat(INTEGER_LEARNING_STEPS) {
             if (combinations == INTEGER_LEARNING_STEPS) return decline("combination-limit")
             state.checkFiniteWork()
@@ -139,6 +141,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             } else state.arithmeticLearningTrace?.row(if (event.streamedPair)
                 "integer.original-pair-row" else "integer.pivot-row", event.row, state, event.trail)
             if (event.streamedPair) streamedPair = true
+            if (event.nonOwnerPair) nonOwnerPair = true
             if (event.nonOwnerOriginalSource) {
                 nonOwnerOriginalSource = true
                 state.integerNonOwnerOriginalSources++
@@ -219,13 +222,14 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 }
             }
             if (streamedPair) state.integerOriginalPairProduced++
+            if (nonOwnerPair) state.integerNonOwnerPairProduced++
             if (compact.declaredBoundTerms > 0) state.integerDeclaredBoundProduced++
             if (compact.declaredBoundModes != 0) state.integerDeclaredBoundExtendedProduced++
             return learnedResult(
                 compact.derivedThroughTransient(transientSteps)
                     .derivedFromRetainedSources(retainedSources, nonOwnerSource, nonOwnerOriginalSource,
                         slackOriginalSource, duplicateContinuation, boundImplication, boundCover)
-                    .withStreamedPairOrigin(streamedPair), fallback)
+                    .withStreamedPairOrigin(streamedPair, nonOwnerPair), fallback)
         }
         return decline("step-limit-without-assertion")
     }
@@ -254,7 +258,10 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         if (factorId !in 0 until state.baseFactorCount) return null
         val pairs = streamedPairs ?: StreamedIntegerSourcePair(state, sourceWork, ::reserveCombination)
             .also { streamedPairs = it }
-        return pairs.source(factorId, target)?.also { state.integerOriginalPairSources++ }
+        return pairs.source(factorId, target)?.also {
+            state.integerOriginalPairSources++
+            if (it.nonOwner) state.integerNonOwnerPairSources++
+        }
     }
 
     private fun combine(
@@ -384,7 +391,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             streamedPairSource(factorId, target)?.let { pair ->
                 return BoundEvent(pair.row, pair.variable, pair.trail,
                     PivotKey(pair.variable, pair.trail, pair.lower, retained = false, streamedPair = true),
-                    streamedPair = true, combination = pair.row)
+                    streamedPair = true, nonOwnerPair = pair.nonOwner, combination = pair.row)
             }
         }
         if (combinations < INTEGER_LEARNING_STEPS) {
@@ -778,6 +785,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val boundImplication: Boolean = false,
         val boundCover: Boolean = false,
         val streamedPair: Boolean = false,
+        val nonOwnerPair: Boolean = false,
         val combination: IntegerLearningInequality? = null,
     )
 }

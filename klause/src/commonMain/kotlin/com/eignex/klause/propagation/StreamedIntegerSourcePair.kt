@@ -1,5 +1,7 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -13,7 +15,13 @@ internal class StreamedIntegerSourcePair(
     private val work: IntegerSourceWork,
     private val reserveCombination: () -> Boolean,
 ) {
-    class Source(val row: IntegerConflictRow, val variable: Int, val trail: Int, val lower: Boolean)
+    class Source(
+        val row: IntegerConflictRow,
+        val variable: Int,
+        val trail: Int,
+        val lower: Boolean,
+        val nonOwner: Boolean = false,
+    )
 
     private data class Key(
         val first: Int,
@@ -93,8 +101,9 @@ internal class StreamedIntegerSourcePair(
         secondId: Int,
         secondUseLo: Boolean,
         variable: Int,
+        nonOwner: Boolean = false,
     ): IntegerConflictRow? = try {
-        combineChecked(firstId, firstUseLo, secondId, secondUseLo, variable)
+        combineChecked(firstId, firstUseLo, secondId, secondUseLo, variable, nonOwner)
     } catch (_: CheckedLongOverflowException) {
         decline("overflow")
     }
@@ -105,6 +114,7 @@ internal class StreamedIntegerSourcePair(
         secondId: Int,
         secondUseLo: Boolean,
         variable: Int,
+        nonOwner: Boolean,
     ): IntegerConflictRow? {
         if (firstId == secondId || exhausted) return null
         val first = original(firstId) ?: return null
@@ -112,6 +122,7 @@ internal class StreamedIntegerSourcePair(
         if (!supports(first, firstUseLo) || !supports(second, secondUseLo)) return decline("side-or-pivot")
         if (first.vars.size <= INTEGER_SOURCE_TERMS && second.vars.size <= INTEGER_SOURCE_TERMS) return null
         if (kotlin.math.abs(first.nonzero - second.nonzero) > INTEGER_LEARNING_TERMS) {
+            sources.remove(secondId)
             return decline("support-width")
         }
         val firstPosition = position(first, variable)
@@ -134,6 +145,7 @@ internal class StreamedIntegerSourcePair(
         }
         attempted.add(key)
         state.arithmeticLearningTrace?.record("integer.retained.original-pair.trial")
+        if (nonOwner) state.arithmeticLearningTrace?.record("integer.retained.non-owner-pair.trial")
         val terms = linkedMapOf<Int, Long>()
         var i = 0
         var j = 0
@@ -182,19 +194,67 @@ internal class StreamedIntegerSourcePair(
                 val side = marker[LAZY_PAYLOAD + 1]
                 if (side !in 0..1) continue
                 val row = combine(factorId, useLo, owner, side == 1, variable) ?: continue
-                var minimum = 0L
-                for (term in row.variables.indices) {
-                    work.visit()
-                    val c = row.coefficients[term]
-                    val domain = state.intDomains[row.variables[term]]
-                    minimum = addExact(minimum, mulExact(c, if (c > 0L) domain.min else domain.max))
-                }
-                if (minimum <= row.bound) {
+                if (!conflicting(row)) {
                     decline("not-conflicting")
                     continue
                 }
                 state.arithmeticLearningTrace?.record("integer.retained.original-pair.selected")
                 return Source(row, variable, marker[2], lower)
+            }
+        }
+        return nonOwnerSource(factorId, seed, target)
+    }
+
+    private fun conflicting(row: IntegerConflictRow): Boolean {
+        var minimum = 0L
+        for (term in row.variables.indices) {
+            work.visit()
+            val c = row.coefficients[term]
+            val domain = state.intDomains[row.variables[term]]
+            minimum = addExact(minimum, mulExact(c, if (c > 0L) domain.min else domain.max))
+        }
+        return minimum > row.bound
+    }
+
+    private fun nonOwnerSource(factorId: Int, seed: Original, target: Int): Source? {
+        state.arithmeticLearningTrace?.record("integer.retained.non-owner-pair.scan")
+        for (useLo in listOf(true, false)) {
+            if (!supports(seed, useLo)) continue
+            for (index in seed.vars.indices) {
+                work.visit()
+                if (exhausted) return null
+                val variable = seed.vars[index]
+                val coefficient = signed(seed.coeffs[index], useLo)
+                if (coefficient == 0L) continue
+                val lower = coefficient > 0L
+                val level = if (lower) state.intMinLevel[variable] else state.intMaxLevel[variable]
+                if (level <= target) continue
+                val owner = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
+                val occurrences = state.projection.readyIntOccurrences(variable)
+                state.arithmeticLearningTrace?.record(if (occurrences == null)
+                    "integer.retained.non-owner-pair.unindexed" else "integer.retained.non-owner-pair.indexed")
+                val size = occurrences?.size ?: state.baseFactorCount
+                for (offset in 0 until size) {
+                    work.visit()
+                    if (exhausted) return null
+                    val secondId = occurrences?.get(offset) ?: offset
+                    if (secondId !in 0 until state.baseFactorCount ||
+                        secondId == factorId || secondId == owner) continue
+                    val factor = state.problem.factors[secondId]
+                    if (factor !is Linear && factor !is ExactLinear) continue
+                    val parent = original(secondId) ?: continue
+                    for (parentUseLo in listOf(true, false)) {
+                        if (!supports(parent, parentUseLo)) continue
+                        val row = combine(factorId, useLo, secondId, parentUseLo, variable, nonOwner = true) ?: continue
+                        if (!conflicting(row)) {
+                            decline("not-conflicting")
+                            continue
+                        }
+                        state.arithmeticLearningTrace?.record("integer.retained.original-pair.selected")
+                        state.arithmeticLearningTrace?.record("integer.retained.non-owner-pair.selected")
+                        return Source(row, variable, state.undo.size, lower, nonOwner = true)
+                    }
+                }
             }
         }
         return null

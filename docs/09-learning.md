@@ -574,8 +574,18 @@ A supported seed can try this route as its first combination after ordinary pare
 selection fails. Historical endpoint markers select the second original constraint;
 endpoint bounds are not substituted for premises of the combined inequality.
 
+If owner pairs fail, above-target seed coordinates can select a different mandatory
+original through an already materialized integer occurrence index, or a funded
+factor-identity walk. The selection omits the seed and the current endpoint owner;
+it neither constructs an index nor substitutes an eager support or endpoint for a
+model premise. The exact combined row must still conflict and pass the same native
+and mapped historical assertion checks. Separate current-analysis non-owner pair
+counters require actual introduction and cannot inherit credit from retained ancestry.
+
 At most 16 validated original-source references and 16 distinct pair signatures are
-cached for one analysis. Validation, cache probes, coordinate search, merging and
+cached for one analysis. A second source whose nonzero support count differs by more
+than 16 cannot yield a compact pair and is removed from the cache. Validation, cache
+probes, coordinate search, merging and
 normalization share the source-visit allowance; failed pair trials share the ordinary
 16-combination allowance. The cache retains no parent proof after analysis. Separate
 source, produced, admitted and consumed counters use a final current-analysis origin

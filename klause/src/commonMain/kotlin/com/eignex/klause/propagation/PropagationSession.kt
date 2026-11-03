@@ -1474,6 +1474,15 @@ class PropagationSession private constructor(
             "learningIntegerOriginalPairAdmitted" to it.integerOriginalPairAdmitted,
             "learningIntegerOriginalPairConsumed" to it.integerOriginalPairConsumed,
         )
+        val nonOwnerPairLifecycle = if (it.integerNonOwnerPairSources == 0L &&
+            it.integerNonOwnerPairAdmitted == 0L) {
+            emptyMap()
+        } else mapOf(
+            "learningIntegerNonOwnerPairSources" to it.integerNonOwnerPairSources,
+            "learningIntegerNonOwnerPairProduced" to it.integerNonOwnerPairProduced,
+            "learningIntegerNonOwnerPairAdmitted" to it.integerNonOwnerPairAdmitted,
+            "learningIntegerNonOwnerPairConsumed" to it.integerNonOwnerPairConsumed,
+        )
         val declaredBoundLifecycle = if (it.integerDeclaredBoundTerms == 0L && it.integerDeclaredBoundAdmitted == 0L) {
             emptyMap()
         } else mapOf(
@@ -1488,7 +1497,8 @@ class PropagationSession private constructor(
         )
         if (it.integerRowLearning) {
             counts + diagnostics + transientLifecycle + chainedLifecycle + boundImplicationLifecycle +
-                originalPairLifecycle + declaredBoundLifecycle + (attached?.integerCensus?.snapshot() ?: emptyMap()) +
+                originalPairLifecycle + nonOwnerPairLifecycle + declaredBoundLifecycle +
+                (attached?.integerCensus?.snapshot() ?: emptyMap()) +
                 ("learningIntegerSessions" to 1L)
         } else counts
     } ?: retiredLifecycle

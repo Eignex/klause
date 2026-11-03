@@ -145,7 +145,7 @@ class StreamedIntegerSourcePairTest {
         val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
             .apply { enableIntegerRowLearning() }
         native.addLearnedIntegerRow(assertNotNull(IntegerConflictRow.normalized(
-            mapOf(0 to 1L, 1 to 1L, 2 to 1L), 1L, Lit.NONE)).withStreamedPairOrigin(true), 1)
+            mapOf(0 to 1L, 1 to 1L, 2 to 1L), 1L, Lit.NONE)).withStreamedPairOrigin(true, nonOwner = true), 1)
         val cp = CpSearchComponent(native)
         val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
         assertIs<ComponentResult.Consistent>(shared.initialize())
@@ -156,11 +156,104 @@ class StreamedIntegerSourcePairTest {
 
         assertTrue(learned.row.retainedSources > 0)
         assertFalse(learned.row.hasStreamedPair)
+        assertFalse(learned.row.hasNonOwnerPair)
         val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
         shared.popTo(backjump.decisionLevel)
         assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
         assertEquals(0L, native.learnedLifecycle()["learningIntegerOriginalPairProduced"])
         assertEquals(admitted, native.learnedLifecycle()["learningIntegerOriginalPairAdmitted"])
+        assertEquals(0L, native.learnedLifecycle()["learningIntegerNonOwnerPairProduced"])
+        assertEquals(admitted, native.learnedLifecycle()["learningIntegerNonOwnerPairAdmitted"])
+    }
+
+
+    @Test
+    fun `non-owner originals should derive a mapped pair beyond unrelated endpoint owners`() {
+        for (learning in listOf(false, true)) {
+            val problem = Problem(0, 35, Array(35) { IntDomain(0, 1) }, Array(34) { index ->
+                when (index) {
+                    0 -> Linear(IntArray(34) { 1 },
+                        intArrayOf(0, 1, 2) + IntArray(31) { it + 4 }, LinearOp.LE, 32)
+                    33 -> Linear(IntArray(33) { if (it == 1) 1 else -1 },
+                        intArrayOf(0, 3) + IntArray(31) { it + 4 }, LinearOp.LE, -31)
+                    else -> {
+                        val variable = if (index == 1) 0 else index + 2
+                        if (variable < 3) Linear(intArrayOf(-1, 1), intArrayOf(variable, 3), LinearOp.LE, 0)
+                        else Linear(intArrayOf(1, -1), intArrayOf(3, variable), LinearOp.LE, 0)
+                    }
+                }
+            })
+            val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+            if (learning) native.enableIntegerRowLearning()
+            val cp = CpSearchComponent(native, IntArray(35) { it + 7 })
+            val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(shared.initialize())
+            assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtLeast(8, 1)))
+            assertEquals(1L, shared.intUpperBound(9))
+
+            assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(10, 1)))
+            if (learning) {
+                val learned =
+                    assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+                assertContentEquals(intArrayOf(1, 2, 3), learned.row.variables)
+                assertContentEquals(longArrayOf(1, 1, 1), learned.row.coefficients)
+                assertEquals(1L, learned.row.bound)
+                assertTrue(learned.row.hasStreamedPair)
+                assertTrue(learned.row.hasNonOwnerPair)
+            }
+            val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+            shared.popTo(backjump.decisionLevel)
+            assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+            assertEquals(0L, shared.intUpperBound(10))
+            assertEquals(if (learning) 0L else 1L, shared.intUpperBound(9))
+            shared.popTo(0)
+            assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtLeast(8, 1)))
+            assertEquals(if (learning) 0L else 1L, shared.intUpperBound(9))
+            val snapshot = native.learnedLifecycle()
+            assertEquals(if (learning) 1L else 0L, snapshot["learningIntegerNonOwnerPairSources"] ?: 0L)
+            assertEquals(if (learning) 1L else 0L, snapshot["learningIntegerNonOwnerPairProduced"] ?: 0L)
+            assertEquals(if (learning) 1L else 0L, snapshot["learningIntegerNonOwnerPairAdmitted"] ?: 0L)
+            assertEquals(if (learning) 1L else 0L, snapshot["learningIntegerNonOwnerPairConsumed"] ?: 0L)
+            native.releaseRetainedState()
+            assertEquals(snapshot, native.learnedLifecycle())
+        }
+    }
+
+    @Test
+    fun `an unavailable root premise should withhold a non-owner paired child`() {
+        val problem = Problem(0, 36, Array(36) { IntDomain(0, 1) }, Array(34) { index ->
+            when (index) {
+                0 -> Linear(IntArray(34) { 1 },
+                    intArrayOf(0, 1, 2) + IntArray(31) { it + 5 }, LinearOp.LE, 32)
+                33 -> Linear(IntArray(34) { if (it == 1 || it == 2) 1 else -1 },
+                    intArrayOf(0, 3, 4) + IntArray(31) { it + 5 }, LinearOp.LE, -30)
+                else -> {
+                    val variable = if (index == 1) 0 else index + 3
+                    if (variable < 3) Linear(intArrayOf(-1, 1), intArrayOf(variable, 3), LinearOp.LE, 0)
+                    else Linear(intArrayOf(1, -1), intArrayOf(3, variable), LinearOp.LE, 0)
+                }
+            }
+        })
+        val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+            .apply { enableIntegerRowLearning() }
+        val peer = object : SearchComponent {
+            override fun initialize(context: SearchContext): ComponentResult =
+                context.publish(SearchDecision.IntAtLeast(4, 1))
+        }
+        val cp = CpSearchComponent(native)
+        val shared = SearchSession(listOf(peer, cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.IntAtLeast(1, 1)))
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(3, 1)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+        assertTrue(learned.row.hasNonOwnerPair)
+
+        assertFalse(cp.prefersNativeConflictAnalysis)
+
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerNonOwnerPairProduced"])
+        assertEquals(0L, native.learnedLifecycle()["learningIntegerNonOwnerPairAdmitted"])
+        assertEquals(0L, native.learnedLifecycle()["learningIntegerNonOwnerPairConsumed"])
     }
 
     @Test
