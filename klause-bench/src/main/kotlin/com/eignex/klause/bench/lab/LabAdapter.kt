@@ -9,6 +9,7 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
+import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.target.collectionOf
@@ -64,11 +65,12 @@ internal object KlauseLabSuite : BenchSuite {
         val settings = LabSettings(request.parameters)
         val selectedProblems = settings.selections.flatMap { KlauseCli.selectProblems(it) }
             .distinctBy { it.suite to it.ref.name }
+        val compilerTrees = mutableMapOf<Path, String>()
         return selectedProblems.flatMap { selected ->
             val ref = selected.ref
             require(ref.source !is ProblemSource.InCode) { "Lab subprocess solves require file-backed inputs" }
             val inputs = LabInputs.resolve(ref, settings.inputOnly)
-            val trees = LabInputs.treeHashes(inputs)
+            val trees = LabInputs.treeHashes(inputs, compilerTrees)
             settings.engines.flatMap { engine ->
                 val variant = if (settings.engines.size > 1) "$engine/" else ""
                 settings.seeds.flatMap { seed ->
@@ -153,11 +155,25 @@ internal object KlauseLabSuite : BenchSuite {
         }
         val provenance = record.buildProvenance?.let { build ->
             build.copy(
+                harness = ComparisonProvenance.current.retained,
                 runtimeOptions = build.runtimeOptions +
                     ("lab.cli.args" to Files.readString(context.outputDirectory.resolve("cli.args"))),
             )
         }
         val retained = record.copy(
+            comparisonControls = comparisonControls(case) + buildMap {
+                provenance?.let { build ->
+                    put("runtimeFingerprint", ComparisonProvenance.runtimeFingerprint(build))
+                    put("harnessFingerprint", ComparisonProvenance.current.harnessFingerprint)
+                    put("libraryFingerprint", ComparisonProvenance.current.libraryFingerprint)
+                }
+                record.compilerIdentity?.let { compiler ->
+                    put(
+                        "compilerFingerprint",
+                        sha256(compiler.copy(executable = "", standardLibrary = "").toString().toByteArray()),
+                    )
+                }
+            },
             buildProvenance = provenance,
             buildFingerprint = provenance?.fingerprint,
             stats = record.stats + mapOf(
@@ -165,9 +181,28 @@ internal object KlauseLabSuite : BenchSuite {
                 "labDebug" to p.getValue("debug"),
             ),
         )
-        val recordPath = context.outputDirectory.resolve("report/${ref.name.replace('/', '_')}.json")
+        val recordPath = context.outputDirectory.resolve("report/${Reports.fileStem(ref.name)}.json")
         Files.writeString(recordPath, Reports.json.encodeToString(SolveRecord.serializer(), retained))
         return retained
+    }
+
+    internal fun comparisonControls(case: BenchCase): Map<String, String> = buildMap {
+        val p = case.parameters
+        put("policy", "matched-source-v1")
+        put("series", p["comparison-series"] ?: "sdk-v1")
+        put("solverSeed", p.getValue("seed"))
+        put("compilerSeed", p["compiler-seed"] ?: "1")
+        put("solverBudgetMs", p.getValue("timeout-ms"))
+        put("compilerTimeoutSeconds", p.getValue("compile-timeout-sec"))
+        put("caseTimeoutSeconds", case.resources.timeoutSeconds.toString())
+        put("cpus", case.resources.cpus.toString())
+        put("memoryMiB", case.resources.memoryMiB.toString())
+        for (key in listOf("heap-mib", "gc", "debug", "measurement", "complete-assignment")) {
+            put(key, p.getValue(key))
+        }
+        put("exact", p["exact"] ?: "false")
+        put("deadlinePolicy", "cli-inclusive-v1")
+        case.attributes["labInputDigest"]?.let { put("inputDigest", it) }
     }
 
     internal fun failure(record: SolveRecord): String? = record.stats["loadError"] ?: record.stats["errorMessage"]

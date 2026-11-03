@@ -1,4 +1,3 @@
-import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.HexFormat
 
@@ -110,27 +109,7 @@ tasks.register<JavaExec>("bench") {
     doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
 }
 
-tasks.register<JavaExec>("intDomainMicrobench") {
-    group = "bench"
-    description = "Run host-sensitive IntDomain representation timing probes."
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.eignex.klause.bench.microbench.IntDomainMicrobench")
-}
 
-tasks.register("dumpSchema", JavaExec::class) {
-    group = "tools"
-    description = "Regenerate bundled JSON SchemaDef sample at smoke-corpus/schema/campaign.json."
-    notCompatibleWithConfigurationCache(
-        "JavaExec.standardOutput is not serialisable into the configuration cache",
-    )
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.eignex.klause.bench.tools.SchemaDumperKt")
-    doFirst {
-        standardOutput = FileOutputStream(
-            layout.projectDirectory.file("smoke-corpus/schema/campaign.json").asFile,
-        )
-    }
-}
 
 tasks.withType<Test> {
     maxHeapSize = "4g"
