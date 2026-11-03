@@ -41,8 +41,10 @@ internal class LpDirectionalProbes(
         try {
             val gains = ArrayList<LpDirectionalGain>(columns.size)
             for (index in columns.indices) {
-                val down = childGain(columns[index], splits[index], true, budget, 2 * columns.size, token) ?: return null
-                val up = childGain(columns[index], splits[index] + 1L, false, budget, 2 * columns.size, token) ?: return null
+                val down = childGain(columns[index], splits[index], true, budget, 2 * columns.size, token)
+                    ?: return null
+                val up = childGain(columns[index], splits[index] + 1L, false, budget, 2 * columns.size, token)
+                    ?: return null
                 gains.add(LpDirectionalGain(down, up))
             }
             return gains.takeUnless { token() }
