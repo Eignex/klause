@@ -86,7 +86,7 @@ internal class PrivateRebuildParity private constructor(
             val sourceRows = if (table.coveredClauses == source.numFactors) 0 else rowCount
             val words = (source.numBoolVars + 63) ushr 6
             val bytes = tableBytes + rowCount * (words * 16L + 128L) + source.numBoolVars * 16L +
-                sourceRows * 24L + if (sourceRows == 0) 0L else 32L
+                sourceRows * 25L + if (sourceRows == 0) 0L else 64L
             if (table.entries * 512L + bytes > byteLimit) { onDecline("Memory"); return null }
             if (!funded(source.numBoolVars * 3L + rowCount * (words + 3L) + sourceRows * 3L)) return null
             onWorkspace(bytes)
