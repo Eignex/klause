@@ -1186,7 +1186,8 @@ private fun executePortfolio(
         explicitArms = request.executionOptions.explicitArms,
         privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly,
     )
-    val privateScenario = privateRebuildDefaultScenario(baseScenario, request.problem, profile, request.executionOptions,
+    val privateScenario = privateRebuildDefaultScenario(
+        baseScenario, request.problem, profile, request.executionOptions,
         enumerating = request.allSolutions || (request.solutionCap ?: 1L) > 1L)
     val scenario = weightedCoreDefaultScenario(privateScenario, request.problem, request.objective,
         request.executionOptions, request.cancellation)
@@ -1227,7 +1228,8 @@ private fun executePortfolio(
         probePolicy = probePolicy,
         booleanProofTasks = booleanProofTasks,
         fundedCompanions = fundedCompanions,
-        privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly || privateScenario !== baseScenario,
+        privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly ||
+            privateScenario !== baseScenario,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {
