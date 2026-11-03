@@ -106,7 +106,7 @@ class IntegerConflictLearnerTest {
         assertEquals(0L, snapshot["learningIntegerDuplicateContinuationAdmitted"])
         assertEquals(0L, snapshot["learningIntegerDuplicateContinuationConsumed"])
         assertEquals(2L, snapshot["learningIntegerAdmitted"])
-        assertTrue(requireNotNull(snapshot["learningIntegerDiagnostic_integer_retained_eager_binary_clause"]) > 0L)
+        assertTrue(requireNotNull(snapshot["learningIntegerDiagnostic_integer_retained_eager_lazy"]) > 0L)
         assertTrue(requireNotNull(snapshot["learningIntegerDiagnostic_integer_retained_eager_owner_table"]) > 0L)
     }
 

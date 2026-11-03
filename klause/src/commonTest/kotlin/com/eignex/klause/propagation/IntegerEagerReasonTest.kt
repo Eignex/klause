@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -9,9 +10,25 @@ import com.eignex.klause.ir.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class IntegerEagerReasonTest {
+    @Test
+    fun `a live learned clause should expose its complete eager integer reason`() {
+        val native = PropagationSession(Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf()),
+            pbLearning = false).apply { enableIntegerRowLearning() }
+        val state = native.explanationState
+        val premise = Lit.make(state.atomVarGe(1, 1), false)
+        val conclusion = Lit.make(state.atomVarGe(0, 1), true)
+        assertIs<PropagationResult.Implied>(native.addLearnedClause(Clause(intArrayOf(premise, conclusion)), 2))
+        assertIs<PropagationResult.Implied>(native.pinIntAtLeast(1, 1))
+
+        val classification = state.classifyIntegerEagerReason(0, true, IntegerSourceWork(state))
+
+        assertEquals(IntegerEagerReason.BinaryClause, classification)
+    }
+
     @Test
     fun `canonical binary atoms should encode the complete eager implication`() {
         for (lower in listOf(false, true)) for (form in 0..3) {
