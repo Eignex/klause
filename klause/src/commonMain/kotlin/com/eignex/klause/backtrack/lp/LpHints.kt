@@ -40,6 +40,7 @@ internal class LpHints(
     private data class SideAdvice(val variable: VarRef, val split: Long, val up: Boolean, val basis: Boolean)
 
     private val collect = directionalGains && numIntVars.toLong() + numBoolVars <= 8192L
+    val collectsDirectionalState: Boolean get() = collect
     private val history = LpDirectionalHistory(observe, charge = charge)
     private var freshRecord = false
     private var pointRelaxation: LpRelaxation? = null

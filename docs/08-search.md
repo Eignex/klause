@@ -346,6 +346,9 @@ base model, active-row identity, objective mapping, estimate kind and incumbent 
 The cutoff context includes the local incumbent publication version and exact external
 bound. Changes hidden by floating precision still discard unmatched comparisons, and
 exact comparison work spends the existing allowance.
+Search requests the exact external bound for this scope only while directional
+collection is enabled and within its width cap. Exact pruning and candidate-admission
+checks retain their own cutoff reads.
 
 Completed per-variable averages are advisory priors within the same variable layout,
 objective mapping and estimate kind. Changing the cutoff context or

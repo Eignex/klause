@@ -1380,7 +1380,7 @@ internal class ResumableMinimize(
             val incumbent = incumbents.current()
             val localBound = incumbent?.objective?.pruningBound ?: Double.POSITIVE_INFINITY
             val effectiveBound = if (externalBound < localBound) externalBound else localBound
-            val externalExact = if (lpHints != null || (rebindable && discreteObjective)) {
+            val externalExact = if (lpHints?.collectsDirectionalState == true || (rebindable && discreteObjective)) {
                 exactObjectiveBoundSupplier?.invoke()
             } else null
             if (rebindable && discreteObjective) {

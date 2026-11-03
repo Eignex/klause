@@ -14,6 +14,7 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -29,6 +30,37 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ResumableMinimizeDirectionalTest {
+    @Test
+    fun `exact cutoff scope is read only by active consumers`() {
+        for (directionalGains in listOf(false, true)) for (rebindable in listOf(false, true)) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, arrayOf<Factor>(
+                Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 3L),
+                Linear(longArrayOf(1L, 1L), intArrayOf(1, 2), LinearOp.GE, 2L),
+                Linear(longArrayOf(3L, 1L), intArrayOf(0, 2), LinearOp.GE, 4L),
+            )).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(2L, 3L, 4L))
+            val params = BacktrackParams(randomSeed = 3L, maxDecisions = 4L,
+                objectiveBoundSupplier = { 10.0 }, lpDirectionalGains = directionalGains,
+                lpPlan = LpPlan(bounding = true, probe = false, rootBudgetMillis = 0L,
+                    rootCutHarvest = false, boundMaxOpsPerNode = 0L),
+                componentFactory = { listOf(object : SearchComponent {
+                    override fun assert(decision: SearchDecision, context: SearchContext) = ComponentResult.Conflict()
+                    override fun retract(decisionLevel: Int) = Unit
+                    override fun check(context: SearchContext) = ComponentCheck.Infeasible()
+                }) })
+            var exactReads = 0
+            ResumableMinimize(BacktrackSolver(problem), objective, params, rebindable = rebindable,
+                exactObjectiveBoundSupplier = { exactReads++; BigFraction(10) },
+                rootBasisGuidance = false).use { search ->
+                var slices = 0
+                while (slices++ < 8 && !search.isDone) search.runSlice(Cancellation.Never, 1000L, 8L) {}
+
+                assertTrue(search.isDone)
+                assertEquals(directionalGains || rebindable, exactReads > 0)
+            }
+        }
+    }
+
     @Test
     fun `finite search records an immediate child pruned by its objective bound`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, arrayOf<Factor>(
