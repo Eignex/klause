@@ -70,6 +70,53 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `later consumers should compile bound rows from retained definitions`() {
+        for (metadata in listOf(false, true)) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 10) }, arrayOf<Factor>(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3)))
+            val cost = LinearObjective(intCoefficients = longArrayOf(1L, 1L))
+            val captured = FactorProjectionProviders.Default.prepare(problem)
+            val before = assertNotNull(captured.prepareLpTemplates(cost, Cancellation.Never,
+                reuseMetadata = metadata))
+            val consumer = CpToLpRelaxation(problem, cost, projections = captured,
+                reuseTemplateMetadata = true, omitBoundRows = true)
+
+            val prepared = consumer.build(RootDomains(problem))
+            val fresh = CpToLpRelaxation(problem, cost, reuseSourceTemplates = false).build(RootDomains(problem))
+            val reused = solveAndCertify(assertNotNull(prepared.authoritativeWithTemplates(Cancellation.Never)))
+            val original = solveAndCertify(assertNotNull(fresh.model.authoritativeModel()))
+
+            assertEquals(1, prepared.model.m)
+            assertEquals(LpVerdict.ATTAINED_OPTIMUM, reused.verdict)
+            assertEquals(original.witness?.objective, reused.witness?.objective)
+            assertSame(before.factors[1], assertNotNull(consumer.preparationTemplates).factors[1])
+            assertEquals(1, consumer.build(RootDomains(problem)).model.m)
+        }
+    }
+
+    @Test
+    fun `cancelled bound row compilation should retain the previous definitions`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)))
+        val captured = FactorProjectionProviders.Default.prepare(problem)
+        val before = assertNotNull(captured.prepareLpTemplates(null, Cancellation.Never, reuseMetadata = true))
+        var work = 0L
+        val token = object : Cancellation {
+            private val meter = WorkMeter { work += it }
+            override fun isCancelled(): Boolean = work >= 3L
+            override fun workMeter(): WorkMeter = meter
+        }
+
+        val stopped = captured.prepareLpTemplates(null, token, reuseMetadata = true, compileBoundRows = true)
+        val after = assertNotNull(captured.prepareLpTemplates(null, Cancellation.Never, reuseMetadata = true))
+
+        assertNull(stopped)
+        assertTrue(work >= 3L)
+        assertSame(before.factors, after.factors)
+    }
+
+    @Test
     fun `wider consuming domains should restore prepared bound rows`() {
         for (upper in listOf(false, true)) {
             val factor = Linear(intArrayOf(1), intArrayOf(0),

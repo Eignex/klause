@@ -114,7 +114,10 @@ The stated source root bounds and the constructed column bounds must both imply 
 condition before the row is omitted. An open required side or a widened constructed
 bound keeps its row. Row and bound changes use the current source binding. Each
 check spends the current allowance. Regional, gated
-and component-owned root layouts retain their row definitions. Numerical owners and
+and component-owned root layouts retain their row definitions. A later consumer
+that can omit bound rows compiles missing conditions within its allowance, retaining
+unrelated row and endpoint definitions. Interrupted compilation preserves the last
+complete snapshot; repeated consumers reuse the completed conditions. Numerical owners and
 source row maps are assembled independently for the emitted rows.
 A selected view whose handoff checked
 ordered factor identities carries the same immutable layout token, so subsequent

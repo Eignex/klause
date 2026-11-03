@@ -122,6 +122,10 @@ internal class LpSourceRowTemplate(private val row: LinearRow, compileBoundRows:
     }
     private val boundCondition = if (compileBoundRows) compileBoundCondition() else null
     val hasBoundCondition: Boolean get() = boundCondition != null
+    val needsBoundCondition: Boolean get() = boundCondition == null && integers?.size == 1 &&
+        row.relation != LinearOp.NE && requireNotNull(coefficients)[0].let {
+            it == 1L || (it == -1L && bound != Long.MIN_VALUE)
+        }
     val storageUnits: Long = 3L + (integers?.size ?: 0) * 2L + if (boundCondition == null) 0L else 4L
 
     private fun compileBoundCondition(): LpSourceBoundRow? {
@@ -263,6 +267,7 @@ internal class LpPreparationTemplates private constructor(
     val storageUnits: Long,
     val reusedIndexes: Boolean = false,
     val hasBoundConditions: Boolean = false,
+    private val boundRowsCompiled: Boolean = false,
 ) : LpPreparationState {
     fun bound(variable: Int): LpIntegerBoundTemplate? = bounds[variable]
 
@@ -317,7 +322,8 @@ internal class LpPreparationTemplates private constructor(
                     return visit()
                 }
                 fun unchanged(): Boolean {
-                    if (old == null || old.objectiveIndependent || old.factors.size != problem.numFactors ||
+                    if (old == null || (compileBoundRows && !old.boundRowsCompiled) ||
+                        old.objectiveIndependent || old.factors.size != problem.numFactors ||
                         old.objectiveConstant != (objective?.constant ?: 0L)
                     ) return false
                     for (index in old.factors.indices) {
@@ -344,7 +350,9 @@ internal class LpPreparationTemplates private constructor(
                     return true
                 }
                 fun rebind(): LpPreparationTemplates? {
-                    if (old == null || old.factors.size != problem.numFactors) return null
+                    if (old == null || old.factors.size != problem.numFactors ||
+                        (compileBoundRows && !old.boundRowsCompiled)
+                    ) return null
                     if (old.rowScope !== rowScope) for (index in old.factors.indices) {
                         if (!visit() || old.factors[index].factor !== problem.factors[index]) return null
                     }
@@ -373,7 +381,7 @@ internal class LpPreparationTemplates private constructor(
                         problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
                         0L, true, old.factors, changedBounds ?: old.bounds,
                         emptyList(), old.source !== problem, old.factors.size, reusedBounds,
-                        0, old.storageUnits, changedBounds == null, old.hasBoundConditions)
+                        0, old.storageUnits, changedBounds == null, old.hasBoundConditions, old.boundRowsCompiled)
                 }
                 if (reuseMetadata) {
                     val rebound = rebind()
@@ -386,20 +394,28 @@ internal class LpPreparationTemplates private constructor(
                             problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
                             it.objectiveConstant, false, it.factors, it.bounds, it.components,
                             it.source !== problem, it.factors.size, it.bounds.size, it.components.size,
-                            it.storageUnits, true, it.hasBoundConditions)
+                            it.storageUnits, true, it.hasBoundConditions, it.boundRowsCompiled)
                     }
                 }
                 if (units + pendingColumnWork > MAX_UNITS || token()) return null
                 val oldFactors = HashMap<Factor, LpFactorTemplate>()
                 for (entry in old?.factors.orEmpty()) {
                     if (!visit()) return null
-                    oldFactors[entry.factor] = entry
+                    var reusable = true
+                    if (compileBoundRows && old?.boundRowsCompiled != true) for (row in entry.rows.orEmpty()) {
+                        if (!visit()) return null
+                        if (row.needsBoundCondition) {
+                            reusable = false
+                            break
+                        }
+                    }
+                    if (reusable) oldFactors[entry.factor] = entry
                 }
                 var reusedFactors = 0
                 val factors = ArrayList<LpFactorTemplate>()
                 val bounds = LinkedHashMap<Int, LpIntegerBoundTemplate>()
                 var reusedBounds = 0
-                var storage = 0L
+                var storage = 1L
                 var hasBoundConditions = false
                 for ((factorId, factor) in problem.factors.withIndex()) {
                     if (!visit()) return null
@@ -450,7 +466,7 @@ internal class LpPreparationTemplates private constructor(
                     return LpPreparationTemplates(problem, namespace, rowScope, problem.semantics,
                         problem is BakedProblem, 0L, true, factors, bounds, emptyList(),
                         old != null && old.source !== problem, reusedFactors, reusedBounds, 0, storage,
-                        hasBoundConditions = hasBoundConditions)
+                        hasBoundConditions = hasBoundConditions, boundRowsCompiled = compileBoundRows)
                 }
                 val unchangedIncidence = old != null && !old.objectiveIndependent &&
                     old.factors.size == factors.size && factors.indices.all {
@@ -528,7 +544,8 @@ internal class LpPreparationTemplates private constructor(
                     if (reuseMetadata) 0L else objective?.constant ?: 0L, reuseMetadata,
                     factors, bounds, components, old != null && old.source !== problem,
                     reusedFactors, reusedBounds,
-                    reusedComponents, storage, hasBoundConditions = hasBoundConditions)
+                    reusedComponents, storage, hasBoundConditions = hasBoundConditions,
+                    boundRowsCompiled = compileBoundRows)
             } finally {
                 onWork(units)
             }
