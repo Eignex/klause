@@ -596,7 +596,7 @@ class AssembledSearchModel internal constructor(values: Map<TypedSearchValueKey<
     @Suppress("UNCHECKED_CAST")
     fun <V : Any> valueOf(key: TypedSearchValueKey<V>): V? {
         val value = values[key] ?: return null
-        require(key.valueType.isInstance(value)) { "model key has an incompatible value type" }
+        require(key.acceptsValue(value)) { "model key has an incompatible value type" }
         return value as V
     }
 }

@@ -343,10 +343,11 @@ bound with the original-source witness after every alternative is covered. See
 
 Complete assignments use typed source-keyed values from each owner, assembled only
 after all required checks finish. Missing or multiply represented coordinates leave
-publication unavailable. Built-in keys check Boolean, exact numeric and completed-sample
-values directly. Extension keys use their declared runtime type; capture validates
-both its input and its captured value. [Theory completion](09-learning.md#theory-completion) describes
-how those values are contributed.
+publication unavailable. Built-in coordinate keys and internal sample keys check
+their fixed value types directly. Public identity keys and extension keys use their
+declared runtime type. Capture validates both its input and its captured value;
+model reads check the retained value. [Theory completion](09-learning.md#theory-completion)
+describes how those values are contributed.
 
 ## Finite propagation
 

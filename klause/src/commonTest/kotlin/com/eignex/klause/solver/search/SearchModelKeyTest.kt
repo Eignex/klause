@@ -11,6 +11,19 @@ import kotlin.test.assertNull
 
 class SearchModelKeyTest {
     @Test
+    fun `sample keys should reject values of another type`() {
+        assertFailsWith<IllegalArgumentException> { SearchModelKey.sample().capture(1L) }
+    }
+
+    @Test
+    fun `model reads should reject values of another type`() {
+        val key = SearchBoolValue(0)
+        val model = AssembledSearchModel(mapOf(key to 1L))
+
+        assertFailsWith<IllegalArgumentException> { model.valueOf(key) }
+    }
+
+    @Test
     fun `built-in Boolean keys should reject values of another type`() {
         assertFailsWith<IllegalArgumentException> { SearchBoolValue(0).capture(1L) }
     }

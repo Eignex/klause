@@ -25,11 +25,22 @@ interface TypedSearchValueKey<V : Any> : SearchValueKey {
  * Identity key for one component-owned value. Keep the same key instance for publication and reads.
  * [capture] freezes borrowed state; its default requires an already immutable value.
  */
-class SearchModelKey<V : Any>(
+class SearchModelKey<V : Any> private constructor(
     override val valueType: KClass<V>,
-    private val capture: (V) -> V = { it },
+    private val capture: (V) -> V,
+    private val sampleType: Boolean,
 ) : TypedSearchValueKey<V> {
+    /** Construct an identity key with a checked runtime type and an immutable capture. */
+    constructor(valueType: KClass<V>, capture: (V) -> V = { it }) : this(valueType, capture, false)
+
     override fun snapshot(value: V): V = capture(value)
+
+    internal fun matchesValue(value: Any): Boolean =
+        if (sampleType) value is Sample else valueType.isInstance(value)
+
+    internal companion object {
+        fun sample(): SearchModelKey<Sample> = SearchModelKey(Sample::class, { it }, true)
+    }
 }
 
 /** Authoritative arbitrary-precision value of a source integer, including finite CP contributions. */
@@ -70,15 +81,15 @@ data class SearchExactRealExpressionValue(
 
 @Suppress("UNCHECKED_CAST")
 internal fun TypedSearchValueKey<*>.capture(value: Any): Any {
-    require(accepts(value)) { "model value does not match ${valueType.simpleName}" }
+    require(acceptsValue(value)) { "model value does not match ${valueType.simpleName}" }
     val captured = (this as TypedSearchValueKey<Any>).snapshot(value)
-    require(accepts(captured)) { "model snapshot does not match ${valueType.simpleName}" }
+    require(acceptsValue(captured)) { "model snapshot does not match ${valueType.simpleName}" }
     return captured
 }
 
-private fun TypedSearchValueKey<*>.accepts(value: Any): Boolean {
-    if (this === completedSearchSample) return value is Sample
-    return when (this) {
+internal fun TypedSearchValueKey<*>.acceptsValue(value: Any): Boolean =
+    when (this) {
+        is SearchModelKey<*> -> matchesValue(value)
         is SearchBoolValue -> value is Boolean
         is SearchExactIntValue -> value is BigInt
         is SearchExactRealValue -> value is BigFraction
@@ -86,6 +97,5 @@ private fun TypedSearchValueKey<*>.accepts(value: Any): Boolean {
         is SearchExactRealExpressionValue -> value is ExactRealValue
         else -> valueType.isInstance(value)
     }
-}
 
-internal val completedSearchSample = SearchModelKey(Sample::class)
+internal val completedSearchSample = SearchModelKey.sample()

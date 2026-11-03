@@ -307,7 +307,7 @@ class DifferenceSearchComponent private constructor(
     }
 
     /** Owned integer potential assignment contributed by this component. */
-    val assignmentKey = SearchModelKey(Sample::class)
+    val assignmentKey = SearchModelKey.sample()
 
     override fun contributeModel(model: SearchModel, context: SearchContext) {
         assignment?.let { assignment ->

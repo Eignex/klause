@@ -496,7 +496,7 @@ class CpSearchComponent(
     }
 
     /** Owned finite assignment contributed by this component. */
-    val assignmentKey = SearchModelKey(Sample::class)
+    val assignmentKey = SearchModelKey.sample()
 
     override fun contributeModel(model: SearchModel, context: com.eignex.klause.solver.search.SearchContext) {
         for (variable in 0 until session.problem.numIntVars) {
