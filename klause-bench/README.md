@@ -23,10 +23,10 @@ fails preparation instead of publishing a reduced comparison plan.
 Declared-input planning uses the complete corpus-pack index even when only a subset
 of its members is materialized locally. Each solve verifies its planned input bytes.
 
-Use `scripts/plan-inputs.sh` as a lab profile script with one JSON `BenchRequest`
-argument and the `:klause-bench:installDist` build task. It writes `plan.json`
-through the input-only SDK planner, using the lab corpus directory and declared
-input indexes, without executing a solver.
+`lab/indexed-catalog.json` discovers external sources during SDK preparation and
+writes `catalog.json` with their pack paths, hashes and metadata. It requires
+declared-input indexes and refuses corpus materialization when an index is absent.
+It does not start a solver or fetch the selected model bytes.
 
 `lab/source-identity.json` accepts `cases` containing at most eight selected
 single-model corpus inputs and their packed hashes. It verifies each lab-fetched

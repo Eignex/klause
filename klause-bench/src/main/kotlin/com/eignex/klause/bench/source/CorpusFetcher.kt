@@ -73,6 +73,8 @@ internal object CorpusFetcher {
      */
     val declaredInputs: Boolean get() = System.getProperty("klause.bench.declaredInputs") == "true"
 
+    private val indexOnly: Boolean get() = getBoolean("klause.bench.indexOnly")
+
     private val indexes: CorpusIndexes get() = CorpusIndexes(storageRoot)
 
     /**
@@ -81,15 +83,21 @@ internal object CorpusFetcher {
      * is never downloaded here. Returns null when declared inputs are off or no index describes the pack.
      */
     fun indexed(collection: ExternalCollection): IndexedCollection? {
-        if (!declaredInputs) return null
+        if (!declaredInputs) {
+            check(!indexOnly) { "Index-only discovery requires declared input planning" }
+            return null
+        }
         val index = indexes.local(collection.id) ?: mirror?.let { remote ->
             storageRoot.mkdirs()
             runCatching { remote.index(collection.id, storageRoot) }.onFailure {
                 System.err.println("corpus index of '${collection.id}' unavailable: ${it.javaClass.simpleName}")
             }.getOrNull()?.also(indexes::save)
-        } ?: return null
+        } ?: run {
+            check(!indexOnly) { "Corpus index required for '${collection.id}'; materialization is disabled" }
+            return null
+        }
         val local = File(cacheRoot, collection.id)
-        if (local.isDirectory && !File(local, CorpusStore.SELECTIVE).exists() &&
+        if (!indexOnly && local.isDirectory && !File(local, CorpusStore.SELECTIVE).exists() &&
             index.files.all { File(local, it.path).isFile }
         ) return null
         return indexes.view(index)
@@ -188,6 +196,7 @@ internal object CorpusFetcher {
     /** The root directory of [collection] in the cache, fetching it if not already present. A fetch first
      *  evicts least recently used collections to fit the cache cap, and again once the new one has landed. */
     fun ensure(collection: ExternalCollection): File {
+        check(!indexOnly) { "Corpus materialization is disabled during index-only discovery" }
         selectiveZip(collection)?.let { zip ->
             zip.paths.forEach { member(collection, it) }
             return File(cacheRoot, collection.id)
