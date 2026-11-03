@@ -90,10 +90,16 @@ for compiler_index in 0 1; do
   metadata="$output/compilers/$compiler_index"
   mkdir "$metadata"
   printf 'LC_ALL=C\nMZN_STDLIB_DIR=%s\n' "$standard" > "$metadata/environment.txt"
-  for environment_key in PATH LANG LC_NUMERIC MZN_SOLVER_PATH MZN_USER_CONFIG_DIR; do
+  for environment_key in PATH LANG LC_NUMERIC MZN_SOLVER_PATH MZN_USER_CONFIG_DIR \
+    DYLD_LIBRARY_PATH DYLD_INSERT_LIBRARIES DYLD_FRAMEWORK_PATH DYLD_FALLBACK_LIBRARY_PATH LD_LIBRARY_PATH; do
     printf '%s=' "$environment_key" >> "$metadata/environment.txt"
     printenv "$environment_key" >> "$metadata/environment.txt" || printf '<unset>\n' >> "$metadata/environment.txt"
   done
+  if command -v otool >/dev/null; then
+    otool -L "$compiler" > "$metadata/linked-libraries.txt"
+  else
+    printf 'linked-library inspection unavailable\n' > "$metadata/linked-libraries-unavailable.txt"
+  fi
   run_tool "$metadata/version" env LC_ALL=C "MZN_STDLIB_DIR=$standard" "$compiler" --version
   run_tool "$metadata/config-dirs" env LC_ALL=C "MZN_STDLIB_DIR=$standard" "$compiler" --config-dirs
   actual_standard=$(jq -er .mznStdlibDir "$metadata/config-dirs.stdout")
