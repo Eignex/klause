@@ -24,10 +24,14 @@ class SourceExecutionPolicy(
     val explicitPresolve: Boolean = false,
 ) {
     /** Requested optional LP ceiling, including per-technique overrides. */
-    val lpCeiling: LpConfig? = lpCeiling?.let { LpConfig(it.emphasis, it.overrides.toMap(), it.sourcePreparation) }
+    val lpCeiling: LpConfig? = lpCeiling?.let {
+        LpConfig(it.emphasis, it.overrides.toMap(), it.sourcePreparation)
+    }
 
     /** Application default LP ceiling for portfolio routes. */
-    val portfolioLpCeiling: LpConfig? = portfolioLpCeiling?.let { LpConfig(it.emphasis, it.overrides.toMap(), it.sourcePreparation) }
+    val portfolioLpCeiling: LpConfig? = portfolioLpCeiling?.let {
+        LpConfig(it.emphasis, it.overrides.toMap(), it.sourcePreparation)
+    }
 
     init {
         if (portfolioArms != null && portfolioArms <= 0) {
