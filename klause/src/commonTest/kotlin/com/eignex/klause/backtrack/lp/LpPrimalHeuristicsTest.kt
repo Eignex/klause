@@ -341,7 +341,7 @@ class LpPrimalHeuristicsTest {
                 )
                 assertTrue(engine.primalPropagationWork - before < 200_000L)
                 assertEquals(assertNotNull(pinning).work, engine.primalPropagationWork)
-                assertTrue((sink.lp.phases["PRIMAL_COMPONENT_REPAIR_RETREAT_ROOT"]
+                assertTrue((sink.snapshot().lp.phases["PRIMAL_COMPONENT_REPAIR_RETREAT_ROOT"]
                     ?.outcomes?.get("CONFLICT") ?: 0L) >= 2L)
                 assertEquals(constructed, factory.calls.size)
                 assertEquals(queries, factory.floatAllowances.size)
