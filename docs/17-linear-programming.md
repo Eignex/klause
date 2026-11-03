@@ -361,6 +361,9 @@ a paid decline retains its charge. These choices supply no directional-history, 
 Continuation observations distinguish a pending interruption from a cancelled run,
 spent root or LP work, and a call without an eligible interruption. They record the
 existing decision without polling another token or changing its checks.
+Pending primal preparation yields at the private query boundary before tree traversal.
+A work stop without a suspended numerical cursor keeps that boundary; the next
+invocation can reuse its owner while charging only the remaining funded allowance.
 
 Preparation is capped at eight million modeled work units; root and node LP work
 stop at 150 million units or the containing invocation's smaller allowance.

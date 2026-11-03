@@ -59,6 +59,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -466,6 +467,65 @@ class ResumableMinimizeTest {
                 ?.outcomes?.get("SEARCH_HANDOFF"))
             assertEquals(1L, search.stats.lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]
                 ?.outcomes?.get("VALUE_ORDER_OFFERED"))
+        }
+    }
+
+    @Test
+    fun `work stopped root preparation yields before finite traversal and resumes its owner`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(
+            Linear(longArrayOf(1, 1), intArrayOf(0, 1), doubleArrayOf(1.0),
+                intArrayOf(0), LinearOp.GE, 1L),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2),
+            realCoefficients = doubleArrayOf(3.0))
+        var constructions = 0
+        var rootQueries = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                if (++constructions != 1) return delegate
+                return object : PersistentLpSolver by delegate {
+                    private var stopped = false
+                    override val lastTermination: LpFloatTermination?
+                        get() = if (stopped) LpFloatTermination.WORK else delegate.lastTermination
+                    override val lastMetrics: LpSolveMetrics
+                        get() = if (stopped) LpSolveMetrics(workOps = 1L) else delegate.lastMetrics
+
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
+                        stopped = ++rootQueries <= 2
+                        return if (stopped) null else delegate.resolveBounds(allowance)
+                    }
+                }
+            }
+        }
+        val attempts = ArrayList<SearchDecision>()
+        val offered = ArrayList<Sample>()
+        val params = BacktrackParams(variableSelector = InputOrder,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false, boundMaxDepth = -1),
+            branchObserver = object : SearchBranchAttemptObserver {
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    attempts += decision
+                }
+            })
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+            assertIs<MinimizeResult.Unknown>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {
+                offered += it.sample
+            })
+
+            assertEquals(2, rootQueries)
+            assertTrue(attempts.isEmpty())
+            assertTrue(offered.isEmpty())
+            assertFalse(search.canReseed)
+            search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
+
+            assertEquals(3, rootQueries)
+            assertEquals(listOf(1L, 0L), offered.single().ints.toList())
+            assertEquals(0.0, offered.single().reals.single())
         }
     }
 
