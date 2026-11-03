@@ -22,6 +22,39 @@ import kotlin.test.assertTrue
 
 class ArithmeticLearningTraceTest {
     @Test
+    fun `decline census should survive discarded and truncated windows`() {
+        val state = PropagationState(Problem(0, 0, emptyArray(), emptyArray()), Assumptions.None)
+        val trace = ArithmeticLearningTrace(maxEvents = 1, maxWords = 4).apply {
+            captureFirstInteger = true
+            collectDeclines = true
+        }
+        state.arithmeticLearningTrace = trace
+        state.arithmeticLearningTrace?.record("integer.decline.seed-source")
+        trace.beginConflict(0, 1, 0)
+
+        state.arithmeticLearningTrace?.record("integer.decline.seed-source")
+        state.arithmeticLearningTrace?.record("integer.source-decline.term-limit")
+
+        assertEquals(mapOf("integer.decline.seed-source" to 2L, "integer.source-decline.term-limit" to 1L),
+            trace.declineCensus)
+        assertEquals(1L, trace.discardedWindows)
+        assertEquals(1, trace.events.size)
+        assertTrue(trace.truncated)
+    }
+
+    @Test
+    fun `decline census should bound reason names without dropping totals`() {
+        val trace = ArithmeticLearningTrace().apply { collectDeclines = true }
+
+        repeat(80) { trace.record("integer.decline.reason-$it") }
+
+        assertEquals(64, trace.declineCensus.size)
+        assertEquals(17L, trace.declineCensus["other"])
+        assertEquals(80L, trace.declineCensus.values.sum())
+        assertTrue(trace.declineCensusTruncated)
+    }
+
+    @Test
     fun `focused capture should retain branch attempts within its allowance`() {
         for (kind in listOf("traversal.pick", "traversal.attempt")) {
             val trace = ArithmeticLearningTrace(maxEvents = 4, maxWords = 16).apply { captureFirstInteger = true }
