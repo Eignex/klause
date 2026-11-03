@@ -146,33 +146,6 @@ class PrivateRebuildGenerationTest {
     }
 
     @Test
-    fun `funded expansions should expose cancellations beyond the shorter triangular form`() {
-        for (phase in 0..1) for (native in listOf(false, true)) {
-            val rows = listOf(intArrayOf(3, 5, 6) to 0, intArrayOf(1, 3, 9) to 0,
-                intArrayOf(4, 7, 8) to 0, intArrayOf(2, 4, 9) to 0, intArrayOf(0, 1, 2) to phase)
-            val clauses = rows.flatMap { (variables, target) ->
-                (0 until 8).filter { it.countOneBits() % 2 != target }.map { mask ->
-                    Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
-                }
-            } + Clause(intArrayOf(Lit.make(10, true), Lit.make(11, true)))
-            val source = Problem(12, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
-            val canonical = PropagationSession(source, nativeSat = native)
-            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
-                Cancellation.Never, parity = captured))
-            val consumer = PropagationSession(generation.problem)
-
-            for ((variable, value) in listOf(5 to false, 6 to true, 7 to false, 8 to true)) {
-                assertIs<PropagationResult.Implied>(consumer.pinBool(variable, value))
-            }
-
-            assertEquals(phase != 0, consumer.boolValue(0))
-            assertNull(consumer.boolValue(9))
-            assertNull(canonical.boolValue(0))
-        }
-    }
-
-    @Test
     fun `learned equivalences should open a reconstructable private consumer without root pins`() {
         for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(

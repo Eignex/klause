@@ -63,22 +63,10 @@ internal class PrivateRebuildAffine(
 
     internal class RowPlan(
         private val forward: BooleanArray,
-        literals: Long,
-        triangularRows: Int,
+        val literals: Long,
+        val triangularRows: Int,
     ) {
-        var literals: Long = literals
-            private set
-        var triangularRows: Int = triangularRows
-            private set
-
         fun usesTriangular(row: Int): Boolean = forward[row]
-
-        fun preferExpanded(row: Int, extraLiterals: Int) {
-            check(forward[row] && extraLiterals > 0)
-            forward[row] = false
-            literals += extraLiterals
-            triangularRows--
-        }
     }
 
     fun planRows(
@@ -109,34 +97,6 @@ internal class PrivateRebuildAffine(
             literals += width
         }
         return RowPlan(forward, literals, triangularRows)
-    }
-
-    fun preferExpandedRows(
-        cancellation: Cancellation,
-        plan: RowPlan,
-        triangular: PrivateRebuildParityRows?,
-        extraLiterals: Long,
-    ): Boolean {
-        var remaining = extraLiterals
-        if (remaining <= 0L) return true
-        for (row in 0 until rank) {
-            cancellation.charge(1L)
-            if (cancellation()) return false
-            if (!plan.usesTriangular(row)) continue
-            cancellation.charge(words * 2L + 4L)
-            if (cancellation()) return false
-            val width = 1 + dependencies[row].sumOf { it.countOneBits() }
-            if (width > 64) continue
-            val forwardWidth = checkNotNull(triangular).rowWidth(row, cancellation) ?: return false
-            val extra = width - forwardWidth
-            cancellation.charge(8L)
-            if (cancellation()) return false
-            if (extra > remaining) continue
-            plan.preferExpanded(row, extra)
-            remaining -= extra
-            if (remaining == 0L) return true
-        }
-        return true
     }
 
     fun materializeRows(
