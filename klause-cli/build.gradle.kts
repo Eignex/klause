@@ -60,6 +60,9 @@ kotlin {
     }
 
     sourceSets {
+        jvmMain.dependencies {
+            implementation("com.github.luben:zstd-jni:1.5.7-24")
+        }
         commonMain.dependencies {
             implementation(project(":klause"))
             // KMP logger for `-v` progress output (custom stderr writer).

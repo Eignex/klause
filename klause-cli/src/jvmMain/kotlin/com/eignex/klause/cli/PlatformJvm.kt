@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.util.CharSource
+import com.github.luben.zstd.ZstdInputStreamNoFinalizer
 import java.io.File
 import java.io.IOException
 import java.io.Reader
@@ -29,6 +30,18 @@ internal actual fun exitCli(code: Int): Nothing = exitProcess(code)
 
 internal actual fun openFileSource(path: String): CharSource {
     val ext = compressionExtension(path) ?: return ReaderCharSource(File(path).bufferedReader())
+    if (ext == "zst") {
+        val decoder = cliProp("klause.zstd.decoder") ?: "external"
+        require(decoder in setOf("external", "jni")) { "Unknown zstd decoder: $decoder" }
+        if (decoder == "jni") {
+            val input = File(path).inputStream()
+            return runCatching {
+                ReaderCharSource(ZstdInputStreamNoFinalizer(input).bufferedReader())
+            }.onFailure { failure ->
+                runCatching { input.close() }.exceptionOrNull()?.let(failure::addSuppressed)
+            }.getOrThrow()
+        }
+    }
     if (ext == "gz") {
         val input = File(path).inputStream()
         return try {

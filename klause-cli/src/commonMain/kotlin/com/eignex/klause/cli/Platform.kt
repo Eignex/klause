@@ -44,7 +44,7 @@ internal expect fun errPrintln(message: String)
 internal expect fun exitCli(code: Int): Nothing
 
 /** Open [path] as a streamed [CharSource]: an uncompressed file read incrementally, or a compressed one
- *  piped through the matching [DECOMPRESSORS] command (see [compressionExtension]). Front-ends consume
+ *  decoded by its platform reader or matching [DECOMPRESSORS] command (see [compressionExtension]). Front-ends consume
  *  the source instead of the whole-file [String], so a huge instance is never fully resident. */
 internal expect fun openFileSource(path: String): CharSource
 
@@ -61,9 +61,8 @@ internal fun nowMillis(): Long = timeOrigin.elapsedNow().inWholeMilliseconds
 
 internal fun fileName(path: String): String = path.substringAfterLast('/').substringAfterLast('\\')
 
-/** Compression suffix → the external decompress-to-stdout command. Shelling out to the system tools
- *  keeps the CLI free of a compression dependency; [openFileSource] pipes the file through the matching
- *  command. */
+/** Compression suffix → the external decompress-to-stdout fallback. JVM gzip and opt-in zstd readers
+ *  decode in process; other readers use the matching command. */
 internal val DECOMPRESSORS = mapOf(
     "xz" to listOf("xz", "-dc"),
     "gz" to listOf("gzip", "-dc"),

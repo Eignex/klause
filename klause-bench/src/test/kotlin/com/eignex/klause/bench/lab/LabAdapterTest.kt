@@ -127,7 +127,7 @@ class LabAdapterTest {
     }
 
     @ParameterizedTest
-    @CsvSource("harness-jfr,true", "source-staging,cli")
+    @CsvSource("harness-jfr,true", "source-staging,cli", "source-staging,cli-jni")
     fun `input only plans reject execution controls`(key: String, value: String) {
         assertFailsWith<IllegalArgumentException> {
             LabSettings(mapOf("input-only" to "true", key to value))

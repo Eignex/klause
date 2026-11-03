@@ -117,8 +117,9 @@ internal object SolverInvocation {
         solve: (File, Budget) -> Result,
     ): Result {
         val start = nanoTime()
-        val cliDecodesInput = CorpusFiles.isCompressed(file) && staging == SourceStaging.CLI
-        val stagingDirectory = if (staging == SourceStaging.CLI) null else staging.directory
+        val cliDelivery = staging in setOf(SourceStaging.CLI, SourceStaging.CLI_JNI)
+        val cliDecodesInput = CorpusFiles.isCompressed(file) && cliDelivery
+        val stagingDirectory = if (cliDelivery) null else staging.directory
         var decoder = emptyMap<String, String>()
         var preparationNanos: Long? = null
         var cleanupNanos = 0L
@@ -144,7 +145,8 @@ internal object SolverInvocation {
                 }
                 if (cliDecodesInput) {
                     checkActive()
-                    decoder = decoderIdentity(::checkActive)
+                    decoder = if (staging == SourceStaging.CLI_JNI) mapOf("sourceDecoderKind" to "zstd-jni")
+                        else decoderIdentity(::checkActive) + ("sourceDecoderKind" to "external-zstd")
                     invokeSource(file)
                 } else {
                     CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it },
@@ -233,6 +235,10 @@ internal object SolverInvocation {
     ): List<String> {
         check(bin.canExecute()) { "klause-cli is not executable at $bin" }
         return buildList {
+            if (CorpusFiles.isCompressed(file) && s.sourceStaging in setOf(SourceStaging.CLI, SourceStaging.CLI_JNI)) {
+                add("/usr/bin/env")
+                add("KLAUSE_ZSTD_DECODER=" + if (s.sourceStaging == SourceStaging.CLI_JNI) "jni" else "external")
+            }
             add(bin.absolutePath)
             // MPS instances (notably extension-less MIPLIB files) can't be auto-detected by suffix;
             // the bench knows the format, so pass it explicitly.

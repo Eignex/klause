@@ -1,13 +1,20 @@
 package com.eignex.klause.bench.metric
 
+import com.eignex.klause.bench.catalog.Category
+import com.eignex.klause.bench.catalog.Expected
+import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.corpus
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.SourceStaging
 import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -117,7 +124,7 @@ class SolverInvocationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["cache", "cli"])
+    @ValueSource(strings = ["cache", "cli", "cli-jni"])
     fun `cancelled preparation retains timings without a solver verdict`(target: String) {
         try {
             Thread.currentThread().interrupt()
@@ -137,6 +144,52 @@ class SolverInvocationTest {
         } finally {
             Thread.interrupted()
         }
+    }
+
+    @ParameterizedTest
+    @CsvSource("cli,external", "cli-jni,jni")
+    fun `compressed CLI launch records its decoder choice`(target: String, decoder: String) {
+        val root = Files.createTempDirectory("cli-decoder").toFile()
+        try {
+            val bin = File(root, "klause").apply { writeText(""); setExecutable(true) }
+            val source = File(root, "input.cnf.zst")
+            val ref = ProblemRef("php4", Format.DIMACS, corpus("dimacs/php4.cnf"), Category.CSP, Expected.Unknown)
+            val entry = ResolvedProblem(ref, lazy { error("subprocess input stays lazy") })
+
+            val command = SolverInvocation.klauseCommand(entry,
+                SolverInvocation.Settings(sourceStaging = SourceStaging.parse(target)),
+                Budget(1000), optimize = false, file = source, bin = bin)
+
+            assertEquals(listOf("/usr/bin/env", "KLAUSE_ZSTD_DECODER=$decoder", bin.absolutePath), command.take(3))
+            assertTrue(source.absolutePath in command)
+            assertEquals("1000", command[command.indexOf("-t") + 1])
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `JNI delivery retains the archive without an external decoder identity`() {
+        val packed = File("original.cnf.zst")
+        var nanos = 0L
+
+        val result = SolverInvocation.withSourceInput(packed, Budget(1000), nanoTime = { nanos },
+            staging = SourceStaging.CLI_JNI, decoderIdentity = { error("external decoder identity") }) { input, remaining ->
+            assertEquals(packed, input)
+            assertEquals(1000L, remaining.timeoutMillis)
+            nanos = 12_000_000
+            SolverInvocation.Result(null, null, null, proven = false,
+                stats = emptyMap(), rawOutput = "unknown", command = "cli", elapsedMs = 10)
+        }
+
+        assertEquals("cli-jni", result.stats["sourceStaging"])
+        assertEquals("zstd-jni", result.stats["sourceDecoderKind"])
+        assertNull(result.stats["sourceDecoderSha256"])
+        assertNull(result.stats["sourceDecodeMs"])
+        assertEquals("cli-frontend", result.stats["sourceDecodeLocation"])
+        assertEquals("0", result.stats["sourceCleanupMs"])
+        assertEquals("12", result.stats["sourceCliMs"])
+        assertEquals("12", result.stats["sourceInvocationMs"])
     }
 
     @Test

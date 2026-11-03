@@ -539,6 +539,16 @@ does not establish cooperative cancellation within a blocked CLI input read.
 Compare full invocation and case/job costs at the same allowance and retain the
 original-source checks, runtime/decoder identities and declared cache conditions.
 
+`source-staging=cli-jni` delivers the original compressed path to the JVM CLI with
+`KLAUSE_ZSTD_DECODER=jni`. It uses the bundled zstd JNI decoder in the CLI thread,
+without a staged output, source producer or external decoder process. The recorded
+launch arguments retain the decoder selection; installed runtime identities retain
+the codec library. `sourceDecoderKind=zstd-jni` replaces the external executable
+identity. Decode, library initialization and reader retirement remain inside the
+CLI and whole-source clocks; a separate decode duration is unavailable. This
+opt-in control works with `lab/frozen.json` and requires ordinary JVM execution.
+The default staging and external CLI decoder choices remain unchanged.
+
 Solve records retain monotonic `harness*Ms` phase observations in `stats`, including
 model resolution, provenance, invocation and witness handling. Nested phases are
 inclusive; do not sum them. Missing phases are unobserved. `harnessCaseMs` covers

@@ -25,8 +25,10 @@ or newer; native executables need no JVM. Build commands live in the
 | `mps` | `.mps` | Linear/mixed-integer status, objective and named values |
 
 `--format <name>` (alias `--mode`) takes priority over the input extension; an
-unrecognized extension defaults to MiniZinc mode. Compressed `.zst` inputs require
-`zstd` on `PATH`. MiniZinc source models go through the
+unrecognized extension defaults to MiniZinc mode. Compressed `.zst` inputs use
+`zstd` on `PATH` by default. The JVM distribution also accepts
+`klause.zstd.decoder=jni` (or `KLAUSE_ZSTD_DECODER=jni`) to select its bundled
+streaming decoder. Native executables use the external decoder. MiniZinc source models go through the
 [MiniZinc integration](../klause-mzn-lib/README.md), which compiles them to FlatZinc
 first. The registry in
 [Main.kt](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/Main.kt) and the
@@ -35,7 +37,8 @@ define supported names, aliases and help text.
 
 Each loader closes its input source when parsing returns or fails, including when
 the parser stops before end of file. Compressed sources release their readers and
-decompressor processes with the same lifetime.
+decompressor processes with the same lifetime. The JVM in-process decoder closes
+its compressed input on completion, failure or early parser return.
 
 Exact objective and unattained-limit rendering follow the
 [arithmetic format contracts](05-arithmetic-formats.md#results-and-objectives);
