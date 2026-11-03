@@ -278,7 +278,16 @@ objective identity. A live root owner copies at most one MiB within the remainin
 root and LP allowance. A closed auxiliary rounding solver transfers its completed
 output array into the same private storage cap after its work is charged. The
 constant-size handoff can preserve a completed point across a slice interruption;
-later pinning still polls its fresh token. The first pinning attempt and its resumes
+later pinning still polls its fresh token. A completed auxiliary point keeps its
+original problem identity and can transfer to ordinary integer value ordering
+under a retained-root plan with the same objective. This handoff requires the
+owned complete point, matching source coordinates and the existing guidance
+storage and transport allowance. A different source or objective, an unfinished
+or masked auxiliary proposal, source real variables or disabled LP branching
+withholds it.
+Retention and actual auxiliary value use have separate observations. The transfer
+carries no basis, certificate or numerical-owner authority; ordinary search keeps
+its alternatives and complete source checks. The first pinning attempt and its resumes
 use the same private coordinate array, so a completed pin prefix belongs to that
 guide. Rounding uses the stored coordinates without another numerical solve; its
 propagation and source-publication checks still run. An incomplete or differently
@@ -313,9 +322,31 @@ work also reduces the graph's remaining preparation ceiling. Within each compone
 known fractional coordinates precede integral and unknown coordinates, with source
 order breaking ties. The stable primitive sort reuses graph scratch and charges
 its passes and comparisons to the same preparation allowance. Membership walks
-charge ordinary CP work and revisit retracted variables. Declined preparation
-keeps ordinary branching; guide replacement, restart, reseed and close discard the
-ordering. An attempt stopped before spending work can retry in a fresh consultation;
+charge ordinary CP work and revisit retracted variables. At each source node,
+preparation can use its existing funded allowance before another LP query. A ready
+component guide defers additional node queries until the first incumbent, while
+inherited checked bounds, combinatorial node bounds and complete CP checks remain
+active. Only the simplex arm defers; other bounds keep their normal cascade. Those nodes supply
+no new directional observations; ordinary node LP policy resumes after an incumbent
+or guide expiry. Declined preparation keeps ordinary branching; guide replacement, restart, reseed and close discard the
+ordering. Completed integer component assignments can retain private Long value
+preferences across ordinary restarts and numerical-guide replacement. Capture first
+checks that every member is fixed; it charges array initialization and member copies
+to the remaining preparation and LP allowances inside the same one MiB guidance cap.
+Interrupted copies retain only visited value preferences and no component result.
+Completed component values precede retained root LP targets; uncached coordinates
+keep eligible root LP preferences. The ordinary frame stack keeps every alternative,
+and full source checks still own
+assignment acceptance. These values supply no bound, proof or LP-point authority.
+Capture observations retain initialization, completed copy and declined or interrupted work.
+Ordinary value use and the first value use after a restart have separate observations.
+Explicit target reset, reseed and close release them. A restored source root can refresh expired preferences from its current
+private numerical owner, after rebuilding the current domain and cut view. The
+read requires matching model and exact state at depth zero, preserves child
+invalidation, charges transport and copies only currently available coordinates.
+Completed and interrupted component results share the authority check and private
+snapshot read; no numerical query runs and no earlier guide arrays remain. An
+attempt stopped before spending work can retry in a fresh consultation;
 a paid decline retains its charge. These choices supply no directional-history, bound or proof authority.
 Continuation observations distinguish a pending interruption from a cancelled run,
 spent root or LP work, and a call without an eligible interruption. They record the
@@ -426,11 +457,19 @@ owner before another numerical query. The read uses the fresh consultation token
 and requires matching retained guide, objective, root model and current exact-state
 identities. Invalidating the active search view preserves this read when the scoped
 owner still holds that root state. Numerical queries retain their active-view requirement.
+While a component cursor is suspended, a fresh read can copy only children that
+have returned against their current exact state. The advancing cursor and its
+unfinished child supply no coordinates. The copy neither advances numerical work
+nor changes the cursor, basis or authority; its buffers remain private and spend
+the same guidance work and storage limits.
 After parent cancellation, a fresh read keeps only earlier returned children with
 optimal, WORK or PIVOTS stops. Cancelled or failed child coordinates stay unknown.
 This supplies no additional bound, certificate or complete-point authority.
 A finished rounding attempt can transfer its private root coordinates and availability
-mask to ordinary finite-search value ordering. The retained root owner and objective
+mask to ordinary finite-search value ordering. Components with known finite targets precede
+components without targets; ties retain source order. Members retain fractional-first
+ordering within their component. Availability and boundary scans spend the existing
+preparation work allowance and reuse its admitted scratch storage. The retained root owner and objective
 must still match at transfer. No coordinate buffer is copied; the target header, protected column maps and
 all simultaneously live guidance buffers share the existing byte limit. Each lookup
 charges the ordinary cumulative LP work allowance. Fresh node hints take precedence;
@@ -649,7 +688,15 @@ lifting and ordinary evidence checking still decide whether the bound is usable.
 
 The scoped root-guidance operation advances the existing floating cursor under
 finite cumulative and per-consultation work limits. Pauses publish no coordinates
-or proofs. A completed point remains heuristic even when bound certification declines.
+or proofs. An admitted sparse root query can separately copy nonzero row multipliers
+from its suspended numerical owner and submit them as a dual proposal. The copy
+performs no basis solve and can lag a pivot. Only the existing exact check against
+the unchanged root model can establish a bound. Snapshot work and storage spend
+the containing root/checking allowances; zero, nonfinite, cancelled or declined
+proposals leave the private cursor suspended. The query retains its strongest checked
+bound while numerical work remains, including stronger completed-query evidence. A
+later consultation stop can return that completed certificate through the ordinary
+source projection and lower-bound publisher while the floating cursor stays suspended. A completed point remains heuristic even when bound certification declines.
 Dual-only certification checks exact Lagrangian evidence under its own sparse input,
 arithmetic and allocation limits. A refused binary dual candidate enters the bounded
 dual-vector rational reconstruction schedule under the same work, allocation and
@@ -949,6 +996,11 @@ infeasibility separately for boxed dual, ordinary dual, primal feasibility and
 primal objective phases. It counts degenerate steps, flips and priced columns;
 factor-policy metrics identify rebuild triggers. These observations carry no
 coordinate, bound or infeasibility authority.
+Retained sparse consumers publish maxima of bounded trace snapshots at cursor pauses
+under separate `Paused` fields. Phase flags identify the last sampled phases in
+those snapshots; a capped trace need not describe the latest iteration. Maxima can
+come from different consultations or workers and do not form a trajectory.
+Reading a snapshot neither advances the cursor nor constructs a numerical owner.
 The owner rejects another solve or authority adoption while that cursor is live;
 closing it unwinds the suspended operation and retires its factors. Synchronous
 calls consume the same operation without suspension.

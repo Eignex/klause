@@ -569,16 +569,21 @@ internal class ComponentLpSolver(
     }
 
     override fun partialPrimalGuidance(cancellation: Cancellation): LpPrimalGuidance? {
-        if (!currentAuthority() || cancellation()) return null
+        val paused = !closed && model.exactState != null && activeSolve?.isAdvancing == false
+        if ((!paused && !currentAuthority()) || cancellation()) return null
         val termination = lastTermination
-        if (termination != LpFloatTermination.WORK && termination != LpFloatTermination.PIVOTS &&
-            termination != LpFloatTermination.CANCELLED
+        if (!paused && termination != LpFloatTermination.WORK && termination != LpFloatTermination.PIVOTS &&
+            termination != LpFloatTermination.CANCELLED && termination != LpFloatTermination.OPTIMAL_CANDIDATE
         ) return null
         val results = blockResults ?: return null
         val guidance = LpPrimalGuidance(DoubleArray(model.n), BooleanArray(model.n))
         for (index in parts.indices) {
             if (cancellation()) return null
             val result = results[index] ?: continue
+            // Suspended traversal keeps returned child buffers separate from its active numerical iterate.
+            if (paused && (result.exactState !== parts[index].model.exactState ||
+                    solvers[index].solvedExactState !== parts[index].model.exactState)
+            ) continue
             if (termination == LpFloatTermination.CANCELLED) {
                 val childStop = solvers[index].lastTermination
                 if (childStop != LpFloatTermination.OPTIMAL_CANDIDATE && childStop != LpFloatTermination.WORK &&
