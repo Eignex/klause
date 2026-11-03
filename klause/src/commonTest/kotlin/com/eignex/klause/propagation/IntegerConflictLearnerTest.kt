@@ -45,13 +45,13 @@ import kotlin.test.assertTrue
 class IntegerConflictLearnerTest {
     @Test
     fun `tight owned parents should compose when tables own both eliminated bounds`() {
-        val native = PropagationSession(Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
+        val native = PropagationSession(PropagationProblem(Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
             Table(intArrayOf(2, 0), longArrayOf(0, 0, 0, 1, 1, 1)),
             Table(intArrayOf(2, 1), longArrayOf(0, 0, 0, 1, 1, 1)),
             Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0),
             Linear(intArrayOf(1, -1), intArrayOf(2, 1), LinearOp.LE, 0),
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1),
-        )), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        ))), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
         for (variable in 0..1) native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
             mapOf(2 to 1L, variable to -1L), 0L, Lit.NONE)), 1)
 
@@ -77,14 +77,14 @@ class IntegerConflictLearnerTest {
 
     @Test
     fun `a slack owned parent should retain clause fallback for eager endpoints`() {
-        val native = PropagationSession(Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
+        val native = PropagationSession(PropagationProblem(Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
             Table(intArrayOf(2, 0), longArrayOf(0, 0, 0, 1, 1, 1)),
             Table(intArrayOf(2, 1), longArrayOf(0, 0, 0, 1, 1, 1)),
             Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0),
             Linear(intArrayOf(1, -1), intArrayOf(2, 1), LinearOp.LE, 0),
             Linear(intArrayOf(1, -1), intArrayOf(3, 0), LinearOp.LE, 0),
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1),
-        )), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        ))), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
         native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
             mapOf(3 to 1L, 0 to -1L), 0L, Lit.NONE)), 1)
 
