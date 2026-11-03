@@ -64,7 +64,7 @@ internal class LearnedPolicyRows(
         return try { operation() } finally { observation = previous }
     }
 
-    private fun locate(index: Int, visit: (Long) -> Unit): Page? {
+    private inline fun locate(index: Int, visit: (Long) -> Unit): Page? {
         if (index == 0) return primary
         val cached = cachedPages[index and CACHE_MASK]
         if (cached?.slot?.key == index) return cached
@@ -85,6 +85,8 @@ internal class LearnedPolicyRows(
 
     private fun pageAt(index: Int): Page? {
         if (index == 0) return primary
+        val cached = cachedPages[index and CACHE_MASK]
+        if (cached?.slot?.key == index) return cached
         return locate(index, ::chargeLookup)
     }
 
