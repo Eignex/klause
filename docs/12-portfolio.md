@@ -163,6 +163,7 @@ proposal can release, a refuted small neighborhood keeps the initial trial pendi
 through its first enlarged adaptive proposal. Owed complete-worker coverage still
 precedes continuation. A checked discovery, an unavailable query or completion of
 the enlarged proposal ends the trial; its work and lifetime are cumulative.
+Continuation earns no reward and cannot renew the companion's allowance.
 
 For a binary mixed source, the first enlarged guided proposal tries one rounded
 integer tuple before numerical neighborhood traversal. Pinned coordinates stay at
@@ -173,7 +174,6 @@ checks as imported seeds. An unavailable or non-improving point leaves the
 neighborhood undecided and numerical traversal continues. Only a strictly improving
 checked point is a repair discovery. Construction, completion and checking share
 the proposal's active time, LP work and allocation ceilings.
-Continuation earns no reward and cannot renew the companion's allowance.
 
 The numerical companion can retain one completed root relaxation point for checked
 handoff repair. A private snapshot belongs to the same captured source context and
@@ -572,8 +572,7 @@ Scheduling changes work order, never publication authority.
 The worker sampler owns primitive success and trial totals per arm. Restricted
 selection reads those totals directly; fading preserves the prior and the
 accumulator's arithmetic order. The library selector's snapshots synchronize when
-that selector is used. Unit Beta shapes use direct inverse-CDF sampling; other
-shapes use Gamma draws.
+that selector is used.
 
 The opt-in `portfolio-reward=source` ablation retains ordinary feasibility rewards.
 After a source incumbent exists, only an accepted strict incumbent or terminal
