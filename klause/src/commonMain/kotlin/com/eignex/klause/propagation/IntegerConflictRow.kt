@@ -16,6 +16,7 @@ internal class IntegerConflictRow private constructor(
     override val guard: Int = Lit.NONE,
     val transientSteps: Int = 0,
     val retainedSources: Int = 0,
+    val hasNonOwnerSource: Boolean = false,
 ) : IntegerLearningInequality {
     override fun coefficient(variable: Int): Long {
         val index = variables.indexOf(variable)
@@ -23,10 +24,12 @@ internal class IntegerConflictRow private constructor(
     }
 
     fun derivedThroughTransient(steps: Int): IntegerConflictRow = if (steps == 0) this else
-        IntegerConflictRow(variables, coefficients, bound, guard, steps, retainedSources)
+        IntegerConflictRow(variables, coefficients, bound, guard, steps, retainedSources, hasNonOwnerSource)
 
-    fun derivedFromRetainedSources(sources: Int): IntegerConflictRow = if (sources == 0) this else
-        IntegerConflictRow(variables, coefficients, bound, guard, transientSteps, sources)
+    fun derivedFromRetainedSources(sources: Int, nonOwnerSource: Boolean = false): IntegerConflictRow =
+        if (sources == 0 && !nonOwnerSource) this else
+            IntegerConflictRow(variables, coefficients, bound, guard, transientSteps, sources,
+                hasNonOwnerSource || nonOwnerSource)
 
     fun subsumes(other: IntegerConflictRow): Boolean =
         (guard == Lit.NONE || guard == other.guard) && bound <= other.bound &&

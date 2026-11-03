@@ -44,6 +44,59 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `tight owned parents should compose when tables own both eliminated bounds`() {
+        val native = PropagationSession(Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
+            Table(intArrayOf(2, 0), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(2, 1), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(2, 1), LinearOp.LE, 0),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1),
+        )), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        for (variable in 0..1) native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(2 to 1L, variable to -1L), 0L, Lit.NONE)), 1)
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(2, 1))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+        native.popToLevel(learned.backjumpLevel)
+        assertIs<PropagationResult.Implied>(native.addLearnedIntegerRow(learned))
+
+        assertContentEquals(intArrayOf(2), learned.row.variables)
+        assertContentEquals(longArrayOf(1), learned.row.coefficients)
+        assertEquals(0L, learned.row.bound)
+        assertTrue(learned.row.hasNonOwnerSource)
+        assertEquals(2, learned.row.retainedSources)
+        assertEquals(0L, native.intDomain(2).max)
+        val snapshot = native.learnedLifecycle()
+        assertEquals(2L, snapshot["learningIntegerNonOwnerSources"])
+        assertEquals(1L, snapshot["learningIntegerNonOwnerProduced"])
+        assertEquals(1L, snapshot["learningIntegerNonOwnerAdmitted"])
+        assertEquals(1L, snapshot["learningIntegerNonOwnerConsumed"])
+        native.releaseRetainedState()
+        assertEquals(snapshot, native.learnedLifecycle())
+    }
+
+    @Test
+    fun `a slack owned parent should retain clause fallback for eager endpoints`() {
+        val native = PropagationSession(Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
+            Table(intArrayOf(2, 0), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(2, 1), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(2, 1), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 0), LinearOp.LE, 0),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1),
+        )), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(3 to 1L, 0 to -1L), 0L, Lit.NONE)), 1)
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(2, 1))
+
+        assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
+        val snapshot = native.learnedLifecycle()
+        assertFalse(snapshot.containsKey("learningIntegerNonOwnerSources"))
+        assertTrue(requireNotNull(snapshot["learningIntegerDiagnostic_integer_retained_reject_not_tight"]) > 0L)
+    }
+
+    @Test
     fun `a composed temporary child should propagate in another branch after its parents retire`() {
         val padding = IntArray(13) { it + 7 }
         val problem = Problem(0, 21, Array(21) {

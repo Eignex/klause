@@ -542,6 +542,16 @@ side and parent identity can be used once per analysis. The child retains derive
 coefficients and a bounded source-count origin, without parent identities; retirement
 and compaction cannot invalidate its arithmetic. Source selections, produced children,
 admission and first consumption have separate counters, including after retirement.
+If current-owner and original historical endpoints supply no parent, a bounded
+scan may select another active owned at-most-one inequality. Its eliminated
+bound must lie above the ordinary fallback target, its pivot has the opposite
+sign, and its minimum under current domains must equal its bound. The scan tries
+deeper bound levels first and shares the same source-reference allowance.
+A numeric inequality supplies the parent independently of the current reason
+owner; eager clause or table supports are not projected into arithmetic.
+The child records this source kind as a primitive flag without parent references.
+Its source selections, produced children, actual admissions and first native
+consumption retain separate counters through compaction and retirement.
 After selecting an owned source, an unconditional derivation may use the same
 32-term temporary rows even when its original seed is compact. Original historical
 sources keep that compact seed's 16-term input limit; source-reference visits,

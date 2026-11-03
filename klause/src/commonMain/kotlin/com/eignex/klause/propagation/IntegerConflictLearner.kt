@@ -3,6 +3,8 @@ package com.eignex.klause.propagation
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
 
 internal const val INTEGER_LEARNING_ROWS = 64
 private const val INTEGER_LEARNING_STEPS = 16
@@ -93,14 +95,19 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         if (row.minimum(state) <= row.bound) return decline("seed-not-conflicting")
         val used = mutableSetOf<PivotKey>()
         var transientSteps = 0
+        var nonOwnerSource = false
         repeat(INTEGER_LEARNING_STEPS) {
             state.checkFiniteWork()
-            val event = reason(row, used, allowWideSources) ?: return decline("no-qualified-endpoint")
+            val event = reason(row, used, allowWideSources, target) ?: return decline("no-qualified-endpoint")
             used.add(event.key)
             if (event.key.retained) {
                 selectedRetainedSource = true
                 retainedSources++
                 state.integerChainedSources++
+                if (event.nonOwnerSource) {
+                    nonOwnerSource = true
+                    state.integerNonOwnerSources++
+                }
                 state.arithmeticLearningTrace?.row("integer.retained-parent-row", event.row, state)
             } else state.arithmeticLearningTrace?.row("integer.pivot-row", event.row, state, event.trail)
             val combined = if (allowWideSources || retainedSources > 0) {
@@ -127,9 +134,11 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             if (retainedSources > 0) {
                 state.integerChainedProduced++
                 if (transientSteps > 0) state.integerChainedTransientProduced++
+                if (nonOwnerSource) state.integerNonOwnerProduced++
             }
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
-                combined.derivedThroughTransient(transientSteps).derivedFromRetainedSources(retainedSources),
+                combined.derivedThroughTransient(transientSteps)
+                    .derivedFromRetainedSources(retainedSources, nonOwnerSource),
                 target, levels.size, levels, fallback)
         }
         return decline("step-limit-without-assertion")
@@ -170,6 +179,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         row: IntegerLearningInequality,
         used: Set<PivotKey>,
         allowWideSources: Boolean,
+        target: Int,
     ): BoundEvent? {
         sourceWork.visit()
         if (state.learned.integerRows?.isNotEmpty() == true) {
@@ -217,15 +227,15 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             indices[position] = index
             count++
         }
-        val indices = candidates ?: return null
-        for (position in 0 until count) {
+        val indices = candidates
+        if (indices != null) for (position in 0 until count) {
             row.visit(state)
             qualifiedReason(row, indices[position], allowWideSources)?.let {
                 if (ownedEndpoint) state.arithmeticLearningTrace?.record("integer.retained.original-preferred")
                 return it
             }
         }
-        return null
+        return scannedRetainedReason(row, used, target)
     }
 
     private fun retainedAmoSource(factorId: Int): IntegerConflictRow? {
@@ -234,7 +244,12 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         if (factorId !in state.baseFactorCount until state.totalFactorCount) return retainedDecline("not-learned")
         val propagator = state.factorAt(factorId) as? LearnedIntegerPropagator
             ?: return retainedDecline("not-owned")
+        return retainedAmoSource(propagator)
+    }
+
+    private fun retainedAmoSource(propagator: LearnedIntegerPropagator): IntegerConflictRow? {
         sourceWork.visit()
+        if (state.incremental) return retainedDecline("incremental")
         val cache = state.learned.integerRows ?: return retainedDecline("no-store")
         val slot = propagator.retentionSlot
         if (slot !in cache.indices || cache[slot] !== propagator) return retainedDecline("identity")
@@ -284,6 +299,81 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             return BoundEvent(parent, variable, state.undo.size, key)
         }
         return null
+    }
+
+    private fun scannedRetainedReason(
+        row: IntegerLearningInequality,
+        used: Set<PivotKey>,
+        target: Int,
+    ): BoundEvent? {
+        val cache = state.learned.integerRows ?: return null
+        state.arithmeticLearningTrace?.record("integer.retained.scan")
+        val candidates = IntArray(row.variables.size)
+        var count = 0
+        for (index in row.variables.indices) {
+            sourceWork.visit()
+            val level = endpointLevel(row, index)
+            if (level <= target) continue
+            var position = count
+            while (position > 0) {
+                sourceWork.visit()
+                if (endpointLevel(row, candidates[position - 1]) >= level) break
+                candidates[position] = candidates[position - 1]
+                position--
+            }
+            candidates[position] = index
+            count++
+        }
+        for (position in 0 until count) {
+            val index = candidates[position]
+            val variable = row.variables[index]
+            val lower = row.coefficients[index] > 0L
+            val owner = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
+            for (slot in cache.indices) {
+                sourceWork.visit()
+                val propagator = cache[slot]
+                if (owner in state.baseFactorCount until state.totalFactorCount &&
+                    state.factorAt(owner) === propagator) continue
+                // Cache slots are stable during one analysis and cannot alias factor ids.
+                val key = PivotKey(variable, -slot - 1, lower, retained = true)
+                if (key in used) continue
+                val parent = oppositeTightParent(propagator, variable, lower) ?: continue
+                state.arithmeticLearningTrace?.record("integer.retained.non-owner")
+                return BoundEvent(parent, variable, state.undo.size, key, nonOwnerSource = true)
+            }
+        }
+        return null
+    }
+
+    private fun endpointLevel(row: IntegerLearningInequality, index: Int): Int {
+        val variable = row.variables[index]
+        return if (row.coefficients[index] > 0L) state.intMinLevel[variable] else state.intMaxLevel[variable]
+    }
+
+    private fun oppositeTightParent(
+        propagator: LearnedIntegerPropagator,
+        variable: Int,
+        lower: Boolean,
+    ): IntegerConflictRow? {
+        val parent = retainedAmoSource(propagator) ?: return null
+        var coefficient = 0L
+        for (index in parent.variables.indices) {
+            sourceWork.visit()
+            if (parent.variables[index] == variable) {
+                coefficient = parent.coefficients[index]
+                break
+            }
+        }
+        if (coefficient == 0L || (coefficient > 0L) == lower) return null
+        var minimum = 0L
+        for (index in parent.variables.indices) {
+            sourceWork.visit()
+            val domain = state.intDomains[parent.variables[index]]
+            val endpoint = if (parent.coefficients[index] > 0L) domain.min else domain.max
+            minimum = addExact(minimum, mulExact(parent.coefficients[index], endpoint))
+        }
+        if (minimum != parent.bound) return retainedDecline("not-tight")
+        return parent
     }
 
     private fun endpointMarker(row: IntegerLearningInequality, index: Int): IntArray? {
@@ -345,5 +435,6 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val variable: Int,
         val trail: Int,
         val key: PivotKey,
+        val nonOwnerSource: Boolean = false,
     )
 }
