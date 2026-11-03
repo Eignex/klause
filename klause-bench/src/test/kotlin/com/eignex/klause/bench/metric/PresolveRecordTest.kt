@@ -57,7 +57,7 @@ class PresolveRecordTest {
 
         val restored = Reports.json.decodeFromString<SolveRecord>(Reports.json.encodeToString(record))
 
-        assertEquals(expected + ("exit" to "0"), restored.stats)
+        assertEquals(expected + ("exit" to "0"), restored.stats.filterKeys { !it.startsWith("harness") })
         assertEquals("revision", restored.gitSha)
         assertEquals("php4", restored.problem)
         assertEquals(1000L, restored.budgetMs)

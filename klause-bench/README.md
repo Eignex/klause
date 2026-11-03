@@ -23,6 +23,9 @@ fails preparation instead of publishing a reduced comparison plan.
 Planning stages every selected source before sealing include-directory identities.
 Execution verifies the planned file and directory identities before each solve.
 
+Declared-input planning uses the complete corpus-pack index even when only a subset
+of its members is materialized locally. Each solve verifies its planned input bytes.
+
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
 copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time
@@ -535,6 +538,14 @@ its existing subprocess watchdog and descendant cleanup still apply. This contro
 does not establish cooperative cancellation within a blocked CLI input read.
 Compare full invocation and case/job costs at the same allowance and retain the
 original-source checks, runtime/decoder identities and declared cache conditions.
+
+Solve records retain monotonic `harness*Ms` phase observations in `stats`, including
+model resolution, provenance, invocation and witness handling. Nested phases are
+inclusive; do not sum them. Missing phases are unobserved. `harnessCaseMs` covers
+the JVM child adapter through comparison-record assembly, excluding JVM startup,
+parent verification, final record encoding/write and lab staging/publication.
+The existing source and subprocess timing boundaries remain separate. Harness
+instrumentation changes its retained byte fingerprint.
 
 `harness-jfr=true` records the ordinary JVM CLI adapter's separate 512 MiB harness
 JVM into `report/harness.jfr`; the default is false. CLI `measurement` remains a
