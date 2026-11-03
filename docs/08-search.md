@@ -296,7 +296,8 @@ Unsupported or overflowing bounds retain the missing-observation fallback.
 
 The `lp-default` optimization recipe enables the finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
-`lp-directional-gains=true`. The execution setting can also disable it. LP bounding
+`lp-directional-gains=true`. The execution setting can also disable it. Disabled
+gains return the reduced-cost winner before child-advice preparation. LP bounding
 and branching must be enabled. The reduced-cost/fractionality scorer supplies its
 winning variable and runner-up. When recent history is available, reliable predicted
 gains compare only those two candidates; missing or tied predictions retain the

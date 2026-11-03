@@ -56,6 +56,7 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
             second = variable
         }
     }
+    if (!hints.directionalEnabled) return best
     val proposal = if (compareHistory) {
         hints.compareVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
             second, (second as? VarRef.IntVar)?.let { session.intDomain(it.varId) })
