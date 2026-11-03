@@ -1178,16 +1178,19 @@ private fun executePortfolio(
 
         is PortfolioPlan.Execute -> Unit
     }
+    val profile = ProblemProfile.of(request.problem, request.optimize)
     val baseScenario = clausalDefaultScenario(
         plan.scenario,
-        ProblemProfile.of(request.problem, request.optimize),
+        profile,
         request.defaultArms,
         explicitArms = request.executionOptions.explicitArms,
         privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly,
     )
-    val scenario = weightedCoreDefaultScenario(baseScenario, request.problem, request.objective,
+    val privateScenario = privateRebuildDefaultScenario(baseScenario, request.problem, profile, request.executionOptions,
+        enumerating = request.allSolutions || (request.solutionCap ?: 1L) > 1L)
+    val scenario = weightedCoreDefaultScenario(privateScenario, request.problem, request.objective,
         request.executionOptions, request.cancellation)
-    if (scenario !== baseScenario) {
+    if (scenario !== privateScenario) {
         request.onPortfolioEvent?.invoke("portfolio", SearchEvent.WorkerAdmission("core-guided/weighted-default",
             admitted = true, requirements = "bounded early trial with historical-reason refinement",
             declines = emptyList(), selected = true))
@@ -1224,7 +1227,7 @@ private fun executePortfolio(
         probePolicy = probePolicy,
         booleanProofTasks = booleanProofTasks,
         fundedCompanions = fundedCompanions,
-        privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly,
+        privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly || privateScenario !== baseScenario,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

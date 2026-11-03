@@ -72,6 +72,12 @@ diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
+Ordinary single-core mixed clausal satisfaction admits a bounded automatic private
+parity trial. `param.private-rebuild-work=0` disables it.
+`param.private-rebuild-bytes` bounds private modeled storage independently of canonical
+learned-memory scratch; an explicit shared scratch limit also bounds private storage
+unless a private limit is supplied.
+
 `param.private-rebuild-work=-1` requests automatic parity admission within a
 1,048,576-work cap and the configured scratch grant. It makes one initial-root
 attempt on the structurally admitted Boolean cohort; see the
