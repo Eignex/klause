@@ -30,13 +30,49 @@ class LpPrimalHandoffTest {
     private val selected = FactorProjectionProviders.Default.prepare(problem)
 
     @Test
+    fun `disabled handoff should spend no preparation allowance`() {
+        for ((pump, handoff) in listOf(false to false, false to true, true to false)) {
+            var charged = 0L
+            var polls = 0
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
+                SolveStatsSink("disabled-handoff"), projections = selected,
+                reusePumpPreparation = pump, reusePrimalHandoff = handoff,
+                containingWork = { charged += it }).use { engine ->
+                val source = LpPrimalHandoff.open(engine, Cancellation { polls++; false })
+
+                assertNull(source)
+                assertEquals(0L, charged)
+                assertEquals(0, polls)
+            }
+        }
+    }
+
+    @Test
+    fun `objective engines should preserve handoff admission`() {
+        for ((pump, handoff) in listOf(false to false, false to true, true to false, true to true)) {
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
+                SolveStatsSink("objective-handoff"), projections = selected,
+                reusePumpPreparation = pump, reusePrimalHandoff = handoff).use { engine ->
+                engine.forObjective(LinearObjective(), Cancellation.Never).use { child ->
+                    val source = LpPrimalHandoff.open(child, Cancellation.Never)
+                    try {
+                        if (pump && handoff) assertNotNull(source) else assertNull(source)
+                    } finally {
+                        source?.close()
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun `a foreign engine should not consume a root definition`() {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(RootDomains(problem))
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("handoff-owner"),
-            projections = selected, reusePumpPreparation = true).use { owner ->
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { owner ->
             LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("handoff-foreign"),
-                projections = selected, reusePumpPreparation = true).use { foreign ->
+                projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { foreign ->
                 assertNotNull(LpPrimalHandoff.open(owner, Cancellation.Never)).use { handoff ->
                     handoff.capture(owner, root, Cancellation.Never)
                     val before = foreign.totalSolveWork()
@@ -56,7 +92,7 @@ class LpPrimalHandoffTest {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(RootDomains(problem))
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("closed-handoff"),
-            projections = selected, reusePumpPreparation = true).use { engine ->
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             val handoff = assertNotNull(LpPrimalHandoff.open(engine, Cancellation.Never))
             handoff.capture(engine, root, Cancellation.Never)
 
@@ -73,7 +109,7 @@ class LpPrimalHandoffTest {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(RootDomains(problem))
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("single-handoff"),
-            projections = selected, reusePumpPreparation = true).use { engine ->
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             assertNotNull(LpPrimalHandoff.open(engine, Cancellation.Never)).use { handoff ->
                 handoff.capture(engine, root, Cancellation.Never)
                 assertNotNull(handoff.prepareFor(engine, Cancellation.Never))
@@ -95,7 +131,7 @@ class LpPrimalHandoffTest {
         var stopped = false
         var charged = 0L
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("cancelled-handoff"),
-            projections = selected, reusePumpPreparation = true, containingWork = {
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true, containingWork = {
                 if (armed) {
                     charged += it
                     stopped = true

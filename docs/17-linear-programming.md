@@ -240,8 +240,14 @@ Admission and rebinding spend the current containing and LP allowance. Their cos
 and actual numerical consumption have separate observations from shared-source reuse;
 optimal floating iterates provide no certificate or source-acceptance authority.
 
-A root-primal call can hand its canonical rounding definition to the pump's
-initial query. The handoff belongs to one engine and closes on return or pause.
+Local pump preparation and root-primal handoff have separate internal opt-ins,
+carried into objective-specific engines. Root handoff defaults off. A local pump can reuse
+its completed layout without capturing canonical provenance or opening a root
+handoff. Root handoff additionally requires local pump reuse; a disabled handoff
+returns before inspecting source domains or spending the preparation allowance.
+
+An opted-in root-primal call can hand its canonical rounding definition to the
+pump's initial query. The handoff belongs to one engine and closes on return or pause.
 A freshly assembled rounding source may attach bounded provenance to its private
 warm continuation before numerical solving. A cancelled solve with no iterate can
 retain that completed definition without a basis or point. On resume, a fresh

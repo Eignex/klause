@@ -40,6 +40,37 @@ class LpPrimalContinuationTest {
     private val domains = RootDomains(problem)
 
     @Test
+    fun `disabled handoff should not inspect domains or fund continued provenance`() {
+        val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
+            .build(domains)
+        var reads = 0
+        val live = object : RelaxationDomains by domains {
+            override fun intDomain(varId: Int): IntDomain {
+                reads++
+                return domains.intDomain(varId)
+            }
+        }
+        for ((pump, handoff) in listOf(false to false, false to true, true to false)) {
+            var charged = 0L
+            var observed = 0L
+            var polls = 0
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
+                SolveStatsSink("disabled-provenance"), projections = selected,
+                reusePumpPreparation = pump, reusePrimalHandoff = handoff,
+                containingWork = { charged += it }).use { engine ->
+                val source = LpPrimalContinuation.capture(engine, root, live,
+                    Cancellation { polls++; false }, 4L) { observed += it }
+
+                assertNull(source)
+                assertEquals(0, reads)
+                assertEquals(0L, charged)
+                assertEquals(0L, observed)
+                assertEquals(0, polls)
+            }
+        }
+    }
+
+    @Test
     fun `equivalent domain values should validate a continued definition`() {
         var domain = IntDomain(0, 10).excludeValue(4)
         val live = object : RelaxationDomains by domains {
@@ -48,7 +79,7 @@ class LpPrimalContinuationTest {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(live)
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("equal-source"),
-            projections = selected, reusePumpPreparation = true).use { engine ->
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             assertNotNull(LpPrimalContinuation.capture(engine, root, live, Cancellation.Never, 4L) {}).use { guard ->
                 domain = IntDomain(0, 10).excludeValue(4)
 
@@ -66,7 +97,7 @@ class LpPrimalContinuationTest {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(live)
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("changed-hole"),
-            projections = selected, reusePumpPreparation = true).use { engine ->
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             assertNotNull(LpPrimalContinuation.capture(engine, root, live, Cancellation.Never, 4L) {}).use { guard ->
                 domain = IntDomain(0, 10).excludeValue(5)
 
@@ -85,7 +116,7 @@ class LpPrimalContinuationTest {
         val root = buildPrimalSource(problem, objective, live, Cancellation.Never, {}, selected,
             reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("factory-changed-hole"),
-            projections = selected, reusePumpPreparation = true).use { engine ->
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             assertNotNull(LpPrimalContinuation.capture(engine, root, live, Cancellation.Never, 4L) {}).use { guard ->
                 domain = IntDomain(0, 10).excludeValue(5)
 
@@ -104,7 +135,7 @@ class LpPrimalContinuationTest {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(live)
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("changed-bound"),
-            projections = selected, reusePumpPreparation = true).use { engine ->
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             assertNotNull(LpPrimalContinuation.capture(engine, root, live, Cancellation.Never, 4L) {}).use { guard ->
                 domain = domain.withMinAtLeast(1)
 
@@ -122,7 +153,7 @@ class LpPrimalContinuationTest {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(live)
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("changed-pin"),
-            projections = selected, reusePumpPreparation = true).use { engine ->
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             assertNotNull(LpPrimalContinuation.capture(engine, root, live, Cancellation.Never, 4L) {}).use { guard ->
                 value = true
 
@@ -136,12 +167,12 @@ class LpPrimalContinuationTest {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(domains)
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("source-owner"),
-            projections = selected, reusePumpPreparation = true).use { owner ->
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { owner ->
             assertNotNull(LpPrimalContinuation.capture(owner, root, domains, Cancellation.Never, 4L) {}).use { guard ->
                 for (source in listOf(problem, problem.bake(FactorProjectionProviders.Default))) {
                     LpEngine(source, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("foreign"),
                         projections = FactorProjectionProviders.Default.prepare(source),
-                        reusePumpPreparation = true).use { foreign ->
+                        reusePumpPreparation = true, reusePrimalHandoff = true).use { foreign ->
                         val before = foreign.totalSolveWork()
 
                         assertFalse(guard.matches(foreign, root, RootDomains(source), Cancellation.Never) {})
@@ -159,7 +190,7 @@ class LpPrimalContinuationTest {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(domains)
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("changed-order"),
-            projections = selected, reusePumpPreparation = true).use { engine ->
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             assertNotNull(LpPrimalContinuation.capture(engine, root, domains, Cancellation.Never, 4L) {}).use { guard ->
                 problem.factors.reverse()
                 try {
@@ -176,7 +207,7 @@ class LpPrimalContinuationTest {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(domains)
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("discarded-work"),
-            projections = selected, reusePumpPreparation = true).use { engine ->
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             assertNotNull(LpPrimalContinuation.capture(engine, root, domains, Cancellation.Never, 4L) {}).use { guard ->
                 val paid = guard.paidWorkFor(engine)
                 val before = engine.totalSolveWork()
@@ -196,7 +227,7 @@ class LpPrimalContinuationTest {
         val root = CpToLpRelaxation(problem, objective, projections = selected, reuseSourceTemplates = false)
             .build(domains)
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("closed-source"),
-            projections = selected, reusePumpPreparation = true).use { engine ->
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             val guard = assertNotNull(LpPrimalContinuation.capture(engine, root, domains, Cancellation.Never, 4L) {})
 
             guard.close()
@@ -214,7 +245,7 @@ class LpPrimalContinuationTest {
         var stopped = false
         var charged = 0L
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("cancelled-source"),
-            projections = selected, reusePumpPreparation = true, containingWork = {
+            projections = selected, reusePumpPreparation = true, reusePrimalHandoff = true, containingWork = {
                 if (armed) {
                     charged += it
                     stopped = true
@@ -272,7 +303,7 @@ class LpPrimalContinuationTest {
             var charged = 0L
             LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
                 SolveStatsSink("large-buffer-source"), projections = selected,
-                reusePumpPreparation = true, containingWork = { charged += it }).use { engine ->
+                reusePumpPreparation = true, reusePrimalHandoff = true, containingWork = { charged += it }).use { engine ->
 
                 val guard = LpPrimalContinuation.capture(engine, root, domains, Cancellation.Never, 4L) {}
 
@@ -295,7 +326,7 @@ class LpPrimalContinuationTest {
         val root = CpToLpRelaxation(source, objective, projections = selection, reuseSourceTemplates = false)
             .build(live)
         LpEngine(source, objective, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("large-domain-source"),
-            projections = selection, reusePumpPreparation = true).use { engine ->
+            projections = selection, reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             val guard = LpPrimalContinuation.capture(engine, root, live, Cancellation.Never, 4L) {}
 
             assertNull(guard)

@@ -79,7 +79,7 @@ class LpPrimalHeuristicsTest {
             })
             val token = Cancellation { stopped }
             LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
-                LpSolveContext(factory), reusePumpPreparation = reuse).use { engine ->
+                LpSolveContext(factory), reusePumpPreparation = reuse, reusePrimalHandoff = true).use { engine ->
                 val first = LpPrimalHandoff.open(engine, token)
                 try {
                     assertNull(engine.lpRoundingProbe(objective, token, handoff = first, accept = {
@@ -137,7 +137,7 @@ class LpPrimalHeuristicsTest {
         var charged = 0L
         val token = Cancellation { stopped }
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
-            LpSolveContext(factory), reusePumpPreparation = true, containingWork = {
+            LpSolveContext(factory), reusePumpPreparation = true, reusePrimalHandoff = true, containingWork = {
                 if (armed) {
                     charged += it
                     stopped = true
@@ -178,7 +178,7 @@ class LpPrimalHeuristicsTest {
             var stopped = false
             val token = Cancellation { stopped }
             LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
-                reusePumpPreparation = true).use { engine ->
+                reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
                 val root = buildPrimalSource(problem, objective, domains, Cancellation.Never, {}, engine.projections,
                     reuseCompleteTemplates = false, reuseSourceTemplates = false, retainPrivateDefinition = true)
                 val source = assertNotNull(LpPrimalContinuation.capture(engine, root, domains,
@@ -224,7 +224,7 @@ class LpPrimalHeuristicsTest {
         var charged = 0L
         val token = Cancellation { stopped }
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
-            LpSolveContext(factory), reusePumpPreparation = true, containingWork = {
+            LpSolveContext(factory), reusePumpPreparation = true, reusePrimalHandoff = true, containingWork = {
                 if (armed) {
                     charged += it
                     stopped = true
@@ -258,7 +258,7 @@ class LpPrimalHeuristicsTest {
         var stopped = false
         val token = Cancellation { stopped }
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
-            reusePumpPreparation = true).use { engine ->
+            reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             assertNotNull(LpPrimalHandoff.open(engine, token)).use { handoff ->
                 assertNull(engine.lpRoundingProbe(objective, token, handoff = handoff, accept = {
                     stopped = true
@@ -285,7 +285,7 @@ class LpPrimalHeuristicsTest {
             val sink = SolveStatsSink("rounding-pump-handoff")
             val factory = RecordingLpEngineFactory()
             LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
-                LpSolveContext(factory), reusePumpPreparation = reuse).use { engine ->
+                LpSolveContext(factory), reusePumpPreparation = reuse, reusePrimalHandoff = true).use { engine ->
                 val handoff = LpPrimalHandoff.open(engine, Cancellation.Never)
                 try {
                     assertNull(engine.lpRoundingProbe(objective, Cancellation.Never,
@@ -320,7 +320,7 @@ class LpPrimalHeuristicsTest {
         var stopped = false
         var charged = 0L
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
-            LpSolveContext(factory), reusePumpPreparation = true, containingWork = {
+            LpSolveContext(factory), reusePumpPreparation = true, reusePrimalHandoff = true, containingWork = {
                 if (armed) {
                     charged += it
                     stopped = true
@@ -351,7 +351,7 @@ class LpPrimalHeuristicsTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val sink = SolveStatsSink("retained-guidance-handoff")
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)), sink,
-            reusePumpPreparation = true).use { engine ->
+            reusePumpPreparation = true, reusePrimalHandoff = true).use { engine ->
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             assertNotNull(engine.rootRoundingWarmStart)
             assertNotNull(LpPrimalHandoff.open(engine, Cancellation.Never)).use { handoff ->

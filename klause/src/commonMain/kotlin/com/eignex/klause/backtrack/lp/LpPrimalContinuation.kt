@@ -129,7 +129,7 @@ internal class LpPrimalContinuation private constructor(
             setupWork: Long,
             onWork: (Long) -> Unit,
         ): LpPrimalContinuation? {
-            if (!engine.reusePumpPreparation) return null
+            if (!engine.reusePumpPreparation || !engine.reusePrimalHandoff) return null
             engine.requireOpen()
             val accounting = LpPrimalAssembly(engine, cancellation)
             val started = TimeSource.Monotonic.markNow()

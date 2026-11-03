@@ -110,7 +110,7 @@ internal class LpPrimalHandoff private constructor(
 
     companion object {
         fun open(engine: LpEngine, cancellation: Cancellation): LpPrimalHandoff? {
-            if (!engine.reusePumpPreparation) return null
+            if (!engine.reusePumpPreparation || !engine.reusePrimalHandoff) return null
             engine.requireOpen()
             val accounting = LpPrimalAssembly(engine, cancellation)
             val token = accounting.token
