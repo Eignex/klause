@@ -1,10 +1,12 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.OWN_ORIGIN
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.propagation.bake
@@ -22,6 +24,127 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PrivateRebuildGenerationTest {
+    @Test
+    fun `mixed private rows should retain local source parity propagation`() {
+        for (width in 2..3) for (phase in 0..1) for (native in listOf(false, true)) {
+            val columns = if (width == 2) intArrayOf(3, 4) else intArrayOf(2, 3, 4)
+            val rows = listOf(intArrayOf(0, 1, 3) to 0, columns to phase)
+            val clauses = rows.flatMap { (variables, target) ->
+                (0 until (1 shl variables.size)).filter { it.countOneBits() % 2 != target }.map { mask ->
+                    Clause(IntArray(variables.size) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                }
+            } + Clause(intArrayOf(Lit.make(5, true), Lit.make(6, true)))
+            val source = Problem(7, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+            val canonical = PropagationSession(source, nativeSat = native)
+            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
+                Cancellation.Never, parity = captured))
+            val consumer = PropagationSession(generation.problem)
+
+            assertIs<PropagationResult.Implied>(consumer.pinBool(3, false))
+            assertIs<PropagationResult.Implied>(consumer.pinBool(2, false))
+
+            assertEquals(phase != 0, consumer.boolValue(4))
+            assertNull(consumer.boolValue(0))
+            assertNull(consumer.boolValue(1))
+            for (variable in 0..6) assertNull(canonical.boolValue(variable))
+        }
+    }
+
+    @Test
+    fun `mixed parity views should propagate free choices within a compact byte grant`() {
+        for (phase in 0..1) for (native in listOf(false, true)) {
+            val rows = listOf(intArrayOf(0, 1, 4) to phase, intArrayOf(2, 4, 5) to 1,
+                intArrayOf(3, 5, 6) to phase)
+            val clauses = rows.flatMap { (variables, target) ->
+                (0 until 8).filter { it.countOneBits() % 2 != target }.map { mask ->
+                    Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                }
+            } + Clause(intArrayOf(Lit.make(7, true), Lit.make(8, true)))
+            val source = Problem(9, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+            val canonical = PropagationSession(source, nativeSat = native)
+            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 30_000L,
+                Cancellation.Never, parity = captured))
+
+            for (mask in 0 until 16) {
+                val consumer = PropagationSession(generation.problem)
+                for (variable in 0..3) assertIs<PropagationResult.Implied>(
+                    consumer.pinBool(variable, mask and (1 shl variable) != 0),
+                )
+                assertIs<PropagationResult.Implied>(consumer.pinBool(7, true))
+                assertIs<PropagationResult.Implied>(consumer.pinBool(8, false))
+
+                val first = (mask and 1 != 0) xor (mask and 2 != 0) xor (phase != 0)
+                val second = first xor (mask and 4 != 0) xor true
+                val third = second xor (mask and 8 != 0) xor (phase != 0)
+                assertEquals(first, consumer.boolValue(4))
+                assertEquals(second, consumer.boolValue(5))
+                assertEquals(third, consumer.boolValue(6))
+                assertTrue(clauses.all { clause ->
+                    clause.literals.any { Lit.evaluate(it, assertNotNull(consumer.boolValue(Lit.variable(it)))) }
+                })
+            }
+            assertTrue(generation.modeledBytes <= 30_000L)
+            for (variable in 0..8) assertNull(canonical.boolValue(variable))
+        }
+    }
+
+    @Test
+    fun `wide free coordinate expressions should retain bounded mixed propagation`() {
+        for (phase in 0..1) for (native in listOf(false, true)) {
+            val clauses = (0 until 65).flatMap { row ->
+                val variables = if (row == 0) intArrayOf(0, 1, 66)
+                else intArrayOf(row + 1, row + 65, row + 66)
+                (0 until 8).filter { it.countOneBits() % 2 != phase }.map { mask ->
+                    Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                }
+            } + Clause(intArrayOf(Lit.make(131, true), Lit.make(132, true)))
+            val source = Problem(133, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+            val canonical = PropagationSession(source, nativeSat = native)
+            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
+                Cancellation.Never, parity = captured))
+            val consumer = PropagationSession(generation.problem)
+
+            for (variable in 0..65) assertIs<PropagationResult.Implied>(consumer.pinBool(variable, false))
+            assertIs<PropagationResult.Implied>(consumer.pinBool(131, true))
+            assertIs<PropagationResult.Implied>(consumer.pinBool(132, false))
+
+            for (row in 0 until 65) assertEquals(phase != 0 && row % 2 == 0, consumer.boolValue(row + 66))
+            assertTrue(clauses.all { clause ->
+                clause.literals.any { Lit.evaluate(it, assertNotNull(consumer.boolValue(Lit.variable(it)))) }
+            })
+            for (variable in 0 until 133) assertNull(canonical.boolValue(variable))
+        }
+    }
+
+    @Test
+    fun `mixed parity rows should retain short expanded deductions`() {
+        for (phase in 0..1) for (native in listOf(false, true)) {
+            val rows = listOf(intArrayOf(0, 1, 5) to phase, intArrayOf(0, 5, 6) to 0,
+                intArrayOf(2, 6, 7) to 0, intArrayOf(3, 7, 8) to 0, intArrayOf(4, 8, 9) to 0)
+            val clauses = rows.flatMap { (variables, target) ->
+                (0 until 8).filter { it.countOneBits() % 2 != target }.map { mask ->
+                    Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                }
+            } + Clause(intArrayOf(Lit.make(10, true), Lit.make(11, true)))
+            val source = Problem(12, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+            val canonical = PropagationSession(source, nativeSat = native)
+            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
+                Cancellation.Never, parity = captured))
+            val consumer = PropagationSession(generation.problem)
+
+            assertIs<PropagationResult.Implied>(consumer.pinBool(1, false))
+
+            assertEquals(phase != 0, consumer.boolValue(6))
+            assertNull(consumer.boolValue(0))
+            assertNull(consumer.boolValue(5))
+            for (variable in 0 until 12) assertNull(canonical.boolValue(variable))
+        }
+    }
+
     @Test
     fun `learned equivalences should open a reconstructable private consumer without root pins`() {
         for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {

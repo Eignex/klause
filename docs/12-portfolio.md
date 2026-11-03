@@ -180,6 +180,8 @@ one invocation; it replaces worker windows rather than summing them. Worker coun
 merge independently, and parallel arm times may overlap. Arm `initMs` measures
 handle opening; deferred preparation belongs to segment time and live counters.
 `maxMs` is the longest segment, and `reseeds` counts arm reseeds.
+Lifecycle snapshots retain the first incumbent-availability time; subscribed
+lifecycle streams retain every accepted incumbent version.
 [Search statistics](09-learning.md#statistics) owns propagation/conflict accounting.
 
 ## Witnesses and proof scope
@@ -522,6 +524,11 @@ optimum, refutation or cutoff exhaustion before withholding its proof authority.
 The scheduler assigns bounded slices, revisits pending preparation and reseeds stale
 workers under the containing [allowance](06-sessions.md#resource-allowances).
 Scheduling changes work order, never publication authority.
+
+The worker sampler owns primitive success and trial totals per arm. Restricted
+selection reads those totals directly; fading preserves the prior and the
+accumulator's arithmetic order. The library selector's snapshots synchronize when
+that selector is used.
 
 The opt-in `portfolio-reward=source` ablation retains ordinary feasibility rewards.
 After a source incumbent exists, only an accepted strict incumbent or terminal
@@ -876,8 +883,12 @@ alone supplies no authority; source validation and conditional proof admission s
 
 ## Worker recipes
 
-Recipes select workers from model structure. Explicit pools, backtrack edits and
-source annotations retain their requested composition. Defaults live in
+Recipes select workers from model structure. Explicit pools, heuristic backtrack
+edits and source annotations retain their requested composition. In single-core
+mixed clausal satisfaction, private-rebuild work and learned-memory scratch settings
+alone preserve the default two-worker pool and its complete-search time reservation.
+Captured option keys distinguish these resource settings from heuristic edits;
+custom backtrack edit callbacks retain their selected composition. Defaults live in
 [portfolio construction](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio).
 
 ### Model-specific worker recipes

@@ -18,6 +18,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class PortfolioPlanTest {
@@ -98,6 +99,32 @@ class PortfolioPlanTest {
                 explicitArms = false,
             ).arms,
         )
+    }
+
+    @Test
+    fun `private rebuild budgets should preserve clausal scheduling without overriding explicit recipes`() {
+        val profile = ProblemProfile(ProblemClass.Sat, optimizing = false, wide = false, scheduling = false)
+        val labels = listOf("ls/probsat/plain", "bt/clausal-balanced")
+        for ((settings, expectedArms, expectedShares) in listOf(
+            Triple(listOf("private-rebuild-work=-1", "learned-memory-scratch-bytes=4194304"), 2, listOf(0.0, 0.98)),
+            Triple(listOf("private-rebuild-work=0", "arms=6"), 6, listOf(0.0, 0.98)),
+            Triple(listOf("private-rebuild-work=0", "bt-arm=clausal-balanced"), 6, emptyList()),
+            Triple(listOf("private-rebuild-work=0", "var-selector=vsids"), 6, emptyList()),
+            Triple(listOf("learned-memory-scratch-bytes=4194304", "luby=8"), 6, emptyList()),
+        )) {
+            val options = ExecutionOptions.parse(settings)
+            val scenario = assertIs<PortfolioPlan.Execute>(FinitePipeline.planPortfolio(PortfolioPlanRequest(
+                FiniteEngine.MIXED, false, 1, options, 17L, autoArms(1), LpConfig.OFF,
+                LpZeroObjectivePricing.MIN_BOUND_SUPPORT, null, null,
+            ))).scenario
+
+            val resolved = clausalDefaultScenario(scenario, profile, autoArms(1), options.explicitArms,
+                options.privateRebuildBudgetOnly)
+            val shares = clausalProofShares(resolved, profile, labels, options.privateRebuildBudgetOnly)
+
+            assertEquals(expectedArms, resolved.arms)
+            assertEquals(expectedShares, shares.toList())
+        }
     }
 
     @Test
