@@ -601,7 +601,7 @@ class FiniteExecutionTest {
         for (intCount in listOf(0, 1)) {
             val problem = Problem(1, intCount, Array(intCount) { IntDomain(0, 1) }, emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(longArrayOf(1), LongArray(intCount) { 1 }), 0, null)
+                LinearObjective(longArrayOf(1), LongArray(intCount) { 1 }), null, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second")),
@@ -620,7 +620,7 @@ class FiniteExecutionTest {
             val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val hints = SearchHints(listOf(SearchGroup(intArrayOf(0), intArrayOf(0))))
             val shape = FiniteSolveShape(problem, true, false, null,
-                LinearObjective(longArrayOf(1), longArrayOf(1)), 0, null, searchHints = hints)
+                LinearObjective(longArrayOf(1), longArrayOf(1)), null, null, searchHints = hints)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
                 executionOptions = ExecutionOptions.parse(listOf("portfolio-probes=$policy")),
