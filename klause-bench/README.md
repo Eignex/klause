@@ -227,8 +227,9 @@ containing allowance. These limits do not change solver grants or source semanti
 
 For retained JFR captures, submit `lab/jfr-summary.json` through `lab run` with
 `bench.request.parameters` containing `source` (the job/artifact label), `sha256`
-and `gzip-base64` (at most 2 MiB). The SDK transports the payload in the frozen case
-file. The JDK recording reader verifies the capture hash and streams sampled stacks
+and exactly one of `gzip-base64` or `zstd-base64` (at most 2 MiB encoded). Decoding
+streams at most 16 MiB and checks the raw capture hash; Zstandard windows are limited
+to 8 MiB. The SDK transports the payload in the frozen case file. The JDK recording reader verifies the capture hash and streams sampled stacks
 on the lab worker, limiting method aggregation to 32 frames per sample and 100,000
 distinct methods. Capture truncation and the analysis depth limit are reported
 separately. Large captures must not be passed through profile arguments:
