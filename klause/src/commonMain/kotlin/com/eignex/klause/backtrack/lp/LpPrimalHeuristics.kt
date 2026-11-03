@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.backtrack.snapshotAssignment
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpRounding
+import com.eignex.klause.lp.bounding.RootComponentRounding
 import com.eignex.klause.lp.bounding.RootRoundingWarmStart
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.FloatLpResult
@@ -42,7 +43,7 @@ internal fun LpEngine.lpRoundingProbe(
     val pending = rootRoundingWarmStart?.takeIf { it.objective === objective }
     rootRoundingWarmStart = pending
     if (pending?.roundingComplete == true && problem.numRealVars == 0) {
-        if (!cancellation()) retainRootPrimalTargets(cancellation)
+        if (!cancellation() && rootPrimalTargets?.coordinates !== pending.primal) retainRootPrimalTargets(cancellation)
         rootRoundingInterrupted = cancellation()
         if (!rootRoundingInterrupted) rootRoundingWarmStart = null
         sink.lp.observePrimalPhase("PRIMAL_ROUNDING",
@@ -197,8 +198,37 @@ internal fun LpEngine.lpRoundingProbe(
             }
         }
         outcome = "PINNING_DECLINED"
+        fun proposeComponents(components: RootComponentRounding): Sample? {
+            keepPinning = false
+            if (resumed == null) components.reset()
+            val sample = session.withProbeInvocation(cancellation) {
+                pinRootComponents(session, components, relaxation, primal, knownColumns, cancellation) {
+                    primalPropagationWork += session.work - previousWork
+                    previousWork = session.work
+                }
+            }
+            if (session.fixpointCancelled || session.probeCancelled || cancellation()) {
+                rootRoundingInterrupted = true
+                keepPinning = !session.fixpointCancelled
+                outcome = "CANCELLED"
+                return null
+            }
+            if (sample == null) {
+                guidance?.roundingComplete = true
+                return null
+            }
+            outcome = "PROPOSED"
+            val accepted = accept(sample)
+            if (accepted == null && cancellation()) {
+                rootRoundingInterrupted = true
+                keepPinning = true
+                outcome = "CANCELLED"
+            } else guidance?.roundingComplete = true
+            return accepted
+        }
         fun roundings(reals: DoubleArray?): Sample? {
             if (discrete) {
+                if (directed) guidance?.componentRounding?.let { return proposeComponents(it) }
                 var rounding = LpRounding.NEAREST
                 if (directed && guidance != null) rounding = guidance.rounding
                 while (true) {
@@ -207,6 +237,9 @@ internal fun LpEngine.lpRoundingProbe(
                     previousWork = session.work
                     if (rootRoundingInterrupted || !directed || rounding == LpRounding.DOWN) return null
                     session.popToLevel(0)
+                    if (rounding == LpRounding.NEAREST && guidance != null && seed == null && outcome != "PROPOSED") {
+                        prepareComponentRounding(session, guidance, cancellation)?.let { return proposeComponents(it) }
+                    }
                     rounding = if (rounding == LpRounding.NEAREST) LpRounding.UP else LpRounding.DOWN
                     guidance?.rounding = rounding
                 }
@@ -239,7 +272,7 @@ internal fun LpEngine.lpRoundingProbe(
             session.releaseRetainedState()
         }
         if (!rootRoundingInterrupted) {
-            retainRootPrimalTargets(cancellation)
+            if (rootPrimalTargets?.coordinates !== guidance?.primal) retainRootPrimalTargets(cancellation)
             rootRoundingWarmStart = null
         }
         sink.lp.observePrimalPhase("PRIMAL_ROUNDING", outcome, started.elapsedNow().inWholeNanoseconds)
@@ -291,7 +324,7 @@ internal fun LpEngine.pinToward(
 /** Pin [v] to the rounded LP value (or [lo] when it has no LP column), falling back to the other side
  *  of the LP value on a conflict. A conflicting pin reverts to its pre-pin state for the fallback;
  *  interruption restores the last complete fixpoint and withholds the proposal. */
-private fun pinIntTowardLp(
+internal fun pinIntTowardLp(
     session: PropagationSession,
     v: Int,
     lp: Double?,
