@@ -65,13 +65,16 @@ internal class TranscendentalArithmetic(
     }
 
     fun multiply(left: RationalEnclosure, right: RationalEnclosure): RationalEnclosure {
+        if (left.lower.signum() >= 0 && right.lower.signum() >= 0) {
+            val lower = multiply(left.lower, right.lower)
+            prepare(left.lower, right.upper)
+            prepare(left.upper, right.lower)
+            return RationalEnclosure(lower, multiply(left.upper, right.upper))
+        }
         val products = listOf(
             multiply(left.lower, right.lower), multiply(left.lower, right.upper),
             multiply(left.upper, right.lower), multiply(left.upper, right.upper),
         )
-        if (left.lower.signum() >= 0 && right.lower.signum() >= 0) {
-            return RationalEnclosure(products[0], products[3])
-        }
         return RationalEnclosure(products.reduce { a, b -> minimum(a, b) }, products.reduce { a, b -> maximum(a, b) })
     }
 

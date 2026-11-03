@@ -2,12 +2,55 @@ package com.eignex.klause.arithmetic.transcendental
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class TranscendentalArithmeticTest {
+    @Test
+    fun `unused cross products should retain cancellation polls`() {
+        var charged = 0L
+        val cancellation = object : Cancellation {
+            override fun isCancelled(): Boolean = charged >= 3
+            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+        }
+        val arithmetic = TranscendentalArithmetic(cancellation = cancellation)
+
+        assertFailsWith<TranscendentalInterrupted> {
+            arithmetic.multiply(RationalEnclosure(q(3), q(5)), RationalEnclosure(q(7), q(11)))
+        }
+
+        assertEquals(3L, arithmetic.work)
+        assertEquals(3L, charged)
+    }
+
+    @Test
+    fun `nonnegative interval products should retain every work-limit boundary`() {
+        val left = RationalEnclosure(q(3), q(5))
+        val right = RationalEnclosure(q(7), q(11))
+        for (cap in 0L..3L) {
+            val arithmetic = TranscendentalArithmetic(maximumWork = cap)
+
+            assertFailsWith<TranscendentalResourceLimit> { arithmetic.multiply(left, right) }
+
+            assertEquals(cap, arithmetic.work)
+        }
+    }
+
+    @Test
+    fun `unused cross products should retain their representation limit`() {
+        val scale = q(1L shl 20)
+        val left = RationalEnclosure(scale.reciprocal(), q(1))
+        val right = RationalEnclosure(q(1), scale)
+        val arithmetic = TranscendentalArithmetic(maximumBits = 32)
+
+        assertFailsWith<TranscendentalResourceLimit> { arithmetic.multiply(left, right) }
+
+        assertEquals(2L, arithmetic.work)
+    }
+
     @Test
     fun `nonnegative interval multiplication should retain exact endpoint bounds and work charges`() {
         val arithmetic = TranscendentalArithmetic()

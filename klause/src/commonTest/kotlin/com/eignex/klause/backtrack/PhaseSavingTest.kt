@@ -23,6 +23,36 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class PhaseSavingTest {
+    @Test
+    fun `a preferred phase should leave remaining values lazy and retain their order`() {
+        val session = PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 5)), emptyArray()))
+        session.pinBool(0, true)
+        session.pinInt(0, 3)
+        val phase = PhaseSaving(1, 1, BacktrackParams(phaseSaving = true))
+        for ((variable, input, expected) in listOf(
+            Triple(VarRef.Bool(0), listOf(0L, 1L, 0L, 1L), listOf(1L, 0L, 0L)),
+            Triple(VarRef.IntVar(0), listOf(2L, 3L, 2L, 3L), listOf(3L, 2L, 2L)),
+        )) {
+            phase.capture(variable, session)
+            val visited = mutableListOf<Long>()
+            val values = sequence {
+                for (value in input) {
+                    visited.add(value)
+                    yield(value)
+                }
+            }
+
+            val ordered = phase.applyPhase(variable, values).iterator()
+            assertEquals(emptyList(), visited)
+            assertEquals(expected.first(), ordered.next())
+            assertEquals(emptyList(), visited)
+            val remaining = ordered.asSequence().toList()
+
+            assertEquals(expected.drop(1), remaining)
+            assertEquals(input, visited)
+        }
+    }
+
 
     @Test
     fun `a propagated phase should survive backtracking`() {

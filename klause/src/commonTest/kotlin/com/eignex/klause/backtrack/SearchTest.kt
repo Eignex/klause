@@ -1,11 +1,14 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.Impact
+import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.SmallestDomain
+import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
@@ -14,6 +17,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -22,6 +26,24 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SearchTest {
+    @Test
+    fun `Boolean branch alternatives should retain the selected order and arity`() {
+        for (values in listOf(emptyList(), listOf(1L), listOf(1L, 0L), listOf(0L, 1L))) {
+            val native = PropagationSession(Problem(1, 0, emptyArray(), emptyArray()))
+            val selector = object : ValueSelector {
+                override fun fresh(): ValueSelector = this
+                override fun values(session: PropagationSession, varRef: VarRef, rng: Random): Sequence<Long> =
+                    values.asSequence()
+            }
+            val params = BacktrackParams(variableSelector = InputOrder, valueSelector = selector, phaseSaving = false)
+            val brancher = BacktrackBrancher(native, params, null, NoRestartSchedule)
+
+            val actual = brancher.nextBranch(SearchSession(emptyList()))
+
+            assertEquals(values.map { SearchDecision.Bool(Lit.make(0, it != 0L)) }, actual)
+        }
+    }
+
     private fun problemOf(vararg domains: IntDomain): Problem = Problem(
         numBoolVars = 0,
         numIntVars = domains.size,

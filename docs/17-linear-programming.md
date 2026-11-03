@@ -991,6 +991,11 @@ owns sparse and small dense elimination, DFS reach, Forrest-Tomlin updates, logi
 repair, indexed forward/transpose solves and rational factors. Each owner has fixed
 dimension, both permutations and three-valued update results.
 
+Basis quality products read columns with at most two entries directly from owned
+CSC storage in entry order, starting dot products at zero and skipping accumulation
+for a zero multiplier. Larger columns use the validated backend. The residual
+formulas and caller's quality work charge apply to both paths.
+
 Indexed norms over fewer than 64 stored entries use storage-order scalar squares,
 with scaled recomputation for overflow and subnormal sums. Larger supports use the
 selected kernel backend. Norm evaluation retains IEEE classification and the

@@ -548,17 +548,9 @@ internal class KotlinBasisSolver(
                 val start = sourcePointers[column]
                 val count = sourcePointers[column + 1] - start
                 if (transpose) {
-                    product[j] = solution.dot(sourceRows, start, sourceValues, start, count)
+                    product[j] = qualityColumnDot(solution, start, count)
                 } else {
-                    koblas.sparseKernels.axpy(
-                        product,
-                        solution[j],
-                        sourceRows,
-                        start,
-                        sourceValues,
-                        start,
-                        count,
-                    )
+                    addQualityColumn(solution[j], start, count)
                 }
             }
         }
@@ -572,6 +564,22 @@ internal class KotlinBasisSolver(
             scale = max(scale, max(abs(product[i]), abs(rhs[i])))
         }
         return BasisSolveQuality(residual, residual / scale)
+    }
+
+    private fun qualityColumnDot(solution: IndexedVector, start: Int, count: Int): Double {
+        if (count > 2) return solution.dot(sourceRows, start, sourceValues, start, count)
+        var result = 0.0
+        for (at in start until start + count) result += sourceValues[at] * solution[sourceRows[at]]
+        return result
+    }
+
+    private fun addQualityColumn(alpha: Double, start: Int, count: Int) {
+        if (alpha == 0.0) return
+        if (count <= 2) {
+            for (at in start until start + count) qualityProduct[sourceRows[at]] += alpha * sourceValues[at]
+            return
+        }
+        koblas.sparseKernels.axpy(qualityProduct, alpha, sourceRows, start, sourceValues, start, count)
     }
 
     override fun ordering(): BasisOrdering? {

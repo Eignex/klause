@@ -579,6 +579,8 @@ target phase (the deepest conflict-free Boolean prefix) and a rephase rotation t
 target, saved, all-true, all-false and random polarities every 1000 conflicts by
 default. A
 mode-switching schedule pins the polarity source to its stage instead.
+Phase ordering yields the preferred value before opening the selector's remaining
+value iterator, then retains the order of other values and omits preferred repeats.
 
 Inprocessing runs at safe complete roots in bounded round-robin slices over the
 learned database. Vivification strengthens a clause by asserting the negations of its

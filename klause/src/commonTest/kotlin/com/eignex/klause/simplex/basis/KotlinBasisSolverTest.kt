@@ -15,6 +15,29 @@ import kotlin.test.assertTrue
 
 class KotlinBasisSolverTest {
     @Test
+    fun `quality checks should use the installed sparse basis in both directions`() {
+        val source = SparseMatrix.ofColumns(2, 3, listOf(
+            listOf(0 to 2.0, 1 to 1.0),
+            listOf(1 to 3.0),
+            listOf(0 to 4.0, 1 to 5.0),
+        ))
+        val solution = IndexedVector(2).also { it.scatter(doubleArrayOf(1.0, -2.0)) }
+        KotlinBasisSolver(source).use { solver ->
+            for ((basis, rightHandSides) in listOf(
+                intArrayOf(0, 1) to listOf(doubleArrayOf(2.0, -5.0), doubleArrayOf(0.0, -6.0)),
+                intArrayOf(2, 1) to listOf(doubleArrayOf(4.0, -1.0), doubleArrayOf(-6.0, -6.0)),
+            )) {
+                assertTrue(solver.refactorize(basis))
+                for ((transpose, rhs) in listOf(false, true).zip(rightHandSides)) {
+                    val actual = solver.solveQuality(rhs, solution, transpose)
+
+                    assertEquals(BasisSolveQuality(0.0, 0.0), actual)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `empty solves should retain zero support without visiting updated factors`() {
         val source = ftSource("dense", 3)
         KotlinBasisSolver(source).use { solver ->

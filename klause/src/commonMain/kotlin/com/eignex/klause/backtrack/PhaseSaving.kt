@@ -92,7 +92,7 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
 
                 RephaseMode.RANDOM -> if ((rng ?: Random.Default).nextBoolean()) 1L else 0L
             }
-            if (preferred != null) sequenceOf(preferred) + values.filter { it != preferred } else values
+            if (preferred != null) preferValue(preferred, values) else values
         }
 
         is VarRef.IntVar -> {
@@ -107,8 +107,13 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
                 intPhase != null && intPhaseSet != null && intPhaseSet[vi] -> intPhase[vi]
                 else -> null
             }
-            if (preferred != null) sequenceOf(preferred) + values.filter { it != preferred } else values
+            if (preferred != null) preferValue(preferred, values) else values
         }
+    }
+
+    private fun preferValue(preferred: Long, values: Sequence<Long>): Sequence<Long> = sequence {
+        yield(preferred)
+        for (value in values) if (value != preferred) yield(value)
     }
 
     /** Seed the solution phase source with a new feasible incumbent (see [BacktrackParams.solutionPhasing]). */

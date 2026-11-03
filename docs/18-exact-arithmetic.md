@@ -157,10 +157,11 @@ from overlapping endpoints.
 ### Arithmetic and domain
 
 `RationalEnclosure` has inclusive exact rational endpoints, and interval arithmetic
-keeps every value of its inputs. Nonnegative interval products select extrema by
-endpoint order after charging and evaluating all four products. The same bit
-limits and cancellation checks apply. Reciprocal rejects intervals containing zero,
-and log requires a strictly positive lower endpoint. The
+keeps every value of its inputs. Nonnegative interval products evaluate their
+endpoint extrema in order. All four operand pairs retain their work charges, bit
+limits and cancellation checks, including the unused cross products. Reciprocal
+rejects intervals containing zero, and log requires a strictly positive lower
+endpoint. The
 [exponential](https://dlmf.nist.gov/4.2.E19), [logarithmic](https://dlmf.nist.gov/4.6.E4),
 [sine and cosine](https://dlmf.nist.gov/4.19) and
 [arctangent](https://dlmf.nist.gov/4.24.E3) series are evaluated in rational

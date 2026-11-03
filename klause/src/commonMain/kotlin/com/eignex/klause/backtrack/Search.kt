@@ -735,10 +735,14 @@ internal class BacktrackBrancher(
             values.guide(session, variable, preferred)
         } else preferred
         val alternatives = when (variable) {
-            is VarRef.Bool -> ordered.map { value ->
-                require(value == 0L || value == 1L) { "Boolean selector produced $value" }
-                SearchDecision.Bool(Lit.make(variable.varId, value != 0L))
-            }.toList()
+            is VarRef.Bool -> {
+                val decisions = ArrayList<SearchDecision>(2)
+                for (value in ordered) {
+                    require(value == 0L || value == 1L) { "Boolean selector produced $value" }
+                    decisions.add(SearchDecision.Bool(Lit.make(variable.varId, value != 0L)))
+                }
+                decisions
+            }
 
             // A probing selector offers nothing once it has refuted every value, so the node is dead. Null
             // would claim every column is fixed and surface the open domains' minima as a model.
