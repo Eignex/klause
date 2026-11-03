@@ -80,7 +80,8 @@ internal class CorpusStore(private val root: File, private val workspace: File =
         Files.walk(path).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach { Files.delete(it) } }
     }
 
-    private companion object {
+    companion object {
+        const val SELECTIVE = ".selected-members"
         val locks = ConcurrentHashMap<String, Any>()
     }
 }
