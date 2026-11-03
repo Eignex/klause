@@ -22,6 +22,38 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LabAdapterTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `unmatched selections should reject the complete plan`(includeMatchedSource: Boolean) {
+        val missing = """{"suite":"dimacs-core","name":"missing-lab-source"}"""
+        val selections = if (includeMatchedSource) {
+            """[{"suite":"dimacs-core","name":"php4"},$missing]"""
+        } else {
+            "[$missing]"
+        }
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            KlauseLabSuite.plan(BenchRequest(parameters = mapOf("selections" to selections)))
+        }
+
+        assertContains(failure.message.orEmpty(), "missing-lab-source")
+    }
+
+    @Test
+    fun `matched selections should retain every source seed and repeat block`() {
+        val cases = KlauseLabSuite.plan(
+            BenchRequest(parameters = mapOf(
+                "selections" to """[{"suite":"dimacs-core","name":"php4"},
+                    {"suite":"mps-core","name":"blend-tiny"}]""",
+                "solver-seeds" to "1,3",
+                "repeats" to "2",
+            )),
+        )
+
+        assertEquals(listOf("php4", "blend-tiny"), cases.map { it.attributes.getValue("problem") }.distinct())
+        assertEquals(8, cases.map { it.id }.distinct().size)
+    }
+
     @Test
     fun `paired propagation controls retain source identity and distinct case identities`() {
         val cases = KlauseLabSuite.plan(
