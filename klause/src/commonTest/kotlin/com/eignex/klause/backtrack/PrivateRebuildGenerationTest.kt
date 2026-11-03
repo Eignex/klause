@@ -148,8 +148,8 @@ class PrivateRebuildGenerationTest {
     @Test
     fun `joint private rows should expose free coordinate cancellations`() {
         for (phase in 0..1) for (native in listOf(false, true)) {
-            val rows = listOf(intArrayOf(3, 5, 6) to 0, intArrayOf(1, 3, 9) to 0,
-                intArrayOf(4, 7, 8) to 0, intArrayOf(2, 4, 9) to 0, intArrayOf(0, 1, 2) to phase)
+            val rows = listOf(intArrayOf(6, 1, 2) to 0, intArrayOf(8, 6, 0) to 0,
+                intArrayOf(5, 3, 4) to 0, intArrayOf(7, 5, 0) to 0, intArrayOf(9, 8, 7) to phase)
             val clauses = rows.flatMap { (variables, target) ->
                 (0 until 8).filter { it.countOneBits() % 2 != target }.map { mask ->
                     Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
@@ -162,13 +162,13 @@ class PrivateRebuildGenerationTest {
                 Cancellation.Never, parity = captured))
             val consumer = PropagationSession(generation.problem)
 
-            for ((variable, value) in listOf(5 to false, 6 to true, 7 to false, 8 to true)) {
+            for ((variable, value) in listOf(1 to false, 2 to true, 3 to false, 4 to true)) {
                 assertIs<PropagationResult.Implied>(consumer.pinBool(variable, value))
             }
 
-            assertEquals(phase != 0, consumer.boolValue(0))
-            assertNull(consumer.boolValue(9))
-            assertNull(canonical.boolValue(0))
+            assertEquals(phase != 0, consumer.boolValue(9))
+            assertNull(consumer.boolValue(0))
+            assertNull(canonical.boolValue(9))
         }
     }
 
