@@ -30,13 +30,15 @@ class LpHarvestTest {
     private val objShavingParams = LpPlan(bounding = true, objectiveShaving = true)
 
     @Test
-    fun `a no op harvest should retain finite templates for the engine bake`() {
+    fun `a no op harvest should retain existing finite templates for the engine bake`() {
         val source = Problem(0, 4, Array(4) { IntDomain(0, 10) }, arrayOf<Factor>(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
             Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
         ))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
         val selection = FactorProjectionProviders.Default.prepare(source)
+        val first = source.bake(selection)
+        CpToLpRelaxation(first, objective).build(RootDomains(first))
         val config = PresolveConfig.parse("off,+lp-harvest")
         val prepared = PresolvePipeline.prepareSource(source, config, objective, finiteLane = true)
 

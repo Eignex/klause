@@ -1572,7 +1572,7 @@ internal class LpEngine(
             val plan = with(LpAutoConfig) {
                 prepare(problem, config, requestedPlan, objective, params.cancellation,
                     sparseTrialAllowed = projections?.builtInRelaxation != false,
-                    sparseTrialWork = retainedRootRemainingWork()) { admission ->
+                    sparseTrialWork = retainedRootRemainingWork(), sourcePreparation = sourcePreparation) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted

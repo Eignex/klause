@@ -730,6 +730,7 @@ internal class CpToLpRelaxation(
         if (!reuseSourceTemplates || !earnTemplatePreparation || projections == null ||
             preparationTemplates != null
         ) return
+        if (problem.numRealVars != 0 || !projections.builtInRelaxation) return
         val model = relaxation.model
         if (model.n == 0 || model.doubleView != null || model.exactState != null) return
         val extent = model.n.toLong() + model.m + model.csc.rowIdx.size

@@ -35,6 +35,7 @@ import com.eignex.klause.lp.prepareRootBoxes
 import com.eignex.klause.lp.prepareStatesBothBounds
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CumulativeRelaxation
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.prepareCandidateArcCount
 import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.lp.relaxation.schedulingViews
@@ -162,6 +163,7 @@ object LpAutoConfig {
         cancellation: Cancellation = Cancellation.Never,
         sparseTrialAllowed: Boolean = true,
         sparseTrialWork: Long = SPARSE_LP_MAX_WORK,
+        sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
         observe: ((LpAdmission) -> Unit)? = null,
     ): LpPlan {
         var visits = 0
@@ -403,7 +405,8 @@ object LpAutoConfig {
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
             if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,
-                minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK))
+                minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK),
+                sourcePreparation)
             else SparseLpAdmission(mapOf("DeclineProjection" to 1L))
         } else null
         if (sparse?.admitted == true) {

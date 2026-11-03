@@ -94,7 +94,8 @@ An internal selective-metadata preparation mode validates row identity and exact
 bound sides before retaining the row index. Node engines select this mode and own
 their numerical component partitions. Ordinary node, primal and shaving consumers
 carry internal disabled, object, complete-index and admitted controls through
-objective-specific engines. Admitted construction first completes its LP without
+objective-specific engines and standalone sparse admission. Admitted construction
+first completes its LP without
 speculative metadata. Completed compact construction accumulates
 admission work in a 16-unit source-scoped record. A later preparation attempt spends
 no more inspection work than those completed builds supplied, within the existing
