@@ -22,7 +22,7 @@ import kotlin.math.abs
 import kotlin.time.TimeSource
 
 /**
- * Result of a [RevisedSimplex] solve: the optimal [basis] (to warm-start or exactly certify), the
+ * Result of a [RevisedSimplex] solve: the retained [basis] (to warm-start or exactly certify), the
  * float objective, and the dual vector `y` (one per row) used by the safe bound of Neumaier and
  * Shcherbina, "Safe bounds in linear and mixed-integer linear programming", Math. Program. 99 (2004),
  * https://doi.org/10.1007/s10107-003-0433-3. All values are double-precision; the authoritative bound
@@ -131,7 +131,8 @@ internal class RevisedSimplex(
     PersistentLpSolver,
     ResumableLpSolver,
     LpDirectionalCostSolver,
-    LpDirectionalProbeSolver {
+    LpDirectionalProbeSolver,
+    LpDirectionalValueSolver {
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
     private var solveStarted = false
     override val currentWork: Long get() = work.ops
@@ -2868,6 +2869,70 @@ internal class RevisedSimplex(
                 primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
                 singletonStart)
         }.run(columns, splits, allowance - scan, token, observe)
+    }
+
+    override fun directionalValues(
+        source: LpProbeSource,
+        columns: IntArray,
+        splits: LongArray,
+        allowance: Long,
+        token: Cancellation,
+        observe: (LpProbeMetrics) -> Unit,
+    ): List<LpDirectionalValues>? {
+        fun decline(reason: LpProbeDecline): List<LpDirectionalValues>? {
+            observe(LpProbeMetrics(0L, 0L, 0, reason))
+            return null
+        }
+        val pointModel = source.model
+        val pointBasis = source.basis
+        val state = model.exactState ?: return decline(LpProbeDecline.OWNER)
+        if (token()) return decline(LpProbeDecline.CANCELLED)
+        if (allowance <= 0L) return decline(LpProbeDecline.ALLOWANCE)
+        if (activeSolve != null) return decline(LpProbeDecline.BUSY)
+        if (pointModel.exactState !== state) return decline(LpProbeDecline.STALE_POINT)
+        if (solvedExactState !== state) return decline(LpProbeDecline.NO_POINT)
+        if (columns.isEmpty() || columns.size > 2 || columns.size != splits.size ||
+            columns.any { it !in 0 until n } || splits.any { it == Long.MAX_VALUE } ||
+            (columns.size == 2 && columns[0] == columns[1]) ||
+            pointBasis.basicVars.size != m || pointBasis.status.size != numVars
+        ) return decline(LpProbeDecline.SPLIT)
+        val scan = 3L * numVars + 2L * m + 1L
+        if (scan >= allowance) return decline(LpProbeDecline.ALLOWANCE)
+        observe(LpProbeMetrics(scan, 0L, 0))
+        if (token()) return decline(LpProbeDecline.CANCELLED)
+        probeBasisDecline(source, token)?.let { return decline(it) }
+        return LpDirectionalProbes(state, pointBasis, factory = { child, work, entries ->
+            RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
+                basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
+                    basisWorkLimit = minOf(pricing.basisWorkLimit, work)), reuseRationalOrder, scalingOptions,
+                primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
+                singletonStart)
+        }).runValues(columns, splits, allowance - scan, token, observe)
+    }
+
+    private fun probeBasisDecline(source: LpProbeSource, token: Cancellation): LpProbeDecline? {
+        val basis = source.basis
+        val seen = BooleanArray(numVars)
+        for ((slot, column) in basis.basicVars.withIndex()) {
+            if (slot % 256 == 0 && token()) return LpProbeDecline.CANCELLED
+            if (column !in seen.indices || seen[column] || basis.status[column] != VarStatus.BASIC) {
+                return LpProbeDecline.SPLIT
+            }
+            seen[column] = true
+        }
+        for (column in basis.status.indices) {
+            if (column % 256 == 0 && token()) return LpProbeDecline.CANCELLED
+            val valid = when (basis.status[column]) {
+                VarStatus.BASIC -> seen[column]
+                VarStatus.AT_LOWER -> !seen[column] && source.model.hasFiniteLower(column)
+                VarStatus.AT_UPPER -> !seen[column] && source.model.hasFiniteUpper(column)
+                VarStatus.FIXED -> !seen[column] && source.model.fixed(column)
+                VarStatus.FREE -> !seen[column] && !source.model.hasFiniteLower(column) &&
+                    !source.model.hasFiniteUpper(column)
+            }
+            if (!valid) return LpProbeDecline.SPLIT
+        }
+        return null
     }
 
     override fun directionalCosts(
