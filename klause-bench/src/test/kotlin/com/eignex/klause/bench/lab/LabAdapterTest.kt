@@ -23,6 +23,69 @@ import kotlin.test.assertTrue
 
 class LabAdapterTest {
     @Test
+    fun `planned shared includes remain valid after staging every selected source`() {
+        val root = Files.createTempDirectory("lab-plan-includes-")
+        val previous = System.getProperty("klause.workspace.root")
+        try {
+            System.setProperty("klause.workspace.root", root.toString())
+            val directory = Files.createDirectory(root.resolve("models"))
+            val request = BenchRequest(parameters = mapOf(
+                "selections" to """[{"suite":"mzn-smoke","name":"argmax"},
+                    {"suite":"mzn-smoke","name":"queens"}]""",
+                "input-only" to "true",
+            ))
+
+            val cases = KlauseLabSuite.plan(request) { ref, inputOnly ->
+                val model = Files.writeString(directory.resolve("${ref.name}.mzn"), "solve satisfy;\n")
+                LabInputs.resolve(ref.copy(source = ProblemSource.Prepared(model.toFile()), data = null), inputOnly)
+            }
+
+            assertEquals(2, cases.size)
+            val context = BenchContext(root, worktree = root)
+            cases.forEach { LabInputs.verify(it, context) }
+        } finally {
+            if (previous == null) {
+                System.clearProperty("klause.workspace.root")
+            } else {
+                System.setProperty("klause.workspace.root", previous)
+            }
+            root.toFile().deleteRecursively()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `unmatched selections should reject the complete plan`(includeMatchedSource: Boolean) {
+        val missing = """{"suite":"dimacs-core","name":"missing-lab-source"}"""
+        val selections = if (includeMatchedSource) {
+            """[{"suite":"dimacs-core","name":"php4"},$missing]"""
+        } else {
+            "[$missing]"
+        }
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            KlauseLabSuite.plan(BenchRequest(parameters = mapOf("selections" to selections)))
+        }
+
+        assertContains(failure.message.orEmpty(), "missing-lab-source")
+    }
+
+    @Test
+    fun `matched selections should retain every source seed and repeat block`() {
+        val cases = KlauseLabSuite.plan(
+            BenchRequest(parameters = mapOf(
+                "selections" to """[{"suite":"dimacs-core","name":"php4"},
+                    {"suite":"mps-core","name":"blend-tiny"}]""",
+                "solver-seeds" to "1,3",
+                "repeats" to "2",
+            )),
+        )
+
+        assertEquals(listOf("php4", "blend-tiny"), cases.map { it.attributes.getValue("problem") }.distinct())
+        assertEquals(8, cases.map { it.id }.distinct().size)
+    }
+
+    @Test
     fun `paired propagation controls retain source identity and distinct case identities`() {
         val cases = KlauseLabSuite.plan(
             BenchRequest(

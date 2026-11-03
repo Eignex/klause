@@ -52,6 +52,7 @@ internal fun configureLabPaths() {
         System.setProperty("klause.bench.minizinc", Path.of(tree, LabInputs.RUNTIME, "bin/minizinc").toString())
     }
     System.getenv("LAB_CORPUS")?.let { System.setProperty("klause.bench.corpusCache", it) }
+    System.getenv("LAB_DECLARED_INPUTS")?.let { System.setProperty("klause.bench.declaredInputs", it) }
     System.setProperty("klause.bench.cache", "false")
 }
 
@@ -61,15 +62,27 @@ internal object KlauseLabSuite : BenchSuite {
         "Frozen catalog workloads and installed CLI solve records",
     )
 
-    override fun plan(request: BenchRequest): List<BenchCase> {
+    override fun plan(request: BenchRequest): List<BenchCase> = plan(request, LabInputs::resolve)
+
+    internal fun plan(
+        request: BenchRequest,
+        resolveInputs: (ProblemRef, Boolean) -> List<BenchInput>,
+    ): List<BenchCase> {
         val settings = LabSettings(request.parameters)
-        val selectedProblems = settings.selections.flatMap { KlauseCli.selectProblems(it) }
+        val selectedProblems = settings.selections.flatMap { selection ->
+            KlauseCli.selectProblems(selection).also { selected ->
+                require(selected.isNotEmpty()) { "No problems match selection: $selection" }
+            }
+        }
             .distinctBy { it.suite to it.ref.name }
-        val compilerTrees = mutableMapOf<Path, String>()
-        return selectedProblems.flatMap { selected ->
+        val resolved = selectedProblems.map { selected ->
             val ref = selected.ref
             require(ref.source !is ProblemSource.InCode) { "Lab subprocess solves require file-backed inputs" }
-            val inputs = LabInputs.resolve(ref, settings.inputOnly)
+            selected to resolveInputs(ref, settings.inputOnly)
+        }
+        val compilerTrees = mutableMapOf<Path, String>()
+        return resolved.flatMap { (selected, inputs) ->
+            val ref = selected.ref
             val trees = LabInputs.treeHashes(inputs, compilerTrees)
             settings.engines.flatMap { engine ->
                 val variant = if (settings.engines.size > 1) "$engine/" else ""

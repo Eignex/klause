@@ -10,3 +10,10 @@ See the [lab run guide](https://github.com/Eignex/eignex-lab/blob/main/docs/runs
 A paired row runs every arm for one workload, seed and repetition on one machine in one worker attempt.
 Use automatic compatible placement; other rows and replacement attempts may use other machines.
 Keep failed attempts and all preparation costs. SSH access and lab administration belong to the operations owner.
+
+Declared-input lab planning uses the corpus-pack index for unmaterialized members.
+Complete local collections retain byte authority. The lab verifies each planned input
+before execution.
+
+Every requested selection must match a source. Planning resolves all selected sources
+before sealing directory identities; each solve verifies its planned files and directories.
