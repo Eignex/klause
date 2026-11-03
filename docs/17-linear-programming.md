@@ -1165,6 +1165,9 @@ Construction reserves its scaling bound before allocation and retains actual
 preparation work when the query completes. Scratch factors use bounded entry
 and construction work limits, and every scratch owner closes on all exits.
 Failed and partial work remains in the reported preparation and solve metrics.
+Decline diagnostics distinguish exhausted work, cancellation, unavailable owners,
+unfinished solves, stale points, missing optima and invalid splits. A declined
+comparison retains its completed-child count without supplying partial advice.
 The caller owns probe admission and cadence.
 
 A retained numerical owner can expose a private solve cursor. It suspends between
