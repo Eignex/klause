@@ -1460,6 +1460,10 @@ class PropagationSession private constructor(
             "learningIntegerOriginalImplicationProduced" to it.integerOriginalImplicationProduced,
             "learningIntegerOriginalImplicationAdmitted" to it.integerOriginalImplicationAdmitted,
             "learningIntegerOriginalImplicationConsumed" to it.integerOriginalImplicationConsumed,
+            "learningIntegerOriginalCoverSources" to it.integerOriginalCoverSources,
+            "learningIntegerOriginalCoverProduced" to it.integerOriginalCoverProduced,
+            "learningIntegerOriginalCoverAdmitted" to it.integerOriginalCoverAdmitted,
+            "learningIntegerOriginalCoverConsumed" to it.integerOriginalCoverConsumed,
         )
         val declaredBoundLifecycle = if (it.integerDeclaredBoundTerms == 0L && it.integerDeclaredBoundAdmitted == 0L) {
             emptyMap()

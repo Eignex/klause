@@ -159,7 +159,10 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     }
     if (row.hasBoundImplication) {
         integerBoundImplicationAdmitted++
-        if (row.retainedSources == 0) integerOriginalImplicationAdmitted++
+        if (row.retainedSources == 0) {
+            integerOriginalImplicationAdmitted++
+            if (row.hasBoundCover) integerOriginalCoverAdmitted++
+        }
     }
     if (row.declaredBoundTerms > 0) integerDeclaredBoundAdmitted++
     if (row.declaredBoundModes != 0) integerDeclaredBoundExtendedAdmitted++
@@ -550,7 +553,10 @@ private fun PropagationState.noteLearnedStage(index: Int, stage: LearnedStage, b
             }
             if (propagator.row.hasBoundImplication) {
                 integerBoundImplicationConsumed++
-                if (propagator.row.retainedSources == 0) integerOriginalImplicationConsumed++
+                if (propagator.row.retainedSources == 0) {
+                    integerOriginalImplicationConsumed++
+                    if (propagator.row.hasBoundCover) integerOriginalCoverConsumed++
+                }
             }
             if (propagator.row.declaredBoundTerms > 0) integerDeclaredBoundConsumed++
             if (propagator.row.declaredBoundModes != 0) integerDeclaredBoundExtendedConsumed++

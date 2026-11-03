@@ -107,6 +107,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         var slackOriginalSource = false
         var duplicateContinuation = false
         var boundImplication = false
+        var boundCover = false
         repeat(INTEGER_LEARNING_STEPS) {
             if (combinations == INTEGER_LEARNING_STEPS) return decline("combination-limit")
             state.checkFiniteWork()
@@ -133,8 +134,12 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
             if (event.boundImplication) {
                 boundImplication = true
+                boundCover = boundCover || event.boundCover
                 state.integerBoundImplicationSources++
-                if (retainedSources == 0) state.integerOriginalImplicationSources++
+                if (retainedSources == 0) {
+                    state.integerOriginalImplicationSources++
+                    if (event.boundCover) state.integerOriginalCoverSources++
+                }
             }
             val combined = event.combination ?: combine(row, event.row, event.variable,
                 allowWideSources, allowCompactGrowth = retainedSources > 0)
@@ -199,14 +204,17 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
             if (boundImplication) {
                 state.integerBoundImplicationProduced++
-                if (retainedSources == 0) state.integerOriginalImplicationProduced++
+                if (retainedSources == 0) {
+                    state.integerOriginalImplicationProduced++
+                    if (boundCover) state.integerOriginalCoverProduced++
+                }
             }
             if (compact.declaredBoundTerms > 0) state.integerDeclaredBoundProduced++
             if (compact.declaredBoundModes != 0) state.integerDeclaredBoundExtendedProduced++
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
                 compact.derivedThroughTransient(transientSteps)
                     .derivedFromRetainedSources(retainedSources, nonOwnerSource, nonOwnerOriginalSource,
-                        slackOriginalSource, duplicateContinuation, boundImplication),
+                        slackOriginalSource, duplicateContinuation, boundImplication, boundCover),
                 target, levels.size, levels, fallback)
         }
         return decline("step-limit-without-assertion")
@@ -381,7 +389,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             val parent = source.source(variable, lower, marker) ?: continue
             val key = PivotKey(variable, marker[2], lower, retained = false, implication = true)
             state.arithmeticLearningTrace?.record("integer.retained.bound-implication.selected")
-            return BoundEvent(parent, variable, marker[2], key, boundImplication = true)
+            return BoundEvent(parent, variable, marker[2], key, boundImplication = true,
+                boundCover = parent.hasBoundCover)
         }
         return null
     }
@@ -722,6 +731,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val nonOwnerOriginalSource: Boolean = false,
         val slackOriginalSource: Boolean = false,
         val boundImplication: Boolean = false,
+        val boundCover: Boolean = false,
         val combination: IntegerLearningInequality? = null,
     )
 }

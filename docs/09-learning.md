@@ -578,30 +578,38 @@ spend the same 4,096 source visits. The selected combination is reused within th
 analysis. A primitive origin flag and separate source, production, admission and
 first-consumption counters identify children from this pass without parent references.
 The ordinary native and mapped shared assertion targets retain their authority.
-A complete historical binary bound implication can supply a final parent after
-ordinary endpoint and retained-parent choices fail, including for an original seed
-without a retained parent. Its source is a mandatory original word-linear constraint with a matching projection and unextended current endpoint
-marker. Both ordinary and exact word-linear forms require the conclusion and every
-strengthened condition to have immutable declared bounds 0..1. Other terms may
-contribute their unchanged declared minimizing endpoint from a wider range; an
-open minimizing side or a stronger nonbinary endpoint withholds the source.
-Guards, real coordinates and unsupported constants also withhold it.
-Checked activity over the complete directional
-historical bounds must reconstruct a raw unit request, with its historical member
+A historical binary bound implication can supply a final parent after ordinary
+endpoint and retained-parent choices fail, including for an original seed without
+a retained parent. Its source is a mandatory original word-linear constraint with
+a matching projection and unextended current endpoint marker. Both ordinary and
+exact word-linear forms require the conclusion and every strengthened condition
+to have immutable declared bounds 0..1. Other terms may contribute their unchanged
+declared minimizing endpoint from a wider range; an open minimizing side or a
+stronger nonbinary endpoint withholds the source. Guards, real coordinates and
+unsupported constants also withhold it. Checked activity over every directional
+historical bound must reconstruct the raw unit request, with its historical member
 and current endpoint intact. The marker's slack is not a requested bound.
-Every historical endpoint stronger than its declared bound becomes an explicit
-condition, including root-level facts. The disjunction of its unit conclusion
-and every negated condition is an exact binary clause and therefore an integer
-inequality. At most 16 literals, including the conclusion, enter this representation;
-an overwide condition set withholds every subset. Source terms are streamed under
-the existing source-reference allowance without materializing a wider numeric row.
-Original numeric views keep their 16/32-term input limits. The implication uses a
-separate per-analysis source key, and its selected sources, produced children,
-admission and first consumption retain a primitive current-derivation origin through
-retirement, independently of retained-parent counts. A separate lifecycle group counts
-only implication children with no retained parent, using the same final row origin
-and retained-source count at production, admission and first consumption.
-Conflict, duplicate and ordinary
+
+When the complete condition set fits 16 literals including the conclusion, every
+stronger-than-declared endpoint remains explicit, including root facts. An overwide
+set can instead supply a sufficient weighted cover. It retains at most 15 largest
+positive term improvements over declared minimizing activity, then tests prefixes
+in descending weight order. The checked declared activity plus only those selected
+improvements must independently imply the same raw unit bound. Every selected
+condition remains explicit; all omitted terms use their declared baseline. An
+insufficient or overflowing cover supplies no source. Duplicate term conditions
+may share one literal but never count unselected contributions toward the proof.
+
+The conclusion or negation of every selected condition is an exact binary clause
+and therefore an integer inequality. Complete-condition storage and cover candidates
+are bounded independently, without materializing a wider numeric row. Traversal,
+cover selection, division and normalization spend the existing source-reference
+allowance. Original numeric views keep their 16/32-term limits. The implication
+uses a separate per-analysis source key. Its current-derivation origin and a
+distinct overwide-cover flag survive row views and retirement without retaining
+parents. Production, admission and first consumption use the same final-row flags;
+separate lifecycle groups identify original-only children and original-only cover
+children by their zero retained-source count. Conflict, duplicate and ordinary
 native/shared assertion checks still govern the child.
 
 After selecting an owned source, an unconditional derivation may use the same

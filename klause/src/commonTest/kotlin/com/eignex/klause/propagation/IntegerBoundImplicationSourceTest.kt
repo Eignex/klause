@@ -31,6 +31,119 @@ import kotlin.test.assertTrue
 
 class IntegerBoundImplicationSourceTest {
     @Test
+    fun `repeated source terms should preserve a compact complete implication`() {
+        val variables = intArrayOf(0) + IntArray(32) { if (it < 16) 1 else 2 }
+        val native = PropagationSession(Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
+            Linear(IntArray(33) { if (it == 0) -1 else 1 }, variables, LinearOp.LE, 31),
+        )), pbLearning = false)
+        assertIs<PropagationResult.Implied>(native.pinIntAtLeast(1, 1))
+        assertIs<PropagationResult.Implied>(native.pinIntAtLeast(2, 1))
+        val state = native.explanationState
+        val marker = assertNotNull(state.intMinAntecedents[0])
+
+        val row = assertNotNull(
+            IntegerBoundImplicationSource(state, IntegerSourceWork(state)).source(0, true, marker))
+
+        assertContentEquals(intArrayOf(0, 1, 2), row.variables)
+        assertContentEquals(longArrayOf(-1, 1, 1), row.coefficients)
+        assertEquals(1L, row.bound)
+        assertFalse(row.hasBoundCover)
+    }
+
+    @Test
+    fun `a sufficient weighted cover should preserve either historical unit sign`() {
+        for (lower in listOf(false, true)) {
+            val coefficients = IntArray(33) { if (it == 0) { if (lower) -100 else 100 } else if (it == 1) 100 else 1 }
+            val bound = if (lower) 31 else 131
+            val native = PropagationSession(Problem(0, 33, Array(33) { IntDomain(0, 1) }, arrayOf(
+                Linear(coefficients, IntArray(33) { it }, LinearOp.LE, bound),
+            )), pbLearning = false)
+            for (v in 2 until 33) assertIs<PropagationResult.Implied>(native.implyIntAtLeast(v, 1))
+            assertIs<PropagationResult.Implied>(native.pinIntAtLeast(1, 1))
+            val state = native.explanationState
+            val marker = assertNotNull(if (lower) state.intMinAntecedents[0] else state.intMaxAntecedents[0])
+
+            val row = assertNotNull(
+                IntegerBoundImplicationSource(state, IntegerSourceWork(state)).source(0, lower, marker))
+
+            assertContentEquals(intArrayOf(0, 1), row.variables)
+            assertContentEquals(longArrayOf(if (lower) -1 else 1, 1), row.coefficients)
+            assertEquals(if (lower) 0L else 1L, row.bound)
+            assertTrue(row.hasBoundCover)
+            for (x in 0L..1L) for (e in 0L..1L) for (smallCount in 0L..31L) {
+                if (coefficients[0] * x + 100L * e + smallCount <= bound) {
+                    assertTrue(row.coefficients[0] * x + e <= row.bound)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `an original weighted cover should assert a mapped child beyond complete width`() {
+        val problem = Problem(0, 35, Array(35) { IntDomain(0, 1) }, Array(3) { index ->
+            if (index == 2) Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1)
+            else Linear(IntArray(33) { if (it == 0) 100 else if (it == 1) -100 else 1 },
+                intArrayOf(3, index) + IntArray(31) { it + 4 }, LinearOp.LE, 31)
+        })
+        val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+            .apply { enableIntegerRowLearning() }
+        for (v in 4 until 35) assertIs<PropagationResult.Implied>(native.implyIntAtLeast(v, 1))
+        val cp = CpSearchComponent(native, IntArray(35) { it + 7 })
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(10, 1)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+        assertContentEquals(intArrayOf(2, 3), learned.row.variables)
+        assertContentEquals(longArrayOf(1, 2), learned.row.coefficients)
+        assertEquals(1L, learned.row.bound)
+        assertEquals(0, learned.row.retainedSources)
+        assertTrue(learned.row.hasBoundImplication)
+        assertTrue(learned.row.hasBoundCover)
+        assertEquals(0L, shared.intUpperBound(10))
+        val snapshot = native.learnedLifecycle()
+        assertEquals(2L, snapshot["learningIntegerOriginalCoverSources"])
+        assertEquals(1L, snapshot["learningIntegerOriginalCoverProduced"])
+        assertEquals(1L, snapshot["learningIntegerOriginalCoverAdmitted"])
+        assertEquals(1L, snapshot["learningIntegerOriginalCoverConsumed"])
+        native.releaseRetainedState()
+        assertEquals(snapshot, native.learnedLifecycle())
+    }
+
+    @Test
+    fun `a required unavailable condition should withhold a weighted cover child`() {
+        val problem = Problem(0, 36, Array(36) { IntDomain(0, 1) }, Array(3) { index ->
+            if (index == 2) Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1)
+            else Linear(IntArray(34) { if (it < 2) 100 else if (it == 2) -200 else 1 },
+                intArrayOf(3, 4, index) + IntArray(31) { it + 5 }, LinearOp.LE, 131)
+        })
+        val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+            .apply { enableIntegerRowLearning() }
+        for (v in 5 until 36) assertIs<PropagationResult.Implied>(native.implyIntAtLeast(v, 1))
+        val peer = object : SearchComponent {
+            override fun initialize(context: SearchContext): ComponentResult =
+                context.publish(SearchDecision.IntAtLeast(4, 1))
+        }
+        val cp = CpSearchComponent(native)
+        val shared = SearchSession(listOf(peer, cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(3, 1)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+        assertTrue(learned.row.hasBoundCover)
+        assertEquals(0, learned.row.retainedSources)
+
+        assertFalse(cp.prefersNativeConflictAnalysis)
+
+        assertEquals(1L, native.learnedLifecycle()["learningIntegerOriginalCoverProduced"])
+        assertEquals(0L, native.learnedLifecycle()["learningIntegerOriginalCoverAdmitted"])
+        assertEquals(0L, native.learnedLifecycle()["learningIntegerOriginalCoverConsumed"])
+    }
+
+    @Test
     fun `original parents should derive a mapped implication without a retained source`() {
         val problem = Problem(0, 35, Array(35) { IntDomain(0, if (it < 4) 1L else 2L) }, Array(3) { index ->
             if (index == 2) Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 1)
@@ -66,6 +179,11 @@ class IntegerBoundImplicationSourceTest {
         assertEquals(1L, snapshot["learningIntegerOriginalImplicationProduced"])
         assertEquals(1L, snapshot["learningIntegerOriginalImplicationAdmitted"])
         assertEquals(1L, snapshot["learningIntegerOriginalImplicationConsumed"])
+        assertFalse(learned.row.hasBoundCover)
+        assertEquals(0L, snapshot["learningIntegerOriginalCoverSources"])
+        assertEquals(0L, snapshot["learningIntegerOriginalCoverProduced"])
+        assertEquals(0L, snapshot["learningIntegerOriginalCoverAdmitted"])
+        assertEquals(0L, snapshot["learningIntegerOriginalCoverConsumed"])
         native.releaseRetainedState()
         assertEquals(snapshot, native.learnedLifecycle())
     }

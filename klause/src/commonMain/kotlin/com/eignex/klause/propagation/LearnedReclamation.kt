@@ -159,7 +159,7 @@ internal fun PropagationState.ownLearned(sample: com.eignex.klause.util.SharingM
         is PseudoBooleanPropagator -> { ints(prop.literals); ints(prop.byWeightDesc); longs(prop.weights) }
         is LearnedIntegerPropagator -> {
             sample.owned(prop, Int.SIZE_BYTES.toLong(), protected)
-            sample.owned(prop.row, Long.SIZE_BYTES + Int.SIZE_BYTES * 5L + 5L, protected)
+            sample.owned(prop.row, Long.SIZE_BYTES + Int.SIZE_BYTES * 5L + 6L, protected)
             ints(prop.row.variables)
             longs(prop.row.coefficients)
         }
