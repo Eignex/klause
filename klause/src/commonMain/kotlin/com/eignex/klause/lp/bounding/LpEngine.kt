@@ -171,11 +171,13 @@ internal class LpEngine(
     internal var primalSearchWork: Long = 0L
     internal var rootPrimalTargets: RootPrimalTargets? = null
         private set
+    internal var rootComponentValues: RootComponentValues? = null
+        private set
     internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
         set(value) {
             if (field !== value) {
                 field?.pinning?.releaseRetainedState()
-                if (value != null) clearRootPrimalTargets()
+                if (value != null) clearRootPrimalTargets(retainComponentValues = true)
             }
             field = value
         }
@@ -322,8 +324,27 @@ internal class LpEngine(
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
-    internal fun clearRootPrimalTargets() {
+    internal fun clearRootPrimalTargets(retainComponentValues: Boolean = false) {
         rootPrimalTargets = null
+        if (!retainComponentValues) rootComponentValues = null
+    }
+
+    internal fun prepareRootComponentValues(
+        targets: RootPrimalTargets,
+        cancellation: Cancellation,
+    ): RootComponentValues? {
+        rootComponentValues?.let { return it }
+        val n = problem.numIntVars
+        val bytes = rootComponentValueBytes(n)
+        val work = 8L * n
+        if (!rootComponentPreparationAllowed(targets, bytes, work) ||
+            rootComponentPreparationWork(targets, bytes) < work || cancellation()
+        ) return null
+        noteNodeOverhead(work)
+        val values = RootComponentValues(n)
+        if (cancellation()) return null
+        rootComponentValues = values
+        return values
     }
 
     private fun rootGuidanceFits(additionalBytes: Long): Boolean {
@@ -337,7 +358,8 @@ internal class LpEngine(
                 (if (it.knownColumns === rounding?.knownColumns) 0L else it.knownColumns?.size?.toLong() ?: 0L) +
                 (it.components?.retainedBytes ?: 0L)
         } ?: 0L
-        return roundingBytes + maskBytes + targetBytes + additionalBytes <= ROOT_PRIMAL_GUIDANCE_BYTES
+        return roundingBytes + maskBytes + targetBytes + (rootComponentValues?.retainedBytes ?: 0L) +
+            additionalBytes <= ROOT_PRIMAL_GUIDANCE_BYTES
     }
 
     internal fun rootComponentPreparationAllowed(targets: RootPrimalTargets, bytes: Long, minimumWork: Long): Boolean =

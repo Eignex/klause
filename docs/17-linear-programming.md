@@ -320,7 +320,14 @@ inherited checked bounds, combinatorial node bounds and complete CP checks remai
 active. Only the simplex arm defers; other bounds keep their normal cascade. Those nodes supply
 no new directional observations; ordinary node LP policy resumes after an incumbent
 or guide expiry. Declined preparation keeps ordinary branching; guide replacement, restart, reseed and close discard the
-ordering. A restored source root can refresh expired preferences from its current
+ordering. Completed integer component assignments can retain private Long value
+preferences across ordinary restarts and numerical-guide replacement. Capture first
+checks that every member is fixed; it charges array initialization and member copies
+to the remaining preparation and LP allowances inside the same one MiB guidance cap.
+Interrupted copies retain only visited value preferences and no component result.
+The ordinary frame stack keeps every alternative, and full source checks still own
+assignment acceptance. These values supply no bound, proof or LP-point authority.
+Explicit target reset, reseed and close release them. A restored source root can refresh expired preferences from its current
 private numerical owner, after rebuilding the current domain and cut view. The
 read requires matching model and exact state at depth zero, preserves child
 invalidation, charges transport and copies only currently available coordinates.

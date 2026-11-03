@@ -56,13 +56,46 @@ internal fun LpEngine.prepareRootComponentOrder(
 internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellation: Cancellation): VarRef? {
     val targets = rootPrimalTargets ?: return null
     val order = prepareRootComponentOrder(session, cancellation) ?: return null
-    val variable = firstRootComponentVariable(order, session, cancellation) ?: return null
+    val variable = firstRootComponentVariable(order, session, cancellation) { group ->
+        retainRootComponentValues(targets, order, group, session, cancellation)
+    } ?: return null
     if (rootPrimalTargets !== targets || cancellation()) return null
     if (!order.offered) {
         order.offered = true
         sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", "COMPONENT_PICK_OFFERED", 0L)
     }
     return VarRef.IntVar(variable)
+}
+
+private fun LpEngine.retainRootComponentValues(
+    targets: RootPrimalTargets,
+    order: RootComponentOrder,
+    group: Int,
+    session: PropagationSession,
+    cancellation: Cancellation,
+) {
+    val start = order.offsets[group]
+    val end = order.offsets[group + 1]
+    if (end - start < 2 || rootComponentValues?.known?.get(order.members[start]) == true) return
+    val work = 8L * (end - start)
+    if (!rootComponentPreparationAllowed(targets, 0L, work) ||
+        rootComponentPreparationWork(targets, 0L) < work || cancellation()
+    ) return
+    noteNodeOverhead(work)
+    for (index in start until end) {
+        if ((index - start) % 256 == 0 && cancellation()) return
+        if (!session.intDomain(order.members[index]).isFixed) return
+    }
+    val values = prepareRootComponentValues(targets, cancellation) ?: return
+    for (index in start until end) {
+        if ((index - start) % 256 == 0 && cancellation()) return
+        val variable = order.members[index]
+        values.values[variable] = session.intDomain(variable).min
+        if (index != start) values.known[variable] = true
+    }
+    // The first member marks a completed copy; interrupted copies remain ordinary value preferences.
+    values.known[order.members[start]] = true
+    sink.lp.observePrimalPhase("PRIMAL_COMPONENT_VALUES", "RETAINED", 0L, work)
 }
 
 internal fun rootComponentPreparationBytes(variables: Int): Long =
@@ -204,6 +237,7 @@ internal fun firstRootComponentVariable(
     order: RootComponentOrder,
     session: PropagationSession,
     cancellation: Cancellation,
+    completed: ((Int) -> Unit)? = null,
 ): Int? {
     var visited = 0
     for (group in 0 until order.groups) {
@@ -213,6 +247,7 @@ internal fun firstRootComponentVariable(
             val variable = order.members[index]
             if (session.needsIntDecision(variable)) return variable
         }
+        completed?.invoke(group)
     }
     return null
 }

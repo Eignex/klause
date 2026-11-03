@@ -1336,7 +1336,7 @@ internal class ResumableMinimize(
             lpHints?.resetHistory()
             restartRootTargetsPending = incumbents.current() == null &&
                 lpEngine.rootPrimalTargets?.components?.offered == true
-            lpEngine.clearRootPrimalTargets()
+            lpEngine.clearRootPrimalTargets(retainComponentValues = true)
         }
 
         override fun pick(session: PropagationSession): VarRef? {
