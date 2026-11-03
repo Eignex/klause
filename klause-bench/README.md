@@ -29,6 +29,12 @@ of its members is materialized locally. Each solve verifies its planned input by
 The standard JVM lab manifests request source snapshots with the selected revision's files and original Git commit identity.
 Their builds and tools use the current revision without requiring ancestors or tags.
 
+Corpus-pack indexes are committed under `klause-bench/corpus-index/<collection>.tsv.gz`
+(`path<TAB>sha256<TAB>bytes`), so declared-input planning makes no network requests and
+transfers no corpus bytes. Regenerate them from complete collection trees with
+`CommittedCorpusIndexes CORPUS_CACHE WORKSPACE [COLLECTION...]` on the bench classpath.
+A collection without a committed index falls back to the mirror's index.
+
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
 copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time
