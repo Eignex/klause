@@ -2809,7 +2809,9 @@ internal class RevisedSimplex(
 
     internal fun probeObjective(token: Cancellation): Double? {
         val values = cachedBeta ?: return null
-        if (optimalBasis == null || cachedModel !== model || cachedPrimalOnly || cachedNumerical !== numerical) return null
+        if (optimalBasis == null || cachedModel !== model || cachedPrimalOnly || cachedNumerical !== numerical) {
+            return null
+        }
         val scale = model.exactState?.model?.objective?.scale?.approximation ?: return null
         if (!scale.isFinite() || scale <= 0.0) return null
         var objective = 0.0

@@ -111,7 +111,9 @@ internal class LpExactState internal constructor(
         val origin = model.column(column).origin.value
         var bits = Long.SIZE_BITS
         fun include(number: ExactLpNumber?) {
-            if (number != null) bits = maxOf(bits, number.value.num.magnitudeBitLength(), number.value.den.magnitudeBitLength())
+            if (number != null) {
+                bits = maxOf(bits, number.value.num.magnitudeBitLength(), number.value.den.magnitudeBitLength())
+            }
         }
         include(model.column(column).origin)
         include(model.column(column).bounds.lower?.number)
