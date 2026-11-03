@@ -287,6 +287,44 @@ class LpHintsTest {
     }
 
     @Test
+    fun `a stronger child breaks a weak tie without lowering the weaker value`() {
+        val cases = listOf(
+            LpDirectionalValues(1.0, 5.0) to true,
+            LpDirectionalValues(5.0, 1.0) to true,
+            LpDirectionalValues(1.0, 4.0) to false,
+            LpDirectionalValues(1.0, 3.0) to false,
+            LpDirectionalValues(1.0 - 1e-10, 99.0) to false,
+            LpDirectionalValues(1.0 - 1e-6, 99.0) to false,
+            LpDirectionalValues(1.0 + 1e-10, 5.0) to true,
+        )
+        for ((candidate, stronger) in cases) for (offset in listOf(-100.0, 0.0, 100.0)) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, 3) }
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+                BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+            val observations = ArrayList<String>()
+            val hints = LpHints(2, 0, directionalGains = true, freshVariableProbes = true,
+                observe = observations::add)
+            hints.beginNode(1, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+            hints.recordBound(relaxation, 10.0)
+            hints.recordProbeBasis(relaxation, Basis(IntArray(0), Array(2) { VarStatus.AT_LOWER }))
+
+            val proposal = hints.compareProbeVariables(VarRef.IntVar(0), IntDomain(0, 3),
+                VarRef.IntVar(1), IntDomain(0, 3), { true }) { _, _, _ ->
+                listOf(LpDirectionalValues(offset + 1.0, offset + 4.0),
+                    LpDirectionalValues(offset + candidate.down, offset + candidate.up))
+            }
+
+            assertEquals(if (stronger) VarRef.IntVar(1) else null, proposal)
+            assertEquals(if (stronger) 1 else 0, observations.count { it == "VARIABLE_PROBE_STRONGER_TIE" })
+            assertEquals(if (stronger) VarRef.IntVar(1) else VarRef.IntVar(0),
+                hints.applyVariableChoice(proposal, VarRef.IntVar(0)))
+        }
+    }
+
+    @Test
     fun `a retained source is queried at most once across cooperative entries`() {
         for (enabled in listOf(false, true)) for (funded in listOf(false, true)) {
             val builder = LpBuilder()

@@ -108,14 +108,14 @@ class ResumableMinimizeDirectionalTest {
     }
 
     @Test
-    fun `finite search consumes fresh weaker child choices across cooperative slices`() {
+    fun `finite search consumes fresh stronger child ties across cooperative slices`() {
         val blocks = 4
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
             repeat(3) { edge ->
                 factors.add(Linear(longArrayOf(1L, 1L),
-                    intArrayOf(edge * blocks + block, (edge + 1) % 3 * blocks + block), LinearOp.GE, 1L))
+                    intArrayOf(block * 3 + edge, block * 3 + (edge + 1) % 3), LinearOp.GE, 1L))
             }
         }
         val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
@@ -145,14 +145,15 @@ class ResumableMinimizeDirectionalTest {
             }) },
         )
 
-        val objective = LinearObjective(intCoefficients = LongArray(variables) { 2L + it % blocks })
+        val objective = LinearObjective(intCoefficients = LongArray(variables) { longArrayOf(3L, 2L, 4L)[it % 3] })
         ResumableMinimize(BacktrackSolver(problem), objective, params,
             rootBasisGuidance = false).use { search ->
             var slices = 0
             while (slices++ < 128 && !search.isDone) {
                 val outcomes = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
                 if ((outcomes?.get("DOWN") ?: 0L) >= 2L && (outcomes?.get("UP") ?: 0L) >= 2L &&
-                    (outcomes?.get("VARIABLE_PROBE_CONSUMED") ?: 0L) > 0L
+                    (outcomes?.get("VARIABLE_PROBE_CONSUMED") ?: 0L) > 0L &&
+                    (outcomes?.get("VARIABLE_PROBE_STRONGER_TIE") ?: 0L) > 0L
                 ) break
                 search.runSlice(Cancellation.Never, 1000L, 32L) {}
             }
@@ -163,6 +164,7 @@ class ResumableMinimizeDirectionalTest {
             assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["VARIABLE_PROBE_COMPARED"] ?: 0L) > 0L, diagnostic)
+            assertTrue((observations["VARIABLE_PROBE_STRONGER_TIE"] ?: 0L) > 0L, diagnostic)
             assertTrue((observations["VARIABLE_PROBE_CONSUMED"] ?: 0L) > 0L, diagnostic)
             assertEquals(0L, observations["SIDE_CONSUMED"] ?: 0L, diagnostic)
             assertEquals(0L, observations["HISTORY_SIDE_CONSUMED"] ?: 0L, diagnostic)

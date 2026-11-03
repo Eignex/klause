@@ -371,7 +371,7 @@ internal class LpHints(
             observe("VARIABLE_PROBE_DECLINED")
             return null
         }
-        charge(8L)
+        charge(14L)
         val firstValues = values[0]
         val secondValues = values[1]
         if (!firstValues.down.isFinite() || !firstValues.up.isFinite() ||
@@ -381,15 +381,19 @@ internal class LpHints(
             return null
         }
         val improvement = minOf(secondValues.down, secondValues.up) - minOf(firstValues.down, firstValues.up)
-        if (!improvement.isFinite()) {
+        val strongImprovement = maxOf(secondValues.down, secondValues.up) -
+            maxOf(firstValues.down, firstValues.up)
+        if (!improvement.isFinite() || !strongImprovement.isFinite()) {
             observe("VARIABLE_PROBE_MISSING_DIRECTION")
             return null
         }
         observe("VARIABLE_PROBE_COMPARED")
-        if (improvement <= 1e-9) {
+        val strongerTie = improvement in 0.0..1e-9 && strongImprovement > 1e-9
+        if (improvement <= 1e-9 && !strongerTie) {
             observe(if (improvement < -1e-9) "VARIABLE_PROBE_BASELINE" else "VARIABLE_PROBE_TIED")
             return null
         }
+        if (strongerTie) observe("VARIABLE_PROBE_STRONGER_TIE")
         variableProbeProposal = true
         observe("VARIABLE_PROBE_ESTIMATED")
         return second

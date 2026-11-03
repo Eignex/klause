@@ -978,7 +978,8 @@ The `lp-default` optimization recipe consumes scoped passive checked-bound gains
 Two recent samples in each direction of both shortlisted variables permit a learned
 variable choice. Incomplete passive history permits a bounded fresh child-value
 comparison below the root. Complete optimal children for both candidates can change
-selection only when the challenger improves the weaker child bound. Numerical
+selection by improving the weaker child bound or breaking a nondecreasing weak
+tie with a stronger other child. Numerical
 values do not train passive history; unavailable advice keeps current scoring.
 History and child probes spend the existing LP allowance; other recipes require an
 explicit directional setting. See

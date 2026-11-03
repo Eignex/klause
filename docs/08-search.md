@@ -313,8 +313,9 @@ using each direction's mean cost per unit of fractional movement. The balanced
 `min + max / 6` score ranks finite positive predictions in the shortlist.
 Missing or unusable passive history permits a fresh child-value comparison of the
 same shortlist below the root. Both candidates require complete optimal child
-solves at their current floor and ceiling. The larger weaker-child objective wins;
-a challenger must strictly improve that value to override current scoring. The
+solves at their current floor and ceiling. The larger weaker-child objective ranks first. A tie within the comparison
+tolerance can instead select a strictly larger stronger-child value, provided the
+weaker value does not decrease. A complete tie keeps current scoring. The
 four finite values share minimized source units. Common objective offsets and an
 unknown parent optimum cancel in this comparison; signed values are valid.
 Numerical values never train passive checked-bound history or carry between points.
