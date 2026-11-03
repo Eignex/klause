@@ -85,7 +85,7 @@ internal object MpsProofFrontier {
         val supported = setOf("suite", "problem", "sha256", "exact", "probe", "history", "frontier", "cuts",
             "selection", "replay", "operations", "activeRows", "supportBranching", "pointCuts", "aggregate-probe",
             "aggregate-mixed", "aggregate-replay", "aggregateCuts", "refutationReuse", "feedbackDelivery",
-            "feedbackRequest", "solveSeconds")
+            "feedbackRequest", "solveSeconds", "certificateState")
         require(options.keys.containsAll(setOf("suite", "problem", "sha256", "exact")) &&
             (options.keys - supported).isEmpty())
         val probe = options["probe"]?.toBooleanStrict() ?: false
@@ -221,6 +221,12 @@ internal object MpsProofFrontier {
             // A snapshot past its inspection allowance leaves the solve record intact.
             val frontier = runCatching { snapshot.capture(invocation) }.getOrElse {
                 buildJsonObject { put("unavailable", it.message) }
+            }
+            if (options["certificateState"]?.toBooleanStrict() == true) {
+                val certificate = runCatching { snapshot.certificateState(invocation) }.getOrElse {
+                    buildJsonObject { put("unavailable", it.message) }
+                }
+                Reports.writeJson(out.resolve("certificate-state.json").path, certificate)
             }
             runCatching { Reports.writeJson(out.resolve("cuts.json").path, snapshot.cuts(invocation)) }
             if (journal != null) {
