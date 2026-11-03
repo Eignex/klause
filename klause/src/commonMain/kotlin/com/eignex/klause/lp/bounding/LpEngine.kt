@@ -63,6 +63,7 @@ import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.exactLeafResult
 import com.eignex.klause.lp.relaxation.floatReals
@@ -154,6 +155,7 @@ internal class LpEngine(
     private val nodeWorkAllowance: () -> Long? = { null },
     private val containingWork: (Long) -> Unit = {},
     private val rootQueryPolicy: LpRootQueryPolicy = LpRootQueryPolicy.SHARED_WORK,
+    internal val sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
@@ -278,6 +280,7 @@ internal class LpEngine(
                 } ?: nodeQueryWorkBudget() }
             } else nodeWorkAllowance,
             containingWork = { work -> if (rootProbe) chargeWork(work) },
+            sourcePreparation = sourcePreparation,
         ).also { it.structuralCutSupport = structuralCutSupport }
     }
 
@@ -591,12 +594,26 @@ internal class LpEngine(
                 elementIndexes = elementIndexes,
                 templateStats = sink.lp,
                 preparationCancellation = params.cancellation,
-                reuseTemplateMetadata = retainedRootEnabled,
+                reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
+                reuseTemplateIndexes = sourcePreparation != LpSourcePreparation.OBJECT,
+                reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
+                earnTemplatePreparation = !retainedRootEnabled && sourcePreparation == LpSourcePreparation.ADMITTED,
                 onTemplateWork = ::noteNodeOverhead,
             )
         } else {
             null
         }
+
+    internal fun primalRelaxer(
+        objective: LinearObjective,
+        source: Problem = problem,
+        selected: PreparedFactorProjections? = projections,
+    ): CpToLpRelaxation = CpToLpRelaxation(source, objective, projections = selected, templateStats = sink.lp,
+        reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
+        reuseTemplateIndexes = sourcePreparation != LpSourcePreparation.OBJECT,
+        reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
+        earnTemplatePreparation = sourcePreparation == LpSourcePreparation.ADMITTED,
+        onTemplateWork = ::noteNodeOverhead)
 
     /** The active relaxer. Rebuilt once by [pruneIneffectiveHulls] when a hull is dropped; otherwise the
      *  [params]-resolved one for the whole search. */

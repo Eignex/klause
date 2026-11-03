@@ -233,8 +233,13 @@ internal class LpPreparationTemplates private constructor(
     val reusedComponents: Int,
     val storageUnits: Long,
     val reusedIndexes: Boolean = false,
-) {
+) : LpPreparationState {
     fun bound(variable: Int): LpIntegerBoundTemplate? = bounds[variable]
+
+    fun sharesScope(namespace: Any, problem: Problem): Boolean = this.namespace === namespace &&
+        semantics == problem.semantics && finite == (problem is BakedProblem) &&
+        source.numBoolVars == problem.numBoolVars && source.numIntVars == problem.numIntVars &&
+        source.numRealVars == problem.numRealVars
 
     fun emit(problem: Problem, factorId: Int, builder: RelaxationBuilder, projection: LinearLpProjection): Boolean {
         require(source === problem) { "LP templates belong to a different prepared source" }
@@ -244,7 +249,7 @@ internal class LpPreparationTemplates private constructor(
     }
 
     companion object {
-        private const val MAX_UNITS = 262_144L
+        const val MAX_UNITS = 262_144L
 
         fun prepare(
             selection: PreparedFactorProjections,
@@ -256,6 +261,7 @@ internal class LpPreparationTemplates private constructor(
             onWork: (Long) -> Unit = {},
             reuseIndexes: Boolean = true,
             reuseMetadata: Boolean = false,
+            workLimit: Long? = null,
         ): LpPreparationTemplates? {
             val problem = selection.problem
             // Continuous and custom projections keep their own authority and preparation path.
@@ -269,6 +275,7 @@ internal class LpPreparationTemplates private constructor(
             var pendingColumnWork = 0L
             try {
                 fun visit(count: Long = 1L): Boolean {
+                    if (workLimit != null && count > workLimit - units - pendingColumnWork) return false
                     units += count
                     token.charge(count)
                     return units + pendingColumnWork <= MAX_UNITS && !token()

@@ -39,6 +39,73 @@ class LpPreparationTemplatesTest {
     private val objective = LinearObjective(intCoefficients = LongArray(6) { 1L })
 
     @Test
+    fun `a first completed LP consumer should defer selective metadata`() {
+        val consumer = CpToLpRelaxation(source, objective, projections = selection,
+            reuseTemplateMetadata = true, earnTemplatePreparation = true)
+
+        consumer.build(RootDomains(source))
+
+        assertNull(consumer.preparationTemplates)
+    }
+
+    @Test
+    fun `completed LP consumers should earn selective metadata`() {
+        var prepared: LpPreparationTemplates? = null
+        repeat(32) {
+            val consumer = CpToLpRelaxation(source, objective, projections = selection,
+                reuseTemplateMetadata = true, earnTemplatePreparation = true)
+            consumer.build(RootDomains(source))
+            prepared = consumer.preparationTemplates
+        }
+
+        assertNotNull(prepared)
+    }
+
+    @Test
+    fun `earned preparation should preserve current objective authority`() {
+        repeat(32) {
+            CpToLpRelaxation(source, objective, projections = selection,
+                reuseTemplateMetadata = true, earnTemplatePreparation = true).build(RootDomains(source))
+        }
+        val changed = LinearObjective(intCoefficients = longArrayOf(2, 1, 1, 1, 1, 1), constant = 7L)
+
+        val reused = assertNotNull(CpToLpRelaxation(source, changed, projections = selection,
+            reuseTemplateMetadata = true, earnTemplatePreparation = true).build(RootDomains(source))
+            .authoritativeWithTemplates(Cancellation.Never))
+        val fresh = assertNotNull(CpToLpRelaxation(source, changed, projections = null)
+            .build(RootDomains(source)).model.authoritativeModel())
+
+        assertTrue(reused.sameAuthority(fresh))
+    }
+
+    @Test
+    fun `post debit cancellation should withhold completed construction admission`() {
+        var cancelled = false
+        selection.recordLpConstruction(LpPreparationTemplates.MAX_UNITS, Cancellation { cancelled }) {
+            cancelled = true
+        }
+
+        val prepared = selection.prepareLpTemplates(objective, Cancellation.Never,
+            reuseMetadata = true, earned = true)
+
+        assertNull(prepared)
+    }
+
+    @Test
+    fun `foreign source scopes should not spend prior construction admission`() {
+        selection.recordLpConstruction(LpPreparationTemplates.MAX_UNITS, Cancellation.Never) {}
+        val finite = source.bake(selection)
+        val remapped = selection.projected(source, IntArray(source.numFactors) { it },
+            VarRemap(intArrayOf(0), IntArray(source.numIntVars) { it }))
+
+        val prepared = listOf(assertNotNull(finite.factorProjections), remapped).map { selected ->
+            selected.prepareLpTemplates(objective, Cancellation.Never, reuseMetadata = true, earned = true)
+        }
+
+        assertTrue(prepared.all { it == null })
+    }
+
+    @Test
     fun `repeated factor roles should retain one component reference`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(
             Element(0, 0, longArrayOf(0, 1), false, 0),

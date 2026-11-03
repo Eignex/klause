@@ -514,6 +514,14 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
 
+    fun observeTemplateFunding(nanos: Long, work: Long, completedUnits: Long, recorded: Boolean) {
+        val key = "TEMPLATE_FUNDING_${probeRoute.name}"
+        val outcome = if (recorded) "RECORDED" else "RETAINED"
+        val delta = LpPhaseStats(calls = 1L, nanos = nanos, work = work,
+            outcomes = mapOf(outcome to 1L, "COMPLETED_UNITS_SUM" to completedUnits))
+        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+    }
+
     fun observeTemplatePreparation(
         nanos: Long,
         work: Long,

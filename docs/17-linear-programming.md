@@ -91,9 +91,18 @@ authorize reuse. The new source binding owns no predecessor snapshot, so repeate
 compatible preparations retain no generation chain.
 
 An internal selective-metadata preparation mode validates row identity and exact
-bound sides before retaining the row index. Explicit component-owned and admitted
-sparse-trial engines select this mode and own their numerical component partitions.
-Other node engines keep the ordinary mode. A selected view whose handoff checked
+bound sides before retaining the row index. Node engines select this mode and own
+their numerical component partitions. Ordinary node, primal and shaving consumers
+carry internal disabled, object, complete-index and admitted controls through
+objective-specific engines. Admitted construction first completes its LP without
+speculative metadata. Completed compact construction accumulates
+admission work in a 16-unit source-scoped record. A later preparation attempt spends
+no more inspection work than those completed builds supplied, within the existing
+262,144-unit ceiling. A failed attempt requires further completed construction
+before retrying; its inspection and replacement record still spend the current
+allowance. Admission work supplies no additional solver grant. Component-owned and
+admitted sparse-trial engines keep their explicit preparation route.
+A selected view whose handoff checked
 ordered factor identities carries the same immutable layout token, so subsequent
 template preparations need no duplicate row scan. Other rewrites and explicit
 namespace remaps carry fresh tokens and validate their actual factor identities.
@@ -113,7 +122,11 @@ An identical stable source-domain table authorizes endpoint metadata reuse witho
 a repeated scan. Shared domain arrays require endpoint checks, including raw views
 carrying a finite session's table; model identity or type alone supplies no such proof.
 The ordinary mode retains its complete-match check. Both modes publish only completed immutable
-snapshots within the same containing allowance and storage cap.
+snapshots within the same containing allowance and storage cap. Admission records
+share those source/finite publication slots and keep no predecessor. Their capture
+and replacement debit the containing allowance before publication; cancellation
+withholds the record and the next consumer. Construction funding has its own phase
+observation and supplies neither a checked result nor source-acceptance authority.
 
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.

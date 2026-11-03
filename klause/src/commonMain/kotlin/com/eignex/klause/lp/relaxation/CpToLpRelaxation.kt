@@ -683,6 +683,7 @@ internal class CpToLpRelaxation(
     private val preparationCancellation: Cancellation = Cancellation.Never,
     private val reuseTemplateIndexes: Boolean = true,
     private val reuseTemplateMetadata: Boolean = false,
+    private val earnTemplatePreparation: Boolean = false,
     private val onTemplateWork: (Long) -> Unit = {},
 ) {
     private val elementIndexes = elementIndexes?.toSet()
@@ -705,11 +706,11 @@ internal class CpToLpRelaxation(
         var work = 0L
         try {
             preparationTemplates = projections.prepareLpTemplates(objective, cancellation,
-                reuseTemplateIndexes, reuseTemplateMetadata) {
+                reuseTemplateIndexes, reuseTemplateMetadata, earned = earnTemplatePreparation) {
                 work = it
+                onTemplateWork(it)
             }
         } finally {
-            onTemplateWork(work)
             val templates = preparationTemplates
             templateStats?.observeTemplatePreparation(
                 start.elapsedNow().inWholeNanoseconds, work, prepared = templates != null,
@@ -721,6 +722,27 @@ internal class CpToLpRelaxation(
                 componentsDirty = templates?.let { it.components.size - it.reusedComponents } ?: 0,
                 retainedUnits = templates?.storageUnits ?: 0L,
             )
+        }
+        if (cancellation()) throw LpAssemblyCancelled()
+    }
+
+    private fun recordConstruction(relaxation: LpRelaxation, cancellation: Cancellation) {
+        if (!reuseSourceTemplates || !earnTemplatePreparation || projections == null ||
+            preparationTemplates != null
+        ) return
+        val model = relaxation.model
+        if (model.n == 0 || model.doubleView != null || model.exactState != null) return
+        val extent = model.n.toLong() + model.m + model.csc.rowIdx.size
+        var work = 0L
+        val started = TimeSource.Monotonic.markNow()
+        var recorded = false
+        try {
+            recorded = projections.recordLpConstruction(extent, cancellation) {
+                work += it
+                onTemplateWork(it)
+            }
+        } finally {
+            templateStats?.observeTemplateFunding(started.elapsedNow().inWholeNanoseconds, work, extent, recorded)
         }
         if (cancellation()) throw LpAssemblyCancelled()
     }
@@ -825,7 +847,10 @@ internal class CpToLpRelaxation(
         val assembler = Assembler(domains, cancellation = token)
         var complete = false
         return try {
-            assembler.assemble(extraCuts).also { complete = true }
+            assembler.assemble(extraCuts).also {
+                recordConstruction(it, token)
+                complete = true
+            }
         } finally {
             if (!complete) onDiscardedAssembly?.invoke(assembler.constructionSize)
         }
@@ -839,7 +864,10 @@ internal class CpToLpRelaxation(
     ): Iterator<Unit> = sequence {
         // The caller supplies a containing lifetime because this builder spans invocations.
         prepareTemplates(cancellation)
-        Assembler(domains, cancellation = cancellation).preparation(emptyList(), onWork, onComplete)
+        Assembler(domains, cancellation = cancellation).preparation(emptyList(), onWork) { relaxation ->
+            recordConstruction(relaxation, cancellation)
+            onComplete(relaxation)
+        }
             .forEach { yield(Unit) }
     }.iterator()
 

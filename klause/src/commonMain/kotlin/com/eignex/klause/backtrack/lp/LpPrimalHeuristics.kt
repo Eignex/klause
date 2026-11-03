@@ -10,7 +10,6 @@ import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.newTableauCutSolver
-import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.floatReals
 import com.eignex.klause.lp.rootDomainOf
@@ -68,7 +67,7 @@ internal fun LpEngine.lpRoundingProbe(
             outcome = "DISCRETE_ROOT_REJECTED"
             return null
         }
-        val relaxation = retained?.relaxation ?: CpToLpRelaxation(problem, objective).build(session)
+        val relaxation = retained?.relaxation ?: primalRelaxer(objective).build(session)
         if (relaxation.model.n == 0) {
             outcome = "EMPTY_RELAXATION"
             return null
@@ -459,7 +458,7 @@ private fun LpEngine.solveRelaxation(
     val session = PropagationSession(problem, cancellation)
     try {
         if (session.isUnsatAtRoot) return null
-        val relaxation = CpToLpRelaxation(problem, obj).build(session)
+        val relaxation = primalRelaxer(obj).build(session)
         if (relaxation.model.n == 0) return null
         val result = try {
             solvePrimalRelaxation(relaxation.model, cancellation, primal = true)
