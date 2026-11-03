@@ -1,13 +1,8 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.factor.arithmetic.ExactLinear
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
-import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Term
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
@@ -33,7 +28,7 @@ internal class IntegerBoundImplicationSource(
         val bounds = state.problem.intBounds
         if (!bounds.hasLower(variable) || !bounds.hasUpper(variable) ||
             bounds.lower(variable) != 0L || bounds.upper(variable) != 1L) return decline("declared-pivot")
-        val source = projection(owner) ?: return null
+        val source = OriginalIntegerLinearSource(state, sourceWork).source(owner) ?: return decline("projection")
         val position = marker[LAZY_PAYLOAD]
         if (source.vars.getOrNull(position) != variable) return decline("position")
         val side = marker[LAZY_PAYLOAD + 1]
@@ -184,40 +179,5 @@ internal class IntegerBoundImplicationSource(
             }
             return null
         }
-    }
-
-    private fun projection(factorId: Int): LinearPropagator? {
-        if (factorId !in 0 until state.baseFactorCount) return decline("not-original")
-        val original = state.problem.factors[factorId]
-        val size = when (original) {
-            is Linear -> original.vars.size
-            is ExactLinear -> original.size
-            else -> return decline("source-kind")
-        }
-        repeat(size) { repeat(4) { sourceWork.visit() } }
-        repeat(8) { sourceWork.visit() }
-        val source = state.factorAt(factorId) as? LinearPropagator ?: return decline("projection")
-        if (source.boolVars.isNotEmpty() || source.op == LinearOp.NE || source.vars.size != size) {
-            return decline("projection")
-        }
-        when (original) {
-            is Linear -> {
-                val constants = original.integerConstants ?: return decline("word")
-                if (original.realVars.isNotEmpty() || source.op != original.op || source.bound != constants.bound ||
-                    !source.vars.contentEquals(original.vars) || !source.coeffs.contentEquals(constants.coeffs)) {
-                    return decline("identity")
-                }
-            }
-            is ExactLinear -> {
-                val constants = original.constants as? IntegerConstants ?: return decline("word")
-                if (original.variables.reals.isNotEmpty() ||
-                    original.activator != LinearRow.ALWAYS || original.strict ||
-                    source.op != original.relation || source.bound != constants.bound ||
-                    source.vars.indices.any { source.vars[it] != Term.intVar(original.ref(it)) } ||
-                    !source.coeffs.contentEquals(constants.coeffs)) return decline("identity")
-            }
-            else -> return decline("source-kind")
-        }
-        return source
     }
 }

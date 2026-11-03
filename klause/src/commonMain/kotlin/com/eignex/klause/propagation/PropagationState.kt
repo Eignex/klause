@@ -402,6 +402,10 @@ class PropagationState private constructor(
     internal var integerOriginalCoverProduced = 0L
     internal var integerOriginalCoverAdmitted = 0L
     internal var integerOriginalCoverConsumed = 0L
+    internal var integerOriginalPairSources = 0L
+    internal var integerOriginalPairProduced = 0L
+    internal var integerOriginalPairAdmitted = 0L
+    internal var integerOriginalPairConsumed = 0L
     internal var integerDeclaredBoundTerms = 0L
     internal var integerDeclaredBoundProduced = 0L
     internal var integerDeclaredBoundAdmitted = 0L

@@ -13,7 +13,7 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
 
 private fun PropagationState.observeSharingMemory(sample: SharingMemoryObservation) {
     selectedRetirements.sharingMemory(sample)
-    sample.owned(this, Long.SIZE_BYTES * 38L, true)
+    sample.owned(this, Long.SIZE_BYTES * 42L, true)
     val protected = protectedLearnedMemory(sample)
     nativeEngine?.sharingMemory(sample, protected) ?: learnedSharingMemory(sample, protected)
     factorAttribution?.sharingMemory(sample)

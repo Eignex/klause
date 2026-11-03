@@ -560,6 +560,28 @@ owner; eager clause or table supports are not projected into arithmetic.
 The child records this source kind as a primitive flag without parent references.
 Its source selections, produced children, actual admissions and first native
 consumption retain separate counters through compaction and retirement.
+A mandatory original word-linear seed can also combine directly with a mandatory
+original endpoint owner when at least one operand exceeds 32 terms. Both immutable
+source identities and projection identities must match, and their coordinates must
+be unique and strictly increasing. Positive gcd-scaled multipliers cancel the chosen
+opposite-sign coordinate; a streaming merge discards exact zeros before retaining
+at most 16 result terms. No wide operand or sorted coordinate copy is materialized.
+Unsupported source sides, guards, strictness, overflow and an overwide result withhold
+the pair. The pair must conflict in the current domain. A paired seed can assert at
+the ordinary first-UIP historical target directly; otherwise it uses bounded
+resolution and the same native assertion and complete mapped-premise authority.
+A supported seed can try this route as its first combination after ordinary parent
+selection fails. Historical endpoint markers select the second original constraint;
+endpoint bounds are not substituted for premises of the combined inequality.
+
+At most 16 validated original-source references and 16 distinct pair signatures are
+cached for one analysis. Validation, cache probes, coordinate search, merging and
+normalization share the source-visit allowance; failed pair trials share the ordinary
+16-combination allowance. The cache retains no parent proof after analysis. Separate
+source, produced, admitted and consumed counters use a final current-analysis origin
+stamp. Later compatible retained parents preserve a pair introduced in that analysis;
+a descendant cannot inherit pair-introduction credit from an older retained row.
+
 If those walks fail after an owned source has entered the derivation, an original
 unconditional linear inequality can supply an opposite-sign tight parent under the
 same target-level rule. The scan reuses an already materialized integer occurrence

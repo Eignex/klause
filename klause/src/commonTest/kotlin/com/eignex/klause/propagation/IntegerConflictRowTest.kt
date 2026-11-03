@@ -19,12 +19,14 @@ class IntegerConflictRowTest {
     fun `bound implication origins should survive row view copies`() {
         val source = requireNotNull(IntegerConflictRow.normalized(mapOf(0 to 1L, 1 to 1L), 1L, Lit.NONE))
             .derivedFromRetainedSources(1, boundImplication = true, boundCover = true)
+            .withStreamedPairOrigin(true)
 
         val copied = source.derivedThroughTransient(2).derivedFromDeclaredBounds(1, DECLARED_BOUND_EARLY)
             .derivedFromRetainedSources(2)
 
         assertTrue(copied.hasBoundImplication)
         assertTrue(copied.hasBoundCover)
+        assertTrue(copied.hasStreamedPair)
     }
 
     @Test

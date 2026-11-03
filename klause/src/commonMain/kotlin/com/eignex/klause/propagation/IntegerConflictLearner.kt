@@ -12,7 +12,7 @@ import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
 
 internal const val INTEGER_LEARNING_ROWS = 64
-private const val INTEGER_LEARNING_STEPS = 16
+internal const val INTEGER_LEARNING_STEPS = 16
 private const val INTEGER_LEARNING_LEVELS = 64
 
 internal class IntegerConflictLearner(private val state: PropagationState) {
@@ -22,6 +22,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
     private var previousUseLo = false
     private var previousRow: IntegerLearningInequality? = null
     private val sourceWork = IntegerSourceWork(state)
+    private var streamedPairs: StreamedIntegerSourcePair? = null
     private var previousWideRowSource: IntegerSourceRow? = null
     private var previousWideUseLo = false
     private var previousWideRow: WideIntegerSourceInequality? = null
@@ -81,7 +82,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         state.arithmeticLearningTrace?.record("integer.fallback-target", target.toLong(), trail.toLong())
         val source = if (factorId in 0 until state.baseFactorCount) sourceFactor(factorId) else null
         val retained = if (source == null) retainedAmoSource(factorId) else null
-        if (source == null && retained == null) return decline("seed-source")
+        val pair = if (source == null && retained == null) streamedPairSource(factorId, target) else null
+        if (source == null && retained == null && pair == null) return decline("seed-source")
         val allowWideSources = source != null && source.linear.vars.size > INTEGER_LEARNING_TERMS
         var retainedSources = if (retained == null) 0 else 1
         if (retained != null) {
@@ -89,17 +91,27 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             state.integerChainedSources++
             state.arithmeticLearningTrace?.record("integer.retained-seed", factorId.toLong())
         }
-        var row: IntegerLearningInequality = if (source == null) requireNotNull(retained) else when (source.linear.op) {
-            LinearOp.LE -> normalizedSource(source, useLo = true)
-            LinearOp.GE -> normalizedSource(source, useLo = false)
-            LinearOp.EQ -> {
-                val lower = normalizedSource(source, useLo = true) ?: return decline("seed-normalization")
-                if (lower.minimum(state) > lower.bound) lower else normalizedSource(source, useLo = false)
+        var row: IntegerLearningInequality = if (pair != null) pair.row else if (source == null) {
+            requireNotNull(retained)
+        } else {
+            when (source.linear.op) {
+                LinearOp.LE -> normalizedSource(source, useLo = true)
+                LinearOp.GE -> normalizedSource(source, useLo = false)
+                LinearOp.EQ -> {
+                    val lower = normalizedSource(source, useLo = true) ?: return decline("seed-normalization")
+                    if (lower.minimum(state) > lower.bound) lower else normalizedSource(source, useLo = false)
+                }
+                LinearOp.NE -> null
             }
-            LinearOp.NE -> null
         } ?: return decline("seed-normalization")
         state.arithmeticLearningTrace?.row("integer.seed-row", row, state)
         if (row.minimum(state) <= row.bound) return decline("seed-not-conflicting")
+        if (pair != null && state.learned.integerRows?.none { it.row.subsumes(pair.row) } != false &&
+            pair.row.assertsAt(state, trail)) {
+            state.integerOriginalPairProduced++
+            state.arithmeticLearningTrace?.record("integer.assertion", target.toLong(), trail.toLong(), 1L)
+            return learnedResult(pair.row.withStreamedPairOrigin(true), fallback)
+        }
         val used = mutableSetOf<PivotKey>()
         var transientSteps = 0
         var nonOwnerSource = false
@@ -108,10 +120,11 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         var duplicateContinuation = false
         var boundImplication = false
         var boundCover = false
+        var streamedPair = pair != null
         repeat(INTEGER_LEARNING_STEPS) {
             if (combinations == INTEGER_LEARNING_STEPS) return decline("combination-limit")
             state.checkFiniteWork()
-            val event = reason(row, used, allowWideSources, target) ?: return decline(
+            val event = reason(row, used, allowWideSources, target, factorId) ?: return decline(
                 if (combinations == INTEGER_LEARNING_STEPS) "combination-limit" else "no-qualified-endpoint")
             used.add(event.key)
             if (event.key.retained) {
@@ -123,7 +136,9 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                     state.integerNonOwnerSources++
                 }
                 state.arithmeticLearningTrace?.row("integer.retained-parent-row", event.row, state)
-            } else state.arithmeticLearningTrace?.row("integer.pivot-row", event.row, state, event.trail)
+            } else state.arithmeticLearningTrace?.row(if (event.streamedPair)
+                "integer.original-pair-row" else "integer.pivot-row", event.row, state, event.trail)
+            if (event.streamedPair) streamedPair = true
             if (event.nonOwnerOriginalSource) {
                 nonOwnerOriginalSource = true
                 state.integerNonOwnerOriginalSources++
@@ -188,12 +203,6 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 }
                 return@repeat
             }
-            val levels = compact.variables.indices.map { index ->
-                val variable = compact.variables[index]
-                val lower = compact.coefficients[index] > 0L
-                val domain = state.intDomains[variable]
-                state.boundEstablishmentLevel(variable, if (lower) domain.min else domain.max, lower) ?: 0
-            }.plus(fallback.decisionLevels.toList()).distinct().sorted().toIntArray()
             if (retainedSources > 0) {
                 state.integerChainedProduced++
                 if (transientSteps > 0) state.integerChainedTransientProduced++
@@ -209,15 +218,43 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                     if (boundCover) state.integerOriginalCoverProduced++
                 }
             }
+            if (streamedPair) state.integerOriginalPairProduced++
             if (compact.declaredBoundTerms > 0) state.integerDeclaredBoundProduced++
             if (compact.declaredBoundModes != 0) state.integerDeclaredBoundExtendedProduced++
-            return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
+            return learnedResult(
                 compact.derivedThroughTransient(transientSteps)
                     .derivedFromRetainedSources(retainedSources, nonOwnerSource, nonOwnerOriginalSource,
-                        slackOriginalSource, duplicateContinuation, boundImplication, boundCover),
-                target, levels.size, levels, fallback)
+                        slackOriginalSource, duplicateContinuation, boundImplication, boundCover)
+                    .withStreamedPairOrigin(streamedPair), fallback)
         }
         return decline("step-limit-without-assertion")
+    }
+
+    private fun learnedResult(
+        row: IntegerConflictRow,
+        fallback: ConflictAnalyzer.AnalysisResult.Learned,
+    ): ConflictAnalyzer.AnalysisResult.LearnedIntegerRow {
+        val levels = row.variables.indices.map { index ->
+            val variable = row.variables[index]
+            val lower = row.coefficients[index] > 0L
+            val domain = state.intDomains[variable]
+            state.boundEstablishmentLevel(variable, if (lower) domain.min else domain.max, lower) ?: 0
+        }.plus(fallback.decisionLevels.toList()).distinct().sorted().toIntArray()
+        return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
+            row, fallback.backjumpLevel, levels.size, levels, fallback)
+    }
+
+    private fun reserveCombination(): Boolean {
+        if (combinations == INTEGER_LEARNING_STEPS) return false
+        combinations++
+        return true
+    }
+
+    private fun streamedPairSource(factorId: Int, target: Int): StreamedIntegerSourcePair.Source? {
+        if (factorId !in 0 until state.baseFactorCount) return null
+        val pairs = streamedPairs ?: StreamedIntegerSourcePair(state, sourceWork, ::reserveCombination)
+            .also { streamedPairs = it }
+        return pairs.source(factorId, target)?.also { state.integerOriginalPairSources++ }
     }
 
     private fun combine(
@@ -227,8 +264,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         allowWideSources: Boolean,
         allowCompactGrowth: Boolean,
     ): IntegerLearningInequality? {
-        if (combinations == INTEGER_LEARNING_STEPS) return null
-        combinations++
+        if (!reserveCombination()) return null
         return if (allowWideSources || allowCompactGrowth) {
             row.resolveTransient(parent, variable, sourceWork, allowCompactGrowth)
         } else row.resolve(parent, variable, sourceWork)
@@ -287,6 +323,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         used: Set<PivotKey>,
         allowWideSources: Boolean,
         target: Int,
+        factorId: Int,
     ): BoundEvent? {
         sourceWork.visit()
         if (state.learned.integerRows?.isNotEmpty() == true) {
@@ -343,6 +380,13 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
         }
         scannedReason(row, used, target, allowWideSources)?.let { return it }
+        if (combinations == 0) {
+            streamedPairSource(factorId, target)?.let { pair ->
+                return BoundEvent(pair.row, pair.variable, pair.trail,
+                    PivotKey(pair.variable, pair.trail, pair.lower, retained = false, streamedPair = true),
+                    streamedPair = true, combination = pair.row)
+            }
+        }
         if (combinations < INTEGER_LEARNING_STEPS) {
             boundImplicationReason(row, used, target)?.let { return it }
             if (selectedRetainedSource) observeEagerReasons(row, target)
@@ -720,6 +764,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val lower: Boolean,
         val retained: Boolean,
         val implication: Boolean = false,
+        val streamedPair: Boolean = false,
     )
 
     private class BoundEvent(
@@ -732,6 +777,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val slackOriginalSource: Boolean = false,
         val boundImplication: Boolean = false,
         val boundCover: Boolean = false,
+        val streamedPair: Boolean = false,
         val combination: IntegerLearningInequality? = null,
     )
 }

@@ -25,6 +25,7 @@ internal class IntegerConflictRow private constructor(
     val hasDuplicateContinuation: Boolean = false,
     val hasBoundImplication: Boolean = false,
     val hasBoundCover: Boolean = false,
+    val hasStreamedPair: Boolean = false,
 ) : IntegerLearningInequality {
     override fun coefficient(variable: Int): Long {
         val index = variables.indexOf(variable)
@@ -34,7 +35,7 @@ internal class IntegerConflictRow private constructor(
     fun derivedThroughTransient(steps: Int): IntegerConflictRow = if (steps == 0) this else
         IntegerConflictRow(variables, coefficients, bound, guard, steps, retainedSources, hasNonOwnerSource,
             hasNonOwnerOriginalSource, declaredBoundTerms, declaredBoundModes, hasSlackOriginalSource,
-            hasDuplicateContinuation, hasBoundImplication, hasBoundCover)
+            hasDuplicateContinuation, hasBoundImplication, hasBoundCover, hasStreamedPair)
 
     fun derivedFromRetainedSources(
         sources: Int,
@@ -52,13 +53,18 @@ internal class IntegerConflictRow private constructor(
             hasNonOwnerSource || nonOwnerSource, hasNonOwnerOriginalSource || nonOwnerOriginalSource,
             declaredBoundTerms, declaredBoundModes, hasSlackOriginalSource || slackOriginalSource,
             hasDuplicateContinuation || duplicateContinuation, hasBoundImplication || boundImplication,
-            hasBoundCover || boundCover)
+            hasBoundCover || boundCover, hasStreamedPair)
     }
 
     fun derivedFromDeclaredBounds(terms: Int, modes: Int = 0): IntegerConflictRow = if (terms == 0) this else
         IntegerConflictRow(variables, coefficients, bound, guard, transientSteps, retainedSources,
             hasNonOwnerSource, hasNonOwnerOriginalSource, terms, declaredBoundModes or modes, hasSlackOriginalSource,
-            hasDuplicateContinuation, hasBoundImplication, hasBoundCover)
+            hasDuplicateContinuation, hasBoundImplication, hasBoundCover, hasStreamedPair)
+
+    fun withStreamedPairOrigin(introduced: Boolean): IntegerConflictRow = if (hasStreamedPair == introduced) this else
+        IntegerConflictRow(variables, coefficients, bound, guard, transientSteps, retainedSources, hasNonOwnerSource,
+            hasNonOwnerOriginalSource, declaredBoundTerms, declaredBoundModes, hasSlackOriginalSource,
+            hasDuplicateContinuation, hasBoundImplication, hasBoundCover, introduced)
 
     fun subsumes(other: IntegerConflictRow): Boolean =
         (guard == Lit.NONE || guard == other.guard) && bound <= other.bound &&
