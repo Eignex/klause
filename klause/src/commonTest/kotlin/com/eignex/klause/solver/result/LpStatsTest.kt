@@ -64,6 +64,40 @@ class LpStatsTest {
     }
 
     @Test
+    fun `bound row snapshots should retain their observed work after further consumers`() {
+        val sink = LpStatsSink()
+        sink.observeTemplateBoundStorageWork(8L)
+        sink.observeTemplateUse(boundChecks = 2, rowsOmitted = 1)
+        val before = sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE")
+
+        sink.observeTemplateUse(boundChecks = 1, rowsOmitted = 1)
+        val after = sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE")
+
+        assertEquals(10L, before.work)
+        assertEquals(2L, before.outcomes.getValue("BOUND_ROW_CHECKS"))
+        assertEquals(1L, before.outcomes.getValue("SOURCE_ROWS_OMITTED"))
+        assertEquals(11L, after.work)
+        assertEquals(3L, after.outcomes.getValue("BOUND_ROW_CHECKS"))
+        assertEquals(2L, after.outcomes.getValue("SOURCE_ROWS_OMITTED"))
+    }
+
+    @Test
+    fun `unobserved bound work should remain distinct from an observed zero`() {
+        val sink = LpStatsSink()
+        sink.observeTemplateUse()
+        val before = sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE")
+
+        sink.observeTemplateBoundStorageWork(0L)
+        val after = sink.snapshot().phases.getValue("TEMPLATE_ASSEMBLY_NODE")
+
+        assertFalse(before.outcomes.containsKey("BOUND_ROW_CHECKS"))
+        assertFalse(before.outcomes.containsKey("BOUND_COLUMN_WORK"))
+        assertEquals(0L, after.outcomes.getValue("BOUND_ROW_CHECKS"))
+        assertEquals(0L, after.outcomes.getValue("BOUND_COLUMN_WORK"))
+        assertEquals(0L, after.outcomes.getValue("SOURCE_ROWS_OMITTED"))
+    }
+
+    @Test
     fun `source residual timing should include component costs on the component route`() {
         val sink = LpStatsSink()
         val metrics = LpSolveMetrics(

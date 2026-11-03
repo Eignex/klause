@@ -511,8 +511,9 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     private var templateBounds = 0L
     private var templateExactBounds = 0L
     private var templateBoundChecks = 0L
-    private var templateBoundColumnSlots = 0L
+    private var templateBoundColumnWork = 0L
     private var templateRowsOmitted = 0L
+    private var templateBoundRowsSeen = false
     val cutLifecycle = LpCutStats { key, delta ->
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
@@ -567,13 +568,15 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         templateRows += rows
         templateBounds += bounds
         templateExactBounds += exactBounds
+        if (boundChecks > 0 || rowsOmitted > 0) templateBoundRowsSeen = true
         templateBoundChecks += boundChecks
         templateRowsOmitted += rowsOmitted
     }
 
-    fun observeTemplateBoundStorage(slots: Long) {
+    fun observeTemplateBoundStorageWork(work: Long) {
         observeTemplateUse()
-        templateBoundColumnSlots += slots
+        templateBoundRowsSeen = true
+        templateBoundColumnWork += work
     }
 
     private fun phaseSnapshot(): Map<String, LpPhaseStats> {
@@ -602,15 +605,17 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
             if (templateAssemblySeen) {
                 val key = "TEMPLATE_ASSEMBLY_${probeRoute.name}"
                 put(key, getValue(key).mergedWith(LpPhaseStats(
-                    work = templateBoundChecks + templateBoundColumnSlots,
-                    outcomes = mapOf(
-                        "ROWS" to templateRows,
-                        "BOUNDS" to templateBounds,
-                        "EXACT_BOUND_OBJECTS" to templateExactBounds,
-                        "BOUND_ROW_CHECKS" to templateBoundChecks,
-                        "BOUND_COLUMN_SLOTS" to templateBoundColumnSlots,
-                        "SOURCE_ROWS_OMITTED" to templateRowsOmitted,
-                    ),
+                    work = templateBoundChecks + templateBoundColumnWork,
+                    outcomes = buildMap {
+                        put("ROWS", templateRows)
+                        put("BOUNDS", templateBounds)
+                        put("EXACT_BOUND_OBJECTS", templateExactBounds)
+                        if (templateBoundRowsSeen) {
+                            put("BOUND_ROW_CHECKS", templateBoundChecks)
+                            put("BOUND_COLUMN_WORK", templateBoundColumnWork)
+                            put("SOURCE_ROWS_OMITTED", templateRowsOmitted)
+                        }
+                    },
                 )))
             }
         }

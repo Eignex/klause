@@ -983,7 +983,7 @@ internal class CpToLpRelaxation(
                 checkCancellation()
                 LongArray(problem.numIntVars) to LongArray(problem.numIntVars)
             } finally {
-                templateStats?.observeTemplateBoundStorage(slots)
+                templateStats?.observeTemplateBoundStorageWork(slots)
             }
         } else null
         private val intCol = IntArray(if (region == null) problem.numIntVars else 0) { -1 }
