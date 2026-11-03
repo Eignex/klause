@@ -85,6 +85,7 @@ internal class LinearAuthority(
     private var directedFamily: LinearAuthorityTemplate? = null
     private var pointMask: Set<Int>? = null
     private var deferAggregatePreparation = false
+    private var boundedAggregateRecipe = false
     private class PointPreparation(
         val template: LinearAuthorityTemplate, val query: LinearAuthorityQuery, val generated: Boolean,
     )
@@ -141,11 +142,20 @@ internal class LinearAuthority(
         directedFamily = null
         pointMask = null
         deferAggregatePreparation = false
+        boundedAggregateRecipe = false
         primalAttempt = null
         cutLifecycle.containing("RETIREMENT") { lp.close() }
     }
 
-    fun advanceWithPointCuts(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
+    fun advanceWithPointCuts(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult =
+        advanceWithSelectedCuts(source, cancellation, generatedFirst = false)
+
+    fun advanceWithGeneratedCutAging(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult =
+        advanceWithSelectedCuts(source, cancellation, generatedFirst = aggregateCuts && additionalCuts.isEmpty())
+
+    private fun advanceWithSelectedCuts(
+        source: SourceProofContext, cancellation: Cancellation, generatedFirst: Boolean,
+    ): LinearAuthorityResult {
         val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe)
             .also { pointPolicy = it }
         if (pointFallback === template && template?.matches(source) == true) {
@@ -169,11 +179,13 @@ internal class LinearAuthority(
             pointListener = { query, values -> if (point == null) point = query to values }
             val baselineMask = pointMask
             policy.observe("BaseQueries")
-            deferAggregatePreparation = baselineMask == null
+            deferAggregatePreparation = baselineMask == null && !generatedFirst
+            boundedAggregateRecipe = baselineMask == null && generatedFirst
             val base = try {
                 advance(source, cancellation, cuts = true, cutMask = baselineMask)
             } finally {
                 deferAggregatePreparation = false
+                boundedAggregateRecipe = false
                 pointListener = null
             }
             if (base.paused || base.evidence != null || base.incumbent != null || cancellation()) return base
@@ -197,6 +209,23 @@ internal class LinearAuthority(
             val baselineFamily = family
             val baselineQuery = prepared
             val currentRows = checkNotNull(family.cuts).rows
+            if (generatedFirst && baselineMask == null && currentRows.isNotEmpty() && currentRows.size <= 64 &&
+                prepared.activeCuts == currentRows.size && prepared.checkedCuts.size == currentRows.size &&
+                currentRows.any {
+                    it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR
+                }) {
+                val selected = cutLifecycle.containing("POINT_SELECTION") {
+                    val installed = policy.prepareGenerated(currentRows, prepared.checkedCuts, cancellation)
+                    if (installed.isEmpty()) installed else policy.select(currentRows, prepared.coordinates,
+                        prepared.costs, prepared.checkedCuts, observed.second, installed, cancellation)
+                }
+                if (selected.size == currentRows.size) {
+                    pointMask = selected
+                    directedFamily = family
+                    policy.observe("GeneratedBaseAdopted", selected.size.toLong())
+                }
+                return base.copy(paused = base.paused || budget.funding?.paused == true)
+            }
             var preparedGenerated = false
             val generatedRecipe = currentRows.isNotEmpty() && currentRows.size <= 64 &&
                 currentRows.all { it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR }
@@ -206,7 +235,8 @@ internal class LinearAuthority(
                 directedFamily = family
                 cutLifecycle.families = checkNotNull(family.cuts).rows.mapTo(HashSet()) { it.family }
                 val refined = cutLifecycle.containing("POINT_SELECTION") {
-                    preparePointFamily(source, family, prepared, observed.second, cancellation)
+                    preparePointFamily(source, family, prepared, observed.second, cancellation,
+                        ordinaryTried = generatedFirst)
                 }
                 if (refined != null) {
                     family = refined.template
@@ -286,11 +316,11 @@ internal class LinearAuthority(
     private fun preparePointFamily(
         source: SourceProofContext, family: LinearAuthorityTemplate, prepared: LinearAuthorityQuery,
         values: List<BigFraction>,
-        cancellation: Cancellation,
+        cancellation: Cancellation, ordinaryTried: Boolean = false,
     ): PointPreparation? {
         if (values.size != prepared.coordinates.size || values.size > 8192) return null
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
-        val ordinary = if (aggregateCuts && additionalCuts.isEmpty()) {
+        val ordinary = if (aggregateCuts && additionalCuts.isEmpty() && !ordinaryTried) {
             val available = maxOf(0, 64 - checkNotNull(family.cuts).rows.size)
             withAdditionalCuts(family, funded, maximumCandidates = available) ?: return null
         } else family
@@ -491,7 +521,9 @@ internal class LinearAuthority(
         val generateAggregates = aggregateCuts && !deferAggregatePreparation
         if (!generateAggregates && additionalCuts.isEmpty()) return prepared
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
-        val generated = if (generateAggregates && maximumCandidates > 0) {
+        val available = if (boundedAggregateRecipe)
+            minOf(maximumCandidates, maxOf(0, 64 - prepared.cuts?.rows.orEmpty().size)) else maximumCandidates
+        val generated = if (generateAggregates && available > 0) {
             LinearAuthorityAggregateCuts.prepareSourcePairs(
                 prepared.numeric, funded, { name, count ->
                     when (name) {
@@ -502,7 +534,7 @@ internal class LinearAuthority(
                             cutEligibility[key] = (cutEligibility[key] ?: 0L) + count
                         }
                     }
-                }, maximumCandidates = maximumCandidates,
+                }, maximumCandidates = available,
                 limits = if (point == null) LinearAuthorityAggregateCuts.sourcePairLimits
                     else LinearAuthorityAggregateCuts.pointSourcePairLimits,
                 point = point)

@@ -596,6 +596,25 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `generated initialization should use one checked LP operation`() {
+        val budget = SourceLpBudget(maxOperations = 1)
+        val capture = LinearAuthorityCapture(2, 20_000L, 1_000_000L, Cancellation.Never)
+        val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithGeneratedCutAging(nonseparating, Cancellation.Never)
+        }
+
+        assertEquals(1, budget.operations)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+            (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+        assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
+        assertEquals(1, capture.records.size)
+        assertTrue(capture.records.single().cuts.all { it.checked && it.installed })
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(nonseparating.withLinearAuthority())
+            .verify(assertNotNull(result.bound)))
+    }
+
+    @Test
     fun `a nonterminal mixed query should install checked generated rows`() {
         val capture = LinearAuthorityCapture(4, 20_000L, 1_000_000L, Cancellation.Never)
         val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->

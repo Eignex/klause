@@ -618,15 +618,18 @@ Rows wider than the support cap are skipped with incomplete coverage. The cached
 proposals under 500,000 preparation work and 8 MiB modeled allocation, with
 per-attempt limits shared with explicit aggregation. Stopped or limited
 preparation reports its decline and leaves only completed proposals available.
-Point selection queries the current recipe before preparing optional aggregate
-pairs. A checked current incumbent or terminal bypasses discovery. A completed
+The current-first point entry point queries the current recipe before preparing
+optional aggregate pairs. A checked current incumbent or terminal bypasses discovery. A completed
 nonterminal point can first prepare an ordinary aggregate recipe under its
 500,000-work and 8 MiB limits. Its current and generated rows share a 64-selected-row
 cap. A fully checked generated mask enters the optional query without projecting
 every row at the base point. If ordinary generation yields no proposal, point-directed
 row alternatives retain their 65,536-work and 1 MiB limits. All attempts share the
-containing request allowance. An installed aggregate recipe with at most 64
-fully checked rows can enter aging without replacing its query.
+containing request allowance. The combined aggregate-and-point frontier initializes
+its ordinary generated recipe within the 64-selected-row cap and solves that recipe
+directly. It adopts the fully checked installed mask without a replacement query.
+The completed initial point supplies its first aging observation. An empty ordinary
+generation retains point-directed discovery under its existing allowance.
 Pure-integer point discovery uses the existing integer-row producer limits of
 48 multi-coordinate source rows and 16 proposals. It tries half rounding on each
 row and positive two-row combinations, retaining only finite separating proposals.
@@ -1455,8 +1458,11 @@ Ordinary linear-source execution binds the same source-cut controls to its admit
 numerical companions. The containing source request owns these settings and removes
 them from finite worker recipe options; they change neither companion admission
 nor lifetime.
-A new template first runs the ordinary checked cut recipe; a completed point can
-add one selection round at that node. A trial that admits no candidate retains
+A new template first runs its ordinary checked cut recipe. With both aggregate and
+point controls enabled, that initial recipe includes generated rows within the
+64-selected-ID cap; its completed point can start installed-row aging without
+replacing the numerical owner. The current-first entry point can instead add one
+selection round after a completed current point. A trial that admits no candidate retains
 the ordinary template, checked query and numerical owner for later queries of that
 template. Successful selection retains its checked mask instead.
 Integer-only templates and aggregate-only cut families with at most 64 fully checked
