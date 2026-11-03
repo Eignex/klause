@@ -18,7 +18,10 @@ class FrozenSourceAdapterTest {
         "cache,MPS", "temporary,MPS", "cli,MPS",
         "cache,OPB", "temporary,OPB", "cli,OPB",
     )
-    fun `ordinary frozen planning preserves source identity across seeded repeat blocks`(target: String, format: String) {
+    fun `ordinary frozen planning preserves source identity across seeded repeat blocks`(
+        target: String,
+        format: String,
+    ) {
         val extension = if (format == "DIMACS") "cnf" else format.lowercase()
         val input = BenchInput("offline/tiny.$extension.zst", BenchInputRoot.CORPUS, "model", "1".repeat(64))
         val template = BenchCase("original", inputs = listOf(input), attributes = mapOf(
