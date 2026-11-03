@@ -5,6 +5,7 @@ import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.ExternalCollection
 import com.eignex.klause.bench.catalog.FetchMethod
 import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.source.CommittedCorpusIndexes
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusIndex
 import com.eignex.klause.bench.source.CorpusIndexes
@@ -98,6 +99,24 @@ class IndexedPlanningTest {
                 ".index",
             ).walkTopDown().filter { it.isFile }.all { it.extension == "json" || it.length() == 0L },
         )
+    }
+
+    @Test
+    fun `a committed index plans offline exactly as the materialized collection`() = withCache { cache ->
+        val materialized = File(cache, "materialized").also { File(it, collection.id).let(::write) }
+        val workspace = File(cache, "workspace")
+        CommittedCorpusIndexes.write(CorpusIndex.of(collection.id, File(materialized, collection.id)), workspace)
+        assertEquals(CorpusIndex.of(collection.id, File(materialized, collection.id)).files.sortedBy { it.path },
+            CommittedCorpusIndexes.load(collection.id, workspace)!!.files)
+        val fresh = File(cache, "fresh") // No local index, no mirror and no bytes: only the committed index.
+        val saved = System.getProperty("klause.workspace.root")
+        try {
+            System.setProperty("klause.workspace.root", workspace.path)
+            assertEquals(planned(materialized, declared = false), planned(fresh, declared = true))
+        } finally {
+            if (saved == null) System.clearProperty("klause.workspace.root") else System.setProperty("klause.workspace.root", saved)
+        }
+        assertFalse(File(fresh, collection.id).exists(), "planning must not fetch the collection")
     }
 
     @Test

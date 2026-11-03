@@ -10,6 +10,8 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.MessageDigest
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 import java.util.HexFormat
 
 /**
@@ -91,6 +93,61 @@ internal class IndexedCollection(val index: CorpusIndex, val root: File) {
  * Local copies of collection indexes and their listing skeletons, under `.index/` of the corpus cache. Dot directories
  * are never collections, so the cache cap, discovery and pack publication all pass over them.
  */
+/**
+ * Collection indexes committed with the source under `klause-bench/corpus-index/<id>.tsv.gz`: a header line, then one
+ * `path<TAB>sha256<TAB>bytes` line per file, exactly [CorpusIndex.of] of the stored pack. Planning reads these instead of
+ * fetching an index or a collection, so a plan needs no network and costs no corpus transfer. A stale entry cannot
+ * admit wrong bytes: the lab fetches each case's inputs by these hashes and verifies them before the case runs.
+ */
+internal object CommittedCorpusIndexes {
+    const val DIRECTORY = "klause-bench/corpus-index"
+    private const val HEADER = "path\tsha256\tbytes"
+
+    fun file(workspace: File, id: String): File = File(workspace, "$DIRECTORY/$id.tsv.gz")
+
+    fun load(id: String, workspace: File? = runCatching { CorpusFetcher.workspaceRoot() }.getOrNull()): CorpusIndex? {
+        val file = workspace?.let { file(it, id) }?.takeIf { it.isFile } ?: return null
+        val lines = GZIPInputStream(file.inputStream()).bufferedReader().use { it.readLines() }
+        require(lines.firstOrNull() == HEADER) { "committed corpus index '$id' has no header" }
+        return CorpusIndex(id, lines.drop(1).filter { it.isNotEmpty() }.map { line ->
+            val fields = line.split('\t')
+            require(fields.size == 3) { "committed corpus index '$id' has a malformed line" }
+            CorpusIndex.Entry(fields[0], fields[1], fields[2].toLong())
+        })
+    }
+
+    fun write(index: CorpusIndex, workspace: File) {
+        val target = file(workspace, index.collection)
+        target.parentFile.mkdirs()
+        val pending = Files.createTempFile(target.parentFile.toPath(), ".${index.collection}.", ".tmp")
+        try {
+            GZIPOutputStream(Files.newOutputStream(pending)).bufferedWriter().use { out ->
+                out.write(HEADER); out.write("\n")
+                for (entry in index.files.sortedBy { it.path }) out.write("${entry.path}\t${entry.sha256}\t${entry.bytes}\n")
+            }
+            Files.move(pending, target.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(pending)
+        }
+    }
+
+    /** Writes the committed index of every complete collection tree under [cache], or of [ids] alone. */
+    @JvmStatic
+    fun main(args: Array<String>) {
+        require(args.size >= 2) { "usage: CommittedCorpusIndexes CORPUS_CACHE WORKSPACE [COLLECTION...]" }
+        val cache = File(args[0]); val workspace = File(args[1])
+        val ids = args.drop(2).ifEmpty {
+            cache.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }.orEmpty().map { it.name }.sorted()
+        }
+        for (id in ids) {
+            val tree = File(cache, id)
+            if (File(tree, CorpusStore.SELECTIVE).exists()) { System.err.println("skip $id: partial tree"); continue }
+            write(CorpusIndex.of(id, tree), workspace)
+            System.err.println("indexed $id")
+        }
+    }
+}
+
 internal class CorpusIndexes(private val root: File) {
     private val directory: File get() = File(root, ".index")
 
