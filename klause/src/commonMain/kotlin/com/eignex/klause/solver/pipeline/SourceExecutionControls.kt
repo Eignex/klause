@@ -50,9 +50,7 @@ internal fun bindSourceExecutionControls(
     val finiteOptions = options.withoutPresolve().without(
         "node-limit", "dry-run-presolve", "open-linear-incremental",
     ).let {
-        if (companions) it.without("source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
-            "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
-            "source-incumbent-completion") else it
+        if (companions) it.withoutSourceCompanionControls() else it
     }
         .overriddenBy(ExecutionOptions(ExecutionOption.seed(seed)))
     val finite: (FiniteSolveShape) -> FiniteSolveRequest = { shape ->
@@ -87,6 +85,9 @@ internal fun bindSourceExecutionControls(
             sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
                 defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
             sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
+            sourceCuts = reader[ExecutionOption.sourceCuts] ?: defaults.sourceCuts,
+            sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
+            sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
             sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
                 ?: defaults.sourceIncumbentCompletion,
             sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
@@ -255,8 +256,7 @@ private fun FiniteSolveRequest.withSourceControls(
             executionOptions.withoutPresolve().without(
                 "node-limit", "dry-run-presolve", "open-linear-incremental",
             ).let {
-                if (numericalCompanions) it.without("source-lp-work-limit", "source-lp-allocation-limit",
-                    "source-lp-operations", "source-incumbent-completion") else it
+                if (numericalCompanions) it.withoutSourceCompanionControls() else it
             }.overriddenBy(options),
         ),
         randomSeed = seed, defaultArms = policy.arms(engine, cores, defaultArms),
@@ -269,3 +269,10 @@ private fun FiniteSolveRequest.withSourceControls(
         toleranceCheck = toleranceCheck,
     )
 }
+
+private fun ExecutionOptions.withoutSourceCompanionControls(): ExecutionOptions = without(
+    "source-lp-work-limit", "source-lp-allocation-limit", "source-lp-operations",
+    "source-cuts", "source-point-cuts", "source-aggregate-cuts",
+    "source-refutation-reuse", "source-refutation-propagation", "source-refutation-resolution",
+    "source-incumbent-completion",
+)
