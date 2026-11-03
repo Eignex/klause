@@ -457,9 +457,10 @@ rewritten; their definition factors keep any resulting violation.
 
 Value-driven moves carry equality indicator flips through connected unit equality
 channels, so a single `IntSet` moves its indicators with it; repeated flips are read
-by their final parity. The channel accumulator retains its first indicator directly
-and allocates deduplication storage only for further distinct indicators. A single
-flip carries directly; multiple flips use parity and first-occurrence ordering.
+by their final parity. The channel accumulator retains its first two indicators
+directly and allocates deduplication storage only for further distinct indicators.
+One or two flips carry directly, with repeated pairs cancelling; longer sequences
+use parity and first-occurrence ordering.
 
 Violated Table rows keep single-coordinate repairs and add at most two joint tuple
 repairs. Tuple moves protect every table coordinate from counter-shifts, so a

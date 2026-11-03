@@ -381,6 +381,8 @@ see [presolve](07-presolve.md).
 Lazy occurrence filtering recognizes factors whose typed subscriptions cover every
 declared integer with temporary variable stamps; only partial coverage retains a
 per-factor membership set. Unsubscribed occurrences keep their factor order.
+Empty and single-variable bound subscriptions need no membership set; each watched
+variable keeps its lower-then-upper event pair.
 Built-in linear rows select their real, wide-integer or integer projection before
 loading the remaining factor-family dispatcher. Provider selection remains the
 owner of custom projections.

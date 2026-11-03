@@ -19,7 +19,9 @@ class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
     private var additionalPins: IntHashSet? = null
     private var indicatorFlips: IntHashSet? = null
     private var firstIndicator: Int = 0
+    private var secondIndicator: Int = 0
     private var hasIndicator: Boolean = false
+    private var hasSecondIndicator: Boolean = false
 
     init {
         parts += Move.IntSet(intVar, newValue)
@@ -49,8 +51,16 @@ class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
             return
         }
         if (boolVar == firstIndicator) return
+        if (!hasSecondIndicator) {
+            secondIndicator = boolVar
+            hasSecondIndicator = true
+            parts += Move.BoolFlip(boolVar)
+            return
+        }
+        if (boolVar == secondIndicator) return
         val indicators = indicatorFlips ?: IntHashSet().also {
             it.add(firstIndicator)
+            it.add(secondIndicator)
             indicatorFlips = it
         }
         if (indicators.add(boolVar)) parts += Move.BoolFlip(boolVar)
@@ -58,20 +68,33 @@ class ChannelingSink internal constructor(intVar: Int, newValue: Long) {
 
     internal fun carryBinaryChannels(state: LocalSearchState, eligibility: MoveSink) {
         var firstFlip: Move.BoolFlip? = null
-        var multipleFlips = false
+        var secondFlip: Move.BoolFlip? = null
+        var moreThanTwoFlips = false
         for (part in parts) {
             if (part !is Move.BoolFlip) continue
-            if (firstFlip != null) {
-                multipleFlips = true
+            if (firstFlip == null) {
+                firstFlip = part
+            } else if (secondFlip == null) {
+                secondFlip = part
+            } else {
+                moreThanTwoFlips = true
                 break
             }
-            firstFlip = part
         }
-        val single = firstFlip ?: return
-        if (!multipleFlips) {
-            if (eligibility.allowsBool(single.varId)) carryBinaryChannels(state, single.varId, eligibility)
+        val first = firstFlip ?: return
+        if (!moreThanTwoFlips) {
+            val second = secondFlip
+            if (second != null && second.varId == first.varId) return
+            if (eligibility.allowsBool(first.varId)) carryBinaryChannels(state, first.varId, eligibility)
+            if (second != null && eligibility.allowsBool(second.varId)) {
+                carryBinaryChannels(state, second.varId, eligibility)
+            }
             return
         }
+        carryBinaryChannelParity(state, eligibility)
+    }
+
+    private fun carryBinaryChannelParity(state: LocalSearchState, eligibility: MoveSink) {
         val flipped = IntHashSet()
         for (part in parts) {
             if (part is Move.BoolFlip && !flipped.add(part.varId)) flipped.remove(part.varId)

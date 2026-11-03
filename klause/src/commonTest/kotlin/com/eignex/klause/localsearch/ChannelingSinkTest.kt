@@ -11,6 +11,31 @@ import kotlin.test.assertEquals
 
 class ChannelingSinkTest {
     @Test
+    fun `paired indicator contributions should keep their binary channels consistent`() {
+        val problem = Problem(
+            2,
+            3,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1)),
+            arrayOf<Factor>(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                ReifiedLinear(1, intArrayOf(2), intArrayOf(1), LinearOp.EQ, 1),
+            ),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+        for (variable in 1..2) state.assignment.setInt(variable, 0)
+        for (variable in 0..1) state.assignment.setBool(variable, false)
+        state.recompute()
+        val sink = ChannelingSink(0, 1)
+
+        for (variable in intArrayOf(0, 1, 0, 1)) sink.addIndicatorFlip(variable)
+        sink.carryBinaryChannels(state, state.moveSink)
+        state.apply(sink.toMove())
+
+        assertEquals(listOf(true, true), (0..1).map(state.assignment::boolValue))
+        assertEquals(0L, state.cost)
+    }
+
+    @Test
     fun `indicator contributions should retain their first occurrence order`() {
         val sink = ChannelingSink(0, 1)
 

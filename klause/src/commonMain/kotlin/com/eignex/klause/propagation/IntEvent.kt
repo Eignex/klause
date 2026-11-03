@@ -1,5 +1,7 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.util.EmptyIntArray
+
 /**
  * Typed integer-domain change events — the int-side analog of the Boolean two-watched-literal
  * scheme ([BoolWatcherIndex.byLit]). A factor subscribes to specific `(intVar, kind)`
@@ -63,6 +65,11 @@ internal object IntEvent {
      * once (bound subscriptions are idempotent), so aliased operands are handled cleanly.
      */
     fun boundEventWatches(vars: IntArray): IntArray {
+        if (vars.isEmpty()) return EmptyIntArray
+        if (vars.size == 1) {
+            val variable = vars[0]
+            return intArrayOf(pack(variable, LB_RAISED), pack(variable, UB_LOWERED))
+        }
         val distinct = vars.toHashSet()
         val out = IntArray(distinct.size * 2)
         var w = 0
