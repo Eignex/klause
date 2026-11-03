@@ -26,8 +26,8 @@ enum class AffinePivotOrder {
      *  Factor payload sizes estimate construction cost; they do not predict search savings. */
     REWRITE_COST,
 
-    /** Markowitz ordering with payload scoring when the first admitted pivot needs structured consumers.
-     *  Retains declaration order for ordinary consumers and aliases.
+    /** Ordinary Markowitz folds followed by structured extensions within the same preparation allowance.
+     *  Scores payloads when the first admitted pivot needs structured consumers.
      *  Reuses existing exact binary cost channels within mixed integer objectives. */
     STRUCTURED,
 

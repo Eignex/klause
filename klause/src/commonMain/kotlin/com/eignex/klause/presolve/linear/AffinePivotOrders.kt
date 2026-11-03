@@ -84,6 +84,8 @@ internal object AffinePivotOrders {
         private var seeded = false
         private var promotionsQueued = 0
 
+        override val exhausted: Boolean get() = seeded && heap.isEmpty()
+
         override fun next(): AffineSingletons.AffineCandidate? {
             if (!seeded) {
                 seed()

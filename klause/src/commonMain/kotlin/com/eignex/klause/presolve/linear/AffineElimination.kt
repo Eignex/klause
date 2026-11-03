@@ -252,7 +252,7 @@ internal object AffineSingletons {
         // The session-maintained index matches the pristine input factor order, so the first candidate
         // search reads it instead of rebuilding an O(factors) index; each fold then patches only the
         // occurrence entries of the rewritten factors rather than re-indexing the whole set.
-        val ws = WorkingSet(problem.factors, eliminated.size, sharedIntOcc, policy.allowsStructuredRewrites)
+        val ws = WorkingSet(problem.factors, eliminated.size, sharedIntOcc, policy == AffinePivotOrder.REWRITE_COST)
         // Each elimination rewrites only the factors mentioning the pivot and appends bound rows, so the
         // per-elimination cost is O(occurrences of x) rather than O(factors). The candidate scan still
         // walks the live factors in order (the elimination order is selection-order-sensitive), but the
@@ -263,14 +263,24 @@ internal object AffineSingletons {
         // the order as much as on the set: folding the cheap pivots first shrinks the graph, so folds that
         // would have been expensive become cheap or stop existing. The gates below (fill-in budget, absorb
         // cap) can only refuse a fold; they cannot defer one.
-        val order = AffinePivotOrders.new(policy, ws, eliminated, objVars, capWide, pivotable, cancellation)
+        var structuredPending = policy == AffinePivotOrder.STRUCTURED
+        val firstPolicy = if (structuredPending) AffinePivotOrder.MARKOWITZ else policy
+        var order = AffinePivotOrders.new(firstPolicy, ws, eliminated, objVars, capWide, pivotable, cancellation)
         // Cumulative substitution fill-in (Σ pivot-degree · substituted-terms). A dense chain of wide
         // folds is superlinear and can dominate presolve on large models where it barely simplifies;
         // once the budget is spent the loop stops, leaving the remaining affine-defined variables to be
         // solved directly (sound). The budget is far above what productive models spend.
         var fillIn = 0L
         while (!cancellation()) {
-            val cand = order.next() ?: break
+            val cand = order.next()
+            if (cand == null) {
+                if (!structuredPending || !order.exhausted || cancellation() ||
+                    !ws.enableStructuredRewrites(cancellation)
+                ) break
+                structuredPending = false
+                order = AffinePivotOrders.new(policy, ws, eliminated, objVars, capWide, pivotable, cancellation)
+                continue
+            }
             if (domainBoundsOverflow(ranges, cand)) {
                 objVars.add(cand.x)
                 order.onRejected(cand.defIdx)
@@ -321,6 +331,8 @@ internal object AffineSingletons {
      * early is always sound (an unfolded variable simply stays and is solved directly).
      */
     internal interface PivotOrder {
+
+        val exhausted: Boolean get() = false
 
         /** The next pivot to fold, or `null` when no admissible candidate remains. */
         fun next(): AffineCandidate?
@@ -981,7 +993,7 @@ internal object AffineSingletons {
         base: Array<Factor>,
         nVars: Int,
         seed: SharedIntOccurrence?,
-        private val rewriteStructured: Boolean,
+        private var rewriteStructured: Boolean,
     ) : FactorOcc {
         private val slots = ArrayList<Factor?>(base.size + 1).apply { addAll(base) }
         private val intOcc = Array(nVars) { IntArrayList(0) }
@@ -1023,6 +1035,25 @@ internal object AffineSingletons {
         private val atCapCount = IntArray(nVars)
 
         private fun isCappable(f: Factor?): Boolean = affineFoldRow(f, rewriteStructured) != null
+
+        fun enableStructuredRewrites(cancellation: Cancellation): Boolean {
+            var polled = 0
+            for (id in slots.indices) {
+                cancellation.charge(AFFINE_WORK_WEIGHT)
+                if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return false
+                if (absorbed[id] < FOLD_ABSORB_CAP) continue
+                val factor = slots[id] ?: continue
+                if (affineFoldRow(factor, false) != null || affineFoldRow(factor, true) == null) continue
+                for (variable in factor.intVars) {
+                    cancellation.charge(AFFINE_WORK_WEIGHT)
+                    if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return false
+                    atCapCount[variable]++
+                }
+            }
+            if (cancellation()) return false
+            rewriteStructured = true
+            return true
+        }
 
         init {
             // The seed's CSR is over the pristine input in input (= stable-id) order, so its dense indices

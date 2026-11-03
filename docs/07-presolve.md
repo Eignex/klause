@@ -99,9 +99,14 @@ the integer cost representation and still processes those unrelated columns.
 An empty mixed admission scan returns unchanged: additional objective protection
 cannot create an eligible column.
 
-`AffinePivotOrder.STRUCTURED` keeps Markowitz ordering between definitions. It
-retains the first admitted declaration-order pivot for aliases and ordinary
-consumers. When that pivot uses a native reified or comparison-clause
+`AffinePivotOrder.STRUCTURED` settles ordinary Markowitz folds before enabling
+structured consumers in the same working set. A cancelled or bounded ordinary
+scan does not start that extension. Both stages share the preparation allowance,
+fill-in budget and per-row absorption cap. Entering the extension charges a scan
+that adds native rows to the absorption-cap index; an interrupted transition
+retains the completed ordinary folds. The extension keeps Markowitz ordering
+between definitions and declaration order for aliases and ordinary consumers.
+When the first admitted pivot uses a native reified or comparison-clause
 consumer, it tries the smallest incident rewrite payload first. Consumer admission
 checks walk the maintained occurrence index and charge the phase allowance. It
 also reuses existing exact binary cost channels within mixed integer objectives.

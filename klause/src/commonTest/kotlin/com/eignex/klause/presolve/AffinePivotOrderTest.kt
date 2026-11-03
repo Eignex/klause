@@ -42,6 +42,43 @@ import kotlin.test.assertTrue
 
 class AffinePivotOrderTest {
     @Test
+    fun `structured order should retain an ordinary pivot before a smaller native payload`() {
+        val source = Problem(1, 10, Array(10) { IntDomain(0, 4) }, listOf(
+            Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+            Linear(IntArray(8) { 1 }, intArrayOf(1, 3, 4, 5, 6, 7, 8, 9), LinearOp.LE, 16),
+        ))
+        val point = Sample(booleanArrayOf(true), LongArray(10).apply {
+            this[0] = 3L
+            this[2] = 1L
+        })
+
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
+            objectiveIntVars = setOf(2, 3, 4, 5, 6, 7, 8, 9), pivotOrder = AffinePivotOrder.STRUCTURED)
+        val restored = assertNotNull(delta.rebuild.asSampleLift())(point)
+
+        assertEquals(3L, restored.ints[0])
+        assertEquals(2L, restored.ints[1])
+    }
+
+    @Test
+    fun `structured order should extend an ordinary fold with a native only fold`() {
+        val source = Problem(1, 5, Array(5) { IntDomain(0, 4) }, listOf(
+            Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
+            Linear(intArrayOf(1, -1), intArrayOf(3, 4), LinearOp.EQ, 0),
+        ))
+
+        val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
+            objectiveIntVars = setOf(1, 2, 4), pivotOrder = AffinePivotOrder.STRUCTURED)
+        val restored = assertNotNull(delta.rebuild.asSampleLift())(
+            Sample(booleanArrayOf(true), longArrayOf(0, 1, 2, 0, 2)),
+        )
+
+        assertEquals(listOf(3L, 1L, 2L, 2L, 2L), restored.ints.toList())
+    }
+
+    @Test
     fun `rewrite cost should reconstruct an xcsp flow input used by a comparison objective`() {
         val parsed = Xcsp3.parse("""
             <instance format="XCSP3" type="COP">
