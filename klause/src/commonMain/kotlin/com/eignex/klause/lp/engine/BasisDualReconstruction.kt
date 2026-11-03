@@ -6,6 +6,8 @@ import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.basis.RationalBasisStats
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.magnitudeBitLength
+import kotlin.math.abs
 
 private class BasisDualStop(val reason: String) : RuntimeException()
 
@@ -47,6 +49,7 @@ private class BasisDualRun(
     private var openBasicColumns = 0
     private var restrictedComponents = 0
     private var restrictedColumns = 0
+    private var largestRestrictedColumns = 0
     private var factorWork = 0L
     private var factorAllocation = 0L
     private var decline: String? = null
@@ -115,7 +118,7 @@ private class BasisDualRun(
     } finally {
         meter.basisRepair = ReconstructionBasisMetrics(peeledRows, peeledColumns, coreRows, components,
             largest, solved, factorWork, factorAllocation, openBasicColumns, decline,
-            restrictedComponents, restrictedColumns)
+            restrictedComponents, restrictedColumns, largestRestrictedColumns)
     }
 
     // Singleton elimination preserves the remaining equations without creating factor fill.
@@ -220,54 +223,135 @@ private class BasisDualRun(
                     val bounds = a.bounds[basis.basicVars[layout.structuralSlots[equation]]]
                     bounds.lower == null || bounds.upper == null
                 }
-                if (open.size > limits.dimension) {
-                    decline = "DIMENSION"
-                    continue
-                }
-                val matched = matchOpen(group, open)
-                if (matched == null) {
-                    decline = "OPEN_RANK"
-                    continue
-                }
-                if (open.isNotEmpty() && !solve(matched, open, local, restricted = true)) break
-                restrictedComponents++
-                restrictedColumns += open.size
+                if (!solveOpen(group, open, local, limits.dimension)) break
                 continue
             }
             if (!solve(group, selected, local)) break
         }
     }
 
-    private fun matchOpen(group: List<Int>, selected: List<Int>): List<Int>? {
-        if (selected.isEmpty()) return emptyList()
-        meter.step(a.m.toLong())
-        meter.storage(a.m * 8L + selected.size * 8L)
-        val matched = IntArray(a.m) { -1 }
-        val seen = IntArray(a.m)
-        var stamp = 0
-        fun augment(index: Int): Boolean {
-            for ((row, _) in equations[selected[index]]) {
+    private fun solveOpen(group: List<Int>, open: List<Int>, local: IntArray, dimension: Int): Boolean {
+        val initial = repairDirections(open, dimension)
+        meter.storage(64L + open.size * 8L + equations.size)
+        meter.step(initial.size.toLong())
+        val required = ArrayList<Int>(open.size).apply { addAll(initial) }
+        val chosen = BooleanArray(equations.size)
+        for (equation in required) {
+            meter.step()
+            chosen[equation] = true
+        }
+        while (true) {
+            largestRestrictedColumns = maxOf(largestRestrictedColumns, required.size)
+            if (required.size > dimension || (open.isNotEmpty() && required.isEmpty())) {
+                decline = "DIMENSION"
+                return true
+            }
+            val matched = selectOpenPivots(group, required)
+            if (matched == null) {
+                decline = "OPEN_RANK"
+                return true
+            }
+            if (required.isNotEmpty() && !solve(matched, required, local, restricted = true)) return false
+            var added = false
+            for (equation in open) {
                 meter.step()
-                if (!activeRow[row] || seen[row] == stamp) continue
-                seen[row] = stamp
-                val previous = matched[row]
-                if (previous < 0 || augment(previous)) {
-                    matched[row] = index
-                    return true
+                if (!chosen[equation] && requiresMissingSide(equation)) {
+                    chosen[equation] = true
+                    required += equation
+                    added = true
                 }
             }
-            return false
+            if (!added) {
+                restrictedComponents++
+                restrictedColumns += required.size
+                return true
+            }
         }
-        for (index in selected.indices) {
-            stamp++
-            if (!augment(index)) return null
-        }
-        val result = IntArray(selected.size) { -1 }
-        for (row in group) {
+    }
+
+    private fun repairDirections(open: List<Int>, dimension: Int): List<Int> {
+        if (open.isEmpty()) return open
+        meter.storage(64L + open.size * 8L)
+        val required = open.filterTo(ArrayList<Int>(open.size), ::requiresMissingSide)
+        // An admitted full subsystem can also repair residues on nonbasic columns.
+        return if (required.isEmpty() && open.size <= dimension) open else required
+    }
+
+    private fun requiresMissingSide(equation: Int): Boolean {
+        var reduced = rhs[equation]
+        for ((row, coefficient) in equations[equation]) {
             meter.step()
-            if (matched[row] >= 0) result[matched[row]] = row
+            if (activeRow[row]) reduced = subtract(reduced, coefficient, y[row])
         }
-        return result.toList()
+        val bounds = a.bounds[basis.basicVars[layout.structuralSlots[equation]]]
+        return (reduced.signum() > 0 && bounds.lower == null) ||
+            (reduced.signum() < 0 && bounds.upper == null)
+    }
+
+    private fun selectOpenPivots(group: List<Int>, selected: List<Int>): List<Int>? {
+        if (selected.isEmpty()) return emptyList()
+        val cells = selected.size.toLong() * group.size
+        if (cells > minOf(meter.limits.maxEntries, 16384)) return null
+        meter.step(cells + a.m)
+        meter.storage(128L + cells * 8L + a.m * 4L + selected.size * 80L + group.size)
+        val local = IntArray(a.m) { -1 }
+        for (column in group.indices) local[group[column]] = column
+        val projected = Array(selected.size) { DoubleArray(group.size) }
+        for (index in selected.indices) {
+            var scale = 0.0
+            for ((row, value) in equations[selected[index]]) {
+                meter.step()
+                val column = local[row]
+                if (column < 0) continue
+                val words = (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 63L) / 64L
+                meter.step(1L + words * words)
+                val scalar = value.toDouble()
+                if (!scalar.isFinite()) return null
+                projected[index][column] = scalar
+                scale = maxOf(scale, abs(scalar))
+            }
+            if (scale == 0.0) return null
+            for (column in group.indices) {
+                meter.step()
+                projected[index][column] /= scale
+            }
+        }
+        val used = BooleanArray(group.size)
+        val result = ArrayList<Int>(selected.size)
+        // Projected pivots propose a square subsystem; exact factors and the full dual check authorize it.
+        for (index in selected.indices) {
+            var pivotRow = -1
+            var pivotColumn = -1
+            var largest = 1e-10
+            for (row in index until selected.size) for (column in group.indices) {
+                meter.step()
+                val magnitude = abs(projected[row][column])
+                if (!used[column] && magnitude > largest) {
+                    largest = magnitude
+                    pivotRow = row
+                    pivotColumn = column
+                }
+            }
+            if (pivotRow < 0) return null
+            val previous = projected[index]
+            projected[index] = projected[pivotRow]
+            projected[pivotRow] = previous
+            used[pivotColumn] = true
+            result += group[pivotColumn]
+            for (row in index + 1 until selected.size) {
+                meter.step()
+                val multiplier = projected[row][pivotColumn] / projected[index][pivotColumn]
+                for (column in group.indices) {
+                    meter.step()
+                    if (used[column]) continue
+                    val value = projected[row][column] - multiplier * projected[index][column]
+                    if (!value.isFinite()) return null
+                    projected[row][column] = value
+                }
+                projected[row][pivotColumn] = 0.0
+            }
+        }
+        return result
     }
 
     private fun solve(

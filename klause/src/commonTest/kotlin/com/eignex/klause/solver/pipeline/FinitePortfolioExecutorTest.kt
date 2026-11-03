@@ -29,9 +29,96 @@ import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class FinitePortfolioExecutorTest {
+    @Test
+    fun `paid heuristic modes should preserve worker slots and their sample providers`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 1) }, emptyArray())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3))
+        val prepared = source.prepareExecutionPlan(objective, preferFinite = true)
+        val scenario = PortfolioScenario(cores = 1, arms = PortfolioScenario.DEFAULT_ARMS,
+            kind = Kind.COP, engine = EngineMix.MIXED)
+        val schedules = listOf(InitialProbePolicy.FAMILY_WORK, InitialProbePolicy.HEURISTIC_WORK,
+            InitialProbePolicy.ALNS_WORK).map { policy ->
+            val invocation = FinitePipeline.portfolioExecutor(source.bake(), scenario, objective, null, null,
+                null, null, prepared, Cancellation.after(1.seconds), numericalCompletion = false,
+                probePolicy = policy)
+            invocation.use { it.minimize(Cancellation { true }, null) }.stats.portfolio
+        }
+
+        assertEquals(schedules[0].arms.map { it.label }, schedules[1].arms.map { it.label })
+        assertEquals(schedules[0].arms.map { it.label }, schedules[2].arms.map { it.label })
+        val localSearch = schedules[0].heuristicStarts.single().workByArm.keys
+        val allHeuristics = schedules[1].heuristicStarts.single().workByArm.keys
+        assertTrue(localSearch.isNotEmpty() && localSearch.all { it.startsWith("ls/") })
+        assertEquals(localSearch + "alns/balanced", allHeuristics)
+        assertEquals(localSearch, schedules[2].heuristicStarts.single().workByArm.keys)
+    }
+
+    @Test
+    fun `an early heuristic probe should preserve every initial worker slot`() {
+        for (early in listOf(false, true)) {
+            val visits = mutableListOf<Int>()
+            val workers = List(4) { arm ->
+                trackingWorker("worker$arm", arm, ScriptedSearch({ false }) { visits += arm })
+                    .also { if (arm >= 2) it.family = ArmFamily.LocalSearch }
+            }
+
+            Portfolio(workers, fixedBandit(4, 0)).also {
+                if (early) it.initialProbeRanks = heuristicSecondProbeRanks(workers)
+            }.use { it.minimize(Cancellation { visits.size >= 4 }) }
+
+            assertEquals(if (early) listOf(0, 2, 1, 3) else listOf(0, 1, 2, 3), visits)
+        }
+    }
+
+    @Test
+    fun `an early heuristic probe should preserve deferred and improvement admission`() {
+        for (deferred in listOf(false, true)) {
+            val visits = mutableListOf<Int>()
+            val workers = List(3) { arm ->
+                trackingWorker("worker$arm", arm, ScriptedSearch({ false }) { visits += arm }).also {
+                    if (arm == 2) {
+                        it.family = ArmFamily.LocalSearch
+                        it.startAfterIncumbent = deferred
+                        it.improvementOnly = !deferred
+                    }
+                }
+            }
+
+            Portfolio(workers, fixedBandit(3, 2)).also {
+                it.initialProbeRanks = heuristicSecondProbeRanks(workers)
+            }.use { it.minimize(Cancellation { visits.size >= 2 }) }
+
+            assertEquals(listOf(0, 1), visits)
+        }
+    }
+
+    @Test
+    fun `an early heuristic incumbent should retain silent complete worker coverage`() {
+        val clock = TestTimeSource()
+        val visits = mutableListOf<Int>()
+        val elapsed = LongArray(3)
+        val workers = List(3) { arm ->
+            trackingWorker("worker$arm", arm, ScriptedSearch({ arm == 2 && it == 0 }) {
+                visits += arm
+                elapsed[arm] += 100L
+                clock += 100.milliseconds
+            }).also { if (arm == 2) it.family = ArmFamily.LocalSearch }
+        }
+
+        Portfolio(workers, fixedBandit(3, 2), reseedStaleThreshold = 0).also {
+            it.runTimeSource = clock
+            it.initialProbeRanks = heuristicSecondProbeRanks(workers)
+        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+
+        assertEquals(listOf(0, 2, 1), visits.take(3))
+        val owed = (elapsed.sum() - 200L) / 4
+        for (arm in 0..1) assertTrue(elapsed[arm] >= owed - 100L)
+    }
+
     @Test
     fun `LP transfers should preserve non-LP sibling probe shares`() {
         val labels = listOf("bt/satOptimized", "bt/lp-default", "ls/fixed", "ls/plateau",

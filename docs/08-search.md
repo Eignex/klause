@@ -126,12 +126,18 @@ traversal as value preferences. Its existing backtracking completes the assignme
 and complete source checks retain publication authority. This transfer carries no
 LP point, bound or proof authority into a leaf. Before its first incumbent, a retained
 integer guide can keep decisions within one declared factor component of the
-undetermined columns at a time.
+undetermined columns at a time. Its preparation precedes additional node LP queries
+under the same funded allowance. A ready guide lets CP seek its first incumbent
+before those queries resume; inherited checked bounds remain available.
+
 The opt-in `lp-mixed-root-targets` setting admits integer and Boolean targets from
 mixed models through the same paid owner. Real coordinates never become finite
 decisions; continuous leaf completion and full source checking retain their authority.
 The same frame stack handles conflicts and retraction; all source constraints stay
-active and every component still belongs to complete source checking.
+active and every component still belongs to complete source checking. A restart
+expires the guide. At its restored root, an integer-only traversal that consumed component
+ordering may request fresh preferences from the current LP owner; the request
+rechecks the root model and state, charges its transport and renews no allowance.
 
 Numerical frontier traversal orders alternatives by inherited checked objective
 bounds, visiting unbounded alternatives first. It keeps both children of every

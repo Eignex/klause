@@ -23,6 +23,86 @@ import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
     @Test
+    fun `typed and parsed publication batching should execute curated integer optimization`() {
+        for (options in listOf(ExecutionOptions(ExecutionOption.portfolioPublications("segment")),
+            ExecutionOptions.parse(listOf("portfolio-publications=segment")))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                cancellation = Cancellation.after(1.seconds), executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        }
+    }
+
+    @Test
+    fun `publication batching should reject unknown policies explicit recipes and work schedules`() {
+        for (settings in listOf(listOf("portfolio-publications=never"),
+            listOf("portfolio-publications=segment", "arms=2"),
+            listOf("portfolio-publications=segment", "bt-arm=satOptimized"),
+            listOf("portfolio-publications=segment", "portfolio-work=100"))) {
+            val shape = FiniteSolveShape(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()), true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions.parse(settings), cancellation = Cancellation.after(1.seconds),
+            )
+
+            assertFailsWith<PipelineConfigException> { FinitePipeline.solve(request, FiniteSolveCallbacks({}, {})) }
+        }
+    }
+
+    @Test
+    fun `publication batching should reject unsupported operations lanes and engines`() {
+        for ((optimize, cores, engine) in listOf(
+            Triple(false, 1, FiniteEngine.MIXED), Triple(true, 2, FiniteEngine.MIXED),
+            Triple(true, 1, FiniteEngine.LOCAL_SEARCH), Triple(true, 1, FiniteEngine.BACKTRACK),
+        )) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, optimize, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)).takeIf { optimize }, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, engine, cores = cores, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions.parse(listOf("portfolio-publications=segment")),
+                cancellation = Cancellation.after(1.seconds),
+            )
+
+            assertFailsWith<PipelineConfigException> { FinitePipeline.solve(request, FiniteSolveCallbacks({}, {})) }
+        }
+    }
+
+    @Test
+    fun `publication batching should reject Boolean sources`() {
+        val shape = FiniteSolveShape(Problem(1, 0, emptyArray(), emptyArray()), true, false, null,
+            LinearObjective(longArrayOf(1)), 0, null)
+        val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+            shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+            executionOptions = ExecutionOptions.parse(listOf("portfolio-publications=segment")),
+            cancellation = Cancellation.after(1.seconds),
+        )
+
+        assertFailsWith<PipelineConfigException> { FinitePipeline.solve(request, FiniteSolveCallbacks({}, {})) }
+    }
+
+    @Test
+    fun `publication batching should require a containing deadline`() {
+        val shape = FiniteSolveShape(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()), true, false, null,
+            LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+        val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+            shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+            executionOptions = ExecutionOptions.parse(listOf("portfolio-publications=segment")),
+            nodeBudget = NodeBudget(8),
+        )
+
+        assertFailsWith<PipelineConfigException> { FinitePipeline.solve(request, FiniteSolveCallbacks({}, {})) }
+    }
+
+    @Test
     fun `fixed cumulative optimization should automatically use cost aware propagation`() {
         for (hints in listOf(null, SearchHints(emptyList()))) {
             val problem = Problem(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf(
@@ -328,8 +408,9 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `leading probe budgets should require a containing time deadline`() {
-        for (policy in listOf("leader-half", "lp-transfer")) {
+    fun `initial probe policies should require a containing time deadline`() {
+        for (policy in listOf("leader-half", "lp-transfer", "heuristic-second", "family-work", "heuristic-work",
+            "alns-work")) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -346,13 +427,13 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `typed and parsed leading probe budgets should execute curated integer optimization`() {
+    fun `typed initial probe policies should execute curated integer optimization`() {
         for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProbes("leader-half")),
-            ExecutionOptions.parse(listOf("portfolio-probes=leader-half")),
-            ExecutionOptions.parse(listOf("portfolio-probes=leader-half", "portfolio-lp-start=after-probes")),
             ExecutionOptions(ExecutionOption.portfolioProbes("lp-transfer")),
-            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer")),
-            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer", "portfolio-lp-start=after-probes")))) {
+            ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-second")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("family-work")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-work")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("alns-work")))) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -369,14 +450,99 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `leading probe budgets should reject unknown policies explicit recipes and work schedules`() {
+    fun `parsed initial probe policies should execute curated integer optimization`() {
+        for (options in listOf(ExecutionOptions.parse(listOf("portfolio-probes=leader-half")),
+            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer")),
+            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second")),
+            ExecutionOptions.parse(listOf("portfolio-probes=family-work")),
+            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work")),
+            ExecutionOptions.parse(listOf("portfolio-probes=alns-work")))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                cancellation = Cancellation.after(1.seconds),
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        }
+    }
+
+    @Test
+    fun `initial probe policies should compose with deferred LP starts`() {
+        for (options in listOf(
+            ExecutionOptions.parse(listOf("portfolio-probes=leader-half", "portfolio-lp-start=after-probes")),
+            ExecutionOptions.parse(listOf("portfolio-probes=lp-transfer", "portfolio-lp-start=after-probes")),
+            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second", "portfolio-lp-start=after-probes")),
+            ExecutionOptions.parse(listOf("portfolio-probes=family-work", "portfolio-lp-start=after-probes")),
+            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work", "portfolio-lp-start=after-probes")),
+            ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-lp-start=after-probes")))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                cancellation = Cancellation.after(1.seconds),
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        }
+    }
+
+    @Test
+    fun `paid heuristic probes should compose with buffered publication`() {
+        for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProbes("family-work"),
+                ExecutionOption.portfolioPublications("segment")),
+            ExecutionOptions.parse(listOf("portfolio-probes=family-work", "portfolio-publications=segment")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-work"),
+                ExecutionOption.portfolioPublications("segment")),
+            ExecutionOptions.parse(listOf("portfolio-probes=heuristic-work", "portfolio-publications=segment")),
+            ExecutionOptions(ExecutionOption.portfolioProbes("alns-work"),
+                ExecutionOption.portfolioPublications("segment")),
+            ExecutionOptions.parse(listOf("portfolio-probes=alns-work", "portfolio-publications=segment")))) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                cancellation = Cancellation.after(1.seconds),
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        }
+    }
+
+    @Test
+    fun `initial probe policies should reject unknown policies explicit recipes and work schedules`() {
         for (settings in listOf(listOf("portfolio-probes=never"),
             listOf("portfolio-probes=leader-half", "arms=2"),
             listOf("portfolio-probes=leader-half", "bt-arm=satOptimized"),
             listOf("portfolio-probes=leader-half", "portfolio-work=100"),
             listOf("portfolio-probes=lp-transfer", "arms=2"),
             listOf("portfolio-probes=lp-transfer", "bt-arm=satOptimized"),
-            listOf("portfolio-probes=lp-transfer", "portfolio-work=100"))) {
+            listOf("portfolio-probes=lp-transfer", "portfolio-work=100"),
+            listOf("portfolio-probes=heuristic-second", "arms=2"),
+            listOf("portfolio-probes=heuristic-second", "bt-arm=satOptimized"),
+            listOf("portfolio-probes=heuristic-second", "portfolio-work=100"),
+            listOf("portfolio-probes=family-work", "arms=2"),
+            listOf("portfolio-probes=family-work", "bt-arm=satOptimized"),
+            listOf("portfolio-probes=family-work", "portfolio-work=100"),
+            listOf("portfolio-probes=heuristic-work", "arms=2"),
+            listOf("portfolio-probes=heuristic-work", "bt-arm=satOptimized"),
+            listOf("portfolio-probes=heuristic-work", "portfolio-work=100"),
+            listOf("portfolio-probes=alns-work", "arms=2"),
+            listOf("portfolio-probes=alns-work", "bt-arm=satOptimized"),
+            listOf("portfolio-probes=alns-work", "portfolio-work=100"))) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -412,8 +578,9 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `leading probe budgets should reject Boolean sources`() {
-        for (policy in listOf("leader-half", "lp-transfer")) {
+    fun `initial probe policies should reject Boolean sources`() {
+        for (policy in listOf("leader-half", "lp-transfer", "heuristic-second", "family-work", "heuristic-work",
+            "alns-work")) {
             val shape = FiniteSolveShape(Problem(1, 0, emptyArray(), emptyArray()), true, false, null,
                 LinearObjective(longArrayOf(1)), 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(

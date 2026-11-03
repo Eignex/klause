@@ -828,6 +828,7 @@ internal class LocalSearchEngine(
             exchange = params.pooledIncumbents,
             importEnabled = effectiveAssumptions.isEmpty,
             evaluate = { objective.evaluate(it) },
+            timing = timing,
         )
 
         // Restart policies require a feasible anchor; residual violation cannot certify one.

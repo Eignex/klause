@@ -39,7 +39,7 @@ data class LocalSearchStats(
     val geometricProposalDeclines: SumResult = ZERO_COUNT,
     /** Sink-emitted geometric candidates before driver sampling; neither commits nor distinct points. */
     val geometricProposalCandidates: SumResult = ZERO_COUNT,
-    /** Optional objective-view preparation and completed scoring counts, populated with phase reporting. */
+    /** Optional objective scoring counts and selection interruptions with their elapsed nanoseconds. */
     val objectiveScoring: Map<String, Long> = emptyMap(),
 ) {
     /** Combine two workers: moves/stalls add, earliest time-to-best wins, incumbent from the lower violation. */

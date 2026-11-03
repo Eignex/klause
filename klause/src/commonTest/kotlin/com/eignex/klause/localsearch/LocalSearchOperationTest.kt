@@ -26,6 +26,8 @@ class LocalSearchOperationTest {
         val problem = Problem(0, 3, arrayOf(IntDomain(0, 2), IntDomain(2, 2), IntDomain(0, 4)),
             arrayOf<Factor>(Product(0, 1, 2), Table(intArrayOf(2), longArrayOf(0))))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        val timer = LocalSearchPhaseTimer { 0L }
+        state.phaseTimer = timer
         state.invariants = checkNotNull(DefinitionalSweep.infer(problem)).network(3, 0)
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 2)
@@ -41,6 +43,7 @@ class LocalSearchOperationTest {
         }
 
         assertNull(interrupted)
+        assertEquals(1L, timer.objectiveScoringSnapshot().getValue("selection-interruptions"))
         assertEquals(before, state.assignment.snapshot())
         assertEquals(0L, state.cost)
         assertEquals(3.0, state.weightedNetDelta(move))

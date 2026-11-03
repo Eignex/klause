@@ -26,6 +26,9 @@ Execution verifies the planned file and directory identities before each solve.
 Declared-input planning uses the complete corpus-pack index even when only a subset
 of its members is materialized locally. Each solve verifies its planned input bytes.
 
+The standard JVM lab manifests request source snapshots with the selected revision's files and original Git commit identity.
+Their builds and tools use the current revision without requiring ancestors or tags.
+
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
 copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time
@@ -34,6 +37,14 @@ and directory membership checks, and expire with the worker session. Unsupported
 A standalone `cp` control sets both `param.bt-arm=LABEL` and `param.arms=1`.
 Named recipes repeat across the configured worker slots otherwise. Check the
 emitted `arm.*` entries to verify the actual worker count before comparing controls.
+
+`bench.profile.LocalSearchTrajectory` accepts hash-pinned XCSP3 sources and
+`format=mps` for exactly retained pure-integer minimization sources.
+`preparationEngine=mixed|ls` selects the preparation route and `seed` its seed.
+`walkSeed` selects the private walk's seed, defaulting to `seed`; `moves`,
+`sliceMillis` and `sliceWork` bound the walk. Retain the emitted models,
+coordinate maps, completed moves and unfinished work when comparing slices.
+Profile timings and working-model checks do not qualify original-source performance.
 
 ## Private rebuild qualification capture
 
@@ -276,6 +287,12 @@ loads and solves. Records retain solver reports, statistics, source hashes,
 installed-build identity and available witnesses. Inspect the JSON record even
 when the bench process exits successfully. Independent source validation runs in
 the lab; the bench records `validationPolicy=reported-result-v1`.
+
+Failed MiniZinc identity queries retain `compilerDiscovery` evidence separately
+from an accepted `compilerIdentity`. `solve.log` retains query lifecycle receipts,
+including the option, executable hash, startup/wait/cleanup times, exit and cancellation.
+Process CPU time is best effort and stays null when unavailable. Startup spends the
+existing ten-second query allowance; the containing case/job deadline still applies.
 
 Subprocess stderr is drained in fixed-size chunks. Records retain at most 16 Ki
 characters of normalized stderr, with `stderrComplete` true only for an untruncated
@@ -986,12 +1003,77 @@ counts source rows once; `MixedCandidates`, `MixedComplementaryAttempts` and
 `MixedComplementaryRetained` distinguish candidate work and retained alternatives.
 Bound-side alternatives and selected rows establish no useful bound or cost gain
 without subsequent checked support and actual frontier consumption.
+`numericalCutSelectionRetiredInstalled` counts installed rows expired after four
+usable slack observations; `POINT_INSTALLED_RETIRED` attributes them by family.
+Installed-row aging continues after candidate discovery retires.
+These scans omit objective projection and candidate comparison vectors; their
+activity work and modeled storage remain in the selection and containing totals.
+Retained tight rows still require current-source checks. Keep subsequent row-layout
+replacement, proof-mode changes and factor work in the containing cost comparison.
+Adopted current families suspend retired rows while retaining their numerical
+definitions. `InactiveRowMappingWork` and `InactiveRowMappingAllocation` record
+mapping through any packed source equalities; these costs also debit the containing
+preparation/funding totals. A partial equality deactivation declines retained
+guidance. Keep failed mapping and fallback costs. Owner reuse alone establishes no
+net source gain, and an inactive retained definition is not an installed cut.
+When every checked candidate is installed, completed points age that family without
+the discovery cooldown and retain its numerical definitions for later suspension.
+`numericalCutSelectionManagedInstalled` counts rows entering this layout management.
+Ordinary-recipe compatibility remains separate from selected-layout ownership.
+Point selection starts from the current checked recipe. `CurrentFallback` and
+`CurrentFallbackQueries` report retaining that recipe after an unproductive trial;
+`BaseQueries` counts base relaxation attempts. A point-selection arm can therefore
+contain both CURRENT and POINT_SELECTION recipe work; retain the ordinary source
+totals and both disjoint recipe costs.
+Optional source-pair discovery waits for a completed nonterminal point and uses
+65,536 work and 1 MiB modeled allocation. Ordinary aggregate-only preparation keeps
+its 500,000-work and 8 MiB limits. Current checked incumbents and terminals bypass
+this discovery; no extra numerical query is needed in that case.
+`numericalCutSelectionAdoptedInstalled` counts already-installed cuts entering
+the bounded mask from an integer-only current recipe or an aggregate-only cut
+family. Adoption adds no LP query or root miss; later completed points supply aging
+observations. These rows are not newly separated cuts. Keep their generation,
+adoption, subsequent scoring, proof and retirement costs.
 `numericalCutSelectionPointPrepared` counts one successful point-directed candidate
 preparation per immutable source template. It chooses each available continuous
 endpoint independently from the point. Its generation shares the original
 65,536-work allowance; point projection, failed preparation, fresh verification
 and any resulting owner replacement retain their containing source/recipe costs.
 `PointPreparationUnavailable` does not establish complete ineligibility.
+
+The generated-aggregate replay includes the ordinary opt-in producer's bounded
+source-pair indexing and discovery. Keep this cost separate from replaying supplied
+diagnostic proposals. `AggregatePair*` reports coverage, attempts and limiting
+stages; a partial generation establishes no general absence of useful cuts.
+`MpsProofFrontier certificateState=true` records retained completed guidance's
+certificate refusal, exact-basis repair dimensions and charged work/allocation in
+`certificate-state.json`, including the rejected basis proposal's column, side and
+exact reduced cost separately from later candidates. This optional post-solve observation issues no query and
+shares the existing capture deadline; scalar strings are capped at 4,096 characters.
+Missing state or a stopped inspection remains unavailable. Its owner scope can
+precede the current frontier leaf. It supplies no certificate authority, independent
+check, performance gain or original tolerant-source claim.
+With both aggregate and point selection enabled, an empty individual-cut family
+installs the bounded aggregate family in the initial CURRENT query. A fully checked
+family of at most 64 rows enters aging while retaining that query. With individual
+cuts present, discovery and fresh candidate checks follow the initial point;
+selected rows enter a subsequent masked query. A fallback can retain the individual
+recipe after paying discovery costs, so retain both recipe totals and report actual
+selected/installed/adopted/retired rows separately.
+Point-directed generation applies the ordinary normalized efficacy threshold before
+retaining a proposal. `AggregatePairLowEfficacy` and `AggregatePairPointUnavailable`
+retain rejected projections; `AggregatePairPointEligible` counts proposals admitted
+to the bounded candidate pool. All derivation and projection costs, including those
+without retained rows, remain in the existing generation work/allocation totals.
+Aggregate-only generation retains its source-order proposal policy.
+Point-directed aggregation selects each coordinate's nearer established source
+endpoint when both distances are finite. `AggregatePointLowerBounds` and
+`AggregatePointUpperBounds` count these indexed choices; endpoint projection and
+map ownership debit the same containing generation grant. `AggregateCandidates`
+counts completed derivations before the point filter, rather than retained rows.
+Repeated `AggregatePairAttempts` or construction observations for one unchanged
+point-prepared template indicate reconstruction cost, rather than additional unique
+candidates. Retain these charges alongside template replacements and masked queries.
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
