@@ -620,7 +620,12 @@ class ResumableMinimizeTest {
         val problem = Problem(
             0,
             weights.size,
-            Array(weights.size) { IntDomain(0, 1) },
+            Array(weights.size) { index ->
+                when (index) {
+                    2, 4, 6, 7, 8 -> IntDomain(1, 1)
+                    else -> IntDomain(0, 1)
+                }
+            },
             arrayOf(Linear(weights.copyOf(), IntArray(weights.size) { it }, LinearOp.LE, 25)),
         ).bake()
         val objective = LinearObjective(intCoefficients = LongArray(profits.size) { -profits[it] })
@@ -635,6 +640,8 @@ class ResumableMinimizeTest {
                 search.runSlice(Cancellation.Never, 1000L, 100000L) {},
             )
             assertEquals(-38.0, initial.objective)
+            val initialLpWork = search.stats.lp.workOps.sum
+            assertTrue(initialLpWork > 0.0)
 
             search.rebind(Assumptions.None.withInt(0, 0), 100000L)
             val restricted = assertIs<MinimizeResult.Optimal>(
@@ -644,6 +651,7 @@ class ResumableMinimizeTest {
             assertEquals(0L, restricted.sample.ints[0])
             assertTrue(weights.indices.sumOf { weights[it] * restricted.sample.ints[it] } <= 25L)
             assertEquals(-36L, objective.evaluateLong(restricted.sample))
+            assertTrue(search.stats.lp.workOps.sum > initialLpWork)
         }
     }
 

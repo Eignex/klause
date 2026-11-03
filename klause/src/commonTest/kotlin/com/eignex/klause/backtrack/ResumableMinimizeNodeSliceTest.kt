@@ -136,8 +136,8 @@ class ResumableMinimizeNodeSliceTest {
 
     @Test
     fun `LP arm slice should spend its LP work as nodes`() {
-        knapsackLp(n = 12).use { search ->
-            val budget = 32L
+        knapsackLp(n = 8, rows = 2).use { search ->
+            val budget = 8L
 
             val terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
 
