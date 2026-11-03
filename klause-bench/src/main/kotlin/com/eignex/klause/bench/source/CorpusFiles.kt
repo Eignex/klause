@@ -6,6 +6,7 @@ import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 import java.io.File
 import java.io.InputStream
 import java.io.InterruptedIOException
+import java.nio.file.DirectoryNotEmptyException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
@@ -76,10 +77,10 @@ internal object CorpusFiles {
         stagingDirectory.mkdirs()
         checkStaging()
         val directory = StagedDirectory(Files.createTempDirectory(stagingDirectory.toPath(), "plain-").toFile(),
-            nanoTime, onCleanup)
+            plainPath(file.name), nanoTime, onCleanup)
         directory.use {
             checkStaging()
-            val plain = File(it.file, plainPath(file.name))
+            val plain = it.source
             open(file).use { input ->
                 plain.outputStream().use { output ->
                     val buffer = ByteArray(bufferBytes)
@@ -99,14 +100,22 @@ internal object CorpusFiles {
 
     private class StagedDirectory(
         val file: File,
+        sourceName: String,
         val nanoTime: () -> Long,
         val onCleanup: (Long) -> Unit,
     ) : AutoCloseable {
+        val source = File(file, sourceName)
+
         override fun close() {
             val cleanupStart = nanoTime()
             try {
                 SourcePreparationCapture.measure("source-cleanup") {
-                    check(file.deleteRecursively()) { "Cannot remove staged source: $file" }
+                    try {
+                        Files.deleteIfExists(source.toPath())
+                        Files.deleteIfExists(file.toPath())
+                    } catch (_: DirectoryNotEmptyException) {
+                        check(file.deleteRecursively()) { "Cannot remove staged source: $file" }
+                    }
                 }
             } finally {
                 onCleanup(nanoTime() - cleanupStart)

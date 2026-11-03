@@ -101,6 +101,26 @@ class CorpusFilesTest {
         }
     }
 
+    @Test
+    fun `consumer auxiliary files are released with their staged source`() {
+        val root = Files.createTempDirectory("corpusfiles").toFile()
+        try {
+            val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeText("p cnf 0 0\n") })
+            val staging = File(root, "staging")
+
+            CorpusFiles.withPlainFile(packed, stagingDirectory = staging) { plain ->
+                File(plain.parentFile, "auxiliary/output.txt").apply {
+                    parentFile.mkdirs()
+                    writeText("auxiliary")
+                }
+            }
+
+            assertTrue(staging.listFiles().orEmpty().isEmpty())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `unpacking can retain the original compressed cache object`(keepPacked: Boolean) {
