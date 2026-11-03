@@ -23,8 +23,8 @@ import kotlin.test.assertNotNull
 
 class LpBranchTest {
     @Test
-    fun `only reliable history within the reduced cost shortlist changes variable choice`() {
-        for (mixed in listOf(false, true)) for (samples in 1..2) {
+    fun `only comparable reliable history within the reduced cost shortlist changes variable choice`() {
+        for (mixed in listOf(false, true)) for (samples in 1..2) for (runnerStronger in listOf(false, true)) {
             for (trained in listOf(listOf(0), listOf(1), listOf(2), listOf(0, 1))) {
                 for (stale in listOf(false, true)) for (enabled in listOf(false, true)) {
                     val bools = if (mixed) 1 else 0
@@ -57,7 +57,9 @@ class LpBranchTest {
                                 hints.beginNode(1, 100.0)
                                 val child = point.copyOf().also { it[column] = (lower + if (up) 1L else 0L).toDouble() }
                                 hints.record(relaxation, child, DoubleArray(0))
-                                hints.recordBound(relaxation, if (up) 13.0 else 11.0)
+                                val gain = if (up) 3.0 else 1.0
+                                val scale = if (column == 1 && runnerStronger) 2 else 1
+                                hints.recordBound(relaxation, 10.0 + gain * scale)
                             }
                         }
                     }
@@ -72,11 +74,12 @@ class LpBranchTest {
                         val selected = engine.lpBranchPick(PropagationSession(problem), hints)
 
                         val baseline = if (mixed) VarRef.Bool(0) else VarRef.IntVar(0)
-                        val expected = if (samples == 2 && trained == listOf(1) && !stale && enabled) {
+                        val useRunner = samples == 2 && trained == listOf(0, 1) && runnerStronger && !stale && enabled
+                        val expected = if (useRunner) {
                             VarRef.IntVar(1 - bools)
                         } else baseline
                         assertEquals(expected, selected,
-                            "mixed=$mixed samples=$samples trained=$trained stale=$stale enabled=$enabled")
+                            "mixed=$mixed samples=$samples trained=$trained runnerStronger=$runnerStronger stale=$stale enabled=$enabled")
                     }
                 }
             }

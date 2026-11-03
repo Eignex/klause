@@ -282,8 +282,13 @@ internal class LpHints(
         first ?: return null
         val firstScore = directionalScore(first, firstDomain)
         val secondScore = second?.let { directionalScore(it, secondDomain) } ?: Double.NaN
+        if (!firstScore.isFinite() || !secondScore.isFinite()) {
+            charge(1L)
+            observe("VARIABLE_COMPARISON_INCOMPLETE")
+            return null
+        }
         val proposal = when {
-            secondScore > 1e-9 && !(firstScore >= secondScore) -> second
+            secondScore > 1e-9 && secondScore > firstScore -> second
             firstScore > 1e-9 -> first
             else -> null
         }

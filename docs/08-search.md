@@ -299,8 +299,9 @@ The `lp-default` optimization recipe enables the passive finite consumer; direct
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
 and branching must be enabled. The reduced-cost/fractionality scorer supplies its
 winning variable and runner-up. When recent history is available, reliable predicted
-gains compare only those two candidates; missing or tied predictions retain the
-original winner. Candidates outside that shortlist keep no selection priority.
+gains compare only those two candidates. Both candidates require reliable predictions;
+missing or tied predictions retain the original winner. Candidates outside that
+shortlist keep no selection priority.
 Shortlist tracking reserves its bounded scan work from the existing LP allowance
 before visiting candidates. It performs no numerical query.
 Two recent samples in each direction supply that variable's predicted child gains,
