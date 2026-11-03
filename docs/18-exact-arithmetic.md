@@ -59,6 +59,9 @@ witness access.
 keys. Lexicographic comparison inspects the largest variable first, so callers remap
 IDs to choose an elimination order. Derivatives, substitution and exact division
 never convert to floating values.
+Multiplication reads each operand's ordered term snapshot once for its term-pair
+traversal. A constant monomial retains the other immutable key; nonconstant products
+keep the checked exponent addition.
 
 Ordered multivariate remainder division retains irreducible terms while reducing
 the remaining terms by the supplied divisors. The input differs from its remainder
