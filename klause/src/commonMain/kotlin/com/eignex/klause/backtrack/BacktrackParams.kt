@@ -459,12 +459,15 @@ data class BacktrackParams(
     val branchObserver: SearchBranchAttemptObserver? = null,
     /** Non-inprocessing work after the first eligible complete root before optional slices; zero disables warmup. */
     val inprocessingWarmupWork: Long = 0L,
+    /** Private modeled-byte grant; null shares [learnedMemoryScratchBytes]. */
+    val privateRebuildBytes: Long? = null,
 ) : SolverParams {
     init {
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }
         require(privateRebuildWork in -1L..1_048_576L) {
             "private rebuild work must be -1 (automatic) or in 0..1048576"
         }
+        require(privateRebuildBytes == null || privateRebuildBytes >= 0L)
         require(learnedMemoryBytes == null || learnedMemoryBytes >= 0L)
         require(learnedMemoryWork >= 0L && learnedMemoryScratchBytes >= 0L)
         require(rootSimplifyBatch > 0) { "root simplification batch must be positive" }

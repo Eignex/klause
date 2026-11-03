@@ -166,7 +166,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
     "root-simplification", "root-simplify-batch", "root-probe-batch", "root-probe-work",
     "root-rebuild-capture-visits",
-    "private-rebuild-work",
+    "private-rebuild-work", "private-rebuild-bytes",
     "inprocessing-work", "inprocessing-root-work", "inprocessing-probe-work", "inprocessing-subsume-work",
     "inprocessing-vivify-work", "inprocessing-interval", "inprocessing-growth", "inprocessing-cooldown",
     "inprocessing-warmup-work",
@@ -218,6 +218,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val rootSimplifyBatch = p[ExecutionOption.rootSimplifyBatch]
     val rootRebuildCaptureVisits = p[ExecutionOption.rootRebuildCaptureVisits]
     val privateRebuildWork = p[ExecutionOption.privateRebuildWork]
+    val privateRebuildBytes = p[ExecutionOption.privateRebuildBytes]
     val rootProbeBatch = p[ExecutionOption.rootProbeBatch]
     val rootProbeWork = p[ExecutionOption.rootProbeWork]
     val inprocessingWork = p[ExecutionOption.inprocessingWork]
@@ -257,7 +258,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         learnedMemoryBytes, learnedMemoryWork, learnedMemoryScratchBytes,
         subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch, rootProbeBatch, rootProbeWork,
         rootRebuildCaptureVisits,
-        privateRebuildWork,
+        privateRebuildWork, privateRebuildBytes,
         inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingSubsumeWork,
         inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth, inprocessingCooldown,
         inprocessingWarmupWork,
@@ -295,6 +296,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         rootSimplifyBatch?.let { out = out.copy(rootSimplifyBatch = it) }
         rootRebuildCaptureVisits?.let { out = out.copy(rootRebuildCaptureVisits = it) }
         privateRebuildWork?.let { out = out.copy(privateRebuildWork = it) }
+        privateRebuildBytes?.let { out = out.copy(privateRebuildBytes = it) }
         rootProbeBatch?.let { out = out.copy(rootProbeBatch = it) }
         rootProbeWork?.let { out = out.copy(rootProbeWork = it) }
         inprocessingWork?.let { out = out.copy(inprocessingWork = it) }

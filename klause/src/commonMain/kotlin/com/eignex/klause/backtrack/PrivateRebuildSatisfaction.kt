@@ -26,6 +26,7 @@ internal class PrivateRebuildSatisfaction(
     private val solver: BacktrackSolver,
     private val params: BacktrackParams,
 ) : ResumableSolve {
+    private val privateByteLimit = params.privateRebuildBytes ?: params.learnedMemoryScratchBytes
     private val automatic = params.privateRebuildWork < 0L
     private val privateWorkLimit = if (automatic) AUTOMATIC_WORK else params.privateRebuildWork
     private val lifetime = params.cancellation.lifetimeCancellation()
@@ -83,6 +84,7 @@ internal class PrivateRebuildSatisfaction(
             parityAttempted = true
             note("AutomaticAttempts")
             note("AutomaticWorkLimit", privateWorkLimit)
+            note("AutomaticByteLimit", privateByteLimit)
             return captureParity(session)
         }
         if (!parityAttempted) {
@@ -112,7 +114,7 @@ internal class PrivateRebuildSatisfaction(
         binaryCount = session.learnedClauseCount
         binaryRevision = session.learnedClauseRevision
         val historyBytes = PrivateRebuildBinaryLearning.MAX_RELATIONS * Long.SIZE_BYTES.toLong()
-        if (params.learnedMemoryScratchBytes < PrivateRebuildBinaryLearning.SCRATCH_BYTES + historyBytes) return false
+        if (privateByteLimit < PrivateRebuildBinaryLearning.SCRATCH_BYTES + historyBytes) return false
         var spent = 0L
         val allowance = minOf(PrivateRebuildBinaryLearning.SCAN_WORK,
             (privateWorkLimit - trialSpent()).coerceAtLeast(0L))
@@ -154,7 +156,7 @@ internal class PrivateRebuildSatisfaction(
         val allowance = (privateWorkLimit - trialSpent()).coerceAtLeast(0L)
         val start = TimeSource.Monotonic.markNow()
         val captured = PrivateRebuildParity.capture(session,
-            params.learnedMemoryScratchBytes - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(),
+            privateByteLimit - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(),
             visit = { work ->
                 if (work > allowance - spent || session.cancelRequested || lifetime() || rootCancellation()) false
                 else { spent += work; charge(work); true }
@@ -293,7 +295,7 @@ internal class PrivateRebuildSatisfaction(
         val parity = pendingParity
         pendingParity = null
         val prepared = PrivateRebuildGeneration.prepare(session,
-            params.learnedMemoryScratchBytes - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(), token,
+            privateByteLimit - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(), token,
             onDecline = { note("Declined$it") }, learnedBinary = binary, parity = parity) {
             (privateWorkLimit - trialSpent()).coerceAtLeast(0L) / 2L
         }
