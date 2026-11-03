@@ -17,8 +17,20 @@ class ChannelingSinkTest {
             3,
             arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1)),
             arrayOf<Factor>(
-                ReifiedLinear(0, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
-                ReifiedLinear(1, intArrayOf(2), intArrayOf(1), LinearOp.EQ, 1),
+                ReifiedLinear(
+                    auxBoolVar = 0,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(1),
+                    op = LinearOp.EQ,
+                    bound = 1,
+                ),
+                ReifiedLinear(
+                    auxBoolVar = 1,
+                    coeffs = intArrayOf(1),
+                    vars = intArrayOf(2),
+                    op = LinearOp.EQ,
+                    bound = 1,
+                ),
             ),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
