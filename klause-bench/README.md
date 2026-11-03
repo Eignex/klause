@@ -28,7 +28,7 @@ of its members is materialized locally. Each solve verifies its planned input by
 
 The Linux JVM lab manifest requests a source snapshot with the selected revision's files and original Git commit identity.
 Its builds and tools use the current revision without requiring ancestors or tags.
-The standard Mac manifest retains Git bundle transport until compact source inputs avoid a second file extraction.
+The standard Mac manifest uses Git bundle transport.
 
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
