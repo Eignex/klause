@@ -130,6 +130,7 @@ internal class RevisedSimplex(
 ) : TableauCutSolver,
     PersistentLpSolver,
     ResumableLpSolver,
+    LpPrimalGuidanceSource,
     LpDirectionalCostSolver {
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
     private var solveStarted = false
@@ -1037,6 +1038,29 @@ internal class RevisedSimplex(
         }
         floatAllowance = allowance
         return true
+    }
+
+    override fun partialPrimalGuidance(state: LpExactState, cancellation: Cancellation): LpPrimalGuidance? {
+        if (!continuationAvailable || !basisLifecycle.factorized || model.exactState !== state ||
+            activeSolve?.isAdvancing == true || cancellation()
+        ) return null
+        if (activeSolve == null && lastTermination != LpFloatTermination.WORK &&
+            lastTermination != LpFloatTermination.PIVOTS && lastTermination != LpFloatTermination.CANCELLED
+        ) return null
+        val guidance = LpPrimalGuidance(DoubleArray(n), BooleanArray(n))
+        var available = false
+        for (column in 0 until n) {
+            if (column % 256 == 0 && cancellation()) return null
+            // Basic values can precede the last pivot; nonbasic seats need no new factor solve.
+            if (status[column] == VarStatus.BASIC) continue
+            val value = model.loShiftD(column) + numerical.sourceCoordinate(column,
+                seat(numerical, status[column], column))
+            if (!value.isFinite()) continue
+            guidance.coordinates[column] = value
+            guidance.known[column] = true
+            available = true
+        }
+        return guidance.takeIf { available && !cancellation() }
     }
 
     private suspend fun pauseAtIteration(progress: SolveProgress) {

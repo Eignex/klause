@@ -313,6 +313,11 @@ internal interface LpSolver : AutoCloseable {
 
 internal class LpPrimalGuidance(val coordinates: DoubleArray, val known: BooleanArray)
 
+internal interface LpPrimalGuidanceSource {
+    // Callers reserve snapshot work and storage; the mask supplies neither point nor proof authority.
+    fun partialPrimalGuidance(state: LpExactState, cancellation: Cancellation): LpPrimalGuidance?
+}
+
 /**
  * An [LpSolver] whose independent component results can be certified without reconstructing one
  * monolithic exact problem. Factories return this capability explicitly so a decorator around a

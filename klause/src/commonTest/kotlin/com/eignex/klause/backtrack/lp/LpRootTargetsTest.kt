@@ -20,9 +20,39 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpRootTargetsTest {
+    @Test
+    fun `mixed advice containing only real coordinates preserves the rounding owner`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf(Linear(longArrayOf(1), intArrayOf(0), doubleArrayOf(1.0),
+                intArrayOf(0), LinearOp.GE, 1L)), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(2.0))
+        val factory = RecordingLpEngineFactory()
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("real-only-root-advice"),
+            LpSolveContext(factory)).use { engine ->
+            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
+            val owner = RootRoundingWarmStart(objective, relaxation,
+                primal = DoubleArray(relaxation.model.n) { 1.0 },
+                knownColumns = BooleanArray(relaxation.model.n) { relaxation.colRealId[it] >= 0 })
+            engine.rootRoundingWarmStart = owner
+            val queries = factory.floatAllowances.size
+
+            assertTrue(!engine.retainRootPrimalTargets(Cancellation.Never, allowMixed = true))
+
+            assertSame(owner, engine.rootRoundingWarmStart)
+            assertNull(engine.rootPrimalTargets)
+            assertEquals(queries, factory.floatAllowances.size)
+        }
+    }
+
     @Test
     fun `mixed root targets require opt in and preserve unknown integer choices without another solve`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },

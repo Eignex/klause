@@ -441,6 +441,11 @@ The opt-in `lp-mixed-root-targets` setting permits this transfer for mixed model
 with finite coordinates. Only integer and Boolean columns affect value ordering;
 the retained real payload grants no feasibility or completion authority. The same
 owner, availability mask, cancellation, root work and byte checks apply.
+An unfinished monolithic owner can supply its finite nonbasic coordinates without
+another factor solve. Basic coordinates stay unknown because their buffer can
+precede the last pivot. The read requires the same exact state and spends the
+existing snapshot work and storage reservation. A mixed transfer with no available
+integer or Boolean target preserves ordinary root rounding.
 The private coordinate and availability buffers spend the existing guidance byte
 limit and root work before allocation. This guide carries no complete LP point or
 proof authority; every proposed source assignment remains fully pinned and checked.

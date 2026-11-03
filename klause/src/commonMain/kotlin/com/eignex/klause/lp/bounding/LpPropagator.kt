@@ -412,8 +412,8 @@ internal class LpPropagator(
         }
     } == true
 
-    fun partialPrimalGuidance(token: Cancellation): LpPrimalGuidance? =
-        withOwner { it.partialPrimalGuidance(token) }
+    fun partialPrimalGuidance(token: Cancellation, includeMonolithic: Boolean = false): LpPrimalGuidance? =
+        withOwner { it.partialPrimalGuidance(token, includeMonolithic) }
 
     fun solveFloat(
         warm: Basis? = null,

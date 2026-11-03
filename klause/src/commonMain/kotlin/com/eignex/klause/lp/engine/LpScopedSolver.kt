@@ -140,10 +140,14 @@ internal class LpScopedSolver(
         return true
     }
 
-    fun partialPrimalGuidance(token: Cancellation): LpPrimalGuidance? {
+    fun partialPrimalGuidance(token: Cancellation, includeMonolithic: Boolean = false): LpPrimalGuidance? {
         requireAvailable()
         if (closed || token()) return null
-        return (solver as? ComponentLpSolverCapability)?.partialPrimalGuidance(token)
+        return when (val current = solver) {
+            is ComponentLpSolverCapability -> current.partialPrimalGuidance(token)
+            is LpPrimalGuidanceSource -> if (includeMonolithic) current.partialPrimalGuidance(state, token) else null
+            else -> null
+        }
     }
 
     fun push(token: Cancellation = cancellation): Boolean = edit(token) { it.push(token) }

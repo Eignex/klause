@@ -354,19 +354,37 @@ internal class LpEngine(
         val guide = rootRoundingWarmStart ?: return false
         val coordinates = guide.primal ?: return false
         val mapBytes = (guide.relaxation.intColOf.size.toLong() + guide.relaxation.boolColOf.size) * Int.SIZE_BYTES
+        val mixed = problem.numRealVars != 0
+        val work = if (mixed) mapBytes / Int.SIZE_BYTES + 1L else 1L
         if (!params.lpPlan.branching || !rootTargetsSourceAllowed(allowMixed) || guide.objective !== objective ||
             coordinates.size != guide.relaxation.model.n ||
             (guide.knownColumns != null && guide.knownColumns.size != coordinates.size) ||
             !retainedRootPrimalStateMatches(guide.relaxation) || cancellation() ||
-            !rootGuidanceFits(ROOT_PRIMAL_TARGET_HEADER_BYTES + mapBytes) || lpWorkAllowanceSpent(1L) ||
-            retainedRootRemainingWork() <= 1L
+            !rootGuidanceFits(ROOT_PRIMAL_TARGET_HEADER_BYTES + mapBytes) || lpWorkAllowanceSpent(work) ||
+            retainedRootRemainingWork() <= work
         ) return false
-        noteNodeOverhead(1L)
+        noteNodeOverhead(work)
+        if (mixed && !hasFiniteRootTarget(guide, cancellation)) return false
         // Transfer the private buffers; pinning state and basis remain owned by the rounding attempt.
         rootPrimalTargets = RootPrimalTargets(guide.relaxation.intColOf, guide.relaxation.boolColOf,
             coordinates, guide.knownColumns)
         sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "RETAINED", 0L)
         return true
+    }
+
+    private fun hasFiniteRootTarget(guide: RootRoundingWarmStart, cancellation: Cancellation): Boolean {
+        val coordinates = guide.primal ?: return false
+        fun available(columns: IntArray): Boolean {
+            for (index in columns.indices) {
+                if (index % 256 == 0 && cancellation()) return false
+                val column = columns[index]
+                if (coordinates.getOrNull(column)?.isFinite() == true &&
+                    (guide.knownColumns == null || guide.knownColumns.getOrNull(column) == true)
+                ) return true
+            }
+            return false
+        }
+        return (available(guide.relaxation.intColOf) || available(guide.relaxation.boolColOf)) && !cancellation()
     }
 
     private fun rootTargetsSourceAllowed(allowMixed: Boolean): Boolean = problem.numRealVars == 0 ||
@@ -414,7 +432,7 @@ internal class LpEngine(
         val outcome = retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_OWNER_RETAINED",
             retainedOwnerRead = true, allowMixed = allowMixed) {
             ownerState = propagator.primalGuidanceState
-            propagator.partialPrimalGuidance(cancellation)
+            propagator.partialPrimalGuidance(cancellation, includeMonolithic = allowMixed && problem.numRealVars > 0)
         }
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "PARTIAL_OWNER_${outcome.name}_$ownerState", 0L)
     }

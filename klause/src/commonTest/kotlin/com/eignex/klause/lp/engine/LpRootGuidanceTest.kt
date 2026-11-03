@@ -3,6 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -16,6 +17,64 @@ class LpRootGuidanceTest {
         listOf(ExactLpRow()),
         ExactLpObjective(listOf(zero, zero)),
     )
+
+    @Test
+    fun `paused monolithic advice leaves basic coordinates unknown without another solve`() {
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(List(3) { ExactLpEntry(it, ExactLpNumber.of(-1L)) }),
+            listOf(ExactLpNumber.of(-1L)),
+            List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) },
+            listOf(ExactLpRow()), ExactLpObjective(List(3) { ExactLpNumber.of(it + 1L) }),
+        )
+        val state = LpExactState(source)
+        val solver = RevisedSimplex(assertNotNull(state.toWorkingModel()))
+        solver.use {
+            solver.openSolve(LpFloatAllowance(1_000_000L, 1), retainFundingStop = true).use { cursor ->
+                assertIs<LpSolveStep.Paused>(cursor.advance())
+                val work = solver.currentWork
+
+                val guide = assertNotNull(solver.partialPrimalGuidance(state, Cancellation.Never))
+
+                assertTrue(!guide.known[0])
+                assertTrue(guide.known[1] && guide.known[2])
+                assertTrue(guide.coordinates[1] == 0.0 && guide.coordinates[2] == 0.0)
+                assertEquals(work, solver.currentWork)
+                assertNull(solver.solvedExactState)
+                assertNull(solver.partialPrimalGuidance(LpExactState(source), Cancellation.Never))
+                assertNull(solver.partialPrimalGuidance(state, Cancellation { true }))
+                assertTrue(solver.promoteSolve(LpFloatAllowance(1_000_000L, 10)))
+                val completed = assertIs<LpSolveStep.Completed<FloatLpResult?>>(cursor.advance())
+                assertEquals(1.0, assertNotNull(completed.value).primal[0])
+            }
+        }
+        assertNull(solver.partialPrimalGuidance(state, Cancellation.Never))
+    }
+
+    @Test
+    fun `scoped monolithic advice requires explicit admission and retains its pending solve`() {
+        val one = ExactLpNumber.of(1L)
+        val source = ExactLpModel(
+            listOf(List(3) { ExactLpEntry(it, ExactLpNumber.of(-1L)) }),
+            listOf(ExactLpNumber.of(-1L)),
+            List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) },
+            listOf(ExactLpRow()), ExactLpObjective(List(3) { ExactLpNumber.of(it + 1L) }),
+        )
+        LpScopedSolver(LpExactState(source)).use { owner ->
+            assertNotNull(owner.advanceFloat(1_000_000L, LpFloatAllowance(1_000_000L, 1),
+                retainFundingStop = true))
+            val metrics = owner.lastMetrics
+            assertTrue(owner.floatPaused)
+            assertNull(owner.partialPrimalGuidance(Cancellation.Never))
+
+            val guide = assertNotNull(owner.partialPrimalGuidance(Cancellation.Never, includeMonolithic = true))
+
+            assertTrue(guide.known[1] && guide.known[2] && !guide.known[0])
+            assertTrue(owner.floatPaused)
+            assertEquals(metrics, owner.lastMetrics)
+            assertNull(owner.lastResult)
+        }
+    }
 
     @Test
     fun `infeasible guidance should certify a ray without a point or a bound`() {
