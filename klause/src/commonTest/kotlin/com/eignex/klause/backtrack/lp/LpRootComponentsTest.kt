@@ -38,9 +38,10 @@ class LpRootComponentsTest {
         val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
         val factory = RecordingLpEngineFactory()
         val offered = 1_000_000L
+        val sink = SolveStatsSink("completed-component-restart")
         LpEngine(problem, objective,
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
-                rootCutHarvest = false)), SolveStatsSink("completed-component-values"),
+                rootCutHarvest = false)), sink,
             LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
             assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
@@ -52,7 +53,7 @@ class LpRootComponentsTest {
             val queries = factory.floatAllowances.size
 
             engine.pickRootComponent(session, Cancellation.Never)
-            engine.clearRootPrimalTargets(retainComponentValues = true)
+            engine.restartRootPrimalTargets()
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
             assertEquals(listOf(1L, 0L), ordered)
@@ -82,7 +83,7 @@ class LpRootComponentsTest {
             val queries = factory.floatAllowances.size
 
             engine.pickRootComponent(session, Cancellation.Never)
-            engine.clearRootPrimalTargets(retainComponentValues = true)
+            engine.restartRootPrimalTargets()
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
             assertEquals(listOf(0L, 1L), ordered)
@@ -178,7 +179,7 @@ class LpRootComponentsTest {
             val queries = factory.floatAllowances.size
 
             engine.pickRootComponent(session, Cancellation.Never)
-            engine.clearRootPrimalTargets(retainComponentValues = true)
+            engine.restartRootPrimalTargets()
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
             assertEquals(listOf(0L, 1L), ordered)
@@ -209,7 +210,7 @@ class LpRootComponentsTest {
             val queries = factory.floatAllowances.size
 
             engine.pickRootComponent(session, Cancellation { engine.rootComponentValues != null })
-            engine.clearRootPrimalTargets(retainComponentValues = true)
+            engine.restartRootPrimalTargets()
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
             assertEquals(listOf(0L, 1L), ordered)

@@ -329,6 +329,11 @@ internal class LpEngine(
         if (!retainComponentValues) rootComponentValues = null
     }
 
+    internal fun restartRootPrimalTargets() {
+        rootComponentValues?.restarted = true
+        clearRootPrimalTargets(retainComponentValues = true)
+    }
+
     internal fun prepareRootComponentValues(
         targets: RootPrimalTargets,
         cancellation: Cancellation,

@@ -18,6 +18,8 @@ internal class RootComponentValues(variables: Int) {
     val values = LongArray(variables)
     val known = BooleanArray(variables)
     var offered: Boolean = false
+    var restarted: Boolean = false
+    var restartOffered: Boolean = false
     val retainedBytes: Long get() = rootComponentValueBytes(values.size)
 }
 

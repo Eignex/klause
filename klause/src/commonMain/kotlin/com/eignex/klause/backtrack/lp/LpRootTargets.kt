@@ -59,6 +59,10 @@ private fun LpEngine.observeRootValuePreference(
         components.offered = true
         sink.lp.observePrimalPhase("PRIMAL_COMPONENT_VALUES", "VALUE_ORDER_OFFERED", 0L)
     }
+    if (saved && components != null && components.restarted && !components.restartOffered) {
+        components.restartOffered = true
+        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_VALUES", "RESTART_VALUE_ORDER_OFFERED", 0L)
+    }
     if (!saved && targets != null && !targets.valueOrderOffered) {
         targets.valueOrderOffered = true
         sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "VALUE_ORDER_OFFERED", 0L)
