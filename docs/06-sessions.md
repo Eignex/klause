@@ -124,6 +124,11 @@ outside these entry points.
 Repeated coordinates in an explicit counting or accurate-sampling projection
 contribute once, preserving their first occurrence's order.
 
+During hashed sampling, a stream can retain proof that its zero-hash cell exceeds
+the target band. This scalar fact skips later zero-hash rejects for the same
+conditioned projection. Interrupted enumeration supplies no such fact, and this
+rejection retains no cell witnesses.
+
 ## Exact count bounds
 
 Anytime exact counting partitions pure Boolean clause models into independent
