@@ -625,10 +625,13 @@ numerical work retains the private owner for an eligible later rounding slice;
 queries with changed authority or objective use ordinary construction. Complete points and
 masked child-coordinate guides can steer rounding; every proposed assignment
 still requires source verification.
-After nearest pinning declines, a probe over independent integer components reuses
-its charged structural order and tries nearest, upward and downward preferences
-within each component. A failed
-direction retracts only that component's pins; completed earlier components stay
+A complete fractional integer guide can prepare a private component probe before
+its handoff to ordinary traversal. The admission scan charges visited coordinates,
+and the private session charges its root propagation before preparing the partition.
+Partial guides retain their direct handoff. A probe over independent integer
+components reuses its charged structural order and tries nearest, upward and
+downward preferences within each component, including after a global nearest
+attempt declines. A failed direction retracts only that component's pins; completed earlier components stay
 in the private propagation session. Interrupted attempts retain their completed
 fixpoint and current component and direction. A fresh session restarts this progress.
 If a later component declines every direction, completed earlier integer values

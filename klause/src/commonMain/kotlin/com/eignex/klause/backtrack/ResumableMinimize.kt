@@ -8,6 +8,7 @@ import com.eignex.klause.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.backtrack.lp.orderRootValues
 import com.eignex.klause.backtrack.lp.pickRootComponent
 import com.eignex.klause.backtrack.lp.prepareRootComponentOrder
+import com.eignex.klause.backtrack.lp.prepareRootComponentTrial
 import com.eignex.klause.backtrack.selector.IndomainBest
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
@@ -1228,7 +1229,12 @@ internal class ResumableMinimize(
         if (pending.primal == null) {
             lpEngine.retainRootPartialPrimalGuidance(pending.relaxation, rootToken)
         }
-        if (!lpEngine.retainRootPrimalTargets(rootToken)) return false
+        val guide = lpEngine.rootRoundingWarmStart ?: return false
+        if (guide.primal == null || rootToken()) return false
+        if (lpEngine.rootPrimalTargets?.coordinates !== guide.primal &&
+            !lpEngine.retainRootPrimalTargets(rootToken)
+        ) return false
+        if (lpEngine.prepareRootComponentTrial(rootToken) || rootToken()) return false
         rootRoundingPending = false
         lpEngine.rootRoundingInterrupted = false
         lpEngine.rootRoundingWarmStart = null

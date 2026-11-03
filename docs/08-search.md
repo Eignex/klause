@@ -122,7 +122,11 @@ precedes that work. The search and its preparation wrapper report an unfinished 
 layout as pending private preparation. Construction completion, cancellation and retirement follow the
 [LP ownership contract](17-linear-programming.md#root-preparation).
 Eligible retained LP root coordinates can pass directly to the ordinary finite
-traversal as value preferences. Its existing backtracking completes the assignment,
+traversal as value preferences. Complete fractional integer guides can first fund
+a private component-rounding trial; its progress survives a slice boundary within
+the existing allowance. Partial guides keep their direct handoff. The private
+probe prepares its partition against its own root domains, and each completed
+proposal still needs the ordinary source acceptance check. Its existing backtracking completes the assignment,
 and complete source checks retain publication authority. This transfer carries no
 LP point, bound or proof authority into a leaf. Before its first incumbent, a retained
 integer guide can keep decisions within one declared factor component of the

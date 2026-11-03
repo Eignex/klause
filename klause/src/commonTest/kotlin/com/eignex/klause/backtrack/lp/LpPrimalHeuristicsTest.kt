@@ -40,6 +40,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -47,6 +48,41 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
+
+    @Test
+    fun `handoff component trials wait for funding without constructing private pinning state`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+        ))
+        val objective = LinearObjective(intCoefficients = LongArray(4))
+        val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+        val guide = RootRoundingWarmStart(objective, relaxation,
+            primal = DoubleArray(relaxation.model.n) { 0.5 }, sourceProblem = problem, auxiliaryPoint = true)
+        val factory = RecordingLpEngineFactory()
+        var offered = 1_000_000L
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),
+            SolveStatsSink("funded-handoff-trial"), LpSolveContext(factory),
+            nodeWorkAllowance = { offered }).use { engine ->
+            engine.rootRoundingWarmStart = guide
+            assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+            offered = 0L
+            assertFalse(engine.prepareRootComponentTrial(Cancellation.Never))
+            assertNull(guide.pinning)
+            assertEquals(0L, engine.primalPropagationWork)
+            offered = 1_000_000L
+            assertTrue(engine.prepareRootComponentTrial(Cancellation.Never))
+            val prefix = assertNotNull(guide.pinning)
+
+            val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+
+            assertTrue(sample.ints.all { it in 0L..1L })
+            assertTrue(sample.ints[0] + sample.ints[2] >= 1L && sample.ints[1] + sample.ints[3] >= 1L)
+            assertEquals(prefix.work, engine.primalPropagationWork)
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
 
     @Test
     fun `component rounding waits for funded progress without another numerical owner`() {
