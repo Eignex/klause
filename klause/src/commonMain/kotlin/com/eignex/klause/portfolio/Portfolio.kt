@@ -885,6 +885,7 @@ class Portfolio(
         private val recorded = BooleanArray(workers.size)
         private val readVersions = LongArray(workers.size) { -1L }
         private var initialIncumbentVersion = 0L
+        private var incumbentAvailabilityObserved = false
         private var executing = false
 
         fun incumbentRead(arm: Int, version: Long) {
@@ -918,6 +919,8 @@ class Portfolio(
                 initialIncumbentVersion = version
                 return
             }
+            if (incumbentAvailabilityObserved && onProgress == null) return
+            incumbentAvailabilityObserved = true
             for (arm in workers.indices) if (!retired[arm]) {
                 lifecycle(arm, PortfolioLifecycleKind.INCUMBENT_AVAILABLE, version)
             }
