@@ -6,6 +6,7 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.result.SearchEvent
@@ -19,6 +20,30 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SourceExecutionPolicyTest {
+    @Test
+    fun `captured LP ceilings should retain source preparation policy`() {
+        for (mode in LpSourcePreparation.entries) {
+            for (applicationDefault in listOf(false, true)) {
+                val config = LpConfig(sourcePreparation = mode)
+                val policy = if (applicationDefault) SourceExecutionPolicy(portfolioLpCeiling = config)
+                else SourceExecutionPolicy(lpCeiling = config)
+
+                val resolved = policy.lpConfig(FiniteEngine.BACKTRACK)
+
+                assertEquals(mode, resolved.sourcePreparation)
+            }
+        }
+    }
+
+    @Test
+    fun `fixed execution should retain an explicit disabled LP preparation policy`() {
+        val policy = SourceExecutionPolicy(lpCeiling = LpConfig.parse("off,preparation=disabled"))
+
+        val resolved = policy.lpConfig(FiniteEngine.FIXED)
+
+        assertEquals(LpSourcePreparation.DISABLED, resolved.sourcePreparation)
+    }
+
     @Test
     fun `native formula sources should accept disabled preparation`() {
         val sources = listOf(
