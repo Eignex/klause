@@ -79,7 +79,8 @@ class LpBranchTest {
                             VarRef.IntVar(1 - bools)
                         } else baseline
                         assertEquals(expected, selected,
-                            "mixed=$mixed samples=$samples trained=$trained runnerStronger=$runnerStronger stale=$stale enabled=$enabled")
+                            "mixed=$mixed samples=$samples trained=$trained " +
+                                "runnerStronger=$runnerStronger stale=$stale enabled=$enabled")
                     }
                 }
             }
