@@ -200,7 +200,7 @@ private class SplitRun(
         var rhs = BigFraction.ZERO
         for ((index, row) in rows.withIndex()) {
             for ((id, coefficient) in row.coefficients) {
-                meter.reserve(1L)
+                meter.reserve(1L, if (id in activity) 0L else 64L)
                 if (id !in activity && activity.size >= limits.support) {
                     observe("AggregateSplitSupportLimit", 1L)
                     return null
