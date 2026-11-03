@@ -324,6 +324,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             candidates[position] = index
             count++
         }
+        if (count == 0) state.arithmeticLearningTrace?.record("integer.retained.scan.target-level")
         for (position in 0 until count) {
             val index = candidates[position]
             val variable = row.variables[index]
@@ -364,7 +365,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 break
             }
         }
-        if (coefficient == 0L || (coefficient > 0L) == lower) return null
+        if (coefficient == 0L) return retainedDecline("scan-no-pivot")
+        if ((coefficient > 0L) == lower) return retainedDecline("scan-pivot-sign")
         var minimum = 0L
         for (index in parent.variables.indices) {
             sourceWork.visit()
