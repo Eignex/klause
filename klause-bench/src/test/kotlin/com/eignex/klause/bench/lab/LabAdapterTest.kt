@@ -22,6 +22,37 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LabAdapterTest {
+    @Test
+    fun `planned shared includes remain valid after staging every selected source`() {
+        val root = Files.createTempDirectory("lab-plan-includes-")
+        val previous = System.getProperty("klause.workspace.root")
+        try {
+            System.setProperty("klause.workspace.root", root.toString())
+            val directory = Files.createDirectory(root.resolve("models"))
+            val request = BenchRequest(parameters = mapOf(
+                "selections" to """[{"suite":"mzn-smoke","name":"argmax"},
+                    {"suite":"mzn-smoke","name":"queens"}]""",
+                "input-only" to "true",
+            ))
+
+            val cases = KlauseLabSuite.plan(request) { ref, inputOnly ->
+                val model = Files.writeString(directory.resolve("${ref.name}.mzn"), "solve satisfy;\n")
+                LabInputs.resolve(ref.copy(source = ProblemSource.Prepared(model.toFile()), data = null), inputOnly)
+            }
+
+            assertEquals(2, cases.size)
+            val context = BenchContext(root, worktree = root)
+            cases.forEach { LabInputs.verify(it, context) }
+        } finally {
+            if (previous == null) {
+                System.clearProperty("klause.workspace.root")
+            } else {
+                System.setProperty("klause.workspace.root", previous)
+            }
+            root.toFile().deleteRecursively()
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `unmatched selections should reject the complete plan`(includeMatchedSource: Boolean) {
