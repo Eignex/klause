@@ -46,6 +46,7 @@ internal object SolverInvocation {
         val measureResources: Boolean = false,
         val completeAssignment: Boolean = false,
         val sourceStaging: SourceStaging = SourceStaging.CACHE,
+        val observeSourceHarness: Boolean = false,
     )
 
     /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
@@ -92,7 +93,9 @@ internal object SolverInvocation {
         } else {
             emptyMap()
         }
-        return withSourceInput(file, budget, staging = settings.sourceStaging) { plain, remaining ->
+        return withSourceInput(file, budget, staging = settings.sourceStaging,
+            observeHarness = if (settings.observeSourceHarness) ({ SourceHarnessObservation.start() }) else null,
+        ) { plain, remaining ->
             val cmd = klauseCommand(entry, settings, remaining, optimize, plain)
             try {
                 invoke(
@@ -114,9 +117,12 @@ internal object SolverInvocation {
         nanoTime: () -> Long = System::nanoTime,
         staging: SourceStaging = SourceStaging.CACHE,
         decoderIdentity: ((() -> Unit) -> Map<String, String>) = { SourceDecoder.capture(it) },
+        observeHarness: (() -> SourceHarnessObservation)? = null,
         solve: (File, Budget) -> Result,
     ): Result {
         val start = nanoTime()
+        val observation = if (observeHarness == null) null else runCatching(observeHarness).getOrNull()
+        val observationSetup = if (observeHarness == null) 0L else nanoTime() - start
         val cliDecodesInput = CorpusFiles.isCompressed(file) && staging == SourceStaging.CLI
         val stagingDirectory = if (staging == SourceStaging.CLI) null else staging.directory
         var decoder = emptyMap<String, String>()
@@ -157,10 +163,18 @@ internal object SolverInvocation {
         if (failure is SourcePreparationTimeout) {
             result = result.copy(stats = result.stats + ("sourcePreparationBudgetExhausted" to "true"))
         }
+        val observationFinishStart = if (observeHarness == null) null else nanoTime()
+        val observed = observation?.finish().orEmpty()
+        val observationFinish = observationFinishStart?.let { nanoTime() - it } ?: 0L
         val totalNanos = nanoTime() - start
         val preparationMillis = (preparationNanos ?: (totalNanos - cleanupNanos)) / NANOS_PER_MILLI
         val decoding = if (cliDecodesInput) emptyMap() else mapOf("sourceDecodeMs" to preparationMillis.toString())
-        result = result.copy(stats = (result.stats - "sourceDecodeMs") + decoder + decoding + mapOf(
+        val observationStats = if (observeHarness == null) emptyMap() else observed + mapOf(
+            "sourceHarnessObservationKind" to if (observation == null) "unavailable" else "jvm-mxbeans",
+            "sourceObservationSetupMs" to (observationSetup / NANOS_PER_MILLI).toString(),
+            "sourceObservationFinishMs" to (observationFinish / NANOS_PER_MILLI).toString(),
+        )
+        result = result.copy(stats = (result.stats - "sourceDecodeMs") + decoder + decoding + observationStats + mapOf(
             "sourceStaging" to if (CorpusFiles.isCompressed(file)) staging.key else "plain",
             "sourceStagingDirectory" to
                 if (CorpusFiles.isCompressed(file)) stagingDirectory?.absolutePath.orEmpty() else "",
