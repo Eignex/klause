@@ -10,6 +10,7 @@ import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.binarySearchInt
 import kotlin.math.abs
 
 internal interface LinearAuthoritySourceRow {
@@ -65,8 +66,11 @@ private class SplitRun(
         val result = ArrayList<LinearAuthorityCut>()
         try {
             val count = minOf(rows.size, LinearAuthoritySplitCuts.MAX_ROWS)
-            meter.reserve(count.toLong() * 2L, 320L + count * 20L)
-            val admitted = rows.take(count)
+            meter.reserve(count.toLong() * 2L, 320L + count * 4L)
+            val admitted = if (count == rows.size) rows else {
+                meter.reserve(count.toLong(), 128L + count * 16L)
+                rows.take(count)
+            }
             if (count < rows.size) observe("AggregateSplitRowLimit", 1L)
             if (admitted.none { it.hasInteger }) return emptyList()
             val owners = IntArray(count) { admitted[it].term.owner }
@@ -84,8 +88,8 @@ private class SplitRun(
                     if (id.kind != SourceCoordinate.Kind.Real) continue
                     meter.reserve(1L, 64L)
                     for (other in incidence[id to (coefficient.signum() > 0)].orEmpty()) {
-                        meter.reserve(7L)
-                        if (owners.binarySearch(other.term.owner) < 0 || !eligible(other) ||
+                        meter.reserve(count.toLong() + 1L)
+                        if (owners.binarySearchInt(other.term.owner) < 0 || !eligible(other) ||
                             other.term.owner == row.term.owner ||
                             (other.term.owner < row.term.owner && other.hasInteger)) continue
                         meter.reserve(1L, 32L)
