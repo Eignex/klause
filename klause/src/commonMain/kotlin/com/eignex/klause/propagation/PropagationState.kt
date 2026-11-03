@@ -370,7 +370,7 @@ class PropagationState private constructor(
     internal var reasonPreflight = false
     internal var historicalTableReason: HistoricalTableReason? = null
     internal var arithmeticLearningTrace: ArithmeticLearningTrace? = null
-        get() = field?.takeIf { it.accepting }
+        get() = field?.takeIf { it.accepting || it.collectDeclines }
     internal var integerLearningTrailAtLevel: ((Int) -> Int?)? = null
 
     /** Factor whose [Propagator.propagate] is currently running. Read by the impl methods so
@@ -385,6 +385,10 @@ class PropagationState private constructor(
     internal var propagations: Long = 0L
 
     internal var work: Long = 0L
+    internal var preparationIndexWork: Long = 0L
+
+    internal fun preparationStatistics(): Map<String, Long> = if (preparationIndexWork == 0L) emptyMap()
+        else mapOf("propagationPreparationIndexWork" to preparationIndexWork)
     internal val finiteWork = FinitePropagationWork()
     internal var finiteMutationInterruptible = false
     internal var finiteMaintenanceActive = false
@@ -449,8 +453,7 @@ class PropagationState private constructor(
     // Per-factor mutable scratch. Its drift across snapshot / restore is intentional: advisory
     // watch state self-corrects on each fire, avoiding snapshot copies of level-aware state.
 
-    /** Backing list for [refPayload]; mutable so [addLearnedClause] can grow it
-     *  alongside the learned-clause registry without copying the full array. */
+    /** Base and incremental factor payload references; General learned rows own their payload slots. */
     private class PayloadOwner(var values: ArrayList<Any?>)
     private val payloadOwner: PayloadOwner by lazy(LazyThreadSafetyMode.NONE) {
         PayloadOwner(prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply {
@@ -470,14 +473,21 @@ class PropagationState private constructor(
     internal val snapshottableIndices: IntHashSet = IntHashSet()
 
     /** Per-factor mutable payload slots (reference-typed). Writes route through this view so
-     *  [snapshottableIndices] stays in sync; reads and structural ops delegate to [refPayloadStore]. */
+     *  [snapshottableIndices] stays in sync. General learned payloads share their paged row owner;
+     *  base and incremental slots delegate to [refPayloadStore]. */
     val refPayload: MutableList<Any?> by lazy(LazyThreadSafetyMode.NONE) {
         object : AbstractMutableList<Any?>() {
-            override val size: Int get() = refPayloadStore.size
-            override fun get(index: Int): Any? = refPayloadStore[index]
+            override val size: Int
+                get() = if (!incremental && nativeEngine == null) baseFactorCount + learned.size
+                else refPayloadStore.size
+            override fun get(index: Int): Any? =
+                if (!incremental && index >= baseFactorCount && nativeEngine == null) {
+                    learned.store.payload(index - baseFactorCount)
+                } else refPayloadStore[index]
             override fun add(index: Int, element: Any?) { refPayloadStore.add(index, element) }
             override fun removeAt(index: Int): Any? = refPayloadStore.removeAt(index)
             override fun set(index: Int, element: Any?): Any? {
+                if (index !in 0 until size) throw IndexOutOfBoundsException("factor payload $index outside $size")
                 if (element is SnapshottablePayload) {
                     snapshottableIndices.add(
                         index,
@@ -485,7 +495,9 @@ class PropagationState private constructor(
                 } else {
                     snapshottableIndices.remove(index)
                 }
-                return refPayloadStore.set(index, element)
+                return if (!incremental && index >= baseFactorCount && nativeEngine == null) {
+                    learned.store.setPayload(index - baseFactorCount, element)
+                } else refPayloadStore.set(index, element)
             }
         }
     }
@@ -498,6 +510,8 @@ class PropagationState private constructor(
             for (f in problem.factors) if (f is Clause && f.literals.size == 2) n++
             n
         },
+        initializeRows = !usesNativeSat && !incremental,
+        rowOwner = this,
     )
     internal val selectedRetirements = LearnedRetirementRequests()
     internal var nextLearnedAdmissionKey = 0L
@@ -515,7 +529,7 @@ class PropagationState private constructor(
     }
 
     /** Constraints learned during conflict analysis; see [LearnedClauseDb]. */
-    internal val learnedClauses: List<LearnedPropagator> get() = learned.store
+    internal val learnedClauses: List<LearnedPropagator> get() = learned.initializedStore ?: emptyList()
 
     /** True iff any binary clause is known — the gate for binary-resolution minimization. */
     val hasBinaryClauses: Boolean get() = learned.binaryClauseCount > 0
@@ -530,7 +544,7 @@ class PropagationState private constructor(
     /** Per-literal bool watcher index (watch lists, blockers, back-pointers) —
      *  see [BoolWatcherIndex]. Mutated by `Watches.kt` and the [forgetLearnedClauses] compaction. */
     private val watchIndex = lazy(LazyThreadSafetyMode.NONE) {
-        prepared?.watches ?: BoolWatcherIndex(problem.numBoolVars)
+        prepared?.watches ?: BoolWatcherIndex(problem.numBoolVars, baseFactorCount = baseFactorCount)
     }
     internal val watches: BoolWatcherIndex get() = watchIndex.value
     internal val initializedWatches: BoolWatcherIndex?
@@ -832,7 +846,8 @@ class PropagationState private constructor(
     init {
         // The native lane uses arena watches and skips general base-factor registration.
         if (prepared == null && nativeEngine == null) {
-            for (fid in 0 until problem.numFactors) registerFactor(fid, projection.propagators[fid])
+            for (fid in 0 until problem.numFactors) registerFactor(fid, projection.propagators[fid], preparation = true)
+            reserveWatchPositions()
         }
     }
 
@@ -852,7 +867,8 @@ class PropagationState private constructor(
                 if (watchers != null) {
                     val blockers = propagator.initialBoolWatcherBlockers
                     for (i in watchers.indices) {
-                        state.installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
+                        state.installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER,
+                            preparation = true)
                         if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
                     }
                 }
@@ -862,24 +878,33 @@ class PropagationState private constructor(
                 }
                 if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
+            state.reserveWatchPositions()
             yield(state)
         }.iterator()
+    }
+
+    private fun reserveWatchPositions() {
+        if (problem.numBoolVars > 0) preparationIndexWork += watches.pos.reserve(baseFactorCount, 8)
     }
 
     /** Install factor [fid]'s static wakeup subscriptions into the per-literal / per-int-event advisor
      *  indices and its delta-consumer accumulators. Shared by initial construction (once per factor,
      *  in factor-id order) and by an incremental presolve session registering a factor added mid-run
      *  without rebuilding the whole state. */
-    private fun registerFactor(fid: Int, propagator: Propagator) {
+    private fun registerFactor(fid: Int, propagator: Propagator, preparation: Boolean = false) {
         val watchers = propagator.initialBoolWatchers
         if (watchers != null) {
             val blockers = propagator.initialBoolWatcherBlockers
-            for (i in watchers.indices) installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER)
+            for (i in watchers.indices) {
+                installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER, preparation)
+            }
         }
         // Base factors' int-event subscriptions are prebuilt into the CSR at [IntEventMachinery]
         // construction; only mid-life factors (fid past the base count) subscribe here, into the overflow.
         if (intEvents.on && fid >= baseFactorCount) {
-            propagator.initialIntEventWatches?.let { for (packed in it) intEvents.subscribeMidlife(packed, fid) }
+            propagator.initialIntEventWatches?.let { events ->
+                for (packed in events) work += intEvents.subscribeMidlife(packed, fid)
+            }
         }
         if (intEvents.deltaOn && propagator.consumesIntEventDelta) {
             intEvents.dirtyVars[fid] = IntArrayList()
@@ -1245,7 +1270,8 @@ class PropagationState private constructor(
         seedQueue(allFactors, factorCount, initialFactor, initialFactors)
         for (i in 0 until learned.pendingAttach.size) {
             val fid = learned.pendingAttach[i]
-            learned.stages[fid - baseFactorCount] = learned.stages[fid - baseFactorCount] and 4.inv()
+            learned.store[fid - baseFactorCount, GeneralLearnedRows.STAGES] =
+                learned.store[fid - baseFactorCount, GeneralLearnedRows.STAGES] and 4.inv()
             propEnq(fid)
         }
         learned.pendingAttach.clear()
@@ -1495,7 +1521,7 @@ class PropagationState private constructor(
         var kind = 0
         while (kind < IntEvent.COUNT) {
             if (mask and (1 shl kind) != 0) {
-                intEvents.forEachWatcher(IntEvent.pack(v, kind)) { fid ->
+                intEvents.forEachWatcher(IntEvent.pack(v, kind), { work += it }) { fid ->
                     work++
                     propEnq(fid)
                     accumulateDirtyVar(fid, v)

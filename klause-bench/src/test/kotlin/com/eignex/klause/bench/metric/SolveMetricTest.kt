@@ -6,6 +6,8 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.corpus
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.runner.MiniZincIdentityEvidence
+import com.eignex.klause.bench.runner.MiniZincIdentityFailure
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.flatzinc.UnsupportedFlatZincException
 import kotlinx.serialization.json.Json
@@ -84,6 +86,28 @@ class SolveMetricTest {
             mapOf("loadError" to "minizinc compile failed (exit 1) for x.mzn: Error: include error / more"),
             stats(failure),
         )
+    }
+
+    @Test
+    fun `failed compiler discovery retains evidence without accepting an identity or excluding the source`() {
+        val evidence = MiniZincIdentityEvidence(
+            phase = "--config-dirs",
+            command = listOf("minizinc", "--config-dirs"),
+            startedAt = "now",
+            outcome = "timed-out",
+            elapsedNs = 123,
+            timeoutNs = 100,
+            exitCode = 137,
+        )
+
+        val record = SolveMetric.loadFailureRecord(
+            ref, SolverInvocation.Settings(), Budget(), "now", null,
+            MiniZincIdentityFailure(evidence), sourceHashes = mapOf("model" to "captured"),
+        )
+
+        assertEquals(evidence, record.compilerDiscovery)
+        assertNull(record.compilerIdentity)
+        assertEquals(setOf("loadError"), record.stats.keys)
     }
 
     @Test
@@ -186,6 +210,40 @@ class SolveMetricTest {
         assertEquals(true, result.feasible)
         assertEquals(true, result.proven)
         assertNull(result.stats["sourceValidation"])
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `harness timings retain invocation boundaries and requested budgets on success and failure`(fails: Boolean) {
+        var nanos = 0L
+        val settings = SolverInvocation.Settings(seed = 17)
+        val budget = Budget(10000)
+        val invocation = SolverInvocation.Result(
+            true, null, null, proven = false,
+            stats = mapOf("sourceInvocationMs" to "7"), rawOutput = "v X=1\n", command = "cli", elapsedMs = 7,
+        )
+
+        val (record, raw) = SolveMetric.solve(
+            entry(), settings, budget, "now", "fixture",
+            installedBuild = { nanos += 30_000_000; null },
+            invoke = { _, supplied, allowance, _ ->
+                assertEquals(settings, supplied)
+                assertEquals(budget, allowance)
+                nanos += 10_000_000
+                if (fails) throw SolverInvocation.Failure(invocation, "failed")
+                invocation
+            },
+            timings = HarnessTimings { nanos },
+        )
+
+        assertEquals("30", record.stats["harnessBuildProvenanceMs"])
+        assertEquals("10", record.stats["harnessInvocationMs"])
+        assertEquals("40", record.stats["harnessSolveMs"])
+        assertEquals("7", record.stats["sourceInvocationMs"])
+        assertEquals(7L, record.elapsedMs)
+        assertEquals(10000L, record.budgetMs)
+        assertEquals(invocation.rawOutput, raw)
+        assertEquals(fails, "errorClass" in record.stats)
     }
 
     private fun entry(): ResolvedProblem {

@@ -17,6 +17,15 @@ replaces the complete unfinished row rather than mixing arms from different
 machines or attempts. Accepted rows remain valid; retain failed and preparation
 costs and report repeated infrastructure losses separately.
 
+Each requested selection must match at least one source. A selection with no matches
+fails preparation instead of publishing a reduced comparison plan.
+
+Planning stages every selected source before sealing include-directory identities.
+Execution verifies the planned file and directory identities before each solve.
+
+Declared-input planning uses the complete corpus-pack index even when only a subset
+of its members is materialized locally. Each solve verifies its planned input bytes.
+
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
 copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time
@@ -69,6 +78,12 @@ diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
+`param.private-rebuild-work=-1` requests automatic parity admission within a
+1,048,576-work cap and the configured scratch grant. It makes one initial-root
+attempt on the structurally admitted Boolean cohort; see the
+[admission contract](../docs/07-presolve.md#private-worker-qualification).
+Use explicit zero as the canonical control. The production default remains zero.
+
 `param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
 trial after new global root pins or an owned learned equivalence, with source reduction and a fresh consuming
 worker. Zero is the default. `ProgressPins` excludes baked-root facts;
@@ -76,7 +91,7 @@ worker. Zero is the default. `ProgressPins` excludes baked-root facts;
 baked root without a captured equivalence keeps its canonical traversal.
 `BinaryScanWork` and `BinaryScanNanos` retain bounded discovery costs;
 `BinaryRelations` counts captured reciprocal implications and `EquivalentColumns`
-counts actual source implication-graph merges. Discovery accepts only owned global
+counts actual signed source substitutions. Discovery accepts only owned global
 binary learning and checks at most 128 binaries within 32,768 work per observation.
 `BinaryHistoryWork` and `BinaryHistoryBytes` retain the fixed history's initialization
 and primitive storage. At most 32 relations are attempted in one worker. Its history
@@ -136,6 +151,36 @@ Projection work remains inside `WarmClauseWork` and preparation. Tautological,
 wide or unsupported selected translations contribute no copied consequence.
 `WarmClauseNormalizationWork` records the final input-normalization reservation;
 it is a subset of transfer and preparation work, rather than another total to add.
+
+
+Private parity discovery reports `ParityDiscoveryWork`, `ParityDiscoveryNanos`,
+`ParityRows` and `ParityPins`. Discovery work is a subset of `ChargedWork`,
+separate from canonical root propagation and later `PreparationWork`.
+`ParitySourceRows` and `ParitySourceLiterals` count short source equations posted
+beside the reduced basis in mixed consumers. Their storage and propagation spend
+the existing private grants.
+`ParityGenerationPins` counts proved pins in a prepared private model;
+`Consumers` confirms that its worker opened.
+`ParityAffineColumns` and `ParityAffineFreeColumns` describe a fully covered
+captured affine basis. `AffineGenerationColumns` and `AffineGenerationFreeColumns`
+count its coordinates in a prepared model. These private pivot slots require
+affine reconstruction and cannot receive unprojected canonical learned clauses.
+`ParityBasisColumns` and `ParityCoveredSourceClauses` describe the captured
+linear subsystem. `ParityReducedRows`, `ParityReducedLiterals` and
+`ParityCoveredClauses` identify a prepared mixed Clause/Xor view with original
+coordinate meanings; they do not count eliminated columns.
+`ParityTriangularRows` counts forward-eliminated rows selected per pivot in that
+reduced basis; the remaining rows use free-coordinate expansion. Both
+representations and their selection spend the existing private grants.
+`ParityPreferredFreeColumns` reports the admitted free-coordinate selection list. Coverage declines name
+incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
+larger widths). Such a miss can retain proved global pins or a mixed view.
+`ParityWorkspaceBytes` is the maximum modeled table/matrix/snapshot workspace
+within one private coordinator, rather than RSS or cumulative allocation.
+`ParityDeclinedPartial`, `Memory`, `NoRows`, `NoPins` and
+`RefutationDeferred` retain unsupported or incomplete outcomes. A derived
+contradiction supplies no checked source proof. Consumer witnesses still require
+reconstruction and complete canonical source checks.
 
 Run from the repository root with JDK 25 or newer:
 
@@ -197,6 +242,15 @@ on the lab worker, limiting method aggregation to 32 frames per sample and 100,0
 distinct methods. Capture truncation and the analysis depth limit are reported
 separately. Large captures must not be passed through profile arguments:
 the generated shell command is subject to the operating system's argument-size limit.
+Optional `events=true` also extracts the selected phase, IO, GC, CPU, compilation,
+contention and sampled-stack events into `harness-events.jsonl` on the worker,
+retaining the original recording scope in its header. Event timestamps establish
+order; file order need not be chronological. Recording thresholds and retention
+settings still apply. Event-type IDs, active settings and recording-loss/shutdown
+events are retained when present, so missing events need not be mistaken for disabled capture.
+The raw hash-checked capture and sampled summary survive
+event-extraction failure, with an error artifact and failed analysis result.
+Decoding and both analysis passes spend the containing case/job allowance; no solver runs.
 
 `param.ls-phase-times=true` also reports `lsObjectiveScoring.*`. `plain` and
 `functional` count the selected objective views; `maintained` counts index-preparation
@@ -222,6 +276,12 @@ loads and solves. Records retain solver reports, statistics, source hashes,
 installed-build identity and available witnesses. Inspect the JSON record even
 when the bench process exits successfully. Independent source validation runs in
 the lab; the bench records `validationPolicy=reported-result-v1`.
+
+Failed MiniZinc identity queries retain `compilerDiscovery` evidence separately
+from an accepted `compilerIdentity`. `solve.log` retains query lifecycle receipts,
+including the option, executable hash, startup/wait/cleanup times, exit and cancellation.
+Process CPU time is best effort and stays null when unavailable. Startup spends the
+existing ten-second query allowance; the containing case/job deadline still applies.
 
 Subprocess stderr is drained in fixed-size chunks. Records retain at most 16 Ki
 characters of normalized stderr, with `stderrComplete` true only for an untruncated
@@ -469,6 +529,30 @@ uses 64 KiB reads. Both read the full plain source before the invocation timer, 
 they do not have identical IO call sizes.
 Native CLI and public-library adapters require cache staging.
 
+`source-staging=cli` passes the original compressed path to the JVM CLI's existing
+streaming decoder. Use `lab/compressed.json` for frozen-source comparisons; it declares
+the required `zstd` executable without adding a tool dependency to ordinary frozen runs.
+The decoder executable path and SHA-256 are retained; capturing that identity spends
+the source preparation allowance. Source hashing before invocation remains unchanged.
+`sourcePreparationMs` measures harness preparation for every delivery policy. In CLI
+delivery, decompression and decoder retirement belong to `sourceCliMs` and
+`sourceInvocationMs`; `sourceDecodeMs` is unavailable, rather than zero, and
+`sourceDecodeLocation=cli-frontend` identifies the scope. `sourceCleanupMs` measures
+only harness temporary-file cleanup. Frontend loading includes decompression and
+parsing and is not an additional disjoint cost. The CLI deadline starts before loading;
+its existing subprocess watchdog and descendant cleanup still apply. This control
+does not establish cooperative cancellation within a blocked CLI input read.
+Compare full invocation and case/job costs at the same allowance and retain the
+original-source checks, runtime/decoder identities and declared cache conditions.
+
+Solve records retain monotonic `harness*Ms` phase observations in `stats`, including
+model resolution, provenance, invocation and witness handling. Nested phases are
+inclusive; do not sum them. Missing phases are unobserved. `harnessCaseMs` covers
+the JVM child adapter through comparison-record assembly, excluding JVM startup,
+parent verification, final record encoding/write and lab staging/publication.
+The existing source and subprocess timing boundaries remain separate. Harness
+instrumentation changes its retained byte fingerprint.
+
 `harness-jfr=true` records the ordinary JVM CLI adapter's separate 512 MiB harness
 JVM into `report/harness.jfr`; the default is false. CLI `measurement` remains a
 separate control. The retained harness command and comparison controls identify
@@ -570,9 +654,10 @@ they do not execute search or validate a source outcome.
 
 ## Corpus and build identity
 
-Compressed file inputs are staged with the existing corpus decoder before CLI
-launch. `sourceDecodeMs` is deducted from the CLI deadline, and
-`sourceInvocationMs` includes decoding, invocation and staged-file retirement.
+Compressed file inputs are staged with the corpus decoder by default.
+`sourcePreparationMs` is deducted from the CLI deadline, and
+`sourceInvocationMs` includes preparation, invocation and staged-file retirement.
+CLI delivery streams compressed input during the invocation instead.
 `elapsedMs` and process witness times retain their subprocess scope. A spent
 preparation allowance supplies no solver verdict. Plain source digests and frozen
 compressed input identities remain available for independent checking.
@@ -589,7 +674,12 @@ See [MiniZinc setup](../klause-mzn-lib/README.md) for direct MiniZinc runs and t
 To reuse installed-build hashes across repeated bench processes, run
 `provenance out=/absolute/path/provenance.json` with the installed launcher and set
 `KLAUSE_BENCH_PROVENANCE` to that path. Regenerate it after rebuilding or restoring
-an installation. Without it, each process captures its own installed-build hashes.
+an installation. Ordinary lab processes also reuse per-file hashes in the existing
+private `LAB_WORKSPACE_CACHE`. Every use traverses its current input/provenance
+inventory and checks filesystem identity, inode, change time, modification time
+and size. Unsupported filesystems and unavailable receipts fall back to reading
+the bytes. The checksum cache uses at most 64 MiB including bounded replacement
+files; it adds no corpus, solver-result or MiniZinc identity-query cache.
 
 ## Weighted objective qualification
 
@@ -916,12 +1006,77 @@ counts source rows once; `MixedCandidates`, `MixedComplementaryAttempts` and
 `MixedComplementaryRetained` distinguish candidate work and retained alternatives.
 Bound-side alternatives and selected rows establish no useful bound or cost gain
 without subsequent checked support and actual frontier consumption.
+`numericalCutSelectionRetiredInstalled` counts installed rows expired after four
+usable slack observations; `POINT_INSTALLED_RETIRED` attributes them by family.
+Installed-row aging continues after candidate discovery retires.
+These scans omit objective projection and candidate comparison vectors; their
+activity work and modeled storage remain in the selection and containing totals.
+Retained tight rows still require current-source checks. Keep subsequent row-layout
+replacement, proof-mode changes and factor work in the containing cost comparison.
+Adopted current families suspend retired rows while retaining their numerical
+definitions. `InactiveRowMappingWork` and `InactiveRowMappingAllocation` record
+mapping through any packed source equalities; these costs also debit the containing
+preparation/funding totals. A partial equality deactivation declines retained
+guidance. Keep failed mapping and fallback costs. Owner reuse alone establishes no
+net source gain, and an inactive retained definition is not an installed cut.
+When every checked candidate is installed, completed points age that family without
+the discovery cooldown and retain its numerical definitions for later suspension.
+`numericalCutSelectionManagedInstalled` counts rows entering this layout management.
+Ordinary-recipe compatibility remains separate from selected-layout ownership.
+Point selection starts from the current checked recipe. `CurrentFallback` and
+`CurrentFallbackQueries` report retaining that recipe after an unproductive trial;
+`BaseQueries` counts base relaxation attempts. A point-selection arm can therefore
+contain both CURRENT and POINT_SELECTION recipe work; retain the ordinary source
+totals and both disjoint recipe costs.
+Optional source-pair discovery waits for a completed nonterminal point and uses
+65,536 work and 1 MiB modeled allocation. Ordinary aggregate-only preparation keeps
+its 500,000-work and 8 MiB limits. Current checked incumbents and terminals bypass
+this discovery; no extra numerical query is needed in that case.
+`numericalCutSelectionAdoptedInstalled` counts already-installed cuts entering
+the bounded mask from an integer-only current recipe or an aggregate-only cut
+family. Adoption adds no LP query or root miss; later completed points supply aging
+observations. These rows are not newly separated cuts. Keep their generation,
+adoption, subsequent scoring, proof and retirement costs.
 `numericalCutSelectionPointPrepared` counts one successful point-directed candidate
 preparation per immutable source template. It chooses each available continuous
 endpoint independently from the point. Its generation shares the original
 65,536-work allowance; point projection, failed preparation, fresh verification
 and any resulting owner replacement retain their containing source/recipe costs.
 `PointPreparationUnavailable` does not establish complete ineligibility.
+
+The generated-aggregate replay includes the ordinary opt-in producer's bounded
+source-pair indexing and discovery. Keep this cost separate from replaying supplied
+diagnostic proposals. `AggregatePair*` reports coverage, attempts and limiting
+stages; a partial generation establishes no general absence of useful cuts.
+`MpsProofFrontier certificateState=true` records retained completed guidance's
+certificate refusal, exact-basis repair dimensions and charged work/allocation in
+`certificate-state.json`, including the rejected basis proposal's column, side and
+exact reduced cost separately from later candidates. This optional post-solve observation issues no query and
+shares the existing capture deadline; scalar strings are capped at 4,096 characters.
+Missing state or a stopped inspection remains unavailable. Its owner scope can
+precede the current frontier leaf. It supplies no certificate authority, independent
+check, performance gain or original tolerant-source claim.
+With both aggregate and point selection enabled, an empty individual-cut family
+installs the bounded aggregate family in the initial CURRENT query. A fully checked
+family of at most 64 rows enters aging while retaining that query. With individual
+cuts present, discovery and fresh candidate checks follow the initial point;
+selected rows enter a subsequent masked query. A fallback can retain the individual
+recipe after paying discovery costs, so retain both recipe totals and report actual
+selected/installed/adopted/retired rows separately.
+Point-directed generation applies the ordinary normalized efficacy threshold before
+retaining a proposal. `AggregatePairLowEfficacy` and `AggregatePairPointUnavailable`
+retain rejected projections; `AggregatePairPointEligible` counts proposals admitted
+to the bounded candidate pool. All derivation and projection costs, including those
+without retained rows, remain in the existing generation work/allocation totals.
+Aggregate-only generation retains its source-order proposal policy.
+Point-directed aggregation selects each coordinate's nearer established source
+endpoint when both distances are finite. `AggregatePointLowerBounds` and
+`AggregatePointUpperBounds` count these indexed choices; endpoint projection and
+map ownership debit the same containing generation grant. `AggregateCandidates`
+counts completed derivations before the point filter, rather than retained rows.
+Repeated `AggregatePairAttempts` or construction observations for one unchanged
+point-prepared template indicate reconstruction cost, rather than additional unique
+candidates. Retain these charges alongside template replacements and masked queries.
 
 The opt-in basis tool uses the [basis corpus](../klause/src/jvmTest/resources/basis-corpus/README.md):
 
@@ -1322,9 +1477,11 @@ Staging checks the containing deadline and thread interruption between bounded
 read/write chunks and before invoking the CLI. It closes streams and removes
 partial files on cancellation, exhausted preparation, decoding failure and CLI
 failure. Cleanup runs even after the deadline and its cost remains charged.
-`sourceDecodeMs`, `sourceCliMs`, `sourceCleanupMs` and `sourceInvocationMs` retain
+`sourcePreparationMs`, `sourceCliMs`, `sourceCleanupMs` and `sourceInvocationMs` retain
 preparation, the invocation callback, retirement and the whole source scope on
 successful and failed attempts. `elapsedMs` remains the subprocess measurement.
+Staged inputs also retain preparation as `sourceDecodeMs`; CLI delivery leaves
+that separate decode measurement unavailable.
 An exhausted preparation records no solver verdict and zero CLI time. Plain inputs
 retain the same source ledger without decompression or temporary files. Staging cooperates between
 IO calls; a blocked filesystem call can delay observation of cancellation.

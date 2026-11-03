@@ -105,6 +105,14 @@ A check yields `Checked`, `Rejected` or `Unavailable`. Missing support, cancella
 and traversal limits all give `Unavailable`, never proof coverage from the producer's
 type. Imports and branches spend one containing verification allowance. Engine
 attestations and reference agreement stay distinct from checked derivations.
+Internal producers traverse the context's captured premise keys and immutable values
+in source order without receiving its map or entries. Public context views remain
+independent snapshots; short-circuit traversal stops at the first declined premise.
+Captured coordinate, premise and affine-objective comparisons expose no collection;
+callers check scope and semantic identity separately. Traversal and producer retention
+use the caller's allowance.
+Internal singleton lookups expose captured coordinates and scalar values without
+returning map entries; iterator storage and lookup work use the caller's allowance.
 Each verification run lazily captures the immutable context's coordinate, premise
 and objective views once, so individual proof lookups do not copy the full source.
 

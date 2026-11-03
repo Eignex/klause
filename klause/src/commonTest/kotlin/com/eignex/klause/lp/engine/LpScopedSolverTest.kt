@@ -18,18 +18,51 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
-    fun `reading child guidance does not construct a numerical owner`() {
+    fun `basis costs reject the point after a bound edit`() {
         val builder = LpBuilder()
-        val column = builder.addVar(0L, 5L, cost = 1L)
-        builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
-        val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
-        val factory = RecordingLpEngineFactory()
-        LpScopedSolver(LpExactState(source), context = LpSolveContext(factory), componentSplit = true).use { owner ->
+        val x = builder.addVar(0, 2)
+        val y = builder.addVar(0, 1, cost = 3)
+        val z = builder.addVar(0, 1, cost = 5)
+        builder.addRow(intArrayOf(x, y, z), longArrayOf(2, 2, -2), Relation.EQ, 1)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val pointModel = assertNotNull(state.ownerWorkingModel())
+        LpScopedSolver(state).use { owner ->
+            assertNotNull(owner.solveFloat()?.second)
+            assertNotNull(owner.directionalCosts(pointModel, intArrayOf(x), 100_000L, Cancellation.Never) {
+                assertTrue(it > 0L)
+            })
+            assertTrue(owner.push())
+            assertTrue(owner.assertBound(x, true, ExactLpSide(ExactLpNumber.of(0L)), 1L))
+            var work = 0L
 
-            val guidance = owner.partialPrimalGuidance(Cancellation.Never)
+            val costs = owner.directionalCosts(pointModel, intArrayOf(x), 100_000L, Cancellation.Never) { work += it }
 
-            assertNull(guidance)
-            assertTrue(factory.calls.isEmpty())
+            assertNull(costs)
+            assertEquals(0L, work)
+        }
+    }
+
+    @Test
+    fun `reading optional guidance does not construct a numerical owner`() {
+        for (directional in listOf(false, true)) {
+            val builder = LpBuilder()
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+            val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
+            val state = LpExactState(source)
+            val point = assertNotNull(state.ownerWorkingModel())
+            val factory = RecordingLpEngineFactory()
+            var work = 0L
+            LpScopedSolver(state, context = LpSolveContext(factory), componentSplit = true).use { owner ->
+
+                val guidance = if (directional) {
+                    owner.directionalCosts(point, intArrayOf(column), 100_000L, Cancellation.Never) { work += it }
+                } else owner.partialPrimalGuidance(Cancellation.Never)
+
+                assertNull(guidance)
+                assertTrue(factory.calls.isEmpty())
+                assertEquals(0L, work)
+            }
         }
     }
 

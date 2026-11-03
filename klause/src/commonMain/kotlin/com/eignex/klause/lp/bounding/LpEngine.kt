@@ -334,10 +334,21 @@ internal class LpEngine(
         val targetBytes = targets?.let {
             ROOT_PRIMAL_TARGET_HEADER_BYTES + (it.intColumns.size.toLong() + it.booleanColumns.size) * Int.SIZE_BYTES +
                 (if (it.coordinates === rounding?.primal) 0L else it.coordinates.size.toLong() * Double.SIZE_BYTES) +
-                (if (it.knownColumns === rounding?.knownColumns) 0L else it.knownColumns?.size?.toLong() ?: 0L)
+                (if (it.knownColumns === rounding?.knownColumns) 0L else it.knownColumns?.size?.toLong() ?: 0L) +
+                (it.components?.retainedBytes ?: 0L)
         } ?: 0L
         return roundingBytes + maskBytes + targetBytes + additionalBytes <= ROOT_PRIMAL_GUIDANCE_BYTES
     }
+
+    internal fun rootComponentPreparationAllowed(targets: RootPrimalTargets, bytes: Long, minimumWork: Long): Boolean =
+        rootPrimalTargets === targets && rootGuidanceFits(bytes) && !lpWorkAllowanceSpent(minimumWork) &&
+            retainedRootCumulativeWork() >= minimumWork &&
+            SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalSolveOps) >= minimumWork
+
+    internal fun rootComponentPreparationWork(targets: RootPrimalTargets, bytes: Long): Long =
+        if (rootPrimalTargets !== targets || !rootGuidanceFits(bytes) || lpWorkAllowanceSpent(1L)) 0L
+        else minOf(retainedRootRemainingWork(),
+            SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalSolveOps))
 
     internal fun retainRootPrimalTargets(cancellation: Cancellation): Boolean {
         val guide = rootRoundingWarmStart ?: return false

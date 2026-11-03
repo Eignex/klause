@@ -5,6 +5,7 @@ import com.eignex.klause.bench.catalog.Expected
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
+import com.eignex.klause.bench.metric.HarnessTimings
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
@@ -66,15 +67,27 @@ internal object KlauseLabSuite : BenchSuite {
         "Frozen catalog workloads and installed CLI solve records",
     )
 
-    override fun plan(request: BenchRequest): List<BenchCase> {
+    override fun plan(request: BenchRequest): List<BenchCase> = plan(request, LabInputs::resolve)
+
+    internal fun plan(
+        request: BenchRequest,
+        resolveInputs: (ProblemRef, Boolean) -> List<BenchInput>,
+    ): List<BenchCase> {
         val settings = LabSettings(request.parameters)
-        val selectedProblems = settings.selections.flatMap { KlauseCli.selectProblems(it) }
+        val selectedProblems = settings.selections.flatMap { selection ->
+            KlauseCli.selectProblems(selection).also { selected ->
+                require(selected.isNotEmpty()) { "No problems match selection: $selection" }
+            }
+        }
             .distinctBy { it.suite to it.ref.name }
-        val compilerTrees = mutableMapOf<Path, String>()
-        return selectedProblems.flatMap { selected ->
+        val resolved = selectedProblems.map { selected ->
             val ref = selected.ref
             require(ref.source !is ProblemSource.InCode) { "Lab subprocess solves require file-backed inputs" }
-            val inputs = LabInputs.resolve(ref, settings.inputOnly)
+            selected to resolveInputs(ref, settings.inputOnly)
+        }
+        val compilerTrees = mutableMapOf<Path, String>()
+        return resolved.flatMap { (selected, inputs) ->
+            val ref = selected.ref
             val trees = LabInputs.treeHashes(inputs, compilerTrees)
             settings.engines.flatMap { engine ->
                 val variant = if (settings.engines.size > 1) "$engine/" else ""
@@ -115,7 +128,12 @@ internal object KlauseLabSuite : BenchSuite {
     }
 
     internal fun solveRecord(case: BenchCase, context: BenchContext): SolveRecord {
-        SourcePreparationCapture.measure("input-verification") { LabInputs.verify(case, context) }
+        val timings = HarnessTimings()
+        val started = timings.start()
+        timings.measure("harnessInputVerificationMs") {
+            SourcePreparationCapture.measure("input-verification") { LabInputs.verify(case, context) }
+        }
+        val inputStarted = timings.start()
         fun source(input: BenchInput) = ProblemSource.Prepared(LabInputs.path(input, context).toFile())
         val includes = case.inputs.filter { it.role == "include" }.map { source(it).file }
         val ref = ProblemRef(
@@ -142,6 +160,7 @@ internal object KlauseLabSuite : BenchSuite {
             sourceStaging = SourceStaging.parse(p["source-staging"] ?: "cache"),
         )
         val budget = Budget(p.getValue("timeout-ms").toLong())
+        timings.finish("harnessInputSetupMs", inputStarted)
         val record = if (ref.format == Format.JSON_SCHEMA) {
             val reason = "JSON schema is an in-process catalog format; the installed CLI has no schema frontend"
             SolveMetric.loadFailureRecord(
@@ -157,8 +176,9 @@ internal object KlauseLabSuite : BenchSuite {
                 buildProvenance = InstalledBuild.current,
             )
         } else {
-            SolveMetric.solveOne(ref, budget, settings, context.outputDirectory.resolve("report").toFile())
+            SolveMetric.solveOne(ref, budget, settings, context.outputDirectory.resolve("report").toFile(), timings)
         }
+        val provenanceStarted = timings.start()
         val provenance = record.buildProvenance?.let { build ->
             build.copy(
                 harness = ComparisonProvenance.current.retained,
@@ -166,7 +186,7 @@ internal object KlauseLabSuite : BenchSuite {
                     ("lab.cli.args" to Files.readString(context.outputDirectory.resolve("cli.args"))),
             )
         }
-        val retained = record.copy(
+        val reported = record.copy(
             comparisonControls = comparisonControls(case) + buildMap {
                 provenance?.let { build ->
                     put("runtimeFingerprint", ComparisonProvenance.runtimeFingerprint(build))
@@ -187,6 +207,10 @@ internal object KlauseLabSuite : BenchSuite {
                 "labDebug" to p.getValue("debug"),
             ),
         )
+        timings.finish("harnessComparisonProvenanceMs", provenanceStarted)
+        // Child solveRecord only: excludes JVM startup, parent verification and final record encoding/write.
+        timings.finish("harnessCaseMs", started)
+        val retained = reported.copy(stats = reported.stats + timings.stats())
         val recordPath = context.outputDirectory.resolve("report/${Reports.fileStem(ref.name)}.json")
         Files.writeString(recordPath, Reports.json.encodeToString(SolveRecord.serializer(), retained))
         return retained

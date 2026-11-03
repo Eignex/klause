@@ -4,12 +4,14 @@ import java.io.File
 
 internal enum class SourceStaging(val key: String) {
     CACHE("cache"),
-    TEMPORARY("temporary");
+    TEMPORARY("temporary"),
+    CLI("cli");
 
     val directory: File
         get() = when (this) {
             CACHE -> CorpusFiles.stagingRoot
             TEMPORARY -> File(System.getProperty("java.io.tmpdir"))
+            CLI -> error("CLI delivery does not stage a temporary source")
         }
 
     companion object {

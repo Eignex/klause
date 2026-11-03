@@ -259,14 +259,34 @@ Reclamation runs at safe propagation/branch boundaries independently of restarts
 Unchanged ownership reuses its maintenance result across short resumed slices; store,
 trail, atom, pass and scope changes invalidate that decision rather than spending a
 whole slice repeatedly before search advances.
-An interrupted optional scan waits for ownership change before retrying; direct
-reclamation attempts remain retryable.
+An interrupted optional observation waits for ownership change before retrying; direct
+reclamation attempts remain retryable. Retired storage cleanup precedes observation
+and resumes while its funded cursor advances, even when ownership sampling is partial.
+Changed work, scratch or byte-limit settings renew the maintenance opportunity.
+An incomplete sample supplies no byte-limit or protected-floor total. Cancellation
+withholds further maintenance until ownership changes.
 `learned-memory-work` and `learned-memory-scratch-bytes` bound preparation and scratch.
 General watch cleanup resumes across bounded maintenance slices without renumbering
 learned handles. Retired Boolean and bound-atom postings are removed independently;
 Boolean back-pointer deletion and swap-pop publication share one funded transaction.
 Watcher movement rewinds the current scan prefix. Small posting arrays trim within
-the same work and scratch limits; larger allocations wait for full compaction.
+the same work and scratch limits. Posting and blocker arrays trim in separate funded
+transactions, so their combined copy need not fit one grant. The Boolean
+back-pointer index uses direct slots for source factors and eight startup rows,
+a bounded sparse directory for later factors, two packed positions per factor
+and a balanced overflow for additional positions. Source preparation reserves the
+startup rows; pressure releases unused reservations. Paired clause watches install
+and retire through one row lookup, and paired swap-pop moves update together.
+Empty rows and directory branches
+release their primitive and reference allocations. Deletion and a swapped watch's
+position update publish together after bounded funding.
+Primitive node fields and reference slots remain separately owned; live and saved
+reasons protect the index. Ordinary index mutations retain their work charges. Initial
+source-index construction records `propagationPreparationIndexWork` separately from
+propagation work, including private source-check construction. Its CPU and elapsed
+cost remain within the containing source invocation. Deferred
+array trims retain their minimum grant requirements and retry when a later grant
+can fund them, independently of further logical retirements.
 Native/general compaction requires a cancellable preflight of all arrays, watches, reasons,
 queues and event indexes, with a conservative envelope for indivisible publication.
 Cancellation or an oversized envelope defers without mutation; accepted publication
@@ -310,12 +330,21 @@ eviction; units, pending rechecks and current root reasons survive.
 Retired rows stop propagation and export and release their owned literal array.
 Admission, reference-array growth and release debit the containing work ledger.
 A short retirement slice suspends before publication and resumes with its stable handle.
-Policy columns, the reference-page directory and watch postings remain owned until
-funded full compaction reclaims them. Ownership reports include those capacities and report
+Policy columns and watch postings retain their separately funded cleanup. Payload
+page directories keep their first page directly and use a bounded compressed index
+for later pages. Fixed directory state belongs to propagation preparation.
+Index lookups debit the active
+maintenance grant or the containing propagation ledger. A cached page avoids
+repeated lookups within one page. Empty page headers enter a separate funded
+unlink queue after their row arrays release; a revived header survives that queue.
+Directory cleanup does not remap live handles or consume the metadata row-release
+transaction. Ownership reports include unfinished directory nodes and report
 `learnedRetiredSlots` separately from active clause count. A page owns a disjoint pool
 of copied arrays. Its observation separates total and cumulative protected payload
-bytes under one stable pool identity; only required rows protect payload, while a
-required row protects the complete page reference allocation. Permanent-row checks read the policy
+bytes under one immutable allocation identity; only required rows protect payload, while a
+required row protects the complete page reference allocation. Directory protection
+includes the union of required branch paths; primitive and reference pools report
+their cumulative protected subsets without per-node ownership scratch. Permanent-row checks read the policy
 column directly. Reference-page and directory capacities are observed separately.
 Window calls, charged work, visits and permanent, active and retained counts remain
 available in the released session's lifecycle totals.
@@ -327,11 +356,17 @@ Boolean undo stores no historical factor handle. Admissions classify these claus
 and full compaction remaps their counters with their factor IDs. Their windows use
 those counts and pending-attachment flags without a store-sized protection mask.
 Other constraints use a funded snapshot covering current Boolean and integer reasons,
-saved integer bounds and pending first assertions. Eligible retired factors become inert
+saved integer bounds and pending first assertions. When its store-sized allocation
+exceeds the slice allowance, a candidate checks those owners directly without scratch.
+Each owner visit is funded; an interrupted check retains the candidate.
+Eligible retired factors become inert
 stable-ID slots; propagation queues and active readers skip them. Integer rows own
 their position in a dense reference cache, allowing retirement to unlink a row
-without scanning other rows. Cache capacity and position fields remain part of
-modeled ownership; removing the last row releases the cache backing array. Full
+without scanning other rows. The cache keeps its first 64 references together and
+uses bounded reference pages for its tail. Growth and trimming charge copied directory
+slots and the partial page; an empty tail releases its directory without copying
+retired references. Cache capacity, directory slots and position fields remain part of
+modeled ownership; removing the last row releases the cache owner and its arrays. Full
 compaction rebuilds cache positions and remaps integer-event subscriptions even
 when no integer rows remain. The candidate cursor survives admissions and is
 rebuilt when full compaction renumbers the store. Lifecycle totals identify the
@@ -408,8 +443,11 @@ remain clause reasons. Support filtering keeps its hole-aware semantics. Repeate
 cells retain their selected index guard, and a result alias supplies no arithmetic row.
 
 Opposite-sign nonnegative combinations use checked signed arithmetic and integer
-gcd normalization. Each combination must remain conflicting. A retained row must
-propagate against the session's historical domains at its first-UIP clause's native
+gcd normalization. One analysis retains only its most recent normalized source, keyed
+by projection identity, signed guard and inequality side. Reusing that immutable row
+still validates each endpoint's historical guard, raw requested bound and membership.
+The cached source is released with the analysis. Each combination must remain
+conflicting. A retained row must propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have
 been a member of its historical domain; a later carve cannot remove that earlier
@@ -441,10 +479,20 @@ shared premise and mapped admission must decline.
 Every native conflict cascade repeats the mapped-target assertion and complete
 premise checks before admitting a typed result. An unavailable mapping retains its
 clausal fallback, including cascades reached through an LP consequence.
-Within one fixpoint publication, integer leaves that are flat conjunctions of
-active named assertions can share complete proof subgraphs. Inherited nested or
-unavailable leaves do not enter that memo. Proof-reference visits charge native
-work, and the publication memo ends with its callback.
+Within one fixpoint publication, complete conjunctions of active named assertions
+can share proof subgraphs, including nested inherited conjunctions. Validation
+admits at most 4,096 proof-reference visits and expands a repeated conjunction once.
+An unavailable, unnameable or inactive leaf withholds reuse. Proof-reference visits
+charge native work, and the publication memo ends with its callback. Complete
+memoized nodes also supply the current traversal; separate temporary proof storage
+is allocated only for nodes that cannot enter that bounded memo.
+Native proof traversal keeps literal identifiers and child references in parallel
+stacks. Inherited-proof validation allocates its stack and seen set only when a
+conjunction branches. Conjunctions retain every child, and reference visits keep
+their work, cancellation and local-limit checks.
+Fixpoint facts already implied by shared integer endpoints retain the shared
+premise without reconstructing a native proof. Endpoint strengthenings use the
+complete proof path; observers and cancellation checks still cover every deduction.
 
 Rows share the learned store and integer bounds propagation. A successful ordinary
 row assertion also retains its first-UIP clause in that native store. The two
@@ -473,6 +521,8 @@ Boolean or order-atom metadata, native/shared targets, decline
 categories and stored arithmetic consumers. Literal metadata distinguishes cached
 atom levels from the analyzer's effective conflict level. Historical domain holes
 exclude later journalled carves; endpoint factor ids describe the live reason owner.
+Depth declines retain the native level boundary and distinguish original factor
+seeds from retained learning; ownership alone does not certify source suitability.
 Storage identities survive factor compaction and retire when their constraint is
 forgotten. Only actual changed bounds or Boolean pins count as consumer events.
 Focused windows retain a selector pick or actual branch attempt after each consumer;
@@ -513,15 +563,38 @@ a whole-store selection buffer. Permanent clauses, protected reasons and policy 
 reduce the heap quota. A pending eviction that gains protection also consumes that
 quota before the next heap step. Mid rows
 survive their demotion window, and classification clears survivor reuse flags.
-An unfunded next-row transaction suspends the cursor for a later grant.
+An unfunded next-row transaction suspends the cursor for a later grant. A completed
+row classification retains its pending admission while heap comparisons wait;
+cleanup comparisons finish before publishing their candidate mutations.
 Current or historical reasons can retain additional rows above the soft cap.
 Native post-undo replay protects its queued clause handles and learned units without
 freezing unrelated retirement. Incomplete trail propagation, conflicts and root
 publication still defer the window.
+An empty General integer-row cache detaches its obsolete event overflow index in a
+funded transaction. A surviving cache trims its reference array when the copy fits
+the work and scratch grant. Nonempty event cleanup retains its event and posting
+cursors across grants. It removes retired subscriptions and empty index entries
+without remapping live handles; posting arrays trim in separately funded transactions.
+A retained entry avoids repeating its lookup before an affordable copy. Deferred
+trims retry when later grants can fund them. A completed pass exposes a continuation
+before testing newly appended retirements. Unfinished cursors, postings and index
+nodes remain in owned primitive and reference totals.
 General retirement replaces its payload with an inert stable-ID slot and releases
 its watch-position payload, integer-row cache entry and applicable deferred/diagnostic
-aliases. Stale watches skip that slot; their allocated capacity and policy columns
-remain owned until compaction. Selection and subsequent retired-slot compaction share
+aliases. General and Native metadata share a paged owner with at most sixteen rows
+per page. General pages include propagator and mutable-payload references. The first
+page belongs directly to its owner; later pages use a bounded sparse index. Fixed
+startup ownership belongs to state preparation, and admissions fund subsequent
+growth and index insertion. Lookups debit the active maintenance or observation
+grant, or the containing propagation ledger. A fixed-size page cache avoids repeated
+lookups during ranking; its reference allocation belongs to fixed preparation and
+modeled ownership. Header unlinking clears its cache slot before releasing the page.
+A page queue and per-page retirement masks resume row release without scanning
+permanent rows or looking up another page. Retained import/use counters survive
+released metadata. Empty arrays release within their row transaction; empty headers
+and index branches wait for separately funded unlinking. Revived pages survive
+unlinking without renumbering live handles.
+Stale watches skip retired slots, and their capacity remains owned until its funded cleanup. Selection and subsequent retired-slot compaction share
 one work grant; compaction keeps every active row and receives only its remainder.
 Root simplification transfers its fresh residual literal array into the learned store;
 other admissions copy borrowed literal arrays. Native learned-watch cleanup scans
@@ -529,8 +602,16 @@ resumably before whole-store preparation under
 the same grant. Sixteen-entry posting pages release at tail boundaries, and an empty
 posting list releases its directory. Posting mutations rewind an affected scan prefix;
 no learned handle or reason is remapped by this scan. A completed pass is reused until
-another learned retirement requires a scan. Policy columns and full generation
-remapping retain their separate funding requirements.
+another learned retirement requires a scan. Metadata release precedes watch scanning,
+so permanent postings cannot delay its progress. Appended retirements extend the page
+queue. Candidate-array trimming receives a separate funded copy transaction and
+retains spare capacity when its work or scratch does not fit.
+Capacity changes replace the disjoint metadata pool identity. A protected row retains
+its complete page allocation; sparse-index protection includes the union of its
+required branch paths. Primitive and reference pools report cumulative protected
+subsets without per-node ownership scratch. Unfinished headers remain owned until
+unlinking. Full generation remapping funds traversal, row copies, queue reset and
+trimming before handles change.
 Tier classification publishes within each funded row transaction. Arithmetic reason
 snapshots and native/general full physical compaction require their complete funding.
 
@@ -866,6 +947,8 @@ Native CP and shared first-UIP outcomes are reported separately. Non-asserting c
 identify chronological fallback, while zero does not establish explanation coverage.
 Native learned-constraint counts include integer rows; their terms do not count as
 Boolean learned literals.
+`learningIntegerSessions` counts native sessions with integer-row learning enabled,
+independently of constructed, admitted and consumed objects.
 Missing metrics stay absent, including root theory results that never enter traversal.
 `smtCompleteSearch*` stage observations overlap and cannot be summed as a work total.
 [SearchStats](../klause/src/commonMain/kotlin/com/eignex/klause/solver/result/SearchStats.kt)
