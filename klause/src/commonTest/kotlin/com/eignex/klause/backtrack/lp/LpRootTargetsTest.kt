@@ -242,6 +242,36 @@ class LpRootTargetsTest {
     }
 
     @Test
+    fun `declined mixed rounding transfers completed coordinates only with opt in`() {
+        for (allowMixed in listOf(false, true)) {
+            val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+                arrayOf(Linear(longArrayOf(1), intArrayOf(0), doubleArrayOf(1.0),
+                    intArrayOf(0), LinearOp.GE, 1L)), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(1),
+                realCoefficients = doubleArrayOf(2.0))
+            val factory = RecordingLpEngineFactory()
+            LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                    rootCutHarvest = false)), SolveStatsSink("completed-mixed-root-value-order"),
+                LpSolveContext(factory)).use { engine ->
+                assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+                engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+
+                val proposal = engine.lpRoundingProbe(objective, Cancellation.Never,
+                    allowMixedTargets = allowMixed, accept = { null })
+                val queries = factory.floatAllowances.size
+                val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
+
+                assertNull(proposal)
+                assertNull(engine.rootRoundingWarmStart)
+                assertEquals(if (allowMixed) listOf(1L, 0L) else listOf(0L, 1L), ordered)
+                assertEquals(queries, factory.floatAllowances.size)
+            }
+        }
+    }
+
+    @Test
     fun `mixed root target transfer refuses cancelled or mismatched objectives`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)),
             arrayOf(Linear(longArrayOf(1), intArrayOf(0), doubleArrayOf(1.0),

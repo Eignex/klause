@@ -33,6 +33,7 @@ internal fun LpEngine.lpRoundingProbe(
     cancellation: Cancellation,
     initial: Sample? = null,
     toleranceReals: Boolean = false,
+    allowMixedTargets: Boolean = false,
     accept: (Sample) -> Sample? = { it },
 ): Sample? {
     requireOpen()
@@ -239,7 +240,7 @@ internal fun LpEngine.lpRoundingProbe(
             session.releaseRetainedState()
         }
         if (!rootRoundingInterrupted) {
-            retainRootPrimalTargets(cancellation)
+            retainRootPrimalTargets(cancellation, allowMixedTargets)
             rootRoundingWarmStart = null
         }
         sink.lp.observePrimalPhase("PRIMAL_ROUNDING", outcome, started.elapsedNow().inWholeNanoseconds)

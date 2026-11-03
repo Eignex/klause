@@ -787,6 +787,9 @@ numerical work retains the private owner for an eligible later rounding slice;
 queries with changed authority or objective use ordinary construction. Complete points and
 masked child-coordinate guides can steer rounding; every proposed assignment
 still requires source verification.
+When mixed root targets are enabled, a completed owned point can retain its finite
+coordinates for ordinary value ordering after rounding fails to publish a witness.
+The transfer keeps the same source, objective, storage and remaining-work guards.
 
 Retained discrete root layouts prepare in private chunks before the first numerical
 consultation. Objective-column batches and factor batches charge materialized construction

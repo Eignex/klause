@@ -1208,6 +1208,7 @@ internal class ResumableMinimize(
         val rounded = lpEngine.lpRoundingProbe(objective, rootToken,
             initial = if (problem.numRealVars > 0) params.pooledIncumbents?.current()?.assignment else null,
             toleranceReals = params.toleranceCheck != null,
+            allowMixedTargets = params.lpMixedRootTargets,
             accept = ::accept)
         rootRoundingPending = rounded == null && canResumeRootRounding()
         if (rootRoundingPending) return null
