@@ -1,5 +1,8 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.CheckedLongOverflowException
@@ -96,6 +99,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val used = mutableSetOf<PivotKey>()
         var transientSteps = 0
         var nonOwnerSource = false
+        var nonOwnerOriginalSource = false
         repeat(INTEGER_LEARNING_STEPS) {
             state.checkFiniteWork()
             val event = reason(row, used, allowWideSources, target) ?: return decline("no-qualified-endpoint")
@@ -110,6 +114,10 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 }
                 state.arithmeticLearningTrace?.row("integer.retained-parent-row", event.row, state)
             } else state.arithmeticLearningTrace?.row("integer.pivot-row", event.row, state, event.trail)
+            if (event.nonOwnerOriginalSource) {
+                nonOwnerOriginalSource = true
+                state.integerNonOwnerOriginalSources++
+            }
             val combined = if (allowWideSources || retainedSources > 0) {
                 row.resolveTransient(event.row, event.variable, sourceWork, allowCompactGrowth = retainedSources > 0)
             } else row.resolve(event.row, event.variable, sourceWork)
@@ -135,10 +143,11 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 state.integerChainedProduced++
                 if (transientSteps > 0) state.integerChainedTransientProduced++
                 if (nonOwnerSource) state.integerNonOwnerProduced++
+                if (nonOwnerOriginalSource) state.integerNonOwnerOriginalProduced++
             }
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
                 combined.derivedThroughTransient(transientSteps)
-                    .derivedFromRetainedSources(retainedSources, nonOwnerSource),
+                    .derivedFromRetainedSources(retainedSources, nonOwnerSource, nonOwnerOriginalSource),
                 target, levels.size, levels, fallback)
         }
         return decline("step-limit-without-assertion")
@@ -235,7 +244,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 return it
             }
         }
-        return scannedRetainedReason(row, used, target)
+        return scannedReason(row, used, target, allowWideSources)
     }
 
     private fun retainedAmoSource(factorId: Int): IntegerConflictRow? {
@@ -301,10 +310,11 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         return null
     }
 
-    private fun scannedRetainedReason(
+    private fun scannedReason(
         row: IntegerLearningInequality,
         used: Set<PivotKey>,
         target: Int,
+        allowWideSources: Boolean,
     ): BoundEvent? {
         val cache = state.learned.integerRows ?: return null
         state.arithmeticLearningTrace?.record("integer.retained.scan")
@@ -343,7 +353,82 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 return BoundEvent(parent, variable, state.undo.size, key, nonOwnerSource = true)
             }
         }
+        if (!selectedRetainedSource) return null
+        for (position in 0 until count) {
+            val index = candidates[position]
+            val variable = row.variables[index]
+            val lower = row.coefficients[index] > 0L
+            val owner = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
+            val occurrences = state.projection.readyIntOccurrences(variable)
+            state.arithmeticLearningTrace?.record(
+                if (occurrences == null) "integer.retained.original.unindexed" else "integer.retained.original.indexed")
+            val size = occurrences?.size ?: state.baseFactorCount
+            for (offset in 0 until size) {
+                sourceWork.visit()
+                val factorId = occurrences?.get(offset) ?: offset
+                if (factorId !in 0 until state.baseFactorCount || factorId == owner) continue
+                // Negative original ids cannot alias historical trail positions.
+                val key = PivotKey(variable, -factorId - 1, lower, retained = false)
+                if (key in used) continue
+                val parent = originalTightParent(factorId, variable, lower, allowWideSources) ?: continue
+                state.arithmeticLearningTrace?.record("integer.retained.original.selected")
+                return BoundEvent(parent, variable, state.undo.size, key, nonOwnerOriginalSource = true)
+            }
+        }
         return null
+    }
+
+    private fun originalDecline(cause: String): Nothing? {
+        state.arithmeticLearningTrace?.record("integer.retained.original.reject.$cause")
+        return null
+    }
+
+    private fun originalTightParent(
+        factorId: Int,
+        variable: Int,
+        lower: Boolean,
+        allowWideSources: Boolean,
+    ): IntegerLearningInequality? {
+        val size = when (val factor = state.problem.factors[factorId]) {
+            is Linear -> factor.vars.size
+            is ExactLinear -> factor.size
+            is ReifiedLinear -> return originalDecline("guarded")
+            else -> return originalDecline("source-kind")
+        }
+        val limit = if (allowWideSources) INTEGER_SOURCE_TERMS else INTEGER_LEARNING_TERMS
+        if (size > limit) return originalDecline("term-limit")
+        // Wide extraction reserves its own visits; compact projection and normalization need funding too.
+        if (size <= INTEGER_LEARNING_TERMS) repeat(size * 4 + 8) { sourceWork.visit() }
+        val source = sourceFactor(factorId, forBoundReason = true, allowWideSources = allowWideSources)
+            ?: return originalDecline("source-qualification")
+        if (source.guard != Lit.NONE) return originalDecline("guarded")
+        val useLo = source.linear.op != LinearOp.GE
+        var parent = normalizedSource(source, useLo) ?: return originalDecline("normalization")
+        var coefficient = chargedCoefficient(parent, variable)
+        if (coefficient == 0L) return originalDecline("no-pivot")
+        if ((coefficient > 0L) == lower && source.linear.op == LinearOp.EQ) {
+            if (size <= INTEGER_LEARNING_TERMS) repeat(size * 2 + 4) { sourceWork.visit() }
+            parent = normalizedSource(source, !useLo) ?: return originalDecline("normalization")
+            coefficient = chargedCoefficient(parent, variable)
+        }
+        if ((coefficient > 0L) == lower) return originalDecline("pivot-sign")
+        var minimum = 0L
+        for (index in parent.variables.indices) {
+            sourceWork.visit()
+            val domain = state.intDomains[parent.variables[index]]
+            val endpoint = if (parent.coefficients[index] > 0L) domain.min else domain.max
+            minimum = addExact(minimum, mulExact(parent.coefficients[index], endpoint))
+        }
+        if (minimum != parent.bound) return originalDecline("not-tight")
+        return parent
+    }
+
+    private fun chargedCoefficient(row: IntegerLearningInequality, variable: Int): Long {
+        for (index in row.variables.indices) {
+            sourceWork.visit()
+            if (row.variables[index] == variable) return row.coefficients[index]
+        }
+        return 0L
     }
 
     private fun endpointLevel(row: IntegerLearningInequality, index: Int): Int {
@@ -438,5 +523,6 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val trail: Int,
         val key: PivotKey,
         val nonOwnerSource: Boolean = false,
+        val nonOwnerOriginalSource: Boolean = false,
     )
 }

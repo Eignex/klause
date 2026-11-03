@@ -71,8 +71,7 @@ class PropagationProblem private constructor(
         return ready?.get(variable)
     }
 
-    /** Propagator occurrences indexed by integer variable. */
-    val intOccurrences: Array<IntArray> by lazy {
+    private val intOccurrenceIndex = lazy {
         preparedIndexes?.intOccurrences ?: run {
             if (problem.numIntVars == 0) {
                 emptyArray()
@@ -80,6 +79,14 @@ class PropagationProblem private constructor(
                 invert(problem.numIntVars, { propagators[it] !== NoPropagator }) { it.intVars }
             }
         }
+    }
+
+    /** Propagator occurrences indexed by integer variable. */
+    val intOccurrences: Array<IntArray> by intOccurrenceIndex
+
+    internal fun readyIntOccurrences(variable: Int): IntArray? {
+        val ready = preparedIndexes?.intOccurrences ?: intOccurrenceIndex.takeIf { it.isInitialized() }?.value
+        return ready?.get(variable)
     }
 
     /** Boolean occurrences excluding factors with literal watchers. */

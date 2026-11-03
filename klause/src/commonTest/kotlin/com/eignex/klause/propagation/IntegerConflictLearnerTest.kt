@@ -44,6 +44,66 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `original tight parents should continue an owned conflict in mapped coordinates`() {
+        val native = PropagationSession(PropagationProblem(Problem(0, 5, Array(5) { IntDomain(0, 1) }, arrayOf(
+            Table(intArrayOf(4, 0), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(4, 1), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Linear(intArrayOf(1, 1, -1), intArrayOf(0, 3, 2), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(4, 0), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(4, 1), LinearOp.LE, 0),
+        ))), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(0 to 1L, 1 to 1L, 2 to -1L), 0L, Lit.NONE)), 1)
+        val cp = CpSearchComponent(native, IntArray(5) { it + 7 })
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(11, 1)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+        assertContentEquals(intArrayOf(2, 4), learned.row.variables)
+        assertContentEquals(longArrayOf(-1, 2), learned.row.coefficients)
+        assertEquals(0L, learned.row.bound)
+        assertEquals(1, learned.row.retainedSources)
+        assertTrue(learned.row.hasNonOwnerOriginalSource)
+        assertFalse(learned.row.hasNonOwnerSource)
+        assertEquals(0L, shared.intUpperBound(11))
+        val snapshot = native.learnedLifecycle()
+        assertEquals(2L, snapshot["learningIntegerNonOwnerOriginalSources"])
+        assertEquals(1L, snapshot["learningIntegerNonOwnerOriginalProduced"])
+        assertEquals(1L, snapshot["learningIntegerNonOwnerOriginalAdmitted"])
+        assertEquals(1L, snapshot["learningIntegerNonOwnerOriginalConsumed"])
+        native.releaseRetainedState()
+        assertEquals(snapshot, native.learnedLifecycle())
+    }
+
+    @Test
+    fun `guarded original parents should retain clause fallback for an owned conflict`() {
+        val native = PropagationSession(PropagationProblem(Problem(1, 5, Array(5) { IntDomain(0, 1) }, arrayOf(
+            Table(intArrayOf(4, 0), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(4, 1), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Linear(intArrayOf(1, 1, -1), intArrayOf(0, 3, 2), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(1, 3), LinearOp.LE, 0),
+            ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(4, 0), LinearOp.LE, 0),
+            ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(4, 1), LinearOp.LE, 0),
+        ))), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        assertIs<PropagationResult.Implied>(native.seed(Assumptions.None.withBool(0, true)))
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(0 to 1L, 1 to 1L, 2 to -1L), 0L, Lit.NONE)), 1)
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(4, 1))
+
+        assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
+        val snapshot = native.learnedLifecycle()
+        assertEquals(0L, snapshot["learningIntegerNonOwnerOriginalSources"])
+        assertTrue(requireNotNull(snapshot["learningIntegerDiagnostic_integer_retained_original_reject_guarded"]) > 0L)
+    }
+
+    @Test
     fun `tight owned parents should compose when tables own both eliminated bounds`() {
         val native = PropagationSession(PropagationProblem(Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
             Table(intArrayOf(2, 0), longArrayOf(0, 0, 0, 1, 1, 1)),

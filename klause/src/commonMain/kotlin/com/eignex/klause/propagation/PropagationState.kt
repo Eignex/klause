@@ -378,6 +378,10 @@ class PropagationState private constructor(
     internal var integerNonOwnerProduced = 0L
     internal var integerNonOwnerAdmitted = 0L
     internal var integerNonOwnerConsumed = 0L
+    internal var integerNonOwnerOriginalSources = 0L
+    internal var integerNonOwnerOriginalProduced = 0L
+    internal var integerNonOwnerOriginalAdmitted = 0L
+    internal var integerNonOwnerOriginalConsumed = 0L
     internal var factorAttribution: FactorAttribution? = null
     internal var historicalTableReasons = false
     internal var reasonPreflight = false

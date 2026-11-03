@@ -552,6 +552,16 @@ owner; eager clause or table supports are not projected into arithmetic.
 The child records this source kind as a primitive flag without parent references.
 Its source selections, produced children, actual admissions and first native
 consumption retain separate counters through compaction and retirement.
+If those walks fail after an owned source has entered the derivation, an original
+unconditional linear inequality can supply an opposite-sign tight parent under the
+same target-level rule. The scan reuses an already materialized integer occurrence
+index, or spends source visits walking original factor identities without building
+an index. Projection identity, input width, normalization, coefficient lookup and
+current tightness share the source allowance. Reified rows, conditional exact rows
+and support explanations supply no parent through this path. Equality orientation
+uses its normalized pivot sign. A separate primitive origin flag and lifecycle
+counters identify these original non-owner selections and their children; original
+parents do not increase the owned-source count.
 After selecting an owned source, an unconditional derivation may use the same
 32-term temporary rows even when its original seed is compact. Original historical
 sources keep that compact seed's 16-term input limit; source-reference visits,
