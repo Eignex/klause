@@ -97,10 +97,6 @@ internal object CorpusFetcher {
     /** The root to discover [collection]'s instances under: its index listing when [indexed], else its fetched tree. */
     fun listing(collection: ExternalCollection): File = indexed(collection)?.root ?: ensure(collection)
 
-    private fun present(id: String): Boolean = listOf(storageRoot, cacheRoot).any { root ->
-        File(root, id).let { it.isDirectory && it.list()?.isNotEmpty() == true }
-    }
-
     /** Resolve [source] to a file, fetching an external collection if needed. [root] locates a collection's tree; an
      *  index listing ([IndexedCollection.root]) resolves the same relative path without the collection's bytes. */
     fun resolve(source: ProblemSource, root: (ExternalCollection) -> File = ::ensure): File = when (source) {
