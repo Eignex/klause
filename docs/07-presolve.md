@@ -326,6 +326,11 @@ consumer point still reconstructs and checks the complete canonical source.
 
 A mixed source can retain its uncovered clauses and replace only proved parity
 encodings with their short source equations and an independent reduced XOR basis.
+A complete triangular basis retains the forward-eliminated matrix and its original
+right-hand sides. The mixed view selects it when its bounded rows use fewer literals
+than expansion over free coordinates, or when only its rows fit the width limit.
+Both representations remain equivalent to the captured equations, and comparison,
+snapshot references and right-hand sides debit the containing work and byte grants.
 The source equations retain local unit propagation that expansion over free coordinates
 can weaken. Their compact captured encodings and materialized rows spend the same
 private byte and work grants. Coverage records each original

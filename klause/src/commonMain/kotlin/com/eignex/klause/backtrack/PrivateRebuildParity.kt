@@ -17,6 +17,7 @@ internal class PrivateRebuildParity private constructor(
     val rows: Int,
     val modeledBytes: Long,
     val basis: PrivateRebuildAffine?,
+    val triangularBasis: PrivateRebuildParityRows?,
     private val sourceKeys: LongArray,
     private val sourceRhs: IntArray,
     val sourceRowLiterals: Long,
@@ -84,19 +85,20 @@ internal class PrivateRebuildParity private constructor(
             val covered = table.coverage() ?: return null
             val sourceRows = if (table.coveredClauses == source.numFactors) 0 else rowCount
             val words = (source.numBoolVars + 63) ushr 6
-            val bytes = tableBytes + rowCount * (words * 16L + 128L) + source.numBoolVars * 16L + sourceRows * 12L
+            val bytes = tableBytes + rowCount * (words * 16L + 128L) + source.numBoolVars * 16L +
+                sourceRows * 24L + if (sourceRows == 0) 0L else 32L
             if (table.entries * 512L + bytes > byteLimit) { onDecline("Memory"); return null }
             if (!funded(source.numBoolVars * 3L + rowCount * (words + 3L) + sourceRows * 3L)) return null
             onWorkspace(bytes)
             val fixed = Array(source.numBoolVars) { session.boolValue(it) }
-            val matrix = Matrix(rowCount, source.numBoolVars, words, fixed, funded)
+            val matrix = Matrix(rowCount, source.numBoolVars, words, fixed, sourceRows != 0, funded)
             val sourceKeys = if (sourceRows == 0) EmptyLongArray else LongArray(sourceRows)
             val sourceRhs = if (sourceRows == 0) EmptyIntArray else IntArray(sourceRows)
             if (!table.populate(matrix, sourceKeys, sourceRhs)) return null
             val pins = matrix.derive(onDecline) ?: return null
             if (pins == 0 && matrix.basis == null) { onDecline("NoPins"); return null }
             if (!funded(16L)) return null
-            return PrivateRebuildParity(source, fixed, pins, rowCount, bytes, matrix.basis,
+            return PrivateRebuildParity(source, fixed, pins, rowCount, bytes, matrix.basis, matrix.triangularBasis,
                 sourceKeys, sourceRhs, table.sourceRowLiterals, covered, table.coveredClauses)
         }
 
@@ -248,6 +250,7 @@ internal class PrivateRebuildParity private constructor(
             private val columns: Int,
             private val words: Int,
             private val fixed: Array<Boolean?>,
+            private val retainRows: Boolean,
             private val visit: (Long) -> Boolean,
         ) {
             private val masks = Array(rows) { LongArray(words) }
@@ -255,6 +258,8 @@ internal class PrivateRebuildParity private constructor(
             private val pivotColumns = IntArray(rows)
             private var added = 0
             var basis: PrivateRebuildAffine? = null
+                private set
+            var triangularBasis: PrivateRebuildParityRows? = null
                 private set
 
             fun add(key: Long, parity: Int): Boolean {
@@ -321,6 +326,11 @@ internal class PrivateRebuildParity private constructor(
                 for (row in rank until masks.size) {
                     if (!visit(2L)) return null
                     if (rhs[row] != 0) { onDecline("RefutationDeferred"); return null }
+                }
+                if (retainRows && rank > 0) {
+                    if (!visit(rank * 4L + 16L)) return null
+                    // Back substitution mutates the constants; retain the forward system separately.
+                    triangularBasis = PrivateRebuildParityRows(Array(rank) { masks[it] }, rhs.copyOf(rank))
                 }
                 if (!visit(columns * 3L)) return null
                 if (!visit(rank.toLong())) return null
