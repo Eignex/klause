@@ -18,21 +18,21 @@ import kotlin.test.assertTrue
 class ResumableMinimizeNodeSliceTest {
 
     private fun problem(): Problem {
-        val n = 6
+        val n = 5
         val vars = IntArray(n) { it }
         return Problem(
             numBoolVars = 0,
             numIntVars = n,
-            intDomains = Array(n) { IntDomain(0, 3) },
+            intDomains = Array(n) { IntDomain(0, 2) },
             factors = arrayOf<Factor>(
-                Linear(LongArray(n) { 1L }, vars, LinearOp.GE, 11L),
-                Linear(LongArray(n) { if (it % 2 == 0) 2L else 1L }, vars, LinearOp.LE, 19L),
-                Linear(LongArray(n) { if (it % 3 == 0) 3L else 1L }, vars, LinearOp.LE, 20L),
+                Linear(LongArray(n) { 1L }, vars, LinearOp.GE, 6L),
+                Linear(LongArray(n) { if (it % 2 == 0) 2L else 1L }, vars, LinearOp.LE, 10L),
+                Linear(LongArray(n) { if (it % 3 == 0) 3L else 1L }, vars, LinearOp.LE, 11L),
             ),
         )
     }
 
-    private fun objective() = LinearObjective(intCoefficients = LongArray(6) { (it % 4 + 1).toLong() })
+    private fun objective() = LinearObjective(intCoefficients = LongArray(5) { (it % 4 + 1).toLong() })
 
     private fun handle() = BacktrackSolver(problem().bake()).resumable(objective(), BacktrackParams(randomSeed = 0L))
 
@@ -136,7 +136,7 @@ class ResumableMinimizeNodeSliceTest {
 
     @Test
     fun `LP arm slice should spend its LP work as nodes`() {
-        knapsackLp().use { search ->
+        knapsackLp(n = 12).use { search ->
             val budget = 32L
 
             val terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }

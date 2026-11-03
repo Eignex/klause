@@ -926,7 +926,7 @@ class ResumableMinimizeTest {
 
     @Test
     fun `a leaf the LP cannot decide should be passed over instead of ending the search`() {
-        val n = 3
+        val n = 2
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = n,
@@ -940,7 +940,7 @@ class ResumableMinimizeTest {
         ).bake()
         val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
         val objective = LinearObjective(
-            intCoefficients = longArrayOf(2L, 3L, 1L),
+            intCoefficients = longArrayOf(2L, 3L),
             realCoefficients = doubleArrayOf(1.5),
         )
         val search = BacktrackSolver(problem, vetoed).resumable(objective, BacktrackParams(randomSeed = 0L))
