@@ -23,6 +23,8 @@ data class PortfolioStats(
     val invocationNanos: Long = 0,
     /** Per-invocation observations for requested Boolean proof sharing. */
     val booleanProof: List<BooleanProofStats> = emptyList(),
+    /** Per-invocation work observations for deferred heuristic starts. */
+    val heuristicStarts: List<HeuristicStartStats> = emptyList(),
 ) {
     /** Combine two runs' schedules: the arms of both, in order, under the first one's classification. */
     fun mergedWith(o: PortfolioStats): PortfolioStats = PortfolioStats(
@@ -34,7 +36,30 @@ data class PortfolioStats(
         sliceGrowth ?: o.sliceGrowth,
         invocationNanos + o.invocationNanos,
         booleanProof + o.booleanProof,
+        heuristicStarts + o.heuristicStarts,
     )
+}
+
+/** An initial heuristic work sample; it supplies no witness or proof authority. */
+data class HeuristicStartStats(
+    /** Existing base work allowance required before additional heuristic starts become eligible. */
+    val requiredWork: Long,
+    /** Work observed by worker label in this invocation before the admission gate opened. */
+    val workByArm: Map<String, Long>,
+    /** Whether one worker independently reached [requiredWork]. */
+    val completed: Boolean,
+    /** Nanoseconds from the portfolio invocation origin when one successful query opened the sample gate.
+     *  Null when completion time was not observed. */
+    val completionNanos: Long? = null,
+) {
+    /** Construct a sample without an observed completion time. */
+    constructor(requiredWork: Long, workByArm: Map<String, Long>, completed: Boolean) :
+        this(requiredWork, workByArm, completed, null)
+
+    /** Copy work observations while retaining the observed completion time. */
+    fun copy(requiredWork: Long = this.requiredWork, workByArm: Map<String, Long> = this.workByArm,
+        completed: Boolean = this.completed): HeuristicStartStats =
+        HeuristicStartStats(requiredWork, workByArm, completed, completionNanos)
 }
 
 /** One arm of a sequential portfolio's schedule; see [PortfolioStats]. */

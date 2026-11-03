@@ -6,7 +6,6 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.Objective
-import java.math.BigInteger
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -222,10 +221,10 @@ internal fun trajectoryRandomBoundary(state: LocalSearchState): JsonObject = bui
     val xorWow = values.keys == setOf("x", "y", "z", "w", "v", "addend")
     put("drawCounterSupported", xorWow)
     if (xorWow) {
-        val modulus = BigInteger.ONE.shiftLeft(32)
-        val inverse = BigInteger.valueOf(362437).modInverse(modulus)
-        val counter = BigInteger.valueOf(values.getValue("addend").toLong() and 0xffffffffL)
-            .multiply(inverse).mod(modulus).toLong()
+        val counter = ((values.getValue("addend").toLong() and 0xffffffffL) * XORWOW_INCREMENT_INVERSE) and
+            0xffffffffL
         put("nextIntDrawBoundaryModulo2To32", counter)
     }
 }
+
+private const val XORWOW_INCREMENT_INVERSE = 945708813L

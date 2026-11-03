@@ -10,6 +10,7 @@ import com.eignex.klause.solver.result.ArmFailure
 import com.eignex.klause.solver.result.ArmSchedule
 import com.eignex.klause.solver.result.BooleanProofStats
 import com.eignex.klause.solver.result.CoreGuidedStats
+import com.eignex.klause.solver.result.HeuristicStartStats
 import com.eignex.klause.solver.result.LocalSearchResidual
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
 import com.eignex.klause.solver.result.LocalSearchStats
@@ -30,6 +31,7 @@ import com.eignex.klause.solver.result.SchedulingStats
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SmtStats
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.SharingStats
 import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.solver.result.ValueOrderingStats
 import com.eignex.klause.util.Cancellation
@@ -37,10 +39,43 @@ import com.eignex.klause.util.parseBigInt
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration
 
 class CliStatsTest {
+    @Test
+    fun `arm output should distinguish queued incumbent offers checks and installations`() {
+        val arm = ArmSchedule(label = "ls/cbls/fixed", segments = 1, work = 1, meanReward = 0.0,
+            failures = 0, credit = emptyMap(), sharing = SharingStats(incumbents =
+            mapOf("offered" to 7L, "coalesced" to 5L, "checked" to 2L, "installed" to 1L)))
+
+        val line = portfolioStatPairs(SolveStats(portfolio = PortfolioStats(arms = listOf(arm))))
+            .toMap().getValue("arm.ls/cbls/fixed")
+
+        assertTrue(line.contains(" incumbentOffered=7"))
+        assertTrue(line.contains(" incumbentCoalesced=5"))
+        assertTrue(line.contains(" incumbentChecked=2"))
+        assertTrue(line.contains(" incumbentInstalled=1"))
+    }
+
+    @Test
+    fun `heuristic start statistics should retain work and completion by invocation`() {
+        val stats = SolveStats(portfolio = PortfolioStats(heuristicStarts = listOf(
+            HeuristicStartStats(5L, mapOf("ls/fixed" to 2L, "ls/other" to 0L), false),
+            HeuristicStartStats(5L, mapOf("ls/fixed" to 6L), true, 7L),
+        )))
+
+        val pairs = portfolioStatPairs(stats).toMap()
+
+        assertEquals("5", pairs["heuristicStart.0.requiredWork"])
+        assertEquals("false", pairs["heuristicStart.0.completed"])
+        assertEquals("2", pairs["heuristicStart.0.work.ls/fixed"])
+        assertEquals("0", pairs["heuristicStart.0.work.ls/other"])
+        assertFalse(pairs.containsKey("heuristicStart.0.completedNs"))
+        assertEquals("7", pairs["heuristicStart.1.completedNs"])
+    }
+
     @Test
     fun `Boolean proof output should retain native closures and probe subsets separately`() {
         val proof = BooleanProofStats(2, 2, 1, 5000L, 22000L, retainedProbes = 1)

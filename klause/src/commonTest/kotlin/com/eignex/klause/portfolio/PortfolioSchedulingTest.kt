@@ -8,6 +8,8 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.ownSearch
+import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
@@ -20,6 +22,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -27,6 +30,351 @@ import kotlin.time.TestTimeSource
 import kotlin.time.TimeSource
 
 class PortfolioSchedulingTest {
+    @Test
+    fun `ALNS deferral should retain every LS probe and require one independent sample`() {
+        val clock = TestTimeSource()
+        val visits = mutableListOf<Int>()
+        val sampleWork = LongArray(4)
+        var targetStart: List<Long>? = null
+        val workers = List(4) { arm ->
+            val search = ScriptedSearch({ arm == 1 && it == 0 }) {
+                visits += arm
+                clock += 1.milliseconds
+                if (arm == 1) sampleWork[arm] += 3L
+                if (arm == 2) sampleWork[arm] += if (sampleWork[arm] == 0L) 2L else 3L
+                if (arm == 3) targetStart = listOf(sampleWork[1], sampleWork[2])
+            }
+            val observed = if (arm in 1..2) object : ResumableSearch by search {
+                override val work: Long get() = sampleWork[arm]
+            } else search
+            trackingWorker("worker$arm", arm, observed).also {
+                if (arm > 0) it.family = if (arm == 3) ArmFamily.Lns else ArmFamily.LocalSearch
+                if (arm == 3) it.improvementOnly = true
+            }
+        }
+
+        val result = Portfolio(workers, fixedBandit(4, 2), baseSliceWork = 5L, maxSliceWork = 5L,
+            sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
+            it.runTimeSource = clock
+            it.initialHeuristicArms = setOf(1, 2)
+            it.initialHeuristicTargets = setOf(3)
+        }.use { it.minimize(Cancellation { targetStart != null || visits.size >= 128 }) }
+
+        assertEquals(listOf(3L, 5L), targetStart)
+        val completed = assertNotNull(result.stats.portfolio.heuristicStarts.single().completionNanos)
+        assertTrue(assertNotNull(result.stats.portfolio.arms[3].lifecycle.firstQueryNanos) >= completed)
+    }
+
+    @Test
+    fun `ALNS deferral should retain silent complete worker coverage with all LS probes`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(5)
+        val sampleWork = LongArray(5)
+        val workers = List(5) { arm ->
+            val search = ScriptedSearch({ arm == 2 && it == 0 }) {
+                elapsed[arm] += 100L
+                clock += 100.milliseconds
+                if (arm in 2..3) sampleWork[arm]++
+            }
+            val observed = if (arm in 2..3) object : ResumableSearch by search {
+                override val work: Long get() = sampleWork[arm]
+            } else search
+            trackingWorker("worker$arm", arm, observed).also {
+                if (arm >= 2) it.family = if (arm == 4) ArmFamily.Lns else ArmFamily.LocalSearch
+                if (arm == 4) it.improvementOnly = true
+            }
+        }
+
+        Portfolio(workers, fixedBandit(5, 2), reseedStaleThreshold = 0).also {
+            it.runTimeSource = clock
+            it.initialHeuristicArms = setOf(2, 3)
+            it.initialHeuristicTargets = setOf(4)
+        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+
+        val owed = (elapsed.sum() - 300L) / 4
+        for (arm in 0..1) assertTrue(elapsed[arm] >= owed - 100L)
+        for (arm in 2..3) assertTrue(elapsed[arm] > 0L)
+        assertEquals(0L, elapsed[4])
+    }
+
+    @Test
+    fun `ALNS should retain ordinary eligibility when its last sample provider retires`() {
+        var providerWork = 0L
+        var targetSlices = 0
+        var slices = 0
+        val provider = ScriptedSearch({ false }) {
+            slices++
+            providerWork += 3L
+            error("provider failed")
+        }
+        val workers = listOf(
+            trackingWorker("complete", 0, ScriptedSearch({ false }) { slices++ }),
+            trackingWorker("provider", 1, object : ResumableSearch by provider {
+                override val work: Long get() = providerWork
+            }).also { it.family = ArmFamily.LocalSearch },
+            trackingWorker("target", 2, ScriptedSearch({ false }) {
+                slices++
+                targetSlices++
+            }).also { it.family = ArmFamily.Lns },
+        )
+
+        val result = Portfolio(workers, fixedBandit(3, 0), baseSliceWork = 5L, maxSliceWork = 5L,
+            reseedStaleThreshold = 0).also {
+            it.initialHeuristicArms = setOf(1)
+            it.initialHeuristicTargets = setOf(2)
+        }.use { it.minimize(Cancellation { targetSlices > 0 || slices >= 128 }) }
+
+        assertEquals(1, targetSlices)
+        assertFalse(result.stats.portfolio.heuristicStarts.single().completed)
+    }
+
+    @Test
+    fun `incumbent gated LNS should wait for the same worker heuristic sample`() {
+        val clock = TestTimeSource()
+        val visits = mutableListOf<Int>()
+        var leaderWork = 0L
+        var lnsStartWork: Long? = null
+        val workers = List(5) { arm ->
+            val search = ScriptedSearch({ arm == 2 && it == 0 }) {
+                visits += arm
+                clock += 1.milliseconds
+                if (arm == 2) leaderWork += 2L
+                if (arm == 3) lnsStartWork = leaderWork
+            }
+            val observed = if (arm == 2) object : ResumableSearch by search {
+                override val work: Long get() = leaderWork
+            } else search
+            trackingWorker("worker$arm", arm, observed).also {
+                if (arm >= 2) it.family = if (arm == 3) ArmFamily.Lns else ArmFamily.LocalSearch
+                if (arm == 3) it.improvementOnly = true
+            }
+        }
+
+        val result = Portfolio(workers, fixedBandit(5, 2), baseSliceWork = 5L, maxSliceWork = 5L,
+            sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
+            it.runTimeSource = clock
+            it.initialHeuristicArms = setOf(2, 3, 4)
+        }.use { it.minimize(Cancellation { lnsStartWork != null || visits.size >= 128 }) }
+
+        assertEquals(6L, lnsStartWork)
+        assertTrue(result.stats.portfolio.heuristicStarts.single().completed)
+        assertTrue(0 in visits && 1 in visits)
+    }
+
+    @Test
+    fun `deferring LNS after an incumbent should retain silent complete worker coverage`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(5)
+        var leaderWork = 0L
+        val workers = List(5) { arm ->
+            val search = ScriptedSearch({ arm == 2 && it == 0 }) {
+                elapsed[arm] += 100L
+                clock += 100.milliseconds
+                if (arm == 2) leaderWork++
+            }
+            val observed = if (arm == 2) object : ResumableSearch by search {
+                override val work: Long get() = leaderWork
+            } else search
+            trackingWorker("worker$arm", arm, observed).also {
+                if (arm >= 2) it.family = if (arm == 3) ArmFamily.Lns else ArmFamily.LocalSearch
+                if (arm == 3) it.improvementOnly = true
+            }
+        }
+
+        val result = Portfolio(workers, fixedBandit(5, 2), reseedStaleThreshold = 0).also {
+            it.runTimeSource = clock
+            it.initialHeuristicArms = setOf(2, 3, 4)
+        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+
+        val owed = (elapsed.sum() - 300L) / 4
+        for (arm in 0..1) assertTrue(elapsed[arm] >= owed - 100L)
+        assertEquals(0L, elapsed[3])
+        assertEquals(0L, elapsed[4])
+        assertFalse(result.stats.portfolio.heuristicStarts.single().completed)
+    }
+
+    @Test
+    fun `paid heuristic admission should publish the checked boundary point before a sibling starts`() {
+        val clock = TestTimeSource()
+        val point = Sample(BooleanArray(0), LongArray(0))
+        var checks = 0
+        val exchange = IncumbentExchange<Sample, Double>({ a, b -> a < b }, { candidate ->
+            checks++
+            clock += 1.milliseconds
+            Verification.Accepted(candidate)
+        })
+        var leaderWork = 0L
+        var leaderSlices = 0
+        var completeSlices = 0
+        var totalSlices = 0
+        var siblingStartWork: Long? = null
+        val scripted = ScriptedSearch({ false }) {
+            totalSlices++
+            clock += 1.milliseconds
+            leaderWork += listOf(0L, 2L, 3L).getOrElse(leaderSlices++) { 0L }
+            exchange.offerFromWorker(point, 11.0 - leaderSlices) { it() }
+            exchange.offerFromWorker(point, 10.0 - leaderSlices) { it() }
+        }
+        val leader = trackingWorker("leader", 1, object : ResumableSearch by scripted {
+            override val work: Long get() = leaderWork
+        }).also {
+            it.family = ArmFamily.LocalSearch
+            it.publicationExchange = exchange
+            it.sharingMeter = SharingMeter()
+        }
+        val workers = listOf(
+            trackingWorker("complete", 0, ScriptedSearch({ false }) {
+                totalSlices++
+                completeSlices++
+                clock += 1.milliseconds
+            }),
+            leader,
+            trackingWorker("sibling", 2, ScriptedSearch({ false }) {
+                totalSlices++
+                clock += 1.milliseconds
+                siblingStartWork = leaderWork
+                assertEquals(7.0, exchange.current()?.objective)
+            }).also { it.family = ArmFamily.LocalSearch },
+        )
+
+        val result = Portfolio(workers, fixedBandit(3, 1), baseSliceWork = 5L, maxSliceWork = 5L,
+            sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
+            it.runTimeSource = clock
+            it.initialHeuristicArms = setOf(1, 2)
+        }.use { it.minimize(Cancellation { siblingStartWork != null || totalSlices >= 128 }) }
+
+        val sample = result.stats.portfolio.heuristicStarts.single()
+        assertEquals(5L, siblingStartWork)
+        assertTrue(sample.completed)
+        assertTrue(completeSlices > 0)
+        assertEquals(3, checks)
+        val offers = result.stats.portfolio.arms[1].sharing.incumbents
+        assertEquals(6L, offers.getValue("offered"))
+        assertEquals(3L, offers.getValue("coalesced"))
+        assertEquals(3L, offers.getValue("checked"))
+    }
+
+    @Test
+    fun `additional heuristic starts should wait for a complete work sample`() {
+        val visits = mutableListOf<Int>()
+        var leaderWork = 0L
+        var leaderSlices = 0
+        var siblingStartWork: Long? = null
+        val leaderSearch = ScriptedSearch({ false }) {
+            visits += 2
+            leaderWork += listOf(0L, 2L, 3L).getOrElse(leaderSlices++) { 0L }
+        }
+        val leader = object : ResumableSearch by leaderSearch {
+            override val work: Long get() = leaderWork
+        }
+        val workers = List(4) { arm ->
+            val search = if (arm == 2) leader else ScriptedSearch({ false }) {
+                visits += arm
+                if (arm == 3) siblingStartWork = leaderWork
+            }
+            trackingWorker("worker$arm", arm, search).also { if (arm >= 2) it.family = ArmFamily.LocalSearch }
+        }
+
+        Portfolio(workers, fixedBandit(4, 2), baseSliceWork = 5L, maxSliceWork = 5L,
+            sliceGrowth = 1.0, reseedStaleThreshold = 0).also {
+            it.initialHeuristicArms = setOf(2, 3)
+        }.use { it.minimize(Cancellation { siblingStartWork != null || visits.size >= 128 }) }
+
+        assertEquals(5L, siblingStartWork)
+        assertEquals(3, leaderSlices)
+    }
+
+    @Test
+    fun `cancellation should retain an incomplete heuristic sample`() {
+        var leaderWork = 0L
+        var siblingSlices = 0
+        val leaderSearch = ScriptedSearch({ false }) { leaderWork++ }
+        val leader = object : ResumableSearch by leaderSearch {
+            override val work: Long get() = leaderWork
+        }
+        val workers = listOf(
+            trackingWorker("first", 0, leader),
+            trackingWorker("second", 1, ScriptedSearch({ false }) { siblingSlices++ }),
+        ).onEach { it.family = ArmFamily.LocalSearch }
+
+        val result = Portfolio(workers, fixedBandit(2, 0), baseSliceWork = 5L, maxSliceWork = 5L,
+            reseedStaleThreshold = 0).also {
+            it.initialHeuristicArms = setOf(0, 1)
+        }.use { it.minimize(Cancellation { leaderWork >= 2L }) }
+
+        val sample = result.stats.portfolio.heuristicStarts.single()
+        assertFalse(sample.completed)
+        assertEquals(mapOf("first" to 2L, "second" to 0L), sample.workByArm)
+        assertEquals(0, siblingSlices)
+    }
+
+    @Test
+    fun `failed heuristic work should not complete another worker sample`() {
+        var failedWork = 0L
+        var nextWork = 0L
+        var thirdStartWork: Long? = null
+        var slices = 0
+        val failedSearch = ScriptedSearch({ false }) {
+            slices++
+            failedWork += 3L
+            error("startup failed")
+        }
+        val failed = object : ResumableSearch by failedSearch {
+            override val work: Long get() = failedWork
+        }
+        val nextSearch = ScriptedSearch({ false }) {
+            slices++
+            nextWork += 2L
+        }
+        val next = object : ResumableSearch by nextSearch {
+            override val work: Long get() = nextWork
+        }
+        val workers = listOf(failed, next, ScriptedSearch({ false }) {
+            slices++
+            thirdStartWork = nextWork
+        })
+            .mapIndexed { arm, search ->
+                trackingWorker("worker$arm", arm, search).also { it.family = ArmFamily.LocalSearch }
+            }
+
+        val result = Portfolio(workers, fixedBandit(3, 1), baseSliceWork = 5L, maxSliceWork = 5L,
+            reseedStaleThreshold = 0).also {
+            it.initialHeuristicArms = setOf(0, 1, 2)
+        }.use { it.minimize(Cancellation { thirdStartWork != null || slices >= 128 }) }
+
+        val sample = result.stats.portfolio.heuristicStarts.single()
+        assertEquals(6L, thirdStartWork)
+        assertEquals(3L, sample.workByArm["worker0"])
+        assertTrue(sample.completed)
+    }
+
+    @Test
+    fun `deferring heuristic starts should retain silent complete worker coverage`() {
+        val clock = TestTimeSource()
+        val elapsed = LongArray(4)
+        var leaderWork = 0L
+        val workers = List(4) { arm ->
+            val search = ScriptedSearch({ arm == 2 && it == 0 }) {
+                elapsed[arm] += 100L
+                clock += 100.milliseconds
+                if (arm == 2) leaderWork++
+            }
+            val observed = if (arm == 2) object : ResumableSearch by search {
+                override val work: Long get() = leaderWork
+            } else search
+            trackingWorker("worker$arm", arm, observed).also { if (arm >= 2) it.family = ArmFamily.LocalSearch }
+        }
+
+        Portfolio(workers, fixedBandit(4, 2), baseSliceWork = 5L, maxSliceWork = 5L,
+            reseedStaleThreshold = 0).also {
+            it.runTimeSource = clock
+            it.initialHeuristicArms = setOf(2, 3)
+        }.use { it.minimize(Cancellation { elapsed.sum() >= 8_000L }) }
+
+        val owed = (elapsed.sum() - 300L) / 4
+        for (arm in 0..1) assertTrue(elapsed[arm] >= owed - 100L)
+    }
+
     @Test
     fun `first witness workers should retire after either sibling supplies an incumbent`() {
         for (helperFindsFirst in listOf(false, true)) {
@@ -263,34 +611,52 @@ class PortfolioSchedulingTest {
     }
 
     @Test
-    fun `useless arms should take a small share of the run however many there are`() {
-        for (useless in listOf(1, 4, 12)) {
-            val slices = IntArray(useless + 1)
-            val workers = List(useless + 1) { arm ->
-                trackingWorker("arm$arm", arm, ScriptedSearch({ arm == 0 }) { slices[arm]++ })
-            }
-            var polls = 0
+    fun `one useless arm should take a small share of the run`() {
+        assertUselessArmShare(1)
+    }
 
-            Portfolio.thompson(workers).also { it.runTimeSource = TestTimeSource() }.use {
-                it.minimize(Cancellation { ++polls > 2_000 })
-            }
+    @Test
+    fun `four useless arms should take a small share of the run`() {
+        assertUselessArmShare(4)
+    }
 
-            val share = slices.drop(1).sum().toDouble() / slices.sum()
-            assertTrue(share < 0.05, "$useless useless arms took $share of the slices")
+    @Test
+    fun `twelve useless arms should take a small share of the run`() {
+        assertUselessArmShare(12)
+    }
+
+    private fun assertUselessArmShare(useless: Int) {
+        val slices = IntArray(useless + 1)
+        val workers = List(useless + 1) { arm ->
+            trackingWorker("arm$arm", arm, ScriptedSearch({ arm == 0 }) { slices[arm]++ })
         }
+        var polls = 0
+
+        Portfolio.thompson(workers).also { it.runTimeSource = TestTimeSource() }.use {
+            it.minimize(Cancellation { ++polls > 2_000 })
+        }
+
+        val share = slices.drop(1).sum().toDouble() / slices.sum()
+        assertTrue(slices.sum() > workers.size)
+        assertTrue(share < 0.05, "$useless useless arms took $share of the slices")
     }
 
     @Test
     fun `plateaued local search should cede the run to backtrack however many local search arms there are`() {
+        val clock = TestTimeSource()
         val slices = IntArray(5)
         val workers = List(5) { arm ->
-            trackingWorker("arm$arm", arm, ScriptedSearch({ arm == 0 && it == 0 }) { slices[arm]++ })
+            trackingWorker("arm$arm", arm, ScriptedSearch({ arm == 0 && it == 0 }) {
+                slices[arm]++
+                clock += 1.milliseconds
+            })
                 .also { if (arm > 0) it.family = ArmFamily.LocalSearch }
         }
-        var polls = 0
 
-        Portfolio.thompson(workers).use { it.minimize(Cancellation { ++polls > 2_000 }) }
+        Portfolio.thompson(workers).also { it.runTimeSource = clock }
+            .use { it.minimize(Cancellation { slices.sum() >= 2_000 }) }
 
+        assertEquals(2_000, slices.sum())
         assertTrue(slices[0] > slices.sum() / 2, "backtrack ran ${slices[0]} of ${slices.sum()} slices")
     }
 

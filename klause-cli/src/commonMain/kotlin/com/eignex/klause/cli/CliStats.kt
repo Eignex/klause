@@ -386,6 +386,13 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         "booleanProof.$index.workerWork" to "${proof.workerWork}",
         proof.decline?.let { "booleanProof.$index.decline" to it },
     ) }
+    val starts = stats.portfolio.heuristicStarts.flatMapIndexed { index, start ->
+        listOf(
+            "heuristicStart.$index.requiredWork" to "${start.requiredWork}",
+            "heuristicStart.$index.completed" to "${start.completed}",
+        ) + listOfNotNull(start.completionNanos?.let { "heuristicStart.$index.completedNs" to "$it" }) +
+            start.workByArm.map { (arm, work) -> "heuristicStart.$index.work.$arm" to "$work" }
+    }
     val schedule = stats.portfolio.arms.map { arm ->
         val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
         val sharing = arm.sharing.channels.entries.joinToString("") { (channel, t) ->
@@ -398,6 +405,8 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
             " initWork=${arm.initializationWork} initCancelled=${arm.initializationCancelled}" +
             "$credit$sharing" + arm.sharing.clauses.entries.sortedBy { it.key }.joinToString("") {
                 " clause" + it.key.replaceFirstChar { c -> c.uppercaseChar() } + "=" + it.value
+            } + arm.sharing.incumbents.entries.sortedBy { it.key }.joinToString("") {
+                " incumbent" + it.key.replaceFirstChar { c -> c.uppercaseChar() } + "=" + it.value
             }
     }
     val failures = stats.portfolio.arms.mapNotNull { arm ->
@@ -438,7 +447,8 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         "alnsBootstrapLsMillis" to "${alns.bootstrapLsMillis}",
         "alnsRepairMillis" to "${alns.repairMillis}",
     )
-    return listOfNotNull(profile, reseeding) + slices + proofs + schedule + phases + lifecycle + failures + inner
+    return listOfNotNull(profile, reseeding) + slices + proofs + starts + schedule + phases + lifecycle +
+        failures + inner
 }
 
 private fun diagnosticString(value: String): String = buildString {
