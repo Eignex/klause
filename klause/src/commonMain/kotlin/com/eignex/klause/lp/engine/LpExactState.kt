@@ -686,14 +686,14 @@ private class LpMatrixProjection(
             val pointers = IntArray(model.n + 1)
             for (j in 0 until model.n) {
                 meter.poll()
-                val count = pointers[j].toLong() + model.entries(j).size
+                val count = pointers[j].toLong() + model.columnEntries(j).size
                 if (count > Int.MAX_VALUE) return null
                 pointers[j + 1] = count.toInt()
             }
             val indices = IntArray(pointers.last())
             val values = DoubleArray(indices.size)
             for (j in 0 until model.n) {
-                for ((k, entry) in model.entries(j).withIndex()) {
+                for ((k, entry) in model.columnEntries(j).withIndex()) {
                     indices[pointers[j] + k] = entry.row
                     meter.poll()
                     val approximation = entry.number.approximation
