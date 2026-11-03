@@ -15,13 +15,13 @@ internal class AffineXorSeed(
         fun initializationWork(columns: Int, free: Int): Long {
             val words = (free.toLong() + 63L) / 64L
             val reasons = (free.toLong() + 64L) / 64L
-            return (free * (words + reasons) + words + reasons + columns + free * 3L + 1L) * 2L + 32L
+            return (free * (words + reasons) + words * 2L + reasons + columns + free * 3L + 1L) * 2L + 32L
         }
 
         fun modeledBytes(columns: Int, rank: Int, free: Int): Long {
             val words = (free.toLong() + 63L) / 64L
             val reasons = (free.toLong() + 64L) / 64L
-            val longSlots = free * (words + reasons) + words + reasons
+            val longSlots = free * (words + reasons) + words * 2L + reasons
             val intSlots = columns + free * 3L + 1L
             val snapshot = columns * 9L + rank * (words * 8L + 12L)
             return snapshot + longSlots * 8L + intSlots * 4L + columns * 1152L + rank * 8L + 256L

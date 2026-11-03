@@ -195,7 +195,9 @@ is included in `ModeledPrivateBytes`; `ParityJointInitializationWork` counts com
 cache initialization inside trial propagation work. `OpeningPropagationWork` is also
 a trial-work subset, including a consumer whose opening stops before publication. Joint `Fires`, `Resets`,
 `InsertedRows`, `Reductions`, `Pins`, `Conflicts` and `WideReasons` retain primitive
-per-consumer observations through retirement. A wide pin reason withholds that deduction.
+per-consumer observations through retirement. `UnitQueriesSkipped` counts queries rejected
+by the coordinate unit precheck; `CompositeBases` counts transitions to general elimination.
+A wide pin reason withholds that deduction.
 `ParityPreferredFreeColumns` reports the admitted free-coordinate selection list. Coverage declines name
 incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
 larger widths). Such a miss can retain proved global pins or a mixed view.

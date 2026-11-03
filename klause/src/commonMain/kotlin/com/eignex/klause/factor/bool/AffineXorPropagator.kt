@@ -17,8 +17,10 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
         val seen = IntArray(seed.coordinates.size) { -1 }
         val query = LongArray(seed.words)
         val support = LongArray(seed.reasonWords)
+        val unitPivots = LongArray(seed.words)
         var value = 0
         var rank = 0
+        var unitBasis = true
         var valid = false
         var queriedRank = -1
         var conflict: IntArray? = null
@@ -29,12 +31,15 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
         var pins = 0L
         var conflicts = 0L
         var wideReasons = 0L
+        var unitQueriesSkipped = 0L
+        var compositeBases = 0L
         val initializationWork = seed.initializationWork
 
         fun observations(): Map<String, Long> = mapOf(
             "Fires" to fires, "Resets" to resets, "InsertedRows" to inserted,
             "Reductions" to reductions, "Pins" to pins, "Conflicts" to conflicts,
             "WideReasons" to wideReasons, "InitializationWork" to initializationWork,
+            "UnitQueriesSkipped" to unitQueriesSkipped, "CompositeBases" to compositeBases,
         )
     }
 
@@ -66,6 +71,11 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
                 state.checkFiniteWork()
                 cache.seen[variable] = -1
             }
+            for (word in cache.unitPivots.indices) {
+                state.checkFiniteWork()
+                cache.unitPivots[word] = 0L
+            }
+            cache.unitBasis = true
             cache.rank = 0
             cache.queriedRank = -1
             cache.valid = true
@@ -92,6 +102,10 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
         for (variable in seed.variables) {
             state.checkFiniteWork()
             if (seed.coordinates[variable] == Int.MIN_VALUE || state.boolAssignedAt(variable)) continue
+            if (!mayBeDetermined(state, cache, variable)) {
+                cache.unitQueriesSkipped++
+                continue
+            }
             expression(state, cache, variable)
             if (!reduce(state, cache)) continue
             val width = reasonWidth(state, cache)
@@ -118,6 +132,21 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         (state.refPayload[factorId] as? Cache)?.conflict
+
+    private fun mayBeDetermined(state: PropagationState, cache: Cache, variable: Int): Boolean {
+        if (!cache.unitBasis) return true
+        val coordinate = seed.coordinates[variable]
+        if (coordinate < 0) {
+            state.checkFiniteWork()
+            val free = -coordinate - 1
+            return cache.unitPivots[free ushr 6] and (1L shl (free and 63)) != 0L
+        }
+        for (word in 0 until seed.words) {
+            state.checkFiniteWork()
+            if (seed.dependencies[coordinate][word] and cache.unitPivots[word].inv() != 0L) return false
+        }
+        return true
+    }
 
     private fun expression(state: PropagationState, cache: Cache, variable: Int) {
         val coordinate = seed.coordinates[variable]
@@ -157,6 +186,21 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
             }
             cache.rhs[next] = cache.value
             cache.pivotRow[column] = next
+            if (cache.unitBasis) {
+                for (word in cache.query.indices) {
+                    state.checkFiniteWork()
+                    val expected = if (word == (column ushr 6)) 1L shl (column and 63) else 0L
+                    if (cache.query[word] != expected) {
+                        cache.unitBasis = false
+                        cache.compositeBases++
+                        break
+                    }
+                }
+                if (cache.unitBasis) {
+                    val word = column ushr 6
+                    cache.unitPivots[word] = cache.unitPivots[word] or (1L shl (column and 63))
+                }
+            }
             cache.rank++
             cache.inserted++
             return true

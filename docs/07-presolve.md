@@ -360,6 +360,9 @@ coordinates; a fixed-size state-local matrix combines them and checks other sour
 coordinates for implied values. Independent assigned facts supply clause reasons
 with at most 64 literals; wider pin reasons withhold the deduction. Undo or an
 interrupted update invalidates the cache, which rebuilds from the current assignment.
+While every retained row is a coordinate unit, a metered pivot mask rejects queries
+with an unspanned coordinate before copying or reducing their expression. A composite
+row disables that precheck until the cache rebuilds. The mask shares the private grant.
 The immutable seed owns its snapshot, while each session owns its matrix and
 primitive observations. Buffer initialization and every scan, reduction and reason
 visit debit propagation work. A fresh session exposes its live propagation counter

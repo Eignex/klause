@@ -22,6 +22,26 @@ import kotlin.test.assertTrue
 
 class AffineXorPropagatorTest {
     @Test
+    fun `assigned affine combinations should determine values without coordinate assignments`() {
+        for (phase in listOf(false, true)) {
+            val seed = AffineXorSeed(intArrayOf(-1, -2, -3, 0, 1, 2), intArrayOf(0, 0, 0),
+                arrayOf(longArrayOf(3L), longArrayOf(6L), longArrayOf(5L)), 3)
+            val rows = listOf(Xor(intArrayOf(0, 2, 6), 0), Xor(intArrayOf(2, 4, 8), 0),
+                Xor(intArrayOf(0, 4, 10), 0))
+            val problem = Problem(6, 0, emptyArray(), arrayOf<Factor>(GaussianXor(rows, seed)))
+            val state = PropagationState(problem, Assumptions.None)
+            assertNull(state.runToFixpoint(allFactors = true))
+            assertTrue(state.pinBool(3, phase))
+            assertTrue(state.pinBool(4, true))
+
+            assertTrue(AffineXorPropagator(seed).propagate(state, 0))
+
+            assertEquals(!phase, state.boolValues[5])
+            for (variable in 0 until 3) assertNull(state.boolValues[variable])
+        }
+    }
+
+    @Test
     fun `opening affine sessions should stop at their reported propagation work`() {
         val seed = AffineXorSeed(intArrayOf(-1, -2, 0), intArrayOf(0), arrayOf(longArrayOf(3L)), 2)
         val rows = listOf(Xor(intArrayOf(0, 2, 4), 0))
