@@ -163,6 +163,9 @@ affine reconstruction and cannot receive unprojected canonical learned clauses.
 linear subsystem. `ParityReducedRows`, `ParityReducedLiterals` and
 `ParityCoveredClauses` identify a prepared mixed Clause/Xor view with original
 coordinate meanings; they do not count eliminated columns.
+`ParityTriangularRows` counts selected forward-eliminated rows in that reduced
+basis; zero retains free-coordinate expansion. Both representations spend the
+existing private work and memory grants.
 `ParityPreferredFreeColumns` reports the admitted free-coordinate selection list. Coverage declines name
 incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
 larger widths). Such a miss can retain proved global pins or a mixed view.
