@@ -528,6 +528,14 @@ retained-source selection retain their own cause counts, including interruption
 by the source allowance or checked arithmetic overflow. An observed owner
 is not a qualified arithmetic parent. These counters retain no parent payloads and
 use the same bounded name census as other source diagnostics.
+When an owned derivation exhausts its parent search, opt-in diagnostics classify
+endpoints above the ordinary target by owner kind and complete eager reason.
+Binary-clause classification requires every premise and conclusion to use a distinct
+declared binary integer coordinate, a canonical bound or equality atom, and active
+false antecedents, within the 16-literal limit. Decisions, root facts, lazy reasons,
+Boolean premises, nonbinary or inactive siblings and repeated coordinates stay
+separate. Classification spends the remaining source visits and retains no proof
+payload; it does not supply a parent or change row admission.
 An active owned unguarded at-most-one row over declared binary integer coordinates
 can also seed a conflict or supply an arithmetic parent before the original
 historical endpoints. A live-store check and bounded current-owner walk spend the

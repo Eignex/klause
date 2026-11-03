@@ -3,6 +3,8 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.ClausePropagator
+import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.CheckedLongOverflowException
@@ -322,7 +324,38 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 return it
             }
         }
-        return scannedReason(row, used, target, allowWideSources)
+        val scanned = scannedReason(row, used, target, allowWideSources)
+        if (scanned == null && selectedRetainedSource && combinations < INTEGER_LEARNING_STEPS) {
+            observeEagerReasons(row, target)
+        }
+        return scanned
+    }
+
+    private fun observeEagerReasons(row: IntegerLearningInequality, target: Int) {
+        val trace = state.arithmeticLearningTrace?.takeIf { it.collectDeclines } ?: return
+        for (index in row.variables.indices) {
+            sourceWork.visit()
+            if (endpointLevel(row, index) <= target) continue
+            val variable = row.variables[index]
+            val lower = row.coefficients[index] > 0L
+            val kind = state.classifyIntegerEagerReason(variable, lower, sourceWork)
+            trace.record("integer.retained.eager." + kind.diagnostic)
+            val owner = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
+            val ownerKind = when {
+                owner !in 0 until state.totalFactorCount -> "unavailable"
+                state.retiredLearnedFactor(owner) -> "retired"
+                owner < state.baseFactorCount -> when (state.problem.factors[owner]) {
+                    is Table -> "table"
+                    is Linear, is ExactLinear -> "linear"
+                    is ReifiedLinear -> "guarded-linear"
+                    else -> "other-original"
+                }
+                state.factorAt(owner) is LearnedIntegerPropagator -> "integer"
+                state.factorAt(owner) is ClausePropagator -> "clause"
+                else -> "other-learned"
+            }
+            trace.record("integer.retained.eager-owner." + ownerKind)
+        }
     }
 
     private fun retainedAmoSource(factorId: Int): IntegerConflictRow? {
