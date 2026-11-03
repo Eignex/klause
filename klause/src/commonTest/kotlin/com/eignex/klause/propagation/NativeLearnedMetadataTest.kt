@@ -73,10 +73,10 @@ class NativeLearnedMetadataTest {
     @Test
     fun `an unfunded paired watch lookup should preserve coordinates for a later grant`() {
         val metadata = NativeLearnedMetadata()
-        repeat(20_000) { metadata.add(9, false, -1, it.toLong()) }
+        repeat(32) { metadata.add(9, false, -1, it.toLong()) }
         metadata[16, NativeLearnedMetadata.WATCH_FIRST] = Int.MIN_VALUE
         metadata[16, NativeLearnedMetadata.WATCH_SECOND] = Int.MAX_VALUE
-        metadata[19_999, NativeLearnedMetadata.WATCH_FIRST]
+        for (index in 32 until 20_000) metadata.add(9, false, -1, index.toLong())
         val budget = ReclamationPreparation(0L, 256L, { false }, {})
 
         assertFailsWith<ReclamationPreparation.Deferred> {
