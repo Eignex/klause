@@ -154,9 +154,9 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
         if (row.transientSteps > 0) integerChainedTransientAdmitted++
         if (row.hasNonOwnerSource) integerNonOwnerAdmitted++
         if (row.hasNonOwnerOriginalSource) integerNonOwnerOriginalAdmitted++
-        if (row.declaredBoundTerms > 0) integerDeclaredBoundAdmitted++
-        if (row.declaredBoundModes != 0) integerDeclaredBoundExtendedAdmitted++
     }
+    if (row.declaredBoundTerms > 0) integerDeclaredBoundAdmitted++
+    if (row.declaredBoundModes != 0) integerDeclaredBoundExtendedAdmitted++
     val propagator = LearnedIntegerPropagator(row)
     val factor = totalFactorCount
     addGeneralLearnedRow(propagator, 0, lbd, false, OWN_ORIGIN)
@@ -532,12 +532,14 @@ private fun PropagationState.noteLearnedStage(index: Int, stage: LearnedStage, b
     learned.lifecycle.note(learnedKind(index), stage)
     if (stage == LearnedStage.Consumed) {
         val propagator = learned.store[index]
-        if (propagator is LearnedIntegerPropagator && propagator.row.transientSteps > 0) integerTransientConsumed++
-        if (propagator is LearnedIntegerPropagator && propagator.row.retainedSources > 0) {
-            integerChainedConsumed++
-            if (propagator.row.transientSteps > 0) integerChainedTransientConsumed++
-            if (propagator.row.hasNonOwnerSource) integerNonOwnerConsumed++
-            if (propagator.row.hasNonOwnerOriginalSource) integerNonOwnerOriginalConsumed++
+        if (propagator is LearnedIntegerPropagator) {
+            if (propagator.row.transientSteps > 0) integerTransientConsumed++
+            if (propagator.row.retainedSources > 0) {
+                integerChainedConsumed++
+                if (propagator.row.transientSteps > 0) integerChainedTransientConsumed++
+                if (propagator.row.hasNonOwnerSource) integerNonOwnerConsumed++
+                if (propagator.row.hasNonOwnerOriginalSource) integerNonOwnerOriginalConsumed++
+            }
             if (propagator.row.declaredBoundTerms > 0) integerDeclaredBoundConsumed++
             if (propagator.row.declaredBoundModes != 0) integerDeclaredBoundExtendedConsumed++
         }
