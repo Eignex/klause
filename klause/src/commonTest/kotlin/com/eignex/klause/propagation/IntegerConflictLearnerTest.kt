@@ -44,6 +44,50 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `declared bounds should compact a temporary owned consequence at its mapped backjump`() {
+        val parentVariables = intArrayOf(0, 9) + IntArray(12) { it + 10 }
+        val native = PropagationSession(PropagationProblem(Problem(0, 24, Array(24) { IntDomain(0, 1) }, arrayOf(
+            Table(intArrayOf(22, 0), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(22, 1), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(22, 9), longArrayOf(0, 0, 0, 1, 1, 0)),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 23), LinearOp.LE, 1),
+            Linear(IntArray(8) { 1 } + intArrayOf(-1), IntArray(8) { it + 1 } + intArrayOf(23),
+                LinearOp.LE, 0),
+            Linear(IntArray(14) { 1 }, parentVariables, LinearOp.GE, 13),
+            Linear(intArrayOf(1, -1), intArrayOf(22, 1), LinearOp.LE, 0),
+            Linear(intArrayOf(1, 1), intArrayOf(22, 9), LinearOp.LE, 1),
+        ))), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            (0..8).associateWith { 1L }, 1L, Lit.NONE)), 1)
+        val cp = CpSearchComponent(native, IntArray(24) { it + 7 })
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(29, 1)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+        assertContentEquals(intArrayOf(22), learned.row.variables)
+        assertContentEquals(longArrayOf(1), learned.row.coefficients)
+        assertEquals(0L, learned.row.bound)
+        assertEquals(1, learned.row.retainedSources)
+        assertEquals(3, learned.row.transientSteps)
+        assertEquals(19, learned.row.declaredBoundTerms)
+        assertTrue(learned.row.hasNonOwnerOriginalSource)
+        assertEquals(0L, shared.intUpperBound(29))
+        val snapshot = native.learnedLifecycle()
+        assertEquals(3L, snapshot["learningIntegerNonOwnerOriginalSources"])
+        assertEquals(57L, snapshot["learningIntegerDeclaredBoundTerms"])
+        assertEquals(1L, snapshot["learningIntegerDeclaredBoundProduced"])
+        assertEquals(1L, snapshot["learningIntegerDeclaredBoundAdmitted"])
+        assertEquals(1L, snapshot["learningIntegerDeclaredBoundConsumed"])
+        native.releaseRetainedState()
+        assertEquals(snapshot, native.learnedLifecycle())
+    }
+
+    @Test
     fun `original tight parents should continue an owned conflict in mapped coordinates`() {
         val native = PropagationSession(PropagationProblem(Problem(0, 5, Array(5) { IntDomain(0, 1) }, arrayOf(
             Table(intArrayOf(4, 0), longArrayOf(0, 0, 0, 1, 1, 1)),

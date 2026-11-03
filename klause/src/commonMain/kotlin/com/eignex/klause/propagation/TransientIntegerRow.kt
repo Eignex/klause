@@ -1,6 +1,9 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 
 internal class TransientIntegerRow private constructor(
     override val variables: IntArray,
@@ -23,6 +26,35 @@ internal class TransientIntegerRow private constructor(
             if (variables[index] == variable) return index
         }
         return -1
+    }
+
+    fun declaredBoundConsequence(state: PropagationState): IntegerConflictRow? = try {
+        val bounds = state.problem.intBounds
+        val terms = mutableMapOf<Int, Long>()
+        var residual = bound
+        var removed = 0
+        for (index in variables.indices) {
+            work.visit()
+            val variable = variables[index]
+            val coefficient = coefficients[index]
+            val domain = state.intDomains[variable]
+            val available = if (coefficient > 0L) bounds.hasLower(variable) else bounds.hasUpper(variable)
+            val current = if (coefficient > 0L) domain.min else domain.max
+            val declared = if (!available) null else if (coefficient > 0L) bounds.lower(variable)
+                else bounds.upper(variable)
+            // Immutable model bounds are axioms; root pins can be call-scoped.
+            if (declared != null && current == declared) {
+                residual = subExact(residual, mulExact(coefficient, declared))
+                removed++
+            } else terms[variable] = coefficient
+        }
+        if (removed == 0 || terms.size > INTEGER_LEARNING_TERMS) null else {
+            repeat(terms.size * 4 + 8) { work.visit() }
+            IntegerConflictRow.normalized(terms, residual, Lit.NONE)?.derivedFromDeclaredBounds(removed)
+        }
+    } catch (_: CheckedLongOverflowException) {
+        state.arithmeticLearningTrace?.record("integer.retained.box.reject.overflow")
+        null
     }
 
     companion object {

@@ -571,6 +571,17 @@ enters the store or supplies a propagation reason. Separate joint-origin counter
 identify production, admission and first consumption of the same child with both
 a retained source and a temporary step. These use its existing origin fields and
 remain available after retirement.
+An unconditional temporary row with an owned source and an original non-owner
+parent may also propose a compact consequence using immutable declared bounds.
+A positive term can be omitted using its declared lower bound, or a negative term
+using its declared upper bound, only when that bound equals its current minimizing
+endpoint. Checked subtraction preserves the current conflict while weakening the
+inequality globally; root pins and derived live bounds supply no axioms. Projection
+and normalization spend the same source allowance. The original temporary row
+continues the derivation if the proposal is unavailable, duplicate or nonasserting.
+A retained child records its omitted-term count without bound-proof references;
+proposal terms, produced children, admission and first consumption have separate
+lifecycle counters through compaction and retirement.
 Only a compact result is tested for admission. A retained row must propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have

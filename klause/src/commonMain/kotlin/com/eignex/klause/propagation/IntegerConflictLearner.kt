@@ -124,18 +124,28 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             combined ?: return decline("combination-shape-or-guard")
             row = combined
             if (combined.minimum(state) <= combined.bound) return decline("combination-lost-conflict")
-            if (combined !is IntegerConflictRow) {
+            val compact = if (combined is IntegerConflictRow) combined else {
                 transientSteps++
-                return@repeat
+                if (!nonOwnerOriginalSource) return@repeat
+                val proposal = (combined as? TransientIntegerRow)?.declaredBoundConsequence(state) ?: return@repeat
+                state.integerDeclaredBoundTerms += proposal.declaredBoundTerms
+                state.arithmeticLearningTrace?.record("integer.retained.box.proposal")
+                proposal
             }
-            if (state.learned.integerRows?.any { it.row.subsumes(combined) } == true) return decline("duplicate")
-            val asserts = combined.assertsAt(state, trail)
+            if (state.learned.integerRows?.any { it.row.subsumes(compact) } == true) {
+                if (compact !== combined) {
+                    state.arithmeticLearningTrace?.record("integer.retained.box.reject.duplicate")
+                    return@repeat
+                }
+                return decline("duplicate")
+            }
+            val asserts = compact.assertsAt(state, trail)
             state.arithmeticLearningTrace?.record("integer.assertion", target.toLong(), trail.toLong(),
                 if (asserts) 1 else 0)
             if (!asserts) return@repeat
-            val levels = combined.variables.indices.map { index ->
-                val variable = combined.variables[index]
-                val lower = combined.coefficients[index] > 0L
+            val levels = compact.variables.indices.map { index ->
+                val variable = compact.variables[index]
+                val lower = compact.coefficients[index] > 0L
                 val domain = state.intDomains[variable]
                 state.boundEstablishmentLevel(variable, if (lower) domain.min else domain.max, lower) ?: 0
             }.plus(fallback.decisionLevels.toList()).distinct().sorted().toIntArray()
@@ -144,9 +154,10 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 if (transientSteps > 0) state.integerChainedTransientProduced++
                 if (nonOwnerSource) state.integerNonOwnerProduced++
                 if (nonOwnerOriginalSource) state.integerNonOwnerOriginalProduced++
+                if (compact.declaredBoundTerms > 0) state.integerDeclaredBoundProduced++
             }
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
-                combined.derivedThroughTransient(transientSteps)
+                compact.derivedThroughTransient(transientSteps)
                     .derivedFromRetainedSources(retainedSources, nonOwnerSource, nonOwnerOriginalSource),
                 target, levels.size, levels, fallback)
         }

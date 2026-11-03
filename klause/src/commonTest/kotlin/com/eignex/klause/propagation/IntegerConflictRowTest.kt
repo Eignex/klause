@@ -16,6 +16,68 @@ import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
     @Test
+    fun `a compact declared box consequence should stay valid outside the current pins`() {
+        val state = PropagationState(Problem(0, 17, Array(17) {
+            if (it < 3) IntDomain(0, 2) else IntDomain(0, 1)
+        }, emptyArray()), Assumptions.None.withInt(0, 1).withInt(1, 1).withInt(2, 1))
+        val work = IntegerSourceWork(state)
+        val row = requireNotNull(TransientIntegerRow.normalized((0..16).associateWith {
+            when (it) {
+                0 -> 2L
+                1 -> 1L
+                2 -> -1L
+                else -> if (it % 2 == 0) 1L else -1L
+            }
+        }, -6L, work))
+
+        val consequence = requireNotNull(row.declaredBoundConsequence(state))
+
+        assertTrue(consequence.minimum(state) > consequence.bound)
+        assertEquals(14, consequence.declaredBoundTerms)
+        for (x in 0L..2L) for (y in 0L..2L) for (z in 0L..2L) for (pattern in 0..3) {
+            val values = LongArray(17) { variable ->
+                when {
+                    variable == 0 -> x
+                    variable == 1 -> y
+                    variable == 2 -> z
+                    pattern == 0 -> 0L
+                    pattern == 1 -> 1L
+                    pattern == 2 -> if (variable % 2 == 0) 0L else 1L
+                    else -> if (variable % 2 == 0) 1L else 0L
+                }
+            }
+            val activity = row.variables.indices.sumOf { row.coefficients[it] * values[row.variables[it]] }
+            if (activity <= row.bound) {
+                assertTrue(consequence.variables.indices.sumOf {
+                    consequence.coefficients[it] * values[consequence.variables[it]]
+                } <= consequence.bound)
+            }
+        }
+    }
+
+    @Test
+    fun `root pins should not supply declared bounds for temporary weakening`() {
+        var assumptions = Assumptions.None
+        for (variable in 0..16) assumptions = assumptions.withInt(variable, 1)
+        val state = PropagationState(Problem(0, 17, Array(17) { IntDomain(0, 1) }, emptyArray()), assumptions)
+        val row = requireNotNull(TransientIntegerRow.normalized(
+            (0..16).associateWith { 1L }, 16L, IntegerSourceWork(state)))
+
+        assertNull(row.declaredBoundConsequence(state))
+    }
+
+    @Test
+    fun `unrepresentable declared bound arithmetic should withhold a compact consequence`() {
+        val state = PropagationState(Problem(0, 17, Array(17) {
+            if (it == 0) IntDomain(Long.MAX_VALUE - 1L, Long.MAX_VALUE) else IntDomain(0, 1)
+        }, emptyArray()), Assumptions.None)
+        val row = requireNotNull(TransientIntegerRow.normalized(
+            (0..16).associateWith { if (it == 0) 2L else 1L }, 0L, IntegerSourceWork(state)))
+
+        assertNull(row.declaredBoundConsequence(state))
+    }
+
+    @Test
     fun `successive wide cancellations should normalize to a compact integer consequence`() {
         for (reverse in listOf(false, true)) {
             val state = PropagationState(Problem(0, 18, Array(18) { IntDomain(0, 1) }, emptyArray()), Assumptions.None)
