@@ -278,7 +278,16 @@ objective identity. A live root owner copies at most one MiB within the remainin
 root and LP allowance. A closed auxiliary rounding solver transfers its completed
 output array into the same private storage cap after its work is charged. The
 constant-size handoff can preserve a completed point across a slice interruption;
-later pinning still polls its fresh token. The first pinning attempt and its resumes
+later pinning still polls its fresh token. A completed auxiliary point keeps its
+original problem identity and can transfer to ordinary integer value ordering
+under a retained-root plan with the same objective. This handoff requires the
+owned complete point, matching source coordinates and the existing guidance
+storage and transport allowance. A different source or objective, an unfinished
+or masked auxiliary proposal, source real variables or disabled LP branching
+withholds it.
+Retention and actual auxiliary value use have separate observations. The transfer
+carries no basis, certificate or numerical-owner authority; ordinary search keeps
+its alternatives and complete source checks. The first pinning attempt and its resumes
 use the same private coordinate array, so a completed pin prefix belongs to that
 guide. Rounding uses the stored coordinates without another numerical solve; its
 propagation and source-publication checks still run. An incomplete or differently

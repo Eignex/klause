@@ -5,6 +5,7 @@ internal class RootPrimalTargets(
     val booleanColumns: IntArray,
     val coordinates: DoubleArray,
     val knownColumns: BooleanArray?,
+    val auxiliary: Boolean = false,
 ) {
     var valueOrderOffered: Boolean = false
     var componentOrderAttempted: Boolean = false
