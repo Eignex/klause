@@ -642,7 +642,10 @@ After all three directions decline, a funded private repair can revisit earlier 
 within the current component. It explores nearest and adjacent target values, or the
 domain endpoints for unknown targets, using an owned bounded frame stack. Completed
 earlier components remain pinned. Interrupted probes roll back to their last complete
-fixpoint; pending alternatives resume under the next invocation token. Frames count
+fixpoint; pending alternatives resume under the next invocation token. An eligible
+partial-owner refresh preserves an active private repair with matching source,
+objective, relaxation and target identities instead of copying a replacement guide.
+Owner invalidation and changed identities keep their ordinary retirement behavior. Frames count
 against the same guidance storage cap, and propagation and retraction spend the remaining
 cumulative root and worker work. Exhausting the candidate choices or allowance supplies
 no infeasibility authority. Completed earlier integer values can remain soft preferences

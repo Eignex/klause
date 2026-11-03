@@ -607,6 +607,7 @@ internal class LpEngine(
         STALE_OWNER,
         CANCELLED,
         COMPLETE_GUIDANCE,
+        PINNING_GUIDANCE,
         NO_ALLOWANCE,
         NO_COORDINATES,
         INVALID_SHAPE,
@@ -628,6 +629,14 @@ internal class LpEngine(
         if (cancellation()) return PartialPrimalRead.CANCELLED
         val previous = rootRoundingWarmStart
         if (previous?.primal != null && previous.knownColumns == null) return PartialPrimalRead.COMPLETE_GUIDANCE
+        if (previous != null && previous.primal != null && previous.objective === objective &&
+            previous.sourceProblem === problem && previous.relaxation === relaxation &&
+            rootPrimalTargets?.coordinates === previous.primal && !previous.roundingComplete &&
+            previous.componentRounding?.repair?.active == true && previous.pinning?.fixpointCancelled == false
+        ) {
+            sink.lp.observePrimalPhase("PRIMAL_CP_GUIDANCE", "REFRESH_RETAINED", 0L)
+            return PartialPrimalRead.PINNING_GUIDANCE
+        }
         val model = relaxation.model
         val work = partialPrimalGuidanceWork(model) ?: return PartialPrimalRead.NO_ALLOWANCE
         val started = TimeSource.Monotonic.markNow()
