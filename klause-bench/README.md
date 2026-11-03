@@ -26,9 +26,8 @@ Execution verifies the planned file and directory identities before each solve.
 Declared-input planning uses the complete corpus-pack index even when only a subset
 of its members is materialized locally. Each solve verifies its planned input bytes.
 
-The Linux JVM lab manifest requests a source snapshot with the selected revision's files and original Git commit identity.
-Its builds and tools use the current revision without requiring ancestors or tags.
-The standard Mac manifest uses Git bundle transport.
+The standard and Linux JVM lab manifests request source snapshots: the lab stages the selected revision as a compact
+Git pack with its original commit identity. Builds and tools use the current revision without requiring ancestors or tags.
 
 Corpus-pack indexes are committed under `klause-bench/corpus-index/<collection>.tsv.gz`
 (`path<TAB>sha256<TAB>bytes`), so declared-input planning makes no network requests and
