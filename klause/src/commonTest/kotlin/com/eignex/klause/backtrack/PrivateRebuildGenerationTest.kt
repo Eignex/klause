@@ -120,6 +120,32 @@ class PrivateRebuildGenerationTest {
     }
 
     @Test
+    fun `mixed parity rows should retain short expanded deductions`() {
+        for (phase in 0..1) for (native in listOf(false, true)) {
+            val rows = listOf(intArrayOf(0, 1, 5) to phase, intArrayOf(0, 5, 6) to 0,
+                intArrayOf(2, 6, 7) to 0, intArrayOf(3, 7, 8) to 0, intArrayOf(4, 8, 9) to 0)
+            val clauses = rows.flatMap { (variables, target) ->
+                (0 until 8).filter { it.countOneBits() % 2 != target }.map { mask ->
+                    Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                }
+            } + Clause(intArrayOf(Lit.make(10, true), Lit.make(11, true)))
+            val source = Problem(12, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+            val canonical = PropagationSession(source, nativeSat = native)
+            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
+                Cancellation.Never, parity = captured))
+            val consumer = PropagationSession(generation.problem)
+
+            assertIs<PropagationResult.Implied>(consumer.pinBool(1, false))
+
+            assertEquals(phase != 0, consumer.boolValue(6))
+            assertNull(consumer.boolValue(0))
+            assertNull(consumer.boolValue(5))
+            for (variable in 0 until 12) assertNull(canonical.boolValue(variable))
+        }
+    }
+
+    @Test
     fun `learned equivalences should open a reconstructable private consumer without root pins`() {
         for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(

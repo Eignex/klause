@@ -91,19 +91,12 @@ internal class PrivateRebuildGeneration private constructor(
             if (parity != null) entries += source.numBoolVars * 2L
             val affine = parity?.affine
             val basis = parity?.basis
-            var rowLiterals = if (affine == null && basis != null) {
-                basis.rowLiteralCount(cancellation) {}
+            val rowPlan = if (affine == null && basis != null) {
+                basis.planRows(cancellation, checkNotNull(parity).triangularBasis, onDecline)
             } else null
             if (cancellation()) return null
-            val triangularLiterals = if (affine == null && basis != null) {
-                checkNotNull(parity).triangularBasis?.rowLiteralCount(cancellation)
-            } else null
-            if (cancellation()) return null
-            val useTriangularRows = triangularLiterals != null &&
-                (rowLiterals == null || triangularLiterals < rowLiterals)
-            if (useTriangularRows) rowLiterals = triangularLiterals
-            val rowView = rowLiterals != null
-            if (affine == null && basis != null && !rowView) onDecline("ParityRowWidth")
+            val rowLiterals = rowPlan?.literals
+            val rowView = rowPlan != null
             val sourceRows = if (rowView) checkNotNull(parity).sourceRowCount else 0
             val sourceRowLiterals = if (rowView) checkNotNull(parity).sourceRowLiterals else 0L
             if (parity != null && affine == null && !rowView && parity.newPins == 0) return null
@@ -186,9 +179,9 @@ internal class PrivateRebuildGeneration private constructor(
             }
             if (rowView) {
                 residual.addAll(checkNotNull(parity).materializeSourceRows(cancellation) ?: return null)
-                val rows = if (useTriangularRows) {
-                    checkNotNull(checkNotNull(parity).triangularBasis).materializeRows(cancellation)
-                } else checkNotNull(basis).materializeRows(cancellation)
+                val rows = checkNotNull(basis).materializeRows(
+                    cancellation, checkNotNull(rowPlan), parity.triangularBasis,
+                )
                 residual.addAll(rows ?: return null)
             }
             val preferred = if (rowView) {
@@ -305,7 +298,7 @@ internal class PrivateRebuildGeneration private constructor(
                 neighborhood?.sourceFactors ?: 0, rebuild.steps.count { it is RebuildStep.CopyLiteral },
                 parity?.newPins ?: 0, affine?.rank ?: 0, affine?.freeColumns ?: 0,
                 if (rowView) checkNotNull(basis).rank else 0, rowLiterals ?: 0L,
-                if (useTriangularRows) checkNotNull(basis).rank else 0,
+                rowPlan?.triangularRows ?: 0,
                 if (rowView) checkNotNull(parity).coveredClauses else 0, sourceRows, sourceRowLiterals, preferred)
         }
     }
