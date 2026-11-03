@@ -216,7 +216,7 @@ class FiniteExecutionTest {
         )) {
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = options, nodeBudget = NodeBudget(5_000),
+                executionOptions = options, nodeBudget = NodeBudget(50_000),
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
