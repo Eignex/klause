@@ -188,6 +188,40 @@ class SolveMetricTest {
         assertNull(result.stats["sourceValidation"])
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `harness timings retain invocation boundaries and requested budgets on success and failure`(fails: Boolean) {
+        var nanos = 0L
+        val settings = SolverInvocation.Settings(seed = 17)
+        val budget = Budget(10000)
+        val invocation = SolverInvocation.Result(
+            true, null, null, proven = false,
+            stats = mapOf("sourceInvocationMs" to "7"), rawOutput = "v X=1\n", command = "cli", elapsedMs = 7,
+        )
+
+        val (record, raw) = SolveMetric.solve(
+            entry(), settings, budget, "now", "fixture",
+            installedBuild = { nanos += 30_000_000; null },
+            invoke = { _, supplied, allowance, _ ->
+                assertEquals(settings, supplied)
+                assertEquals(budget, allowance)
+                nanos += 10_000_000
+                if (fails) throw SolverInvocation.Failure(invocation, "failed")
+                invocation
+            },
+            timings = HarnessTimings { nanos },
+        )
+
+        assertEquals("30", record.stats["harnessBuildProvenanceMs"])
+        assertEquals("10", record.stats["harnessInvocationMs"])
+        assertEquals("40", record.stats["harnessSolveMs"])
+        assertEquals("7", record.stats["sourceInvocationMs"])
+        assertEquals(7L, record.elapsedMs)
+        assertEquals(10000L, record.budgetMs)
+        assertEquals(invocation.rawOutput, raw)
+        assertEquals(fails, "errorClass" in record.stats)
+    }
+
     private fun entry(): ResolvedProblem {
         val mps = ProblemRef(
             "bounded-decimal-constant",
