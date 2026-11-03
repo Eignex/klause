@@ -408,6 +408,32 @@ class PrivateRebuildParityTest {
     }
 
     @Test
+    fun `sparse parity discovery should return reconstructable bases within its work grant`() {
+        val rows = 1_024
+        val clauses = (0 until rows).flatMap { row ->
+            (0..7).filter { it.countOneBits() % 2 != row % 2 }.map { mask ->
+                Clause(IntArray(3) {
+                    val column = if (it == 2) rows + 1 else row + it
+                    Lit.make(column, mask and (1 shl it) == 0)
+                })
+            }
+        }.toTypedArray<Factor>()
+        val session = PropagationSession(Problem(rows + 2, 0, emptyArray(), clauses).bake())
+        var spent = 0L
+
+        val captured = assertNotNull(PrivateRebuildParity.capture(session, 16_777_216L, { work ->
+            if (work > 1_048_576L - spent) false else { spent += work; true }
+        }))
+        val basis = assertNotNull(captured.basis)
+        val point = basis.reconstruct(Sample(BooleanArray(rows + 2) { it % 2 == 0 }, longArrayOf()))
+
+        assertEquals(rows, basis.rank)
+        assertTrue(clauses.all { factor ->
+            (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+        })
+    }
+
+    @Test
     fun `insufficient modeled parity memory should withhold the derived view`() {
         val clauses = (0..3).flatMap { excluded ->
             val columns = (0..3).filter { it != excluded }

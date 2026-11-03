@@ -306,7 +306,11 @@ their complete two- and four-clause Boolean encodings. Each clause excludes one 
 the complete parity class of exclusions entails the opposite parity equation.
 A preparation-only GF(2) matrix substitutes the canonical global pins and uses
 forward elimination from higher source slots followed by affine back substitution
-over its free coordinates. This ordering favors earlier slots as free coordinates.
+over its free coordinates. Private column-to-row bitsets select pivots and restrict
+elimination to rows containing the pivot. Row swaps and XOR updates maintain that
+index; its primitive words, reference slots, initialization and visits spend the
+same modeled-byte and work grants. The index is discarded with discovery.
+This ordering favors earlier slots as free coordinates.
 A pivot is globally forced only when its complete free-coordinate dependency
 cancels. Additional Boolean pins are emitted only after complete elimination.
 Incomplete clause groups, duplicate exclusions and partial matrix work grant no
