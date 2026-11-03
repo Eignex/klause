@@ -76,9 +76,9 @@ internal object CorpusFetcher {
     private val indexes: CorpusIndexes get() = CorpusIndexes(storageRoot)
 
     /**
-     * [collection] by its complete pack index when [declaredInputs] is on. Materialized local members can be a subset
-     * of the collection. A missing local index is fetched from the mirror; the pack itself is never downloaded here.
-     * Returns null when declared inputs are off or no index describes the pack.
+     * [collection] by its complete pack index when [declaredInputs] is on and some indexed members are absent locally.
+     * A complete local tree keeps byte authority. A missing local index is fetched from the mirror; the pack itself
+     * is never downloaded here. Returns null when declared inputs are off or no index describes the pack.
      */
     fun indexed(collection: ExternalCollection): IndexedCollection? {
         if (!declaredInputs) return null
@@ -88,6 +88,10 @@ internal object CorpusFetcher {
                 System.err.println("corpus index of '${collection.id}' unavailable: ${it.javaClass.simpleName}")
             }.getOrNull()?.also(indexes::save)
         } ?: return null
+        val local = File(cacheRoot, collection.id)
+        if (local.isDirectory && !File(local, CorpusStore.SELECTIVE).exists() &&
+            index.files.all { File(local, it.path).isFile }
+        ) return null
         return indexes.view(index)
     }
 
