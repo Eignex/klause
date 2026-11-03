@@ -368,7 +368,10 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
  */
 internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val profile = stats.portfolio.profile?.let {
-        "profile" to "${it.problemClass} optimizing=${it.optimizing} wide=${it.wide} scheduling=${it.scheduling}"
+        "profile" to buildString {
+            append(it.problemClass).append(" optimizing=").append(it.optimizing)
+            append(" wide=").append(it.wide).append(" scheduling=").append(it.scheduling)
+        }
     }
     val reseeding = stats.portfolio.reseedStaleThreshold?.let { "portfolioReseedStaleThreshold" to "$it" }
     val slices = listOfNotNull(
@@ -387,18 +390,23 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         proof.decline?.let { "booleanProof.$index.decline" to it },
     ) }
     val schedule = stats.portfolio.arms.map { arm ->
-        val credit = arm.credit.entries.joinToString("") { (signal, amount) -> " $signal=${round4(amount)}" }
-        val sharing = arm.sharing.channels.entries.joinToString("") { (channel, t) ->
-            " share$channel=us:${t.nanos / NANOS_PER_MICRO},out:${t.exported},in:${t.imported},dup:${t.duplicates}"
-        }
-        "arm.${arm.label}" to
-            "segments=${arm.segments} work=${arm.work} ms=${arm.millis} reward=${round4(arm.meanReward)} " +
-            "failures=${arm.failures} faults=${arm.faults} maxMs=${arm.maxMillis} " +
-            "initMs=${arm.initializationMillis} reseeds=${arm.reseeds}" +
-            " initWork=${arm.initializationWork} initCancelled=${arm.initializationCancelled}" +
-            "$credit$sharing" + arm.sharing.clauses.entries.sortedBy { it.key }.joinToString("") {
-                " clause" + it.key.replaceFirstChar { c -> c.uppercaseChar() } + "=" + it.value
+        "arm.${arm.label}" to buildString {
+            append("segments=").append(arm.segments).append(" work=").append(arm.work)
+            append(" ms=").append(arm.millis).append(" reward=").append(round4(arm.meanReward))
+            append(" failures=").append(arm.failures).append(" faults=").append(arm.faults)
+            append(" maxMs=").append(arm.maxMillis).append(" initMs=").append(arm.initializationMillis)
+            append(" reseeds=").append(arm.reseeds).append(" initWork=").append(arm.initializationWork)
+            append(" initCancelled=").append(arm.initializationCancelled)
+            for ((signal, amount) in arm.credit) append(' ').append(signal).append('=').append(round4(amount))
+            for ((channel, t) in arm.sharing.channels) {
+                append(" share").append(channel).append("=us:").append(t.nanos / NANOS_PER_MICRO)
+                append(",out:").append(t.exported).append(",in:").append(t.imported)
+                append(",dup:").append(t.duplicates)
             }
+            for ((key, value) in arm.sharing.clauses.entries.sortedBy { it.key }) {
+                append(" clause").append(key.replaceFirstChar { it.uppercaseChar() }).append('=').append(value)
+            }
+        }
     }
     val failures = stats.portfolio.arms.mapNotNull { arm ->
         arm.failure?.let {
@@ -409,23 +417,31 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         }
     }
     val phases = stats.portfolio.arms.flatMap { arm -> arm.phases.map { phase ->
-        "armPhase.${arm.label}.${phase.phase}" to
-            "segments=${phase.segments} work=${phase.work} ns=${phase.nanos} " +
-            "checks=${phase.checks} checkNs=${phase.checkingNanos} incumbents=${phase.incumbents} " +
-            "closures=${phase.closures} initNs=${phase.initializationNanos} initWork=${phase.initializationWork} " +
-            "preparationNs=${phase.preparationNanos}" + phase.credit.entries.joinToString("") {
-                " ${it.key}=${round4(it.value)}"
+        "armPhase.${arm.label}.${phase.phase}" to buildString {
+            append("segments=").append(phase.segments).append(" work=").append(phase.work)
+            append(" ns=").append(phase.nanos).append(" checks=").append(phase.checks)
+            append(" checkNs=").append(phase.checkingNanos).append(" incumbents=").append(phase.incumbents)
+            append(" closures=").append(phase.closures).append(" initNs=").append(phase.initializationNanos)
+            append(" initWork=").append(phase.initializationWork)
+            append(" preparationNs=").append(phase.preparationNanos)
+            for ((signal, amount) in phase.credit) {
+                append(' ').append(signal).append('=').append(round4(amount))
             }
+        }
     } }
     val lifecycle = stats.portfolio.arms.map { arm ->
         val life = arm.lifecycle
-        "armLifecycle.${arm.label}" to
-            "createdNs=${life.createdNanos} constructionNs=${life.constructionNanos} " +
-            "firstQueryNs=${life.firstQueryNanos} availableNs=${life.incumbentAvailableNanos} " +
-            "readNs=${life.incumbentReadNanos} importedNs=${life.incumbentImportedNanos} " +
-            "consumedNs=${life.incumbentConsumedNanos} retiredNs=${life.retiredNanos} " +
-            "retirementNs=${life.retirementNanos} activeNs=${life.activeNanos} reads=${life.incumbentReads} " +
-            "imports=${life.incumbentImports} uses=${life.incumbentUses}"
+        "armLifecycle.${arm.label}" to buildString {
+            append("createdNs=").append(life.createdNanos).append(" constructionNs=").append(life.constructionNanos)
+            append(" firstQueryNs=").append(life.firstQueryNanos)
+            append(" availableNs=").append(life.incumbentAvailableNanos)
+            append(" readNs=").append(life.incumbentReadNanos)
+            append(" importedNs=").append(life.incumbentImportedNanos)
+            append(" consumedNs=").append(life.incumbentConsumedNanos).append(" retiredNs=").append(life.retiredNanos)
+            append(" retirementNs=").append(life.retirementNanos).append(" activeNs=").append(life.activeNanos)
+            append(" reads=").append(life.incumbentReads).append(" imports=").append(life.incumbentImports)
+            append(" uses=").append(life.incumbentUses)
+        }
     }
     val alns = stats.alns
     val inner = if (alns == AlnsStats()) emptyList() else listOf(

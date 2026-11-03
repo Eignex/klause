@@ -65,6 +65,25 @@ class SearchTrailTest {
     }
 
     @Test
+    fun `integer facts should retract across Boolean-only levels`() {
+        val session = SearchSession(emptyList())
+        session.publish(SearchDecision.IntAtLeast(0, 4L))
+        session.push(SearchDecision.Bool(0))
+        session.push(SearchDecision.Bool(2))
+        session.publish(SearchDecision.IntAtMost(0, 9L))
+        session.publish(SearchDecision.IntAtMost(0, 7L))
+        session.push(SearchDecision.Bool(4))
+
+        session.popTo(1)
+
+        assertEquals(4L, session.intLowerBound(0))
+        assertNull(session.intUpperBound(0))
+        assertEquals(true, session.boolValue(0))
+        assertNull(session.boolValue(1))
+        assertNull(session.boolValue(2))
+    }
+
+    @Test
     fun `rebuilding root facts should retain and wake learned units`() {
         val session = SearchSession(emptyList())
         session.learn(SearchExplanation(intArrayOf(0)))

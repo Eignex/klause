@@ -971,7 +971,9 @@ stored-entry arithmetic.
 
 Sparse accumulation skips empty columns and treats a zero multiplier as a no-op.
 Columns with at most two entries update their stored rows directly from the current
-CSC arrays; larger columns use the validated backend. Work charges belong to the
+CSC arrays; larger columns use the validated backend. Quality-column scatter
+clears its private RHS buffer and copies at most two stored entries directly;
+larger columns use the validated scatter backend. Work charges belong to the
 calling solve operation.
 
 Dual leaving selection uses verified Devex, reselecting when a maintained weight

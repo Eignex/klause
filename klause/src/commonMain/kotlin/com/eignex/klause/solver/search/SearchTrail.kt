@@ -10,10 +10,11 @@ internal class SearchTrail {
     private val boolValues = MutableIntIntMap()
     private val boolLevels = MutableIntIntMap()
     private var boolReasons = MutableIntObjectMap<SearchExplanation>()
+    private var reasonIndexUsed = false
     private val boolPublishers = MutableIntObjectMap<SearchComponent>()
     private val valuesAtLevel = ArrayList<IntArrayList>().apply { add(IntArrayList()) }
     private val intFacts = MutableIntObjectMap<IntFact>()
-    private val priorIntFactsAtLevel = ArrayList<MutableIntObjectMap<IntFact?>>().apply { add(MutableIntObjectMap()) }
+    private val priorIntFactsAtLevel = ArrayList<MutableIntObjectMap<IntFact?>?>().apply { add(null) }
     val pendingAssertions = SearchAssertionQueue()
     val boolTrail = IntArrayList()
     internal var ownershipRevision: Long = 0L
@@ -63,11 +64,13 @@ internal class SearchTrail {
     internal fun releaseLearning() {
         ownershipRevision++
         boolReasons = MutableIntObjectMap()
+        reasonIndexUsed = false
         pendingAssertions.clear()
     }
     fun publisherOf(variable: Int): SearchComponent? = boolPublishers[variable]
     fun retainReason(variable: Int, reason: SearchExplanation) {
         boolReasons.put(variable, reason)
+        reasonIndexUsed = true
         ownershipRevision++
     }
     fun retainPublisher(variable: Int, publisher: SearchComponent) {
@@ -84,7 +87,7 @@ internal class SearchTrail {
         decisions.add(decision)
         trailStartAtLevel.add(boolTrail.size)
         valuesAtLevel.add(IntArrayList())
-        priorIntFactsAtLevel.add(MutableIntObjectMap())
+        priorIntFactsAtLevel.add(null)
     }
 
     fun assignBool(variable: Int, value: Int, source: SearchComponent?, atoms: SearchAtomRegistry?) {
@@ -114,7 +117,7 @@ internal class SearchTrail {
                 listener?.onUnassign(variable)
             }
             valuesAtLevel.removeAt(current)
-            priorIntFactsAtLevel.removeAt(current).forEach { variable, fact ->
+            priorIntFactsAtLevel.removeAt(current)?.forEach { variable, fact ->
                 if (fact == null) intFacts.remove(variable) else intFacts.put(variable, fact)
             }
         }
@@ -122,7 +125,10 @@ internal class SearchTrail {
         boolTrail.truncateTo(trailStartAtLevel[level + 1])
         trailStartAtLevel.truncateTo(level + 1)
         pendingAssertions.clear()
-        if (boolReasons.isEmpty()) boolReasons = MutableIntObjectMap()
+        if (reasonIndexUsed && boolReasons.isEmpty()) {
+            boolReasons = MutableIntObjectMap()
+            reasonIndexUsed = false
+        }
     }
 
     fun resetRoot() {
@@ -130,12 +136,13 @@ internal class SearchTrail {
         boolValues.clear()
         boolLevels.clear()
         boolReasons = MutableIntObjectMap()
+        reasonIndexUsed = false
         boolPublishers.clear()
         valuesAtLevel.clear()
         valuesAtLevel.add(IntArrayList())
         intFacts.clear()
         priorIntFactsAtLevel.clear()
-        priorIntFactsAtLevel.add(MutableIntObjectMap())
+        priorIntFactsAtLevel.add(null)
         pendingAssertions.clear()
         boolTrail.clear()
         trailStartAtLevel.clear()
@@ -193,6 +200,7 @@ internal class SearchTrail {
         }
         if (candidate == prior) return ComponentResult.Consistent
         val changedAtLevel = priorIntFactsAtLevel[decisionLevel]
+            ?: MutableIntObjectMap<IntFact?>().also { priorIntFactsAtLevel[decisionLevel] = it }
         if (!changedAtLevel.containsKey(variable)) changedAtLevel.put(variable, prior)
         intFacts.put(variable, candidate)
         return ComponentResult.Consistent

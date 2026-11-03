@@ -823,14 +823,13 @@ internal class RevisedSimplex(
 
     private fun denseColumn(column: Int): DoubleArray = qualityRhs.also { dense ->
         dense.fill(0.0)
-        koblas.sparseKernels.scatter(
-            rowIdx,
-            colPtr[column],
-            colVal,
-            colPtr[column],
-            columnNnz(column),
-            dense,
-        )
+        val from = colPtr[column]
+        val until = colPtr[column + 1]
+        if (until - from <= 2) {
+            for (at in from until until) dense[rowIdx[at]] = colVal[at]
+        } else {
+            koblas.sparseKernels.scatter(rowIdx, from, colVal, from, until - from, dense)
+        }
     }
 
     internal fun sparseAxpy(destination: DoubleArray, alpha: Double, column: Int) {

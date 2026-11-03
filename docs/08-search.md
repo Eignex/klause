@@ -175,7 +175,8 @@ nor records an indeterminate region. Cancellation still bounds each retry; a roo
 reset discards pending completion with the old traversal.
 
 Retraction removes trail facts and restores integer premises before notifying
-components; a root rebuild keeps learned clauses. Components obtain their token,
+components; a root rebuild keeps learned clauses. A level allocates integer undo
+storage only when it changes an integer fact. Components obtain their token,
 accounting and stop diagnostics from `SearchContext.executionControls`; see
 [resource allowances](06-sessions.md#component-execution-controls). Components with
 retained root preparation implement `PreparingSearchComponent` and return no verdict
