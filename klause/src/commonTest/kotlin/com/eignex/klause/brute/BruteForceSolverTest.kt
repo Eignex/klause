@@ -1,9 +1,19 @@
 package com.eignex.klause.brute
 
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
+import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.ScoringProjection
+import com.eignex.klause.localsearch.ScoringProjectionProvider
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.AssignmentCheckCapability
+import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.ScoringCapability
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -15,6 +25,54 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class BruteForceSolverTest {
+    @Test
+    fun `unit equality channels should retain every source witness`() {
+        val channel = ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(channel)).bake()
+
+        val actual = BruteForceSolver(problem).enumerate(BruteForceParams(randomSeed = 0L))
+            .map { it.intValue(0) to it.boolValue(0) }.toSet()
+
+        assertEquals(setOf(0L to true, 1L to false), actual)
+    }
+
+    @Test
+    fun `channel rejection should consume the assignment budget`() {
+        val channel = ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)
+        val solver = BruteForceSolver(Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(channel)).bake())
+
+        val partial = solver.minimize(LinearObjective(), BruteForceParams(randomSeed = 0L, maxSteps = 3))
+        val complete = solver.minimize(LinearObjective(), BruteForceParams(randomSeed = 0L, maxSteps = 4))
+
+        assertIs<MinimizeResult.BestFound>(partial)
+        assertIs<MinimizeResult.Optimal>(complete)
+    }
+
+    @Test
+    fun `custom scoring should receive every enumerated assignment`() {
+        val observed = mutableSetOf<Pair<Long, Boolean>>()
+        val channel = ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)
+        val providers = FactorProjectionProviders(scoring = ScoringProjectionProvider {
+            ScoringProjection(ScoringCapability.GRADED, AssignmentCheckCapability.EXACT) { _, _ ->
+                object : Invariant {
+                    override fun initialize(state: LocalSearchState, factorId: Int) {
+                        observed.add(state.assignment.intValue(0) to state.assignment.boolValue(0))
+                    }
+
+                    override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
+                        state.assignment.boolValue(0) != (state.assignment.intValue(0) == 0L)
+                }
+            }
+        })
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf<Factor>(channel)).bake(providers)
+
+        val actual = BruteForceSolver(problem).enumerate(BruteForceParams(randomSeed = 0L))
+            .map { it.intValue(0) to it.boolValue(0) }.toSet()
+
+        assertEquals(setOf(0L to true, 0L to false, 1L to true, 1L to false), observed)
+        assertEquals(setOf(0L to true, 1L to false), actual)
+    }
+
     @Test
     fun `zero budget should decline an unenumerable domain without walking it`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, Int.MAX_VALUE.toLong())), emptyArray()).bake()

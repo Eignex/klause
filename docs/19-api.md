@@ -68,6 +68,10 @@ The final chunk checks assignments directly within its permutation iterator; onl
 feasible assignments retain owned snapshots, without a coroutine per candidate.
 Integer dimensions retain read-only enumerable domain views without copying their
 values. Chunk decoding uses indexed traversal without a per-assignment iterator.
+An exactly scored native model checks unit equality channels before full grading.
+Every assignment consumes its step before rejection, preserving permutation order
+and exhaustive-budget accounting. Custom scoring or nonexact factor roles retain
+full grading for every candidate.
 
 ### Source setup
 

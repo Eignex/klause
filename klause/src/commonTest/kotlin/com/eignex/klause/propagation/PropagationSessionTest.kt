@@ -19,6 +19,21 @@ import kotlin.test.assertTrue
 
 class PropagationSessionTest {
     @Test
+    fun `a decision without consequences should publish no implied facts`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(Problem(1, 0, emptyArray(), emptyArray()), nativeSat = native)
+            session.seed(Assumptions.None)
+
+            val result = assertIs<PropagationResult.Implied>(session.pinBool(0, true))
+
+            assertTrue(result.boolKeys.isEmpty())
+            assertTrue(result.intKeys.isEmpty())
+            assertTrue(result.intMinKeys.isEmpty())
+            assertTrue(result.intMaxKeys.isEmpty())
+        }
+    }
+
+    @Test
     fun `imported boolean clauses own their literals independently of the portable buffer`() {
         for (native in listOf(false, true)) {
             val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))

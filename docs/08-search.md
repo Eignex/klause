@@ -445,6 +445,10 @@ deduction or constructing its premise; a partial publication cannot certify a le
 A conflict or indeterminate publication result ends the callback immediately.
 Slice polls charge completed native propagation visits before deciding whether the
 slice has expired.
+Push deltas exclude decision pins before allocating their Boolean collection.
+Boolean and integer result collections are created only for their respective
+changes; a push with no publishable singleton or endpoint facts shares the empty
+result. Non-singleton endpoint deltas retain their own keys and values.
 
 A completed fixpoint can share Boolean- and root-grounded native subproofs with search
 peers through a bounded memo of at most 4,096 entries. No memo survives a callback,

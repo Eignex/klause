@@ -9,6 +9,7 @@ import com.eignex.klause.solver.result.ValueOrderingStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -1792,21 +1793,28 @@ class PropagationSession private constructor(
         if (state.runCancelled) return PropagationResult.Implied.EMPTY
         val top = state.undoTop
         if (top <= base) return PropagationResult.Implied.EMPTY
-        val bRaw = IntArrayList()
-        val iRaw = IntArrayList()
+        var bRaw: IntArrayList? = null
+        var iRaw: IntArrayList? = null
         for (i in base until top) {
             val v = state.undoVarAt(i)
             if (state.undoIsBoolAt(i)) {
-                bRaw.add(v)
+                if (boolPinned[v] == -1 && state.boolValues[v] != null) {
+                    if (bRaw == null) bRaw = IntArrayList()
+                    bRaw.add(v)
+                }
             } else if (!intPinnedSet[v] && impliedIntUndo[v] < 0 && state.undo.domain[i] != null) {
                 // Interior carves preserve endpoints; the first full snapshot precedes every endpoint move.
+                if (iRaw == null) iRaw = IntArrayList()
                 impliedIntUndo[v] = i
                 iRaw.add(v)
             }
         }
-        val bKeys = IntArrayList()
-        val bVals = ArrayList<Boolean>()
-        if (bRaw.size > 0) {
+        if (bRaw == null && iRaw == null) return PropagationResult.Implied.EMPTY
+        var boolKeys = EmptyIntArray
+        var boolValues = EmptyBooleanArray
+        if (bRaw != null) {
+            val bKeys = IntArrayList()
+            val bVals = ArrayList<Boolean>()
             val sorted = bRaw.toIntArray()
             sorted.sort()
             var prev = -1
@@ -1818,14 +1826,18 @@ class PropagationSession private constructor(
                 bKeys.add(v)
                 bVals.add(b)
             }
+            boolKeys = bKeys.toIntArray()
+            boolValues = BooleanArray(bVals.size) { bVals[it] }
         }
-        val iKeys = IntArrayList()
-        val iVals = LongArrayList()
+        var intKeys = EmptyIntArray
+        var intValues = EmptyLongArray
         var minKeys = EmptyIntArray
         var minValues = EmptyLongArray
         var maxKeys = EmptyIntArray
         var maxValues = EmptyLongArray
-        if (iRaw.size > 0) {
+        if (iRaw != null) {
+            val iKeys = IntArrayList()
+            val iVals = LongArrayList()
             val sorted = iRaw.toIntArray()
             sorted.sort()
             val mins = IntArrayList()
@@ -1854,12 +1866,17 @@ class PropagationSession private constructor(
             minValues = minVals.toLongArray()
             maxKeys = maxs.toIntArray()
             maxValues = maxVals.toLongArray()
+            intKeys = iKeys.toIntArray()
+            intValues = iVals.toLongArray()
+        }
+        if (boolKeys.isEmpty() && intKeys.isEmpty() && minKeys.isEmpty() && maxKeys.isEmpty()) {
+            return PropagationResult.Implied.EMPTY
         }
         return PropagationResult.Implied(
-            boolKeys = bKeys.toIntArray(),
-            boolValues = BooleanArray(bVals.size) { bVals[it] },
-            intKeys = iKeys.toIntArray(),
-            intValues = iVals.toLongArray(),
+            boolKeys = boolKeys,
+            boolValues = boolValues,
+            intKeys = intKeys,
+            intValues = intValues,
             intMinKeys = minKeys,
             intMinValues = minValues,
             intMaxKeys = maxKeys,

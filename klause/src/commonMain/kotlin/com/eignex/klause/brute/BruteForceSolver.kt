@@ -1,14 +1,18 @@
 package com.eignex.klause.brute
 
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntSpan
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
+import com.eignex.klause.solver.builtInExecutionCapabilities
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -158,7 +162,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
         val perms = chunks.mapIndexed { i, c ->
             longPermutation(size = c.totalSize, seed = seed + i * 0x9E3779B97F4A7C15uL.toLong())
         }
-        return walkChunks(perms, depth = 0, state = state, budget = budget)
+        return walkChunks(perms, depth = 0, state = state, budget = budget, channels = equalityChannels(state))
     }
 
     /** Mutable counter so the recursive [walkChunks] decrements one shared budget across
@@ -186,18 +190,45 @@ class BruteForceSolver(override val problem: BakedProblem) :
         depth: Int,
         state: LocalSearchState,
         budget: StepBudget,
+        channels: List<EqualityChannel>,
     ): Sequence<Sample> = sequence {
         for (idx in perms[depth]) {
             if (!budget.hasRemaining()) return@sequence
             applyChunkIndex(chunks[depth], idx, state)
             if (depth == perms.lastIndex) {
                 if (!budget.consume()) return@sequence
+                if (!satisfiesChannels(state, channels)) continue
                 state.recompute()
                 if (state.cost == 0L) yield(state.assignment.snapshot().withSourceSemantics(problem.semantics))
             } else {
-                yieldAll(walkChunks(perms, depth + 1, state, budget))
+                yieldAll(walkChunks(perms, depth + 1, state, budget, channels))
             }
         }
+    }
+
+    private fun equalityChannels(state: LocalSearchState): List<EqualityChannel> {
+        if (state.model.selection?.builtInScoring == false ||
+            state.problem.factors.any {
+                it.builtInExecutionCapabilities()?.assignmentCheck != AssignmentCheckCapability.EXACT
+            }
+        ) return emptyList()
+        val channels = ArrayList<EqualityChannel>()
+        for (factor in state.problem.factors) {
+            if (factor !is ReifiedLinear || factor.op != LinearOp.EQ || factor.vars.size != 1) continue
+            val constants = factor.integerConstants ?: continue
+            if (constants.coeffs[0] != 1L) continue
+            channels.add(EqualityChannel(factor.auxBoolVar, factor.vars[0], constants.bound))
+        }
+        return channels
+    }
+
+    private fun satisfiesChannels(state: LocalSearchState, channels: List<EqualityChannel>): Boolean {
+        for (at in channels.indices) {
+            val channel = channels[at]
+            val equal = state.assignment.intValue(channel.intVar) == channel.value
+            if (state.assignment.boolValue(channel.boolVar) != equal) return false
+        }
+        return true
     }
 
     /** Decode [idx] into the variables held by [chunk] and write them into [state]'s
@@ -228,6 +259,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
     }
 
     private enum class DimKind { BOOL, INT }
+    private data class EqualityChannel(val boolVar: Int, val intVar: Int, val value: Long)
     private data class Dim(val kind: DimKind, val varId: Int, val radix: Long, val values: IntSpan? = null)
     private data class Chunk(val dims: List<Dim>, val totalSize: Long)
 
