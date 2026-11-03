@@ -269,12 +269,20 @@ class ResumableMinimizeTest {
             }
             assertNull(firstRefreshes)
 
-            search.runSlice(stopAtPoint, Long.MAX_VALUE, 100_000L) {
+            val result = search.runSlice(stopAtPoint, Long.MAX_VALUE, 100_000L) {
                 firstRefreshes = search.stats.lp.phases["PRIMAL_RESTART_GUIDANCE_ROOT"]
                     ?.outcomes?.get("RETAINED") ?: 0L
             }
 
-            assertTrue(assertNotNull(firstRefreshes) > 0L)
+            val diagnostic = if (firstRefreshes == null || firstRefreshes == 0L) {
+                val phases = search.stats.lp.phases.filterKeys {
+                    it.contains("RESTART") || it.contains("COMPONENT") || it.contains("GUIDANCE") ||
+                        it.contains("PRIMAL_CONTINUATION")
+                }.mapValues { it.value.outcomes }
+                "result=${result?.let { it::class.simpleName }}, queries=$queries, " +
+                    "nodes=${search.stats.search.nodes.sum}, nodeLp=${search.stats.lp.nodePasses.sum}, phases=$phases"
+            } else null
+            assertTrue(assertNotNull(firstRefreshes, diagnostic) > 0L, diagnostic)
         }
     }
 
