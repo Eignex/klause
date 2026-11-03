@@ -763,15 +763,17 @@ internal class CpToLpRelaxation(
         structurallyPersistent = !objectiveCone && !cumulative && !diffn && projections?.builtInRelaxation != false
         if (structurallyPersistent) for (fid in problem.factors.indices) {
             val factor = problem.factors[fid]
-            if (factor is ReifiedLinear || factor is ReifiedPseudoBoolean || factor is ReifiedCardinality ||
-                factor is ReifiedRealLinear || factor is RealElement || factor is LinearIndicator
-            ) {
+            if (factor !is Linear && hasLiveDomainCoefficients(factor)) {
                 structurallyPersistent = false
                 break
             }
             if ((fid + 1) % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
         }
     }.iterator()
+
+    private fun hasLiveDomainCoefficients(factor: Factor): Boolean =
+        factor is ReifiedLinear || factor is ReifiedPseudoBoolean || factor is ReifiedCardinality ||
+            factor is ReifiedRealLinear || factor is RealElement || factor is LinearIndicator
 
     private val cone: FactorConeProjection? by lazy {
         if (objectiveCone) FactorConeProjection(problem, objective) else null

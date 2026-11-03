@@ -186,8 +186,14 @@ object LpAutoConfig {
         var rows = 0L
         for (f in problem.factors) {
             if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            // Plain rows do not need the optional hull classifier.
+            if (f is Linear) {
+                lpEmittable = true
+                rows += 1
+                continue
+            }
             when (f) {
-                is Linear, is ExactLinear, is LinearIndicator -> {
+                is ExactLinear, is LinearIndicator -> {
                     lpEmittable = true
                     rows += 1
                 }

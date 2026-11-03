@@ -56,6 +56,8 @@ its own columns; the numerical builder copies coefficients into its private rows
 Guarded rows read the current pin on every emission. Bounds, premises and numerical
 owners belong to the current build.
 Templates retain neither a basis nor a checked claim.
+Admission counts one row for an unconditional `Linear` factor; its coefficients
+are domain independent for fixed-layout planning.
 Exact bound columns materialize only when an import needs them. Each endpoint
 definition retains one completed normalized column; changing an open upper side
 replaces the cached column without linking prior versions. Preparation reserves
