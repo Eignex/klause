@@ -60,6 +60,8 @@ class ChannelTrajectoryTest {
         assertNull(candidate["decline"])
         assertEquals("true", candidate.getValue("source").jsonObject.getValue("bools")
             .jsonArray.single().jsonPrimitive.content)
+        assertEquals("0", candidate.getValue("source").jsonObject.getValue("ints")
+            .jsonArray.single().jsonPrimitive.content)
     }
 
     @ParameterizedTest
