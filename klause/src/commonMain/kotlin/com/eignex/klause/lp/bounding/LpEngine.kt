@@ -174,13 +174,16 @@ internal class LpEngine(
     internal var primalSearchWork: Long = 0L
     internal var rootPrimalTargets: RootPrimalTargets? = null
         private set
+    private var restartRootTargets: RootPrimalTargets? = null
     internal var rootComponentValues: RootComponentValues? = null
         private set
     internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
         set(value) {
             if (field !== value) {
                 field?.pinning?.releaseRetainedState()
-                if (value != null) clearRootPrimalTargets(retainComponentValues = true)
+                if (value != null) {
+                    clearRootPrimalTargets(retainComponentValues = true, retainRestartTargets = true)
+                }
             }
             field = value
         }
@@ -328,14 +331,19 @@ internal class LpEngine(
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
-    internal fun clearRootPrimalTargets(retainComponentValues: Boolean = false) {
+    internal fun clearRootPrimalTargets(
+        retainComponentValues: Boolean = false,
+        retainRestartTargets: Boolean = false,
+    ) {
         rootPrimalTargets = null
+        if (!retainRestartTargets) restartRootTargets = null
         if (!retainComponentValues) rootComponentValues = null
     }
 
     internal fun restartRootPrimalTargets() {
         rootComponentValues?.restarted = true
-        clearRootPrimalTargets(retainComponentValues = true)
+        rootPrimalTargets?.let { restartRootTargets = it }
+        clearRootPrimalTargets(retainComponentValues = true, retainRestartTargets = true)
     }
 
     internal fun prepareRootComponentValues(
@@ -361,19 +369,24 @@ internal class LpEngine(
         val targets = rootPrimalTargets
         val roundingBytes = rounding?.primal?.size?.toLong()?.times(Double.SIZE_BYTES) ?: 0L
         val maskBytes = rounding?.knownColumns?.size?.toLong() ?: 0L
-        val targetBytes = targets?.let {
-            ROOT_PRIMAL_TARGET_HEADER_BYTES + (it.intColumns.size.toLong() + it.booleanColumns.size) * Int.SIZE_BYTES +
-                (if (it.coordinates === rounding?.primal) 0L else it.coordinates.size.toLong() * Double.SIZE_BYTES) +
-                (if (it.knownColumns === rounding?.knownColumns) 0L else it.knownColumns?.size?.toLong() ?: 0L) +
-                (it.components?.retainedBytes ?: 0L)
-        } ?: 0L
+        val targetBytes = rootTargetBytes(targets, rounding) +
+            if (restartRootTargets === targets) 0L else rootTargetBytes(restartRootTargets, rounding)
         val componentRoundingBytes = rounding?.componentRounding?.let {
-            128L + if (it.order === targets?.components) 0L else it.order.retainedBytes
+            128L + if (it.order === targets?.components || it.order === restartRootTargets?.components) 0L
+            else it.order.retainedBytes
         } ?: 0L
         return roundingBytes + maskBytes + targetBytes + componentRoundingBytes +
             (rootComponentValues?.retainedBytes ?: 0L) +
             additionalBytes <= ROOT_PRIMAL_GUIDANCE_BYTES
     }
+
+    private fun rootTargetBytes(targets: RootPrimalTargets?, rounding: RootRoundingWarmStart?): Long =
+        targets?.let {
+            ROOT_PRIMAL_TARGET_HEADER_BYTES + (it.intColumns.size.toLong() + it.booleanColumns.size) * Int.SIZE_BYTES +
+                (if (it.coordinates === rounding?.primal) 0L else it.coordinates.size.toLong() * Double.SIZE_BYTES) +
+                (if (it.knownColumns === rounding?.knownColumns) 0L else it.knownColumns?.size?.toLong() ?: 0L) +
+                (it.components?.retainedBytes ?: 0L)
+        } ?: 0L
 
     internal fun prepareRootComponentRounding(
         targets: RootPrimalTargets,
@@ -418,6 +431,7 @@ internal class LpEngine(
         // Transfer the private buffers; pinning state and basis remain owned by the rounding attempt.
         rootPrimalTargets = RootPrimalTargets(guide.relaxation.intColOf, guide.relaxation.boolColOf,
             coordinates, guide.knownColumns, auxiliary = guide.auxiliaryPoint)
+        restartRootTargets = null
         sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "RETAINED", 0L)
         if (guide.auxiliaryPoint) {
             sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "AUXILIARY_ROOT_RETAINED", 0L)
@@ -433,30 +447,66 @@ internal class LpEngine(
         try {
             if (session.problem !== problem || session.decisionLevel != 0 || problem.numRealVars != 0 ||
                 !params.lpPlan.componentOwnership || !params.lpPlan.probe || !params.lpPlan.branching ||
-                params.lpPlan.lbTreeSearch || rootPrimalTargets != null || rootRoundingWarmStart != null
+                params.lpPlan.lbTreeSearch || rootPrimalTargets != null
             ) return false
             outcome = "CANCELLED"
             if (cancellation()) return false
-            outcome = "NO_ALLOWANCE"
-            if (retainedRootRemainingWork() <= 1L) return false
-            outcome = "NO_VIEW"
-            val relaxer = lpRelaxer ?: return false
-            val relaxation = nodeRelaxation(relaxer, session, lpGlobalCuts) ?: return false
-            outcome = "CANCELLED"
-            if (cancellation()) return false
-            outcome = "STALE_OWNER"
-            if (!ownsRootPrimalModel(relaxation.model)) return false
-            retainRootPrimalOwner(relaxation)
-            return try {
-                retainRootPartialPrimalGuidance(relaxation, cancellation)
-                retainRootPrimalTargets(cancellation).also {
-                    outcome = if (it) "RETAINED" else "DECLINED"
+            fun fresh(): Boolean {
+                outcome = "BUSY_OWNER"
+                if (rootRoundingWarmStart != null) return false
+                outcome = "NO_ALLOWANCE"
+                if (retainedRootRemainingWork() <= 1L) return false
+                outcome = "NO_VIEW"
+                val relaxer = lpRelaxer ?: return false
+                val relaxation = nodeRelaxation(relaxer, session, lpGlobalCuts) ?: return false
+                outcome = "CANCELLED"
+                if (cancellation()) return false
+                outcome = "STALE_OWNER"
+                if (!ownsRootPrimalModel(relaxation.model)) return false
+                retainRootPrimalOwner(relaxation)
+                return try {
+                    retainRootPartialPrimalGuidance(relaxation, cancellation)
+                    retainRootPrimalTargets(cancellation).also {
+                        outcome = if (it) "RETAINED" else "DECLINED"
+                    }
+                } finally {
+                    rootRoundingWarmStart = null
                 }
-            } finally {
-                rootRoundingWarmStart = null
             }
+            return fresh() || replayRootPrimalTargets(cancellation)
         } finally {
             sink.lp.observePrimalPhase("PRIMAL_RESTART_GUIDANCE", outcome,
+                started.elapsedNow().inWholeNanoseconds, totalSolveWork() - before)
+        }
+    }
+
+    private fun replayRootPrimalTargets(cancellation: Cancellation): Boolean {
+        val saved = restartRootTargets ?: return false
+        val started = TimeSource.Monotonic.markNow()
+        val before = totalSolveWork()
+        var outcome = "ALLOWANCE_DECLINED"
+        try {
+            if (rootPrimalTargets != null || saved.intColumns.size != problem.numIntVars ||
+                saved.booleanColumns.size != problem.numBoolVars ||
+                !rootGuidanceFits(ROOT_PRIMAL_TARGET_HEADER_BYTES) || lpWorkAllowanceSpent(1L) ||
+                retainedRootRemainingWork() <= 1L || cancellation()
+            ) return false
+            noteNodeOverhead(1L)
+            outcome = "CANCELLED"
+            if (cancellation()) return false
+            // A fresh handle expires queued readers while the engine keeps its own value buffers.
+            val replay = RootPrimalTargets(saved.intColumns, saved.booleanColumns, saved.coordinates,
+                saved.knownColumns, auxiliary = saved.auxiliary)
+            replay.components = saved.components
+            replay.componentOrderAttempted = saved.components != null
+            replay.components?.offered = false
+            replay.replayed = true
+            rootPrimalTargets = replay
+            restartRootTargets = null
+            outcome = "RETAINED"
+            return true
+        } finally {
+            sink.lp.observePrimalPhase("PRIMAL_RESTART_REPLAY", outcome,
                 started.elapsedNow().inWholeNanoseconds, totalSolveWork() - before)
         }
     }

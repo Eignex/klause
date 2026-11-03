@@ -135,9 +135,13 @@ under the same funded allowance. A ready guide lets CP seek its first incumbent
 before those queries resume; inherited checked bounds remain available.
 The same frame stack handles conflicts and retraction; all source constraints stay
 active and every component still belongs to complete source checking. A restart
-expires the guide. At its restored root, a traversal that consumed component
-ordering may request fresh preferences from the current LP owner; the request
-rechecks the root model and state, charges its transport and renews no allowance.
+expires the guide's reader handle. At its restored root, a traversal that consumed
+component ordering first requests fresh preferences from the current LP owner.
+The request rechecks the root model and state, charges its transport and renews no
+allowance. If that lookup declines, the same engine can replay its already-owned
+coordinate buffers through a fresh reader handle as value preferences. Replay
+spends the remaining allowance and carries no numerical authority. Explicit guide
+retirement and engine closure release the pending buffers.
 
 Numerical frontier traversal orders alternatives by inherited checked objective
 bounds, visiting unbounded alternatives first. It keeps both children of every

@@ -8,6 +8,8 @@ internal class RootPrimalTargets(
     val auxiliary: Boolean = false,
 ) {
     var valueOrderOffered: Boolean = false
+    var replayed: Boolean = false
+    var replayOffered: Boolean = false
     var componentOrderAttempted: Boolean = false
     var components: RootComponentOrder? = null
 }

@@ -283,6 +283,8 @@ class ResumableMinimizeTest {
                     "nodes=${search.stats.search.nodes.sum}, nodeLp=${search.stats.lp.nodePasses.sum}, phases=$phases"
             } else null
             assertTrue(assertNotNull(firstRefreshes, diagnostic) > 0L, diagnostic)
+            assertTrue((search.stats.lp.phases["PRIMAL_RESTART_REPLAY_ROOT"]
+                ?.outcomes?.get("RETAINED") ?: 0L) > 0L)
         }
     }
 

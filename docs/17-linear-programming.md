@@ -639,6 +639,15 @@ can remain soft preferences for complete search. No partial assignment is a witn
 Component progress and its retained order share the existing guidance storage cap;
 all graph, propagation and value-copy work spends the containing allowances.
 
+A complete traversal restart expires existing preference readers while retaining
+one generation of the engine's owned coordinate buffers. Fresh root-owner lookup
+precedes replay; a declined lookup can expose those buffers through a fresh value
+hint handle without a numerical query. Both pending and replacement storage count
+against the same guidance cap, including their overlap during replacement. Replay
+requires the owning source root, an uncancelled token and remaining funding; it
+transfers no model, basis or certificate authority. Explicit guide retirement and
+engine closure discard the pending generation.
+
 Retained discrete root layouts prepare in private chunks before the first numerical
 consultation. Objective-column batches and factor batches charge materialized construction
 before yielding to the worker's slice. A paused builder retains only its source-root
