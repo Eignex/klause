@@ -137,14 +137,14 @@ class ResumableMinimizeNodeSliceTest {
     @Test
     fun `LP arm slice should spend its LP work as nodes`() {
         knapsackLp(n = 8, rows = 2).use { search ->
-            val budget = 8L
+            val budget = 2L
 
             val terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
 
             assertTrue(search.stats.lp.workOps.sum > 0.0)
             assertTrue(
                 terminal == null && search.stats.search.nodes.sum < budget,
-                "slice ${search.stats.search.nodes.sum} of $budget, terminal $terminal",
+                "slice ${search.stats.search.nodes.sum} of $budget, completed=${terminal != null}",
             )
         }
     }
