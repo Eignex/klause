@@ -42,6 +42,7 @@ import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
@@ -520,7 +521,7 @@ class ResumableMinimizeTest {
             assertEquals(2, rootQueries)
             assertTrue(attempts.isEmpty())
             assertTrue(offered.isEmpty())
-            assertFalse(search.canReseed)
+            assertFalse(assertIs<ReseedGuard>(search).canReseed)
             search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
 
             assertEquals(3, rootQueries)
