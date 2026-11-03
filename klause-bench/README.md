@@ -536,6 +536,14 @@ does not establish cooperative cancellation within a blocked CLI input read.
 Compare full invocation and case/job costs at the same allowance and retain the
 original-source checks, runtime/decoder identities and declared cache conditions.
 
+Solve records retain monotonic `harness*Ms` phase observations in `stats`, including
+model resolution, provenance, invocation and witness handling. Nested phases are
+inclusive; do not sum them. Missing phases are unobserved. `harnessCaseMs` covers
+the JVM child adapter through comparison-record assembly, excluding JVM startup,
+parent verification, final record encoding/write and lab staging/publication.
+The existing source and subprocess timing boundaries remain separate. Harness
+instrumentation changes its retained byte fingerprint.
+
 `harness-jfr=true` records the ordinary JVM CLI adapter's separate 512 MiB harness
 JVM into `report/harness.jfr`; the default is false. CLI `measurement` remains a
 separate control. The retained harness command and comparison controls identify
