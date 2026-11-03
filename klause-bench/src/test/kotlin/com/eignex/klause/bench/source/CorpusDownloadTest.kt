@@ -12,7 +12,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertIs
+import kotlin.test.assertTrue
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 
@@ -161,7 +161,7 @@ class CorpusDownloadTest {
         val failure = assertFailsWith<Exception> {
             downloader.range(URI("https://corpus.invalid/archive"), 0, 1)
         }
-        if (size == 0) assertIs<CorpusUnavailable>(failure) else assertIs<IllegalArgumentException>(failure)
+        assertTrue(if (size == 0) failure is CorpusUnavailable else failure is IllegalArgumentException)
     }
 
     @ParameterizedTest
