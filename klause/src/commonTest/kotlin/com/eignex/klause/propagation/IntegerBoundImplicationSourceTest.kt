@@ -32,10 +32,12 @@ import kotlin.test.assertTrue
 class IntegerBoundImplicationSourceTest {
     @Test
     fun `an unavailable mapped endpoint should withhold implication child admission`() {
-        val native = PropagationSession(Problem(0, 35, Array(35) { IntDomain(0, 1) }, Array(2) { pivot ->
+        val problem = Problem(0, 35, Array(35) { IntDomain(0, 1) }, Array(2) { pivot ->
             Linear(IntArray(33) { if (it == 1) -1 else 1 },
                 intArrayOf(3, pivot) + IntArray(31) { it + 4 }, LinearOp.LE, 0)
-        }), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        })
+        val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+            .apply { enableIntegerRowLearning() }
         native.addLearnedIntegerRow(assertNotNull(IntegerConflictRow.normalized(
             mapOf(0 to 1L, 1 to 1L, 2 to 1L), 1L, Lit.NONE)), 1)
         val peer = object : SearchComponent {
@@ -61,13 +63,15 @@ class IntegerBoundImplicationSourceTest {
     @Test
     fun `complete wide source implications should derive a mapped owned assertion`() {
         for (exact in listOf(false, true)) {
-            val native = PropagationSession(Problem(0, 35, Array(35) { IntDomain(0, 1) }, Array(2) { pivot ->
+            val problem = Problem(0, 35, Array(35) { IntDomain(0, 1) }, Array(2) { pivot ->
                 val vars = intArrayOf(3, pivot) + IntArray(31) { it + 4 }
                 val coefficients = IntArray(33) { if (it == 1) -1 else 1 }
                 if (exact) ExactLinear.of(IntArray(33) { Term.ofIntVar(vars[it]) },
                     coefficients.map { BigFraction.ofLong(it.toLong()) }, LinearOp.LE, BigFraction.ZERO)
                 else Linear(coefficients, vars, LinearOp.LE, 0)
-            }), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+            })
+            val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
+                .apply { enableIntegerRowLearning() }
             assertNull(GuardedIntegerSource(native.explanationState).source(0,
                 sourceWork = IntegerSourceWork(native.explanationState)))
             native.addLearnedIntegerRow(assertNotNull(IntegerConflictRow.normalized(
