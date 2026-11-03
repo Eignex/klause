@@ -66,6 +66,13 @@ class PreparedFactorProjections internal constructor(
     private val lpTemplateCache: AtomicReference<LpPreparationState?>
         get() = if (problem is BakedProblem) lpFiniteTemplateCache else lpSourceTemplateCache
 
+    internal val lpPreparationStorageUnits: Long
+        get() = when (val current = lpTemplateCache.load()) {
+            is LpPreparationTemplates -> current.storageUnits
+            is LpPreparationAdmission -> LpPreparationAdmission.STORAGE_UNITS
+            null -> 0L
+        }
+
     internal fun prepareLpTemplates(
         objective: LinearObjective?, token: Cancellation, reuseIndexes: Boolean = true,
         reuseMetadata: Boolean = false,
