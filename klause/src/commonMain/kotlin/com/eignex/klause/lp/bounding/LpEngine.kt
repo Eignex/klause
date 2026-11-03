@@ -156,6 +156,7 @@ internal class LpEngine(
     private val containingWork: (Long) -> Unit = {},
     private val rootQueryPolicy: LpRootQueryPolicy = LpRootQueryPolicy.SHARED_WORK,
     internal val sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
+    private val eagerSourcePreparation: Boolean = false,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
@@ -281,6 +282,7 @@ internal class LpEngine(
             } else nodeWorkAllowance,
             containingWork = { work -> if (rootProbe) chargeWork(work) },
             sourcePreparation = sourcePreparation,
+            eagerSourcePreparation = eagerSourcePreparation,
         ).also { it.structuralCutSupport = structuralCutSupport }
     }
 
@@ -597,7 +599,8 @@ internal class LpEngine(
                 reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
                 reuseTemplateIndexes = sourcePreparation != LpSourcePreparation.OBJECT,
                 reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
-                earnTemplatePreparation = !retainedRootEnabled && sourcePreparation == LpSourcePreparation.ADMITTED,
+                earnTemplatePreparation = !retainedRootEnabled && !eagerSourcePreparation &&
+                    sourcePreparation == LpSourcePreparation.ADMITTED,
                 onTemplateWork = ::noteNodeOverhead,
             )
         } else {
@@ -612,7 +615,7 @@ internal class LpEngine(
         reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
         reuseTemplateIndexes = sourcePreparation != LpSourcePreparation.OBJECT,
         reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
-        earnTemplatePreparation = sourcePreparation == LpSourcePreparation.ADMITTED,
+        earnTemplatePreparation = !eagerSourcePreparation && sourcePreparation == LpSourcePreparation.ADMITTED,
         onTemplateWork = ::noteNodeOverhead)
 
     /** The active relaxer. Rebuilt once by [pruneIneffectiveHulls] when a hull is dropped; otherwise the

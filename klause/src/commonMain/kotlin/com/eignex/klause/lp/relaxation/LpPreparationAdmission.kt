@@ -7,6 +7,8 @@ internal enum class LpSourcePreparation { DISABLED, OBJECT, INDEX, ADMITTED }
 
 internal sealed interface LpPreparationState
 
+internal class LpPreparationNamespace : LpPreparationState
+
 internal class LpPreparationAdmission(
     private val namespace: Any,
     problem: Problem,

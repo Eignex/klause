@@ -49,6 +49,19 @@ class LpPreparationTemplatesTest {
     }
 
     @Test
+    fun `a first LP consumer should spend less admission work than a repeated consumer`() {
+        val work = List(2) {
+            var charged = 0L
+            CpToLpRelaxation(source, objective, projections = selection,
+                reuseTemplateMetadata = true, earnTemplatePreparation = true,
+                onTemplateWork = { charged += it }).build(RootDomains(source))
+            charged
+        }
+
+        assertTrue(work[0] < work[1])
+    }
+
+    @Test
     fun `completed LP consumers should earn selective metadata`() {
         var prepared: LpPreparationTemplates? = null
         repeat(32) {
@@ -80,6 +93,7 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `post debit cancellation should withhold completed construction admission`() {
+        selection.recordLpConstruction(1L, Cancellation.Never) {}
         var cancelled = false
         selection.recordLpConstruction(LpPreparationTemplates.MAX_UNITS, Cancellation { cancelled }) {
             cancelled = true
@@ -93,7 +107,9 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `foreign source scopes should not spend prior construction admission`() {
-        selection.recordLpConstruction(LpPreparationTemplates.MAX_UNITS, Cancellation.Never) {}
+        repeat(2) {
+            selection.recordLpConstruction(LpPreparationTemplates.MAX_UNITS, Cancellation.Never) {}
+        }
         val finite = source.bake(selection)
         val remapped = selection.projected(source, IntArray(source.numFactors) { it },
             VarRemap(intArrayOf(0), IntArray(source.numIntVars) { it }))

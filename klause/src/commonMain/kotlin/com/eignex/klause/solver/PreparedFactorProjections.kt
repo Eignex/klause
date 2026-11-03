@@ -22,6 +22,7 @@ import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.RelaxationProjection
 import com.eignex.klause.lp.relaxation.LpPreparationAdmission
+import com.eignex.klause.lp.relaxation.LpPreparationNamespace
 import com.eignex.klause.lp.relaxation.LpPreparationState
 import com.eignex.klause.lp.relaxation.LpPreparationTemplates
 import com.eignex.klause.propagation.BakedProblem
@@ -58,7 +59,7 @@ class PreparedFactorProjections internal constructor(
         Array(problem.numFactors) { providers.encoder.select(problem.factors[it], target) }
     },
 ) {
-    private var lpTemplateNamespace: Any = Any()
+    private var lpTemplateNamespace = LpPreparationNamespace()
     private var lpTemplateRows: Any = Any()
     private var lpSourceTemplateCache = AtomicReference<LpPreparationState?>(null)
     private var lpFiniteTemplateCache = AtomicReference<LpPreparationState?>(null)
@@ -70,6 +71,7 @@ class PreparedFactorProjections internal constructor(
         get() = when (val current = lpTemplateCache.load()) {
             is LpPreparationTemplates -> current.storageUnits
             is LpPreparationAdmission -> LpPreparationAdmission.STORAGE_UNITS
+            is LpPreparationNamespace -> 1L
             null -> 0L
         }
 
@@ -116,6 +118,14 @@ class PreparedFactorProjections internal constructor(
         val previous = cache.load()
         if ((previous as? LpPreparationTemplates)?.sharesScope(lpTemplateNamespace, problem) == true) return false
         val old = (previous as? LpPreparationAdmission)?.takeIf { it.matches(lpTemplateNamespace, problem) }
+        if (previous !== lpTemplateNamespace && old == null) {
+            try {
+                token.charge(1L)
+            } finally {
+                onWork(1L)
+            }
+            return !token() && cache.compareAndSet(previous, lpTemplateNamespace)
+        }
         val paid = old?.paidUnits ?: 0L
         val nextPaid = paid + minOf(completedUnits, Long.MAX_VALUE - paid)
         val next = try {

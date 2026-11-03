@@ -95,14 +95,16 @@ bound sides before retaining the row index. Node engines select this mode and ow
 their numerical component partitions. Ordinary node, primal and shaving consumers
 carry internal disabled, object, complete-index and admitted controls through
 objective-specific engines and standalone sparse admission. Admitted construction
-first completes its LP without
-speculative metadata. Completed compact construction accumulates
-admission work in a 16-unit source-scoped record. A later preparation attempt spends
+first completes its LP without speculative metadata and marks the existing
+namespace token. A later completed consumer can allocate a 16-unit source-scoped
+record and accumulate construction work. The marker carries no work credit or
+numerical state. A preparation attempt spends
 no more inspection work than those completed builds supplied, within the existing
 262,144-unit ceiling. A failed attempt requires further completed construction
 before retrying; its inspection and replacement record still spend the current
 allowance. Admission work supplies no additional solver grant. Component-owned and
-admitted sparse-trial engines keep their explicit preparation route.
+admitted sparse-trial engines keep their explicit preparation route. LP harvest
+also eagerly prepares definitions for its later engine bake.
 A selected view whose handoff checked
 ordered factor identities carries the same immutable layout token, so subsequent
 template preparations need no duplicate row scan. Other rewrites and explicit
