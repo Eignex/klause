@@ -91,6 +91,35 @@ class PrivateRebuildGenerationTest {
     }
 
     @Test
+    fun `wide free coordinate expressions should retain bounded mixed propagation`() {
+        for (phase in 0..1) for (native in listOf(false, true)) {
+            val clauses = (0 until 65).flatMap { row ->
+                val variables = if (row == 0) intArrayOf(0, 1, 66)
+                else intArrayOf(row + 1, row + 65, row + 66)
+                (0 until 8).filter { it.countOneBits() % 2 != phase }.map { mask ->
+                    Clause(IntArray(3) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                }
+            } + Clause(intArrayOf(Lit.make(131, true), Lit.make(132, true)))
+            val source = Problem(133, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+            val canonical = PropagationSession(source, nativeSat = native)
+            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
+                Cancellation.Never, parity = captured))
+            val consumer = PropagationSession(generation.problem)
+
+            for (variable in 0..65) assertIs<PropagationResult.Implied>(consumer.pinBool(variable, false))
+            assertIs<PropagationResult.Implied>(consumer.pinBool(131, true))
+            assertIs<PropagationResult.Implied>(consumer.pinBool(132, false))
+
+            for (row in 0 until 65) assertEquals(phase != 0 && row % 2 == 0, consumer.boolValue(row + 66))
+            assertTrue(clauses.all { clause ->
+                clause.literals.any { Lit.evaluate(it, assertNotNull(consumer.boolValue(Lit.variable(it)))) }
+            })
+            for (variable in 0 until 133) assertNull(canonical.boolValue(variable))
+        }
+    }
+
+    @Test
     fun `learned equivalences should open a reconstructable private consumer without root pins`() {
         for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
             val source = Problem(4, 0, emptyArray(), arrayOf(

@@ -186,8 +186,9 @@ internal class PrivateRebuildGeneration private constructor(
             }
             if (rowView) {
                 residual.addAll(checkNotNull(parity).materializeSourceRows(cancellation) ?: return null)
-                val rows = if (useTriangularRows) checkNotNull(checkNotNull(parity).triangularBasis).materializeRows(cancellation)
-                else checkNotNull(basis).materializeRows(cancellation)
+                val rows = if (useTriangularRows) {
+                    checkNotNull(checkNotNull(parity).triangularBasis).materializeRows(cancellation)
+                } else checkNotNull(basis).materializeRows(cancellation)
                 residual.addAll(rows ?: return null)
             }
             val preferred = if (rowView) {
