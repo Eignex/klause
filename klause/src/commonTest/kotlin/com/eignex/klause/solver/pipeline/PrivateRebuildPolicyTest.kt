@@ -66,7 +66,14 @@ class PrivateRebuildPolicyTest {
         for (work in listOf(0L, -1L, 65_536L)) {
             for (options in listOf(ExecutionOptions(ExecutionOption.privateRebuildWork(work)),
                 ExecutionOptions.parse(listOf("private-rebuild-work=$work")))) {
-                assertSame(scenario, privateRebuildDefaultScenario(scenario, problem, profile, options, false))
+                val edit = assertNotNull(backtrackOverride(options.reader(), allowSelectors = true))
+                val configured = scenario.copy(btEdit = edit)
+
+                val selected = privateRebuildDefaultScenario(configured, problem, profile, options, false)
+
+                assertSame(configured, selected)
+                assertEquals(work, assertNotNull(selected.btEdit).invoke(
+                    BacktrackParams(privateRebuildWork = -1L)).privateRebuildWork)
             }
         }
     }

@@ -209,31 +209,25 @@ class FiniteExecutionTest {
         }
         val problem = Problem(130, 0, emptyArray(), (parity + contradiction).toTypedArray())
         val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
-        for ((options, expected) in listOf(
-            ExecutionOptions() to 1L,
-            ExecutionOptions(ExecutionOption.privateRebuildWork(0L)) to 0L,
-            ExecutionOptions.parse(listOf("private-rebuild-work=0")) to 0L,
-        )) {
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
-                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
-                executionOptions = options, nodeBudget = NodeBudget(50_000),
-            )
+        val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+            shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+            nodeBudget = NodeBudget(50_000),
+        )
 
-            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+        val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
 
-            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-            assertEquals(FiniteSolveVerdict.UNSAT, completed.verdict)
-            val learning = completed.stats.search.learning
-            assertEquals(expected, learning["privateRebuildAutomaticAttempts"] ?: 0L)
-            assertEquals(expected * 4_194_304L, learning["privateRebuildAutomaticByteLimit"] ?: 0L)
-            assertEquals(expected * 1_048_576L,
-                learning["privateRebuildAutomaticCanonicalScratchLimit"] ?: 0L)
-            assertEquals(expected, learning["privateRebuildConsumers"] ?: 0L)
-            assertEquals(expected, learning["privateRebuildRetired"] ?: 0L)
-            assertEquals(listOf("ls/probsat/plain", "bt/clausal-balanced"),
-                completed.stats.portfolio.arms.map { it.label })
-            assertTrue(completed.stats.portfolio.arms.all { it.faults == 0L && it.failures == 0L })
-        }
+        val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        assertEquals(FiniteSolveVerdict.UNSAT, completed.verdict)
+        val learning = completed.stats.search.learning
+        assertEquals(1L, learning["privateRebuildAutomaticAttempts"] ?: 0L)
+        assertEquals(4_194_304L, learning["privateRebuildAutomaticByteLimit"] ?: 0L)
+        assertEquals(1_048_576L,
+            learning["privateRebuildAutomaticCanonicalScratchLimit"] ?: 0L)
+        assertEquals(1L, learning["privateRebuildConsumers"] ?: 0L)
+        assertEquals(1L, learning["privateRebuildRetired"] ?: 0L)
+        assertEquals(listOf("ls/probsat/plain", "bt/clausal-balanced"),
+            completed.stats.portfolio.arms.map { it.label })
+        assertTrue(completed.stats.portfolio.arms.all { it.faults == 0L && it.failures == 0L })
     }
 
     @Test
