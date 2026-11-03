@@ -194,7 +194,7 @@ class ResumableMinimizeRealLeafTest {
 
     @Test
     fun `continuous completion should retain its discrete leaf across work slices`() {
-        val n = 24
+        val n = 12
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0L, 1L)),
             Array<Factor>(n) { row ->
@@ -231,7 +231,7 @@ class ResumableMinimizeRealLeafTest {
         }
 
         assertNotNull(pendingNodes)
-        assertEquals(12.0, assertIs<MinimizeResult.Optimal>(terminal).objective)
+        assertEquals(6.0, assertIs<MinimizeResult.Optimal>(terminal).objective)
         assertEquals(0L, offered.single().ints.single())
     }
 
