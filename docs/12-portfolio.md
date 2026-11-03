@@ -542,7 +542,9 @@ Scheduling changes work order, never publication authority.
 
 `portfolio-probes=heuristic-second` gives the first initially eligible local-search
 worker the probe after the leading complete worker. It applies to curated single-core
-mixed finite integer optimization with a containing deadline. Deferred, improvement-only
+mixed finite Boolean/integer optimization with a containing deadline. Source search
+annotations retain their worker and branching intent; explicit recipe pools and edits
+remain outside this policy's scope. Deferred, improvement-only
 and auxiliary workers keep their admission rules; early core trials keep their priority.
 The remaining probes retain their order, and all workers retain their identities, seeds,
 probe weights and work limits. Initial attempts and silent complete-worker coverage
@@ -556,7 +558,8 @@ the full initial pool as their denominator. Observed failed worker work stays re
 does not complete another worker's sample. An unavailable or retired first worker
 allows the next eligible heuristic to start its own sample. Reaching the allowance
 opens the remaining heuristic starts for the invocation; it grants no work or time.
-The same curated single-core finite integer scope applies. `heuristicStart` statistics
+This gate applies to curated single-core finite integer optimization without source
+search annotations. `heuristicStart` statistics
 retain required work, observed work by worker and completion separately per invocation.
 With `portfolio-publications=segment`, pending private offers finish their checks
 before the scheduler settles that query's sample work. Checking contributes time,

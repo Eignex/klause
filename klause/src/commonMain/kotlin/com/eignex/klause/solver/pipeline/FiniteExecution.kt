@@ -1182,7 +1182,7 @@ private fun executePortfolio(
     }
     if (probePolicy != InitialProbePolicy.ORDINARY && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
             plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
-            plan.scenario.annotationArm != null)) {
+            (probePolicy != InitialProbePolicy.HEURISTIC_SECOND && plan.scenario.annotationArm != null))) {
         pipelineConfigError("portfolio-probes requires a curated recipe pool")
     }
     if (bufferedPublications && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
