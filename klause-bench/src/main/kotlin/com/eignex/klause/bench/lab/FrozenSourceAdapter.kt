@@ -39,7 +39,8 @@ internal object FrozenSourceSuite : BenchSuite {
             val suite = attributes.getValue("suite")
             val problem = attributes.getValue("problem")
             require(suite.isNotBlank() && problem.isNotBlank())
-            require(Format.valueOf(attributes.getValue("format")) in setOf(Format.DIMACS, Format.WCNF, Format.MPS))
+            require(Format.valueOf(attributes.getValue("format")) in
+                setOf(Format.DIMACS, Format.WCNF, Format.MPS, Format.XCSP3))
             Category.valueOf(attributes.getValue("category"))
             require(attributes.getValue("sourcePlainSha256").matches(Regex("[a-f0-9]{64}")))
             val input = template.inputs.single()

@@ -7,16 +7,21 @@ import com.eignex.lab.bench.BenchProtocol
 import com.eignex.lab.bench.BenchRequest
 import kotlinx.serialization.encodeToString
 import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
+import org.junit.jupiter.params.provider.CsvSource
 import kotlin.test.assertEquals
 
 class FrozenSourceAdapterTest {
     @ParameterizedTest
-    @ValueSource(strings = ["cache", "temporary", "cli", "cli-jni"])
-    fun `ordinary frozen planning preserves source identity across seeded repeat blocks`(target: String) {
-        val input = BenchInput("offline/tiny.cnf.zst", BenchInputRoot.CORPUS, "model", "1".repeat(64))
+    @CsvSource("cache,DIMACS,cnf", "temporary,DIMACS,cnf", "cli,DIMACS,cnf", "cli-jni,DIMACS,cnf",
+        "cache,XCSP3,xml", "temporary,XCSP3,xml", "cli,XCSP3,xml", "cli-jni,XCSP3,xml")
+    fun `ordinary frozen planning preserves source identity across seeded repeat blocks`(
+        target: String,
+        format: String,
+        extension: String,
+    ) {
+        val input = BenchInput("offline/tiny.$extension.zst", BenchInputRoot.CORPUS, "model", "1".repeat(64))
         val template = BenchCase("original", inputs = listOf(input), attributes = mapOf(
-            "suite" to "offline", "problem" to "tiny", "format" to "DIMACS", "category" to "UNSAT",
+            "suite" to "offline", "problem" to "tiny", "format" to format, "category" to "UNSAT",
             "sourcePlainSha256" to "2".repeat(64), "labInputDigest" to "stale"))
 
         val cases = FrozenSourceSuite.plan(BenchRequest(mapOf(
@@ -28,6 +33,7 @@ class FrozenSourceAdapterTest {
         assertEquals(setOf("2".repeat(64)), cases.map { it.attributes["sourcePlainSha256"] }.toSet())
         assertEquals(setOf(target), cases.map { it.parameters["source-staging"] }.toSet())
         assertEquals(setOf("10000"), cases.map { it.parameters["timeout-ms"] }.toSet())
+        assertEquals(setOf(format), cases.map { it.attributes["format"] }.toSet())
         assertEquals(setOf<String?>(null), cases.map { it.attributes["labInputDigest"] }.toSet())
     }
 }
