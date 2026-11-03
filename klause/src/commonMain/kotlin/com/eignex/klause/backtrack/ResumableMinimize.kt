@@ -1387,10 +1387,13 @@ internal class ResumableMinimize(
                 restartRootTargetsPending = false
                 lpEngine.refreshRootPrimalTargets(session, params.cancellation)
             }
-            val deferSimplex = incumbents.current() == null &&
-                lpEngine.prepareRootComponentOrder(session, params.cancellation) != null
+            val mixedRootGuide = incumbents.current() == null && params.lpMixedRootTargets &&
+                problem.numRealVars > 0 && lpEngine.rootPrimalTargets != null
+            val deferSimplex = mixedRootGuide || (incumbents.current() == null &&
+                lpEngine.prepareRootComponentOrder(session, params.cancellation) != null)
             if (deferSimplex) {
-                sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", "NODE_QUERY_DEFERRED", 0L)
+                val phase = if (mixedRootGuide) "PRIMAL_CP_GUIDANCE" else "PRIMAL_COMPONENT_ORDER"
+                sink.lp.observePrimalPhase(phase, "NODE_QUERY_DEFERRED", 0L)
             }
             val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1,
                 singleObj?.ascending ?: true, deferSimplex = deferSimplex)

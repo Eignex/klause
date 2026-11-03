@@ -320,6 +320,10 @@ coordinates can transfer without completing the numerical parent or the missing
 coordinates. LP branching opt-outs, LP tree mode and workers with no decision
 allowance retain the primal completion path. The handoff keeps the same storage,
 work, guide identity and root-state guards as a completed rounding attempt.
+An opted-in mixed guide defers the node simplex arm before its first incumbent,
+while inherited checked bounds and the remaining bound cascade stay active.
+The ordinary node policy resumes after an incumbent or guide expiry; continuous
+leaf completion and full source checks still gate every assignment.
 Before its first incumbent, an integer-only traversal can visit declared factor
 components of its undetermined columns contiguously while using these coordinates. Preparation admits at least
 two coupled components, charges its graph work to the remaining LP allowance and

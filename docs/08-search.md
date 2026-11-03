@@ -133,6 +133,9 @@ before those queries resume; inherited checked bounds remain available.
 The opt-in `lp-mixed-root-targets` setting admits integer and Boolean targets from
 mixed models through the same paid owner. Real coordinates never become finite
 decisions; continuous leaf completion and full source checking retain their authority.
+Before the first incumbent, an eligible mixed guide defers new node simplex queries
+until guide expiry, so fresh numerical preferences do not displace its value ordering.
+Inherited checked bounds and the other node bounds remain active.
 The same frame stack handles conflicts and retraction; all source constraints stay
 active and every component still belongs to complete source checking. A restart
 expires the guide. At its restored root, an integer-only traversal that consumed component

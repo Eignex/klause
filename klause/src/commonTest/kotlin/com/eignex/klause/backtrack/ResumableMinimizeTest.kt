@@ -332,6 +332,45 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `mixed root preferences defer node queries until the first incumbent`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(longArrayOf(-1), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.EQ, 0L),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(2, 2, 3),
+            realCoefficients = doubleArrayOf(0.25))
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
+            phaseSaving = false, targetPhasing = false, solutionPhasing = false, lpMixedRootTargets = true,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false, boundEvery = 1))
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
+            var firstPasses = Double.NaN
+            var firstOffers = 0L
+            var firstDeferrals = 0L
+            var firstPoint = true
+
+            val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {
+                if (firstPoint) {
+                    firstPoint = false
+                    firstPasses = search.stats.lp.nodePasses.sum
+                    firstOffers = search.stats.lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]
+                        ?.outcomes?.get("VALUE_ORDER_OFFERED") ?: 0L
+                    firstDeferrals = search.stats.lp.phases["PRIMAL_CP_GUIDANCE_ROOT"]
+                        ?.outcomes?.get("NODE_QUERY_DEFERRED") ?: 0L
+                }
+            }
+
+            assertEquals(4.25, assertIs<MinimizeResult.Optimal>(result).objective)
+            assertEquals(0.0, firstPasses)
+            assertTrue(firstOffers > 0L)
+            assertTrue(firstDeferrals > 0L)
+            assertTrue(search.stats.lp.nodePasses.sum > 0.0)
+        }
+    }
+
+    @Test
     fun `mixed root targets backtrack through discrete rows and complete real leaves`() {
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
