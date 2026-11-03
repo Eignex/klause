@@ -257,13 +257,16 @@ internal object SolveMetric {
             } to r.rawOutput
         }.getOrElse { failure ->
             val invocation = (failure as? SolverInvocation.Failure)?.result
-            val record = (
+            val failed = if (failure is MiniZincIdentityFailure) {
+                loadFailureRecord(entry.ref, settings, budget, timestamp, sha, failure, sourceHashes)
+            } else {
                 invocation?.let { record(entry, settings, budget, kind, timestamp, sha, it) }
-                ?: errorRecord(entry, settings, budget, kind, timestamp, sha)
-            )
+                    ?: errorRecord(entry, settings, budget, kind, timestamp, sha)
+            }
+            val record = failed
                 .copy(
-                    stats = invocation?.stats.orEmpty() + SolveFailure.stats(failure),
-                    compilerIdentity = compiler,
+                    stats = failed.stats + invocation?.stats.orEmpty() + SolveFailure.stats(failure),
+                    compilerIdentity = compiler.takeUnless { failure is MiniZincIdentityFailure },
                     sourceHashes = sourceHashes,
                     buildProvenance = provenance,
                     buildFingerprint = provenance?.fingerprint,
