@@ -322,8 +322,9 @@ of the root variable comparison. In that mode the selected root variable can req
 one child-order estimate from its retained optimal basis after the actual
 complementary alternatives exist. This attempt is limited to one column and
 one attempt per hint owner, including across slices, restarts and assumption reseeding.
-An unsupported or unfunded attempt consumes that opportunity and retains the existing
-child order. Reliable history takes precedence and consumes no basis opportunity.
+An unsupported numerical attempt consumes that opportunity and retains the existing
+child order. Unfunded preparation leaves the opportunity available. Reliable history
+takes precedence and consumes no basis opportunity.
 History preparation and ordering share the existing LP allowance.
 
 In an explicitly enabled run, the larger predicted objective increase is tried first,
