@@ -1,9 +1,7 @@
 package com.eignex.klause.bench.profile
 
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
@@ -44,8 +42,7 @@ class ChannelTrajectoryTest {
 
     @Test
     fun `searched channel moves report a changed source destination`() {
-        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)),
-            arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val sweep = assertNotNull(DefinitionalSweep.fromSource(problem,
             listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true)))))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
