@@ -36,6 +36,7 @@ internal class LpHints(
     private val observe: (String) -> Unit = {},
     private val charge: (Long) -> Unit = {},
     private val rootBasis: Boolean = false,
+    private val rootVariableBasis: Boolean = false,
 ) : LpHintSink {
     private data class SideAdvice(val variable: VarRef, val split: Long, val up: Boolean, val basis: Boolean)
 
@@ -47,6 +48,8 @@ internal class LpHints(
     private var pendingSide: SideAdvice? = null
     private var activeSide: SideAdvice? = null
     private var rootBasisAttempted = false
+    private var rootVariableBasisAttempted = false
+    private var variableBasisProposal = false
     private var boundRecorded = false
     private var unavailable = LpHintUnavailable.UNOBSERVED
     private var scopeModel: ExactLpModel? = null
@@ -74,6 +77,7 @@ internal class LpHints(
         pendingSide = null
         activeSide = null
         boundRecorded = false
+        variableBasisProposal = false
         unavailable = LpHintUnavailable.UNOBSERVED
         if (collect) history.beginNode(depth)
     }
@@ -265,8 +269,8 @@ internal class LpHints(
     }
 
     fun prepareVariableComparison(variables: Int): Boolean {
-        if (!collect || !directionalGains || !freshRecord || !boundRecorded ||
-            !history.mayHaveScores || variables !in 1..8192
+        if (!collect || !freshRecord || variables !in 1..8192 ||
+            (!(boundRecorded && history.mayHaveScores) && !rootVariableChoiceReady)
         ) return false
         charge(3L * variables + 4L)
         observe("VARIABLE_COMPARISON")
@@ -279,6 +283,7 @@ internal class LpHints(
         second: VarRef?,
         secondDomain: IntDomain?,
     ): VarRef? {
+        variableBasisProposal = false
         first ?: return null
         val firstScore = directionalScore(first, firstDomain)
         val secondScore = second?.let { directionalScore(it, secondDomain) } ?: Double.NaN
@@ -300,11 +305,69 @@ internal class LpHints(
     }
 
     fun applyVariableChoice(proposal: VarRef?, baseline: VarRef?): VarRef? {
+        val basis = variableBasisProposal
+        variableBasisProposal = false
         proposal ?: return baseline
         charge(2L)
         observe("VARIABLE_CONSUMED")
+        if (basis) observe("VARIABLE_BASIS_CONSUMED")
         observe(if (proposal == baseline) "VARIABLE_BASELINE_AGREED" else "VARIABLE_BASELINE_CHANGED")
         return proposal
+    }
+
+    val rootVariableChoiceReady: Boolean get() = collect && rootVariableBasis && freshRecord &&
+        history.isRootNode && !rootVariableBasisAttempted
+
+    fun compareRootVariables(
+        first: VarRef?,
+        firstDomain: IntDomain?,
+        second: VarRef?,
+        secondDomain: IntDomain?,
+        reserve: (Long) -> Boolean,
+        estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>?,
+    ): VarRef? {
+        if (!rootVariableChoiceReady || first == null || second == null) return null
+        val relaxation = pointRelaxation ?: return null
+        val firstValue = value(first, firstDomain)
+        val secondValue = value(second, secondDomain)
+        if (!fractional(first, firstValue) || !fractional(second, secondValue)) return null
+        val firstColumn = relaxation.column(first)
+        val secondColumn = relaxation.column(second)
+        if (firstColumn < 0 || secondColumn < 0 || firstColumn == secondColumn) return null
+        rootVariableBasisAttempted = true
+        observe("VARIABLE_BASIS_ATTEMPT")
+        if (!reserve(16L)) {
+            observe("VARIABLE_BASIS_UNFUNDED")
+            return null
+        }
+        val costs = estimate(relaxation.model, intArrayOf(firstColumn, secondColumn))
+        if (costs == null || costs.size != 2) {
+            observe("VARIABLE_BASIS_DECLINED")
+            return null
+        }
+        val firstScore = basisScore(costs[0], firstValue)
+        val secondScore = basisScore(costs[1], secondValue)
+        if (!firstScore.isFinite() || !secondScore.isFinite()) {
+            observe("VARIABLE_BASIS_MISSING_DIRECTION")
+            return null
+        }
+        val proposal = when {
+            secondScore > firstScore && secondScore > 1e-9 -> second
+            firstScore > 1e-9 -> first
+            else -> return null
+        }
+        variableBasisProposal = true
+        observe("VARIABLE_BASIS_ESTIMATED")
+        return proposal
+    }
+
+    private fun basisScore(cost: LpDirectionalCost?, value: Double): Double {
+        cost ?: return Double.NaN
+        if (!cost.down.isFinite() || !cost.up.isFinite() || cost.down < 0.0 || cost.up < 0.0) return Double.NaN
+        val fraction = value - floor(value)
+        val down = cost.down * fraction
+        val up = cost.up * (1.0 - fraction)
+        return minOf(down, up) + maxOf(down, up) / 6.0
     }
 
     fun directionalScore(variable: VarRef, domain: IntDomain? = null): Double =
@@ -569,6 +632,7 @@ internal class LpHints(
         activeSide = null
         boundRecorded = false
         unavailable = LpHintUnavailable.UNOBSERVED
+        variableBasisProposal = false
     }
 
     override fun clear() {

@@ -300,17 +300,25 @@ The `lp-default` optimization recipe enables the passive finite consumer; direct
 and branching must be enabled. The reduced-cost/fractionality scorer supplies its
 winning variable and runner-up. When recent history is available, reliable predicted
 gains compare only those two candidates. Both candidates require reliable predictions;
-missing or tied predictions retain the original winner. Candidates outside that
-shortlist keep no selection priority.
-Shortlist tracking reserves its bounded scan work from the existing LP allowance
-before visiting candidates. It performs no numerical query.
+tied predictions retain the original winner. Candidates outside that shortlist keep
+no selection priority. Shortlist tracking charges its bounded scan work to the existing
+LP allowance before visiting candidates.
 Two recent samples in each direction supply that variable's predicted child gains,
 using each direction's mean cost per unit of fractional movement. The balanced
 `min + max / 6` score ranks finite positive predictions in the shortlist.
-Missing or unreliable history retains the existing variable order. Ordinary finite
-workers use value and incumbent guidance to order their children and issue no
-directional numerical queries. Finite-run construction can explicitly enable a
-root child-order fallback. In that mode the selected root variable can request
+Missing or unusable history permits one root comparison of the same two candidates
+from the retained optimal basis. Both candidates need finite nonnegative costs in
+both directions, scaled by their current fractional movement and ranked by the same
+balanced score. A tie retains the original winner. Preparation reserves 16 work units
+before allocating the two-column request; analysis spends the unspent node allowance
+and remaining containing and cumulative allowances. Unsupported and unfunded attempts
+consume the single opportunity. It belongs to the hint owner and survives slices,
+restarts and assumption reseeding. Basis estimates train no history and supply no
+bound or pruning authority. Missing or unavailable advice retains the original winner.
+Ordinary finite workers use value and incumbent guidance to order their children.
+
+Finite-run construction can explicitly enable a root child-order fallback in place
+of the root variable comparison. In that mode the selected root variable can request
 one child-order estimate from its retained optimal basis after the actual
 complementary alternatives exist. This attempt is limited to one column and
 one attempt per hint owner, including across slices, restarts and assumption reseeding.

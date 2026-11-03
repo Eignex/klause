@@ -52,7 +52,7 @@ class ResumableMinimizeDirectionalTest {
     }
 
     @Test
-    fun `basis queries require explicit finite search opt in`() {
+    fun `root child basis queries require explicit finite search opt in`() {
         for (basis in listOf(false, true)) {
             val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, arrayOf<Factor>(
                 Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 3L),
@@ -76,6 +76,28 @@ class ResumableMinimizeDirectionalTest {
                 assertEquals(expected, observations["BASIS_ATTEMPT"] ?: 0L, observations.toString())
                 assertEquals(expected, observations["BASIS_SIDE_CONSUMED"] ?: 0L, observations.toString())
             }
+        }
+    }
+
+    @Test
+    fun `finite root variable advice uses one retained basis comparison`() {
+        val factors = Array<Factor>(3) { edge ->
+            Linear(longArrayOf(1L, 1L), intArrayOf(edge, (edge + 1) % 3), LinearOp.GE, 1L)
+        }
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, factors).bake()
+        val params = BacktrackParams(randomSeed = 3L, maxDecisions = 64L, objectiveBoundSupplier = { 100.0 },
+            lpDirectionalGains = true,
+            lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
+                boundMaxOpsPerNode = 0L))
+        val objective = LinearObjective(intCoefficients = longArrayOf(3L, 2L, 4L))
+        ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
+            var slices = 0
+            while (slices++ < 8 && !search.isDone) search.runSlice(Cancellation.Never, 1000L, 8L) {}
+
+            val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
+            assertEquals(1L, observations["VARIABLE_BASIS_ATTEMPT"] ?: 0L, observations.toString())
+            assertEquals(1L, observations["VARIABLE_BASIS_CONSUMED"] ?: 0L, observations.toString())
+            assertEquals(0L, observations["SIDE_CONSUMED"] ?: 0L, observations.toString())
         }
     }
 

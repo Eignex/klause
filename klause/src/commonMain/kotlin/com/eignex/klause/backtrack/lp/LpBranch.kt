@@ -10,7 +10,8 @@ import com.eignex.klause.solver.search.VarRef
  * the LP gives no fractional signal, or the residual problem is too wide to scan. Purely advisory — the
  * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound
  * branch, so search stays complete and correct regardless. Reliable passive history compares the
- * winner and runner-up without another LP query; missing history retains the score winner.
+ * winner and runner-up. Missing history permits one funded root comparison of retained basis costs;
+ * unavailable advice retains the score winner.
  * `O(unassigned)` per call, capped.
  *
  * Lives in the search layer (not [LpEngine]'s home) because it reads the backtrack [VarRef] selector type
@@ -56,9 +57,14 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
             second = variable
         }
     }
-    val proposal = if (compareHistory) {
+    val historyProposal = if (compareHistory) {
         hints.compareVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
             second, (second as? VarRef.IntVar)?.let { session.intDomain(it.varId) })
+    } else null
+    val proposal = historyProposal ?: if (compareHistory && hints.rootVariableChoiceReady) {
+        hints.compareRootVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
+            second, (second as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
+            reserve = ::reserveDirectionalWork, estimate = ::directionalCosts)
     } else null
     return hints.applyVariableChoice(proposal, best)
 }

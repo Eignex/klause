@@ -242,6 +242,84 @@ class LpHintsTest {
     }
 
     @Test
+    fun `root variable basis comparison has one funded opportunity across resets`() {
+        for (enabled in listOf(false, true)) for (funded in listOf(false, true)) {
+            for (available in listOf(false, true)) {
+                val builder = LpBuilder()
+                repeat(2) { builder.addVar(0, 2) }
+                val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE), intArrayOf(0, 1),
+                    BooleanArray(2), 0L, intArrayOf(0, 1), IntArray(0))
+                val hints = LpHints(2, 0, directionalGains = true, rootVariableBasis = enabled)
+                val first = VarRef.IntVar(0)
+                val second = VarRef.IntVar(1)
+                val domain = IntDomain(0, 2)
+                var reservations = 0
+                var queries = 0
+                val reserve: (Long) -> Boolean = { reservations++; funded }
+                val estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>? = { _, columns ->
+                    assertEquals(listOf(0, 1), columns.toList())
+                    queries++
+                    if (available) listOf(LpDirectionalCost(1.0, 4.0), LpDirectionalCost(2.0, 8.0)) else null
+                }
+                hints.beginNode(1, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+                assertEquals(null, hints.compareRootVariables(first, domain, second, domain, reserve, estimate))
+                assertEquals(0, queries)
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+
+                val proposal = hints.compareRootVariables(first, domain, second, domain, reserve, estimate)
+
+                assertEquals(if (enabled && funded && available) second else null, proposal)
+                assertEquals(null, hints.compareRootVariables(first, domain, second, domain, reserve, estimate))
+                hints.resetHistory()
+                hints.beginNode(0, 100.0)
+                hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+                assertEquals(null, hints.compareRootVariables(first, domain, second, domain, reserve, estimate))
+                assertEquals(if (enabled) 1 else 0, reservations)
+                assertEquals(if (enabled && funded) 1 else 0, queries)
+            }
+        }
+    }
+
+    @Test
+    fun `root variable basis choice requires two usable direction estimates`() {
+        val valid = LpDirectionalCost(1.0, 4.0)
+        val stronger = LpDirectionalCost(2.0, 8.0)
+        val cases: List<Pair<List<LpDirectionalCost?>?, Int?>> = listOf(
+            listOf(valid, stronger) to 1,
+            listOf(stronger, valid) to 0,
+            listOf(valid, valid) to 0,
+            null to null,
+            emptyList<LpDirectionalCost>() to null,
+            listOf(valid) to null,
+            listOf(null, valid) to null,
+            listOf(valid, null) to null,
+            listOf(valid, LpDirectionalCost(-1.0, 4.0)) to null,
+            listOf(valid, LpDirectionalCost(Double.NaN, 4.0)) to null,
+            listOf(valid, LpDirectionalCost(1.0, Double.POSITIVE_INFINITY)) to null,
+            listOf(LpDirectionalCost(0.0, 0.0), LpDirectionalCost(0.0, 0.0)) to null,
+        )
+        for (bools in 0..2) for ((costs, expected) in cases) {
+            val builder = LpBuilder()
+            repeat(2) { builder.addVar(0, if (it < bools) 1 else 2) }
+            val relaxation = LpRelaxation(builder.build(Sense.MINIMIZE),
+                IntArray(2) { if (it < bools) it else it - bools },
+                BooleanArray(2) { it < bools }, 0L, IntArray(2 - bools) { it + bools }, IntArray(bools) { it })
+            val hints = LpHints(2 - bools, bools, directionalGains = true, rootVariableBasis = true)
+            val variables = List(2) { if (it < bools) VarRef.Bool(it) else VarRef.IntVar(it - bools) }
+            hints.beginNode(0, 100.0)
+            hints.record(relaxation, doubleArrayOf(0.5, 0.5), DoubleArray(0))
+
+            val proposal = hints.compareRootVariables(variables[0], if (bools > 0) null else IntDomain(0, 2),
+                variables[1], if (bools > 1) null else IntDomain(0, 2),
+                reserve = { true }, estimate = { _, _ -> costs })
+
+            assertEquals(expected?.let { variables[it] }, proposal)
+        }
+    }
+
+    @Test
     fun `selected side basis opportunity is confined to one root attempt across resets`() {
         for (enabled in listOf(false, true)) for (available in listOf(false, true)) {
             val builder = LpBuilder()
