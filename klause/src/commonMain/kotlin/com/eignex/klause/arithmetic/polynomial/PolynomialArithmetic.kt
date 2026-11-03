@@ -55,8 +55,12 @@ internal class PolynomialArithmetic(
     fun multiply(left: Polynomial, right: Polynomial): Polynomial {
         step()
         return Polynomial.of(buildList {
-            for (a in left.terms) for (b in right.terms) {
-                add(product(a, b))
+            val leftTerms = left.terms
+            if (leftTerms.isNotEmpty()) {
+                val rightTerms = right.terms
+                for (a in leftTerms) for (b in rightTerms) {
+                    add(product(a, b))
+                }
             }
         })
     }

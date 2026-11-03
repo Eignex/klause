@@ -15,6 +15,17 @@ class PolynomialArithmeticTest {
     private val y = Polynomial.variable(1)
 
     @Test
+    fun `constant monomial multiplication should preserve sparse extreme exponents`() {
+        val value = Monomial.of(mapOf(0 to Int.MAX_VALUE, Int.MAX_VALUE to 1))
+        for (powers in listOf(emptyMap(), mapOf(9 to 0))) {
+            val constant = Monomial.of(powers)
+
+            assertEquals(value, constant.times(value))
+            assertEquals(value, value.times(constant))
+        }
+    }
+
+    @Test
     fun `monomial order should compare powers at the greatest coordinate first`() {
         for ((left, right, expected) in listOf(
             Triple(emptyMap<Int, Int>(), emptyMap(), 0),
