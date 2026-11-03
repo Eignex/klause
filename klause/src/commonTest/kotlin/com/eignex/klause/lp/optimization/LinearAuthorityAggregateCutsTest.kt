@@ -81,6 +81,9 @@ class LinearAuthorityAggregateCutsTest {
         }
 
         assertTrue(capture.records.first().cuts.isEmpty())
+        assertTrue(capture.records.drop(1).any { record ->
+            record.cuts.isNotEmpty() && record.cuts.all { it.installed && it.checked }
+        })
         assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
             assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
         assertEquals(SourceEvidenceCheck.Checked,

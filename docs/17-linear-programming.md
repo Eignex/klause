@@ -620,9 +620,12 @@ per-attempt limits shared with explicit aggregation. Stopped or limited
 preparation reports its decline and leaves only completed proposals available.
 Point selection queries the current recipe before preparing optional aggregate
 pairs. A checked current incumbent or terminal bypasses discovery. A completed
-nonterminal point can prepare aggregates alongside point-directed row alternatives
-under 65,536 work and 1 MiB modeled allocation. Ordinary aggregate-only queries keep
-their 500,000-work and 8 MiB limits. An installed aggregate recipe with at most 64
+nonterminal point can first prepare an ordinary aggregate recipe under its
+500,000-work and 8 MiB limits. Its current and generated rows share a 64-selected-row
+cap. A fully checked generated mask enters the optional query without projecting
+every row at the base point. If ordinary generation yields no proposal, point-directed
+row alternatives retain their 65,536-work and 1 MiB limits. All attempts share the
+containing request allowance. An installed aggregate recipe with at most 64
 fully checked rows can enter aging without replacing its query.
 Pure-integer point discovery uses the existing integer-row producer limits of
 48 multi-coordinate source rows and 16 proposals. It tries half rounding on each
@@ -1459,7 +1462,10 @@ template. Successful selection retains its checked mask instead.
 Integer-only templates and aggregate-only cut families with at most 64 fully checked
 installed cuts adopt that mask directly from the current recipe, without another
 LP query or a root miss.
-Their later completed points age installed rows under the same scoring limits.
+A nonterminal current query can also seed a fully checked generated mask, including
+current mixed rows, within the same 64-selected-ID limit. This mask is a proposal
+for the optional query; it conveys no proof or installation authority. Its completed
+points and adopted current recipes age installed rows under the same scoring limits.
 Complementary endpoint mode retains an adopted current template; its mask refers
 to the installed definitions. Integer-only templates also share endpoint modes
 because they add no continuous bound alternatives.
