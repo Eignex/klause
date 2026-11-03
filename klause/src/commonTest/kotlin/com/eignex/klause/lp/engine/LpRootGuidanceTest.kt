@@ -22,10 +22,11 @@ class LpRootGuidanceTest {
     fun `paused monolithic advice leaves basic coordinates unknown without another solve`() {
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
-            listOf(List(3) { ExactLpEntry(it, ExactLpNumber.of(-1L)) }),
+            List(3) { listOf(ExactLpEntry(0, ExactLpNumber.of(-1L))) },
             listOf(ExactLpNumber.of(-1L)),
-            List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) },
-            listOf(ExactLpRow()), ExactLpObjective(List(3) { ExactLpNumber.of(it + 1L) }),
+            List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) } +
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            listOf(ExactLpRow()), ExactLpObjective(List(3) { ExactLpNumber.of(it + 1L) } + zero),
         )
         val state = LpExactState(source)
         val solver = RevisedSimplex(assertNotNull(state.toWorkingModel()))
@@ -55,10 +56,11 @@ class LpRootGuidanceTest {
     fun `scoped monolithic advice requires explicit admission and retains its pending solve`() {
         val one = ExactLpNumber.of(1L)
         val source = ExactLpModel(
-            listOf(List(3) { ExactLpEntry(it, ExactLpNumber.of(-1L)) }),
+            List(3) { listOf(ExactLpEntry(0, ExactLpNumber.of(-1L))) },
             listOf(ExactLpNumber.of(-1L)),
-            List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) },
-            listOf(ExactLpRow()), ExactLpObjective(List(3) { ExactLpNumber.of(it + 1L) }),
+            List(3) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero), ExactLpSide(one))) } +
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
+            listOf(ExactLpRow()), ExactLpObjective(List(3) { ExactLpNumber.of(it + 1L) } + zero),
         )
         LpScopedSolver(LpExactState(source)).use { owner ->
             assertNotNull(owner.advanceFloat(1_000_000L, LpFloatAllowance(1_000_000L, 1),
