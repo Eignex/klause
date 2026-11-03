@@ -25,6 +25,25 @@ class RevisedSimplexResolveBoundsTest {
     }
 
     @Test
+    fun `repeated nonbasic bound changes should retain certified objectives`() {
+        val trail = LpBoundTrail(assertNotNull(base().authoritativeModel()))
+        RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { solver ->
+            assertNotNull(solver.solve())
+            for ((lower, objective) in listOf(1L to 4L, 2L to 5L, 3L to 6L)) {
+                assertTrue(trail.assertBound(1, false, ExactLpSide(ExactLpNumber.of(lower)), lower))
+                assertTrue(solver.adopt(trail.state, Cancellation.Never))
+
+                val result = assertNotNull(solver.resolveBounds())
+
+                val certified = certifyLpResult(assertNotNull(trail.state.toWorkingModel()), solver, result)
+                assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
+                assertEquals(BigFraction.ofLong(objective), certified.lowerBound)
+                assertEquals(0, result.refactorizations)
+            }
+        }
+    }
+
+    @Test
     fun `a bound-only revision should re-solve without rebuilding the factorization`() {
         val model = base()
         val initial = LpExactState(assertNotNull(model.authoritativeModel()))

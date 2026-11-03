@@ -2336,7 +2336,8 @@ internal class RevisedSimplex(
         if (changed) {
             val change = boundChange
             ftranDense(rhs, change, rhsVec, boundUpdateFtran = true)
-            koblas.vectorKernels.axpy(out, 0, 1.0, change, 0, m)
+            // Preserve the unit-stride AXPY's multiply/add order.
+            for (row in 0 until m) out[row] += 1.0 * change[row]
             work.add(m)
         }
         return out.all { it.isFinite() }

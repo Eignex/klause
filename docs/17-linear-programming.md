@@ -758,7 +758,9 @@ sides, and pop restores bounds and deactivates scoped rows.
 A nonbasic bound change updates the basic values by `-B^-1 A(j) delta(x(j))`; pop
 reseats nonbasics and recomputes `x(B) = B^-1 (b - N x(N))`. Compatible edits and
 pops retain factors; missing sides require status and dual-feasibility repair, and
-objective edits invalidate dependent proofs.
+objective edits invalidate dependent proofs. Cached bound restoration applies its
+unit-stride multiply/add to owned vectors in row order, retaining the per-row work
+charge.
 [LpScopedSolver](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpScopedSolver.kt)
 and [CpLpAdapter](../klause/src/commonMain/kotlin/com/eignex/klause/lp/bounding/CpLpAdapter.kt)
 hold bound trails, active-row identity and verification caches.
