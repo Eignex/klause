@@ -17,6 +17,9 @@ replaces the complete unfinished row rather than mixing arms from different
 machines or attempts. Accepted rows remain valid; retain failed and preparation
 costs and report repeated infrastructure losses separately.
 
+Each requested selection must match at least one source. A selection with no matches
+fails preparation instead of publishing a reduced comparison plan.
+
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
 copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time
@@ -69,6 +72,12 @@ diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
+`param.private-rebuild-work=-1` requests automatic parity admission within a
+1,048,576-work cap and the configured scratch grant. It makes one initial-root
+attempt on the structurally admitted Boolean cohort; see the
+[admission contract](../docs/07-presolve.md#private-worker-qualification).
+Use explicit zero as the canonical control. The production default remains zero.
+
 `param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
 trial after new global root pins or an owned learned equivalence, with source reduction and a fresh consuming
 worker. Zero is the default. `ProgressPins` excludes baked-root facts;
@@ -76,7 +85,7 @@ worker. Zero is the default. `ProgressPins` excludes baked-root facts;
 baked root without a captured equivalence keeps its canonical traversal.
 `BinaryScanWork` and `BinaryScanNanos` retain bounded discovery costs;
 `BinaryRelations` counts captured reciprocal implications and `EquivalentColumns`
-counts actual source implication-graph merges. Discovery accepts only owned global
+counts actual signed source substitutions. Discovery accepts only owned global
 binary learning and checks at most 128 binaries within 32,768 work per observation.
 `BinaryHistoryWork` and `BinaryHistoryBytes` retain the fixed history's initialization
 and primitive storage. At most 32 relations are attempted in one worker. Its history
@@ -136,6 +145,33 @@ Projection work remains inside `WarmClauseWork` and preparation. Tautological,
 wide or unsupported selected translations contribute no copied consequence.
 `WarmClauseNormalizationWork` records the final input-normalization reservation;
 it is a subset of transfer and preparation work, rather than another total to add.
+
+
+Private parity discovery reports `ParityDiscoveryWork`, `ParityDiscoveryNanos`,
+`ParityRows` and `ParityPins`. Discovery work is a subset of `ChargedWork`,
+separate from canonical root propagation and later `PreparationWork`.
+`ParitySourceRows` and `ParitySourceLiterals` count short source equations posted
+beside the reduced basis in mixed consumers. Their storage and propagation spend
+the existing private grants.
+`ParityGenerationPins` counts proved pins in a prepared private model;
+`Consumers` confirms that its worker opened.
+`ParityAffineColumns` and `ParityAffineFreeColumns` describe a fully covered
+captured affine basis. `AffineGenerationColumns` and `AffineGenerationFreeColumns`
+count its coordinates in a prepared model. These private pivot slots require
+affine reconstruction and cannot receive unprojected canonical learned clauses.
+`ParityBasisColumns` and `ParityCoveredSourceClauses` describe the captured
+linear subsystem. `ParityReducedRows`, `ParityReducedLiterals` and
+`ParityCoveredClauses` identify a prepared mixed Clause/Xor view with original
+coordinate meanings; they do not count eliminated columns.
+`ParityPreferredFreeColumns` reports the admitted free-coordinate selection list. Coverage declines name
+incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
+larger widths). Such a miss can retain proved global pins or a mixed view.
+`ParityWorkspaceBytes` is the maximum modeled table/matrix/snapshot workspace
+within one private coordinator, rather than RSS or cumulative allocation.
+`ParityDeclinedPartial`, `Memory`, `NoRows`, `NoPins` and
+`RefutationDeferred` retain unsupported or incomplete outcomes. A derived
+contradiction supplies no checked source proof. Consumer witnesses still require
+reconstruction and complete canonical source checks.
 
 Run from the repository root with JDK 25 or newer:
 

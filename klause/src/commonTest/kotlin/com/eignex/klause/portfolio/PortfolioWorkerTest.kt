@@ -35,13 +35,15 @@ import kotlin.test.assertTrue
 
 class PortfolioWorkerTest {
     @Test
-    fun `objective coordinate search should preserve instruction slices and preparation continuation`() {
+    fun `objective coordinate search should preserve instruction slices and continuation guards`() {
         val point = MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf(3)), 3.0)
         val tracking = TrackingResumableSearch(point)
         val allowances = mutableListOf<Long>()
+        var pending = true
         val child = object : ResumableSearch by tracking, InstructionSlicedSearch, ReseedGuard {
             override val canReseed = false
             override val canContinuePreparation = true
+            override val incumbentTrialPending: Boolean get() = pending
             override fun runInstructionSlice(
                 global: Cancellation,
                 sliceMillis: Long,
@@ -60,6 +62,7 @@ class PortfolioWorkerTest {
         }
         val handle = assertNotNull(worker.newResumableSearch { 0.0 })
         val points = mutableListOf<MinimizeResult.WithSample>()
+        assertTrue(assertIs<ReseedGuard>(handle).incumbentTrialPending)
 
         val terminal = assertIs<InstructionSlicedSearch>(handle).runInstructionSlice(
             Cancellation.Never, 1L, 17L, points::add,
@@ -71,6 +74,8 @@ class PortfolioWorkerTest {
         val guard = assertIs<ReseedGuard>(handle)
         assertFalse(guard.canReseed)
         assertTrue(guard.canContinuePreparation)
+        pending = false
+        assertFalse(guard.incumbentTrialPending)
         handle.close()
         assertEquals(1, tracking.closes)
     }

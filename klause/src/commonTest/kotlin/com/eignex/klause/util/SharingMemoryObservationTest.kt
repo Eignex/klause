@@ -191,4 +191,29 @@ class SharingMemoryObservationTest {
         assertEquals(SharingMemoryStatus.COMPLETE, memory.status)
         assertEquals(2, arrays.size)
     }
+
+    @Test
+    fun `reference pool protection should preserve one immutable owned capacity`() {
+        val sample = SharingMemoryObservation(1024L, 128, { false }, {})
+        val pool = Any()
+
+        val values = assertNotNull(sample.snapshot {
+            sample.ownedReferencesPool(pool, 100L, 40L)
+            sample.ownedReferencesPool(pool, 100L, 70L)
+            sample.ownedReferencesPool(pool, 100L, 20L)
+        }.completeValues)
+
+        assertEquals(100L, values["ownedReferenceSlots"])
+        assertEquals(70L, values["protectedReferenceSlots"])
+    }
+
+    @Test
+    fun `reference pool reports should reject capacity changes within one observation`() {
+        val sample = SharingMemoryObservation(1024L, 128, { false }, {})
+        val pool = Any()
+        sample.ownedReferencesPool(pool, 100L, 40L)
+
+        assertFailsWith<IllegalArgumentException> { sample.ownedReferencesPool(pool, 120L, 40L) }
+    }
+
 }

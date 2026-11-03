@@ -1,10 +1,12 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.OWN_ORIGIN
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.propagation.bake
@@ -22,6 +24,33 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PrivateRebuildGenerationTest {
+    @Test
+    fun `mixed private rows should retain local source parity propagation`() {
+        for (width in 2..3) for (phase in 0..1) for (native in listOf(false, true)) {
+            val columns = if (width == 2) intArrayOf(3, 4) else intArrayOf(2, 3, 4)
+            val rows = listOf(intArrayOf(0, 1, 3) to 0, columns to phase)
+            val clauses = rows.flatMap { (variables, target) ->
+                (0 until (1 shl variables.size)).filter { it.countOneBits() % 2 != target }.map { mask ->
+                    Clause(IntArray(variables.size) { Lit.make(variables[it], mask and (1 shl it) == 0) })
+                }
+            } + Clause(intArrayOf(Lit.make(5, true), Lit.make(6, true)))
+            val source = Problem(7, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+            val canonical = PropagationSession(source, nativeSat = native)
+            val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
+                Cancellation.Never, parity = captured))
+            val consumer = PropagationSession(generation.problem)
+
+            assertIs<PropagationResult.Implied>(consumer.pinBool(3, false))
+            assertIs<PropagationResult.Implied>(consumer.pinBool(2, false))
+
+            assertEquals(phase != 0, consumer.boolValue(4))
+            assertNull(consumer.boolValue(0))
+            assertNull(consumer.boolValue(1))
+            for (variable in 0..6) assertNull(canonical.boolValue(variable))
+        }
+    }
+
     @Test
     fun `learned equivalences should open a reconstructable private consumer without root pins`() {
         for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {

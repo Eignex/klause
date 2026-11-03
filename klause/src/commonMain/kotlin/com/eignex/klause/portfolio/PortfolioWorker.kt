@@ -219,6 +219,8 @@ class PortfolioWorker private constructor(
                         override val canReseed: Boolean get() = (child as? ReseedGuard)?.canReseed ?: true
                         override val canContinuePreparation: Boolean
                             get() = (child as? ReseedGuard)?.canContinuePreparation ?: false
+                        override val incumbentTrialPending: Boolean
+                            get() = (child as? ReseedGuard)?.incumbentTrialPending == true
 
                         override fun runSlice(
                             global: Cancellation,
