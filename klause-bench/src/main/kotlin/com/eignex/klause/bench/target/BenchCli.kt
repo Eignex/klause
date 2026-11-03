@@ -15,7 +15,6 @@ import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.source.CorpusCache
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
-import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.CorpusUnavailable
 import com.eignex.klause.bench.source.ProblemKind
 import java.io.File
@@ -237,23 +236,22 @@ object BenchCli {
             candidates = candidates.filter { c -> pats.any { matches(it, c.ref.name) } }
         }
         val wantCop = f["kind"]?.let(::parseKind)
-        val capped = BenchSelection.capFamilies(
+        val balanceFormats = when (f["balance"]?.lowercase()) {
+            null -> false
+            "format" -> true
+            else -> error("balance must be 'format', got '${f["balance"]}'")
+        }
+        return BenchSelection.select(
             candidates,
             perFamily = f["per-family"]?.toIntOrNull(),
             seed = f["seed"]?.toLongOrNull(),
+            maxInstances = f["max"]?.toIntOrNull(),
+            balanceFormats = balanceFormats,
             compatible = { candidate ->
                 f["set"] != null || candidate.suite != "mzn-bench-compatible-v1" || compatible(candidate)
             },
             accept = { wantCop == null || ProblemKind.isCop(it) == wantCop },
         )
-        // Families are already capped; what is left is the round-robin interleave and the overall `max`.
-        val sel = CorpusSelection.Selection(maxInstances = f["max"]?.toIntOrNull())
-        // Format balancing water-fills the total cap across formats; unset uses the family-global cap.
-        return when (f["balance"]?.lowercase()) {
-            null -> CorpusSelection.applySelectionBy(capped, sel) { it.family }
-            "format" -> CorpusSelection.applyBalancedBy(capped, sel, { it.family }) { it.ref.format }
-            else -> error("balance must be 'format', got '${f["balance"]}'")
-        }
     }
 
     private fun compatible(candidate: SelectedProblem): Boolean =
