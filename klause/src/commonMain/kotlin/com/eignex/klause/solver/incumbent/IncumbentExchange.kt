@@ -2,6 +2,7 @@
 
 package com.eignex.klause.solver.incumbent
 
+import com.eignex.klause.util.Cancellation
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -46,21 +47,54 @@ class IncumbentExchange<A, V>(
 ) : IncumbentSource<A, V> {
 
     private val cell = AtomicReference<VerifiedIncumbent<A, V>?>(null)
+    private var bufferedOffers: BufferedIncumbentOffers<A, V>? = null
+    internal val buffersWorkerOffers: Boolean get() = bufferedOffers != null
 
     override fun current(): VerifiedIncumbent<A, V>? = cell.load()
 
     /** Verify [assignment]/[objective] and install it when it strictly improves the standing incumbent. */
-    fun offer(assignment: A, objective: V): Publication<A, V> {
+    fun offer(assignment: A, objective: V): Publication<A, V> = checkNotNull(offer(assignment, objective, null))
+
+    private fun offer(assignment: A, objective: V, cancellation: Cancellation?): Publication<A, V>? {
         val accepted = when (val verdict = verifier.verify(Candidate(assignment, objective))) {
             is Verification.Accepted -> verdict.candidate
             is Verification.Rejected -> return Publication.Rejected(verdict.reason)
             is Verification.Indeterminate -> return Publication.Indeterminate(verdict.reason)
         }
         while (true) {
+            if (cancellation?.invoke() == true) return null
             val standing = cell.load()
             if (standing != null && !improves(accepted.objective, standing.objective)) return Publication.NotImproving
             val next = VerifiedIncumbent(accepted.assignment, accepted.objective, (standing?.version ?: 0L) + 1L)
             if (cell.compareAndSet(standing, next)) return Publication.Installed(next)
+        }
+    }
+
+    internal fun offerFromWorker(assignment: A, objective: V, measure: (() -> Unit) -> Unit) {
+        val buffered = bufferedOffers
+        if (buffered == null) measure { offer(assignment, objective) }
+        else buffered.add(assignment, objective, measure)
+    }
+
+    internal fun <T> withBufferedOffers(
+        cancellation: Cancellation,
+        observe: (IncumbentOfferEvent) -> Unit,
+        measure: (() -> Unit) -> Unit,
+        action: () -> T,
+    ): T {
+        check(bufferedOffers == null) { "incumbent buffering requires an exclusive query" }
+        val buffered = BufferedIncumbentOffers<A, V>(improves, observe)
+        bufferedOffers = buffered
+        try {
+            val result = action()
+            bufferedOffers = null
+            buffered.flush(cancellation, measure) { assignment, objective ->
+                offer(assignment, objective, cancellation)
+            }
+            return result
+        } finally {
+            bufferedOffers = null
+            buffered.discard()
         }
     }
 

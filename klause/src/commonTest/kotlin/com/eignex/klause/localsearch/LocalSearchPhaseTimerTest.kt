@@ -15,6 +15,43 @@ import kotlin.test.assertNotNull
 
 class LocalSearchPhaseTimerTest {
     @Test
+    fun `interrupted scoring should retain elapsed pick time without suspended gaps`() {
+        var clock = 0L
+        val timer = LocalSearchPhaseTimer { clock }
+        timer.measureScoringPick {
+            clock += 2L
+            Move.BoolFlip(0)
+        }
+        val before = timer.objectiveScoringSnapshot()
+        clock += 1000L
+
+        assertFailsWith<LocalSearchScoringInterrupted> {
+            timer.measureScoringPick {
+                clock += 7L
+                throw LocalSearchScoringInterrupted
+            }
+        }
+        val after = timer.objectiveScoringSnapshot()
+
+        assertEquals(0L, before.getValue("selection-interruptions"))
+        assertEquals(2L, after.getValue("selection-picks"))
+        assertEquals(1L, after.getValue("selection-interruptions"))
+        assertEquals(7L, after.getValue("selection-interrupted-ns"))
+    }
+
+    @Test
+    fun `a completed null scoring pick should not count as an interruption`() {
+        val timer = LocalSearchPhaseTimer { 0L }
+
+        assertEquals(null, timer.measureScoringPick { null })
+
+        val report = timer.objectiveScoringSnapshot()
+        assertEquals(1L, report.getValue("selection-picks"))
+        assertEquals(0L, report.getValue("selection-interruptions"))
+        assertEquals(0L, report.getValue("selection-interrupted-ns"))
+    }
+
+    @Test
     fun `inspection snapshots should retain their captured visit count`() {
         var visits = 4L
         val timer = LocalSearchPhaseTimer { 0L }
