@@ -69,6 +69,11 @@ internal object LinearAuthorityAggregateCuts {
         try {
             meter.reserve(source.premiseCount.toLong(), 512L)
             val rows = ArrayList<ProbeRow>()
+            val splitRows = if (point == null) null else {
+                meter.reserve(1L, 128L)
+                ArrayList<LinearAuthoritySourceRow>()
+            }
+            var splitRowLimit = false
             val integerRows = if (point == null) null else {
                 meter.reserve(1L, 128L)
                 ArrayList<ProbeRow>()
@@ -102,6 +107,12 @@ internal object LinearAuthorityAggregateCuts {
                     return@forEachPremise
                 }
                 rows += row
+                if (splitRows != null && coefficients.size > 1) {
+                    if (splitRows.size < LinearAuthoritySplitCuts.MAX_ROWS) {
+                        meter.reserve(1L, 16L)
+                        splitRows += row
+                    } else splitRowLimit = true
+                }
                 for ((id, coefficient) in coefficients) {
                     meter.reserve(1L)
                     if (id.kind != SourceCoordinate.Kind.Real) continue
@@ -135,16 +146,8 @@ internal object LinearAuthorityAggregateCuts {
                 override fun isCancelled(): Boolean = cancellation()
                 override fun deadline() = cancellation.deadline()
             }
-            if (point != null && rows.size >= 2) {
-                meter.reserve(rows.size.toLong())
-                val multiCount = rows.count { it.coefficients.size > 1 }
-                val splitCount = minOf(multiCount, LinearAuthoritySplitCuts.MAX_ROWS)
-                meter.reserve(rows.size.toLong(), 384L + splitCount * 64L)
-                val splitRows = rows.asSequence().filter { it.coefficients.size > 1 }
-                    .take(LinearAuthoritySplitCuts.MAX_ROWS).map {
-                        LinearAuthoritySplitRow(it.term, it.coefficients)
-                    }.toList()
-                if (multiCount > LinearAuthoritySplitCuts.MAX_ROWS) {
+            if (point != null && !splitRows.isNullOrEmpty()) {
+                if (splitRowLimit) {
                     eligibilityKnown = false
                     observe("AggregateSplitRowLimit", 1L)
                 }
@@ -155,7 +158,7 @@ internal object LinearAuthorityAggregateCuts {
                     charge(name, count)
                 }
                 val split = LinearAuthoritySplitCuts.prepare(source, splitRows, point, derivedStop,
-                    splitObserve, splitLimits, maximumCandidates)
+                    splitObserve, splitLimits, maximumCandidates, incidence)
                 for (cut in split) {
                     if (separates(cut, point, meter, observe) != true) continue
                     meter.reserve(1L, 128L + cut.inequality.supportSize * 64L)
@@ -299,10 +302,11 @@ internal object LinearAuthorityAggregateCuts {
     }
 
     private class ProbeRow(
-        val term: LinearAuthorityAggregateTerm, val coefficients: Map<SourceCoordinate, BigFraction>,
-    ) {
+        override val term: LinearAuthorityAggregateTerm,
+        override val coefficients: Map<SourceCoordinate, BigFraction>,
+    ) : LinearAuthoritySourceRow {
         val realCount = coefficients.keys.count { it.kind == SourceCoordinate.Kind.Real }
-        val hasInteger = coefficients.keys.any { it.kind == SourceCoordinate.Kind.Integer }
+        override val hasInteger = coefficients.keys.any { it.kind == SourceCoordinate.Kind.Integer }
     }
 
     private fun integerScale(

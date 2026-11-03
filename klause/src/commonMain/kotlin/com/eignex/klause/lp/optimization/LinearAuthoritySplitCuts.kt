@@ -12,25 +12,34 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import kotlin.math.abs
 
+internal interface LinearAuthoritySourceRow {
+    val term: LinearAuthorityAggregateTerm
+    val coefficients: Map<SourceCoordinate, BigFraction>
+    val hasInteger: Boolean
+}
+
 internal class LinearAuthoritySplitRow(
-    val term: LinearAuthorityAggregateTerm,
-    val coefficients: Map<SourceCoordinate, BigFraction>,
-)
+    override val term: LinearAuthorityAggregateTerm,
+    override val coefficients: Map<SourceCoordinate, BigFraction>,
+) : LinearAuthoritySourceRow {
+    override val hasInteger = coefficients.keys.any { it.kind == SourceCoordinate.Kind.Integer }
+}
 
 internal object LinearAuthoritySplitCuts {
     const val MAX_ROWS = 48
 
     fun prepare(
-        source: SourceProofContext, rows: List<LinearAuthoritySplitRow>,
+        source: SourceProofContext, rows: List<LinearAuthoritySourceRow>,
         point: Map<SourceCoordinate, Double>, cancellation: Cancellation,
         observe: (String, Long) -> Unit = { _, _ -> },
         limits: LinearAuthorityAggregateLimits = LinearAuthorityAggregateLimits(),
         maximumCandidates: Int = 64,
+        incidence: Map<Pair<SourceCoordinate, Boolean>, List<LinearAuthoritySourceRow>>? = null,
     ): List<LinearAuthorityCut> {
         require(maximumCandidates in 0..64)
         if (maximumCandidates == 0 || rows.size < 2) return emptyList()
         val run = SplitRun(source, point, AggregateMeter(limits, cancellation, observe), limits, observe)
-        return run.prepare(rows, maximumCandidates)
+        return run.prepare(rows, maximumCandidates, incidence)
     }
 }
 
@@ -42,56 +51,48 @@ private class SplitRun(
     private val observe: (String, Long) -> Unit,
 ) {
     private class Bound(
-        val row: LinearAuthoritySplitRow, val coefficient: BigFraction, val origin: BigFraction,
+        val row: LinearAuthoritySourceRow, val coefficient: BigFraction, val origin: BigFraction,
     )
-    private class Nonnegative(val row: LinearAuthoritySplitRow, val scale: BigFraction, val alpha: BigFraction)
+    private class Nonnegative(val row: LinearAuthoritySourceRow, val scale: BigFraction, val alpha: BigFraction)
     private val bounds = HashMap<Pair<SourceCoordinate, Boolean>, Bound>()
-    private val allowed = HashSet<Int>()
+    private val checkedBounds = HashSet<SourceCoordinate>()
+    private val checkedRows = HashSet<Int>()
 
-    fun prepare(rows: List<LinearAuthoritySplitRow>, maximum: Int): List<LinearAuthorityCut> {
+    fun prepare(
+        rows: List<LinearAuthoritySourceRow>, maximum: Int,
+        borrowed: Map<Pair<SourceCoordinate, Boolean>, List<LinearAuthoritySourceRow>>?,
+    ): List<LinearAuthorityCut> {
         val result = ArrayList<LinearAuthorityCut>()
         try {
             val count = minOf(rows.size, LinearAuthoritySplitCuts.MAX_ROWS)
-            meter.reserve(count.toLong(), 128L + count * 16L)
+            meter.reserve(count.toLong() * 2L, 320L + count * 20L)
             val admitted = rows.take(count)
             if (count < rows.size) observe("AggregateSplitRowLimit", 1L)
-            val incidence = HashMap<Pair<SourceCoordinate, Boolean>, MutableList<LinearAuthoritySplitRow>>()
-            for (row in admitted) {
-                meter.reserve(row.coefficients.size.toLong())
-                if (row.coefficients.size !in 2..limits.support) continue
-                if (row.coefficients.keys.any { it.kind == SourceCoordinate.Kind.Boolean }) continue
-                meter.number(row.term.inequality.rhs)
-                for ((id, coefficient) in row.coefficients) {
-                    meter.number(coefficient)
-                    if (id.kind != SourceCoordinate.Kind.Real) continue
-                    meter.reserve(1L, 64L)
-                    val key = id to (coefficient > BigFraction.ZERO)
-                    val bucket = incidence[key] ?: run {
-                        meter.reserve(1L, 160L)
-                        ArrayList<LinearAuthoritySplitRow>().also { incidence[key] = it }
-                    }
-                    bucket += row
-                }
-            }
-            if (incidence.values.none { it.size > 1 }) return emptyList()
-            indexBounds()
+            if (admitted.none { it.hasInteger }) return emptyList()
+            val owners = IntArray(count) { admitted[it].term.owner }
+            meter.reserve(count.toLong() * count / 8L + 1L)
+            owners.sort()
+            val incidence = borrowed?.also { observe("AggregateSplitBorrowedIncidence", 1L) }
+                ?: indexRows(admitted)
             for (row in admitted) {
                 meter.reserve(1L)
-                if (row.term.owner !in allowed || row.coefficients.size <= 1 ||
-                    row.coefficients.keys.none { it.kind == SourceCoordinate.Kind.Integer }) continue
+                if (!row.hasInteger || !eligible(row)) continue
                 meter.reserve(1L, 128L)
                 val paired = HashSet<Int>()
                 for ((id, coefficient) in row.coefficients) {
                     meter.reserve(1L)
                     if (id.kind != SourceCoordinate.Kind.Real) continue
-                    for (other in incidence[id to (coefficient > BigFraction.ZERO)].orEmpty()) {
-                        meter.reserve(1L)
-                        if (other.term.owner !in allowed || other.term.owner == row.term.owner ||
-                            (other.term.owner < row.term.owner &&
-                                other.coefficients.keys.any { it.kind == SourceCoordinate.Kind.Integer })) continue
+                    meter.reserve(1L, 64L)
+                    for (other in incidence[id to (coefficient.signum() > 0)].orEmpty()) {
+                        meter.reserve(7L)
+                        if (owners.binarySearch(other.term.owner) < 0 || !eligible(other) ||
+                            other.term.owner == row.term.owner ||
+                            (other.term.owner < row.term.owner && other.hasInteger)) continue
                         meter.reserve(1L, 32L)
                         if (!paired.add(other.term.owner)) continue
                         if (result.size >= maximum) throw AggregateStop("RetentionLimit")
+                        validate(row)
+                        validate(other)
                         observe("AggregateSplitAttempts", 1L)
                         val weights = listOf(meter.number(magnitude(other.coefficients.getValue(id))),
                             meter.number(magnitude(coefficient).negated()))
@@ -109,30 +110,85 @@ private class SplitRun(
         return result.toList()
     }
 
-    private fun indexBounds() {
-        meter.reserve(source.premiseCount.toLong(), 128L)
+    private fun eligible(row: LinearAuthoritySourceRow): Boolean {
+        meter.reserve(1L)
+        if (row.coefficients.size !in 2..limits.support) return false
+        val premise = source.premise(row.term.premise) ?: return false
+        return premise.inequality === row.term.inequality && premise.guardCount == 0 && premise.integerPinCount == 0
+    }
+
+    private fun validate(row: LinearAuthoritySourceRow) {
+        meter.reserve(1L)
+        if (row.term.owner in checkedRows) return
+        meter.reserve(1L, 32L)
+        checkedRows += row.term.owner
+        meter.number(row.term.inequality.rhs)
+        for ((coordinate, value) in row.coefficients) {
+            if (coordinate.kind == SourceCoordinate.Kind.Boolean) throw AggregateStop("BooleanActivity")
+            meter.number(value)
+        }
+    }
+
+    private fun indexRows(rows: List<LinearAuthoritySourceRow>):
+        Map<Pair<SourceCoordinate, Boolean>, List<LinearAuthoritySourceRow>> {
+        meter.reserve(1L, 128L)
+        val incidence = HashMap<Pair<SourceCoordinate, Boolean>, MutableList<LinearAuthoritySourceRow>>()
+        for (row in rows) {
+            meter.reserve(1L)
+            if (row.coefficients.size !in 2..limits.support) continue
+            for ((id, coefficient) in row.coefficients) {
+                meter.reserve(1L)
+                if (id.kind != SourceCoordinate.Kind.Real) continue
+                meter.reserve(1L, 64L)
+                val key = id to (coefficient.signum() > 0)
+                val bucket = incidence[key] ?: run {
+                    meter.reserve(1L, 160L)
+                    ArrayList<LinearAuthoritySourceRow>().also { incidence[key] = it }
+                }
+                bucket += row
+            }
+        }
+        return incidence
+    }
+
+    private fun fillBounds(activity: Map<SourceCoordinate, BigFraction>, anchor: SourceCoordinate) {
+        meter.reserve(activity.size.toLong())
+        val count = activity.count { (id, coefficient) ->
+            id != anchor && !coefficient.isZero && id !in checkedBounds
+        }
+        if (count == 0) return
+        meter.reserve(activity.size.toLong(), 128L + count * 32L)
+        val wanted = HashSet<SourceCoordinate>()
+        for ((id, coefficient) in activity) {
+            if (id != anchor && !coefficient.isZero && id !in checkedBounds) wanted += id
+        }
+        meter.reserve(1L, 128L)
+        val found = HashMap<Pair<SourceCoordinate, Boolean>, Bound>()
         var owner = 0
         source.forEachPremise { name, premise ->
             val index = owner++
             meter.reserve(1L)
-            if (premise.guards.isNotEmpty() || premise.integerPins.isNotEmpty()) return@forEachPremise
-            meter.reserve(1L, 48L)
-            allowed += index
+            observe("AggregateSplitBoundVisits", 1L)
+            if (premise.guardCount != 0 || premise.integerPinCount != 0) return@forEachPremise
             val id = premise.inequality.singleCoordinate() ?: return@forEachPremise
-            if (id.kind == SourceCoordinate.Kind.Boolean) return@forEachPremise
+            if (id !in wanted) return@forEachPremise
             val coefficient = meter.number(checkNotNull(premise.inequality.coefficient(id)))
-            val key = id to (coefficient > BigFraction.ZERO)
             meter.reserve(1L, 64L)
-            if (key in bounds) return@forEachPremise
+            val key = id to (coefficient.signum() > 0)
+            if (key in found) return@forEachPremise
             val origin = divide(meter.number(premise.inequality.rhs), coefficient)
             meter.reserve(1L, 192L + name.length * 2L)
             val term = LinearAuthorityAggregateTerm(index, name, premise.inequality)
-            bounds[key] = Bound(LinearAuthoritySplitRow(term, mapOf(id to coefficient)), coefficient, origin)
+            found[key] = Bound(LinearAuthoritySplitRow(term, mapOf(id to coefficient)), coefficient, origin)
         }
+        meter.reserve(found.size.toLong() + wanted.size, 128L + wanted.size * 32L + found.size * 48L)
+        bounds.putAll(found)
+        checkedBounds.addAll(wanted)
+        observe("AggregateSplitBoundScanComplete", 1L)
     }
 
     private fun pair(
-        left: LinearAuthoritySplitRow, right: LinearAuthoritySplitRow, weights: List<BigFraction>,
+        left: LinearAuthoritySourceRow, right: LinearAuthoritySourceRow, weights: List<BigFraction>,
     ): LinearAuthorityCut? {
         meter.reserve(2L, 256L)
         val rows = listOf(left, right)
@@ -141,7 +197,10 @@ private class SplitRun(
         for ((index, row) in rows.withIndex()) {
             for ((id, coefficient) in row.coefficients) {
                 meter.reserve(1L)
-                if (id !in activity && activity.size >= limits.support) throw AggregateStop("SupportLimit")
+                if (id !in activity && activity.size >= limits.support) {
+                    observe("AggregateSplitSupportLimit", 1L)
+                    return null
+                }
                 activity[id] = meter.add(activity[id] ?: BigFraction.ZERO,
                     meter.multiply(weights[index], coefficient))
             }
@@ -169,10 +228,11 @@ private class SplitRun(
     }
 
     private fun derive(
-        rows: List<LinearAuthoritySplitRow>, weights: List<BigFraction>,
+        rows: List<LinearAuthoritySourceRow>, weights: List<BigFraction>,
         activity: Map<SourceCoordinate, BigFraction>, rhs: BigFraction,
         anchor: SourceCoordinate, gamma: BigFraction,
     ): LinearAuthorityCut? {
+        fillBounds(activity, anchor)
         meter.reserve(activity.size.toLong(), 128L + activity.size * 64L)
         val nonnegative = ArrayList<Nonnegative>()
         var shifted = rhs

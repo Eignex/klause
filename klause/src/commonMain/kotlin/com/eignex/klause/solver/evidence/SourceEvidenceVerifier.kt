@@ -93,6 +93,8 @@ class SourceProofContext(
         return true
     }
 
+    internal fun premise(id: String): SourcePremise? = capturedPremises[id]
+
     internal fun containsCoordinate(coordinate: SourceCoordinate): Boolean = coordinate in capturedCoordinates
 
     internal fun hasSameLinearData(other: SourceProofContext): Boolean =

@@ -625,7 +625,12 @@ under 65,536 work and 1 MiB modeled allocation. Ordinary aggregate-only queries 
 their 500,000-work and 8 MiB limits. An installed aggregate recipe with at most 64
 fully checked rows can enter aging without replacing its query.
 Mixed point discovery admits at most 48 multi-coordinate source rows in source
-order and pairs same-sign continuous coefficients through a signed slack identity. A fractional integer anchor gives an exhaustive integer split.
+order and pairs same-sign continuous coefficients through a signed slack identity.
+It shares the generation's row snapshots and incidence index, checking scalar limits
+only on used rows. Immutable source-premise lookup retains guards and integer pins.
+Endpoint lookup scans only for uncanceled coordinates requested by a pair and
+caches stated sides and missing coordinates after a fully funded scan. Interrupted
+scans publish no partial cache. A fractional integer anchor gives an exhaustive integer split.
 Each uncanceled nonanchor coordinate requires an unguarded original singleton
 bound; canceled coordinates need no bound. Both split branches use nonnegative
 combinations of original rows and the split assumption. The imported consequence

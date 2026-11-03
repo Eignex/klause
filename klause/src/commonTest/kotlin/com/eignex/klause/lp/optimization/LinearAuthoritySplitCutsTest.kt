@@ -146,13 +146,16 @@ class LinearAuthoritySplitCutsTest {
 
     @Test
     fun `split discovery should retain work storage scalar support and proof limits`() {
-        for (limits in listOf(LinearAuthorityAggregateLimits(work = 1L),
+        val indices: List<Map<Pair<SourceCoordinate, Boolean>, List<LinearAuthoritySourceRow>>?> =
+            listOf(null, mapOf((real to true) to rows))
+        for (incidence in indices) for (limits in listOf(LinearAuthorityAggregateLimits(work = 1L),
             LinearAuthorityAggregateLimits(allocation = 1L), LinearAuthorityAggregateLimits(scalarBits = 1),
             LinearAuthorityAggregateLimits(support = 1), LinearAuthorityAggregateLimits(proofBytes = 1L))) {
             val observations = mutableMapOf<String, Long>()
 
             val cuts = LinearAuthoritySplitCuts.prepare(source, rows, point, Cancellation.Never,
-                observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count }, limits = limits)
+                observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                limits = limits, incidence = incidence)
 
             assertTrue(cuts.isEmpty())
             assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
@@ -185,4 +188,49 @@ class LinearAuthoritySplitCutsTest {
             }
         }
     }
+
+    @Test
+    fun `shared incidence should leave the production slice for a checked split`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val loose = SourceInequality(mapOf(x to BigFraction.ONE, real to BigFraction.ONE,
+            residual to BigFraction.ONE), BigFraction.ofLong(100))
+        val premises = linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right))
+        repeat(1800) { index -> premises["loose $index"] = SourcePremise(loose) }
+        val context = SourceProofContext(scope, setOf(x, real, residual), premises)
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(context, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            maximumCandidates = 1, limits = limits, point = point + (residual to 0.0)).single()
+
+        assertEquals(mapOf(x to BigFraction.ofLong(6), real to BigFraction.ofLong(4)), cut.inequality.coefficients)
+        assertEquals(BigFraction.ofLong(8), cut.inequality.rhs)
+        assertEquals(1L, observations["AggregateSplitBorrowedIncidence"])
+        assertEquals(null, observations["AggregateSplitBoundVisits"])
+        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `an interrupted endpoint scan should withhold the split proposal`() {
+        val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val changed = SourceInequality(left.coefficients + (residual to BigFraction.ONE), left.rhs)
+        val context = SourceProofContext(scope, setOf(x, real, residual), linkedMapOf(
+            "left" to SourcePremise(changed), "right" to SourcePremise(right),
+            "lower" to SourcePremise(SourceInequality(mapOf(residual to BigFraction.MINUS_ONE), BigFraction.ZERO))))
+        val inputs = listOf(LinearAuthoritySplitRow(LinearAuthorityAggregateTerm(0, "left", changed),
+            changed.coefficients), rows[1])
+        var stopped = false
+
+        val cuts = LinearAuthoritySplitCuts.prepare(context, inputs, point, Cancellation { stopped },
+            observe = { name, _ -> if (name == "AggregateSplitBoundVisits") stopped = true })
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+    }
+
+
 }
