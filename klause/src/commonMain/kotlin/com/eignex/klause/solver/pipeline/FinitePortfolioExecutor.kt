@@ -91,10 +91,15 @@ internal fun FinitePipeline.portfolioExecutor(
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
     }
     val profile = ProblemProfile.of(problem, scenario.kind == Kind.COP)
-    val curatedFiniteInteger = profile.problemClass == ProblemClass.FiniteCp && problem.numBoolVars == 0 &&
-        scenario.cores == 1 && scenario.kind == Kind.COP && scenario.engine == EngineMix.MIXED &&
+    val curatedPortfolio = scenario.cores == 1 && scenario.kind == Kind.COP && scenario.engine == EngineMix.MIXED &&
         !scenario.explicitArms && scenario.arms == PortfolioScenario.DEFAULT_ARMS &&
-        scenario.btPool == null && scenario.lsPool == null && scenario.btEdit == null && scenario.annotationArm == null
+        scenario.btPool == null && scenario.lsPool == null && scenario.btEdit == null
+    val curatedFiniteInteger = curatedPortfolio && profile.problemClass == ProblemClass.FiniteCp &&
+        problem.numBoolVars == 0 && scenario.annotationArm == null
+    val supportedProbeSource = if (probePolicy == InitialProbePolicy.HEURISTIC_SECOND) {
+        curatedPortfolio && profile.problemClass in setOf(ProblemClass.Sat, ProblemClass.PseudoBoolean,
+            ProblemClass.FiniteCp)
+    } else curatedFiniteInteger
     if (deferLpProbes && !curatedFiniteInteger) {
         pipelineConfigError("portfolio-lp-start requires a curated single-core mixed finite integer optimization")
     }
@@ -104,9 +109,10 @@ internal fun FinitePipeline.portfolioExecutor(
             "portfolio-publications requires curated elapsed single-core mixed finite integer optimization",
         )
     }
-    if (probePolicy != InitialProbePolicy.ORDINARY && (!curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
+    if (probePolicy != InitialProbePolicy.ORDINARY && (!supportedProbeSource || scenario.diagnosticWorkLimit != null ||
             cancellation.deadline() == null)) {
-        pipelineConfigError("portfolio-probes requires curated elapsed single-core mixed finite integer optimization")
+        pipelineConfigError("portfolio-probes requires curated elapsed single-core mixed finite optimization " +
+            "within the selected policy's source scope")
     }
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
