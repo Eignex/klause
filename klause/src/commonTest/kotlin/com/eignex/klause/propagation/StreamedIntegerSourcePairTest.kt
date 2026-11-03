@@ -50,7 +50,7 @@ class StreamedIntegerSourcePairTest {
             var trials = 0
             val source = StreamedIntegerSourcePair(state, IntegerSourceWork(state)) { trials++; true }
 
-            val row = assertNotNull(source.combine(0, true, 1, !exact || !ge, 0))
+            val row = assertNotNull(source.combine(0, true, 1, true, 0))
 
             assertContentEquals(intArrayOf(1, 2, 3), row.variables)
             assertContentEquals(longArrayOf(1, 1, 1), row.coefficients)
