@@ -324,8 +324,13 @@ class LpPrimalHeuristicsTest {
         val objective = LinearObjective(intCoefficients = LongArray(8))
         val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
         val primal = DoubleArray(relaxation.model.n)
-        for (v in 0 until 8) primal[relaxation.intColOf[v]] = if (v % 4 == 0) 1.0 else 0.5
-        val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal,
+        val known = BooleanArray(primal.size)
+        for (v in 0 until 8) {
+            val column = relaxation.intColOf[v]
+            known[column] = v % 4 < 2
+            primal[column] = when (v % 4) { 0 -> 1.0; 1 -> 0.5; else -> 123.75 }
+        }
+        val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal, knownColumns = known,
             sourceProblem = problem, auxiliaryPoint = true)
         var expired = false
         val slice = Cancellation {
