@@ -28,6 +28,10 @@ argument and the `:klause-bench:installDist` build task. It writes `plan.json`
 through the input-only SDK planner, using the lab corpus directory and declared
 input indexes, without executing a solver.
 
+`lab/source-identity.json` accepts `cases` containing at most eight selected
+single-model corpus inputs and their packed hashes. It verifies each lab-fetched
+input and records its decoded SHA-256 and byte count without parsing or solving it.
+
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
 copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time
