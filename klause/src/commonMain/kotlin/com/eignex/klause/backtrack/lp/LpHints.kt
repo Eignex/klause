@@ -302,9 +302,9 @@ internal class LpHints(
     fun applyVariableChoice(proposal: VarRef?, baseline: VarRef?): VarRef? {
         proposal ?: return baseline
         charge(2L)
-        observe("VARIABLE_CONSUMED")
-        observe(if (proposal == baseline) "VARIABLE_BASELINE_AGREED" else "VARIABLE_BASELINE_CHANGED")
-        return proposal
+        observe("VARIABLE_WITHHELD")
+        observe(if (proposal == baseline) "VARIABLE_PROPOSAL_AGREED" else "VARIABLE_PROPOSAL_CHANGED")
+        return baseline
     }
 
     fun directionalScore(variable: VarRef, domain: IntDomain? = null): Double =
