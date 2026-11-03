@@ -510,7 +510,7 @@ for either choice. The comparison record retains the policy, actual staging root
 and CLI arguments. Identity preparation, checking and reporting remain in case/job
 costs outside the source invocation; comparing invocation times alone omits them.
 `lab/frozen.json` executes the ordinary adapter over `cases`, a JSON array of retained
-single-model `BenchCase` templates for DIMACS, WCNF or MPS. Each template retains its
+single-model `BenchCase` templates for DIMACS, WCNF, MPS or OPB. Each template retains its
 packed corpus path/hash and declares `sourcePlainSha256` in its attributes. Planning
 expands ordinary engine/seed/repeat controls from at most eight templates into at
 most 128 cases without catalog discovery; execution
