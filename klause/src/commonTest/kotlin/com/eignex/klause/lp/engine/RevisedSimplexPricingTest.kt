@@ -60,7 +60,8 @@ class RevisedSimplexPricingTest {
                     solver.sparseAxpy(destination, alpha, 0)
 
                     for (row in destination.indices) {
-                        assertEquals(expected[row].toBits(), destination[row].toBits(), "rows $rows alpha $alpha row $row")
+                        assertEquals(expected[row].toBits(), destination[row].toBits(),
+                            "rows $rows alpha $alpha row $row")
                     }
                 }
             }
