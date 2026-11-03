@@ -15,6 +15,7 @@ import kotlinx.serialization.encodeToString
 import java.io.File
 import java.io.IOException
 import java.io.InterruptedIOException
+import java.io.OutputStream
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
@@ -92,16 +93,30 @@ internal object SolverInvocation {
         } else {
             emptyMap()
         }
+        val sourceStart = System.nanoTime()
+        val owner = Thread.currentThread()
         return withSourceInput(file, budget, staging = settings.sourceStaging) { plain, remaining ->
-            val cmd = klauseCommand(entry, settings, remaining, optimize, plain)
+            val piped = CorpusFiles.isCompressed(plain) && settings.sourceStaging == SourceStaging.PIPE
+            val cmd = klauseCommand(entry, settings, remaining, optimize,
+                if (piped) File("/dev/stdin") else plain)
             try {
-                invoke(
+                val result = if (piped) invokePiped(
+                    cmd, dialectFor(entry.ref.format), remaining.timeoutMillis * 2 + 20_000,
+                    settings.captureDirectory, settings.measureResources,
+                    produce = { output ->
+                        CorpusFiles.pipe(plain, output) {
+                            if (owner.isInterrupted) throw InterruptedIOException("Source input interrupted")
+                            checkSourceActive(System.nanoTime() - sourceStart, budget)
+                        }
+                    },
+                ) else invoke(
                     cmd,
                     dialectFor(entry.ref.format),
                     hardTimeoutMs = remaining.timeoutMillis * 2 + 20_000,
                     captureDirectory = settings.captureDirectory,
                     measureResources = settings.measureResources,
-                ).copy(compiledInputHashes = compiled)
+                )
+                result.copy(compiledInputHashes = compiled)
             } catch (failure: Failure) {
                 throw Failure(failure.result.copy(compiledInputHashes = compiled), failure.message.orEmpty(), failure)
             }
@@ -118,7 +133,9 @@ internal object SolverInvocation {
     ): Result {
         val start = nanoTime()
         val cliDecodesInput = CorpusFiles.isCompressed(file) && staging == SourceStaging.CLI
-        val stagingDirectory = if (staging == SourceStaging.CLI) null else staging.directory
+        val pipedInput = CorpusFiles.isCompressed(file) && staging == SourceStaging.PIPE
+        val streamed = staging in setOf(SourceStaging.CLI, SourceStaging.PIPE)
+        val stagingDirectory = if (streamed) null else staging.directory
         var decoder = emptyMap<String, String>()
         var preparationNanos: Long? = null
         var cleanupNanos = 0L
@@ -142,7 +159,10 @@ internal object SolverInvocation {
                     }
                     return result
                 }
-                if (cliDecodesInput) {
+                if (pipedInput) {
+                    check(File("/dev/stdin").exists()) { "Piped input requires /dev/stdin" }
+                    invokeSource(file)
+                } else if (cliDecodesInput) {
                     checkActive()
                     decoder = decoderIdentity(::checkActive)
                     invokeSource(file)
@@ -159,7 +179,8 @@ internal object SolverInvocation {
         }
         val totalNanos = nanoTime() - start
         val preparationMillis = (preparationNanos ?: (totalNanos - cleanupNanos)) / NANOS_PER_MILLI
-        val decoding = if (cliDecodesInput) emptyMap() else mapOf("sourceDecodeMs" to preparationMillis.toString())
+        val decoding = if (cliDecodesInput || pipedInput) emptyMap()
+            else mapOf("sourceDecodeMs" to preparationMillis.toString())
         result = result.copy(stats = (result.stats - "sourceDecodeMs") + decoder + decoding + mapOf(
             "sourceStaging" to if (CorpusFiles.isCompressed(file)) staging.key else "plain",
             "sourceStagingDirectory" to
@@ -167,6 +188,7 @@ internal object SolverInvocation {
             "sourcePreparationMs" to preparationMillis.toString(),
             "sourceDecodeLocation" to when {
                 cliDecodesInput -> "cli-frontend"
+                pipedInput -> "harness-pipe"
                 CorpusFiles.isCompressed(file) -> "harness"
                 else -> "none"
             },
@@ -236,7 +258,10 @@ internal object SolverInvocation {
             add(bin.absolutePath)
             // MPS instances (notably extension-less MIPLIB files) can't be auto-detected by suffix;
             // the bench knows the format, so pass it explicitly.
-            if (entry.ref.format == Format.MPS) {
+            if (file.path == "/dev/stdin") {
+                add("--format")
+                add(entry.ref.format.name.lowercase())
+            } else if (entry.ref.format == Format.MPS) {
                 add("--format")
                 add("mps")
             }
@@ -300,6 +325,36 @@ internal object SolverInvocation {
         else -> Dialect.MINIZINC
     }
 
+    internal fun invokePiped(
+        cmd: List<String>,
+        dialect: Dialect,
+        hardTimeoutMs: Long = Long.MAX_VALUE,
+        captureDirectory: File? = null,
+        measureResources: Boolean = false,
+        startProcess: (List<String>) -> Process = { ProcessBuilder(it).redirectErrorStream(false).start() },
+        produce: (OutputStream) -> Unit,
+    ): Result {
+        var pipe: SourceInputPipe? = null
+        val invocation = runCatching {
+            invoke(cmd, dialect, hardTimeoutMs, captureDirectory, measureResources,
+                startProcess = { command ->
+                    startProcess(command).also { pipe = SourceInputPipe(it, produce) }
+                }, inputFailure = { pipe?.failure })
+        }
+        pipe?.close()
+        val inputFailure = pipe?.failure
+        if (inputFailure != null) {
+            val result = invocation.getOrNull() ?: (invocation.exceptionOrNull() as? Failure)?.result
+                ?: Result(null, null, null, proven = false, stats = emptyMap(),
+                    rawOutput = "", command = cmd.joinToString(" "))
+            throw Failure(result.copy(feasible = null, objective = null, exactObjective = null, proven = false,
+                timeToBestMs = null, timeToFirstFeasibleMs = null,
+                stats = result.stats + ("sourceInputFailure" to StderrCapture.describe(inputFailure))),
+                "Source input failed", inputFailure)
+        }
+        return invocation.getOrThrow()
+    }
+
     internal fun invoke(
         cmd: List<String>,
         dialect: Dialect,
@@ -308,6 +363,7 @@ internal object SolverInvocation {
         measureResources: Boolean = false,
         startProcess: (List<String>) -> Process = { ProcessBuilder(it).redirectErrorStream(false).start() },
         stderrDrainWaitMs: Long = STDERR_DRAIN_WAIT_MS,
+        inputFailure: () -> Throwable? = { null },
     ): Result {
         val startNanos = System.nanoTime()
         captureDirectory?.mkdirs()
@@ -500,6 +556,7 @@ internal object SolverInvocation {
             process.waitFor(STDERR_DRAIN_WAIT_MS, TimeUnit.MILLISECONDS)
         }
         watchdog.interrupt()
+        if (inputFailure() != null) killed.compareAndSet(null, "source-input-failure")
         var diagnostics = stderr.await(stderrDrainWaitMs, killed.get() != null)
         captureDirectory?.let { directory ->
             runCatching {

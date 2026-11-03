@@ -117,7 +117,7 @@ class SolverInvocationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["cache", "cli"])
+    @ValueSource(strings = ["cache", "cli", "pipe"])
     fun `cancelled preparation retains timings without a solver verdict`(target: String) {
         try {
             Thread.currentThread().interrupt()
@@ -184,6 +184,59 @@ class SolverInvocationTest {
         assertEquals("5", result.stats["sourcePreparationMs"])
         assertEquals("0", result.stats["sourceCliMs"])
         assertEquals("5", result.stats["sourceInvocationMs"])
+    }
+
+    @Test
+    fun `piped input retains decoder and retirement cost inside the source invocation`() {
+        val packed = File("original.cnf.zst")
+        var nanos = 0L
+
+        val result = SolverInvocation.withSourceInput(packed, Budget(1000), nanoTime = { nanos },
+            staging = SourceStaging.PIPE, decoderIdentity = { error("external decoder") }) { input, remaining ->
+            assertEquals(packed, input)
+            assertEquals(1000L, remaining.timeoutMillis)
+            nanos = 12_000_000
+            SolverInvocation.Result(null, null, null, proven = false,
+                stats = emptyMap(), rawOutput = "unknown", command = "cli")
+        }
+
+        assertEquals("harness-pipe", result.stats["sourceDecodeLocation"])
+        assertNull(result.stats["sourceDecodeMs"])
+        assertEquals("0", result.stats["sourceCleanupMs"])
+        assertEquals("12", result.stats["sourceCliMs"])
+        assertEquals("12", result.stats["sourceInvocationMs"])
+    }
+
+    @Test
+    fun `piped compressed input reaches the child as original bytes`() {
+        val root = Files.createTempDirectory("solver-source").toFile()
+        try {
+            val body = "p cnf 2 1\n1 -2 0\n"
+            val packed = File(root, "input.cnf.zst")
+            ZstdOutputStreamNoFinalizer(packed.outputStream(), 1).use { it.write(body.toByteArray()) }
+            val output = ByteArrayOutputStream()
+
+            SolverInvocation.invokePiped(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
+                startProcess = { FakeProcess("".byteInputStream(), stdin = output) },
+                produce = { CorpusFiles.pipe(packed, it) {} })
+
+            assertEquals(body, output.toString(Charsets.UTF_8))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `failed source input cannot publish a child verdict`() {
+        val failure = assertFailsWith<SolverInvocation.Failure> {
+            SolverInvocation.invokePiped(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
+                startProcess = { FakeProcess("".byteInputStream(), stdout = "sat\n") },
+                produce = { throw IOException("invalid compressed source") })
+        }
+
+        assertNull(failure.result.feasible)
+        assertFalse(failure.result.proven)
+        assertTrue(assertNotNull(failure.result.stats["sourceInputFailure"]).contains("invalid compressed source"))
     }
 
     @Test
@@ -855,11 +908,12 @@ class SolverInvocationTest {
         private val timeout: Boolean = false,
         private val stdoutStream: InputStream = ByteArrayInputStream(stdout.toByteArray()),
         private val onDestroy: () -> Unit = {},
+        private val stdin: ByteArrayOutputStream = ByteArrayOutputStream(),
     ) : Process() {
         @Volatile private var destroyed = false
         override fun getInputStream(): InputStream = stdoutStream
         override fun getErrorStream(): InputStream = stderr
-        override fun getOutputStream(): ByteArrayOutputStream = ByteArrayOutputStream()
+        override fun getOutputStream(): ByteArrayOutputStream = stdin
         override fun waitFor(): Int = exit
         override fun waitFor(timeout: Long, unit: TimeUnit): Boolean = !this.timeout || destroyed
         override fun exitValue(): Int = if (isAlive()) throw IllegalThreadStateException() else exit

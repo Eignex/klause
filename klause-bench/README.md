@@ -536,6 +536,18 @@ only harness temporary-file cleanup. Frontend loading includes decompression and
 parsing and is not an additional disjoint cost. The CLI deadline starts before loading;
 its existing subprocess watchdog and descendant cleanup still apply. This control
 does not establish cooperative cancellation within a blocked CLI input read.
+
+`source-staging=pipe` streams the existing in-process zstd decoder into the JVM
+CLI through `/dev/stdin`, with an explicit input format. It requires that Unix
+device path and accepts the ordinary frozen manifest without external decoder
+tools. The producer observes the containing source deadline between bounded
+reads and writes, and its retirement finishes before the invocation returns.
+Input failures retain their costs and supply no solver verdict. Decoding,
+backpressure and producer retirement belong to `sourceCliMs` and
+`sourceInvocationMs`; the separate `sourceDecodeMs` remains unavailable and
+`sourceDecodeLocation=harness-pipe` identifies this scope. No temporary source is
+created, so harness file cleanup is zero. This control does not guarantee prompt
+cancellation inside a blocked filesystem or pipe call.
 Compare full invocation and case/job costs at the same allowance and retain the
 original-source checks, runtime/decoder identities and declared cache conditions.
 

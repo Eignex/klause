@@ -6,6 +6,7 @@ import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 import java.io.File
 import java.io.InputStream
 import java.io.InterruptedIOException
+import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
@@ -50,6 +51,20 @@ internal object CorpusFiles {
     fun open(file: File): InputStream = if (isCompressed(file)) decompress(file) else file.inputStream()
 
     fun readText(file: File): String = open(file).bufferedReader().use { it.readText() }
+
+    fun pipe(file: File, output: OutputStream, checkActive: () -> Unit) {
+        checkActive()
+        open(file).use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                checkActive()
+                val count = input.read(buffer)
+                checkActive()
+                if (count < 0) break
+                output.write(buffer, 0, count)
+            }
+        }
+    }
 
     /** Feed the plain bytes of [file] into [digest], so a compressed and a plain copy hash alike. */
     fun update(digest: MessageDigest, file: File) = open(file).use { it.feed(digest) }
