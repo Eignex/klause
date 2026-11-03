@@ -1,7 +1,10 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.binarySearchInt
+import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.klause.util.minus
 
 internal data class LpMatrixProjectionStatus(val underflows: Int, val overflows: Int)
 
@@ -101,6 +104,40 @@ internal class LpExactState internal constructor(
     val model: ExactLpModel
     val conflict: LpBoundConflict?
     val trailStorageUnits: Long
+
+    internal fun probeBound(column: Int, upper: Boolean, endpoint: Long, meter: LpProjectionMeter): LpExactState? {
+        if (column !in 0 until model.n || boundRevision == Long.MAX_VALUE) return null
+        meter.reserve(activeAssertions.size.toLong() + 4L, 0L, matrix = false)
+        val origin = model.column(column).origin.value
+        var bits = Long.SIZE_BITS
+        fun include(number: ExactLpNumber?) {
+            if (number != null) bits = maxOf(bits, number.value.num.magnitudeBitLength(), number.value.den.magnitudeBitLength())
+        }
+        include(model.column(column).origin)
+        include(model.column(column).bounds.lower?.number)
+        include(model.column(column).bounds.upper?.number)
+        include(baseModel.column(column).bounds.lower?.number)
+        include(baseModel.column(column).bounds.upper?.number)
+        for (assertion in activeAssertions) if (assertion.column == column) include(assertion.side.number)
+        val words = (bits.toLong() + Long.SIZE_BITS - 1L) / Long.SIZE_BITS
+        val entries = model.numVars.toLong() + activeAssertions.size + scopeMarks.size
+        val comparisons = 8L * (activeAssertions.size.toLong() + 4L)
+        val square = words * words
+        if (square > (Long.MAX_VALUE - 8L * entries - 64L) / comparisons) throw LpProjectionStop()
+        meter.reserve(8L * entries + 64L + comparisons * square,
+            128L * entries + 1024L + 64L * words, matrix = false)
+        var witness = 0L
+        for (assertion in activeAssertions) if (assertion.witness >= witness) {
+            if (assertion.witness == Long.MAX_VALUE) return null
+            witness = assertion.witness + 1L
+        }
+        val side = ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(endpoint) - origin))
+        return LpExactState(baseModel,
+            activeAssertions + LpBoundAssertion(column, upper, side, witness, depth), scopeMarks,
+            matrixRevision, boundRevision + 1L, objectiveRevision, popRevision, listOf(column),
+            rows, rowRevision, previous = this).also { it.inheritProjection(this) }
+            .takeIf { it.conflict == null }
+    }
 
     init {
         require(listOf(matrixRevision, boundRevision, objectiveRevision, popRevision, rowRevision).all { it >= 0L })

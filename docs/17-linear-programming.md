@@ -1146,6 +1146,27 @@ access. Changed models, unfinished solves, missing directions and cancellation
 retain unavailability. This read preserves the retained optimum and carries no
 bound, infeasibility or certificate authority.
 
+Explicit directional probes compare the actual floating LP objective increase at
+the two adjacent integer bounds of at most two structural columns. Each child
+owns an immutable bound-state fork and a separate scratch numerical owner, warm
+started from the retained parent basis. The parent state, optimum, factors and
+metrics remain untouched. Common objective constants are excluded before gain
+subtraction; objective scaling maps every result to minimized source units.
+Both directions of every candidate require a complete optimal floating result
+and a finite nonnegative gain. Infeasibility, an unfinished query, cancellation
+or failed preparation withholds the entire comparison. These estimates train no
+history and supply no pruning or certificate authority.
+
+Projection, bound-state construction, numerical scaling, workspace setup,
+objective scans and native retirement share one positive caller work allowance
+with the floating solves. Each next child receives a share of the remaining
+work; an exhausted grant is never passed as the floating API's unbounded zero.
+Construction reserves its scaling bound before allocation and retains actual
+preparation work when the query completes. Scratch factors use bounded entry
+and construction work limits, and every scratch owner closes on all exits.
+Failed and partial work remains in the reported preparation and solve metrics.
+The caller owns probe admission and cadence.
+
 A retained numerical owner can expose a private solve cursor. It suspends between
 iterations, retaining the current phase, factors, artificial seats, pricing state
 and cumulative solve limits. A pause returns no numerical result or certificate.
