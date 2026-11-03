@@ -174,7 +174,8 @@ class SolverInvocationTest {
         var nanos = 0L
 
         val result = SolverInvocation.withSourceInput(packed, Budget(1000), nanoTime = { nanos },
-            staging = SourceStaging.CLI_JNI, decoderIdentity = { error("external decoder identity") }) { input, remaining ->
+            staging = SourceStaging.CLI_JNI,
+            decoderIdentity = { error("external decoder identity") }) { input, remaining ->
             assertEquals(packed, input)
             assertEquals(1000L, remaining.timeoutMillis)
             nanos = 12_000_000

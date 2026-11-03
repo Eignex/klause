@@ -53,7 +53,10 @@ class PlatformTest {
         val property = "klause.zstd.decoder"
         val previous = System.getProperty(property)
         try {
-            ZstdOutputStreamNoFinalizer(file.outputStream(), 1).use { it.write("c comment\n".repeat(20_000).toByteArray()) }
+            ZstdOutputStreamNoFinalizer(
+                file.outputStream(),
+                1,
+            ).use { it.write("c comment\n".repeat(20_000).toByteArray()) }
             System.setProperty(property, "jni")
             val source = openFileSource(file.absolutePath)
 
