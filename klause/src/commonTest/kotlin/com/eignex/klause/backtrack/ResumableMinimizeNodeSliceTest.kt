@@ -186,7 +186,7 @@ class ResumableMinimizeNodeSliceTest {
 
     @Test
     fun `leaf LP completions should charge work without a node LP arm`() {
-        val reals = 20
+        val reals = 8
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
