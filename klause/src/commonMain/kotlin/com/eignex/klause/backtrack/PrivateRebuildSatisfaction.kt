@@ -313,6 +313,7 @@ internal class PrivateRebuildSatisfaction(
         note("AffineGenerationFreeColumns", prepared.affineFreeColumns.toLong())
         note("ParityReducedRows", prepared.parityReducedRows.toLong())
         note("ParityReducedLiterals", prepared.parityReducedLiterals)
+        note("ParityTriangularRows", prepared.parityTriangularRows.toLong())
         note("ParityCoveredClauses", prepared.parityCoveredClauses.toLong())
         note("ParitySourceRows", prepared.paritySourceRows.toLong())
         note("ParitySourceLiterals", prepared.paritySourceLiterals)

@@ -39,6 +39,7 @@ internal class PrivateRebuildGeneration private constructor(
     val affineFreeColumns: Int,
     val parityReducedRows: Int,
     val parityReducedLiterals: Long,
+    val parityTriangularRows: Int,
     val parityCoveredClauses: Int,
     val paritySourceRows: Int,
     val paritySourceLiterals: Long,
@@ -90,11 +91,12 @@ internal class PrivateRebuildGeneration private constructor(
             if (parity != null) entries += source.numBoolVars * 2L
             val affine = parity?.affine
             val basis = parity?.basis
-            val rowLiterals = if (affine == null && basis != null) {
-                basis.rowLiteralCount(cancellation, onDecline)
+            val rowPlan = if (affine == null && basis != null) {
+                basis.planRows(cancellation, checkNotNull(parity).triangularBasis, onDecline)
             } else null
             if (cancellation()) return null
-            val rowView = rowLiterals != null
+            val rowLiterals = rowPlan?.literals
+            val rowView = rowPlan != null
             val sourceRows = if (rowView) checkNotNull(parity).sourceRowCount else 0
             val sourceRowLiterals = if (rowView) checkNotNull(parity).sourceRowLiterals else 0L
             if (parity != null && affine == null && !rowView && parity.newPins == 0) return null
@@ -177,7 +179,10 @@ internal class PrivateRebuildGeneration private constructor(
             }
             if (rowView) {
                 residual.addAll(checkNotNull(parity).materializeSourceRows(cancellation) ?: return null)
-                residual.addAll(checkNotNull(basis).materializeRows(cancellation) ?: return null)
+                val rows = checkNotNull(basis).materializeRows(
+                    cancellation, checkNotNull(rowPlan), parity.triangularBasis,
+                )
+                residual.addAll(rows ?: return null)
             }
             val preferred = if (rowView) {
                 checkNotNull(basis).preferredFreeCoordinates(cancellation) ?: return null
@@ -293,6 +298,7 @@ internal class PrivateRebuildGeneration private constructor(
                 neighborhood?.sourceFactors ?: 0, rebuild.steps.count { it is RebuildStep.CopyLiteral },
                 parity?.newPins ?: 0, affine?.rank ?: 0, affine?.freeColumns ?: 0,
                 if (rowView) checkNotNull(basis).rank else 0, rowLiterals ?: 0L,
+                rowPlan?.triangularRows ?: 0,
                 if (rowView) checkNotNull(parity).coveredClauses else 0, sourceRows, sourceRowLiterals, preferred)
         }
     }

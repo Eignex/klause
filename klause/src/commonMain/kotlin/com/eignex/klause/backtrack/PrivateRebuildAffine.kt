@@ -61,19 +61,49 @@ internal class PrivateRebuildAffine(
         return result
     }
 
-    fun rowLiteralCount(cancellation: Cancellation, onDecline: (String) -> Unit): Long? {
-        var result = 0L
+    internal class RowPlan(
+        private val forward: BooleanArray,
+        val literals: Long,
+        val triangularRows: Int,
+    ) {
+        fun usesTriangular(row: Int): Boolean = forward[row]
+    }
+
+    fun planRows(
+        cancellation: Cancellation,
+        triangular: PrivateRebuildParityRows?,
+        onDecline: (String) -> Unit,
+    ): RowPlan? {
+        cancellation.charge(rank * 2L + 16L)
+        if (cancellation()) return null
+        val forward = BooleanArray(rank)
+        var literals = 0L
+        var triangularRows = 0
         for (row in 0 until rank) {
             cancellation.charge(words * 2L + 4L)
             if (cancellation()) return null
-            val width = 1 + dependencies[row].sumOf { it.countOneBits() }
+            val expandedWidth = 1 + dependencies[row].sumOf { it.countOneBits() }
+            val forwardWidth = if (triangular == null) null else {
+                triangular.rowWidth(row, cancellation) ?: return null
+            }
+            cancellation.charge(8L)
+            if (cancellation()) return null
+            val useForward = forwardWidth != null && forwardWidth <= 64 &&
+                (expandedWidth > 64 || forwardWidth < expandedWidth)
+            val width = if (useForward) checkNotNull(forwardWidth) else expandedWidth
             if (width > 64) { onDecline("ParityRowWidth"); return null }
-            result += width
+            forward[row] = useForward
+            if (useForward) triangularRows++
+            literals += width
         }
-        return result
+        return RowPlan(forward, literals, triangularRows)
     }
 
-    fun materializeRows(cancellation: Cancellation): Array<Factor>? {
+    fun materializeRows(
+        cancellation: Cancellation,
+        plan: RowPlan,
+        triangular: PrivateRebuildParityRows?,
+    ): Array<Factor>? {
         cancellation.charge(coordinates.size * 2L + rank + 8L)
         if (cancellation()) return null
         val free = IntArray(freeColumns)
@@ -83,6 +113,12 @@ internal class PrivateRebuildAffine(
         }
         val result = ArrayList<Factor>(rank)
         for (row in 0 until rank) {
+            cancellation.charge(2L)
+            if (cancellation()) return null
+            if (plan.usesTriangular(row)) {
+                result.add(checkNotNull(triangular).materializeRow(row, cancellation) ?: return null)
+                continue
+            }
             cancellation.charge(words * 2L + 4L)
             if (cancellation()) return null
             val width = 1 + dependencies[row].sumOf { it.countOneBits() }
