@@ -200,9 +200,12 @@ class LinearAuthoritySplitCutsTest {
         val observations = mutableMapOf<String, Long>()
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(context, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(context, Cancellation.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
-            maximumCandidates = 1, limits = limits, point = point + (residual to 0.0)).single()
+            maximumCandidates = 1, limits = limits, point = point + (residual to 0.0))
+
+        assertEquals(1, cuts.size, observations.toString())
+        val cut = cuts.single()
 
         assertEquals(mapOf(x to BigFraction.ofLong(6), real to BigFraction.ofLong(4)), cut.inequality.coefficients)
         assertEquals(BigFraction.ofLong(8), cut.inequality.rhs)

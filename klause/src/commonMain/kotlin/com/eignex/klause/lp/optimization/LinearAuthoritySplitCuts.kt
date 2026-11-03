@@ -205,10 +205,10 @@ private class SplitRun(
                     observe("AggregateSplitSupportLimit", 1L)
                     return null
                 }
-                activity[id] = meter.add(activity[id] ?: BigFraction.ZERO,
-                    meter.multiply(weights[index], coefficient))
+                activity[id] = sum(activity[id] ?: BigFraction.ZERO,
+                    product(weights[index], coefficient))
             }
-            rhs = meter.add(rhs, meter.multiply(weights[index], row.term.inequality.rhs))
+            rhs = sum(rhs, product(weights[index], row.term.inequality.rhs))
         }
         for ((coordinate, coefficient) in activity) {
             meter.reserve(1L)
@@ -247,9 +247,9 @@ private class SplitRun(
                 observe("AggregateSplitMissingBound", 1L)
                 return null
             }
-            shifted = meter.add(shifted, meter.multiply(coefficient, bound.origin).negated())
+            shifted = sum(shifted, product(coefficient, bound.origin).negated())
             val sign = if (bound.coefficient < BigFraction.ZERO) BigFraction.ONE else BigFraction.MINUS_ONE
-            val alpha = divide(meter.multiply(coefficient, sign), gamma)
+            val alpha = divide(product(coefficient, sign), gamma)
             meter.reserve(1L, 64L)
             nonnegative += Nonnegative(bound.row, meter.number(magnitude(bound.coefficient).reciprocal()), alpha)
         }
@@ -260,10 +260,10 @@ private class SplitRun(
         val beta = divide(shifted, gamma)
         meter.arithmetic(beta, BigFraction.ONE)
         val threshold = meter.number(BigFraction.of(beta.negated().ceilInteger(), BIG_ONE).negated())
-        val fraction = meter.add(beta, threshold.negated())
+        val fraction = sum(beta, threshold.negated())
         if (fraction.isZero) return null
         val belowScale = meter.number(fraction.reciprocal())
-        val aboveScale = meter.number(meter.add(BigFraction.ONE, fraction.negated()).reciprocal())
+        val aboveScale = meter.number(sum(BigFraction.ONE, fraction.negated()).reciprocal())
         return conclusion(nonnegative, anchor, threshold, belowScale, aboveScale)
     }
 
@@ -288,21 +288,21 @@ private class SplitRun(
         var rhs = BigFraction.MINUS_ONE
         // Signed slack identities give two proofs whose inequality multipliers are nonnegative.
         for (entry in nonnegative) {
-            val lower = meter.multiply(entry.alpha, belowScale)
-            val upper = meter.multiply(entry.alpha.negated(), aboveScale)
+            val lower = product(entry.alpha, belowScale)
+            val upper = product(entry.alpha.negated(), aboveScale)
             meter.arithmetic(lower, upper)
             val coefficient = if (lower >= upper) lower else upper
             if (coefficient.isZero) continue
-            val factor = meter.multiply(coefficient, entry.scale)
+            val factor = product(coefficient, entry.scale)
             val row = entry.row
             for ((id, value) in row.coefficients) {
-                meter.reserve(1L)
+                meter.reserve(1L, if (id in coefficients) 0L else 64L)
                 if (id !in coefficients && coefficients.size >= limits.support) throw AggregateStop("SupportLimit")
-                coefficients[id] = meter.add(coefficients[id] ?: BigFraction.ZERO, meter.multiply(factor, value))
+                coefficients[id] = sum(coefficients[id] ?: BigFraction.ZERO, product(factor, value))
             }
-            rhs = meter.add(rhs, meter.multiply(factor, row.term.inequality.rhs))
-            val belowWeight = meter.multiply(meter.add(coefficient, lower.negated()), entry.scale)
-            val aboveWeight = meter.multiply(meter.add(coefficient, upper.negated()), entry.scale)
+            rhs = sum(rhs, product(factor, row.term.inequality.rhs))
+            val belowWeight = product(sum(coefficient, lower.negated()), entry.scale)
+            val aboveWeight = product(sum(coefficient, upper.negated()), entry.scale)
             if (belowWeight < BigFraction.ZERO || aboveWeight < BigFraction.ZERO) throw AggregateStop("ProofSign")
             if (!belowWeight.isZero) below += term(belowWeight,
                 SourceDerivation.Premise(row.term.premise), row.term.premise.length)
@@ -325,6 +325,29 @@ private class SplitRun(
     private fun magnitude(value: BigFraction): BigFraction =
         if (value.signum() < 0) value.negated() else value
 
-    private fun divide(left: BigFraction, right: BigFraction): BigFraction =
-        meter.multiply(left, meter.number(right.reciprocal()))
+    private fun product(left: BigFraction, right: BigFraction): BigFraction {
+        meter.reserve(1L)
+        return when {
+            left.isZero || right.isZero -> BigFraction.ZERO
+            left == BigFraction.ONE -> right
+            right == BigFraction.ONE -> left
+            else -> meter.multiply(left, right)
+        }
+    }
+
+    private fun sum(left: BigFraction, right: BigFraction): BigFraction {
+        meter.reserve(1L)
+        return when {
+            left.isZero -> right
+            right.isZero -> left
+            else -> meter.add(left, right)
+        }
+    }
+
+    private fun divide(left: BigFraction, right: BigFraction): BigFraction {
+        meter.reserve(1L)
+        if (left.isZero) return BigFraction.ZERO
+        if (right == BigFraction.ONE) return left
+        return product(left, meter.number(right.reciprocal()))
+    }
 }
