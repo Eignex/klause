@@ -1160,7 +1160,8 @@ history and supply no pruning or certificate authority.
 Child-value consultations instead accept the basis of a completed current
 iterate, including a bound-only result. Every child still requires a complete
 optimal floating solve. Their finite objective values share minimized source
-units and omit the common external objective constant; negative values are valid.
+units and omit shared objective offsets, including column origins and the external
+constant; negative values are valid.
 They do not subtract a nonoptimal parent's objective or supply a parent-optimum
 claim. The caller funds linear basis validation and its scratch before allocation.
 Busy owners, changed states and incomplete children withhold the whole comparison.

@@ -14,12 +14,13 @@ class LpDirectionalProbesTest {
     @Test
     fun `child values preserve normalized source units without a common objective constant`() {
         for (sense in listOf(Sense.MINIMIZE, Sense.MAXIMIZE)) for (scale in listOf(1L, 4L)) {
-            for (origin in listOf(0L, 7L, -3L)) {
+            for (origin in listOf(0L, 7L, -3L)) for (negative in listOf(false, true)) {
                 val builder = LpBuilder()
-                val sign = if (sense == Sense.MAXIMIZE) -1L else 1L
+                val sign = (if (sense == Sense.MAXIMIZE) -1L else 1L) * (if (negative) -1L else 1L)
                 repeat(3) { builder.addVar(origin, origin + 1L, cost = longArrayOf(3L, 2L, 4L)[it] * sign) }
                 repeat(3) {
-                    builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 2L * origin + 1L)
+                    builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1),
+                        if (negative) Relation.LE else Relation.GE, 2L * origin + 1L)
                 }
                 val trail = LpBoundTrail(assertNotNull(builder.build(sense).authoritativeModel()))
                 val objective = trail.state.model.objective
@@ -34,10 +35,10 @@ class LpDirectionalProbesTest {
                         longArrayOf(origin, origin), 1_000_000L, Cancellation.Never) { completed += it.completed }
 
                     assertNotNull(values)
-                    assertEquals((9.0 * origin + 6.0) / scale, values[0].down, 1e-7)
-                    assertEquals((9.0 * origin + 5.0) / scale, values[0].up, 1e-7)
-                    assertEquals((9.0 * origin + 7.0) / scale, values[1].down, 1e-7)
-                    assertEquals((9.0 * origin + 5.0) / scale, values[1].up, 1e-7)
+                    assertEquals((if (negative) -4.0 else 6.0) / scale, values[0].down, 1e-7)
+                    assertEquals((if (negative) -3.0 else 5.0) / scale, values[0].up, 1e-7)
+                    assertEquals((if (negative) -4.0 else 7.0) / scale, values[1].down, 1e-7)
+                    assertEquals((if (negative) -2.0 else 5.0) / scale, values[1].up, 1e-7)
                     assertEquals(4, completed)
                 }
             }
