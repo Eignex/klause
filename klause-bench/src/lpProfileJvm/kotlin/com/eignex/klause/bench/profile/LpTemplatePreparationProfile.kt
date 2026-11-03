@@ -39,16 +39,21 @@ import kotlin.time.Duration.Companion.seconds
 internal object LpTemplatePreparationProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 4..5)
+        require(args.size in 4..6)
         val route = args.getOrElse(4) { "standalone" }.also {
             require(it in listOf("standalone", "retained"))
         }
+        val availableChanges = listOf("cold", "unchanged", "bound", "objective", "row", "cancel",
+            "affine", "namespace", "finite", "origin", "guard")
+        val changes = args.getOrNull(5)?.split(',')?.also {
+            require(it.isNotEmpty() && it.distinct().size == it.size && it.all(availableChanges::contains))
+        } ?: availableChanges
         val file = if (args[0].startsWith("selection=")) {
             val line = File(args[0].removePrefix("selection=")).readLines().single { it.isNotBlank() }
             val selected = Json.parseToJsonElement(line).jsonObject
             require(selected.getValue("suite").jsonPrimitive.content == "miplib3")
             require(selected.getValue("format").jsonPrimitive.content == "MPS")
-            require(selected.getValue("problem").jsonPrimitive.content in listOf("p0033", "p0201"))
+            require(selected.getValue("problem").jsonPrimitive.content in listOf("p0033", "mod008", "p0201"))
             File(selected.getValue("model").jsonPrimitive.content).also {
                 require(it.nameWithoutExtension == selected.getValue("problem").jsonPrimitive.content)
             }
@@ -84,8 +89,7 @@ internal object LpTemplatePreparationProfile {
         val modes = listOf("disabled", "object", "index", "candidate")
         out.resolve("runs.jsonl").bufferedWriter().use { writer ->
             repeat(repeats + 1) { round ->
-                for (change in listOf("cold", "unchanged", "bound", "objective", "row", "cancel",
-                    "affine", "namespace", "finite", "origin", "guard")) {
+                for (change in changes) {
                     val signatures = HashMap<String, List<String>>()
                     for (offset in modes.indices) {
                         val mode = modes[(round + offset) % modes.size]
@@ -154,6 +158,9 @@ internal object LpTemplatePreparationProfile {
                         var alternateNamespaceAttempts = 0L
                         var trueGuardAttempts = 0L
                         var falseGuardAttempts = 0L
+                        var firstModelColumns: Int? = null
+                        var firstModelRows: Int? = null
+                        var firstModelNonzeros: Int? = null
                         var coldNs = 0L
                         val results = ArrayList<String>()
                         repeat(steps) consumers@ { step ->
@@ -221,6 +228,11 @@ internal object LpTemplatePreparationProfile {
                                 } else {
                                     val relaxation = consumer.build(domains, cancellation = consumerToken)
                                     check(relaxation.objectiveConstant == cost.constant)
+                                    if (step == 0) {
+                                        firstModelColumns = relaxation.model.n
+                                        firstModelRows = relaxation.model.m
+                                        firstModelNonzeros = relaxation.model.csc.rowIdx.size
+                                    }
                                     finishAssembly()
                                     val solving = System.nanoTime()
                                     val exact = requireNotNull(relaxation.authoritativeWithTemplates(token) {
@@ -271,6 +283,12 @@ internal object LpTemplatePreparationProfile {
                             put("source", file.name)
                             put("route", route)
                             put("sourceSha256", hash)
+                            put("sourceIntegerVariables", source.numIntVars)
+                            put("sourceBooleanVariables", source.numBoolVars)
+                            put("sourceFactors", source.numFactors)
+                            put("firstModelColumns", firstModelColumns)
+                            put("firstModelRows", firstModelRows)
+                            put("firstModelNonzeros", firstModelNonzeros)
                             put("parseNs", parseNs)
                             put("round", round)
                             put("warmup", round == 0)

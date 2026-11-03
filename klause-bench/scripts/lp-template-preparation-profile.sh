@@ -10,7 +10,7 @@ case "$source_name" in
     source_argument="$LAB_WORKTREE/klause-bench/smoke-corpus/lp-component-split/$source_name.mps"
     source_hash="$(sha256sum "$source_argument" | cut -d ' ' -f 1)"
     ;;
-  miplib3-p0033|miplib3-p0201)
+  miplib3-p0033|miplib3-mod008|miplib3-p0201)
     source_problem="${source_name#miplib3-}"
     bench="$LAB_WORKTREE/klause-bench/build/install/klause-bench/bin/klause-bench"
     [[ -x "$bench" ]] || { echo ':klause-bench:installDist is required' >&2; exit 2; }
@@ -20,6 +20,7 @@ case "$source_name" in
     source_argument="selection=$OUT/selection.jsonl"
     case "$source_problem" in
       p0033) source_hash=8ccff819023237c79ef32e238a5da9348725ce9a4425d48888baf3a0b3b42628 ;;
+      mod008) source_hash=5a08fe11b87bfe51f55e5537f5e8d0ad0e5fecbc57710a5b58c48a5f10a8e993 ;;
       p0201) source_hash=8352d7f121289185f443fdc67080fa9de01e5b9bf11b0bf41087fba4277c07a4 ;;
     esac
     ;;
@@ -33,6 +34,8 @@ if command -v lscpu >/dev/null; then lscpu > "$OUT/cpu.txt"; fi
   'set -euo pipefail; find -H "$1" -type f -print0 | sort -z | xargs -0 sha256sum' _ "$JAVA_HOME" \
   > "$OUT/runtime-sha256.txt"
 find "$LAB_WORKTREE/klause/build/lp-profile/jvm" -type f -print0 | sort -z | xargs -0 sha256sum > "$OUT/jvm-sha256.txt"
+profile_scopes=()
+if [[ -n "${5:-}" ]]; then profile_scopes=("$5"); fi
 profile_status=0
 /usr/bin/time -v -o "$OUT/resources.txt" \
   "${JAVA_HOME:+$JAVA_HOME/bin/}java" -Xmx512m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC \
@@ -40,7 +43,7 @@ profile_status=0
   "-XX:StartFlightRecording=filename=$OUT/profile.jfr,settings=profile,dumponexit=true" \
   -cp "$LAB_WORKTREE/klause/build/lp-profile/jvm/classes:$LAB_WORKTREE/klause/build/lp-profile/jvm/lib/*" \
   com.eignex.klause.bench.profile.LpTemplatePreparationProfile "$source_argument" "$source_hash" \
-  "${2:-3}" "${3:-32}" "${4:-standalone}" || profile_status=$?
+  "${2:-3}" "${3:-32}" "${4:-standalone}" "${profile_scopes[@]}" || profile_status=$?
 printf '%s\n' "$profile_status" > "$OUT/numerical.exit"
 analysis_status=0
 JAVA_TOOL_OPTIONS='-Xmx512m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC' \
