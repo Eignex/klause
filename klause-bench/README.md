@@ -17,6 +17,9 @@ replaces the complete unfinished row rather than mixing arms from different
 machines or attempts. Accepted rows remain valid; retain failed and preparation
 costs and report repeated infrastructure losses separately.
 
+Each requested selection must match at least one source. A selection with no matches
+fails preparation instead of publishing a reduced comparison plan.
+
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
 copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time

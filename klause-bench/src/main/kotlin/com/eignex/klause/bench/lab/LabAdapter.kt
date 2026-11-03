@@ -68,7 +68,11 @@ internal object KlauseLabSuite : BenchSuite {
 
     override fun plan(request: BenchRequest): List<BenchCase> {
         val settings = LabSettings(request.parameters)
-        val selectedProblems = settings.selections.flatMap { KlauseCli.selectProblems(it) }
+        val selectedProblems = settings.selections.flatMap { selection ->
+            KlauseCli.selectProblems(selection).also { selected ->
+                require(selected.isNotEmpty()) { "No problems match selection: $selection" }
+            }
+        }
             .distinctBy { it.suite to it.ref.name }
         val compilerTrees = mutableMapOf<Path, String>()
         return selectedProblems.flatMap { selected ->
