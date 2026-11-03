@@ -362,7 +362,9 @@ with at most 64 literals; wider pin reasons withhold the deduction. Undo or an
 interrupted update invalidates the cache, which rebuilds from the current assignment.
 The immutable seed owns its snapshot, while each session owns its matrix and
 primitive observations. Buffer initialization and every scan, reduction and reason
-visit debit propagation work. Modeled seed, matrix, observation and watch storage
+visit debit propagation work. A fresh session exposes its live propagation counter
+before its root fixpoint, so work during consumer opening shares the same private
+and containing stop conditions. Stopped opening work remains charged once. Modeled seed, matrix, observation and watch storage
 share the private byte grant after selector reservation; an unfunded joint view
 retains the per-row system. Retirement copies primitive observations before releasing
 the private state.

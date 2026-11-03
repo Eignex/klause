@@ -5,6 +5,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.FinitePropagationInterrupted
+import com.eignex.klause.propagation.PropagationProblem
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.undoTo
@@ -19,6 +21,47 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AffineXorPropagatorTest {
+    @Test
+    fun `opening affine sessions should stop at their reported propagation work`() {
+        val seed = AffineXorSeed(intArrayOf(-1, -2, 0), intArrayOf(0), arrayOf(longArrayOf(3L)), 2)
+        val rows = listOf(Xor(intArrayOf(0, 2, 4), 0))
+        val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(GaussianXor(rows, seed)))
+        var readWork: () -> Long = { 0L }
+        val budget = 40L
+        val token = object : Cancellation {
+            override fun isCancelled(): Boolean = readWork() >= budget
+            override fun workMeter(): WorkMeter = WorkMeter { }
+        }
+
+        val session = PropagationSession(PropagationProblem(problem), cancellation = token,
+            onPropagationWork = { readWork = it })
+
+        assertTrue(session.fixpointCancelled)
+        assertTrue(session.work in budget..budget + 64L)
+        assertNull(session.boolValue(0))
+        assertNull(session.boolValue(1))
+        assertNull(session.boolValue(2))
+    }
+
+    @Test
+    fun `affine pins should require bounded assigned support`() {
+        for (width in listOf(64, 65)) {
+            val coordinates = IntArray(width + 1) { if (it < width) -it - 1 else 0 }
+            val dependencies = LongArray((width + 63) / 64) { if (it == 0) -1L else 1L }
+            val seed = AffineXorSeed(coordinates, intArrayOf(0), arrayOf(dependencies), width)
+            val rows = listOf(Xor(IntArray(width + 1) { Lit.make(it, true) }, 0))
+            val problem = Problem(width + 1, 0, emptyArray(), arrayOf<Factor>(GaussianXor(rows, seed)))
+            val state = PropagationState(problem, Assumptions.None)
+            assertNull(state.runToFixpoint(allFactors = true))
+            for (variable in 0 until width) assertTrue(state.pinBool(variable, false))
+
+            assertTrue(AffineXorPropagator(seed).propagate(state, 0))
+
+            if (width == 64) assertEquals(false, state.boolValues[width])
+            else assertNull(state.boolValues[width])
+        }
+    }
+
     @Test
     fun `inconsistent affine assignments should retain their assigned support`() {
         for (phase in 0..1) {

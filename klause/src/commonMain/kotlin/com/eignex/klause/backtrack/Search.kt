@@ -185,6 +185,7 @@ internal class CpSatisfactionTraversal(
     preparedSeed: PropagationResult? = null,
     private val rebindable: Boolean = false,
     onRelease: ((PropagationSession) -> Unit)? = null,
+    onPropagationWork: ((() -> Long) -> Unit)? = null,
 ) : AutoCloseable {
     private val resources = SearchInvocationResources()
     private val lpResources = ArrayList<LpSearchResource>()
@@ -200,6 +201,7 @@ internal class CpSatisfactionTraversal(
             costAware = params.costAwarePropagation,
             reasonPreflight = params.reasonPreflight,
             cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
+            onPropagationWork = onPropagationWork,
         )).also {
             if (params.integerRowLearning) it.enableIntegerRowLearning()
             it.configureAttribution(params.propagationAttribution, params.historicalTableReasons,

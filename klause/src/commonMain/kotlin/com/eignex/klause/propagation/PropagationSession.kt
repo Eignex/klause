@@ -61,6 +61,7 @@ class PropagationSession private constructor(
     historicalTables: Boolean = false,
     costAware: Boolean = false,
     reasonPreflight: Boolean = false,
+    onPropagationWork: ((() -> Long) -> Unit)? = null,
 ) {
     /** Construct a private propagation projection over [problem]. */
     constructor(
@@ -82,9 +83,10 @@ class PropagationSession private constructor(
         historicalTables: Boolean = false,
         costAware: Boolean = false,
         reasonPreflight: Boolean = false,
+        onPropagationWork: ((() -> Long) -> Unit)? = null,
     ) : this(projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection,
         cumulativeUnarySubsets = cumulativeUnarySubsets, attribution = attribution, historicalTables = historicalTables,
-        costAware = costAware, reasonPreflight = reasonPreflight)
+        costAware = costAware, reasonPreflight = reasonPreflight, onPropagationWork = onPropagationWork)
 
     internal fun checkSelectedProjection(
         checks: SelectedProjectionChecks? = projection.selection?.originalChecks,
@@ -431,6 +433,7 @@ class PropagationSession private constructor(
     }
 
     init {
+        onPropagationWork?.invoke { work }
         val conflict = if (preparedState == null) {
             if (!state.seeded) state.conflictLevels ?: EmptyIntArray
             else state.runToFixpoint(allFactors = true, cancellation = cancellation)

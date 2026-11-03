@@ -192,7 +192,8 @@ reduced basis; the remaining rows use free-coordinate expansion. Both
 representations and their selection spend the existing private grants.
 `ParityJointFactors` identifies funded joint affine kernels. `ParityJointModeledBytes`
 is included in `ModeledPrivateBytes`; `ParityJointInitializationWork` counts completed
-cache initialization inside trial propagation work. Joint `Fires`, `Resets`,
+cache initialization inside trial propagation work. `OpeningPropagationWork` is also
+a trial-work subset, including a consumer whose opening stops before publication. Joint `Fires`, `Resets`,
 `InsertedRows`, `Reductions`, `Pins`, `Conflicts` and `WideReasons` retain primitive
 per-consumer observations through retirement. A wide pin reason withholds that deduction.
 `ParityPreferredFreeColumns` reports the admitted free-coordinate selection list. Coverage declines name

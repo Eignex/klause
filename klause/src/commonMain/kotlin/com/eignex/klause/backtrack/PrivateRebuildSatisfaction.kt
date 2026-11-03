@@ -52,6 +52,7 @@ internal class PrivateRebuildSatisfaction(
     private val canonical = ResumableSatisfaction(solver, sharedParams, ownsWorkDebt = false, atRoot = ::atRoot)
     private var generation: PrivateRebuildGeneration? = null
     private var consumer: ResumableSatisfaction? = null
+    private var openingPropagationWork: (() -> Long)? = null
     private var retiredStats = SolveStats.EMPTY
     private var retiredClauseWork = 0L
     private var debt = 0L
@@ -284,7 +285,7 @@ internal class PrivateRebuildSatisfaction(
     }
 
     private fun trialSpent(): Long = saturatedWork(chargedPrivateWork,
-        saturatedWork(retiredClauseWork, consumer?.clauseWork ?: 0L))
+        saturatedWork(retiredClauseWork, consumer?.clauseWork ?: openingPropagationWork?.invoke() ?: 0L))
 
     private fun charge(work: Long) {
         chargedPrivateWork = saturatedWork(chargedPrivateWork, work)
@@ -377,20 +378,31 @@ internal class PrivateRebuildSatisfaction(
             maxLearnedClauses = minOf(params.maxLearnedClauses ?: 256, 256),
         )
         val openingStart = TimeSource.Monotonic.markNow()
+        var openingRecorded = false
         try {
             consumer = ResumableSatisfaction(BacktrackSolver(prepared.problem), privateParams, ownsWorkDebt = false,
-                affineFactorId = prepared.parityJointFactor)
+                affineFactorId = prepared.parityJointFactor, onPropagationWork = { openingPropagationWork = it })
         } catch (stopped: SearchInitializationCancelled) {
             val decisions = stopped.stats.search.nodes.sum.toLong()
                 .coerceAtMost(Long.MAX_VALUE / PROPAGATION_WORK_PER_NODE) * PROPAGATION_WORK_PER_NODE
-            retiredClauseWork = saturatedWork(retiredClauseWork,
-                saturatedWork(decisions, stopped.stats.search.propagationWork.sum.toLong()))
+            val stoppedWork = saturatedWork(decisions, stopped.stats.search.propagationWork.sum.toLong())
+            retiredClauseWork = saturatedWork(retiredClauseWork, stoppedWork)
+            note("TrialWork", stoppedWork)
+            openingRecorded = true
             retiredStats = retiredStats.mergedWith(stopped.stats)
             generation = null
             root = null
             note("OpeningStopped")
             return
         } finally {
+            val readOpeningWork = openingPropagationWork
+            openingPropagationWork = null
+            val propagationWork = readOpeningWork?.invoke() ?: 0L
+            note("OpeningPropagationWork", propagationWork)
+            if (consumer == null && !openingRecorded) {
+                retiredClauseWork = saturatedWork(retiredClauseWork, propagationWork)
+                note("TrialWork", propagationWork)
+            }
             note("OpeningNanos", openingStart.elapsedNow().inWholeNanoseconds)
         }
         note("Consumers")
@@ -454,6 +466,7 @@ internal class PrivateRebuildSatisfaction(
             } finally {
                 root = null
                 generation = null
+                openingPropagationWork = null
                 pendingBinary = null
                 pendingParity = null
                 attemptedBinaryPairs = longArrayOf()

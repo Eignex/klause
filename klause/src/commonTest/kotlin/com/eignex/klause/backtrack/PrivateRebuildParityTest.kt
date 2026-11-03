@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.GaussianXor
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
@@ -285,6 +286,9 @@ class PrivateRebuildParityTest {
                             is Clause -> factor.literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
                             is Xor -> factor.literals.count { Lit.evaluate(it, point[Lit.variable(it)]) } % 2 ==
                                 factor.targetParity
+                            is GaussianXor -> factor.constraints.all { row ->
+                                row.literals.count { Lit.evaluate(it, point[Lit.variable(it)]) } % 2 == row.targetParity
+                            }
                             else -> false
                         }
                     }) {
@@ -322,6 +326,9 @@ class PrivateRebuildParityTest {
                         is Clause -> factor.literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
                         is Xor -> factor.literals.count { Lit.evaluate(it, point[Lit.variable(it)]) } % 2 ==
                             factor.targetParity
+                        is GaussianXor -> factor.constraints.all { row ->
+                            row.literals.count { Lit.evaluate(it, point[Lit.variable(it)]) } % 2 == row.targetParity
+                        }
                         else -> false
                     }
                 }) {
