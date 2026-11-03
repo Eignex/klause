@@ -222,7 +222,7 @@ private class SplitRun(
             val lower = meter.multiply(entry.alpha, belowScale)
             val upper = meter.multiply(entry.alpha.negated(), aboveScale)
             meter.arithmetic(lower, upper)
-            val coefficient = maxOf(lower, upper)
+            val coefficient = if (lower >= upper) lower else upper
             if (coefficient.isZero) continue
             val factor = meter.multiply(coefficient, entry.scale)
             val row = entry.row
