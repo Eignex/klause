@@ -68,11 +68,11 @@ class LpPrimalHeuristicsTest {
             engine.rootRoundingWarmStart = guide
             assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
             offered = 0L
-            assertFalse(engine.prepareRootComponentTrial(Cancellation.Never))
+            assertFalse(engine.prepareRootComponentTrial(objective, Cancellation.Never))
             assertNull(guide.pinning)
             assertEquals(0L, engine.primalPropagationWork)
             offered = 1_000_000L
-            assertTrue(engine.prepareRootComponentTrial(Cancellation.Never))
+            assertTrue(engine.prepareRootComponentTrial(objective, Cancellation.Never))
             val prefix = assertNotNull(guide.pinning)
 
             val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))

@@ -11,11 +11,15 @@ import com.eignex.klause.lp.engine.LpProjectionStop
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.math.round
 import kotlin.time.TimeSource
 
-internal fun LpEngine.prepareRootComponentTrial(cancellation: Cancellation): Boolean {
+internal fun LpEngine.prepareRootComponentTrial(
+    objective: LinearObjective,
+    cancellation: Cancellation,
+): Boolean {
     val guide = rootRoundingWarmStart ?: return false
     val targets = rootPrimalTargets ?: return false
     if (guide.primal == null || targets.coordinates !== guide.primal || guide.knownColumns != null ||

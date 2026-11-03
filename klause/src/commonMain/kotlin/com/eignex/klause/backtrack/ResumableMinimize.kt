@@ -1234,7 +1234,7 @@ internal class ResumableMinimize(
         if (lpEngine.rootPrimalTargets?.coordinates !== guide.primal &&
             !lpEngine.retainRootPrimalTargets(rootToken)
         ) return false
-        if (lpEngine.prepareRootComponentTrial(rootToken) || rootToken()) return false
+        if (lpEngine.prepareRootComponentTrial(objective, rootToken) || rootToken()) return false
         rootRoundingPending = false
         lpEngine.rootRoundingInterrupted = false
         lpEngine.rootRoundingWarmStart = null
