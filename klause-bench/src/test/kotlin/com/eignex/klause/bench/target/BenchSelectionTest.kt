@@ -151,7 +151,9 @@ class BenchSelectionTest {
             problem("two", "flat-2", family = "flat"),
             problem("two", "empty/1", default = 0),
         ).map { candidate ->
-            if (candidate.suite == "one") candidate else candidate.copy(ref = candidate.ref.copy(format = Format.MINIZINC))
+            if (candidate.suite == "one") candidate else {
+                candidate.copy(ref = candidate.ref.copy(format = Format.MINIZINC))
+            }
         }
         val compatible: (SelectedProblem) -> Boolean = { it.ref.name != "f/2" }
         val accept: (ProblemRef) -> Boolean = { it.name != "g/1" }
@@ -163,7 +165,9 @@ class BenchSelectionTest {
             CorpusSelection.applySelectionBy(capped, selection) { it.family }
         }
 
-        val selected = BenchSelection.select(candidates, perFamily, seed, maxInstances, balanceFormats, compatible, accept)
+        val selected = BenchSelection.select(
+            candidates, perFamily, seed, maxInstances, balanceFormats, compatible, accept,
+        )
 
         assertEquals(expected, selected)
     }
@@ -232,7 +236,10 @@ class BenchSelectionTest {
 
     @ParameterizedTest
     @CsvSource(nullValues = ["null"], value = ["null,false", "0,false", "-1,false", "1,true"])
-    fun `unbounded nonpositive and format balanced selection retain eager admission`(maxInstances: Int?, balance: Boolean) {
+    fun `unbounded nonpositive and format balanced selection retain eager admission`(
+        maxInstances: Int?,
+        balance: Boolean,
+    ) {
         val candidates = listOf(problem("s", "a/1"), problem("s", "a/2"), problem("s", "b/1"))
         val reached = mutableListOf<String>()
         val select = {
