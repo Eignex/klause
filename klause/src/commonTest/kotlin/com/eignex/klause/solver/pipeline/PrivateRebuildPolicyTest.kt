@@ -85,6 +85,8 @@ class PrivateRebuildPolicyTest {
             assertSame(control, privateRebuildDefaultScenario(control, problem, profile, ExecutionOptions(), false))
         }
         assertSame(scenario, privateRebuildDefaultScenario(scenario, problem, profile, ExecutionOptions(), true))
+        assertSame(scenario, privateRebuildDefaultScenario(scenario, problem, profile,
+            ExecutionOptions(ExecutionOption.booleanProofTasks(true)), false))
         assertSame(scenario, privateRebuildDefaultScenario(scenario, problem,
             profile.copy(problemClass = ProblemClass.PseudoBoolean), ExecutionOptions(), false))
         for (columns in listOf(127, 2_001)) {

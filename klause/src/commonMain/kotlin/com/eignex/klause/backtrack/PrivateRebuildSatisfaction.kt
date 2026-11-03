@@ -85,6 +85,7 @@ internal class PrivateRebuildSatisfaction(
             note("AutomaticAttempts")
             note("AutomaticWorkLimit", privateWorkLimit)
             note("AutomaticByteLimit", privateByteLimit)
+            note("AutomaticCanonicalScratchLimit", params.learnedMemoryScratchBytes)
             return captureParity(session)
         }
         if (!parityAttempted) {
