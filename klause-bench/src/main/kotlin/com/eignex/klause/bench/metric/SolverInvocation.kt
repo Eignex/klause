@@ -525,7 +525,9 @@ internal object SolverInvocation {
         outputFailure?.let { stats["outputCaptureFailure"] = StderrCapture.describe(it) }
         stats["exit"] = exit?.toString() ?: "unavailable"
         diagnostics.quarantines?.let { stats[QUARANTINED] = it }
-        if (cmd.first().substringAfterLast('/') == "klause-cli") {
+        val launcherIndex = if (cmd.first() == "/usr/bin/env" &&
+            cmd.getOrNull(1)?.startsWith("KLAUSE_ZSTD_DECODER=") == true) 2 else 0
+        if (cmd.getOrNull(launcherIndex)?.substringAfterLast('/') == "klause-cli") {
             System.getenv("KLAUSE_LAB_PROFILE_DIR")?.let { directory ->
                 val recording = File(directory, "cli.jfr")
                 runCatching { CliProfile.summarizeCli(recording) }
