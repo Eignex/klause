@@ -1,5 +1,6 @@
 {
   "main": "com.eignex.klause.bench.lab.LabAdapterKt",
+  "sourceHistory": "snapshot",
   "classpath": [
     "klause-bench/build/install/klause-bench/lib/*"
   ],
