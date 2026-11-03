@@ -32,7 +32,7 @@ internal class MutableIntObjectIndex<V : Any> {
         return closest(key)?.takeIf { it.key == key }?.value
     }
 
-    fun lookup(key: Int, visit: (Long) -> Unit): V? {
+    inline fun lookup(key: Int, visit: (Long) -> Unit): V? {
         lastWork = 0L
         return closest(key, visit)?.takeIf { it.key == key }?.value
     }
@@ -139,11 +139,11 @@ internal class MutableIntObjectIndex<V : Any> {
         return bytes to references
     }
 
-    private fun closest(key: Int, visit: ((Long) -> Unit)? = null): Leaf<V>? {
+    private inline fun closest(key: Int, visit: (Long) -> Unit = {}): Leaf<V>? {
         if (key < 0) return null
         var node = root
         while (node != null) {
-            visit?.invoke(1L)
+            visit(1L)
             lastWork++
             when (node) {
                 is Leaf -> return node
