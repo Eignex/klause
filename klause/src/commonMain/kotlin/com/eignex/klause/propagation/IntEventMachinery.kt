@@ -4,7 +4,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntObjectMap
 
 /**
  * Typed int-event wakeup machinery for [PropagationState]: the per-`(intVar, kind)` advisor index,
@@ -48,11 +47,11 @@ internal class IntEventMachinery private constructor(
     internal val baseOffsets: IntArray
     internal val baseFlat: IntArray
 
-    /** Mid-life subscriptions (packed slot → factor ids in add order), allocated lazily — the common case
+    /** Mid-life subscriptions (packed slot → factor ids), allocated lazily — the common case
      *  adds no int-event-watching factor mid-run (presolve appends Linear rows, which watch nothing), so
      *  this stays `null` and the read pays only a null check past the CSR. */
     @Suppress("DoubleMutabilityForCollection") // null until the first mid-life subscription; assigned once, lazily
-    internal var overflow: MutableIntObjectMap<IntArrayList>? = null
+    internal var overflow: IntEventOverflow? = null
 
     init {
         if (preparedOffsets != null) {
@@ -85,34 +84,27 @@ internal class IntEventMachinery private constructor(
 
     /** Subscribe a mid-life factor [fid] to the event [packed] ([IntEvent.pack]); the base CSR is frozen,
      *  so post-construction subscriptions go to the sparse [overflow]. */
-    fun subscribeMidlife(packed: Int, fid: Int) {
-        val o = overflow ?: MutableIntObjectMap<IntArrayList>().also { overflow = it }
-        o.getOrPut(packed) { IntArrayList(initialCapacity = 1) }.add(fid)
+    fun subscribeMidlife(packed: Int, fid: Int): Long {
+        var work = 0L
+        val index = overflow ?: IntEventOverflow().also { overflow = it; work += 12L }
+        return work + index.subscribe(packed, fid)
     }
 
-    fun remapLearned(remap: IntArray, base: Int) {
-        val replacement = MutableIntObjectMap<IntArrayList>()
-        overflow?.forEach { event, list ->
-            var write = 0
-            for (index in 0 until list.size) {
-                val factor = list[index]
-                val next = if (factor < base) factor else remap.getOrNull(factor - base)?.let {
-                    if (it < 0) null else base + it
-                }
-                if (next != null) list[write++] = next
-            }
-            list.truncateTo(write)
-            list.trim()
-            if (write > 0) replacement.put(event, list)
-        }
-        overflow = replacement.takeUnless { it.isEmpty() }
+    fun remapLearned(remap: IntArray, base: Int): Long {
+        val previous = overflow ?: return 0L
+        val (replacement, work) = previous.remap(remap, base)
+        overflow = replacement
+        return work
     }
 
     /** Visit every factor subscribed to event [packed]: base subscribers (CSR, ascending factor id) then
-     *  mid-life subscribers (overflow, add order). */
-    inline fun forEachWatcher(packed: Int, action: (Int) -> Unit) {
+     *  mid-life subscribers (overflow). */
+    inline fun forEachWatcher(packed: Int, charge: (Long) -> Unit, action: (Int) -> Unit) {
         for (k in baseOffsets[packed] until baseOffsets[packed + 1]) action(baseFlat[k])
-        overflow?.get(packed)?.let { list -> for (i in 0 until list.size) action(list[i]) }
+        val index = overflow
+        val list = index?.get(packed)
+        if (index != null) charge(index.lookupWork)
+        if (list != null) for (i in 0 until list.size) action(list[i])
     }
 
     /**

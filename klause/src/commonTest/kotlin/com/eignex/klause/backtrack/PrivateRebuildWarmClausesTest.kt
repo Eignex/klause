@@ -21,20 +21,20 @@ import kotlin.test.assertTrue
 
 class PrivateRebuildWarmClausesTest {
     @Test
-    fun `complementing source coordinates should preserve owned consequences`() {
-        for (complemented in listOf(0, 1)) for (variable in listOf(0, 1)) {
+    fun `signed aliases should preserve consequences over retained and eliminated columns`() {
+        for (replacement in listOf(0, 1)) for (variable in listOf(0, 1)) {
             val learned = Clause(intArrayOf(Lit.make(variable, true), 4))
             val source = Problem(3, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(0, 2)), Clause(intArrayOf(1, 3)), learned,
+                Clause(intArrayOf(3, replacement)), Clause(intArrayOf(2, Lit.negate(replacement))), learned,
             )).bake()
             val session = PropagationSession(source)
             session.addLearnedClause(learned, 2)
 
             val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session,
-                SourceRebuilds(listOf(RebuildStep.CopyLiteral(1, 0))), arrayOfNulls(3),
-                1_048_576L, 65_536L, Cancellation.Never, complemented))
+                SourceRebuilds(listOf(RebuildStep.CopyLiteral(1, replacement))), arrayOfNulls(3),
+                1_048_576L, 65_536L, Cancellation.Never))
 
-            assertContentEquals(intArrayOf(Lit.make(0, variable != complemented), 4),
+            assertContentEquals(intArrayOf(if (variable == 0) 0 else replacement, 4),
                 (warm.clauses.single() as Clause).literals)
         }
     }

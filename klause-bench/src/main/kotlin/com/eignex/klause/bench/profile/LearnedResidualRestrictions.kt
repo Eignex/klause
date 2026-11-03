@@ -35,6 +35,9 @@ internal object LearnedResidualRestrictions {
     private val isClause = PropagationSession::class.java.declaredMethods.single {
         it.name.startsWith("isLearnedClause") && it.parameterCount == 1
     }.apply { isAccessible = true }
+    private val learnedRows = Class.forName("com.eignex.klause.propagation.PropagationState")
+        .declaredMethods.single { it.name.startsWith("getLearnedClauses") && it.parameterCount == 0 }
+        .apply { isAccessible = true }
     private val nativeLiteralCount = Class.forName("com.eignex.klause.propagation.NativeSatState")
         .declaredMethods.single { it.name == "literalCountOf" }.apply { isAccessible = true }
 
@@ -49,10 +52,7 @@ internal object LearnedResidualRestrictions {
         val state = LivePropagationState.current(session)
             ?: return LearnedResidualInspection(entries, count, "released-session")
         val native = if (session.usesNativeSat) field(state, "nativeEngine") else null
-        val store = if (native == null) {
-            val db = field(state, "learned")
-            field(db, "store") as List<*>
-        } else null
+        val store = if (native == null) learnedRows.invoke(state) as List<*> else null
         for (index in 0 until count) {
             if (stop()) return LearnedResidualInspection(entries, count, "interrupted")
             if (terms >= maxTerms) return LearnedResidualInspection(entries, count, "term-limit")

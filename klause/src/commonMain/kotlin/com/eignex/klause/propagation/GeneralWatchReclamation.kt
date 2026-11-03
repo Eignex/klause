@@ -5,10 +5,17 @@ import com.eignex.klause.util.IntArrayList
 internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPreparation) {
     if (incremental || nativeEngine != null || learned.retiredCount == 0) return
     if (learned.sweepingRetirements < 0) {
-        if (learned.sweptRetirements == learned.retiredCount) return
-        budget.visit(4L)
+        if (learned.sweptRetirements == learned.retiredCount &&
+            (learned.deferredWatchTrimWork == 0L ||
+                !budget.supports(learned.deferredWatchTrimWork, learned.deferredWatchTrimScratch))
+        ) {
+            return
+        }
+        budget.visit(8L)
         budget.visit(0L)
         learned.sweepingRetirements = learned.retiredCount
+        learned.deferredWatchTrimWork = 0L
+        learned.deferredWatchTrimScratch = 0L
     }
     val boolCount = problem.numBoolVars * 2
     val index = initializedWatches
@@ -17,6 +24,7 @@ internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPrep
         budget.visit(0L)
         learned.watchCleanupLiteral = boolCount
         learned.watchCleanupIndex = 0
+        budget.advanced()
     }
     while (learned.watchCleanupLiteral < boolCount + atoms.watchersByLit.size) {
         budget.visit(4L)
@@ -32,6 +40,7 @@ internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPrep
         } else if (retiredLearnedFactor(posting[learned.watchCleanupIndex])) {
             if (!removeRetiredWatch(literal, posting, budget)) return
         } else learned.watchCleanupIndex++
+        budget.advanced()
     }
     budget.visit(4L)
     budget.visit(0L)
@@ -64,16 +73,31 @@ private fun PropagationState.removeRetiredWatch(
     return true
 }
 
-private fun trimWatchPosting(posting: IntArrayList, blockers: IntArrayList?, budget: ReclamationPreparation) {
+private fun PropagationState.trimWatchPosting(
+    posting: IntArrayList,
+    blockers: IntArrayList?,
+    budget: ReclamationPreparation,
+) {
+    trimPostingArray(posting, budget)
+    if (blockers != null) trimPostingArray(blockers, budget)
+}
+
+private fun PropagationState.trimPostingArray(posting: IntArrayList, budget: ReclamationPreparation) {
     val size = posting.size.coerceAtLeast(1).toLong()
-    var copies = if (posting.backingData.size > size) 1L else 0L
-    if (blockers != null && blockers.backingData.size > size) copies++
-    if (copies == 0L) return
-    val scratch = copies * size * Int.SIZE_BYTES
-    val work = 4L + copies * (size * 2L + 1L)
-    if (!budget.supports(work, scratch)) return
+    if (posting.backingData.size <= size) return
+    val work = 5L + size * 2L
+    val scratch = size * Int.SIZE_BYTES
+    if (!budget.supports(work, scratch)) {
+        if (learned.deferredWatchTrimWork == 0L || work < learned.deferredWatchTrimWork) {
+            budget.visit(4L)
+            budget.visit(0L)
+            learned.deferredWatchTrimWork = work
+            learned.deferredWatchTrimScratch = scratch
+        }
+        return
+    }
     budget.visit(work, scratch)
     budget.visit(0L)
     posting.trim()
-    blockers?.trim()
+    budget.advanced()
 }

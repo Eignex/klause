@@ -30,6 +30,25 @@ class BuildProvenanceTest {
     }
 
     @Test
+    fun `workspace checksum reuse preserves exact provenance and notices changed installed files`() = withRoot { root ->
+        val launcher = distribution(root)
+        val runtime = File(root, "jdk")
+        val environment = mapOf("LAB_WORKSPACE_CACHE" to File(root, "cache").path)
+        val fresh = InstalledBuild.capture(launcher, runtime, emptyMap())
+        assertEquals(fresh, InstalledBuild.capture(launcher, runtime, environment))
+        assertEquals(fresh, InstalledBuild.capture(launcher, runtime, environment))
+        val library = File(root, "dist/lib/solver.jar")
+        val modified = Files.getLastModifiedTime(library.toPath())
+
+        library.writeText("modified")
+        Files.setLastModifiedTime(library.toPath(), modified)
+
+        val changed = InstalledBuild.capture(launcher, runtime, environment)
+        assertNotEquals(fresh, changed)
+        assertEquals(InstalledBuild.capture(launcher, runtime, emptyMap()), changed)
+    }
+
+    @Test
     fun `identical distributions at different paths should retain their fingerprint`() = withRoot { root ->
         val launcher = distribution(root, "first/")
         File(root, "first").copyRecursively(File(root, "second"))

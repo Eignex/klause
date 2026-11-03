@@ -7,9 +7,11 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -278,4 +280,45 @@ class LearnedReclamationTest {
             assertEquals(1L, session.learnedLifecycle().getValue("learningClauseAdmitted"))
         }
     }
+
+    @Test
+    fun `native full compaction should release a live row beside already retired payload slots`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = true)
+        repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+        session.maintainCapWindow(1, 65_536L, 1_048_576L, { false }) { it == 0 }
+        assertEquals(1, session.activeLearnedClauseCount)
+        val generation = session.learnedRetirementGeneration
+
+        val published = session.compactLearnedClauses(1_000_000L, 1_048_576L, { false }) { _, _ -> false }
+
+        assertTrue(published)
+        assertEquals(0, session.learnedClauseCount)
+        assertEquals(0, session.activeLearnedClauseCount)
+        assertTrue(session.learnedRetirementGeneration > generation)
+        val observed = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        assertEquals(0L, observed.getValue("learnedPayloadBytes"))
+        session.pinBool(0, false)
+        assertNull(session.boolValue(1))
+        session.popLast()
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9)
+        session.pinBool(2, false)
+        assertEquals(true, session.boolValue(3))
+    }
+
+    @Test
+    fun `candidate capacity should survive cancellation after funding and trim on retry`() {
+        val candidates = IntArrayList(64)
+        for (value in listOf(7, 2, 9)) candidates.add(value)
+        var work = 0L
+        val cancelled = ReclamationPreparation(11L, 12L, { work >= 11L }, { work += it })
+
+        assertFailsWith<ReclamationPreparation.Deferred> { trimLearnedCandidates(candidates, cancelled) }
+
+        assertEquals(64, candidates.backingData.size)
+        trimLearnedCandidates(candidates, ReclamationPreparation(11L, 12L, { false }, {}))
+        assertEquals(3, candidates.backingData.size)
+        assertEquals(listOf(7, 2, 9), candidates.toIntArray().toList())
+    }
+
 }

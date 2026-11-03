@@ -17,6 +17,9 @@ replaces the complete unfinished row rather than mixing arms from different
 machines or attempts. Accepted rows remain valid; retain failed and preparation
 costs and report repeated infrastructure losses separately.
 
+Each requested selection must match at least one source. A selection with no matches
+fails preparation instead of publishing a reduced comparison plan.
+
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
 copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time
@@ -69,6 +72,12 @@ diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
+`param.private-rebuild-work=-1` requests automatic parity admission within a
+1,048,576-work cap and the configured scratch grant. It makes one initial-root
+attempt on the structurally admitted Boolean cohort; see the
+[admission contract](../docs/07-presolve.md#private-worker-qualification).
+Use explicit zero as the canonical control. The production default remains zero.
+
 `param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
 trial after new global root pins or an owned learned equivalence, with source reduction and a fresh consuming
 worker. Zero is the default. `ProgressPins` excludes baked-root facts;
@@ -76,7 +85,7 @@ worker. Zero is the default. `ProgressPins` excludes baked-root facts;
 baked root without a captured equivalence keeps its canonical traversal.
 `BinaryScanWork` and `BinaryScanNanos` retain bounded discovery costs;
 `BinaryRelations` counts captured reciprocal implications and `EquivalentColumns`
-counts actual source implication-graph merges. Discovery accepts only owned global
+counts actual signed source substitutions. Discovery accepts only owned global
 binary learning and checks at most 128 binaries within 32,768 work per observation.
 `BinaryHistoryWork` and `BinaryHistoryBytes` retain the fixed history's initialization
 and primitive storage. At most 32 relations are attempted in one worker. Its history
@@ -136,6 +145,33 @@ Projection work remains inside `WarmClauseWork` and preparation. Tautological,
 wide or unsupported selected translations contribute no copied consequence.
 `WarmClauseNormalizationWork` records the final input-normalization reservation;
 it is a subset of transfer and preparation work, rather than another total to add.
+
+
+Private parity discovery reports `ParityDiscoveryWork`, `ParityDiscoveryNanos`,
+`ParityRows` and `ParityPins`. Discovery work is a subset of `ChargedWork`,
+separate from canonical root propagation and later `PreparationWork`.
+`ParitySourceRows` and `ParitySourceLiterals` count short source equations posted
+beside the reduced basis in mixed consumers. Their storage and propagation spend
+the existing private grants.
+`ParityGenerationPins` counts proved pins in a prepared private model;
+`Consumers` confirms that its worker opened.
+`ParityAffineColumns` and `ParityAffineFreeColumns` describe a fully covered
+captured affine basis. `AffineGenerationColumns` and `AffineGenerationFreeColumns`
+count its coordinates in a prepared model. These private pivot slots require
+affine reconstruction and cannot receive unprojected canonical learned clauses.
+`ParityBasisColumns` and `ParityCoveredSourceClauses` describe the captured
+linear subsystem. `ParityReducedRows`, `ParityReducedLiterals` and
+`ParityCoveredClauses` identify a prepared mixed Clause/Xor view with original
+coordinate meanings; they do not count eliminated columns.
+`ParityPreferredFreeColumns` reports the admitted free-coordinate selection list. Coverage declines name
+incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
+larger widths). Such a miss can retain proved global pins or a mixed view.
+`ParityWorkspaceBytes` is the maximum modeled table/matrix/snapshot workspace
+within one private coordinator, rather than RSS or cumulative allocation.
+`ParityDeclinedPartial`, `Memory`, `NoRows`, `NoPins` and
+`RefutationDeferred` retain unsupported or incomplete outcomes. A derived
+contradiction supplies no checked source proof. Consumer witnesses still require
+reconstruction and complete canonical source checks.
 
 Run from the repository root with JDK 25 or newer:
 
@@ -478,6 +514,22 @@ uses 64 KiB reads. Both read the full plain source before the invocation timer, 
 they do not have identical IO call sizes.
 Native CLI and public-library adapters require cache staging.
 
+`source-staging=cli` passes the original compressed path to the JVM CLI's existing
+streaming decoder. Use `lab/compressed.json` for frozen-source comparisons; it declares
+the required `zstd` executable without adding a tool dependency to ordinary frozen runs.
+The decoder executable path and SHA-256 are retained; capturing that identity spends
+the source preparation allowance. Source hashing before invocation remains unchanged.
+`sourcePreparationMs` measures harness preparation for every delivery policy. In CLI
+delivery, decompression and decoder retirement belong to `sourceCliMs` and
+`sourceInvocationMs`; `sourceDecodeMs` is unavailable, rather than zero, and
+`sourceDecodeLocation=cli-frontend` identifies the scope. `sourceCleanupMs` measures
+only harness temporary-file cleanup. Frontend loading includes decompression and
+parsing and is not an additional disjoint cost. The CLI deadline starts before loading;
+its existing subprocess watchdog and descendant cleanup still apply. This control
+does not establish cooperative cancellation within a blocked CLI input read.
+Compare full invocation and case/job costs at the same allowance and retain the
+original-source checks, runtime/decoder identities and declared cache conditions.
+
 `harness-jfr=true` records the ordinary JVM CLI adapter's separate 512 MiB harness
 JVM into `report/harness.jfr`; the default is false. CLI `measurement` remains a
 separate control. The retained harness command and comparison controls identify
@@ -565,9 +617,10 @@ they do not execute search or validate a source outcome.
 
 ## Corpus and build identity
 
-Compressed file inputs are staged with the existing corpus decoder before CLI
-launch. `sourceDecodeMs` is deducted from the CLI deadline, and
-`sourceInvocationMs` includes decoding, invocation and staged-file retirement.
+Compressed file inputs are staged with the corpus decoder by default.
+`sourcePreparationMs` is deducted from the CLI deadline, and
+`sourceInvocationMs` includes preparation, invocation and staged-file retirement.
+CLI delivery streams compressed input during the invocation instead.
 `elapsedMs` and process witness times retain their subprocess scope. A spent
 preparation allowance supplies no solver verdict. Plain source digests and frozen
 compressed input identities remain available for independent checking.
@@ -584,7 +637,12 @@ See [MiniZinc setup](../klause-mzn-lib/README.md) for direct MiniZinc runs and t
 To reuse installed-build hashes across repeated bench processes, run
 `provenance out=/absolute/path/provenance.json` with the installed launcher and set
 `KLAUSE_BENCH_PROVENANCE` to that path. Regenerate it after rebuilding or restoring
-an installation. Without it, each process captures its own installed-build hashes.
+an installation. Ordinary lab processes also reuse per-file hashes in the existing
+private `LAB_WORKSPACE_CACHE`. Every use traverses its current input/provenance
+inventory and checks filesystem identity, inode, change time, modification time
+and size. Unsupported filesystems and unavailable receipts fall back to reading
+the bytes. The checksum cache uses at most 64 MiB including bounded replacement
+files; it adds no corpus, solver-result or MiniZinc identity-query cache.
 
 ## Weighted objective qualification
 
@@ -1317,9 +1375,11 @@ Staging checks the containing deadline and thread interruption between bounded
 read/write chunks and before invoking the CLI. It closes streams and removes
 partial files on cancellation, exhausted preparation, decoding failure and CLI
 failure. Cleanup runs even after the deadline and its cost remains charged.
-`sourceDecodeMs`, `sourceCliMs`, `sourceCleanupMs` and `sourceInvocationMs` retain
+`sourcePreparationMs`, `sourceCliMs`, `sourceCleanupMs` and `sourceInvocationMs` retain
 preparation, the invocation callback, retirement and the whole source scope on
 successful and failed attempts. `elapsedMs` remains the subprocess measurement.
+Staged inputs also retain preparation as `sourceDecodeMs`; CLI delivery leaves
+that separate decode measurement unavailable.
 An exhausted preparation records no solver verdict and zero CLI time. Plain inputs
 retain the same source ledger without decompression or temporary files. Staging cooperates between
 IO calls; a blocked filesystem call can delay observation of cancellation.

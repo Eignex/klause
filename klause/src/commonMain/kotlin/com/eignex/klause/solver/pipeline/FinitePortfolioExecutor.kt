@@ -85,6 +85,7 @@ internal fun FinitePipeline.portfolioExecutor(
     booleanProofTasks: Boolean? = false,
     fundedCompanions: Boolean = false,
     guidedCompanions: Boolean = false,
+    privateRebuildBudgetOnly: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -208,7 +209,7 @@ internal fun FinitePipeline.portfolioExecutor(
             { companionAdmission?.stages().orEmpty() + companions?.guidanceStages().orEmpty() }
         } else companionAdmission?.let { it::stages },
     ) { workers ->
-        val proofShares = clausalProofShares(scenario, profile, workers.map { it.label })
+        val proofShares = clausalProofShares(scenario, profile, workers.map { it.label }, privateRebuildBudgetOnly)
         val shares = if (proofShares.isEmpty()) {
             continuousLpShares(
                 scenario,
@@ -328,10 +329,11 @@ internal fun clausalProofShares(
     scenario: PortfolioScenario,
     profile: ProblemProfile,
     labels: List<String>,
+    privateRebuildBudgetOnly: Boolean = false,
 ): DoubleArray {
     if (scenario.cores != 1 || scenario.kind != Kind.CSP || scenario.engine != EngineMix.MIXED ||
         profile.problemClass != ProblemClass.Sat || scenario.btPool != null || scenario.lsPool != null ||
-        scenario.btEdit != null || scenario.annotationArm != null
+        (scenario.btEdit != null && !privateRebuildBudgetOnly) || scenario.annotationArm != null
     ) {
         return DoubleArray(0)
     }
