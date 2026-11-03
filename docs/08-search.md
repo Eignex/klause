@@ -272,28 +272,141 @@ modes stop incomplete when their model continuation would require such a blocker
 
 ### Finite LP directional guidance
 
-Finite optimization records passive immediate parent/child floating LP optimum gains
-in minimized working objective units. Each gain is divided by the fractional movement
-to the actual lower or upper branch. A missing or interrupted optimum, infeasibility,
-negative or nonfinite gain, integral point or mismatched split supplies no numeric
-sample. These advisory observations supply no certified bound or pruning authority.
+Finite optimization records passive immediate parent/child progress of already accepted
+LP objective lower bounds in minimized working units. Each gain is divided by the
+fractional movement of the advisory LP iterate to the actual lower or upper branch.
+An unfinished iterate need not be feasible; its existing checked dual bound can still
+supply progress. Missing bounds, infeasibility, negative or nonfinite gains, integral
+coordinates and mismatched splits supply no numeric sample. Boolean coordinates must
+lie within `[0, 1]`; both integer split neighbours must belong to the current domain.
+These advisory observations supply no additional certified bound or pruning authority.
+The bound and fractional coordinates must come from the same working model.
+A cut re-solve that returns an iterate refreshes the point before its accepted bound
+reaches the history. This bounded point snapshot is separate from the initial
+iterate's value-order hints and reduced-cost averages, which continue to supply the
+fallback scorer. Directional advice declines when the refreshed integer point
+would require a different floor split from that value ordering.
+When ordinary bounding needs no certificate, an existing floating optimum remains
+the fallback estimate. Switching between checked bounds and floating optima clears
+history, so the two estimate kinds never train the same gains.
 The common objective constant stays in the scope key and is excluded from gain
 subtraction, preserving small gains when the constant exceeds floating precision.
+An ordinary finite objective lower bound can complete a pending immediate-child
+observation when no LP child bound was recorded. It requires the same checked-bound
+parent, retained base, active rows, cutoff, publication version and exact external
+context. Subtracting the scoped constant in checked integer arithmetic precedes
+floating conversion. This completion supplies no fresh LP point or new parent
+observation. Objective-bound pruning can supply progress; pure infeasibility cannot.
+Unsupported or overflowing bounds retain the missing-observation fallback.
 
-The finite consumer is opt-in through `BacktrackParams.lpDirectionalGains` or
-`lp-directional-gains=true`, with LP bounding and branching enabled. Two recent samples
-in each direction permit a balanced gain score; otherwise reduced-cost/fractionality
-scoring and the configured selector keep their precedence. Directional scores compete
-with each other before fallback, so objective units are not mixed with reduced costs.
+The `lp-default` optimization recipe enables the passive finite consumer; direct
+`BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
+`lp-directional-gains=true`. The execution setting can also disable it. LP bounding
+and branching must be enabled. The reduced-cost/fractionality scorer supplies its
+winning variable and runner-up. When recent history is available, reliable predicted
+gains compare only those two candidates. Both candidates require reliable predictions;
+tied predictions retain the original winner. Candidates outside that shortlist keep
+no selection priority. Shortlist tracking charges its bounded scan work to the existing
+LP allowance before visiting candidates.
+Two recent samples in each direction supply that variable's predicted child gains,
+using each direction's mean cost per unit of fractional movement. The balanced
+`min + max / 6` score ranks finite positive predictions in the shortlist.
+Missing or unusable passive history permits a separate numerical gain history to
+compare the same shortlist. Each numerical direction needs two recent observations
+in compatible source objective units. An initial complete probe supplies one
+observation and retains the baseline choice. Observed gains are divided by the
+actual fractional movement before averaging; predictions use the current point's
+movement and the same balanced score. A numerical challenger replaces the original
+winner only when both predicted child gains are strictly greater. An improvement
+that trades away or ties either direction retains baseline. Numerical observations
+never train passive checked-bound history.
 
-Samples share one retained exact base model, active-row identity, objective mapping
-and incumbent cutoff. Changed rows or cuts, layout or objective rescaling invalidate
-history and pending comparisons. Restart and assumption reseeding clear history.
+A missing numerical history can request at most one comparison at a retained LP
+point, including eligible points below the root. Both candidates require complete
+optimal child solves at their current floor and ceiling, finite nonnegative gains
+and finite normalized costs before either history is updated. Unfunded, unsupported
+or incomplete comparisons keep the original winner. Reliable zero predictions keep
+fallback without repeating the query. Numerical histories expire after 256 node
+visits and clear on changed model, active rows, objective units, cutoff or publication
+context, restart and assumption reseeding. There are at most 8,192 histories of each
+kind and one previously probed immutable state per hint owner.
+
+Preparation reserves 20 work units before allocating the column and split requests.
+The numerical grant retains 24 work units per candidate for normalization, history
+updates and consuming selection. Projection, scratch construction, scaling, solving,
+objective scans and retirement share the containing and cumulative allowances.
+Warm parent solves and private comparisons use separate bounded admission budgets.
+A stopped comparison can grow its future grant within the existing adaptive work
+range when its construction or numerical allowance is insufficient. Cancellation,
+stale points and unusable gains supply no growth feedback; ratio demotion keeps
+the remaining warm-node grant. Every admitted attempt charges the same LP ledger.
+Numerical estimates supply no bound or pruning
+authority. Missing, tied or unusable advice retains the original winner.
+Ordinary finite workers use value and incumbent guidance to order their children.
+
+Finite-run construction can explicitly enable a root child-order fallback in place
+of numerical variable-history initialization. In that mode the selected root variable can request
+one child-order estimate from its retained optimal basis after the actual
+complementary alternatives exist. This attempt is limited to one column and
+one attempt per hint owner, including across slices, restarts and assumption reseeding.
+An unsupported numerical attempt consumes that opportunity and retains the existing
+child order. Unfunded preparation leaves the opportunity available. Reliable history
+takes precedence and consumes no basis opportunity.
+History preparation and ordering share the existing LP allowance.
+
+In an explicitly enabled run, the larger predicted objective increase is tried first,
+after value and incumbent guidance. Passive history requires the estimated Boolean or integer floor/ceil
+partition and only swaps its existing children. After validating two complementary
+children, a usable root basis estimate can choose integer cuts at the current LP
+point's floor and ceiling. Both neighbours must belong to the current domain, so
+the replacement cuts remain nonempty and partition that domain completely. The
+basis costs are scaled by movement to these adjacent cuts. This preparation reserves
+32 work units from the existing LP allowance before the query, including bounded
+construction of the two cuts. Boolean branches keep their existing literals.
+Tied gains, insufficient allowance, pruned alternatives and incompatible partitions
+retain the existing heuristics. Preferences expire at the next node, point replacement or history reset.
+History and basis side consumption, changed order and unavailable advice are recorded
+separately. Numerical probes report completed children, preparation and solve work, and
+complete or declined comparisons independently of retained-basis analysis. Root observations distinguish a changed partition from an agreed or
+changed complete root choice. Child-order fallback distinguishes a changed variable, an incomplete pair
+and a different partition. Variable proposal preparation is separate from actual selection, with
+changed and agreed baseline choices counted at selection. Accepted row-extension
+compatibility checks have their own outcome.
+The readiness check and all analysis spend the existing LP work allowance. Ancestor
+observations use a bounded depth-indexed buffer. Initial buffer preparation and visited
+slot ranges are funded before allocation or clearing, including across scope resets.
+Committed observation attempts retain their branch direction. Missing immediate-child
+bound estimates distinguish LP admission gates, suspended or absent results and
+unavailable bounds. Scope changes, depth changes and replaced alternatives report discarded
+attempts separately. These observations spend the existing allowance and do not
+request another solve or supply a gain sample.
+
+Each numeric gain compares an immediate parent and child with the same retained exact
+base model, active-row identity, objective mapping, estimate kind and incumbent cutoff.
+The cutoff context includes the local incumbent publication version and exact external
+bound. Changes hidden by floating precision still discard unmatched comparisons, and
+exact comparison work spends the existing allowance.
+
+Completed per-variable averages are advisory priors within the same variable layout,
+objective mapping and estimate kind. Changing the cutoff context or
+which existing rows are active discards pending comparisons and ancestor splits while
+retaining those completed averages. Fresh current-point and partition checks are still
+required before an average can order a child. A row change after the last recorded
+point invalidates that point and its preferences. A row-only matrix extension can retain
+completed averages when the old immutable matrix, row metadata, bounds, coordinate
+origins and objective coefficients remain its exact shared prefix. Added logical
+columns must have zero cost, and objective scale, sense and constants must retain
+their identities. Verification spends at most 8,192 entry-work units plus fixed
+bookkeeping from the existing LP allowance; an incomplete check clears the averages.
+Every base change still discards unmatched comparisons and requires a fresh point.
+Other model, layout or objective changes, switching between checked bounds and
+floating optima, restart and assumption reseeding clear the averages.
 Ordinary sibling retraction preserves compatible observations and the immediate
 parent split; a skipped child cannot borrow a deeper descendant's objective.
 Directions expire after 256 node visits without a sample. At most 8,192 variable
-histories and 128 ancestor splits are retained; bookkeeping charges the existing LP
-work allowance and creates no extra LP query. Invocation close releases the scope.
+histories and 128 ancestor splits are retained; bookkeeping charges
+the existing LP work allowance and creates no extra LP query. Invocation close
+releases the scope.
 
 ### Leaf-completed columns
 

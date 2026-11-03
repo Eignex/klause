@@ -140,6 +140,7 @@ internal class ResumableMinimize(
     preparationBudget: SliceBudget? = null,
     private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack"),
     private val deferredInstallation: Boolean = false,
+    private val rootBasisGuidance: Boolean = false,
 ) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
@@ -331,7 +332,8 @@ internal class ResumableMinimize(
     private val lpHints: LpHints? =
         if (params.lpPlan.branching) {
             LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
-                sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) })
+                sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
+                rootBasis = rootBasisGuidance, reliableVariableProbes = !rootBasisGuidance)
         } else null
 
     private lateinit var cp: CpSearchComponent
@@ -618,6 +620,7 @@ internal class ResumableMinimize(
             ownsWorkDebt = ownsWorkDebt,
             initialCandidate = sample,
             problem = root,
+            rootBasisGuidance = rootBasisGuidance,
         )
         try {
             if (freshParams.cancellation()) throw CancellationException("objective replacement cancelled")
@@ -1328,7 +1331,10 @@ internal class ResumableMinimize(
 
     /** LP guidance affects only branch order; the shared runner still owns every frame and retraction. */
     private inner class LpGuidedBranching : BacktrackBranching {
-        override fun onBranch(variable: VarRef) { lpHints?.branch(variable) }
+        override fun onBranch(variable: VarRef) {
+            val domain = (variable as? VarRef.IntVar)?.let { session.intDomain(it.varId) }
+            lpHints?.branch(variable, domain)
+        }
 
         override fun onCommit(decision: SearchDecision, depth: Int) { lpHints?.commit(decision, depth) }
 
@@ -1342,7 +1348,6 @@ internal class ResumableMinimize(
         override fun pick(session: PropagationSession): VarRef? {
             if (incumbents.current() == null) {
                 lpEngine.pickRootComponent(session, params.cancellation)?.let {
-                    lpHints?.selected(null)
                     return it
                 }
             }
@@ -1352,6 +1357,16 @@ internal class ResumableMinimize(
         override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> {
             val rooted = lpEngine.orderRootValues(variable, values)
             return lpHints?.order(variable, rooted) ?: rooted
+        }
+
+        override fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> {
+            val hints = lpHints ?: return alternatives
+            val allowBasis = rootBasisGuidance
+            if (!hints.rootChoiceReady) return hints.orderAlternatives(variable, alternatives, allowBasis)
+            return hints.selectRootAlternatives(variable,
+                (variable as? VarRef.IntVar)?.let { session.intDomain(it.varId) }, alternatives,
+                allowBasis = allowBasis, reserve = lpEngine::reserveDirectionalWork,
+                estimate = lpEngine::directionalCosts)
         }
     }
 
@@ -1367,10 +1382,14 @@ internal class ResumableMinimize(
                 SearchRunDisposition.Continue -> Unit
             }
             val externalBound = externalCutoff()
-            val effectiveBound = if (externalBound < bestObj) externalBound else bestObj
+            val incumbent = incumbents.current()
+            val localBound = incumbent?.objective?.pruningBound ?: Double.POSITIVE_INFINITY
+            val effectiveBound = if (externalBound < localBound) externalBound else localBound
+            val externalExact = if (lpHints != null || (rebindable && discreteObjective)) {
+                exactObjectiveBoundSupplier?.invoke()
+            } else null
             if (rebindable && discreteObjective) {
-                val externalExact = exactObjectiveBoundSupplier?.invoke()
-                val localExact = incumbents.current()?.objective?.exact
+                val localExact = incumbent?.objective?.exact
                 val exactBound = when {
                     externalExact == null -> localExact
                     localExact == null || externalExact < localExact -> externalExact
@@ -1382,7 +1401,7 @@ internal class ResumableMinimize(
             }
             // Persistent LP fixings may use only a cutoff that survives every later repair.
             val lpBound = if (rebindable) externalBound else effectiveBound
-            lpHints?.beginNode(context.decisionLevel, lpBound)
+            lpHints?.beginNode(context.decisionLevel, lpBound, incumbent?.version ?: 0L, externalExact)
             if (restartRootTargetsPending && context.decisionLevel == 0 && incumbents.current() == null) {
                 restartRootTargetsPending = false
                 lpEngine.refreshRootPrimalTargets(session, params.cancellation)
