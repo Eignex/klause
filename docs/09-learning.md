@@ -654,7 +654,7 @@ clauses under stable variable ids and share the native arena read-only; variable
 elimination runs once in [presolve](07-presolve.md) instead. Seeded searches skip
 inprocessing, since derivations under assumption pins would not hold globally.
 
-Opt-in root simplification examines bounded slices of source and learned Boolean
+Root simplification examines bounded slices of source and learned Boolean
 clauses against permanent root facts. An empty Boolean pin trail withholds the scan;
 without a pinned literal it cannot satisfy or shorten a Boolean clause. Clauses
 affected by a new Boolean root fact can be reached through a source-occurrence index
@@ -698,7 +698,7 @@ historical reasons and removes obsolete watches; attaching a shortened binary in
 both implication directions and evaluates facts already assigned at the root. There
 is no separate stale binary graph or whole-graph rebuild.
 
-Opt-in failed-literal probing alternates a bounded rotating set of source Boolean
+Failed-literal probing alternates a bounded rotating set of source Boolean
 and existing integer-bound literals with coordinates from newly examined learned
 clauses of two to eight literals. The global rotation alternates existing literals
 with unfixed integer endpoints, including columns without existing atoms. Separate
@@ -711,13 +711,37 @@ decisions and discard implied-result payloads, retaining the same undo and cance
 paths. A proved bound enters as a session-local clause over its semantic atom and
 publishes through the original integer coordinate.
 Permanent source replacements supply the same bounded priorities; their clauses and
-ownership remain protected. A priority supplies no deduction without an actual probe conflict.
+ownership remain protected. A priority supplies no consequence without completed propagation.
 The learned cursor advances without replaying an exhausted unchanged neighborhood;
 compaction invalidates its indices. Preparation and retained literal storage share the
 probe class allowance and memory observation. Funded probing precedes cheap root
 simplification so proved facts can refresh binaries in the same safe-root opportunity. Each attempt has a propagation-work ceiling within
 the invocation token. A completed root conflict proves the complementary unit, which is attached and
-propagated through ordinary search. Completed root facts are published to shared
+propagated through ordinary search. A completed consistent pure-Boolean probe can retain
+one newly implied Boolean literal as a binary clause conditional on its probe literal.
+Pure-Boolean scopes alternate ordinary opportunities with failed-pair opportunities.
+A completed first probe can spend the second attempt of the same batch on a distinct
+unassigned Boolean literal. A completed child conflict proves the binary excluding
+both assumptions; a consistent or interrupted child proves no such binary. Child
+selection first negates unassigned literals from the parent's retained learned
+neighborhood, then rotates through other Boolean coordinates. Both walks together
+inspect at most 64 candidates and share the containing and probe grants. The
+neighborhood reuses the pass's bounded literal buffer without another retained owner.
+The child also shares the first probe's remaining work ceiling. Both decisions unwind
+before admission, and a proved single-literal consequence retains priority after root
+progress. Independent parent cursors and child polarities survive optional buffer
+release and reset with the scope. A one-attempt batch retains ordinary probing.
+Capture is prepaid before propagation and reads only the final trail entry. After
+rollback, a funded lookup skips a matching direct binary reason and the bounded
+history prevents repeated admissions. At most 64 binaries enter per search scope;
+the 64-key history and pending pair share the probe class and retained-memory
+grants. Unfunded admission resumes at a fresh safe root without another probe.
+Optional buffer release drops history and neighborhood arrays while preserving the
+pending pair, primitive cursors and admission count. Learned remapping invalidates
+the direct-reason hint, without changing the proved literals. Reseeding discards
+the pending pair and resets that count. Admitted binaries use ordinary
+learned ownership, forgetting and required attachment completion.
+Completed root facts are published to shared
 components before traversal resumes. Successful and interrupted probes retract to the
 complete root; interruption supplies no deduction. Speculative retractions preserve
 the saved search phases while retaining ordinary unassignment notifications for
