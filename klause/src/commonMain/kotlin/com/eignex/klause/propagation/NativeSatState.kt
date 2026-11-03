@@ -138,8 +138,10 @@ internal class NativeSatState(private val state: PropagationState) {
     private fun packWatch(handle: Int, blocker: Int): Long =
         (blocker.toLong() shl 32) or (handle.toLong() and 0xFFFFFFFFL)
 
-    private fun watchPosition(h: Int, slot: Int): Int =
-        if (h < baseCount) watchPos[2 * h + slot] else metadata[h - baseCount, NativeLearnedMetadata.WATCH_FIRST + slot]
+    private fun watchPositions(h: Int): Long {
+        if (h >= baseCount) return metadata.watchPositions(h - baseCount)
+        return (watchPos[2 * h].toLong() shl 32) or (watchPos[2 * h + 1].toLong() and 0xFFFFFFFFL)
+    }
 
     private fun setWatchPosition(h: Int, slot: Int, position: Int) {
         if (h < baseCount) watchPos[2 * h + slot] = position
@@ -914,8 +916,9 @@ internal class NativeSatState(private val state: PropagationState) {
             val lits = if (baseClause) arena.lits else learnedPayloads[h - baseCount]
             val start = if (baseClause) arena.start(h) else 0
             val len = if (baseClause) arena.length(h) else lits.size
-            val i0 = watchPosition(h, 0)
-            val i1 = watchPosition(h, 1)
+            val positions = watchPositions(h)
+            val i0 = (positions ushr 32).toInt()
+            val i1 = positions.toInt()
             val slot0IsFalse = lits[start + i0] == falseLit
             val lIdx = if (slot0IsFalse) i0 else i1
             val otherIdx = if (slot0IsFalse) i1 else i0
