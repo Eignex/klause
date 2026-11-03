@@ -110,7 +110,9 @@ class LpPrimalHeuristicsTest {
 
             assertEquals(listOf(1L, 1L, 1L, 1L, 1L, 0L, 0L, 0L), sample.ints.toList())
             val verifier = ComposedSampleVerifier(problem, objective, Cancellation.Never)
-            assertIs<Verification.Accepted<Sample, Double>>(verifier.verify(Candidate(sample, objective.evaluate(sample))))
+            assertIs<Verification.Accepted<Sample, Double>>(
+                verifier.verify(Candidate(sample, objective.evaluate(sample))),
+            )
             assertTrue(factory.calls.isEmpty())
         }
     }
