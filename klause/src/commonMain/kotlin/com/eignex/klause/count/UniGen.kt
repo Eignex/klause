@@ -71,9 +71,10 @@ internal object UniGen {
 
         // Otherwise hash down to a cell in the target band, then pick uniformly within it.
         val mStar = (log2(count.toDouble()) - log2(pivot.toDouble())).roundToInt().coerceAtLeast(0)
+        val sampler = CellSampler(ctx, mStar, loThresh, hiThresh)
         var consecutiveRejects = 0
         while (true) {
-            val s = drawOne(ctx, mStar, loThresh, hiThresh, seedCounter++)
+            val s = sampler.draw(seedCounter++)
             if (s != null) {
                 consecutiveRejects = 0
                 yield(s)
@@ -88,20 +89,31 @@ internal object UniGen {
     /** Give up on rejection sampling after this many consecutive out-of-band draws. */
     private const val MAX_CONSECUTIVE_REJECTS = 64
 
-    private fun drawOne(ctx: CellContext, mStar: Int, loThresh: Int, hiThresh: Int, seed: Long): Sample? {
-        val n = ctx.hashDomain.size
-        val allHashes = XorHashFamily(ctx.hashDomain, seed).draw(n)
-        val rng = Random(seed * 0x9E3779B97F4A7C15uL.toLong() + 1)
-        // Search a small window of hash counts around mStar for a cell in the target band.
-        val lo = (mStar - 1).coerceAtLeast(0)
-        val hi = (mStar + 1).coerceAtMost(n)
-        for (m in lo..hi) {
-            val cell = cellCount(ctx, allHashes.subList(0, m), cap = hiThresh)
-            if (cell.complete && cell.count in loThresh..hiThresh) {
-                return cell.representatives[rng.nextInt(cell.representatives.size)]
+    private class CellSampler(
+        private val ctx: CellContext,
+        private val mStar: Int,
+        private val loThresh: Int,
+        private val hiThresh: Int,
+    ) {
+        private var unhashedOverCap = false
+
+        fun draw(seed: Long): Sample? {
+            val n = ctx.hashDomain.size
+            val allHashes = XorHashFamily(ctx.hashDomain, seed).draw(n)
+            val rng = Random(seed * 0x9E3779B97F4A7C15uL.toLong() + 1)
+            val lo = (mStar - 1).coerceAtLeast(0)
+            val hi = (mStar + 1).coerceAtMost(n)
+            for (m in lo..hi) {
+                if (m == 0 && unhashedOverCap) continue
+                val cell = cellCount(ctx, allHashes.subList(0, m), cap = hiThresh)
+                // Every hash family has the same zero-hash cell in this conditioned projection.
+                if (m == 0 && cell.capped) unhashedOverCap = true
+                if (cell.complete && cell.count in loThresh..hiThresh) {
+                    return cell.representatives[rng.nextInt(cell.representatives.size)]
+                }
             }
+            return null
         }
-        return null // no in-band cell this round — reject; caller retries with a fresh seed
     }
 
     private fun log2(x: Double): Double = ln(x) / ln(2.0)
