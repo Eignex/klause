@@ -3,7 +3,7 @@ set -euo pipefail
 : "${LAB_WORKTREE:?lab source root is required}"
 : "${OUT:?lab output directory is required}"
 request="${1:?a compiler comparison JSON request is required}"
-command -v jq >/dev/null
+command -v jq >/dev/null || { printf 'jq is required\n' >&2; exit 69; }
 if command -v sha256sum >/dev/null; then
   digest() { sha256sum "$@"; }
 else
@@ -11,7 +11,8 @@ else
   digest() { shasum -a 256 "$@"; }
 fi
 if command -v timeout >/dev/null; then tool_timer=$(command -v timeout)
-else tool_timer=$(command -v gtimeout); fi
+elif command -v gtimeout >/dev/null; then tool_timer=$(command -v gtimeout)
+else printf 'timeout or gtimeout is required\n' >&2; exit 69; fi
 jq -e '
   .schema == "minizinc-input-comparison-v1" and .compilerSeed == 1 and
   .toolTimeoutSeconds == 60 and (.repeats | IN(2,4,6,8)) and
@@ -96,7 +97,7 @@ for compiler_index in 0 1; do
     printenv "$environment_key" >> "$metadata/environment.txt" || printf '<unset>\n' >> "$metadata/environment.txt"
   done
   if command -v otool >/dev/null; then
-    otool -L "$compiler" > "$metadata/linked-libraries.txt"
+    run_tool "$metadata/linked-libraries" otool -L "$compiler" || true
   else
     printf 'linked-library inspection unavailable\n' > "$metadata/linked-libraries-unavailable.txt"
   fi
