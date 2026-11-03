@@ -79,6 +79,7 @@ class PreparedFactorProjections internal constructor(
         objective: LinearObjective?, token: Cancellation, reuseIndexes: Boolean = true,
         reuseMetadata: Boolean = false,
         earned: Boolean = false,
+        compileBoundRows: Boolean = false,
         onWork: (Long) -> Unit = {},
     ): LpPreparationTemplates? {
         if (earned && (problem.numRealVars != 0 || !builtInRelaxation)) return null
@@ -97,7 +98,7 @@ class PreparedFactorProjections internal constructor(
             } else {
                 val prepared = LpPreparationTemplates.prepare(this, lpTemplateNamespace, lpTemplateRows, objective,
                     old, token, { work += it }, reuseIndexes, reuseMetadata,
-                    if (earned && old == null) checkNotNull(demand).paidUnits else null)
+                    if (earned && old == null) checkNotNull(demand).paidUnits else null, compileBoundRows)
                 if (prepared == null && earned && demand != null && !token()) {
                     token.charge(LpPreparationAdmission.STORAGE_UNITS)
                     work += LpPreparationAdmission.STORAGE_UNITS

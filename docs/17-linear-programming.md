@@ -106,6 +106,13 @@ before retrying; its inspection and replacement record still spend the current
 allowance. Admission work supplies no additional solver grant. Component-owned and
 admitted sparse-trial engines keep their explicit preparation route. LP harvest
 also eagerly prepares definitions for its later engine bake.
+Admitted ordinary consumers compile unary integer bound conditions into source rows.
+The stated source root bounds and the constructed column bounds must both imply a
+condition before the row is omitted. An open required side or a widened constructed
+bound keeps its row. Row and bound changes use the current source binding. Each
+check spends the current allowance. Regional, gated
+and component-owned root layouts retain their row definitions. Numerical owners and
+source row maps are assembled independently for the emitted rows.
 A selected view whose handoff checked
 ordered factor identities carries the same immutable layout token, so subsequent
 template preparations need no duplicate row scan. Other rewrites and explicit

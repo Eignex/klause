@@ -161,6 +161,8 @@ internal object LpTemplatePreparationProfile {
                         var firstModelColumns: Int? = null
                         var firstModelRows: Int? = null
                         var firstModelNonzeros: Int? = null
+                        var minimumModelRows: Int? = null
+                        var maximumModelRows: Int? = null
                         var coldNs = 0L
                         val results = ArrayList<String>()
                         repeat(steps) consumers@ { step ->
@@ -205,6 +207,7 @@ internal object LpTemplatePreparationProfile {
                                 reuseSourceTemplates = mode != "disabled", reuseTemplateIndexes = mode != "object",
                                 reuseTemplateMetadata = mode == "candidate",
                                 earnTemplatePreparation = mode == "candidate" && route == "standalone",
+                                omitBoundRows = mode == "candidate" && route == "standalone",
                                 preparationCancellation = consumerToken)
                             val result = try {
                                 if (route == "retained") {
@@ -228,6 +231,10 @@ internal object LpTemplatePreparationProfile {
                                 } else {
                                     val relaxation = consumer.build(domains, cancellation = consumerToken)
                                     check(relaxation.objectiveConstant == cost.constant)
+                                    minimumModelRows = minimumModelRows?.let { minOf(it, relaxation.model.m) }
+                                        ?: relaxation.model.m
+                                    maximumModelRows = maximumModelRows?.let { maxOf(it, relaxation.model.m) }
+                                        ?: relaxation.model.m
                                     if (step == 0) {
                                         firstModelColumns = relaxation.model.n
                                         firstModelRows = relaxation.model.m
@@ -289,6 +296,8 @@ internal object LpTemplatePreparationProfile {
                             put("firstModelColumns", firstModelColumns)
                             put("firstModelRows", firstModelRows)
                             put("firstModelNonzeros", firstModelNonzeros)
+                            put("minimumModelRows", minimumModelRows)
+                            put("maximumModelRows", maximumModelRows)
                             put("parseNs", parseNs)
                             put("round", round)
                             put("warmup", round == 0)
@@ -322,6 +331,8 @@ internal object LpTemplatePreparationProfile {
                             put("rowsAssembled", assembly?.outcomes?.get("ROWS"))
                             put("boundsAssembled", assembly?.outcomes?.get("BOUNDS"))
                             put("exactBoundsAdopted", assembly?.outcomes?.get("EXACT_BOUND_OBJECTS"))
+                            put("boundRowChecks", assembly?.outcomes?.get("BOUND_ROW_CHECKS"))
+                            put("sourceRowsOmitted", assembly?.outcomes?.get("SOURCE_ROWS_OMITTED"))
                             put("fundingCalls", funding?.calls)
                             put("fundingWork", funding?.work)
                             put("constructionRecords", funding?.outcomes?.get("RECORDED"))

@@ -601,6 +601,7 @@ internal class LpEngine(
                 reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
                 earnTemplatePreparation = !retainedRootEnabled && !eagerSourcePreparation &&
                     sourcePreparation == LpSourcePreparation.ADMITTED,
+                omitBoundRows = !retainedRootEnabled && sourcePreparation == LpSourcePreparation.ADMITTED,
                 onTemplateWork = ::noteNodeOverhead,
             )
         } else {
@@ -616,6 +617,7 @@ internal class LpEngine(
         reuseTemplateIndexes = sourcePreparation != LpSourcePreparation.OBJECT,
         reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
         earnTemplatePreparation = !eagerSourcePreparation && sourcePreparation == LpSourcePreparation.ADMITTED,
+        omitBoundRows = sourcePreparation == LpSourcePreparation.ADMITTED,
         onTemplateWork = ::noteNodeOverhead)
 
     /** The active relaxer. Rebuilt once by [pruneIneffectiveHulls] when a hull is dropped; otherwise the
