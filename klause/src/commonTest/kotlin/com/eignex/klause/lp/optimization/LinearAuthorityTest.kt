@@ -929,6 +929,27 @@ class LinearAuthorityTest {
     }
 
     @Test
+    fun `cancelled query preparation should charge only the visited source prefix`() {
+        val source = SourceProofContext(scope, setOf(real), linkedMapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+        ), mapOf(real to BigFraction.ONE))
+        val funding = SourceLpFunding(1000L, 1_000_000L).apply { grant(1000L) }
+        val budget = SourceLpBudget(funding = funding)
+        var polls = 0
+
+        val result = LinearAuthority(budget, retainLp = true).use { authority ->
+            authority.advance(source, Cancellation { ++polls >= 3 })
+        }
+
+        assertNull(result.evidence)
+        assertNull(result.bound)
+        assertEquals(0, budget.operations)
+        assertEquals(3L, budget.measuredPreparationWork)
+        assertEquals(3L, funding.spent)
+    }
+
+    @Test
     fun `undeclared invocation coordinates should withhold linear authority`() {
         val absent = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val condition = SourceCondition(lower = mapOf(absent to BigFraction.ONE))

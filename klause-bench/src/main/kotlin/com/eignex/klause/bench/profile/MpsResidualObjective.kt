@@ -106,7 +106,7 @@ internal object MpsResidualObjective {
         val queryType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityQuery")
         val companion = queryType.getField("Companion").get(null)
         val query = checkNotNull(call(companion, "prepare", context, null, stop, 100_000,
-            { _: Long -> }, null, emptyList<SourceEvidence>(), { _: Any, _: String, _: Long -> }))
+            { _: Long -> }, null, emptyList<SourceEvidence>(), { _: Any, _: String, _: Long -> }, true, false))
         check(call(query, "getCoordinates") == coordinates)
         val budget = Class.forName("com.eignex.klause.lp.SourceLpBudget").getConstructor().newInstance()
         val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()

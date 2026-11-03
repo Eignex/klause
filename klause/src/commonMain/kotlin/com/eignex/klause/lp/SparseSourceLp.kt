@@ -53,6 +53,38 @@ internal class SparseSourceLp private constructor(
         intArrayOf(primaryRows[row], it)
     } ?: intArrayOf(primaryRows[row])
 
+    fun emittedInactiveRows(
+        inactive: Set<Int>, cancellation: Cancellation,
+        onCost: (Long, Long) -> Boolean,
+    ): Set<Int>? {
+        if (cancellation()) return null
+        if (inactive.isEmpty()) return emptySet()
+        if (sourceRowCount == emittedRowCount) {
+            for (row in inactive) {
+                if (!onCost(1L, 0L) || cancellation() || row !in 0 until sourceRowCount) return null
+            }
+            return inactive
+        }
+        if (!onCost(1L, 128L + inactive.size * 64L) || cancellation()) return null
+        val emitted = HashSet<Int>()
+        for (source in inactive) {
+            var lower = 0
+            var upper = primaryRows.lastIndex
+            while (lower <= upper) {
+                if (!onCost(1L, 0L) || cancellation()) return null
+                val middle = (lower + upper) ushr 1
+                if (primaryRows[middle] <= source) lower = middle + 1 else upper = middle - 1
+            }
+            if (!onCost(3L, 0L) || cancellation() || upper < 0) return null
+            val primary = primaryRows[upper]
+            val opposite = oppositeRows[upper]
+            if (source != primary && source != opposite) return null
+            if (opposite >= 0 && (primary !in inactive || opposite !in inactive)) return null
+            emitted += upper
+        }
+        return emitted
+    }
+
     fun sourceRowWeights(
         weights: List<BigFraction>,
         cancellation: Cancellation = Cancellation.Never,
