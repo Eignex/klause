@@ -184,6 +184,7 @@ internal class CpSatisfactionTraversal(
     preparedSession: PropagationSession? = null,
     preparedSeed: PropagationResult? = null,
     private val rebindable: Boolean = false,
+    onRelease: ((PropagationSession) -> Unit)? = null,
 ) : AutoCloseable {
     private val resources = SearchInvocationResources()
     private val lpResources = ArrayList<LpSearchResource>()
@@ -280,6 +281,7 @@ internal class CpSatisfactionTraversal(
                     cp.session.sharedLearningPosition = null
                 }
             })
+            onRelease?.let { capture -> resources.own(AutoCloseable { capture(cp.session) }) }
             cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
                 .flatMap { it.enforcingFiniteFactors(problem) }.toSet())
             deferredRoot = deferredInitialization &&
@@ -351,6 +353,8 @@ internal class CpSatisfactionTraversal(
     val initializationCancelled: Boolean get() = cp.session.fixpointCancelled
 
     fun propagationWork(): Long = cp.session.work
+
+    fun affineParityStatistics(factorId: Int): Map<String, Long> = cp.session.affineParityStatistics(factorId)
 
     fun splitLiteral(): Int? {
         check(rebindable && !closed)

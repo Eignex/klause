@@ -146,7 +146,7 @@ class PrivateRebuildGenerationTest {
     }
 
     @Test
-    fun `funded expansions should expose cancellations beyond the shorter triangular form`() {
+    fun `joint private rows should expose free coordinate cancellations`() {
         for (phase in 0..1) for (native in listOf(false, true)) {
             val rows = listOf(intArrayOf(3, 5, 6) to 0, intArrayOf(1, 3, 9) to 0,
                 intArrayOf(4, 7, 8) to 0, intArrayOf(2, 4, 9) to 0, intArrayOf(0, 1, 2) to phase)

@@ -387,6 +387,10 @@ stateless propagation projections and occurrence indexes; incremental payloads,
 scratch, watchers and failure contexts belong to each state. Undo discards pending
 failure context, and fresh presolve rebuilds keep the originating cancellation token;
 see [presolve](07-presolve.md).
+An owned affine seed lets joint parity propagation share immutable source rows
+while keeping its assigned-fact basis and observations per state. The
+[private worker contract](07-presolve.md#private-worker-qualification) defines
+its grants, cache reset and bounded reasons.
 
 Learned integer rows subscribe to lower/upper bound events in the dynamic watch
 index. A compressed binary index owns one posting per event; its branch masks

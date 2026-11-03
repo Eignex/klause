@@ -342,14 +342,11 @@ consumer point still reconstructs and checks the complete canonical source.
 A mixed source can retain its uncovered clauses and replace only proved parity
 encodings with their short source equations and an independent reduced XOR basis.
 A complete triangular basis retains the forward-eliminated matrix and its original
-right-hand sides. For each pivot the mixed view first selects the shorter bounded
-equation from that system or its free-coordinate expansion. Remaining private bytes,
-after reserving selector storage, fund longer free-coordinate expansions in pivot
-order. Those rows can expose cancellations before intermediate pivots become fixed.
-Each extra coefficient consumes the same modeled-entry byte charge; selection and
-materialization debit the containing work grant. A tight grant retains its shorter
-forms. Distinct pivots and dependencies on lower coordinates keep every selected
-system complete. Snapshot references and right-hand sides share the same grants.
+right-hand sides. For each pivot the mixed view selects the shorter bounded equation
+from that system or its free-coordinate expansion. Distinct pivots and dependencies
+on lower coordinates keep the selected system complete, while short expanded rows
+retain their early deductions. Comparison, row choices, snapshot references and
+right-hand sides debit the containing work and byte grants.
 The source equations retain local unit propagation that expansion over free coordinates
 can weaken. Their compact captured encodings and materialized rows spend the same
 private byte and work grants. Coverage records each original
@@ -357,6 +354,18 @@ clause's excluded assignment, so extra exclusions in an otherwise complete group
 remain constraints. Each replacement row has at most 64 distinct coordinates;
 unsupported widths decline the row view. Row arrays, coefficient projections and
 fresh worker indexes share the containing work and modeled-memory grants.
+A funded mixed consumer also owns a joint affine propagator over the captured
+free-coordinate basis. Assigned source values become equations over those free
+coordinates; a fixed-size state-local matrix combines them and checks other source
+coordinates for implied values. Independent assigned facts supply clause reasons
+with at most 64 literals; wider pin reasons withhold the deduction. Undo or an
+interrupted update invalidates the cache, which rebuilds from the current assignment.
+The immutable seed owns its snapshot, while each session owns its matrix and
+primitive observations. Buffer initialization and every scan, reduction and reason
+visit debit propagation work. Modeled seed, matrix, observation and watch storage
+share the private byte grant after selector reservation; an unfunded joint view
+retains the per-row system. Retirement copies primitive observations before releasing
+the private state.
 The mixed view preserves original coordinate meanings, including its live pivots,
 and can retain supported canonical warm clauses through the fixed-value projection.
 Its reduced rows and covered clauses are counted separately from eliminated columns.

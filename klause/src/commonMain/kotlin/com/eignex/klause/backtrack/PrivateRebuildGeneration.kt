@@ -45,6 +45,8 @@ internal class PrivateRebuildGeneration private constructor(
     val paritySourceLiterals: Long,
     val preferredFreeColumns: IntArray,
     val freeSelectorActivity: Boolean,
+    val parityJointFactor: Int,
+    val parityJointModeledBytes: Long,
 ) {
     fun reconstruct(sample: Sample): Sample = mapping.reconstructFrom(problem, sample)
 
@@ -96,13 +98,13 @@ internal class PrivateRebuildGeneration private constructor(
                 basis.planRows(cancellation, checkNotNull(parity).triangularBasis, onDecline)
             } else null
             if (cancellation()) return null
-            val minimumRowLiterals = rowPlan?.literals
+            val rowLiterals = rowPlan?.literals
             val rowView = rowPlan != null
             val sourceRows = if (rowView) checkNotNull(parity).sourceRowCount else 0
             val sourceRowLiterals = if (rowView) checkNotNull(parity).sourceRowLiterals else 0L
             if (parity != null && affine == null && !rowView && parity.newPins == 0) return null
             val modelEntries = if (rowView) {
-                source.numBoolVars * 3L + checkNotNull(basis).rank + checkNotNull(minimumRowLiterals) +
+                source.numBoolVars * 3L + checkNotNull(basis).rank + checkNotNull(rowLiterals) +
                     sourceRows + sourceRowLiterals + retainedEntries + 1L
             } else entries
             // This admission model covers simultaneous primitive buffers and reference slots,
@@ -112,19 +114,14 @@ internal class PrivateRebuildGeneration private constructor(
             val selectorBytes = if (rowView && source.numBoolVars * 2L <= PROPAGATION_WORK_PER_NODE) {
                 PrivateRebuildFreeSelector.modeledBytes(source.numBoolVars)
             } else 0L
-            val minimumBytes = modelEntries * 512L + binaryBytes + (parity?.modeledBytes ?: 0L)
-            if (minimumBytes > byteLimit) {
+            val bytes = modelEntries * 512L + binaryBytes + (parity?.modeledBytes ?: 0L)
+            if (bytes > byteLimit) {
                 onDecline("Memory")
                 return null
             }
-            if (rowPlan != null) {
-                val extraLiterals = (byteLimit - minimumBytes - selectorBytes).coerceAtLeast(0L) / 512L
-                if (!checkNotNull(basis).preferExpandedRows(
-                        cancellation, rowPlan, checkNotNull(parity).triangularBasis, extraLiterals,
-                    )) return null
-            }
-            val rowLiterals = rowPlan?.literals
-            val bytes = minimumBytes + ((rowLiterals ?: 0L) - (minimumRowLiterals ?: 0L)) * 512L
+            val jointBytes = if (rowView) checkNotNull(basis).jointModeledBytes() else 0L
+            val jointFunded = jointBytes > 0L && jointBytes <= byteLimit - bytes - selectorBytes
+            val fundedBytes = bytes + if (jointFunded) jointBytes else 0L
             cancellation.charge(source.numBoolVars * if (parity == null) 1L else 3L)
             if (cancellation()) return null
             val fixed = Array(source.numBoolVars) { session.boolValue(it) }
@@ -151,7 +148,8 @@ internal class PrivateRebuildGeneration private constructor(
             }
             val privateFixed = if (affine == null) fixed else Array(source.numBoolVars) { affine.privateValue(it) }
             val capacity = when {
-                rowView -> retainedFactors + checkNotNull(basis).rank + sourceRows + source.numBoolVars
+                rowView -> retainedFactors + checkNotNull(basis).rank + sourceRows + source.numBoolVars +
+                    if (jointFunded) 1 else 0
                 affine != null -> source.numBoolVars
                 else -> source.numFactors
             }
@@ -160,6 +158,7 @@ internal class PrivateRebuildGeneration private constructor(
                 if (cancellation()) return null
             }
             val residual = ArrayList<Factor>(capacity)
+            var jointFactor = -1
             var reused = 0
             if (affine == null) for (index in source.factors.indices) {
                 val factor = source.factors[index]
@@ -193,8 +192,13 @@ internal class PrivateRebuildGeneration private constructor(
                 residual.addAll(checkNotNull(parity).materializeSourceRows(cancellation) ?: return null)
                 val rows = checkNotNull(basis).materializeRows(
                     cancellation, checkNotNull(rowPlan), parity.triangularBasis,
-                )
-                residual.addAll(rows ?: return null)
+                ) ?: return null
+                residual.addAll(rows)
+                if (jointFunded) {
+                    val joint = checkNotNull(basis).jointRows(cancellation, rows) ?: return null
+                    jointFactor = residual.size
+                    residual.add(joint)
+                }
             }
             val preferred = if (rowView) {
                 checkNotNull(basis).preferredFreeCoordinates(cancellation) ?: return null
@@ -273,7 +277,7 @@ internal class PrivateRebuildGeneration private constructor(
                     else -> return null
                 }
             }
-            val baseBytes = bytes + descriptorWork * 8L
+            val baseBytes = fundedBytes + descriptorWork * 8L
             val freeSelectorActivity = selectorBytes > 0L && selectorBytes <= byteLimit - baseBytes
             val privateBytes = baseBytes + if (freeSelectorActivity) selectorBytes else 0L
             if (privateBytes > byteLimit) {
@@ -314,7 +318,7 @@ internal class PrivateRebuildGeneration private constructor(
                 if (rowView) checkNotNull(basis).rank else 0, rowLiterals ?: 0L,
                 rowPlan?.triangularRows ?: 0,
                 if (rowView) checkNotNull(parity).coveredClauses else 0, sourceRows, sourceRowLiterals,
-                preferred, freeSelectorActivity)
+                preferred, freeSelectorActivity, jointFactor, if (jointFunded) jointBytes else 0L)
         }
     }
 }

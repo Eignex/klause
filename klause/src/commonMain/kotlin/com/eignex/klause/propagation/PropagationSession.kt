@@ -1,7 +1,9 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.bool.AffineXorPropagator
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.ClausePropagator
+import com.eignex.klause.factor.bool.GaussianXor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -1397,6 +1399,15 @@ class PropagationSession private constructor(
             (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap())
         if (it.integerRowLearning) counts + ("learningIntegerSessions" to 1L) else counts
     } ?: retiredLifecycle
+
+    internal fun affineParityStatistics(factorId: Int): Map<String, Long> {
+        val owner = retainedState ?: return emptyMap()
+        check((problem.factors[factorId] as? GaussianXor)?.affineSeed != null)
+        return (owner.refPayload[factorId] as? AffineXorPropagator.Cache)?.observations() ?: mapOf(
+            "Fires" to 0L, "Resets" to 0L, "InsertedRows" to 0L, "Reductions" to 0L,
+            "Pins" to 0L, "Conflicts" to 0L, "WideReasons" to 0L, "InitializationWork" to 0L,
+        )
+    }
 
     internal fun preparationStatistics(): Map<String, Long> =
         retainedState?.preparationStatistics() ?: retiredPreparationStatistics

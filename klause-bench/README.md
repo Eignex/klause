@@ -190,6 +190,11 @@ coordinate meanings; they do not count eliminated columns.
 `ParityTriangularRows` counts forward-eliminated rows selected per pivot in that
 reduced basis; the remaining rows use free-coordinate expansion. Both
 representations and their selection spend the existing private grants.
+`ParityJointFactors` identifies funded joint affine kernels. `ParityJointModeledBytes`
+is included in `ModeledPrivateBytes`; `ParityJointInitializationWork` counts completed
+cache initialization inside trial propagation work. Joint `Fires`, `Resets`,
+`InsertedRows`, `Reductions`, `Pins`, `Conflicts` and `WideReasons` retain primitive
+per-consumer observations through retirement. A wide pin reason withholds that deduction.
 `ParityPreferredFreeColumns` reports the admitted free-coordinate selection list. Coverage declines name
 incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
 larger widths). Such a miss can retain proved global pins or a mixed view.

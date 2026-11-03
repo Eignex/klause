@@ -69,7 +69,16 @@ internal class PrivateRebuildSatisfaction(
         get() {
             if (closed) return retainedStats
             val total = canonical.stats.mergedWith(retiredStats).mergedWith(consumer?.stats ?: SolveStats.EMPTY)
-            return total.copy(search = total.search.copy(learning = total.search.learning + observations))
+            val joint = consumer?.affineParityStatistics().orEmpty()
+            if (joint.isEmpty()) return total.copy(
+                search = total.search.copy(learning = total.search.learning + observations),
+            )
+            val learning = (total.search.learning + observations).toMutableMap()
+            for ((key, value) in joint) {
+                val name = "privateRebuildParityJoint$key"
+                learning[name] = saturatedWork(learning[name] ?: 0L, value)
+            }
+            return total.copy(search = total.search.copy(learning = learning))
         }
 
     private fun note(key: String, value: Long = 1L) {
@@ -317,6 +326,8 @@ internal class PrivateRebuildSatisfaction(
         note("ParityReducedRows", prepared.parityReducedRows.toLong())
         note("ParityReducedLiterals", prepared.parityReducedLiterals)
         note("ParityTriangularRows", prepared.parityTriangularRows.toLong())
+        note("ParityJointFactors", if (prepared.parityJointFactor >= 0) 1L else 0L)
+        note("ParityJointModeledBytes", prepared.parityJointModeledBytes)
         note("ParityCoveredClauses", prepared.parityCoveredClauses.toLong())
         note("ParitySourceRows", prepared.paritySourceRows.toLong())
         note("ParitySourceLiterals", prepared.paritySourceLiterals)
@@ -367,7 +378,8 @@ internal class PrivateRebuildSatisfaction(
         )
         val openingStart = TimeSource.Monotonic.markNow()
         try {
-            consumer = ResumableSatisfaction(BacktrackSolver(prepared.problem), privateParams, ownsWorkDebt = false)
+            consumer = ResumableSatisfaction(BacktrackSolver(prepared.problem), privateParams, ownsWorkDebt = false,
+                affineFactorId = prepared.parityJointFactor)
         } catch (stopped: SearchInitializationCancelled) {
             val decisions = stopped.stats.search.nodes.sum.toLong()
                 .coerceAtMost(Long.MAX_VALUE / PROPAGATION_WORK_PER_NODE) * PROPAGATION_WORK_PER_NODE
@@ -408,6 +420,7 @@ internal class PrivateRebuildSatisfaction(
         try {
             search.close()
         } finally {
+            for ((key, value) in search.affineParityStatistics()) note("ParityJoint$key", value)
             note("TrialWork", search.clauseWork)
             retiredClauseWork = saturatedWork(retiredClauseWork, search.clauseWork)
             retiredStats = retiredStats.mergedWith(search.stats)

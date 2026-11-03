@@ -33,6 +33,7 @@ internal class ResumableSatisfaction(
     preparedSeed: PropagationResult? = null,
     private val rebindable: Boolean = false,
     atRoot: ((PropagationSession) -> Boolean)? = null,
+    private val affineFactorId: Int = -1,
 ) : ResumableSolve {
     private val lifetimeToken = params0.cancellation.lifetimeCancellation()
     private var globalToken: Cancellation = params0.cancellation
@@ -49,6 +50,7 @@ internal class ResumableSatisfaction(
         listOfNotNull(globalToken.deadline(), slice.deadline).minOrNull()
     }, { globalToken.workScheduled() }) { globalToken() || slice.expired() })
     private var assumptions = params0.assumptions
+    private var retiredAffineStatistics: Map<String, Long> = emptyMap()
     private val traversal: CpSatisfactionTraversal = CpSatisfactionTraversal(
         solver.problem,
         params,
@@ -64,6 +66,9 @@ internal class ResumableSatisfaction(
         preparedSession = preparedSession,
         preparedSeed = preparedSeed,
         rebindable = rebindable,
+        onRelease = if (affineFactorId < 0) null else { session ->
+            retiredAffineStatistics = session.affineParityStatistics(affineFactorId)
+        },
         slice = TraversalSlice(pauses = { !globalToken() }, atRoot = atRoot, beforeBranch = {
             slice.charge()
             slice.workExpired()
@@ -86,6 +91,12 @@ internal class ResumableSatisfaction(
     )
 
     override val initialWork: Long = slice.spent()
+
+    internal fun affineParityStatistics(): Map<String, Long> = when {
+        affineFactorId < 0 -> emptyMap()
+        retiredAffineStatistics.isNotEmpty() -> retiredAffineStatistics
+        else -> traversal.affineParityStatistics(affineFactorId)
+    }
 
     init {
         try {
