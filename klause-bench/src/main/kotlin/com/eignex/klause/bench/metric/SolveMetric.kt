@@ -8,6 +8,8 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.runner.MiniZincCompileFailure
 import com.eignex.klause.bench.runner.MiniZincCompilerIdentity
+import com.eignex.klause.bench.runner.MiniZincIdentityEvidence
+import com.eignex.klause.bench.runner.MiniZincIdentityFailure
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.runner.Runners
@@ -65,6 +67,8 @@ internal data class SolveRecord(
     val processTimeToBestMs: Long? = null,
     val exactObjective: String? = null,
     val compilerIdentity: MiniZincCompilerIdentity? = null,
+    /** Failed compiler discovery evidence; never an accepted compiler identity. */
+    val compilerDiscovery: MiniZincIdentityEvidence? = null,
     /** Normalized subprocess stderr, limited to 16 Ki characters; null when unavailable. */
     val stderr: String? = null,
     /** Whether [stderr] contains the whole normalized stream rather than a bounded prefix. */
@@ -180,6 +184,7 @@ internal object SolveMetric {
             sourceHashes = sourceHashes ?: (failure as? MiniZincCompileFailure)?.sourceHashes
                 ?: runCatching { SolveEvidence.sourceHashes(ref) }.getOrDefault(emptyMap()),
             compilerIdentity = (failure as? MiniZincCompileFailure)?.compiler,
+            compilerDiscovery = (failure as? MiniZincIdentityFailure)?.evidence,
             gitSha = sha,
             timestamp = timestamp,
             command = "LOAD",
@@ -252,13 +257,16 @@ internal object SolveMetric {
             } to r.rawOutput
         }.getOrElse { failure ->
             val invocation = (failure as? SolverInvocation.Failure)?.result
-            val record = (
+            val failed = if (failure is MiniZincIdentityFailure) {
+                loadFailureRecord(entry.ref, settings, budget, timestamp, sha, failure, sourceHashes)
+            } else {
                 invocation?.let { record(entry, settings, budget, kind, timestamp, sha, it) }
-                ?: errorRecord(entry, settings, budget, kind, timestamp, sha)
-            )
+                    ?: errorRecord(entry, settings, budget, kind, timestamp, sha)
+            }
+            val record = failed
                 .copy(
-                    stats = invocation?.stats.orEmpty() + SolveFailure.stats(failure),
-                    compilerIdentity = compiler,
+                    stats = failed.stats + invocation?.stats.orEmpty() + SolveFailure.stats(failure),
+                    compilerIdentity = compiler.takeUnless { failure is MiniZincIdentityFailure },
                     sourceHashes = sourceHashes,
                     buildProvenance = provenance,
                     buildFingerprint = provenance?.fingerprint,

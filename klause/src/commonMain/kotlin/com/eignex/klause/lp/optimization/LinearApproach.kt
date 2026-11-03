@@ -169,6 +169,11 @@ internal fun SourceProofContext.pinnedConstant(): BigFraction = objective.entrie
 }
 
 internal fun SourceProofContext.numericContext(): SourceProofContext {
+    val sourceCoordinates = coordinates
+    if (sourceCoordinates.none { it.kind == SourceCoordinate.Kind.Boolean }) {
+        return SourceProofContext(scope, sourceCoordinates, premises, objective, objectiveConstant,
+            semantics = semantics)
+    }
     val rows = premises.mapValues { (_, premise) ->
         val boolTerms = premise.inequality.coefficients.filterKeys { it.kind == SourceCoordinate.Kind.Boolean }
         val offset = boolTerms.entries.fold(BigFraction.ZERO) { sum, (id, value) ->
@@ -178,7 +183,7 @@ internal fun SourceProofContext.numericContext(): SourceProofContext {
             it.kind != SourceCoordinate.Kind.Boolean
         }, premise.inequality.rhs - offset, premise.inequality.strict), premise.guards, premise.integerPins)
     }
-    return SourceProofContext(scope, coordinates, rows, objective.filterKeys {
+    return SourceProofContext(scope, sourceCoordinates, rows, objective.filterKeys {
         it.kind != SourceCoordinate.Kind.Boolean
     }, pinnedConstant(), semantics = semantics)
 }

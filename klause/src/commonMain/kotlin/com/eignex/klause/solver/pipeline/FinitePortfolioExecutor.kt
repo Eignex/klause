@@ -80,6 +80,7 @@ internal fun FinitePipeline.portfolioExecutor(
     incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
     improvementProofShare: Double = 0.5,
     deferLpProbes: Boolean = false,
+    bufferedPublications: Boolean = false,
     includeRestartingProof: Boolean = false,
     probePolicy: InitialProbePolicy = InitialProbePolicy.ORDINARY,
     booleanProofTasks: Boolean? = false,
@@ -96,6 +97,12 @@ internal fun FinitePipeline.portfolioExecutor(
         scenario.btPool == null && scenario.lsPool == null && scenario.btEdit == null && scenario.annotationArm == null
     if (deferLpProbes && !curatedFiniteInteger) {
         pipelineConfigError("portfolio-lp-start requires a curated single-core mixed finite integer optimization")
+    }
+    if (bufferedPublications && (!curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
+            cancellation.deadline() == null || problem.numRealVars != 0)) {
+        pipelineConfigError(
+            "portfolio-publications requires curated elapsed single-core mixed finite integer optimization",
+        )
     }
     if (probePolicy != InitialProbePolicy.ORDINARY && (!curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
             cancellation.deadline() == null)) {
@@ -139,7 +146,7 @@ internal fun FinitePipeline.portfolioExecutor(
     }
     val finiteFactories = PortfolioBuilder.factories(
         problem, scenario, objective, lsObjective, definitionalSweep, onEvent,
-        profile, numericalCompletion, sourceHints, objectiveCoordinates,
+        profile, numericalCompletion, sourceHints, objectiveCoordinates, bufferedPublications,
     ).map { factory ->
         PortfolioArmFactory(preparedPlan, factory.armId, factory.family, binding = { worker ->
             SourceWorkerBinding(
@@ -234,7 +241,36 @@ internal fun FinitePipeline.portfolioExecutor(
         }
         PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes,
             probeWeights = probeWeights,
+            probeRanks = if (probePolicy == InitialProbePolicy.HEURISTIC_SECOND)
+                heuristicSecondProbeRanks(workers) else intArrayOf(),
+            initialHeuristics = when (probePolicy) {
+                InitialProbePolicy.FAMILY_WORK, InitialProbePolicy.ALNS_WORK -> workers.indices.filter { arm ->
+                    arm < scenario.arms && workers[arm].family == ArmFamily.LocalSearch &&
+                        !workers[arm].startAfterIncumbent && !workers[arm].improvementOnly &&
+                        !workers[arm].auxiliaryProof
+                }.toSet()
+                InitialProbePolicy.HEURISTIC_WORK -> workers.indices.filter { arm ->
+                    workers[arm].family in setOf(ArmFamily.LocalSearch, ArmFamily.Lns) && !workers[arm].auxiliaryProof
+                }.toSet()
+                else -> emptySet()
+            },
+            heuristicTargets = if (probePolicy == InitialProbePolicy.ALNS_WORK) workers.indices.filter { arm ->
+                workers[arm].family == ArmFamily.Lns && !workers[arm].auxiliaryProof
+            }.toSet() else null,
             onProgress = deferred)
+    }
+}
+
+internal fun heuristicSecondProbeRanks(workers: List<PortfolioWorker>): IntArray {
+    val initial = workers.indices.filter {
+        !workers[it].startAfterIncumbent && !workers[it].improvementOnly && !workers[it].auxiliaryProof
+    }
+    val leader = initial.firstOrNull() ?: return intArrayOf()
+    if (workers[leader].family != ArmFamily.Backtrack || !workers[leader].permitsSourceProofs) return intArrayOf()
+    val heuristic = initial.firstOrNull { workers[it].family == ArmFamily.LocalSearch } ?: return intArrayOf()
+    val order = listOf(leader, heuristic) + workers.indices.filter { it != leader && it != heuristic }
+    return IntArray(workers.size).also { ranks ->
+        order.forEachIndexed { rank, arm -> ranks[arm] = rank }
     }
 }
 

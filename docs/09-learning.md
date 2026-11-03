@@ -443,8 +443,11 @@ remain clause reasons. Support filtering keeps its hole-aware semantics. Repeate
 cells retain their selected index guard, and a result alias supplies no arithmetic row.
 
 Opposite-sign nonnegative combinations use checked signed arithmetic and integer
-gcd normalization. Each combination must remain conflicting. A retained row must
-propagate against the session's historical domains at its first-UIP clause's native
+gcd normalization. One analysis retains only its most recent normalized source, keyed
+by projection identity, signed guard and inequality side. Reusing that immutable row
+still validates each endpoint's historical guard, raw requested bound and membership.
+The cached source is released with the analysis. Each combination must remain
+conflicting. A retained row must propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have
 been a member of its historical domain; a later carve cannot remove that earlier
@@ -476,10 +479,20 @@ shared premise and mapped admission must decline.
 Every native conflict cascade repeats the mapped-target assertion and complete
 premise checks before admitting a typed result. An unavailable mapping retains its
 clausal fallback, including cascades reached through an LP consequence.
-Within one fixpoint publication, integer leaves that are flat conjunctions of
-active named assertions can share complete proof subgraphs. Inherited nested or
-unavailable leaves do not enter that memo. Proof-reference visits charge native
-work, and the publication memo ends with its callback.
+Within one fixpoint publication, complete conjunctions of active named assertions
+can share proof subgraphs, including nested inherited conjunctions. Validation
+admits at most 4,096 proof-reference visits and expands a repeated conjunction once.
+An unavailable, unnameable or inactive leaf withholds reuse. Proof-reference visits
+charge native work, and the publication memo ends with its callback. Complete
+memoized nodes also supply the current traversal; separate temporary proof storage
+is allocated only for nodes that cannot enter that bounded memo.
+Native proof traversal keeps literal identifiers and child references in parallel
+stacks. Inherited-proof validation allocates its stack and seen set only when a
+conjunction branches. Conjunctions retain every child, and reference visits keep
+their work, cancellation and local-limit checks.
+Fixpoint facts already implied by shared integer endpoints retain the shared
+premise without reconstructing a native proof. Endpoint strengthenings use the
+complete proof path; observers and cancellation checks still cover every deduction.
 
 Rows share the learned store and integer bounds propagation. A successful ordinary
 row assertion also retains its first-UIP clause in that native store. The two
@@ -508,6 +521,8 @@ Boolean or order-atom metadata, native/shared targets, decline
 categories and stored arithmetic consumers. Literal metadata distinguishes cached
 atom levels from the analyzer's effective conflict level. Historical domain holes
 exclude later journalled carves; endpoint factor ids describe the live reason owner.
+Depth declines retain the native level boundary and distinguish original factor
+seeds from retained learning; ownership alone does not certify source suitability.
 Storage identities survive factor compaction and retire when their constraint is
 forgotten. Only actual changed bounds or Boolean pins count as consumer events.
 Focused windows retain a selector pick or actual branch attempt after each consumer;
@@ -930,6 +945,8 @@ Native CP and shared first-UIP outcomes are reported separately. Non-asserting c
 identify chronological fallback, while zero does not establish explanation coverage.
 Native learned-constraint counts include integer rows; their terms do not count as
 Boolean learned literals.
+`learningIntegerSessions` counts native sessions with integer-row learning enabled,
+independently of constructed, admitted and consumed objects.
 Missing metrics stay absent, including root theory results that never enter traversal.
 `smtCompleteSearch*` stage observations overlap and cannot be summed as a work total.
 [SearchStats](../klause/src/commonMain/kotlin/com/eignex/klause/solver/result/SearchStats.kt)

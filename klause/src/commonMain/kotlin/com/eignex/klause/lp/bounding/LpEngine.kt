@@ -116,6 +116,8 @@ internal class RootRoundingWarmStart(
     val basis: Basis? = null,
     val primal: DoubleArray? = null,
     val knownColumns: BooleanArray? = null,
+    val sourceProblem: Problem? = null,
+    val auxiliaryPoint: Boolean = false,
 ) {
     var pinning: PropagationSession? = null
     var rounding: LpRounding = LpRounding.NEAREST
@@ -175,11 +177,13 @@ internal class LpEngine(
     internal var primalSearchWork: Long = 0L
     internal var rootPrimalTargets: RootPrimalTargets? = null
         private set
+    internal var rootComponentValues: RootComponentValues? = null
+        private set
     internal var rootRoundingWarmStart: RootRoundingWarmStart? = null
         set(value) {
             if (field !== value) {
                 field?.pinning?.releaseRetainedState()
-                if (value != null) clearRootPrimalTargets()
+                if (value != null) clearRootPrimalTargets(retainComponentValues = true)
             }
             field = value
         }
@@ -324,12 +328,37 @@ internal class LpEngine(
         noteNodeOverhead(work)
         val primal = result.primal.copyOf()
         if (cancellation()) return
-        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal)
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal,
+            sourceProblem = problem)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
-    internal fun clearRootPrimalTargets() {
+    internal fun clearRootPrimalTargets(retainComponentValues: Boolean = false) {
         rootPrimalTargets = null
+        if (!retainComponentValues) rootComponentValues = null
+    }
+
+    internal fun restartRootPrimalTargets() {
+        rootComponentValues?.restarted = true
+        clearRootPrimalTargets(retainComponentValues = true)
+    }
+
+    internal fun prepareRootComponentValues(
+        targets: RootPrimalTargets,
+        cancellation: Cancellation,
+    ): RootComponentValues? {
+        rootComponentValues?.let { return it }
+        val n = problem.numIntVars
+        val bytes = rootComponentValueBytes(n)
+        val work = 8L * n
+        if (!rootComponentPreparationAllowed(targets, bytes, work) ||
+            rootComponentPreparationWork(targets, bytes) < work || cancellation()
+        ) return null
+        noteNodeOverhead(work)
+        val values = RootComponentValues(n)
+        if (cancellation()) return null
+        rootComponentValues = values
+        return values
     }
 
     private fun rootGuidanceFits(additionalBytes: Long): Boolean {
@@ -343,7 +372,8 @@ internal class LpEngine(
                 (if (it.knownColumns === rounding?.knownColumns) 0L else it.knownColumns?.size?.toLong() ?: 0L) +
                 (it.components?.retainedBytes ?: 0L)
         } ?: 0L
-        return roundingBytes + maskBytes + targetBytes + additionalBytes <= ROOT_PRIMAL_GUIDANCE_BYTES
+        return roundingBytes + maskBytes + targetBytes + (rootComponentValues?.retainedBytes ?: 0L) +
+            additionalBytes <= ROOT_PRIMAL_GUIDANCE_BYTES
     }
 
     internal fun rootComponentPreparationAllowed(targets: RootPrimalTargets, bytes: Long, minimumWork: Long): Boolean =
@@ -363,21 +393,66 @@ internal class LpEngine(
         if (!params.lpPlan.branching || problem.numRealVars != 0 || guide.objective !== objective ||
             coordinates.size != guide.relaxation.model.n ||
             (guide.knownColumns != null && guide.knownColumns.size != coordinates.size) ||
-            !retainedRootPrimalStateMatches(guide.relaxation) || cancellation() ||
+            !rootPrimalGuidanceMatches(guide) || cancellation() ||
             !rootGuidanceFits(ROOT_PRIMAL_TARGET_HEADER_BYTES + mapBytes) || lpWorkAllowanceSpent(1L) ||
             retainedRootRemainingWork() <= 1L
         ) return false
         noteNodeOverhead(1L)
         // Transfer the private buffers; pinning state and basis remain owned by the rounding attempt.
         rootPrimalTargets = RootPrimalTargets(guide.relaxation.intColOf, guide.relaxation.boolColOf,
-            coordinates, guide.knownColumns)
+            coordinates, guide.knownColumns, auxiliary = guide.auxiliaryPoint)
         sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "RETAINED", 0L)
+        if (guide.auxiliaryPoint) {
+            sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "AUXILIARY_ROOT_RETAINED", 0L)
+        }
         return true
+    }
+
+    internal fun refreshRootPrimalTargets(session: PropagationSession, cancellation: Cancellation): Boolean {
+        requireOpen()
+        val started = TimeSource.Monotonic.markNow()
+        val before = totalSolveWork()
+        var outcome = "INELIGIBLE"
+        try {
+            if (session.problem !== problem || session.decisionLevel != 0 || problem.numRealVars != 0 ||
+                !params.lpPlan.componentOwnership || !params.lpPlan.probe || !params.lpPlan.branching ||
+                params.lpPlan.lbTreeSearch || rootPrimalTargets != null || rootRoundingWarmStart != null
+            ) return false
+            outcome = "CANCELLED"
+            if (cancellation()) return false
+            outcome = "NO_ALLOWANCE"
+            if (retainedRootRemainingWork() <= 1L) return false
+            outcome = "NO_VIEW"
+            val relaxer = lpRelaxer ?: return false
+            val relaxation = nodeRelaxation(relaxer, session, lpGlobalCuts) ?: return false
+            outcome = "CANCELLED"
+            if (cancellation()) return false
+            outcome = "STALE_OWNER"
+            if (!ownsRootPrimalModel(relaxation.model)) return false
+            retainRootPrimalOwner(relaxation)
+            return try {
+                retainRootPartialPrimalGuidance(relaxation, cancellation)
+                retainRootPrimalTargets(cancellation).also {
+                    outcome = if (it) "RETAINED" else "DECLINED"
+                }
+            } finally {
+                rootRoundingWarmStart = null
+            }
+        } finally {
+            sink.lp.observePrimalPhase("PRIMAL_RESTART_GUIDANCE", outcome,
+                started.elapsedNow().inWholeNanoseconds, totalSolveWork() - before)
+        }
     }
 
     internal fun ownsRootPrimalModel(model: LpModel): Boolean = retainedRootEnabled &&
         cpAdapter.currentModel === model && model.exactState != null &&
         propagator.state === model.exactState && model.exactState.depth == 0
+
+    private fun rootPrimalGuidanceMatches(guide: RootRoundingWarmStart): Boolean {
+        if (!retainedRootEnabled) return false
+        return if (guide.auxiliaryPoint) guide.sourceProblem === problem && guide.knownColumns == null
+        else retainedRootPrimalStateMatches(guide.relaxation)
+    }
 
     private fun retainedRootPrimalStateMatches(relaxation: LpRelaxation): Boolean {
         val retained = rootRoundingWarmStart ?: return false
@@ -391,7 +466,7 @@ internal class LpEngine(
             rootRoundingWarmStart?.primal != null || lpWorkAllowanceSpent(1L)
         ) return
         noteNodeOverhead(1L)
-        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation)
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, sourceProblem = problem)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "OWNER_RETAINED", 0L)
     }
 
@@ -455,7 +530,7 @@ internal class LpEngine(
         }
         if (cancellation()) return PartialPrimalRead.CANCELLED
         rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
-            primal = guidance.coordinates, knownColumns = guidance.known)
+            primal = guidance.coordinates, knownColumns = guidance.known, sourceProblem = problem)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", outcome, started.elapsedNow().inWholeNanoseconds)
         return PartialPrimalRead.RETAINED
     }
@@ -473,6 +548,7 @@ internal class LpEngine(
         relaxation: LpRelaxation,
         result: FloatLpResult,
         guidanceObjective: LinearObjective,
+        sourceProblem: Problem? = null,
     ) {
         if (!params.lpPlan.probe || !result.optimal ||
             !rootGuidanceFits(result.primal.size.toLong() * Double.SIZE_BYTES) || lpWorkAllowanceSpent(1L)
@@ -484,12 +560,27 @@ internal class LpEngine(
         // The auxiliary solver has closed; its completed output buffer belongs to this private worker.
         // Pause bookkeeping preserves it while future pinning polls the next invocation's token.
         noteNodeOverhead(1L)
-        rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation, result.basis, result.primal)
+        rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation, result.basis, result.primal,
+            sourceProblem = sourceProblem, auxiliaryPoint = true)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
     internal fun observeSparseTrial(solver: LpSolver) {
         if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial + solver.trialProgress
+    }
+
+    internal fun observeSparsePausedProgress() {
+        if (!sparseTrialActive) return
+        val progress = propagator.pausedTrialProgress
+        if (progress.isEmpty()) return
+        val previous = sink.lp.sparseTrial
+        sink.lp.sparseTrial = buildMap {
+            putAll(previous)
+            for ((key, value) in progress) {
+                val field = "Paused$key"
+                put(field, maxOf(previous[field] ?: 0L, value))
+            }
+        }
     }
 
     internal fun rootCertificationObserver(): LpCertificationObserver {
@@ -1321,10 +1412,12 @@ internal class LpEngine(
         effectiveBound: Double,
         objectiveVar: Int,
         objectiveAscending: Boolean,
+        deferSimplex: Boolean = false,
     ): Boolean {
         requireOpen()
         lpBackjump = null
         for (b in bounds) {
+            if (deferSimplex && b is LpSimplexBound) continue
             if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) return true
         }
         return false

@@ -130,7 +130,8 @@ internal class RevisedSimplex(
 ) : TableauCutSolver,
     PersistentLpSolver,
     ResumableLpSolver,
-    LpDirectionalCostSolver {
+    LpDirectionalCostSolver,
+    LpDirectionalProbeSolver {
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
     private var solveStarted = false
     override val currentWork: Long get() = work.ops
@@ -503,6 +504,25 @@ internal class RevisedSimplex(
     override val lastSingularRefactorizations: Int get() = observations.singularRefactorizations
     override val lastSmallPivotBails: Int get() = observations.smallPivotBails
     override val lastMetrics: LpSolveMetrics get() = observations.snapshot(work.ops)
+    override fun pausedDualProposal(cancellation: Cancellation): DoubleArray? {
+        if (activeSolve?.isAdvancing != false || cancellation()) return null
+        val proposal = DoubleArray(m)
+        var nonzero = false
+        // Row multipliers can lag the basis; exact checking against the original model supplies authority.
+        for (row in 0 until m) {
+            if (row % 256 == 0 && cancellation()) return null
+            val value = try {
+                numerical.sourceDual(row, dualValues[row])
+            } catch (_: LpScalingArithmeticException) {
+                return null
+            }
+            if (!value.isFinite()) return null
+            proposal[row] = value
+            if (value != 0.0) nonzero = true
+        }
+        return proposal.takeIf { nonzero && !cancellation() }
+    }
+
     override val trialProgress: Map<String, Long> get() {
         val samples = progressTrace?.samples ?: return emptyMap()
         return buildMap {
@@ -2786,6 +2806,69 @@ internal class RevisedSimplex(
 
     /** The structural primal `x*` at the last optimal [solve], for scoring tableau cuts by violation. */
     private var optimalPrimal: DoubleArray? = null
+
+    internal fun probeObjective(token: Cancellation): Double? {
+        val values = cachedBeta ?: return null
+        if (optimalBasis == null || cachedModel !== model || cachedPrimalOnly || cachedNumerical !== numerical) {
+            return null
+        }
+        val scale = model.exactState?.model?.objective?.scale?.approximation ?: return null
+        if (!scale.isFinite() || scale <= 0.0) return null
+        var objective = 0.0
+        for (j in 0 until numVars) {
+            if (j % 256 == 0 && token()) return null
+            if (status[j] != VarStatus.BASIC) objective += cost(j) * seat(numerical, status[j], j)
+        }
+        for (i in 0 until m) {
+            if (i % 256 == 0 && token()) return null
+            objective += cost(basicVar[i]) * values[i]
+        }
+        return (objective / scale).takeIf { it.isFinite() }
+    }
+
+    override fun directionalGains(
+        pointModel: LpModel,
+        columns: IntArray,
+        splits: LongArray,
+        allowance: Long,
+        token: Cancellation,
+        observe: (LpProbeMetrics) -> Unit,
+    ): List<LpDirectionalGain>? {
+        fun decline(reason: LpProbeDecline): List<LpDirectionalGain>? {
+            observe(LpProbeMetrics(0L, 0L, 0, reason))
+            return null
+        }
+        val state = model.exactState ?: return decline(LpProbeDecline.OWNER)
+        val basis = optimalBasis ?: return decline(LpProbeDecline.NO_OPTIMUM)
+        val point = optimalPrimal ?: return decline(LpProbeDecline.NO_OPTIMUM)
+        if (token()) return decline(LpProbeDecline.CANCELLED)
+        if (allowance <= 0L) return decline(LpProbeDecline.ALLOWANCE)
+        if (activeSolve != null || !basisLifecycle.factorized) return decline(LpProbeDecline.BUSY)
+        if (pointModel.exactState !== state) return decline(LpProbeDecline.STALE_POINT)
+        if (columns.isEmpty() || columns.size > 2 ||
+            columns.size != splits.size || columns.any { it !in 0 until n } ||
+            (columns.size == 2 && columns[0] == columns[1])
+        ) return decline(LpProbeDecline.SPLIT)
+        for (index in columns.indices) {
+            val split = splits[index]
+            if (split == Long.MAX_VALUE || !(split.toDouble() < point[columns[index]] &&
+                    point[columns[index]] < (split + 1L).toDouble())
+            ) return decline(LpProbeDecline.SPLIT)
+        }
+        val scan = 2L * numVars + m + 1L
+        if (scan >= allowance) return decline(LpProbeDecline.ALLOWANCE)
+        observe(LpProbeMetrics(scan, 0L, 0))
+        val parentObjective = probeObjective(token) ?: return decline(
+            if (token()) LpProbeDecline.CANCELLED else LpProbeDecline.NO_OPTIMUM,
+        )
+        return LpDirectionalProbes(state, basis, parentObjective) { child, work, entries ->
+            RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
+                basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
+                    basisWorkLimit = minOf(pricing.basisWorkLimit, work)), reuseRationalOrder, scalingOptions,
+                primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
+                singletonStart)
+        }.run(columns, splits, allowance - scan, token, observe)
+    }
 
     override fun directionalCosts(
         pointModel: LpModel,

@@ -54,6 +54,121 @@ import kotlin.test.assertTrue
 
 class LpEngineTest {
     @Test
+    fun `linear bound should release branch costs when first read after a backtrack`() {
+        val problem = Problem(2, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val session = PropagationSession(problem)
+        session.pinBool(0, true)
+        session.pinBool(1, true)
+        session.popToLevel(1)
+
+        val rootPruned = LpEngine(problem,
+            LinearObjective(boolWeights = longArrayOf(5, 2), intCoefficients = longArrayOf(1)),
+            LpParams(), SolveStatsSink("late-linear-bound")).use { engine ->
+            assertTrue(engine.pruneNode(session, 4.0, -1, true))
+            session.popToLevel(0)
+            engine.pruneNode(session, 4.0, -1, true)
+        }
+
+        assertFalse(rootPruned)
+    }
+
+    @Test
+    fun `a restored root refreshes expired preferences without another lp query`() {
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 5) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(6) { 2L })
+        val factory = RecordingLpEngineFactory()
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("refreshed-root-preferences"),
+            LpSolveContext(factory)).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+            engine.rootRoundingWarmStart = null
+            val expired = assertNotNull(engine.rootPrimalTargets)
+            shared.push(SearchDecision.IntAtLeast(0, 1L))
+            shared.restart()
+            engine.clearRootPrimalTargets()
+            val queries = factory.floatAllowances.size
+            val before = engine.totalSolveWork()
+
+            val refreshed = engine.refreshRootPrimalTargets(cp.session, Cancellation.Never)
+
+            assertTrue(refreshed)
+            assertFalse(expired === engine.rootPrimalTargets)
+            assertNull(engine.rootRoundingWarmStart)
+            assertEquals(queries, factory.floatAllowances.size)
+            assertTrue(engine.totalSolveWork() > before)
+        }
+    }
+
+    @Test
+    fun `root preference refresh declines live search restrictions`() {
+        val problem = boundedProblem().bake()
+        val factory = RecordingLpEngineFactory()
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("nested-root-preference-refresh"),
+            LpSolveContext(factory)).use { engine ->
+            val cp = CpSearchComponent(PropagationSession(problem))
+            engine.cpAdapter.attach(cp.session, feasibility = false)
+            val shared = SearchSession(listOf(cp, engine.propagator))
+            shared.initialize()
+            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            engine.rootRoundingWarmStart = null
+            shared.push(SearchDecision.IntAtLeast(0, 1L))
+            val before = engine.totalSolveWork()
+            val queries = factory.floatAllowances.size
+
+            val refreshed = engine.refreshRootPrimalTargets(cp.session, Cancellation.Never)
+
+            assertFalse(refreshed)
+            assertNull(engine.rootPrimalTargets)
+            assertEquals(before, engine.totalSolveWork())
+            assertEquals(queries, factory.floatAllowances.size)
+        }
+    }
+
+    @Test
+    fun `cancelled root preference refresh withholds a new guide`() {
+        val problem = boundedProblem().bake()
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("cancelled-root-preference-refresh")).use { engine ->
+            val session = PropagationSession(problem)
+            val before = engine.totalSolveWork()
+
+            val refreshed = engine.refreshRootPrimalTargets(session, Cancellation { true })
+
+            assertFalse(refreshed)
+            assertNull(engine.rootPrimalTargets)
+            assertEquals(before, engine.totalSolveWork())
+        }
+    }
+
+    @Test
+    fun `deferring node simplex preserves combinatorial objective pruning`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(1, 2)), emptyList())
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val session = PropagationSession(problem)
+        LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink("deferred-simplex-objective-bound")).use { engine ->
+
+            val pruned = engine.pruneNode(session, 1.0, -1, true, deferSimplex = true)
+
+            assertTrue(pruned)
+        }
+    }
+
+    @Test
     fun `numerical root preparation finishes before the bounded root query`() {
         val sink = SolveStatsSink("paid-numerical-root-preparation")
         LpEngine(boundedProblem().bake(), LinearObjective(intCoefficients = LongArray(3) { 2L }),

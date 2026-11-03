@@ -194,6 +194,8 @@ internal data class LpSolveMetrics(
 internal interface LpSolver : AutoCloseable {
     val trialProgress: Map<String, Long> get() = emptyMap()
 
+    fun pausedDualProposal(cancellation: Cancellation = Cancellation.Never): DoubleArray? = null
+
     // Certified callers validate source feasibility independently. Scaled arithmetic guards remain required.
     fun deferUnscaledSourceDiagnostics() = Unit
 

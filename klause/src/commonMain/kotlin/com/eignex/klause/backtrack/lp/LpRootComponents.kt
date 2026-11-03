@@ -14,7 +14,10 @@ import com.eignex.klause.util.argsortBy
 import kotlin.math.floor
 import kotlin.time.TimeSource
 
-internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellation: Cancellation): VarRef? {
+internal fun LpEngine.prepareRootComponentOrder(
+    session: PropagationSession,
+    cancellation: Cancellation,
+): RootComponentOrder? {
     val targets = rootPrimalTargets ?: return null
     if (problem.numBoolVars != 0 || problem.numRealVars != 0 || params.lpPlan.lbTreeSearch) return null
     if (!targets.componentOrderAttempted) {
@@ -46,15 +49,64 @@ internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellatio
         sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", outcome,
             started.elapsedNow().inWholeNanoseconds, preparationWork)
     }
-    if (rootPrimalTargets !== targets) return null
-    val order = targets.components ?: return null
-    val variable = firstRootComponentVariable(order, session, cancellation) ?: return null
+    if (rootPrimalTargets !== targets || cancellation()) return null
+    return targets.components
+}
+
+internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellation: Cancellation): VarRef? {
+    val targets = rootPrimalTargets ?: return null
+    val order = prepareRootComponentOrder(session, cancellation) ?: return null
+    val variable = firstRootComponentVariable(order, session, cancellation) { group ->
+        retainRootComponentValues(targets, order, group, session, cancellation)
+    } ?: return null
     if (rootPrimalTargets !== targets || cancellation()) return null
     if (!order.offered) {
         order.offered = true
         sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", "COMPONENT_PICK_OFFERED", 0L)
     }
     return VarRef.IntVar(variable)
+}
+
+private fun LpEngine.retainRootComponentValues(
+    targets: RootPrimalTargets,
+    order: RootComponentOrder,
+    group: Int,
+    session: PropagationSession,
+    cancellation: Cancellation,
+) {
+    val start = order.offsets[group]
+    val end = order.offsets[group + 1]
+    if (end - start < 2 || rootComponentValues?.known?.get(order.members[start]) == true) return
+    val started = TimeSource.Monotonic.markNow()
+    val before = totalSolveWork()
+    var outcome = "ALLOWANCE_DECLINED"
+    try {
+        val work = 8L * (end - start)
+        if (!rootComponentPreparationAllowed(targets, 0L, work) ||
+            rootComponentPreparationWork(targets, 0L) < work || cancellation()
+        ) return
+        noteNodeOverhead(work)
+        outcome = "CANCELLED_OR_UNFIXED"
+        for (index in start until end) {
+            if ((index - start) % 256 == 0 && cancellation()) return
+            if (!session.intDomain(order.members[index]).isFixed) return
+        }
+        outcome = "INITIALIZATION_DECLINED"
+        val values = prepareRootComponentValues(targets, cancellation) ?: return
+        outcome = "CANCELLED_COPY"
+        for (index in start until end) {
+            if ((index - start) % 256 == 0 && cancellation()) return
+            val variable = order.members[index]
+            values.values[variable] = session.intDomain(variable).min
+            if (index != start) values.known[variable] = true
+        }
+        // The first member marks a completed copy; interrupted copies remain ordinary value preferences.
+        values.known[order.members[start]] = true
+        outcome = "RETAINED"
+    } finally {
+        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_VALUES", outcome,
+            started.elapsedNow().inWholeNanoseconds, totalSolveWork() - before)
+    }
 }
 
 internal fun rootComponentPreparationBytes(variables: Int): Long =
@@ -109,7 +161,7 @@ internal fun rootComponentOrder(
         members[writes[group]++] = variable
     }
     val prepared = RootComponentOrder(offsets, members, groups)
-    val ordered = if (targets == null) prepared else prepared.orderTargets(byRoot, sizes, targets, meter)
+    val ordered = if (targets == null) prepared else prepared.orderTargets(byRoot, sizes, writes, targets, meter)
     meter.poll()
     return ordered
 }
@@ -117,6 +169,7 @@ internal fun rootComponentOrder(
 private fun RootComponentOrder.orderTargets(
     byRoot: IntArray,
     scratch: IntArray,
+    groupRanks: IntArray,
     targets: RootPrimalTargets,
     meter: LpProjectionMeter,
 ): RootComponentOrder {
@@ -128,10 +181,11 @@ private fun RootComponentOrder.orderTargets(
         width *= 2L
     }
     meter.reserve((2L * levels + 2L) * n, 0L, matrix = false)
+    val guidedGroups = rankTargetGroups(groupRanks, targets, meter)
     for (group in 0 until groups) {
         for (index in offsets[group] until offsets[group + 1]) {
             if (index % 256 == 0) meter.poll()
-            byRoot[members[index]] = group
+            byRoot[members[index]] = groupRanks[group]
         }
     }
     // Reusing graph scratch keeps sorting within the admitted primitive storage.
@@ -140,7 +194,46 @@ private fun RootComponentOrder.orderTargets(
         val groupOrder = byRoot[a].compareTo(byRoot[b])
         if (groupOrder != 0) groupOrder else targets.fractionality(b).compareTo(targets.fractionality(a))
     }
+    if (guidedGroups > 0 && guidedGroups < groups) {
+        meter.reserve(n.toLong() + 2L * groups + 1L, 0L, matrix = false)
+        offsets.fill(0)
+        for (index in ordered.indices) {
+            if (index % 256 == 0) meter.poll()
+            offsets[byRoot[ordered[index]] + 1]++
+        }
+        for (group in 0 until groups) {
+            if (group % 256 == 0) meter.poll()
+            offsets[group + 1] += offsets[group]
+        }
+    }
     return if (ordered === members) this else RootComponentOrder(offsets, ordered, groups)
+}
+
+private fun RootComponentOrder.rankTargetGroups(
+    groupRanks: IntArray,
+    targets: RootPrimalTargets,
+    meter: LpProjectionMeter,
+): Int {
+    var guidedGroups = 0
+    for (group in 0 until groups) {
+        groupRanks[group] = 1
+        for (index in offsets[group] until offsets[group + 1]) {
+            if (index % 256 == 0) meter.poll()
+            meter.reserve(8L, 0L, matrix = false)
+            if (targets.fractionality(members[index]) >= 0.0) {
+                groupRanks[group] = 0
+                guidedGroups++
+                break
+            }
+        }
+    }
+    meter.reserve(2L * groups, 0L, matrix = false)
+    var guidedRank = 0
+    var ordinaryRank = guidedGroups
+    for (group in 0 until groups) {
+        groupRanks[group] = if (groupRanks[group] == 0) guidedRank++ else ordinaryRank++
+    }
+    return guidedGroups
 }
 
 private fun RootPrimalTargets.fractionality(variable: Int): Double {
@@ -155,6 +248,7 @@ internal fun firstRootComponentVariable(
     order: RootComponentOrder,
     session: PropagationSession,
     cancellation: Cancellation,
+    completed: ((Int) -> Unit)? = null,
 ): Int? {
     var visited = 0
     for (group in 0 until order.groups) {
@@ -164,6 +258,7 @@ internal fun firstRootComponentVariable(
             val variable = order.members[index]
             if (session.needsIntDecision(variable)) return variable
         }
+        completed?.invoke(group)
     }
     return null
 }

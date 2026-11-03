@@ -486,7 +486,7 @@ class PortfolioBuilderTest {
             val result = it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never, maxInstructions = 0).last()
 
             assertEquals(
-                setOf("preparation", "seeding", "selection", "application", "other"),
+                setOf("preparation", "seeding", "selection", "application", "publication", "other"),
                 result.stats.ls.phaseNanos.keys,
             )
             assertEquals(0L, result.stats.ls.bestResidual?.cost)
