@@ -76,12 +76,12 @@ internal object CorpusFetcher {
     private val indexes: CorpusIndexes get() = CorpusIndexes(storageRoot)
 
     /**
-     * [collection] by its index alone, or null when its bytes are already local (the tree is then authoritative and
-     * cheap), when [declaredInputs] is off, or when no index describes its pack. A missing local index is fetched from
-     * the mirror; the pack itself is never downloaded here.
+     * [collection] by its complete pack index when [declaredInputs] is on. Materialized local members can be a subset
+     * of the collection. A missing local index is fetched from the mirror; the pack itself is never downloaded here.
+     * Returns null when declared inputs are off or no index describes the pack.
      */
     fun indexed(collection: ExternalCollection): IndexedCollection? {
-        if (!declaredInputs || present(collection.id)) return null
+        if (!declaredInputs) return null
         val index = indexes.local(collection.id) ?: mirror?.let { remote ->
             storageRoot.mkdirs()
             runCatching { remote.index(collection.id, storageRoot) }.onFailure {
