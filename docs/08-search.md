@@ -308,8 +308,9 @@ Two recent samples in each direction supply that variable's predicted child gain
 using each direction's mean cost per unit of fractional movement. The balanced
 `min + max / 6` score ranks finite positive predictions in the shortlist.
 Missing or unreliable history retains the existing variable order. Ordinary finite
-workers issue no directional numerical queries. Finite-run construction can explicitly
-enable a root-basis fallback. In that mode the selected root variable can request
+workers use value and incumbent guidance to order their children and issue no
+directional numerical queries. Finite-run construction can explicitly enable a
+root child-order fallback. In that mode the selected root variable can request
 one child-order estimate from its retained optimal basis after the actual
 complementary alternatives exist. This attempt is limited to one column and
 one attempt per hint owner, including across slices, restarts and assumption reseeding.
@@ -317,8 +318,8 @@ An unsupported or unfunded attempt consumes that opportunity and retains the exi
 child order. Reliable history takes precedence and consumes no basis opportunity.
 History preparation and ordering share the existing LP allowance.
 
-The larger predicted objective increase is tried first, after value and incumbent
-guidance. Passive history requires the estimated Boolean or integer floor/ceil
+In an explicitly enabled run, the larger predicted objective increase is tried first,
+after value and incumbent guidance. Passive history requires the estimated Boolean or integer floor/ceil
 partition and only swaps its existing children. After validating two complementary
 children, a usable root basis estimate can choose integer cuts at the current LP
 point's floor and ceiling. Both neighbours must belong to the current domain, so

@@ -912,8 +912,8 @@ annotated, or execution is parallel or single-engine. See
 [ordinary tableau admission](17-linear-programming.md).
 
 The `lp-default` optimization recipe consumes scoped passive checked-bound gains.
-Two recent samples in each direction of the same variable permit a learned choice.
-Incomplete variable history keeps current scoring. History spends
+Two recent samples in each direction of both shortlisted variables permit a learned
+variable choice. Incomplete variable history keeps current scoring. History spends
 the existing LP allowance; other recipes require an explicit directional setting. See
 [finite branching](08-search.md#finite-lp-directional-guidance).
 

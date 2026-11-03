@@ -80,7 +80,7 @@ class ResumableMinimizeDirectionalTest {
     }
 
     @Test
-    fun `finite search consumes observed child advice across cooperative slices`() {
+    fun `finite search collects history without child advice across cooperative slices`() {
         val blocks = 4
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
@@ -123,9 +123,7 @@ class ResumableMinimizeDirectionalTest {
             var slices = 0
             while (slices++ < 128 && !search.isDone) {
                 val outcomes = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
-                if ((outcomes?.get("DOWN") ?: 0L) >= 2L && (outcomes?.get("UP") ?: 0L) >= 2L &&
-                    (outcomes?.get("SIDE_CONSUMED") ?: 0L) > 0L
-                ) break
+                if ((outcomes?.get("DOWN") ?: 0L) >= 2L && (outcomes?.get("UP") ?: 0L) >= 2L) break
                 search.runSlice(Cancellation.Never, 1000L, 32L) {}
             }
 
@@ -133,8 +131,8 @@ class ResumableMinimizeDirectionalTest {
             val diagnostic = "$observations; solves=${search.stats.lp.solves.sum}"
             assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
-            assertTrue((observations["SIDE_CONSUMED"] ?: 0L) > 0L, diagnostic)
-            assertTrue((observations["HISTORY_SIDE_CONSUMED"] ?: 0L) > 0L, diagnostic)
+            assertEquals(0L, observations["SIDE_CONSUMED"] ?: 0L, diagnostic)
+            assertEquals(0L, observations["HISTORY_SIDE_CONSUMED"] ?: 0L, diagnostic)
             assertEquals(0L, observations["BASIS_SIDE_CONSUMED"] ?: 0L, diagnostic)
             assertEquals(0L, observations["BASIS_ATTEMPT"] ?: 0L, diagnostic)
         }

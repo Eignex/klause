@@ -60,9 +60,7 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
         hints.compareVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
             second, (second as? VarRef.IntVar)?.let { session.intDomain(it.varId) })
     } else null
-    val selected = hints.applyVariableChoice(proposal, best)
-    hints.prepareHistorySide(selected, (selected as? VarRef.IntVar)?.let { session.intDomain(it.varId) })
-    return selected
+    return hints.applyVariableChoice(proposal, best)
 }
 
 /** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below
