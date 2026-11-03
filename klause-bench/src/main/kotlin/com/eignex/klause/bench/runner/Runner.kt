@@ -14,12 +14,13 @@ import com.eignex.klause.solver.objective.LinearObjective
 /**
  * A resolved catalog [ProblemRef] with a lazily materialized [Problem]. Subprocess solves
  * pass the file directly to the CLI; only in-process consumers request the model, so
- * their finite-domain restrictions do not filter subprocess inputs.
+ * their finite-domain restrictions do not filter subprocess inputs. A format with a
+ * fixed operation can also defer its exact objective until an in-process consumer reads it.
  */
-internal data class ResolvedProblem(
+internal class ResolvedProblem(
     internal val ref: ProblemRef,
     private val ingest: Lazy<Problem>,
-    internal val objective: LinearObjective? = null,
+    objective: LinearObjective? = null,
     /** True when the source maximises its objective, so "better" means higher. [objective] stays
      *  minimise-canonical either way. */
     internal val maximize: Boolean = false,
@@ -36,7 +37,11 @@ internal data class ResolvedProblem(
     val searchParams: BacktrackParams? = null,
     val hasFloats: Boolean = false,
     val floatApproximation: Boolean = false,
+    deferredObjective: Lazy<LinearObjective?>? = null,
+    internal val optimizes: Boolean = objective != null,
 ) {
+    internal val objective: LinearObjective? by (deferredObjective ?: lazyOf(objective))
+
     internal val name: String get() = ref.name
 
     /**
@@ -77,6 +82,11 @@ internal object InProcessRunner : Runner {
         val format = Formats[ref.format]
         require(format.inProcess) { "${ref.name}: format ${ref.format} is not in-process; use its dedicated runner" }
         val file = CorpusFetcher.resolve(src)
+        if (ref.format == Format.WCNF) {
+            val ingested by lazy { format.ingest(file) }
+            return ResolvedProblem(ref, lazy { ingested.problem },
+                deferredObjective = lazy { ingested.objective }, optimizes = true)
+        }
         return runCatching { format.ingest(file) }
             .map { ResolvedProblem(ref, lazy { it.problem }, it.objective, maximize = it.maximize) }
             .getOrElse { failure ->

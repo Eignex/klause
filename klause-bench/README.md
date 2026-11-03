@@ -534,6 +534,10 @@ the default is `cache`. Decoding, staging and cleanup spend the same source allo
 for either choice. The comparison record retains the policy, actual staging root
 and CLI arguments. Identity preparation, checking and reporting remain in case/job
 costs outside the source invocation; comparing invocation times alone omits them.
+WCNF subprocess operation metadata selects minimization without building a second
+weighted model in the harness. In-process consumers build the model and its exact
+penalty objective together on first access. The CLI parses and validates its original
+source; original-source hashing and the containing source allowance still apply.
 `lab/frozen.json` executes the ordinary adapter over `cases`, a JSON array of retained
 single-model `BenchCase` templates for DIMACS, WCNF or MPS. Each template retains its
 packed corpus path/hash and declares `sourcePlainSha256` in its attributes. Planning
