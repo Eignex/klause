@@ -1157,6 +1157,15 @@ and a finite nonnegative gain. Infeasibility, an unfinished query, cancellation
 or failed preparation withholds the entire comparison. These estimates train no
 history and supply no pruning or certificate authority.
 
+Child-value consultations instead accept the basis of a completed current
+iterate, including a bound-only result. Every child still requires a complete
+optimal floating solve. Their finite objective values share minimized source
+units and omit shared objective offsets, including column origins and the external
+constant; negative values are valid.
+They do not subtract a nonoptimal parent's objective or supply a parent-optimum
+claim. The caller funds linear basis validation and its scratch before allocation.
+Busy owners, changed states and incomplete children withhold the whole comparison.
+
 Projection, bound-state construction, numerical scaling, workspace setup,
 objective scans and native retirement share one positive caller work allowance
 with the floating solves. Each next child receives a share of the remaining
