@@ -14,6 +14,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -170,9 +171,10 @@ class EngineParamsTest {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         assertTrue(!base.lpMixedRootTargets)
         for (enabled in listOf(false, true)) {
-            val params = EngineParams(listOf("lp-mixed-root-targets=$enabled"))
-            for (configured in listOf(applyBacktrackParams(base, params),
-                applyFixedBacktrackParams(base, params, allowSelectors = true))) {
+            val settings = listOf("lp-mixed-root-targets=$enabled")
+            val workerEdit = assertNotNull(scenario(1, settings).btEdit)
+            for (configured in listOf(workerEdit(base),
+                applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true))) {
                 assertEquals(enabled, configured.lpMixedRootTargets)
                 assertEquals(base, configured.copy(lpMixedRootTargets = false))
             }
