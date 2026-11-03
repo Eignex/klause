@@ -136,9 +136,17 @@ internal object LinearAuthorityAggregateCuts {
                 override fun deadline() = cancellation.deadline()
             }
             if (point != null && rows.size >= 2) {
-                meter.reserve(rows.size.toLong(), 128L + rows.size * 32L)
-                val splitRows = rows.filter { it.coefficients.size > 1 }.map {
-                    LinearAuthoritySplitRow(it.term, it.coefficients)
+                meter.reserve(rows.size.toLong())
+                val multiCount = rows.count { it.coefficients.size > 1 }
+                val splitCount = minOf(multiCount, LinearAuthoritySplitCuts.MAX_ROWS)
+                meter.reserve(rows.size.toLong(), 384L + splitCount * 64L)
+                val splitRows = rows.asSequence().filter { it.coefficients.size > 1 }
+                    .take(LinearAuthoritySplitCuts.MAX_ROWS).map {
+                        LinearAuthoritySplitRow(it.term, it.coefficients)
+                    }.toList()
+                if (multiCount > LinearAuthoritySplitCuts.MAX_ROWS) {
+                    eligibilityKnown = false
+                    observe("AggregateSplitRowLimit", 1L)
                 }
                 val splitLimits = attemptLimits.copy(work = minOf(meter.remainingWork / 4L, 16_384L),
                     allocation = minOf(meter.remainingAllocation / 4L, 262_144L))

@@ -624,8 +624,8 @@ nonterminal point can prepare aggregates alongside point-directed row alternativ
 under 65,536 work and 1 MiB modeled allocation. Ordinary aggregate-only queries keep
 their 500,000-work and 8 MiB limits. An installed aggregate recipe with at most 64
 fully checked rows can enter aging without replacing its query.
-Mixed point discovery also pairs same-sign continuous coefficients through a signed
-slack identity. A fractional integer anchor gives an exhaustive integer split.
+Mixed point discovery admits at most 48 multi-coordinate source rows in source
+order and pairs same-sign continuous coefficients through a signed slack identity. A fractional integer anchor gives an exhaustive integer split.
 Each uncanceled nonanchor coordinate requires an unguarded original singleton
 bound; canceled coordinates need no bound. Both split branches use nonnegative
 combinations of original rows and the split assumption. The imported consequence

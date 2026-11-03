@@ -18,6 +18,8 @@ internal class LinearAuthoritySplitRow(
 )
 
 internal object LinearAuthoritySplitCuts {
+    const val MAX_ROWS = 48
+
     fun prepare(
         source: SourceProofContext, rows: List<LinearAuthoritySplitRow>,
         point: Map<SourceCoordinate, Double>, cancellation: Cancellation,
@@ -49,9 +51,12 @@ private class SplitRun(
     fun prepare(rows: List<LinearAuthoritySplitRow>, maximum: Int): List<LinearAuthorityCut> {
         val result = ArrayList<LinearAuthorityCut>()
         try {
-            meter.reserve(rows.size.toLong(), 128L + rows.size * 16L)
+            val count = minOf(rows.size, LinearAuthoritySplitCuts.MAX_ROWS)
+            meter.reserve(count.toLong(), 128L + count * 16L)
+            val admitted = rows.take(count)
+            if (count < rows.size) observe("AggregateSplitRowLimit", 1L)
             val incidence = HashMap<Pair<SourceCoordinate, Boolean>, MutableList<LinearAuthoritySplitRow>>()
-            for (row in rows) {
+            for (row in admitted) {
                 meter.reserve(row.coefficients.size.toLong())
                 if (row.coefficients.size !in 2..limits.support) continue
                 if (row.coefficients.keys.any { it.kind == SourceCoordinate.Kind.Boolean }) continue
@@ -70,7 +75,7 @@ private class SplitRun(
             }
             if (incidence.values.none { it.size > 1 }) return emptyList()
             indexBounds()
-            for (row in rows) {
+            for (row in admitted) {
                 meter.reserve(1L)
                 if (row.term.owner !in allowed || row.coefficients.size <= 1 ||
                     row.coefficients.keys.none { it.kind == SourceCoordinate.Kind.Integer }) continue
