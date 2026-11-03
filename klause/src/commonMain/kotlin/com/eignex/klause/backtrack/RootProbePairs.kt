@@ -1,6 +1,10 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.Cancellation
@@ -10,6 +14,7 @@ internal class RootProbePairs {
     private var parentCursor = 0L
     private var nextIsPair = false
     private var childPositive = true
+    private var candidateVisits = 0
 
     fun begin(session: PropagationSession, params: BacktrackParams, enabled: Boolean): Boolean {
         if (!enabled || params.rootProbeBatch < 2 || session.problem.numIntVars != 0 ||
@@ -35,10 +40,11 @@ internal class RootProbePairs {
         parentCursor = 0L
         nextIsPair = false
         childPositive = true
+        candidateVisits = 0
     }
 
     fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
-        sample.owned(this, Long.SIZE_BYTES + 2L, protected)
+        sample.owned(this, Long.SIZE_BYTES + Int.SIZE_BYTES + 2L, protected)
     }
 
     fun conflict(
@@ -88,12 +94,10 @@ internal class RootProbePairs {
     ): Int? {
         val variables = session.problem.numBoolVars
         val start = session.work
-        var visited = 0
+        candidateVisits = 0
         if (neighborhood != null) {
             for (literal in neighborhood) {
-                if (visited >= CANDIDATE_LIMIT || session.work - start >= limit || !budget.visit()) return null
-                visited++
-                budget.note("PairCandidates")
+                if (!visitCandidate(session, budget, start, limit)) return null
                 budget.note("PairNeighborhoodCandidates")
                 val variable = Lit.variable(literal)
                 if (variable >= variables || session.boolValue(variable) != null) continue
@@ -101,15 +105,117 @@ internal class RootProbePairs {
                 return Lit.negate(literal)
             }
         }
-        for (offset in 1..minOf(variables - 1, CANDIDATE_LIMIT - visited)) {
-            if (session.work - start >= limit || !budget.visit()) return null
-            budget.note("PairCandidates")
+        sourceCandidate(session, parent, budget, start, limit)?.let { return it }
+        for (offset in 1..minOf(variables - 1, CANDIDATE_LIMIT - candidateVisits)) {
+            if (!visitCandidate(session, budget, start, limit)) return null
             val variable = ((Lit.variable(parent).toLong() + offset) % variables).toInt()
             if (session.boolValue(variable) != null) continue
             val literal = Lit.make(variable, childPositive)
             if (!session.explanationState.incremental && session.learnedClauseCount == 0 &&
                 session.projection.readyBoolOccurrences(variable)?.isEmpty() == true) continue
             return literal
+        }
+        return null
+    }
+
+    private fun visitCandidate(
+        session: PropagationSession,
+        budget: InprocessingBudget,
+        start: Long,
+        limit: Long,
+    ): Boolean {
+        if (candidateVisits >= CANDIDATE_LIMIT || session.work - start >= limit || !budget.visit()) return false
+        candidateVisits++
+        budget.note("PairCandidates")
+        return true
+    }
+
+    private fun sourceCandidate(
+        session: PropagationSession,
+        parent: Int,
+        budget: InprocessingBudget,
+        start: Long,
+        limit: Long,
+    ): Int? {
+        val occurrences = session.projection.readyBoolOccurrences(Lit.variable(parent)) ?: return null
+        for (index in 0 until minOf(occurrences.size, SOURCE_ROW_LIMIT)) {
+            if (session.work - start >= limit || !budget.visit()) return null
+            budget.note("PairSourceRows")
+            val factor = session.problem.factors[occurrences[index]]
+            val child = when (factor) {
+                is Clause -> sourceClause(session, factor.literals, budget, start, limit)
+                is Cardinality -> sourceRow(session, factor.literals, budget, start, limit,
+                    if (factor.min > 0 && factor.max < factor.literals.size) childPositive else factor.min == 0)
+                is PseudoBoolean -> sourceWeightedRow(session, factor, budget, start, limit)
+                else -> null
+            }
+            if (child != null) {
+                budget.note("PairSourceEligible")
+                return child
+            }
+        }
+        return null
+    }
+
+    private fun sourceClause(
+        session: PropagationSession,
+        literals: IntArray,
+        budget: InprocessingBudget,
+        start: Long,
+        limit: Long,
+    ): Int? {
+        if (literals.size > SOURCE_CLAUSE_LIMIT) return null
+        var child: Int? = null
+        for (literal in literals) {
+            if (!visitCandidate(session, budget, start, limit)) return null
+            budget.note("PairSourceCandidates")
+            if (Lit.variable(literal) >= session.problem.numBoolVars) return null
+            when (session.litTruth(literal)) {
+                true -> return null
+                null -> if (child == null) child = Lit.negate(literal)
+                else -> Unit
+            }
+        }
+        return child
+    }
+
+    private fun sourceRow(
+        session: PropagationSession,
+        literals: IntArray,
+        budget: InprocessingBudget,
+        start: Long,
+        limit: Long,
+        positive: Boolean,
+    ): Int? {
+        for (literal in literals) {
+            if (!visitCandidate(session, budget, start, limit)) return null
+            budget.note("PairSourceCandidates")
+            if (session.litTruth(literal) == null) return if (positive) literal else Lit.negate(literal)
+        }
+        return null
+    }
+
+    private fun sourceWeightedRow(
+        session: PropagationSession,
+        factor: PseudoBoolean,
+        budget: InprocessingBudget,
+        start: Long,
+        limit: Long,
+    ): Int? {
+        val constants = factor.integerConstants ?: return null
+        val high = when (factor.op) {
+            PbOp.LE -> true
+            PbOp.GE -> false
+            PbOp.EQ -> childPositive
+        }
+        for (index in factor.literals.indices) {
+            if (!visitCandidate(session, budget, start, limit)) return null
+            budget.note("PairSourceCandidates")
+            val literal = factor.literals[index]
+            val weight = constants.coeff(index)
+            if (weight != 0L && session.litTruth(literal) == null) {
+                return if ((weight > 0L) == high) literal else Lit.negate(literal)
+            }
         }
         return null
     }
@@ -139,5 +245,7 @@ internal class RootProbePairs {
     private companion object {
         const val BOOKKEEPING_WORK = 8
         const val CANDIDATE_LIMIT = 64
+        const val SOURCE_ROW_LIMIT = 16
+        const val SOURCE_CLAUSE_LIMIT = 8
     }
 }

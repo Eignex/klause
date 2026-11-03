@@ -724,9 +724,16 @@ A completed first probe can spend the second attempt of the same batch on a dist
 unassigned Boolean literal. A completed child conflict proves the binary excluding
 both assumptions; a consistent or interrupted child proves no such binary. Child
 selection first negates unassigned literals from the parent's retained learned
-neighborhood, then rotates through other Boolean coordinates. Both walks together
-inspect at most 64 candidates and share the containing and probe grants. The
-neighborhood reuses the pass's bounded literal buffer without another retained owner.
+neighborhood, then consults the parent's prepared source occurrences before rotating
+through other Boolean coordinates. Source lookup reads at most 16 factor headers;
+all three walks together inspect at most 64 literals or coordinates and share the
+containing and probe grants. Source clauses of at most eight literals prefer an
+unassigned literal only when no literal satisfies the clause. Cardinality and
+signed-word pseudo-Boolean rows prefer a polarity that tightens a row bound;
+two-sided bounds alternate directions. These choices supply no proof themselves.
+Lookup borrows immutable source arrays and never constructs a missing occurrence
+index. The learned neighborhood reuses the pass's bounded literal buffer without
+another retained owner.
 The child also shares the first probe's remaining work ceiling. Both decisions unwind
 before admission, and a proved single-literal consequence retains priority after root
 progress. Independent parent cursors and child polarities survive optional buffer
