@@ -12,6 +12,36 @@ import kotlin.test.assertTrue
 
 class LpDirectionalProbesTest {
     @Test
+    fun `cancellation during the parent objective scan retains its work charge`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+        repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
+        RevisedSimplex(model).use { solver ->
+            assertNotNull(solver.solve())
+            var cancelled = false
+            var work = 0L
+            var completed = 0
+            var decline: LpProbeDecline? = null
+
+            val gains = solver.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
+                1_000_000L, Cancellation { cancelled }) {
+                work += it.work
+                completed += it.completed
+                decline = it.decline
+                if (it.preparationWork > 0L) cancelled = true
+            }
+
+            assertNull(gains)
+            assertEquals(LpProbeDecline.CANCELLED, decline)
+            assertTrue(work in 1L..1_000_000L)
+            assertEquals(0, completed)
+            assertEquals(4.5, assertNotNull(solver.resolveBounds()).objective, 1e-7)
+        }
+    }
+
+    @Test
     fun `a retained child state supplies complete probe gains after bound resolution`() {
         val builder = LpBuilder()
         repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
