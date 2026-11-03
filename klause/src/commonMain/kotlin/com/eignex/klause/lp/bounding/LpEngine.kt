@@ -1095,7 +1095,11 @@ internal class LpEngine(
         return reserveDirectionalWork(work)
     }
 
-    internal fun directionalValues(source: LpProbeSource, columns: IntArray, splits: LongArray): List<LpDirectionalValues>? {
+    internal fun directionalValues(
+        source: LpProbeSource,
+        columns: IntArray,
+        splits: LongArray,
+    ): List<LpDirectionalValues>? {
         // Leave room for comparison and the consuming selection.
         val allowance = remainingDirectionalWork() - 24L * columns.size
         branchWorkAllowance = 0L

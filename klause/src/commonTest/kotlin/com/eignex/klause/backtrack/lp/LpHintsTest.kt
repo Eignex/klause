@@ -361,7 +361,8 @@ class LpHintsTest {
             listOf(valid, valid), listOf(valid, LpDirectionalValues(0.0, 99.0)),
             listOf(valid, LpDirectionalValues(Double.NaN, 4.0)),
             listOf(valid, LpDirectionalValues(1.0, Double.POSITIVE_INFINITY)),
-            listOf(LpDirectionalValues(-Double.MAX_VALUE, 0.0), LpDirectionalValues(Double.MAX_VALUE, Double.MAX_VALUE)))
+            listOf(LpDirectionalValues(-Double.MAX_VALUE, 0.0),
+                LpDirectionalValues(Double.MAX_VALUE, Double.MAX_VALUE)))
         for (bad in unusable) {
             val builder = LpBuilder()
             repeat(2) { builder.addVar(0, 3) }
