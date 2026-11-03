@@ -297,9 +297,9 @@ internal class LpHints(
     fun applyVariableChoice(proposal: VarRef?, baseline: VarRef?): VarRef? {
         proposal ?: return baseline
         charge(2L)
-        observe("VARIABLE_CONSUMED")
-        observe(if (proposal == baseline) "VARIABLE_BASELINE_AGREED" else "VARIABLE_BASELINE_CHANGED")
-        return proposal
+        observe("VARIABLE_WITHHELD")
+        observe(if (proposal == baseline) "VARIABLE_PROPOSAL_AGREED" else "VARIABLE_PROPOSAL_CHANGED")
+        return baseline
     }
 
     fun directionalScore(variable: VarRef, domain: IntDomain? = null): Double =
@@ -481,11 +481,11 @@ internal class LpHints(
             observe("BASIS_SIDE_WITHHELD")
             return alternatives
         }
-        observe(if (advice.basis) "BASIS_SIDE_CONSUMED" else "HISTORY_SIDE_CONSUMED")
-        observe("SIDE_CONSUMED")
+        observe(if (advice.basis) "BASIS_SIDE_WITHHELD" else "HISTORY_SIDE_WITHHELD")
+        observe("SIDE_WITHHELD")
         val changed = firstUp != advice.up
-        observe(if (changed) "SIDE_BASELINE_CHANGED" else "SIDE_BASELINE_AGREED")
-        return if (changed) listOf(alternatives[1], alternatives[0]) else alternatives
+        observe(if (changed) "SIDE_PROPOSAL_CHANGED" else "SIDE_PROPOSAL_AGREED")
+        return alternatives
     }
 
     private fun SearchDecision.matchesSide(advice: SideAdvice, up: Boolean): Boolean = when (this) {
