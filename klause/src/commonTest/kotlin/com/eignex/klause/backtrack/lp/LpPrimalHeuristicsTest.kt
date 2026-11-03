@@ -21,10 +21,12 @@ import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.lp.engine.LpSolveCursor
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.engine.ResumableLpSolver
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
@@ -45,6 +47,69 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpPrimalHeuristicsTest {
+    @Test
+    fun `retained root primal quanta resume one numerical cursor within the root allowance`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(
+            Linear(longArrayOf(1, 1), intArrayOf(0, 1), doubleArrayOf(1.0),
+                intArrayOf(0), LinearOp.GE, 1L),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2),
+            realCoefficients = doubleArrayOf(3.0))
+        var constructions = 0
+        var openings = 0
+        var quantum = Long.MAX_VALUE
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                constructions++
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                val resumable = assertIs<ResumableLpSolver>(delegate)
+                return object : PersistentLpSolver by delegate, ResumableLpSolver {
+                    private var initial = true
+                    override val lastTermination: LpFloatTermination?
+                        get() = if (initial) LpFloatTermination.WORK else delegate.lastTermination
+                    override val lastMetrics: LpSolveMetrics
+                        get() = if (initial) LpSolveMetrics(workOps = 1L) else delegate.lastMetrics
+                    override val currentWork: Long get() = resumable.currentWork
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? = null
+                    override fun openSolve(
+                        allowance: LpFloatAllowance?, retainFundingStop: Boolean,
+                    ): LpSolveCursor<FloatLpResult?> {
+                        initial = false
+                        openings++
+                        return resumable.openSolve(allowance, retainFundingStop)
+                    }
+                }
+            }
+        }
+        val sink = SolveStatsSink("retained-primal-cursor")
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false, rootMaxWork = 1_000_000L)), sink, LpSolveContext(factory),
+            nodeWorkAllowance = { quantum }).use { engine ->
+            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+            quantum = 1L
+
+            assertNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertTrue(engine.propagator.floatPaused)
+            var sample: Sample? = null
+            var consultations = 0
+            while (sample == null && consultations++ < 512) {
+                sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+            }
+
+            assertEquals(listOf(1L, 0L), assertNotNull(sample).ints.toList())
+            assertEquals(0.0, sample.reals.single())
+            assertEquals(1, openings)
+            assertEquals(1, constructions)
+            assertTrue(engine.totalSolveWork() in 1L..1_000_000L)
+        }
+    }
+
     @Test
     fun `ordinary integer rounding keeps nearest targets without a retained root plan`() {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) },

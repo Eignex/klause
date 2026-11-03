@@ -872,6 +872,9 @@ internal class LpEngine(
         return remaining
     }
 
+    internal fun retainedRootPrimalContinuationWork(): Long =
+        minOf(rootPrimalWorkBudget(), retainedRootCumulativeWork())
+
     internal fun rootQueryStopView(): String {
         val rootCap = minOf(params.lpPlan.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK,
             SPARSE_LP_MAX_WORK)

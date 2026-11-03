@@ -521,7 +521,8 @@ private fun LpEngine.solveRetainedPrimalRelaxation(
     if (remaining <= 0L) return null
     val token = cancellation or Cancellation { retainedRootRemainingWork() <= 0L }
     try {
-        val attempt = propagator.solveFloat(token = token, queryAllowance = {
+        val attempt = propagator.solveFloat(token = token,
+            continuationWorkAllowance = { retainedRootPrimalContinuationWork() }, queryAllowance = {
             minOf(rootPrimalWorkBudget(), retainedRootRemainingWork()).coerceAtLeast(1L)
         })
         if (attempt == null) observeSparsePausedProgress()

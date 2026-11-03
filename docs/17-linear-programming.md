@@ -413,6 +413,10 @@ and invocation allowances, separately from the adaptive numerical query quantum.
 Without a timed shared LP allowance, preparation uses the remaining bounded root
 work grant. Ordinary component roots make one adaptive numerical query before
 primal heuristics run; unfinished owners remain available to later node queries.
+Retained root primal queries advance a numerical cursor by the adaptive query quantum
+inside the remaining cumulative root and LP work allowances. A paused cursor retains
+its numerical phase between consultations; completed or unsupported consultations
+keep the ordinary fallback. These consultations grant no additional query or lifetime work.
 Ordinary node queries keep their individual numerical limits. Sparse-trial root-bound
 consultations retain a cumulative continuation grant.
 Preparation is charged before the query receives its remaining allowance.
