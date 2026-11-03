@@ -624,6 +624,15 @@ nonterminal point can prepare aggregates alongside point-directed row alternativ
 under 65,536 work and 1 MiB modeled allocation. Ordinary aggregate-only queries keep
 their 500,000-work and 8 MiB limits. An installed aggregate recipe with at most 64
 fully checked rows can enter aging without replacing its query.
+Mixed point discovery also pairs same-sign continuous coefficients through a signed
+slack identity. A fractional integer anchor gives an exhaustive integer split.
+Each uncanceled nonanchor coordinate requires an unguarded original singleton
+bound; canceled coordinates need no bound. Both split branches use nonnegative
+combinations of original rows and the split assumption. The imported consequence
+retains the full producer scope and every supporting owner. This discovery takes
+at most one quarter of the remaining generation allowance, capped at 16,384 work
+and 256 KiB, with the same support, scalar and proof limits. Only completed,
+separating proposals enter the shared candidate pool and source verification.
 Pure-integer point discovery uses the existing integer-row producer limits of
 48 multi-coordinate source rows and 16 proposals. It tries half rounding on each
 row and positive two-row combinations, retaining only finite separating proposals.

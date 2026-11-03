@@ -243,6 +243,8 @@ internal class LinearAuthorityCapture(
             is SourceDerivation.MixedIntegerRounding -> proof(value.inequality, depth + 1) &&
                 value.bounds.all { proof(it, depth + 1) }
             is SourceDerivation.BooleanSplit -> proof(value.whenFalse, depth + 1) && proof(value.whenTrue, depth + 1)
+            is SourceDerivation.IntegerSplit -> scalar(value.threshold) &&
+                proof(value.below, depth + 1) && proof(value.above, depth + 1)
             is SourceDerivation.Import -> {
                 val claim = value.evidence.claim as? SourceClaim.Consequence ?: return false
                 val condition = value.evidence.scope.condition

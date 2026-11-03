@@ -135,6 +135,25 @@ internal object LinearAuthorityAggregateCuts {
                 override fun isCancelled(): Boolean = cancellation()
                 override fun deadline() = cancellation.deadline()
             }
+            if (point != null && rows.size >= 2) {
+                meter.reserve(rows.size.toLong(), 128L + rows.size * 32L)
+                val splitRows = rows.filter { it.coefficients.size > 1 }.map {
+                    LinearAuthoritySplitRow(it.term, it.coefficients)
+                }
+                val splitLimits = attemptLimits.copy(work = minOf(meter.remainingWork / 4L, 16_384L),
+                    allocation = minOf(meter.remainingAllocation / 4L, 262_144L))
+                val splitObserve: (String, Long) -> Unit = { name, count ->
+                    if (name == "AggregateSplitAttempts") eligibilityKnown = false
+                    charge(name, count)
+                }
+                val split = LinearAuthoritySplitCuts.prepare(source, splitRows, point, derivedStop,
+                    splitObserve, splitLimits, maximumCandidates)
+                for (cut in split) {
+                    if (separates(cut, point, meter, observe) != true) continue
+                    meter.reserve(1L, 128L + cut.inequality.supportSize * 64L)
+                    candidates += cut
+                }
+            }
             val selectedBounds = if (point == null) bounds else pointBounds(bounds, point, meter, observe)
             val integerBounds = if (point == null) null else {
                 meter.reserve(1L, 64L)
@@ -1122,7 +1141,7 @@ internal object LinearAuthorityAggregateCuts {
     }
 }
 
-private class AggregateMeter(
+internal class AggregateMeter(
     private val limits: LinearAuthorityAggregateLimits,
     private val cancellation: Cancellation,
     private val observe: (String, Long) -> Unit,
@@ -1173,6 +1192,6 @@ private class AggregateMeter(
     }
 }
 
-private class AggregateStop(val reason: String) : RuntimeException()
+internal class AggregateStop(val reason: String) : RuntimeException()
 
 private fun stopAggregate(reason: String): Nothing = throw AggregateStop(reason)
