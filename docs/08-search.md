@@ -332,8 +332,13 @@ kind and one previously probed immutable state per hint owner.
 Preparation reserves 20 work units before allocating the column and split requests.
 The numerical grant retains 24 work units per candidate for normalization, history
 updates and consuming selection. Projection, scratch construction, scaling, solving,
-objective scans and retirement share the unspent node allowance and remaining
-containing and cumulative allowances. Numerical estimates supply no bound or pruning
+objective scans and retirement share the containing and cumulative allowances.
+Warm parent solves and private comparisons use separate bounded admission budgets.
+A stopped comparison can grow its future grant within the existing adaptive work
+range when its construction or numerical allowance is insufficient. Cancellation,
+stale points and unusable gains supply no growth feedback; ratio demotion keeps
+the remaining warm-node grant. Every admitted attempt charges the same LP ledger.
+Numerical estimates supply no bound or pruning
 authority. Missing, tied or unusable advice retains the original winner.
 Ordinary finite workers use value and incumbent guidance to order their children.
 

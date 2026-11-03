@@ -228,7 +228,11 @@ scratch solvers spend a positive grant after reserving the caller's normalizatio
 and history work. Numerical estimates train a separate advisory history, with two
 recent observations per direction before selection. Query work and elapsed time are
 recorded separately. Declines distinguish a missing or busy owner, a stale point,
-missing retained optimum, invalid split, exhausted grant and incomplete child solves.
+missing retained optimum, invalid split, exhausted construction or numerical grant,
+and other incomplete child solves. Private comparisons own their admission budget
+inside the existing LP work range and share containing and cumulative charges with
+node solves. Resource stops can increase that comparison budget without changing
+the warm parent solver's adaptive request.
 Neither history certifies a branch bound. Explicit root
 child-order mode instead permits one retained-basis consultation for its selected
 column per hint owner, including across restarts and reseeding.

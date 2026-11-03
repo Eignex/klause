@@ -214,13 +214,19 @@ class LpDirectionalProbesTest {
             assertNotNull(solver.solve())
             var work = 0L
             var completed = 0
+            var decline: LpProbeDecline? = null
 
             val gains = solver.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                100L, Cancellation.Never) { work += it.work; completed += it.completed }
+                100L, Cancellation.Never) {
+                work += it.work
+                completed += it.completed
+                decline = it.decline
+            }
 
             assertNull(gains)
             assertTrue(work in 1L..100L)
             assertEquals(0, completed)
+            assertEquals(LpProbeDecline.ALLOWANCE, decline)
             assertEquals(4.5, assertNotNull(solver.resolveBounds()).objective, 1e-7)
         }
     }

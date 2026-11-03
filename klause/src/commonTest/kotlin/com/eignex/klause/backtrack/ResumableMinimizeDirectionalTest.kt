@@ -85,14 +85,17 @@ class ResumableMinimizeDirectionalTest {
             Linear(longArrayOf(1L, 1L), intArrayOf(edge, (edge + 1) % 3), LinearOp.GE, 1L)
         }
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, factors).bake()
-        val params = BacktrackParams(randomSeed = 3L, maxDecisions = 1L, objectiveBoundSupplier = { 100.0 },
+        val params = BacktrackParams(randomSeed = 3L, maxDecisions = 64L, objectiveBoundSupplier = { 100.0 },
             lpDirectionalGains = true,
             lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                 boundMaxOpsPerNode = 0L))
         val objective = LinearObjective(intCoefficients = longArrayOf(3L, 2L, 4L))
         ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
-            var slices = 0
-            while (slices++ < 8 && !search.isDone) search.runSlice(Cancellation.Never, 1000L, 8L) {}
+            val stopAfterPair = Cancellation {
+                (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
+                    ?.get("VARIABLE_PROBE_LEARNED") ?: 0L) > 0L
+            }
+            search.runSlice(stopAfterPair, 1000L, 8L) {}
 
             val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
             assertEquals(1L, observations["VARIABLE_PROBE_ATTEMPT"] ?: 0L, observations.toString())

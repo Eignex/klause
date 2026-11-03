@@ -46,8 +46,8 @@ import com.eignex.klause.lp.engine.LpDirectionalCost
 import com.eignex.klause.lp.engine.LpDirectionalCostSolver
 import com.eignex.klause.lp.engine.LpDirectionalGain
 import com.eignex.klause.lp.engine.LpDirectionalProbeSolver
-import com.eignex.klause.lp.engine.LpProbeMetrics
 import com.eignex.klause.lp.engine.LpProbeDecline
+import com.eignex.klause.lp.engine.LpProbeMetrics
 import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPhaseTimer
@@ -1064,6 +1064,12 @@ internal class LpEngine(
     internal var nodeSimplex: PersistentLpSolver? = null
     internal var nodeUsesTrail: Boolean = false
     private var branchWorkAllowance = 0L
+    // Scratch comparisons fund construction that a retained parent solve can avoid.
+    private val directionalWorkBudget = LpWorkBudget(
+        minOps = MIN_NODE_WORK_OPS,
+        maxOps = MAX_NODE_WORK_OPS,
+        initialOps = MIN_NODE_WORK_OPS,
+    )
 
     private fun remainingDirectionalWork(): Long {
         var allowance = branchWorkAllowance
@@ -1077,6 +1083,15 @@ internal class LpEngine(
         branchWorkAllowance -= work
         noteNodeOverhead(work)
         return true
+    }
+
+    internal fun reserveProbeWork(work: Long): Boolean {
+        if (work <= 0L) return false
+        if (!lpEffortGovernor.isDemoted) {
+            branchWorkAllowance = maxOf(branchWorkAllowance, directionalWorkBudget.ops())
+        }
+        branchWorkAllowance = minOf(branchWorkAllowance, MAX_NODE_WORK_OPS)
+        return reserveDirectionalWork(work)
     }
 
     internal fun directionalGains(model: LpModel, columns: IntArray, splits: LongArray): List<LpDirectionalGain>? {
@@ -1102,6 +1117,9 @@ internal class LpEngine(
             (nodeSimplex as? LpDirectionalProbeSolver)?.directionalGains(
                 model, columns, splits, allowance, params.cancellation, observe,
             )
+        }
+        if (gains == null && decline == LpProbeDecline.ALLOWANCE && !lpEffortGovernor.isDemoted) {
+            directionalWorkBudget.observeWorkStop()
         }
         sink.lp.observeDirectionalProbes(started.elapsedNow().inWholeNanoseconds,
             LpProbeMetrics(preparation, solving, completed,
