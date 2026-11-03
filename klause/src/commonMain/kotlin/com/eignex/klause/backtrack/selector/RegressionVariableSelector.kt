@@ -39,15 +39,23 @@ import kotlin.random.Random
  * carries the shared regression; the per-candidate feature vector is the context.
  */
 class RegressionVariableSelector private constructor(
-    private val newBandit: () -> RegressionContextualBandit<*>,
+    private val seed: Long,
+    private val exploration: Double,
+    private val priorVariance: Double,
     private val scoreCap: Int,
 ) : VariableSelector {
 
-    private val bandit: RegressionContextualBandit<*> by lazy(LazyThreadSafetyMode.NONE, newBandit)
+    private var runtime: RegressionVariableRuntime? = null
+
+    private fun bandit(): RegressionVariableRuntime {
+        val current = runtime
+        if (current != null) return current
+        return RegressionVariableRuntime(seed, exploration, priorVariance).also { runtime = it }
+    }
 
     /** A fresh selector with the same config and a new, unlearned bandit — so reuse across solves
      *  starts each search from the documented per-session state, never a prior problem's model. */
-    override fun fresh() = RegressionVariableSelector(newBandit, scoreCap)
+    override fun fresh() = RegressionVariableSelector(seed, exploration, priorVariance, scoreCap)
 
     // Pending attribution for the previous decision (rewarded at the next pick, once its outcome
     // is observable). Null between runs / before the first decision.
@@ -88,7 +96,7 @@ class RegressionVariableSelector private constructor(
         var bestScore = Double.NEGATIVE_INFINITY
         for (c in candidates) {
             val f = features(session, c)
-            val score = bandit.evaluate(0, DenseVector.of(f))
+            val score = bandit().evaluate(f)
             if (score > bestScore) {
                 bestScore = score
                 best = c.ref
@@ -110,7 +118,7 @@ class RegressionVariableSelector private constructor(
             // Squash propagation yield into [0,1): 0 → 0, large → ~1.
             (delta / (delta + PROP_SQUASH)).coerceIn(0.0, 1.0)
         }
-        bandit.update(0, DenseVector.of(f), reward, 1.0)
+        bandit().update(f, reward)
         pendingFeatures = null
     }
 
@@ -240,16 +248,25 @@ class RegressionVariableSelector private constructor(
             exploration: Double = 1.0,
             priorVariance: Double = 1.0,
             scoreCap: Int = 64,
-        ): RegressionVariableSelector {
-            val newBandit = {
-                val specification = BayesianRegression(FEATURE_SIZE, priorVariance)
-                fun newRegression() = BayesianRegressionStat(
-                    specification.featureSize, specification.priorVariance, specification.link,
-                    Concurrency.None, specification.priorMean, specification.priorCovariance,
-                )
-                RegressionContextualBandit(1, newRegression(), LinUcb, exploration, newRegression(), Random(seed))
-            }
-            return RegressionVariableSelector(newBandit, scoreCap)
-        }
+        ): RegressionVariableSelector = RegressionVariableSelector(seed, exploration, priorVariance, scoreCap)
+    }
+}
+
+private class RegressionVariableRuntime(seed: Long, exploration: Double, priorVariance: Double) {
+    private val bandit: RegressionContextualBandit<*>
+
+    init {
+        val specification = BayesianRegression(RegressionVariableSelector.FEATURE_SIZE, priorVariance)
+        fun newRegression() = BayesianRegressionStat(
+            specification.featureSize, specification.priorVariance, specification.link,
+            Concurrency.None, specification.priorMean, specification.priorCovariance,
+        )
+        bandit = RegressionContextualBandit(1, newRegression(), LinUcb, exploration, newRegression(), Random(seed))
+    }
+
+    fun evaluate(features: DoubleArray): Double = bandit.evaluate(0, DenseVector.of(features))
+
+    fun update(features: DoubleArray, reward: Double) {
+        bandit.update(0, DenseVector.of(features), reward, 1.0)
     }
 }

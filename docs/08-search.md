@@ -343,7 +343,9 @@ bound with the original-source witness after every alternative is covered. See
 
 Complete assignments use typed source-keyed values from each owner, assembled only
 after all required checks finish. Missing or multiply represented coordinates leave
-publication unavailable. [Theory completion](09-learning.md#theory-completion) describes
+publication unavailable. Built-in keys check Boolean, exact numeric and completed-sample
+values directly. Extension keys use their declared runtime type; capture validates
+both its input and its captured value. [Theory completion](09-learning.md#theory-completion) describes
 how those values are contributed.
 
 ## Finite propagation
@@ -581,7 +583,8 @@ new deductions to propagation-aware selectors. Phase saving captures values befo
 retraction, so propagated as well as decided polarities survive backjumps and
 restarts. Dom/wdeg failure weights belong to the solve and survive restarts; fresh
 selectors isolate solves that share a projection.
-LinUCB builds its Bayesian regression runtime directly on first use.
+LinUCB factories retain scalar settings. Their private Bayesian regression runtime
+materializes for scoring or a pending reward.
 Fresh selectors start with separate unlearned posteriors.
 Each fresh finite selector receives its native-session attachment before search
 and LP branch proposals; the attachment can precede root initialization.

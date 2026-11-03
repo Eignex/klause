@@ -70,10 +70,22 @@ data class SearchExactRealExpressionValue(
 
 @Suppress("UNCHECKED_CAST")
 internal fun TypedSearchValueKey<*>.capture(value: Any): Any {
-    require(valueType.isInstance(value)) { "model value does not match ${valueType.simpleName}" }
+    require(accepts(value)) { "model value does not match ${valueType.simpleName}" }
     val captured = (this as TypedSearchValueKey<Any>).snapshot(value)
-    require(valueType.isInstance(captured)) { "model snapshot does not match ${valueType.simpleName}" }
+    require(accepts(captured)) { "model snapshot does not match ${valueType.simpleName}" }
     return captured
+}
+
+private fun TypedSearchValueKey<*>.accepts(value: Any): Boolean {
+    if (this === completedSearchSample) return value is Sample
+    return when (this) {
+        is SearchBoolValue -> value is Boolean
+        is SearchExactIntValue -> value is BigInt
+        is SearchExactRealValue -> value is BigFraction
+        is SearchExactAlgebraicRealValue -> value is AlgebraicReal
+        is SearchExactRealExpressionValue -> value is ExactRealValue
+        else -> valueType.isInstance(value)
+    }
 }
 
 internal val completedSearchSample = SearchModelKey(Sample::class)

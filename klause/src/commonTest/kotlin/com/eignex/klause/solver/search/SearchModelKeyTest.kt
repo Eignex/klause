@@ -11,6 +11,11 @@ import kotlin.test.assertNull
 
 class SearchModelKeyTest {
     @Test
+    fun `built-in Boolean keys should reject values of another type`() {
+        assertFailsWith<IllegalArgumentException> { SearchBoolValue(0).capture(1L) }
+    }
+
+    @Test
     fun `extension-defined typed keys should infer their contributed value`() {
         data class FunctionValue(val symbol: String) : TypedSearchValueKey<String> {
             override val valueType: KClass<String> get() = String::class
