@@ -20,6 +20,7 @@ import com.eignex.klause.lowering.PolynomialRealLowering.Companion.or
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.relation
 import com.eignex.klause.lowering.transcendentalDistinctEncoding
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.signum
 
 internal class TranscendentalRelaxationModel(
     firstAuxiliary: Int,
@@ -79,12 +80,21 @@ internal class TranscendentalRelaxationModel(
             }
             return relation(first, source.relation, second)
         }
-        return relation(expression(source.left, guard).first, source.relation, expression(source.right, guard).first)
+        return relation(
+            expression(source.left, guard, needsEnclosure(source.left, source.right)).first,
+            source.relation,
+            expression(source.right, guard, needsEnclosure(source.right, source.left)).first,
+        )
     }
+
+    private fun needsEnclosure(source: TranscendentalExpression, other: TranscendentalExpression): Boolean =
+        source !is TranscendentalExpression.Function || source.function != TranscendentalFunction.EXP ||
+            other !is TranscendentalExpression.Constant || other.value.numerator.signum() > 0
 
     private fun expression(
         source: TranscendentalExpression,
         guard: PolynomialRealFormula,
+        encloseFunction: Boolean = true,
     ): Pair<PolynomialExpression, RationalEnclosure?> {
         arithmetic.step()
         return when (source) {
@@ -129,7 +139,7 @@ internal class TranscendentalRelaxationModel(
                     arithmetic.power(it, source.exponent)
                 }
             }
-            is TranscendentalExpression.Function -> function(source, guard)
+            is TranscendentalExpression.Function -> function(source, guard, encloseFunction)
             is TranscendentalExpression.Conditional -> {
                 val condition = boolean(source.condition, guard)
                 val first = expression(source.whenTrue, and(listOf(guard, condition)))
@@ -156,6 +166,7 @@ internal class TranscendentalRelaxationModel(
     private fun function(
         source: TranscendentalExpression.Function,
         guard: PolynomialRealFormula,
+        enclose: Boolean,
     ): Pair<PolynomialExpression, RationalEnclosure?> {
         val (argument, box) = expression(source.argument, guard)
         val value = fresh()
@@ -168,6 +179,7 @@ internal class TranscendentalRelaxationModel(
             )
             TranscendentalFunction.SIN, TranscendentalFunction.COS -> range(value, RationalEnclosure.UNIT)
         }
+        if (!enclose) return value to null
         val enclosure = when (source.function) {
             TranscendentalFunction.EXP -> box?.let { arithmetic.exp(it, terms) }
             TranscendentalFunction.LOG -> box?.takeIf { it.lower.signum() > 0 }?.let { arithmetic.log(it, terms) }

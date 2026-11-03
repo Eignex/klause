@@ -83,6 +83,33 @@ class DiscountedThompsonTest {
         repeat(16) { assertEquals(reference.choose(), bandit.choose()) }
     }
 
+    @Test
+    fun `restricted sampling should preserve seeded posterior choices across resets`() {
+        for (halfLife in listOf(0.5, 4.0, Double.POSITIVE_INFINITY)) {
+            val restricted = DiscountedThompson(4, Random(7), halfLife, restrictedOnly = true)
+            val reference = DiscountedThompson(4, Random(7), halfLife)
+            val candidates = listOf(0, 2, 3)
+            val weights = listOf(0.0, 0.25, 1.0, 1e-12)
+            repeat(32) { step ->
+                val arm = step % 4
+                val value = (step % 5) / 4.0
+                val weight = weights[step % weights.size]
+                restricted.update(arm, value, weight)
+                reference.update(arm, value, weight)
+                if (step % 8 == 7) {
+                    restricted.fade(0.25)
+                    reference.fade(0.25)
+                }
+
+                assertEquals(reference.chooseAmong(candidates), restricted.chooseAmong(candidates))
+            }
+            restricted.reset()
+            reference.reset()
+
+            repeat(16) { assertEquals(reference.chooseAmong(candidates), restricted.chooseAmong(candidates)) }
+        }
+    }
+
     private fun choicesOf(bandit: DiscountedThompson, arm: Int, rounds: Int): Int =
         (0 until rounds).count { bandit.choose() == arm }
 

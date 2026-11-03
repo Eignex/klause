@@ -1622,7 +1622,9 @@ class Portfolio(
             onProgress: ((PortfolioEvent) -> Unit)? = null,
         ): Portfolio = Portfolio(
             workers = workers,
-            bandit = DiscountedThompson(workers.size, Random(diagnostics?.seed ?: seed), halfLife),
+            bandit = DiscountedThompson(
+                workers.size, Random(diagnostics?.seed ?: seed), halfLife, restrictedOnly = true,
+            ),
             lanes = lanes,
             baseSliceMillis = baseSliceMillis,
             maxSliceMillis = maxSliceMillis,

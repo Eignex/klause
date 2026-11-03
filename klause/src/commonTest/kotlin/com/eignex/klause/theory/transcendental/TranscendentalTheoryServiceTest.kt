@@ -50,6 +50,41 @@ class TranscendentalTheoryServiceTest {
     }
 
     @Test
+    fun `exponential positivity should refute a wide conditioned interval`() {
+        val x = TranscendentalExpression.Variable(SourceRealId(0))
+        val exp = TranscendentalExpression.Function(TranscendentalFunction.EXP, x)
+        val formulas = listOf(
+            atom(exp, PolynomialRelation.LE, constant(0)),
+            atom(constant(0), PolynomialRelation.GE, exp),
+        )
+        val condition = TranscendentalCondition(PolynomialCondition(
+            lower = mapOf(0 to BigFraction.ofLong(-1024)),
+            upper = mapOf(0 to BigFraction.ofLong(1024)),
+        ))
+        for (formula in formulas) {
+            val source = TranscendentalProblem(formula, emptyMap(), mapOf("x" to 0), emptyMap())
+
+            val result = TranscendentalTheoryService(source, maximumBits = 64).check(condition)
+
+            assertEquals(TranscendentalCheckResult.Refuted, result)
+        }
+    }
+
+    @Test
+    fun `negated exponential comparisons should retain nested logarithm domain constraints`() {
+        val logarithm = TranscendentalExpression.Function(TranscendentalFunction.LOG, constant(-1))
+        val exp = TranscendentalExpression.Function(TranscendentalFunction.EXP, logarithm)
+        val source = TranscendentalProblem(
+            TranscendentalFormula.Not(atom(exp, PolynomialRelation.LE, constant(0))),
+            emptyMap(), emptyMap(), emptyMap(),
+        )
+
+        val result = TranscendentalTheoryService(source).check()
+
+        assertEquals(TranscendentalCheckResult.Refuted, result)
+    }
+
+    @Test
     fun `a relaxed near equality should not publish a source witness`() {
         val x = TranscendentalExpression.Variable(SourceRealId(0))
         val exp = TranscendentalExpression.Function(TranscendentalFunction.EXP, x)

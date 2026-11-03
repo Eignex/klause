@@ -527,8 +527,9 @@ Scheduling changes work order, never publication authority.
 
 The worker sampler owns primitive success and trial totals per arm. Restricted
 selection reads those totals directly; fading preserves the prior and the
-accumulator's arithmetic order. The library selector's snapshots synchronize when
-that selector is used.
+accumulator's arithmetic order. Default scheduling retains only these primitive
+posteriors. An unrestricted sampler keeps the library selector and synchronizes its
+snapshots when that selector is used.
 
 The opt-in `portfolio-reward=source` ablation retains ordinary feasibility rewards.
 After a source incumbent exists, only an accepted strict incumbent or terminal

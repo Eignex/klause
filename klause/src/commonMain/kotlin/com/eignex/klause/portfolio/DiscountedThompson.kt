@@ -29,31 +29,35 @@ internal class DiscountedThompson(
     override val random: Random,
     /** Full segments after which an observation counts half as much. */
     private val halfLife: Double,
+    restrictedOnly: Boolean = false,
 ) : UnivariateBandit {
     init {
         require(halfLife > 0.0) { "halfLife must be > 0" }
+        require(nbrArms > 0) { "nbrArms must be positive" }
     }
 
-    private val inner = MultiArmedBandit(nbrArms, BetaBernoulliTS(PRIOR, PRIOR), random)
+    private val inner = if (restrictedOnly) null else MultiArmedBandit(nbrArms, BetaBernoulliTS(PRIOR, PRIOR), random)
     private val successes = DoubleArray(nbrArms)
     private val trials = DoubleArray(nbrArms)
     private var selectorDirty = false
 
     override fun choose(): Int {
+        val selector = checkNotNull(inner) { "restricted sampler requires candidate arms" }
         if (selectorDirty) {
             for (arm in 0 until nbrArms) {
-                val stat = inner.armStat(arm)
+                val stat = selector.armStat(arm)
                 stat.reset()
                 stat.merge(BernoulliSumResult(PRIOR + successes[arm], 2 * PRIOR + trials[arm]), 0L)
             }
             selectorDirty = false
         }
-        return inner.choose()
+        return selector.choose()
     }
 
     override fun update(armIndex: Int, value: Double, weight: Double) {
         fade(2.0.pow(-weight / halfLife))
-        inner.update(armIndex, value, weight)
+        require(armIndex in 0 until nbrArms) { "arm index out of bounds" }
+        inner?.update(armIndex, value, weight)
         if (weight > 0.0 && weight.isFinite()) {
             trials[armIndex] += weight
             successes[armIndex] += value * weight
@@ -61,7 +65,7 @@ internal class DiscountedThompson(
     }
 
     override fun reset() {
-        inner.reset()
+        inner?.reset()
         successes.fill(0.0)
         trials.fill(0.0)
         selectorDirty = false

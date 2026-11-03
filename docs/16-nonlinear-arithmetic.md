@@ -503,7 +503,9 @@ by its domain, range and domain-bound affine relaxations from
 Rational enclosures propagate through sums, products and powers to bound the
 arguments. A comparison between two applications of the same monotone function,
 such as `exp(a) < exp(b)`, reduces to a comparison of the arguments. A completed
-exact refutation of the relaxation refutes its source scope.
+exact refutation of the relaxation refutes its source scope. A direct exponential
+comparison against a nonpositive rational needs only the strict positive range;
+its argument retains the same guarded domain constraints.
 
 #### Proposals and repair
 
