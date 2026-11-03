@@ -63,7 +63,7 @@ class LpRootGuidanceTest {
             listOf(ExactLpRow()), ExactLpObjective(List(3) { ExactLpNumber.of(it + 1L) } + zero),
         )
         LpScopedSolver(LpExactState(source)).use { owner ->
-            assertNotNull(owner.advanceFloat(1_000_000L, LpFloatAllowance(1_000_000L, 1),
+            assertNull(owner.advanceFloat(1_000_000L, LpFloatAllowance(1_000_000L, 1),
                 retainFundingStop = true))
             val metrics = owner.lastMetrics
             assertTrue(owner.floatPaused)
