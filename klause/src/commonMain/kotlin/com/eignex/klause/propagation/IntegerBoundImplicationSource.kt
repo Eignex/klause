@@ -29,6 +29,9 @@ internal class IntegerBoundImplicationSource(
         if (state.incremental || !state.undoLogging || marker !== current || !isLazyReason(marker) ||
             marker.size != LAZY_PAYLOAD + 6 || marker[1] != owner || marker[2] !in 0..state.undo.size ||
             marker[LAZY_PAYLOAD + 5] != 0) return decline("marker")
+        val bounds = state.problem.intBounds
+        if (!bounds.hasLower(variable) || !bounds.hasUpper(variable) ||
+            bounds.lower(variable) != 0L || bounds.upper(variable) != 1L) return decline("declared-pivot")
         val source = projection(owner) ?: return null
         val position = marker[LAZY_PAYLOAD]
         if (source.vars.getOrNull(position) != variable) return decline("position")
@@ -71,18 +74,27 @@ internal class IntegerBoundImplicationSource(
         for (index in source.vars.indices) {
             sourceWork.visit()
             val v = source.vars[index]
-            if (v !in 0 until state.problem.numIntVars || !bounds.hasLower(v) || !bounds.hasUpper(v) ||
-                bounds.lower(v) != 0L || bounds.upper(v) != 1L) return decline("declared-binary")
+            if (v !in 0 until state.problem.numIntVars) return decline("coordinate")
             if (index == position) continue
             if (v == variable) return decline("repeated-pivot")
             val c = if (useLo) source.coeffs[index] else subExact(0L, source.coeffs[index])
             if (c == 0L) continue
+            if ((c > 0L && !bounds.hasLower(v)) || (c < 0L && !bounds.hasUpper(v))) {
+                return decline("declared-endpoint")
+            }
+            val baseline = if (c > 0L) bounds.lower(v) else bounds.upper(v)
             sourceWork.visit()
             val historical = state.domainAt(v, trail)
             val endpoint = if (c > 0L) historical.min else historical.max
-            if (endpoint !in 0L..1L) return decline("historical-domain")
+            if ((c > 0L && endpoint < baseline) || (c < 0L && endpoint > baseline)) {
+                return decline("historical-domain")
+            }
             other = addExact(other, mulExact(c, endpoint))
-            if ((c > 0L && endpoint == 1L) || (c < 0L && endpoint == 0L)) {
+            if (endpoint != baseline) {
+                if (!bounds.hasLower(v) || !bounds.hasUpper(v) ||
+                    bounds.lower(v) != 0L || bounds.upper(v) != 1L || endpoint !in 0L..1L) {
+                    return decline("declared-condition")
+                }
                 val domain = state.intDomains[v]
                 if ((endpoint == 1L && domain.min != 1L) || (endpoint == 0L && domain.max != 0L)) {
                     return decline("inactive-condition")

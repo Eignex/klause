@@ -581,9 +581,12 @@ The ordinary native and mapped shared assertion targets retain their authority.
 A complete historical binary bound implication can supply a final parent after
 these choices fail following an owned source. Its source is a mandatory original
 word-linear constraint with a matching projection and unextended current endpoint
-marker. Both ordinary and exact word-linear forms require every source coordinate
-to have immutable declared bounds 0..1; guards, real coordinates and unsupported
-constants withhold the source. Checked activity over the complete directional
+marker. Both ordinary and exact word-linear forms require the conclusion and every
+strengthened condition to have immutable declared bounds 0..1. Other terms may
+contribute their unchanged declared minimizing endpoint from a wider range; an
+open minimizing side or a stronger nonbinary endpoint withholds the source.
+Guards, real coordinates and unsupported constants also withhold it.
+Checked activity over the complete directional
 historical bounds must reconstruct a raw unit request, with its historical member
 and current endpoint intact. The marker's slack is not a requested bound.
 Every historical endpoint stronger than its declared bound becomes an explicit

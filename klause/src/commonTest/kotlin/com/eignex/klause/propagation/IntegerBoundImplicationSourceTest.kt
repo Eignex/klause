@@ -62,14 +62,15 @@ class IntegerBoundImplicationSourceTest {
 
     @Test
     fun `complete wide source implications should derive a mapped owned assertion`() {
-        for (exact in listOf(false, true)) {
-            val problem = Problem(0, 35, Array(35) { IntDomain(0, 1) }, Array(2) { pivot ->
-                val vars = intArrayOf(3, pivot) + IntArray(31) { it + 4 }
-                val coefficients = IntArray(33) { if (it == 1) -1 else 1 }
-                if (exact) ExactLinear.of(IntArray(33) { Term.ofIntVar(vars[it]) },
-                    coefficients.map { BigFraction.ofLong(it.toLong()) }, LinearOp.LE, BigFraction.ZERO)
-                else Linear(coefficients, vars, LinearOp.LE, 0)
-            })
+        for ((exact, paddingUpper) in listOf(false to 1L, true to 1L, false to 2L, true to 2L)) {
+            val problem = Problem(0, 35,
+                Array(35) { IntDomain(0, if (it < 4) 1L else paddingUpper) }, Array(2) { pivot ->
+                    val vars = intArrayOf(3, pivot) + IntArray(31) { it + 4 }
+                    val coefficients = IntArray(33) { if (it == 1) -1 else 1 }
+                    if (exact) ExactLinear.of(IntArray(33) { Term.ofIntVar(vars[it]) },
+                        coefficients.map { BigFraction.ofLong(it.toLong()) }, LinearOp.LE, BigFraction.ZERO)
+                    else Linear(coefficients, vars, LinearOp.LE, 0)
+                })
             val native = PropagationSession(PropagationProblem(problem), pbLearning = false, attribution = true)
                 .apply { enableIntegerRowLearning() }
             assertNull(GuardedIntegerSource(native.explanationState).source(0,
@@ -99,6 +100,83 @@ class IntegerBoundImplicationSourceTest {
             native.releaseRetainedState()
             assertEquals(snapshot, native.learnedLifecycle())
         }
+    }
+
+    @Test
+    fun `unchanged declared endpoints should supply nonbinary baseline activity`() {
+        for ((coefficient, domain, bound) in listOf(
+            Triple(1, IntDomain(5, 7), 5),
+            Triple(-1, IntDomain(-7, -5), 5),
+            Triple(2, IntDomain(2, 2), 4),
+            Triple(-2, IntDomain(3, 3), -6),
+        )) {
+            val native = PropagationSession(Problem(0, 3,
+                arrayOf(IntDomain(0, 1), IntDomain(0, 1), domain), arrayOf(
+                    Linear(intArrayOf(1, -1, coefficient), intArrayOf(1, 0, 2), LinearOp.LE, bound),
+                )), pbLearning = false)
+            assertIs<PropagationResult.Implied>(native.pinIntAtLeast(1, 1))
+            val state = native.explanationState
+            val marker = assertNotNull(state.intMinAntecedents[0])
+
+            val row = assertNotNull(
+                IntegerBoundImplicationSource(state, IntegerSourceWork(state)).source(0, true, marker))
+
+            assertContentEquals(intArrayOf(0, 1), row.variables)
+            assertContentEquals(longArrayOf(-1, 1), row.coefficients)
+            assertEquals(0L, row.bound)
+            for (x in 0L..1L) for (e in 0L..1L) for (z in domain.min..domain.max) {
+                if (e - x + coefficient * z <= bound) assertTrue(e - x <= row.bound)
+            }
+        }
+    }
+
+    @Test
+    fun `an open minimizing side should not supply an invented baseline`() {
+        val native = PropagationSession(Problem(0, 3,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)), arrayOf(
+                Linear(intArrayOf(1, -1, 1), intArrayOf(1, 0, 2), LinearOp.LE, 0),
+            ), openIntLo = booleanArrayOf(false, false, true)), pbLearning = false)
+        assertIs<PropagationResult.Implied>(native.pinIntAtLeast(1, 1))
+        val state = native.explanationState
+        val marker = assertNotNull(state.intMinAntecedents[0])
+
+        val row = IntegerBoundImplicationSource(state, IntegerSourceWork(state)).source(0, true, marker)
+
+        assertNull(row)
+    }
+
+    @Test
+    fun `an open unused side should preserve a declared minimizing endpoint`() {
+        val native = PropagationSession(Problem(0, 3,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)), arrayOf(
+                Linear(intArrayOf(1, -1, 1), intArrayOf(1, 0, 2), LinearOp.LE, 0),
+            ), openIntHi = booleanArrayOf(false, false, true)), pbLearning = false)
+        assertIs<PropagationResult.Implied>(native.pinIntAtLeast(1, 1))
+        val state = native.explanationState
+        val marker = assertNotNull(state.intMinAntecedents[0])
+
+        val row = assertNotNull(
+            IntegerBoundImplicationSource(state, IntegerSourceWork(state)).source(0, true, marker))
+
+        assertContentEquals(intArrayOf(0, 1), row.variables)
+        assertContentEquals(longArrayOf(-1, 1), row.coefficients)
+        assertEquals(0L, row.bound)
+    }
+
+    @Test
+    fun `a binary live endpoint should not replace a nonbinary declared conclusion`() {
+        val native = PropagationSession(Problem(0, 2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 1)), arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.LE, 0),
+            )), pbLearning = false)
+        assertIs<PropagationResult.Implied>(native.implyIntAtMost(0, 1))
+        assertIs<PropagationResult.Implied>(native.pinIntAtLeast(1, 1))
+        val state = native.explanationState
+        val marker = assertNotNull(state.intMinAntecedents[0])
+
+        val row = IntegerBoundImplicationSource(state, IntegerSourceWork(state)).source(0, true, marker)
+
+        assertNull(row)
     }
 
     @Test
@@ -166,8 +244,10 @@ class IntegerBoundImplicationSourceTest {
     fun `a live binary projection should not replace nonbinary declared bounds`() {
         val native = PropagationSession(Problem(0, 3,
             arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)), arrayOf(
-                Linear(intArrayOf(1, -1, 1), intArrayOf(1, 0, 2), LinearOp.LE, 0),
+                Linear(intArrayOf(1, -2, 1), intArrayOf(1, 0, 2), LinearOp.LE, 1),
             )), pbLearning = false)
+        assertIs<PropagationResult.Implied>(native.implyIntAtLeast(2, 1))
+        assertIs<PropagationResult.Implied>(native.implyIntAtMost(2, 1))
         assertIs<PropagationResult.Implied>(native.pinIntAtLeast(1, 1))
         val state = native.explanationState
         val marker = assertNotNull(state.intMinAntecedents[0])
