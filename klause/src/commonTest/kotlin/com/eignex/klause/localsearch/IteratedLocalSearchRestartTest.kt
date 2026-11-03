@@ -154,14 +154,14 @@ class IteratedLocalSearchRestartTest {
         for (i in 0 until seedProblem.numFactors) seedState.factors[i].initialize(seedState, i)
         policy.onLocalOptimum(seedState, Sample(BooleanArray(0), LongArray(2)), 10.0)
         policy.onLocalOptimum(seedState, Sample(BooleanArray(0), LongArray(2)), 12.0)
-        val n = 6
+        val n = 3
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = n,
             intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
             factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
         )
-        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L, 4L, 5L, 6L))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L))
 
         val result = LocalSearchSolver(problem.bake(), restartPolicy = policy, seedImplicitOnRestart = true)
             .minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 1L))

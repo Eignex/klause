@@ -241,16 +241,20 @@ class LocalSearchSolverTest {
     @Test
     fun `a pooled optimum should be adopted on restart and reported as the result`() {
         val objective = objective()
-        val result = LocalSearchSolver(problem().bake()).minimize(
+        val initial = Sample(BooleanArray(12) { it in dearest }, LongArray(0))
+        val result = LocalSearchSolver(problem().bake(),
+            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 1)).minimize(
             objective,
             LocalSearchParams(
-                maxFlips = 300L,
+                maxFlips = 8L,
                 randomSeed = 1L,
+                initialAssignment = initial,
                 pooledIncumbents = exchangeHolding(optimalSample(), objective),
             ),
         )
         val sample = assertNotNull(result.assignment)
         assertEquals(optimum, objective.evaluate(sample))
+        assertTrue(result.stats.search.restarts.sum > 0.0)
     }
 
     @Test
