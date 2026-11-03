@@ -29,6 +29,11 @@ A standalone `cp` control sets both `param.bt-arm=LABEL` and `param.arms=1`.
 Named recipes repeat across the configured worker slots otherwise. Check the
 emitted `arm.*` entries to verify the actual worker count before comparing controls.
 
+For single-file source identities, run `scripts/select-model-hashes.sh` as a lab profile
+script after building `:klause-bench:installDist`, passing the ordinary `select` arguments.
+It preserves selection metadata and writes raw model SHA-256 hashes and byte counts
+to `source-hashes.jsonl`. Inputs with data files or include directories are rejected.
+
 ## Private rebuild qualification capture
 
 Enable `param.root-simplification=true` and
