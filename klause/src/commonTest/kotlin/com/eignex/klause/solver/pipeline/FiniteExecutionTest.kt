@@ -165,6 +165,8 @@ class FiniteExecutionTest {
     @Test
     fun `private rebuild budgets should preserve the default clausal source pool`() {
         for (options in listOf(
+            ExecutionOptions(ExecutionOption.privateRebuildBytes(4_194_304L)),
+            ExecutionOptions.parse(listOf("private-rebuild-bytes=4194304")),
             ExecutionOptions(ExecutionOption.privateRebuildWork(0L)),
             ExecutionOptions.parse(listOf("private-rebuild-work=0")),
             ExecutionOptions(ExecutionOption.learnedMemoryScratchBytes(4_194_304L)),
@@ -189,6 +191,43 @@ class FiniteExecutionTest {
 
             val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
             assertEquals(FiniteSolveVerdict.SAT, completed.verdict)
+            assertEquals(listOf("ls/probsat/plain", "bt/clausal-balanced"),
+                completed.stats.portfolio.arms.map { it.label })
+            assertTrue(completed.stats.portfolio.arms.all { it.faults == 0L && it.failures == 0L })
+        }
+    }
+
+    @Test
+    fun `ordinary source defaults should open and retire a private parity consumer`() {
+        val parity = (0 until 128).flatMap { row ->
+            listOf(1, 2, 4, 7).map { mask ->
+                Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
+            }
+        }
+        val contradiction = (0 until 16).map { mask ->
+            Clause(IntArray(4) { Lit.make(it, mask and (1 shl it) == 0) })
+        }
+        val problem = Problem(130, 0, emptyArray(), (parity + contradiction).toTypedArray())
+        val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
+        for ((options, expected) in listOf(
+            ExecutionOptions() to 1L,
+            ExecutionOptions(ExecutionOption.privateRebuildWork(0L)) to 0L,
+            ExecutionOptions.parse(listOf("private-rebuild-work=0")) to 0L,
+        )) {
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = options, nodeBudget = NodeBudget(5_000),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.UNSAT, completed.verdict)
+            val learning = completed.stats.search.learning
+            assertEquals(expected, learning["privateRebuildAutomaticAttempts"] ?: 0L)
+            assertEquals(expected * 4_194_304L, learning["privateRebuildAutomaticByteLimit"] ?: 0L)
+            assertEquals(expected, learning["privateRebuildConsumers"] ?: 0L)
+            assertEquals(expected, learning["privateRebuildRetired"] ?: 0L)
             assertEquals(listOf("ls/probsat/plain", "bt/clausal-balanced"),
                 completed.stats.portfolio.arms.map { it.label })
             assertTrue(completed.stats.portfolio.arms.all { it.faults == 0L && it.failures == 0L })

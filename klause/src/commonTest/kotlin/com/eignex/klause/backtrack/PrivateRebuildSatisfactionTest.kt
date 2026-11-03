@@ -23,6 +23,32 @@ import kotlin.test.assertTrue
 
 class PrivateRebuildSatisfactionTest {
     @Test
+    fun `an independent private byte grant should preserve the canonical scratch limit`() {
+        val clauses = (0..3).flatMap { excluded ->
+            val columns = (0..3).filter { it != excluded }
+            val rhs = if (excluded == 0) 1 else 0
+            (0..7).filter { it.countOneBits() % 2 != rhs }.map { mask ->
+                Clause(IntArray(3) { Lit.make(columns[it], mask and (1 shl it) == 0) })
+            }
+        }.toTypedArray<Factor>()
+        val source = Problem(4, 0, emptyArray(), clauses).bake()
+        for (privateBytes in listOf(null, 1_048_576L)) {
+            val params = BacktrackParams(privateRebuildWork = 65_536L,
+                learnedMemoryScratchBytes = 0L, privateRebuildBytes = privateBytes)
+
+            val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(params))
+
+            assertEquals(0L, params.learnedMemoryScratchBytes)
+            assertEquals(if (privateBytes == null) 0L else 1L,
+                result.stats.search.learning["privateRebuildConsumers"] ?: 0L)
+            assertTrue(clauses.all { factor ->
+                (factor as Clause).literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+            })
+        }
+    }
+
+
+    @Test
     fun `proved parity pins should reach a consuming worker and a checked source witness`() {
         for (native in listOf(false, true)) {
             val clauses = (0..3).flatMap { excluded ->

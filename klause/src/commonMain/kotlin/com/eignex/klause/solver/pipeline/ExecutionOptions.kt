@@ -313,6 +313,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Private Boolean work; -1 selects bounded automatic parity admission and zero disables it. */
         val privateRebuildWork: ExecutionOption<Long> = ExecutionOption("private-rebuild-work", ValueKind.LONG)
 
+        /** Private modeled-byte grant, separate from canonical learned-memory scratch. */
+        val privateRebuildBytes: ExecutionOption<Long> = ExecutionOption("private-rebuild-bytes", ValueKind.LONG)
+
         /** Failed-literal probes per scheduled restart; zero disables probing. */
         val rootProbeBatch: ExecutionOption<Int> = ExecutionOption("root-probe-batch", ValueKind.INT)
 
@@ -581,7 +584,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
                 subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch,
                 rootRebuildCaptureVisits,
-                privateRebuildWork,
+                privateRebuildWork, privateRebuildBytes,
                 rootProbeBatch, rootProbeWork, inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
                 inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth,
                 inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,
@@ -642,7 +645,8 @@ class ExecutionOptions private constructor(
         get() {
             val overrides = values.keys.filter { it in BACKTRACK_OVERRIDE_KEYS }
             return overrides.isNotEmpty() && overrides.all {
-                it == "private-rebuild-work" || it == "learned-memory-scratch-bytes"
+                it == "private-rebuild-work" || it == "private-rebuild-bytes" ||
+                    it == "learned-memory-scratch-bytes"
             }
         }
 
