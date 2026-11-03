@@ -166,6 +166,20 @@ class EngineParamsTest {
     }
 
     @Test
+    fun `mixed root targets reach fixed and portfolio workers without changing the lp plan`() {
+        val base = com.eignex.klause.backtrack.BacktrackParams()
+        assertTrue(!base.lpMixedRootTargets)
+        for (enabled in listOf(false, true)) {
+            val params = EngineParams(listOf("lp-mixed-root-targets=$enabled"))
+            for (configured in listOf(applyBacktrackParams(base, params),
+                applyFixedBacktrackParams(base, params, allowSelectors = true))) {
+                assertEquals(enabled, configured.lpMixedRootTargets)
+                assertEquals(base, configured.copy(lpMixedRootTargets = false))
+            }
+        }
+    }
+
+    @Test
     fun `early objective core admission should reject parallel portfolios`() {
         assertFailsWith<PipelineConfigException> { scenario(2, listOf("core-early=true")) }
     }

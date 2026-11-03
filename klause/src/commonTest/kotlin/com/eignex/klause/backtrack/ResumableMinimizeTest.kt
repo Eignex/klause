@@ -268,6 +268,48 @@ class ResumableMinimizeTest {
     }
 
     @Test
+    fun `mixed root targets backtrack through discrete rows and complete real leaves`() {
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(longArrayOf(-1), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.EQ, 0L),
+        ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(2, 2, 3),
+            realCoefficients = doubleArrayOf(0.25))
+        val attempts = mutableListOf<SearchDecision>()
+        val offers = mutableListOf<Sample>()
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
+            phaseSaving = false, targetPhasing = false, solutionPhasing = false, lpMixedRootTargets = true,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false, boundMaxDepth = -1),
+            branchObserver = object : SearchBranchAttemptObserver {
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    attempts.add(decision)
+                }
+            })
+
+        BacktrackSolver(problem).resumable(objective, params).use { search ->
+            val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { offers.add(it.sample) }
+
+            assertEquals(4.25, assertIs<MinimizeResult.Optimal>(result).objective)
+            assertEquals(SearchDecision.IntAtMost(0, 0L), attempts.first())
+            assertEquals(listOf(5.0, 4.25), offers.map { objective.evaluate(it) })
+            for (sample in offers) {
+                assertTrue(sample.ints[0] + sample.ints[1] >= 1L)
+                assertTrue(sample.ints[1] + sample.ints[2] >= 1L)
+                assertTrue(sample.ints[0] + sample.ints[2] >= 1L)
+                assertEquals(sample.ints[0].toDouble(), sample.reals[0])
+                assertNotNull(sample.exactReals)
+            }
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_CP_GUIDANCE_ROOT"]
+                ?.outcomes?.get("SEARCH_HANDOFF"))
+            assertNull(search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"])
+            assertEquals(0.0, search.stats.lp.nodePasses.sum)
+        }
+    }
+
+    @Test
     fun `returned child targets reach complete search without another root query`() {
         val problem = Problem(0, 7, Array(7) { IntDomain(0, 1) }, listOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),

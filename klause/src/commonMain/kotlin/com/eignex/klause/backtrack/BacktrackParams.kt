@@ -352,6 +352,8 @@ data class BacktrackParams(
     val lpPlan: LpPlan = LpPlan(),
     /** Use reliable, recent directional LP gains for finite variable ordering; missing history keeps LP scoring. */
     val lpDirectionalGains: Boolean = false,
+    /** Reuse paid LP integer targets in mixed models; continuous leaves retain completion authority. */
+    val lpMixedRootTargets: Boolean = false,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     /**

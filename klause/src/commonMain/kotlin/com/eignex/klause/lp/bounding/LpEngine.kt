@@ -350,11 +350,11 @@ internal class LpEngine(
         else minOf(retainedRootRemainingWork(),
             SPARSE_LP_MAX_PREPARATION_WORK - minOf(SPARSE_LP_MAX_PREPARATION_WORK, totalSolveOps))
 
-    internal fun retainRootPrimalTargets(cancellation: Cancellation): Boolean {
+    internal fun retainRootPrimalTargets(cancellation: Cancellation, allowMixed: Boolean = false): Boolean {
         val guide = rootRoundingWarmStart ?: return false
         val coordinates = guide.primal ?: return false
         val mapBytes = (guide.relaxation.intColOf.size.toLong() + guide.relaxation.boolColOf.size) * Int.SIZE_BYTES
-        if (!params.lpPlan.branching || problem.numRealVars != 0 || guide.objective !== objective ||
+        if (!params.lpPlan.branching || !rootTargetsSourceAllowed(allowMixed) || guide.objective !== objective ||
             coordinates.size != guide.relaxation.model.n ||
             (guide.knownColumns != null && guide.knownColumns.size != coordinates.size) ||
             !retainedRootPrimalStateMatches(guide.relaxation) || cancellation() ||
@@ -368,6 +368,9 @@ internal class LpEngine(
         sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "RETAINED", 0L)
         return true
     }
+
+    private fun rootTargetsSourceAllowed(allowMixed: Boolean): Boolean = problem.numRealVars == 0 ||
+        (allowMixed && (problem.numIntVars > 0 || problem.numBoolVars > 0))
 
     internal fun ownsRootPrimalModel(model: LpModel): Boolean = retainedRootEnabled &&
         cpAdapter.currentModel === model && model.exactState != null &&
@@ -400,12 +403,16 @@ internal class LpEngine(
         }
     }
 
-    internal fun retainRootPartialPrimalGuidance(relaxation: LpRelaxation, cancellation: Cancellation) {
+    internal fun retainRootPartialPrimalGuidance(
+        relaxation: LpRelaxation,
+        cancellation: Cancellation,
+        allowMixed: Boolean = false,
+    ) {
         if (!params.lpPlan.componentOwnership) return
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "PARTIAL_OWNER_ATTEMPTED", 0L)
         var ownerState = "NOT_READ"
         val outcome = retainPartialPrimalGuidance(relaxation, cancellation, "PARTIAL_OWNER_RETAINED",
-            retainedOwnerRead = true) {
+            retainedOwnerRead = true, allowMixed = allowMixed) {
             ownerState = propagator.primalGuidanceState
             propagator.partialPrimalGuidance(cancellation)
         }
@@ -429,10 +436,11 @@ internal class LpEngine(
         cancellation: Cancellation,
         outcome: String,
         retainedOwnerRead: Boolean = false,
+        allowMixed: Boolean = false,
         read: () -> LpPrimalGuidance?,
     ): PartialPrimalRead {
         if (!params.lpPlan.probe) return PartialPrimalRead.DISABLED
-        if (problem.numRealVars != 0) return PartialPrimalRead.CONTINUOUS_SOURCE
+        if (!rootTargetsSourceAllowed(allowMixed)) return PartialPrimalRead.CONTINUOUS_SOURCE
         val currentOwner = ownsRootPrimalModel(relaxation.model) ||
             (retainedOwnerRead && retainedRootPrimalStateMatches(relaxation))
         if (!currentOwner) return PartialPrimalRead.STALE_OWNER

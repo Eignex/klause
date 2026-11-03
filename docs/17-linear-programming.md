@@ -437,6 +437,10 @@ charges the ordinary cumulative LP work allowance. Fresh node hints take precede
 unknown coordinates preserve the configured choices. These root targets train no
 reduced-cost or directional history and supply no query or proof authority. A new
 root guide, restart, assumption reseeding and engine close discard them.
+The opt-in `lp-mixed-root-targets` setting permits this transfer for mixed models
+with finite coordinates. Only integer and Boolean columns affect value ordering;
+the retained real payload grants no feasibility or completion authority. The same
+owner, availability mask, cancellation, root work and byte checks apply.
 The private coordinate and availability buffers spend the existing guidance byte
 limit and root work before allocation. This guide carries no complete LP point or
 proof authority; every proposed source assignment remains fully pinned and checked.

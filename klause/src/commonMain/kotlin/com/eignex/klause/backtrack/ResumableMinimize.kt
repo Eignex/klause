@@ -1218,14 +1218,14 @@ internal class ResumableMinimize(
 
     private fun handoffRootTargets(rootToken: Cancellation): Boolean {
         val plan = lpEngine.params.lpPlan
-        if (!pausable || decisionLimit <= 0L || problem.numRealVars != 0 ||
+        if (!pausable || decisionLimit <= 0L || (problem.numRealVars != 0 && !params.lpMixedRootTargets) ||
             !plan.branching || plan.lbTreeSearch || !lpEngine.retainedRootEnabled
         ) return false
         val pending = lpEngine.rootRoundingWarmStart ?: return false
         if (pending.primal == null) {
-            lpEngine.retainRootPartialPrimalGuidance(pending.relaxation, rootToken)
+            lpEngine.retainRootPartialPrimalGuidance(pending.relaxation, rootToken, params.lpMixedRootTargets)
         }
-        if (!lpEngine.retainRootPrimalTargets(rootToken)) return false
+        if (!lpEngine.retainRootPrimalTargets(rootToken, params.lpMixedRootTargets)) return false
         rootRoundingPending = false
         lpEngine.rootRoundingInterrupted = false
         lpEngine.rootRoundingWarmStart = null

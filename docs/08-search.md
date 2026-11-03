@@ -127,6 +127,9 @@ and complete source checks retain publication authority. This transfer carries n
 LP point, bound or proof authority into a leaf. Before its first incumbent, a retained
 integer guide can keep decisions within one declared factor component of the
 undetermined columns at a time.
+The opt-in `lp-mixed-root-targets` setting admits integer and Boolean targets from
+mixed models through the same paid owner. Real coordinates never become finite
+decisions; continuous leaf completion and full source checking retain their authority.
 The same frame stack handles conflicts and retraction; all source constraints stay
 active and every component still belongs to complete source checking.
 
