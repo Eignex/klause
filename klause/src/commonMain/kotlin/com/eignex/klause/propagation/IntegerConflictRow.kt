@@ -1,7 +1,6 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.LinearPropagator
-import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
@@ -49,34 +48,6 @@ internal class IntegerConflictRow private constructor(
         (guard == Lit.NONE || guard == other.guard) && bound <= other.bound &&
             variables.contentEquals(other.variables) && coefficients.contentEquals(other.coefficients)
 
-    fun assertsAt(state: PropagationState, trail: Int): Boolean {
-        if (!state.integerGuardTrueAt(guard, trail)) return false
-        val domains = Array(variables.size) {
-            state.checkFiniteWork()
-            domain(state, variables[it], trail)
-        }
-        val contributions = LongArray(variables.size)
-        var minimum = 0L
-        for (index in variables.indices) {
-            val endpoint = if (coefficients[index] > 0L) domains[index].min else domains[index].max
-            val contribution = mulExact(coefficients[index], endpoint)
-            contributions[index] = contribution
-            minimum = addExact(minimum, contribution)
-        }
-        if (minimum > bound) return false
-        for (index in variables.indices) {
-            state.checkFiniteWork()
-            val coefficient = coefficients[index]
-            val residual = subExact(bound, subExact(minimum, contributions[index]))
-            val next = if (coefficient > 0L) floorDivide(residual, coefficient) else ceilDivide(residual, coefficient)
-            val domain = domains[index]
-            val tightens = if (coefficient > 0L) next < domain.max else next > domain.min
-            // Admission certifies a raw bound assertion, without relying on sparse snapping.
-            if (tightens && state.inDomainAt(variables[index], next, trail, domain)) return true
-        }
-        return false
-    }
-
     fun resolve(other: IntegerConflictRow, variable: Int): IntegerConflictRow? {
         if (guard != Lit.NONE && other.guard != Lit.NONE && guard != other.guard) return null
         val a = coefficient(variable)
@@ -123,9 +94,6 @@ internal class IntegerConflictRow private constructor(
             return IntegerConflictRow(variables, LongArray(variables.size) { terms.getValue(variables[it]) / divisor },
                 floorDivide(bound, divisor), guard)
         }
-
-        private fun domain(state: PropagationState, variable: Int, trail: Int?): IntDomain =
-            if (trail == null) state.intDomains[variable] else state.domainAt(variable, trail)
 
         internal fun magnitude(value: Long): Long = if (value < 0L) subExact(0L, value) else value
 

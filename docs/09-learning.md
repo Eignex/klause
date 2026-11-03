@@ -586,6 +586,10 @@ an original non-owner parent or preserved other eligible coordinates, without
 bound-proof references. These modes have a separate lifecycle subset. Proposal
 terms, produced children, admission and first consumption retain their counters
 independently of owned-source ancestry, including through compaction and retirement.
+Opt-in diagnostics classify a rejected compact proposal and its original temporary
+row at the same historical target as conflicting, unable to tighten, missing a raw
+bound member, guarded-unavailable, or asserting. The temporary observation spends
+the existing source-reference allowance and retains no domains or row payloads.
 Only a compact result is tested for admission. A retained row must propagate against the session's historical domains at its first-UIP clause's native
 backjump and the mapped shared target. Each combination checks that same native
 target, preserving clausal backjump selection. The raw assertion target must have

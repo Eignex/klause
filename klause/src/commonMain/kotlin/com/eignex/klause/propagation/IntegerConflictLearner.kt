@@ -144,12 +144,19 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 }
                 return decline("duplicate")
             }
-            val asserts = compact.assertsAt(state, trail)
+            val assertion = compact.assertionAt(state, trail)
+            val asserts = assertion == IntegerAssertion.ASSERTING
             state.arithmeticLearningTrace?.record("integer.assertion", target.toLong(), trail.toLong(),
                 if (asserts) 1 else 0)
             if (!asserts) {
                 if (compact !== combined) {
                     state.arithmeticLearningTrace?.record("integer.retained.box.reject.nonasserting")
+                    if (state.arithmeticLearningTrace?.collectDeclines == true) {
+                        state.arithmeticLearningTrace?.record("integer.retained.box.compact." + assertion.diagnostic)
+                        val temporaryAssertion = combined.assertionAt(state, trail)
+                        state.arithmeticLearningTrace?.record(
+                            "integer.retained.box.temporary." + temporaryAssertion.diagnostic)
+                    }
                 }
                 return@repeat
             }

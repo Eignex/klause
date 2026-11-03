@@ -16,6 +16,22 @@ import kotlin.test.assertTrue
 
 class IntegerConflictRowTest {
     @Test
+    fun `a historical conflict should not qualify as an assertion`() {
+        val row = requireNotNull(IntegerConflictRow.normalized(mapOf(0 to 1L), 0L, Lit.NONE))
+        val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(1, 2)), emptyArray()), Assumptions.None)
+
+        assertEquals(IntegerAssertion.CONFLICTING, row.assertionAt(state, 0))
+    }
+
+    @Test
+    fun `an entailed historical row should report no tightening`() {
+        val row = requireNotNull(IntegerConflictRow.normalized(mapOf(0 to 1L), 2L, Lit.NONE))
+        val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray()), Assumptions.None)
+
+        assertEquals(IntegerAssertion.NO_TIGHTENING, row.assertionAt(state, 0))
+    }
+
+    @Test
     fun `a compact declared box consequence should stay valid outside the current pins`() {
         val state = PropagationState(Problem(0, 17, Array(17) {
             if (it < 3) IntDomain(0, 2) else IntDomain(0, 1)
@@ -275,6 +291,7 @@ class IntegerConflictRowTest {
         assertTrue(state.tightenIntMax(0, 2))
 
         assertFalse(row.assertsAt(state, 0))
+        assertEquals(IntegerAssertion.RAW_BOUND_UNAVAILABLE, row.assertionAt(state, 0))
     }
 
     @Test
