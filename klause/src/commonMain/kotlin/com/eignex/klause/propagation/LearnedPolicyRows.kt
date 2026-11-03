@@ -9,7 +9,7 @@ internal class LearnedPolicyRows(
     private val retiredFlag: Int,
     private val objectColumns: Boolean,
     private val state: PropagationState?,
-) {
+) : (Long) -> Unit {
     private class Page(capacity: Int, columns: Int, objectColumns: Boolean) {
         var values = IntArray(capacity * columns)
         var admissions = LongArray(capacity)
@@ -73,7 +73,8 @@ internal class LearnedPolicyRows(
         return page
     }
 
-    private fun chargeLookup(units: Long) {
+    // The owner is the visitor so cached-page reads do not allocate a bound function reference.
+    override fun invoke(units: Long) {
         val sample = observation
         val active = budget
         when {
@@ -85,7 +86,7 @@ internal class LearnedPolicyRows(
 
     private fun pageAt(index: Int): Page? {
         if (index == 0) return primary
-        return locate(index, ::chargeLookup)
+        return locate(index, this)
     }
 
     private fun allocationWork(page: Page?, required: Int): Long = when {
@@ -177,7 +178,7 @@ internal class LearnedPolicyRows(
 
     fun add(stage: Int, lbd: Int, permanent: Boolean, origin: Int, admission: Long, value: LearnedPropagator?) {
         val slot = size and PAGE_MASK
-        val page = pageFor(size ushr PAGE_SHIFT, slot + 1, ::chargeLookup) {}
+        val page = pageFor(size ushr PAGE_SHIFT, slot + 1, this) {}
         page.retained = page.retained or (1 shl slot)
         if (stage != 0) page.values[slot * columns + STAGES] = stage
         page.values[slot * columns + LBD] = lbd

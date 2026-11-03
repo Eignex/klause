@@ -10,6 +10,7 @@ import com.eignex.klause.simplex.basis.BasisSolveQuality
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
+import com.eignex.klause.simplex.basis.MAX_SCALAR_COLUMN_ENTRIES
 import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
@@ -578,7 +579,7 @@ internal class RevisedSimplex(
         if (j >= n) return y[j - n]
         val from = colPtr[j]
         val until = colPtr[j + 1]
-        if (until - from <= 2) {
+        if (until - from <= MAX_SCALAR_COLUMN_ENTRIES) {
             var value = 0.0
             for (at in from until until) value += colVal[at] * y[rowIdx[at]]
             return value
@@ -846,7 +847,7 @@ internal class RevisedSimplex(
         dense.fill(0.0)
         val from = colPtr[column]
         val until = colPtr[column + 1]
-        if (until - from <= 2) {
+        if (until - from <= MAX_SCALAR_COLUMN_ENTRIES) {
             for (at in from until until) dense[rowIdx[at]] = colVal[at]
         } else {
             koblas.sparseKernels.scatter(rowIdx, from, colVal, from, until - from, dense)
@@ -857,7 +858,7 @@ internal class RevisedSimplex(
         if (alpha == 0.0) return
         val from = colPtr[column]
         val until = colPtr[column + 1]
-        if (until - from <= 2) {
+        if (until - from <= MAX_SCALAR_COLUMN_ENTRIES) {
             for (at in from until until) {
                 val row = rowIdx[at]
                 destination[row] += alpha * colVal[at]

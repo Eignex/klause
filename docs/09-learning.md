@@ -586,7 +586,8 @@ per page. General pages include propagator and mutable-payload references. The f
 page belongs directly to its owner; later pages use a bounded sparse index. Fixed
 startup ownership belongs to state preparation, and admissions fund subsequent
 growth and index insertion. Lookups debit the active maintenance or observation
-grant, or the containing propagation ledger. A fixed-size page cache avoids repeated
+grant, or the containing propagation ledger. The metadata owner supplies the lookup
+visitor directly, without a separate callback allocation. A fixed-size page cache avoids repeated
 lookups during ranking; its reference allocation belongs to fixed preparation and
 modeled ownership. Header unlinking clears its cache slot before releasing the page.
 A page queue and per-page retirement masks resume row release without scanning

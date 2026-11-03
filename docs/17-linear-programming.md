@@ -1212,7 +1212,7 @@ Feasibility gradients are recomputed after each step. The sparse breakpoint
 workspace, ordering and value updates consume the same floating work and
 iteration allowance as other pivots.
 
-Structural columns with at most two stored entries price in storage order from a
+Structural columns with at most eight stored entries price in storage order from a
 zero accumulator. Other columns pass the current owned CSC matrix to Koblas's
 validated column dot. Pricing reads the installed CSC arrays without
 column copies; an unscaled fallback refreshes those arrays with its matrix and
@@ -1220,9 +1220,9 @@ retires the basis backend. Stored zeros and current coefficient values retain
 stored-entry arithmetic.
 
 Sparse accumulation skips empty columns and treats a zero multiplier as a no-op.
-Columns with at most two entries update their stored rows directly from the current
+Columns with at most eight entries update their stored rows directly from the current
 CSC arrays; larger columns use the validated backend. Quality-column scatter
-clears its private RHS buffer and copies at most two stored entries directly;
+clears its private RHS buffer and copies at most eight stored entries directly;
 larger columns use the validated scatter backend. Work charges belong to the
 calling solve operation.
 
