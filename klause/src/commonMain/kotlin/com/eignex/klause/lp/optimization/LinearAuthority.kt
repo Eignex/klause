@@ -81,10 +81,13 @@ internal class LinearAuthority(
     private var pointListener: ((LinearAuthorityQuery, List<BigFraction>) -> Unit)? = null
     private var pointPolicy: LinearAuthorityPointCuts? = null
     private var pointFamily: LinearAuthorityTemplate? = null
+    private var pointFallback: LinearAuthorityTemplate? = null
     private var directedFamily: LinearAuthorityTemplate? = null
-    private var pointMask: Set<Int> = emptySet()
+    private var pointMask: Set<Int>? = null
+    private var deferAggregatePreparation = false
     private class PointRound(
         val query: LinearAuthorityQuery, val base: LinearAuthorityResult, val mask: Set<Int>,
+        val rows: List<LinearAuthorityCut>,
     ) {
         var reported = false
     }
@@ -128,9 +131,12 @@ internal class LinearAuthority(
         capturedPoint = null
         pointListener = null
         pointRound = null
+        pointPolicy?.releaseCandidates()
         pointFamily = null
+        pointFallback = null
         directedFamily = null
-        pointMask = emptySet()
+        pointMask = null
+        deferAggregatePreparation = false
         primalAttempt = null
         cutLifecycle.containing("RETIREMENT") { lp.close() }
     }
@@ -138,21 +144,32 @@ internal class LinearAuthority(
     fun advanceWithPointCuts(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
         val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe)
             .also { pointPolicy = it }
+        if (pointFallback === template && template?.matches(source) == true) {
+            policy.observe("CurrentFallbackQueries")
+            return advance(source, cancellation, cuts = true)
+        }
         if (pointFamily !== template || template?.matches(source) != true || template?.cuts == null) {
-            pointMask = emptySet()
+            pointMask = null
+            pointFallback = null
             pointRound = null
             pointFamily = template
         }
         var pending = pointRound?.takeIf {
-            it.query.matches(source, cuts = true, cutMask = it.query.cutMask)
+            it.query.matches(source, cuts = true, cutMask = it.query.cutMask,
+                checkUnselectedCuts = it.query.checkUnselectedCuts,
+                retainMaskedCuts = it.query.retainMaskedCuts)
         }
         if (pending == null) {
             pointRound = null
             var point: Pair<LinearAuthorityQuery, List<BigFraction>>? = null
             pointListener = { query, values -> if (point == null) point = query to values }
+            val baselineMask = pointMask
+            policy.observe("BaseQueries")
+            deferAggregatePreparation = baselineMask == null
             val base = try {
-                advance(source, cancellation, cuts = true, cutMask = pointMask)
+                advance(source, cancellation, cuts = true, cutMask = baselineMask)
             } finally {
+                deferAggregatePreparation = false
                 pointListener = null
             }
             if (base.paused || base.evidence != null || base.incumbent != null || cancellation()) return base
@@ -167,12 +184,20 @@ internal class LinearAuthority(
             }
             pointFamily = family
             if (family.cuts == null ||
-                !prepared.matches(source, cuts = true, cutMask = pointMask)) {
+                !prepared.matches(source, cuts = true, cutMask = baselineMask,
+                    checkUnselectedCuts = checkUnselectedCuts(baselineMask),
+                    retainMaskedCuts = retainMaskedCuts(baselineMask))) {
                 policy.observe("PointUnavailable")
                 return base
             }
-            if (!checkNotNull(family.cuts).pointDirected && directedFamily !== family && pointMask.isEmpty() &&
-                checkNotNull(family.cuts).rows.any { it.mixed }) {
+            val baselineFamily = family
+            val baselineQuery = prepared
+            val currentRows = checkNotNull(family.cuts).rows
+            val generatedRecipe = currentRows.isNotEmpty() && currentRows.size <= 64 &&
+                currentRows.all { it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR }
+            if (!generatedRecipe && !checkNotNull(family.cuts).pointDirected && directedFamily !== family &&
+                pointMask == null &&
+                (aggregateCuts || checkNotNull(family.cuts).rows.any { it.mixed })) {
                 directedFamily = family
                 cutLifecycle.families = checkNotNull(family.cuts).rows.mapTo(HashSet()) { it.family }
                 val refined = cutLifecycle.containing("POINT_SELECTION") {
@@ -188,11 +213,29 @@ internal class LinearAuthority(
             }
             val selected = cutLifecycle.containing("POINT_SELECTION") {
                 policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
-                    prepared.checkedCuts, observed.second, pointMask.intersect(prepared.checkedCuts), cancellation)
+                    prepared.checkedCuts, observed.second, pointMask.orEmpty().intersect(prepared.checkedCuts),
+                    cancellation, adoptCurrent = baselineMask == null && family === baselineFamily &&
+                        prepared.activeCuts == checkNotNull(family.cuts).rows.size)
             }
-            if (selected == pointMask || budget.funding?.exhausted == true || cancellation()) return base
+            if (budget.funding?.exhausted == true || cancellation()) return base
+            if (policy.adoptedCurrent) {
+                pointMask = selected
+                return base.copy(paused = base.paused || budget.funding?.paused == true)
+            }
+            if (baselineMask == null && selected.isEmpty()) {
+                template = baselineFamily
+                query = baselineQuery
+                pointFamily = baselineFamily
+                pointFallback = baselineFamily
+                directedFamily = null
+                policy.releaseCandidates()
+                policy.observe("CurrentFallback")
+                cutLifecycle.families = baselineQuery.cutFamilies.values.toSet()
+                return base.copy(paused = base.paused || budget.funding?.paused == true)
+            }
+            if (selected == pointMask) return base
             pointMask = selected
-            pending = PointRound(prepared, base, selected)
+            pending = PointRound(prepared, base, selected, checkNotNull(family.cuts).rows)
             pointRound = pending
             policy.observe("Rounds")
             budget.funding?.charge(0L, 1024L + 64L * (base.fractional.size + base.relaxedPoint.size))
@@ -213,11 +256,17 @@ internal class LinearAuthority(
         if (result.paused && (budget.funding?.exhausted == true || cancellation())) {
             return pending.base.copy(primalStages = stages)
         }
+        val completed = !result.paused && budget.funding?.paused != true && !cancellation()
         if (!result.paused && result.evidence == null && result.incumbent == null && result.split == null) {
+            if (completed) policy.observeRound(pending.rows, improved = false)
             policy.observe("UnavailableRounds")
             return pending.base.copy(primalStages = stages)
         }
         val strongest = strongerLinearBound(pending.base.bound, result.bound)
+        if (completed) {
+            policy.observeRound(pending.rows, result.evidence != null || result.incumbent != null ||
+                (strongest != null && strongest !== pending.base.bound))
+        }
         return result.copy(bound = strongest, primalStages = stages,
             cutBoundFamilies = if (strongest != null && strongest === pending.base.bound) {
                 pending.base.cutBoundFamilies
@@ -245,14 +294,14 @@ internal class LinearAuthority(
             work += cost
             point[prepared.coordinates[index]] = value.toDouble().takeIf(Double::isFinite) ?: return null
         }
-        val refined = family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost)
-            ?.let { withAdditionalCuts(it, funded) } ?: return null
+        val directed = family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
+        val refined = withAdditionalCuts(directed, funded, point) ?: return null
         if (funded()) return null
         val previous = template
         adoptTemplate(refined)
         query = null
         val checked = prepareQuery(source, funded, cuts = true, cutMask = emptySet())
-        if (checked == null || funded()) {
+        if (checked == null || funded() || template !== refined) {
             template = previous
             return null
         }
@@ -354,14 +403,20 @@ internal class LinearAuthority(
         return recovered
     }
 
+    private fun checkUnselectedCuts(mask: Set<Int>?): Boolean =
+        mask == null || pointPolicy?.candidatesRetired(template?.cuts?.rows) != true
+
+    private fun retainMaskedCuts(mask: Set<Int>?): Boolean =
+        mask != null && pointPolicy?.retainsCandidateLayout(template?.cuts?.rows) == true
+
     private fun prepareQuery(
         source: SourceProofContext, cancellation: Cancellation, cuts: Boolean, cutMask: Set<Int>?,
     ): LinearAuthorityQuery? {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return null
         if ((source.scope.condition.lower.keys + source.scope.condition.upper.keys).any {
-                it !in source.coordinates
+                !source.containsCoordinate(it)
             } || source.scope.condition.bools.keys.any {
-                SourceCoordinate(SourceCoordinate.Kind.Boolean, it) !in source.coordinates
+                !source.containsCoordinate(SourceCoordinate(SourceCoordinate.Kind.Boolean, it))
             }
         ) return null
         if (source.scope.objective == null || source.coordinates.any {
@@ -371,20 +426,24 @@ internal class LinearAuthority(
         if (budget.funding != null) {
             val condition = source.scope.condition
             budget.funding.charge(0L, condition.integerRows.sumOf { 128L + 64L * it.supportSize })
-            var work = source.coordinates.size.toLong() + condition.bools.size + condition.lower.size +
+            var work = source.coordinateCount.toLong() + condition.bools.size + condition.lower.size +
                 condition.upper.size + condition.integerRows.sumOf { it.supportSize.toLong() + 1L }
             try {
-                for (premise in source.premises.values) {
-                    if (cancellation()) return null
-                    work += 1L + premise.inequality.coefficients.size + premise.guards.size + premise.integerPins.size
+                val complete = source.allPremises { _, premise ->
+                    if (cancellation()) return@allPremises false
+                    work += 1L + premise.inequality.supportSize + premise.guardCount + premise.integerPinCount
+                    true
                 }
+                if (!complete) return null
             } finally {
                 budget.observe(preparation = work)
             }
         }
         val prepared = if (retainLp || cuts) {
             template?.takeIf { it.matches(source) && (it.cuts != null) == cuts &&
-                (!cuts || it.cuts?.complementary == (cutMask != null)) }
+                (!cuts || it.cuts?.complementary == (cutMask != null) ||
+                    pointPolicy?.managesCurrentRecipe(it.cuts?.rows) == true ||
+                    it.coordinates.all { coordinate -> coordinate.kind == SourceCoordinate.Kind.Integer }) }
                 ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts, cutMask != null) { work ->
                     cutPreparationWork += work
                     budget.observe(preparation = work)
@@ -396,7 +455,9 @@ internal class LinearAuthority(
             for (family in prepared?.cuts?.rows.orEmpty().mapTo(HashSet()) { it.family }) {
                 cutLifecycle.observe(family, "ProofVerificationWork", work)
             }
-        }, cutMask = cutMask, onCut = cutLifecycle::observe)?.also {
+        }, cutMask = cutMask, onCut = cutLifecycle::observe,
+            checkUnselectedCuts = checkUnselectedCuts(cutMask),
+            retainMaskedCuts = retainMaskedCuts(cutMask))?.also {
             cutLifecycle.families = it.cutFamilies.values.toSet()
             activeCutPeak = maxOf(activeCutPeak, it.activeCuts.toLong())
             activeMixedCutPeak = maxOf(activeMixedCutPeak, it.activeMixedCuts.toLong())
@@ -405,10 +466,12 @@ internal class LinearAuthority(
 
     private fun withAdditionalCuts(
         prepared: LinearAuthorityTemplate, cancellation: Cancellation,
+        point: Map<SourceCoordinate, Double>? = null,
     ): LinearAuthorityTemplate? {
-        if (!aggregateCuts && additionalCuts.isEmpty()) return prepared
+        val generateAggregates = aggregateCuts && !deferAggregatePreparation
+        if (!generateAggregates && additionalCuts.isEmpty()) return prepared
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
-        val generated = if (aggregateCuts) LinearAuthorityAggregateCuts.prepareBoundProjections(
+        val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairs(
             prepared.numeric, funded, { name, count ->
                 when (name) {
                     "AggregateWork" -> cutCost(count, 0L)
@@ -418,7 +481,10 @@ internal class LinearAuthority(
                         cutEligibility[key] = (cutEligibility[key] ?: 0L) + count
                     }
                 }
-            }, maximumCandidates = 64 - additionalCuts.size) else emptyList()
+            }, maximumCandidates = 64 - additionalCuts.size,
+            limits = if (point == null) LinearAuthorityAggregateCuts.sourcePairLimits
+                else LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            point = point) else emptyList()
         if (funded()) return null
         val additional = if (generated.isEmpty()) additionalCuts else {
             cutCost(1L, 64L + (generated.size + additionalCuts.size) * 8L)
@@ -438,7 +504,9 @@ internal class LinearAuthority(
         source: SourceProofContext, cancellation: Cancellation, guidance: Boolean = false, cuts: Boolean = false,
         cutMask: Set<Int>? = null,
     ): LinearAuthorityResult {
-        val cached = if (retainLp || guidance) query?.takeIf { it.matches(source, cuts, cutMask) } else null
+        val cached = if (retainLp || guidance) query?.takeIf {
+            it.matches(source, cuts, cutMask, checkUnselectedCuts(cutMask), retainMaskedCuts(cutMask))
+        } else null
         val prepared = cached ?: prepareQuery(source, cancellation, cuts, cutMask)?.also {
             if (retainLp || guidance) query = it
         } ?: return LinearAuthorityResult()
