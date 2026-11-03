@@ -50,6 +50,60 @@ import kotlin.test.assertTrue
 class LpPrimalHeuristicsTest {
 
     @Test
+    fun `masked component admission uses only known fractional targets`() {
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it == 4) 2 else 1) },
+            (0 until 2).flatMap { group ->
+                (0 until 8).map { mask ->
+                    val coefficients = IntArray(4) { v ->
+                        if (v == 0) { if (group == 0) 2 else -2 }
+                        else if (mask and (1 shl (v - 1)) == 0) 1 else -1
+                    }
+                    Linear(coefficients, IntArray(4) { 4 * group + it }, LinearOp.GE,
+                        (if (group == 0) 2 else -2) - coefficients.drop(1).count { it < 0 })
+                }
+            }).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0, -1, 0, 0, 0))
+        for (kind in listOf("unknown", "integral", "fractional")) {
+            val factory = RecordingLpEngineFactory()
+            LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                    rootCutHarvest = false)), SolveStatsSink("masked-component-admission"),
+                LpSolveContext(factory)).use { engine ->
+                assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+                engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+                val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
+                val known = BooleanArray(relaxation.model.n)
+                val point = DoubleArray(relaxation.model.n) { 1.75 }
+                if (kind != "unknown") {
+                    for (variable in 0 until 4) {
+                        val column = relaxation.intColOf[variable]
+                        known[column] = true
+                        point[column] = if (kind == "integral") 1.0 else if (variable == 0) 0.25 else 0.5
+                    }
+                }
+                val guide = RootRoundingWarmStart(objective, relaxation, primal = point, knownColumns = known)
+                engine.rootRoundingWarmStart = guide
+                assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+                val constructed = factory.calls.size
+
+                val prepared = engine.prepareRootComponentTrial(objective, Cancellation.Never)
+
+                assertEquals(kind == "fractional", prepared, kind)
+                if (prepared) {
+                    val prefix = assertNotNull(guide.pinning)
+                    val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+                    assertEquals(listOf(1L, 1L, 1L, 1L, 0L, 0L, 0L, 0L), sample.ints.toList())
+                    assertEquals(prefix.work, engine.primalPropagationWork)
+                } else {
+                    assertNull(guide.pinning, kind)
+                    assertEquals(0L, engine.primalPropagationWork, kind)
+                }
+                assertEquals(constructed, factory.calls.size, kind)
+            }
+        }
+    }
+
+    @Test
     fun `component trial admission separates paid numerical work from its preparation limit`() {
         for (rootLimit in listOf(8_000_000L, 150_000_000L)) {
             val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(

@@ -22,7 +22,7 @@ internal fun LpEngine.prepareRootComponentTrial(
 ): Boolean {
     val guide = rootRoundingWarmStart ?: return false
     val targets = rootPrimalTargets ?: return false
-    if (guide.primal == null || targets.coordinates !== guide.primal || guide.knownColumns != null ||
+    if (guide.primal == null || targets.coordinates !== guide.primal ||
         guide.objective !== objective || guide.roundingComplete || problem.numBoolVars != 0 ||
         problem.numRealVars != 0 || problem.numIntVars < 4 || cancellation()
     ) return false
@@ -78,6 +78,7 @@ private fun LpEngine.fractionalComponentTargets(
     try {
         for (column in targets.intColumns) {
             meter.reserve(8L, 0L, matrix = false)
+            if (targets.knownColumns != null && targets.knownColumns.getOrNull(column) != true) continue
             val value = targets.coordinates.getOrNull(column) ?: continue
             if (value.isFinite() && value != round(value)) {
                 outcome = "FRACTIONAL_TARGETS"

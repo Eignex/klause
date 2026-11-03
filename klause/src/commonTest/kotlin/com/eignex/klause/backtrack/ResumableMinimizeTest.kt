@@ -192,6 +192,70 @@ internal object FiniteCutoffKnapsackFixture {
 }
 
 class ResumableMinimizeTest {
+
+    @Test
+    fun `returned fractional child targets round before their coordinates pass to search`() {
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it == 4) 2 else 1) },
+            (0 until 2).flatMap { group ->
+                (0 until 8).map { mask ->
+                    val coefficients = IntArray(4) { v ->
+                        if (v == 0) { if (group == 0) 2 else -2 }
+                        else if (mask and (1 shl (v - 1)) == 0) 1 else -1
+                    }
+                    Linear(coefficients, IntArray(4) { 4 * group + it }, LinearOp.GE,
+                        (if (group == 0) 2 else -2) - coefficients.drop(1).count { it < 0 })
+                }
+            }).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0, -1, 0, 0, 0))
+        var queries = 0
+        val factory = object : LpEngineFactory by ProductionLpEngineFactory {
+            override fun newPersistentSolver(
+                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
+            ): PersistentLpSolver {
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
+                val unfinished = model.cost.any { it < 0L }
+                return object : PersistentLpSolver by delegate {
+                    private var charged = 0L
+                    override val lastMetrics: LpSolveMetrics get() =
+                        delegate.lastMetrics.copy(workOps = delegate.lastMetrics.workOps + charged)
+
+                    override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
+                        delegate.resolveBounds(if (unfinished) {
+                            LpFloatAllowance(allowance?.work ?: 0L, 1)
+                        } else allowance).also {
+                            queries++
+                            if (unfinished) charged = 5_000L * LP_WORK_PER_NODE
+                        }
+                }
+            }
+        }
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMax,
+            lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false, boundMaxDepth = -1))
+        val offered = ArrayList<Sample>()
+        val stopAtPoint = Cancellation { offered.isNotEmpty() }
+        BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
+            search.runSlice(stopAtPoint, Long.MAX_VALUE, 5_000L) { offered += it.sample }
+            assertTrue(offered.isEmpty())
+            assertEquals(2, queries)
+
+            search.runSlice(stopAtPoint, Long.MAX_VALUE, 100_000L) { offered += it.sample }
+
+            assertEquals(listOf(1L, 1L, 1L, 1L, 0L, 0L, 0L, 0L), offered.single().ints.toList())
+            assertEquals(2, queries)
+            assertEquals(0.0, search.stats.lp.nodePasses.sum)
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_LP_GUIDANCE_ROOT"]
+                ?.outcomes?.get("PARTIAL_REUSED"))
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_COMPONENT_ROUNDING_ROOT"]
+                ?.outcomes?.get("HANDOFF_TRIAL_PREPARED"))
+            assertEquals(2L, search.stats.lp.phases["PRIMAL_COMPONENT_ROUNDING_ROOT"]
+                ?.outcomes?.get("GROUP_COMPLETED"))
+            assertEquals(1L, search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"]?.outcomes?.get("IMPROVING"))
+        }
+    }
+
     @Test
     fun `complete root components round before their coordinates pass to search`() {
         val problem = Problem(0, 8, Array(8) { IntDomain(0, if (it == 4) 2 else 1) },
