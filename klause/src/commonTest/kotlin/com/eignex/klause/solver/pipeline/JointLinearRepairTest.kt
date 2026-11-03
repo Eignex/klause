@@ -45,6 +45,38 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
+    fun `a non improving guided point should leave numerical neighborhood traversal available`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ), numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val funding = SourceLpFunding(100_000, 100_000).also { it.grant(100_000) }
+        val guidance = LinearRepairGuidance()
+        assertTrue(guidance.remember(source, (0..2).associate {
+            SourceCoordinate(SourceCoordinate.Kind.Integer, it) to 0.0
+        }, SourceLpBudget(funding = funding), Cancellation.Never))
+        val seed = Sample(booleanArrayOf(), longArrayOf(1, 1, 1), doubleArrayOf(1.0),
+            exactReals = listOf(BigFraction.ONE))
+
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, sourceLpOperations = 8, maxFlips = 3),
+            external = { seed }, repairGuidance = guidance,
+            incumbentCompletionCheck = { _, _, _ -> true }).use { repair ->
+            repair.search(adaptive = true).use { search ->
+                var done = false
+                repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1_000) }
+
+                assertFalse(search.minimizeResult(TerminationReason.BudgetExhausted) is MinimizeResult.WithSample)
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairGuidedPointNonImproving"))
+                assertTrue(requireNotNull(repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures")) >= 2)
+            }
+        }
+    }
+
+    @Test
     fun `an original rejected guided point should remain unpublished`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
             factors = arrayOf(
@@ -106,7 +138,8 @@ class JointLinearRepairTest {
                 var done = false
                 repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1_000) }
 
-                val result = assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                val result = assertIs<MinimizeResult.WithSample>(
+                    search.minimizeResult(TerminationReason.BudgetExhausted))
                 assertEquals(0L, result.sample.intValue(0))
                 assertEquals(listOf(BigFraction.ONE), result.sample.exactReals)
                 assertTrue(originalChecks > 0)

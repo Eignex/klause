@@ -27,7 +27,6 @@ import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.math.round
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 internal data class JointRepairAttempt(
@@ -497,8 +496,8 @@ internal class JointLinearRepair(
         trial: GuidedPointTrial, condition: ExactNeighborhoodCondition, cancellation: Cancellation,
     ): Sample? {
         if (trial.finished) return null
-        funding.grant(QUERY_SLICE_WORK * LP_WORK_PER_NODE)
-        val token = stop or cancellation or Cancellation.after(QUERY_SLICE_MILLIS.milliseconds)
+        funding.grant(20_000_000L)
+        val token = stop or cancellation
         if (!trial.prepared) {
             trial.seed = JointRepairGuidedPoint.propose(model, trial.center, condition, trial.hint, budget, token)
             if (token()) return null
