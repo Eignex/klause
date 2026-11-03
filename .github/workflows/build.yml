@@ -124,6 +124,14 @@ jobs:
       - name: Run Linux native tests
         run: ./gradlew --refresh-dependencies :klause:linuxX64Test :klause-cli:linkReleaseExecutableLinuxX64 :klause:linkLpProfileReleaseExecutableLinuxX64
 
+      - name: Capture native runner durations
+        run: |
+          klause/build/bin/linuxX64/debugTest/test.kexe --ktest_logger=TEAMCITY \
+            > klause/build/test-results/linuxX64Test/native-monotonic-teamcity.log \
+            2> klause/build/test-results/linuxX64Test/native-monotonic-stderr.log
+          git rev-parse HEAD > klause/build/test-results/linuxX64Test/native-monotonic-source-head.txt
+          sha256sum klause/build/bin/linuxX64/debugTest/test.kexe > klause/build/test-results/linuxX64Test/native-monotonic-binary-sha256.txt
+
       - name: Start the Linux native CLI
         run: klause-cli/build/bin/linuxX64/releaseExecutable/klause-cli.kexe --version
 
