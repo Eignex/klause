@@ -186,6 +186,91 @@ class SolverInvocationTest {
         assertEquals("5", result.stats["sourceInvocationMs"])
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `source observation setup spends the containing allowance`(unavailable: Boolean) {
+        var nanos = 0L
+
+        val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000), nanoTime = { nanos },
+            observeHarness = {
+                val observation = SourceHarnessObservation { SourceHarnessCounters(nanos, threadId = 1) }
+                nanos += 3_000_000
+                if (unavailable) error("observation unavailable")
+                observation
+            },
+        ) { _, remaining ->
+            assertEquals(997L, remaining.timeoutMillis)
+            nanos += 10_000_000
+            SolverInvocation.Result(true, null, null, proven = false,
+                stats = emptyMap(), rawOutput = "sat", command = "cli")
+        }
+
+        assertEquals("3", result.stats["sourceObservationSetupMs"])
+        assertEquals("3", result.stats["sourcePreparationMs"])
+        assertEquals("13", result.stats["sourceInvocationMs"])
+        assertEquals(true, result.feasible)
+    }
+
+    @Test
+    fun `final source sampling retains its whole invocation cost`() {
+        var nanos = 0L
+        var reads = 0
+
+        val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000), nanoTime = { nanos },
+            observeHarness = {
+                SourceHarnessObservation {
+                    reads++
+                    if (reads == 2) nanos += 2_000_000
+                    SourceHarnessCounters(nanos, threadId = 1)
+                }
+            },
+        ) { _, _ ->
+            nanos = 10_000_000
+            SolverInvocation.Result(true, null, null, proven = false,
+                stats = emptyMap(), rawOutput = "sat", command = "cli")
+        }
+
+        assertEquals("2", result.stats["sourceObservationFinishMs"])
+        assertEquals("10", result.stats["sourceCliMs"])
+        assertEquals("12", result.stats["sourceInvocationMs"])
+    }
+
+    @Test
+    fun `exhausted preparations retain harness observations without a solver verdict`() {
+        var nanos = 0L
+
+        val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(5), nanoTime = { nanos },
+            observeHarness = {
+                val observation = SourceHarnessObservation { SourceHarnessCounters(nanos, threadId = 1) }
+                nanos = 5_000_000
+                observation
+            },
+        ) { _, _ -> error("budget exhausted") }
+
+        assertNull(result.feasible)
+        assertEquals("true", result.stats["sourcePreparationBudgetExhausted"])
+        assertEquals("5", result.stats["sourceHarnessThreadCpuMs"])
+        assertEquals("0", result.stats["sourceCliMs"])
+    }
+
+    @Test
+    fun `failed invocations retain harness observations with their failure result`() {
+        var nanos = 0L
+
+        val failure = assertFailsWith<SolverInvocation.Failure> {
+            SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000), nanoTime = { nanos },
+                observeHarness = { SourceHarnessObservation { SourceHarnessCounters(nanos, threadId = 1) } },
+            ) { _, _ ->
+                nanos = 7_000_000
+                throw SolverInvocation.Failure(SolverInvocation.Result(null, null, null, proven = false,
+                    stats = emptyMap(), rawOutput = "partial", command = "cli"), "failed")
+            }
+        }
+
+        assertEquals("7", failure.result.stats["sourceHarnessThreadCpuMs"])
+        assertEquals("partial", failure.result.rawOutput)
+    }
+
     @Test
     fun `plain inputs retain the whole source invocation cost`() {
         var nanos = 0L
