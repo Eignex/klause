@@ -21,6 +21,7 @@ internal class IntegerConflictRow private constructor(
     val hasNonOwnerOriginalSource: Boolean = false,
     val declaredBoundTerms: Int = 0,
     val declaredBoundModes: Int = 0,
+    val hasSlackOriginalSource: Boolean = false,
 ) : IntegerLearningInequality {
     override fun coefficient(variable: Int): Long {
         val index = variables.indexOf(variable)
@@ -29,20 +30,24 @@ internal class IntegerConflictRow private constructor(
 
     fun derivedThroughTransient(steps: Int): IntegerConflictRow = if (steps == 0) this else
         IntegerConflictRow(variables, coefficients, bound, guard, steps, retainedSources, hasNonOwnerSource,
-            hasNonOwnerOriginalSource, declaredBoundTerms, declaredBoundModes)
+            hasNonOwnerOriginalSource, declaredBoundTerms, declaredBoundModes, hasSlackOriginalSource)
 
     fun derivedFromRetainedSources(
         sources: Int,
         nonOwnerSource: Boolean = false,
         nonOwnerOriginalSource: Boolean = false,
-    ): IntegerConflictRow = if (sources == 0 && !nonOwnerSource && !nonOwnerOriginalSource) this else
+        slackOriginalSource: Boolean = false,
+    ): IntegerConflictRow = if (sources == 0 && !nonOwnerSource && !nonOwnerOriginalSource && !slackOriginalSource) {
+        this
+    } else {
         IntegerConflictRow(variables, coefficients, bound, guard, transientSteps, sources,
             hasNonOwnerSource || nonOwnerSource, hasNonOwnerOriginalSource || nonOwnerOriginalSource,
-            declaredBoundTerms, declaredBoundModes)
+            declaredBoundTerms, declaredBoundModes, hasSlackOriginalSource || slackOriginalSource)
+    }
 
     fun derivedFromDeclaredBounds(terms: Int, modes: Int = 0): IntegerConflictRow = if (terms == 0) this else
         IntegerConflictRow(variables, coefficients, bound, guard, transientSteps, retainedSources,
-            hasNonOwnerSource, hasNonOwnerOriginalSource, terms, declaredBoundModes or modes)
+            hasNonOwnerSource, hasNonOwnerOriginalSource, terms, declaredBoundModes or modes, hasSlackOriginalSource)
 
     fun subsumes(other: IntegerConflictRow): Boolean =
         (guard == Lit.NONE || guard == other.guard) && bound <= other.bound &&

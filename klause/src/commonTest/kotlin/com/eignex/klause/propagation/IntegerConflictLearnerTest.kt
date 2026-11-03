@@ -13,6 +13,7 @@ import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.toSearchHints
 import com.eignex.klause.formats.json.ProblemJson
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -43,6 +44,87 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
+    @Test
+    fun `a non tight original parent should derive a mapped owned consequence`() {
+        val native = PropagationSession(PropagationProblem(Problem(0, 4, Array(4) { IntDomain(0, 1) }, arrayOf(
+            Table(intArrayOf(3, 0), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(3, 1), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(3, 2), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Linear(intArrayOf(-1, -1, -1, 2), intArrayOf(0, 1, 2, 3), LinearOp.LE, 0),
+        ))), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(0 to 1L, 1 to 1L, 2 to 1L), 1L, Lit.NONE)), 1)
+        val cp = CpSearchComponent(native, IntArray(4) { it + 7 })
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(10, 1)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+        assertContentEquals(intArrayOf(3), learned.row.variables)
+        assertContentEquals(longArrayOf(1), learned.row.coefficients)
+        assertEquals(0L, learned.row.bound)
+        assertTrue(learned.row.hasSlackOriginalSource)
+        assertTrue(learned.row.hasNonOwnerOriginalSource)
+        assertEquals(0L, shared.intUpperBound(10))
+        val snapshot = native.learnedLifecycle()
+        assertEquals(1L, snapshot["learningIntegerSlackOriginalSources"])
+        assertEquals(1L, snapshot["learningIntegerSlackOriginalProduced"])
+        assertEquals(1L, snapshot["learningIntegerSlackOriginalAdmitted"])
+        assertEquals(1L, snapshot["learningIntegerSlackOriginalConsumed"])
+        native.releaseRetainedState()
+        assertEquals(snapshot, native.learnedLifecycle())
+    }
+
+    @Test
+    fun `a nonconflicting parent trial should not hide a later conflicting combination`() {
+        val native = PropagationSession(PropagationProblem(Problem(0, 5, Array(5) { IntDomain(0, 1) }, arrayOf(
+            Table(intArrayOf(3, 0), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(3, 1), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(3, 2), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Linear(intArrayOf(-1, 3), intArrayOf(0, 4), LinearOp.LE, 2),
+            Linear(intArrayOf(-1, -1, -1, 2), intArrayOf(0, 1, 2, 3), LinearOp.LE, 0),
+        ))), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(0 to 1L, 1 to 1L, 2 to 1L), 1L, Lit.NONE)), 1)
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(3, 1))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(conflict.learnedClause)
+
+        assertContentEquals(intArrayOf(3), learned.row.variables)
+        assertEquals(0L, learned.row.bound)
+        assertTrue(learned.row.hasSlackOriginalSource)
+        val snapshot = native.learnedLifecycle()
+        assertEquals(1L, snapshot["learningIntegerDiagnostic_integer_retained_original_reject_slack_not_conflicting"])
+        assertEquals(1L, snapshot["learningIntegerSlackOriginalSources"])
+    }
+
+    @Test
+    fun `failed parent trials should share the original combination limit`() {
+        val factors = mutableListOf<Factor>(
+            Table(intArrayOf(3, 0), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(3, 1), longArrayOf(0, 0, 0, 1, 1, 1)),
+            Table(intArrayOf(3, 2), longArrayOf(0, 0, 0, 1, 1, 1)),
+        )
+        repeat(16) { factors.add(Linear(intArrayOf(-1, 3), intArrayOf(0, 4), LinearOp.LE, 2)) }
+        factors.add(Linear(intArrayOf(-1, -1, -1, 2), intArrayOf(0, 1, 2, 3), LinearOp.LE, 0))
+        val native = PropagationSession(PropagationProblem(Problem(0, 5, Array(5) { IntDomain(0, 1) },
+            factors.toTypedArray())), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        native.addLearnedIntegerRow(requireNotNull(IntegerConflictRow.normalized(
+            mapOf(0 to 1L, 1 to 1L, 2 to 1L), 1L, Lit.NONE)), 1)
+
+        val conflict = assertIs<PropagationResult.Unsat>(native.pinIntAtLeast(3, 1))
+
+        assertIs<ConflictAnalyzer.AnalysisResult.Learned>(conflict.learnedClause)
+        val snapshot = native.learnedLifecycle()
+        assertEquals(16L, snapshot["learningIntegerDiagnostic_integer_retained_original_slack_trial"])
+        assertEquals(1L, snapshot["learningIntegerDiagnostic_integer_decline_combination_limit"])
+        assertEquals(0L, snapshot["learningIntegerSlackOriginalSources"])
+    }
+
     @Test
     fun `an original only temporary consequence should assert in mapped coordinates`() {
         val variables = intArrayOf(0, 1) + IntArray(16) { it + 3 }

@@ -15,6 +15,7 @@ private const val INTEGER_LEARNING_LEVELS = 64
 
 internal class IntegerConflictLearner(private val state: PropagationState) {
     private var selectedRetainedSource = false
+    private var combinations = 0
     private var previousSource: IntegerSourceRow? = null
     private var previousUseLo = false
     private var previousRow: IntegerLearningInequality? = null
@@ -29,6 +30,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         fallback: ConflictAnalyzer.AnalysisResult.Learned,
     ): ConflictAnalyzer.AnalysisResult.LearnedIntegerRow? = try {
         selectedRetainedSource = false
+        combinations = 0
         derive(factorId, currentLevel, fallback)
     } catch (_: CheckedLongOverflowException) {
         decline("overflow")
@@ -100,9 +102,12 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         var transientSteps = 0
         var nonOwnerSource = false
         var nonOwnerOriginalSource = false
+        var slackOriginalSource = false
         repeat(INTEGER_LEARNING_STEPS) {
+            if (combinations == INTEGER_LEARNING_STEPS) return decline("combination-limit")
             state.checkFiniteWork()
-            val event = reason(row, used, allowWideSources, target) ?: return decline("no-qualified-endpoint")
+            val event = reason(row, used, allowWideSources, target) ?: return decline(
+                if (combinations == INTEGER_LEARNING_STEPS) "combination-limit" else "no-qualified-endpoint")
             used.add(event.key)
             if (event.key.retained) {
                 selectedRetainedSource = true
@@ -118,9 +123,12 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 nonOwnerOriginalSource = true
                 state.integerNonOwnerOriginalSources++
             }
-            val combined = if (allowWideSources || retainedSources > 0) {
-                row.resolveTransient(event.row, event.variable, sourceWork, allowCompactGrowth = retainedSources > 0)
-            } else row.resolve(event.row, event.variable, sourceWork)
+            if (event.slackOriginalSource) {
+                slackOriginalSource = true
+                state.integerSlackOriginalSources++
+            }
+            val combined = event.combination ?: combine(row, event.row, event.variable,
+                allowWideSources, allowCompactGrowth = retainedSources > 0)
             combined ?: return decline("combination-shape-or-guard")
             row = combined
             if (combined.minimum(state) <= combined.bound) return decline("combination-lost-conflict")
@@ -171,15 +179,48 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 if (transientSteps > 0) state.integerChainedTransientProduced++
                 if (nonOwnerSource) state.integerNonOwnerProduced++
                 if (nonOwnerOriginalSource) state.integerNonOwnerOriginalProduced++
+                if (slackOriginalSource) state.integerSlackOriginalProduced++
             }
             if (compact.declaredBoundTerms > 0) state.integerDeclaredBoundProduced++
             if (compact.declaredBoundModes != 0) state.integerDeclaredBoundExtendedProduced++
             return ConflictAnalyzer.AnalysisResult.LearnedIntegerRow(
                 compact.derivedThroughTransient(transientSteps)
-                    .derivedFromRetainedSources(retainedSources, nonOwnerSource, nonOwnerOriginalSource),
+                    .derivedFromRetainedSources(retainedSources, nonOwnerSource, nonOwnerOriginalSource,
+                        slackOriginalSource),
                 target, levels.size, levels, fallback)
         }
         return decline("step-limit-without-assertion")
+    }
+
+    private fun combine(
+        row: IntegerLearningInequality,
+        parent: IntegerLearningInequality,
+        variable: Int,
+        allowWideSources: Boolean,
+        allowCompactGrowth: Boolean,
+    ): IntegerLearningInequality? {
+        if (combinations == INTEGER_LEARNING_STEPS) return null
+        combinations++
+        return if (allowWideSources || allowCompactGrowth) {
+            row.resolveTransient(parent, variable, sourceWork, allowCompactGrowth)
+        } else row.resolve(parent, variable, sourceWork)
+    }
+
+    private fun slackCombination(
+        row: IntegerLearningInequality,
+        parent: IntegerLearningInequality,
+        variable: Int,
+    ): IntegerLearningInequality? {
+        state.arithmeticLearningTrace?.record("integer.retained.original.slack.trial")
+        return try {
+            val combined = combine(row, parent, variable, allowWideSources = true, allowCompactGrowth = true)
+                ?: return null
+            if (chargedMinimum(combined) <= combined.bound) {
+                originalDecline("slack-not-conflicting")
+            } else combined
+        } catch (_: CheckedLongOverflowException) {
+            originalDecline("slack-overflow")
+        }
     }
 
     private fun normalizedSource(source: IntegerSourceRow, useLo: Boolean): IntegerLearningInequality? {
@@ -383,8 +424,20 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
         }
         if (!selectedRetainedSource) return null
-        for (position in 0 until count) {
-            val index = candidates[position]
+        val originalCandidates = candidates.copyOf(count)
+        return originalReason(row, used, originalCandidates, allowWideSources, slackOnly = false)
+            ?: originalReason(row, used, originalCandidates, allowWideSources, slackOnly = true)
+    }
+
+    private fun originalReason(
+        row: IntegerLearningInequality,
+        used: Set<PivotKey>,
+        candidates: IntArray,
+        allowWideSources: Boolean,
+        slackOnly: Boolean,
+    ): BoundEvent? {
+        if (slackOnly) state.arithmeticLearningTrace?.record("integer.retained.original.slack.scan")
+        for (index in candidates) {
             val variable = row.variables[index]
             val lower = row.coefficients[index] > 0L
             val owner = if (lower) state.intMinReason[variable] else state.intMaxReason[variable]
@@ -393,15 +446,19 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
                 if (occurrences == null) "integer.retained.original.unindexed" else "integer.retained.original.indexed")
             val size = occurrences?.size ?: state.baseFactorCount
             for (offset in 0 until size) {
+                if (combinations == INTEGER_LEARNING_STEPS) return null
                 sourceWork.visit()
                 val factorId = occurrences?.get(offset) ?: offset
                 if (factorId !in 0 until state.baseFactorCount || factorId == owner) continue
                 // Negative original ids cannot alias historical trail positions.
                 val key = PivotKey(variable, -factorId - 1, lower, retained = false)
                 if (key in used) continue
-                val parent = originalTightParent(factorId, variable, lower, allowWideSources) ?: continue
+                val parent = originalParent(factorId, variable, lower, allowWideSources, slackOnly) ?: continue
+                val combination = if (slackOnly) slackCombination(row, parent, variable) ?: continue else null
                 state.arithmeticLearningTrace?.record("integer.retained.original.selected")
-                return BoundEvent(parent, variable, state.undo.size, key, nonOwnerOriginalSource = true)
+                if (slackOnly) state.arithmeticLearningTrace?.record("integer.retained.original.slack.selected")
+                return BoundEvent(parent, variable, state.undo.size, key, nonOwnerOriginalSource = true,
+                    slackOriginalSource = slackOnly, combination = combination)
             }
         }
         return null
@@ -412,11 +469,12 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         return null
     }
 
-    private fun originalTightParent(
+    private fun originalParent(
         factorId: Int,
         variable: Int,
         lower: Boolean,
         allowWideSources: Boolean,
+        slackOnly: Boolean,
     ): IntegerLearningInequality? {
         val size = when (val factor = state.problem.factors[factorId]) {
             is Linear -> factor.vars.size
@@ -441,15 +499,22 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             coefficient = chargedCoefficient(parent, variable)
         }
         if ((coefficient > 0L) == lower) return originalDecline("pivot-sign")
-        var minimum = 0L
-        for (index in parent.variables.indices) {
-            sourceWork.visit()
-            val domain = state.intDomains[parent.variables[index]]
-            val endpoint = if (parent.coefficients[index] > 0L) domain.min else domain.max
-            minimum = addExact(minimum, mulExact(parent.coefficients[index], endpoint))
-        }
-        if (minimum != parent.bound) return originalDecline("not-tight")
+        val minimum = chargedMinimum(parent)
+        if (slackOnly) {
+            if (minimum >= parent.bound) return originalDecline("not-slack")
+        } else if (minimum != parent.bound) return originalDecline("not-tight")
         return parent
+    }
+
+    private fun chargedMinimum(row: IntegerLearningInequality): Long {
+        var minimum = 0L
+        for (index in row.variables.indices) {
+            sourceWork.visit()
+            val domain = state.intDomains[row.variables[index]]
+            val endpoint = if (row.coefficients[index] > 0L) domain.min else domain.max
+            minimum = addExact(minimum, mulExact(row.coefficients[index], endpoint))
+        }
+        return minimum
     }
 
     private fun chargedCoefficient(row: IntegerLearningInequality, variable: Int): Long {
@@ -553,5 +618,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val key: PivotKey,
         val nonOwnerSource: Boolean = false,
         val nonOwnerOriginalSource: Boolean = false,
+        val slackOriginalSource: Boolean = false,
+        val combination: IntegerLearningInequality? = null,
     )
 }

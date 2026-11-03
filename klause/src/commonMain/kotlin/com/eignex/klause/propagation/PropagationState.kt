@@ -382,6 +382,10 @@ class PropagationState private constructor(
     internal var integerNonOwnerOriginalProduced = 0L
     internal var integerNonOwnerOriginalAdmitted = 0L
     internal var integerNonOwnerOriginalConsumed = 0L
+    internal var integerSlackOriginalSources = 0L
+    internal var integerSlackOriginalProduced = 0L
+    internal var integerSlackOriginalAdmitted = 0L
+    internal var integerSlackOriginalConsumed = 0L
     internal var integerDeclaredBoundTerms = 0L
     internal var integerDeclaredBoundProduced = 0L
     internal var integerDeclaredBoundAdmitted = 0L

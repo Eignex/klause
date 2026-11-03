@@ -562,6 +562,14 @@ and support explanations supply no parent through this path. Equality orientatio
 uses its normalized pivot sign. A separate primitive origin flag and lifecycle
 counters identify these original non-owner selections and their children; original
 parents do not increase the owned-source count.
+After every tight-original choice fails, a second pass may try an unconditional
+original parent whose current minimum is below its bound. Its checked opposite-sign
+combination must remain conflicting. Failed trials and ordinary combinations share
+one 16-attempt allowance, and all extraction, normalization and conflict checks
+spend the same 4,096 source visits. The selected combination is reused within the
+analysis. A primitive origin flag and separate source, production, admission and
+first-consumption counters identify children from this pass without parent references.
+The ordinary native and mapped shared assertion targets retain their authority.
 After selecting an owned source, an unconditional derivation may use the same
 32-term temporary rows even when its original seed is compact. Original historical
 sources keep that compact seed's 16-term input limit; source-reference visits,
