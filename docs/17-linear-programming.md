@@ -334,8 +334,9 @@ preferences across ordinary restarts and numerical-guide replacement. Capture fi
 checks that every member is fixed; it charges array initialization and member copies
 to the remaining preparation and LP allowances inside the same one MiB guidance cap.
 Interrupted copies retain only visited value preferences and no component result.
-Completed component values precede numerical targets; uncached coordinates retain
-eligible LP preferences. The ordinary frame stack keeps every alternative, and full source checks still own
+Completed component values precede retained root LP targets; uncached coordinates
+keep eligible root LP preferences. The ordinary frame stack keeps every alternative,
+and full source checks still own
 assignment acceptance. These values supply no bound, proof or LP-point authority.
 Capture observations retain initialization, completed copy and declined or interrupted work.
 Ordinary value use and the first value use after a restart have separate observations.
