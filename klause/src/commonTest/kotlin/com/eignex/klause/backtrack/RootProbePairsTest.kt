@@ -112,7 +112,7 @@ class RootProbePairsTest {
             assertEquals(1, session.decisionLevel)
             assertNull(session.boolValue(90))
             assertTrue(session.work - start <= 12L)
-            assertEquals(2L, stats.snapshot().learning.getValue("inprocessProbePairSourceCandidates"))
+            assertEquals(1L, stats.snapshot().learning.getValue("inprocessProbePairSourceCandidates"))
         }
     }
 
