@@ -596,6 +596,25 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `a nonterminal mixed query should install checked generated rows`() {
+        val capture = LinearAuthorityCapture(4, 20_000L, 1_000_000L, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithPointCuts(nonseparating, Cancellation.Never)
+        }
+
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+            (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+        assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
+        assertTrue(capture.records.first().cuts.isNotEmpty())
+        assertTrue(capture.records.drop(1).any { record ->
+            record.cuts.size > capture.records.first().cuts.size && record.cuts.all { it.checked && it.installed }
+        })
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(nonseparating.withLinearAuthority())
+            .verify(assertNotNull(result.bound)))
+    }
+
+    @Test
     fun `a checked mixed generated recipe should enter installed row aging`() {
         val rows = listOf(
             LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),

@@ -318,7 +318,7 @@ internal class LinearAuthority(
         val previous = template
         adoptTemplate(refined)
         query = null
-        val checked = prepareQuery(source, funded, cuts = true, cutMask = emptySet())
+        val checked = prepareQuery(source, funded, cuts = true, cutMask = emptySet(), retainRecipe = generated)
         if (checked == null || funded() || template !== refined) {
             template = previous
             return null
@@ -429,6 +429,7 @@ internal class LinearAuthority(
 
     private fun prepareQuery(
         source: SourceProofContext, cancellation: Cancellation, cuts: Boolean, cutMask: Set<Int>?,
+        retainRecipe: Boolean = false,
     ): LinearAuthorityQuery? {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return null
         if ((source.scope.condition.lower.keys + source.scope.condition.upper.keys).any {
@@ -459,7 +460,7 @@ internal class LinearAuthority(
         }
         val prepared = if (retainLp || cuts) {
             template?.takeIf { it.matches(source) && (it.cuts != null) == cuts &&
-                (!cuts || it.cuts?.complementary == (cutMask != null) ||
+                (!cuts || retainRecipe || it.cuts?.complementary == (cutMask != null) ||
                     pointPolicy?.managesCurrentRecipe(it.cuts?.rows) == true ||
                     it.coordinates.all { coordinate -> coordinate.kind == SourceCoordinate.Kind.Integer }) }
                 ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts, cutMask != null) { work ->
