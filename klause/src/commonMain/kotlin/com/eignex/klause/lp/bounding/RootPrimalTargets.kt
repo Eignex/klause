@@ -40,11 +40,12 @@ internal class RootComponentRounding(val order: RootComponentOrder) {
     }
 }
 
-internal fun rootComponentRepairBytes(variables: Int): Long = 256L + 33L * variables
+internal fun rootComponentRepairBytes(variables: Int): Long = 288L + 37L * variables
 
 internal class RootComponentRepair(variables: Int) {
     val positions = IntArray(variables)
     val levels = IntArray(variables)
+    val conflictFrames = IntArray(variables) { -1 }
     val first = LongArray(variables)
     val second = LongArray(variables)
     val undoWork = LongArray(variables)
@@ -52,6 +53,7 @@ internal class RootComponentRepair(variables: Int) {
     var depth: Int = 0
     var position: Int = 0
     var retreat: Boolean = false
+    var retreatLimit: Int = -1
     var active: Boolean = false
     val retainedBytes: Long get() = rootComponentRepairBytes(positions.size)
 
@@ -59,6 +61,7 @@ internal class RootComponentRepair(variables: Int) {
         depth = 0
         position = 0
         retreat = false
+        retreatLimit = -1
         active = false
     }
 }

@@ -418,7 +418,7 @@ internal class LpEngine(
             targets.coordinates !== guide.primal
         ) return null
         val bytes = if (pending.repair == null) rootComponentRepairBytes(problem.numIntVars) else 0L
-        val work = if (pending.repair == null) 8L * problem.numIntVars + 1L else 1L
+        val work = if (pending.repair == null) 9L * problem.numIntVars + 2L else 1L
         if (!rootComponentPreparationAllowed(targets, bytes, work) ||
             rootComponentPreparationWork(targets, bytes) < work || cancellation()
         ) return null

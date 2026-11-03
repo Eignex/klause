@@ -647,7 +647,14 @@ partial-owner refresh preserves an active private repair with matching source,
 objective, relaxation and target identities instead of copying a replacement guide.
 Owner invalidation and changed identities keep their ordinary retirement behavior. Frames count
 against the same guidance storage cap, and propagation and retraction spend the remaining
-cumulative root and worker work. Exhausting the candidate choices or allowance supplies
+cumulative root and worker work. When both candidates conflict and their reported
+levels map to the private frames, those hints can guide retreat past later choices.
+Missing or foreign levels retain chronological retreat. The
+reason scan and every skipped frame's retraction spend the same work allowance;
+interrupted retreat retains its target and charges. One private support index per
+frame shares the guidance byte cap. These level hints carry no refutation authority;
+ordinary complete search keeps its alternatives.
+Exhausting the candidate choices or allowance supplies
 no infeasibility authority. Completed earlier integer values can remain soft preferences
 for complete search. No partial assignment is a witness.
 Component progress and its retained order share the existing guidance storage cap;

@@ -273,6 +273,83 @@ class LpPrimalHeuristicsTest {
     }
 
     @Test
+    fun `component repair skips unrelated pins across interrupted conflict retreats`() {
+        for (interrupted in listOf(false, true)) {
+            val width = 20
+            val problem = Problem(0, 2 * width,
+                Array(2 * width) { IntDomain(0, if (it % width == 0) 2 else 1) },
+                (0 until 2).flatMap { group ->
+                    val gate = group * width
+                    listOf(1 to 2, 2 to 3, 3 to 1).flatMap { (a, b) ->
+                        val variables = intArrayOf(gate, gate + a, gate + b)
+                        listOf(Linear(intArrayOf(1, 1, 1), variables, LinearOp.GE, 2),
+                            Linear(intArrayOf(1, -1, -1), variables, LinearOp.GE, 0))
+                    } + (4 until width).map { offset ->
+                        Linear(intArrayOf(1, 1), intArrayOf(gate, gate + offset), LinearOp.LE, 2)
+                    }
+                })
+            val objective = LinearObjective(intCoefficients = LongArray(2 * width))
+            val factory = RecordingLpEngineFactory()
+            val sink = SolveStatsSink("conflict-component-retreat")
+            LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                    rootCutHarvest = false)), sink, LpSolveContext(factory)).use { engine ->
+                assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+                engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
+                val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
+                val primal = DoubleArray(relaxation.model.n)
+                val known = BooleanArray(primal.size)
+                for (v in 0 until 2 * width) {
+                    val column = relaxation.intColOf[v]
+                    known[column] = v % width == 0 || v % width == 4
+                    primal[column] = when (v % width) { 0 -> 1.0; 4 -> 0.25; else -> 123.75 }
+                }
+                val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal,
+                    knownColumns = known, sourceProblem = problem)
+                val before = engine.primalPropagationWork
+                val limit = Cancellation { engine.primalPropagationWork - before >= 200_000L }
+                var expired = false
+                var retreatDepth = -1
+                var pinning: PropagationSession? = null
+                val slice = Cancellation {
+                    guidance.pinning?.let { pinning = it }
+                    val pending = guidance.componentRounding
+                    val repair = pending?.repair
+                    if (interrupted && pending?.group == 1 && repair != null && repair.retreatLimit >= 0) {
+                        if (retreatDepth < 0) retreatDepth = repair.depth
+                        else if (repair.depth < retreatDepth) expired = true
+                    }
+                    expired || limit()
+                }
+                val constructed = factory.calls.size
+                val queries = factory.floatAllowances.size
+                engine.rootRoundingWarmStart = guidance
+
+                val first = engine.lpRoundingProbe(objective, slice)
+                val sample = if (interrupted) {
+                    assertNull(first)
+                    assertTrue(expired)
+                    assertEquals(IntDomain(2, 2), assertNotNull(guidance.pinning).intDomain(0))
+                    assertNotNull(engine.lpRoundingProbe(objective, limit))
+                } else assertNotNull(first)
+
+                assertEquals(2L, sample.ints[0])
+                assertEquals(2L, sample.ints[width])
+                assertIs<Verification.Accepted<Sample, Double>>(
+                    ComposedSampleVerifier(problem, objective, Cancellation.Never)
+                        .verify(Candidate(sample, objective.evaluate(sample))),
+                )
+                assertTrue(engine.primalPropagationWork - before < 200_000L)
+                assertEquals(assertNotNull(pinning).work, engine.primalPropagationWork)
+                assertTrue((sink.lp.phases["PRIMAL_COMPONENT_REPAIR_RETREAT_ROOT"]
+                    ?.outcomes?.get("CONFLICT") ?: 0L) >= 2L)
+                assertEquals(constructed, factory.calls.size)
+                assertEquals(queries, factory.floatAllowances.size)
+            }
+        }
+    }
+
+    @Test
     fun `component repair declines when its containing root work is spent`() {
         val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) },
             (0 until 2).flatMap { group ->
