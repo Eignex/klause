@@ -273,7 +273,8 @@ class LpEngineTest {
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
             LpParams(lpPlan = LpPlan(bounding = true), cancellation = token),
             SolveStatsSink("cancelled-template-charge"),
-            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+            projections = FactorProjectionProviders.Default.prepare(problem),
+            eagerSourcePreparation = true).use { engine ->
             val before = engine.totalSolveWork()
             work = 0L
 
@@ -282,6 +283,31 @@ class LpEngineTest {
             }
 
             assertTrue(work >= 3L)
+            assertEquals(work, engine.totalSolveWork() - before)
+        }
+    }
+
+    @Test
+    fun `cancelled admission lookup charges the containing LP allowance`() {
+        val problem = boundedProblem().bake()
+        var work = 0L
+        val token = object : Cancellation {
+            private val meter = WorkMeter { work += it }
+            override fun isCancelled(): Boolean = work >= 1L
+            override fun workMeter(): WorkMeter = meter
+        }
+        LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
+            LpParams(lpPlan = LpPlan(bounding = true), cancellation = token),
+            SolveStatsSink("cancelled-admission-charge"),
+            projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
+            val before = engine.totalSolveWork()
+            work = 0L
+
+            assertFailsWith<LpAssemblyCancelled> {
+                assertNotNull(engine.lpRelaxer).build(RootDomains(problem), cancellation = token)
+            }
+
+            assertTrue(work >= 1L)
             assertEquals(work, engine.totalSolveWork() - before)
         }
     }
