@@ -11,6 +11,8 @@ import com.eignex.klause.lp.bounding.RootRoundingWarmStart
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -18,11 +20,97 @@ import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpRootTargetsTest {
+
+    @Test
+    fun `completed auxiliary root points guide ordinary values without a live numerical owner`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val factory = RecordingLpEngineFactory()
+        val sink = SolveStatsSink("auxiliary-root-value-order")
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), sink, LpSolveContext(factory)).use { engine ->
+            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            val constructed = factory.calls.size
+
+            val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
+
+            assertEquals(listOf(1L, 0L), ordered)
+            assertEquals(constructed, factory.calls.size)
+            assertNull(engine.propagator.state)
+            assertEquals(1L, sink.snapshot().lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]
+                ?.outcomes?.get("AUXILIARY_ROOT_VALUE_ORDER_OFFERED"))
+        }
+    }
+
+    @Test
+    fun `cancelled auxiliary value transfers resume under a fresh token without another query`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val factory = RecordingLpEngineFactory()
+        var stopped = false
+        val token = Cancellation { stopped }
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("resumed-auxiliary-value-order"),
+            LpSolveContext(factory)).use { engine ->
+            assertNull(engine.lpRoundingProbe(objective, token, accept = {
+                stopped = true
+                null
+            }))
+            val constructed = factory.calls.size
+            assertFalse(engine.retainRootPrimalTargets(token))
+            stopped = false
+
+            assertTrue(engine.retainRootPrimalTargets(token))
+            val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
+
+            assertEquals(listOf(1L, 0L), ordered)
+            assertEquals(constructed, factory.calls.size)
+        }
+    }
+
+    @Test
+    fun `auxiliary value transfer requires its source objective and retained root plan`() {
+        for (guard in listOf("source", "unstamped", "objective", "masked", "ordinary", "branching", "unfinished")) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+            val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
+            val source = when (guard) {
+                "source" -> Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyList())
+                "unstamped" -> null
+                else -> problem
+            }
+            val guidanceObjective = if (guard == "objective") {
+                LinearObjective(intCoefficients = longArrayOf(1, 2))
+            } else objective
+            LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, probe = true, branching = guard != "branching",
+                    componentOwnership = guard != "ordinary", rootCutHarvest = false)),
+                SolveStatsSink("qualified-auxiliary-value-order")).use { engine ->
+                engine.rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation,
+                    primal = if (guard == "unfinished") null else DoubleArray(relaxation.model.n) { 1.0 },
+                    knownColumns = if (guard == "masked") BooleanArray(relaxation.model.n) { true } else null,
+                    sourceProblem = source, auxiliaryPoint = true)
+
+                val retained = engine.retainRootPrimalTargets(Cancellation.Never)
+                val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
+
+                assertFalse(retained, guard)
+                assertEquals(listOf(0L, 1L), ordered, guard)
+            }
+        }
+    }
+
     @Test
     fun `finished masked rounding guides ordinary values without reading unknown payloads or solving again`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },

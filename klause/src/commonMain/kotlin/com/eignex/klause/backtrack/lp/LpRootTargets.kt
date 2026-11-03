@@ -30,6 +30,9 @@ internal fun LpEngine.orderRootValues(variable: VarRef, values: Sequence<Long>):
         if (!targets.valueOrderOffered) {
             targets.valueOrderOffered = true
             sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "VALUE_ORDER_OFFERED", 0L)
+            if (targets.auxiliary) {
+                sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "AUXILIARY_ROOT_VALUE_ORDER_OFFERED", 0L)
+            }
         }
         val preferred = if (variable is VarRef.Bool) {
             if (coordinate >= 0.5) 1L else 0L

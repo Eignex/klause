@@ -115,6 +115,8 @@ internal class RootRoundingWarmStart(
     val basis: Basis? = null,
     val primal: DoubleArray? = null,
     val knownColumns: BooleanArray? = null,
+    val sourceProblem: Problem? = null,
+    val auxiliaryPoint: Boolean = false,
 ) {
     var pinning: PropagationSession? = null
     var rounding: LpRounding = LpRounding.NEAREST
@@ -318,7 +320,8 @@ internal class LpEngine(
         noteNodeOverhead(work)
         val primal = result.primal.copyOf()
         if (cancellation()) return
-        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal)
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, result.basis, primal,
+            sourceProblem = problem)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
@@ -357,15 +360,18 @@ internal class LpEngine(
         if (!params.lpPlan.branching || problem.numRealVars != 0 || guide.objective !== objective ||
             coordinates.size != guide.relaxation.model.n ||
             (guide.knownColumns != null && guide.knownColumns.size != coordinates.size) ||
-            !retainedRootPrimalStateMatches(guide.relaxation) || cancellation() ||
+            !rootPrimalGuidanceMatches(guide) || cancellation() ||
             !rootGuidanceFits(ROOT_PRIMAL_TARGET_HEADER_BYTES + mapBytes) || lpWorkAllowanceSpent(1L) ||
             retainedRootRemainingWork() <= 1L
         ) return false
         noteNodeOverhead(1L)
         // Transfer the private buffers; pinning state and basis remain owned by the rounding attempt.
         rootPrimalTargets = RootPrimalTargets(guide.relaxation.intColOf, guide.relaxation.boolColOf,
-            coordinates, guide.knownColumns)
+            coordinates, guide.knownColumns, auxiliary = guide.auxiliaryPoint)
         sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "RETAINED", 0L)
+        if (guide.auxiliaryPoint) {
+            sink.lp.observePrimalPhase("PRIMAL_VALUE_GUIDANCE", "AUXILIARY_ROOT_RETAINED", 0L)
+        }
         return true
     }
 
@@ -409,6 +415,12 @@ internal class LpEngine(
         cpAdapter.currentModel === model && model.exactState != null &&
         propagator.state === model.exactState && model.exactState.depth == 0
 
+    private fun rootPrimalGuidanceMatches(guide: RootRoundingWarmStart): Boolean {
+        if (!retainedRootEnabled) return false
+        return if (guide.auxiliaryPoint) guide.sourceProblem === problem && guide.knownColumns == null
+        else retainedRootPrimalStateMatches(guide.relaxation)
+    }
+
     private fun retainedRootPrimalStateMatches(relaxation: LpRelaxation): Boolean {
         val retained = rootRoundingWarmStart ?: return false
         val state = relaxation.model.exactState ?: return false
@@ -421,7 +433,7 @@ internal class LpEngine(
             rootRoundingWarmStart?.primal != null || lpWorkAllowanceSpent(1L)
         ) return
         noteNodeOverhead(1L)
-        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation)
+        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, sourceProblem = problem)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "OWNER_RETAINED", 0L)
     }
 
@@ -485,7 +497,7 @@ internal class LpEngine(
         }
         if (cancellation()) return PartialPrimalRead.CANCELLED
         rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
-            primal = guidance.coordinates, knownColumns = guidance.known)
+            primal = guidance.coordinates, knownColumns = guidance.known, sourceProblem = problem)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", outcome, started.elapsedNow().inWholeNanoseconds)
         return PartialPrimalRead.RETAINED
     }
@@ -503,6 +515,7 @@ internal class LpEngine(
         relaxation: LpRelaxation,
         result: FloatLpResult,
         guidanceObjective: LinearObjective,
+        sourceProblem: Problem? = null,
     ) {
         if (!params.lpPlan.probe || !result.optimal ||
             !rootGuidanceFits(result.primal.size.toLong() * Double.SIZE_BYTES) || lpWorkAllowanceSpent(1L)
@@ -514,7 +527,8 @@ internal class LpEngine(
         // The auxiliary solver has closed; its completed output buffer belongs to this private worker.
         // Pause bookkeeping preserves it while future pinning polls the next invocation's token.
         noteNodeOverhead(1L)
-        rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation, result.basis, result.primal)
+        rootRoundingWarmStart = RootRoundingWarmStart(guidanceObjective, relaxation, result.basis, result.primal,
+            sourceProblem = sourceProblem, auxiliaryPoint = true)
         sink.lp.observePrimalPhase("PRIMAL_LP_GUIDANCE", "RETAINED", started.elapsedNow().inWholeNanoseconds)
     }
 
