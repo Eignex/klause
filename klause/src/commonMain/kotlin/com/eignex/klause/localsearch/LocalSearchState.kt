@@ -265,7 +265,8 @@ class LocalSearchState private constructor(
         scoringCancellation = cancellation
         scoringCountdown = 0
         return try {
-            pick()
+            val timer = phaseTimer
+            if (timer == null) pick() else timer.measureScoringPick(pick)
         } catch (_: LocalSearchScoringInterrupted) {
             null
         } finally {

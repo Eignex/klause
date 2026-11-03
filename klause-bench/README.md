@@ -26,6 +26,16 @@ Execution verifies the planned file and directory identities before each solve.
 Declared-input planning uses the complete corpus-pack index even when only a subset
 of its members is materialized locally. Each solve verifies its planned input bytes.
 
+The Linux JVM lab manifest requests a source snapshot with the selected revision's files and original Git commit identity.
+Its builds and tools use the current revision without requiring ancestors or tags.
+The standard Mac manifest uses Git bundle transport.
+
+Corpus-pack indexes are committed under `klause-bench/corpus-index/<collection>.tsv.gz`
+(`path<TAB>sha256<TAB>bytes`), so declared-input planning makes no network requests and
+transfers no corpus bytes. Regenerate them from complete collection trees with
+`CommittedCorpusIndexes CORPUS_CACHE WORKSPACE [COLLECTION...]` on the bench classpath.
+A collection without a committed index falls back to the mirror's index.
+
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
 copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time
@@ -34,6 +44,14 @@ and directory membership checks, and expire with the worker session. Unsupported
 A standalone `cp` control sets both `param.bt-arm=LABEL` and `param.arms=1`.
 Named recipes repeat across the configured worker slots otherwise. Check the
 emitted `arm.*` entries to verify the actual worker count before comparing controls.
+
+`bench.profile.LocalSearchTrajectory` accepts hash-pinned XCSP3 sources and
+`format=mps` for exactly retained pure-integer minimization sources.
+`preparationEngine=mixed|ls` selects the preparation route and `seed` its seed.
+`walkSeed` selects the private walk's seed, defaulting to `seed`; `moves`,
+`sliceMillis` and `sliceWork` bound the walk. Retain the emitted models,
+coordinate maps, completed moves and unfinished work when comparing slices.
+Profile timings and working-model checks do not qualify original-source performance.
 
 ## Private rebuild qualification capture
 

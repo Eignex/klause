@@ -1,5 +1,6 @@
 {
   "main": "com.eignex.klause.bench.lab.LabAdapterKt",
+  "sourceHistory": "snapshot",
   "classpath": [
     "klause-bench/build/install/klause-bench/lib/*"
   ],
@@ -29,6 +30,7 @@
     "klause-bench/lab",
     "klause-bench/scripts",
     "klause-bench/sets",
+    "klause-bench/corpus-index",
     "klause-bench/smoke-corpus",
     "klause-bench/build/install",
     "klause-bench/build/lab-runtime",

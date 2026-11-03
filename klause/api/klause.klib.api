@@ -15988,6 +15988,30 @@ final class com.eignex.klause.solver.result/CoreGuidedStats { // com.eignex.klau
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/CoreGuidedStats.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.solver.result/HeuristicStartStats { // com.eignex.klause.solver.result/HeuristicStartStats|null[0]
+    constructor <init>(kotlin/Long, kotlin.collections/Map<kotlin/String, kotlin/Long>, kotlin/Boolean) // com.eignex.klause.solver.result/HeuristicStartStats.<init>|<init>(kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Long>;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/Long, kotlin.collections/Map<kotlin/String, kotlin/Long>, kotlin/Boolean, kotlin/Long? = ...) // com.eignex.klause.solver.result/HeuristicStartStats.<init>|<init>(kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Long>;kotlin.Boolean;kotlin.Long?){}[0]
+
+    final val completed // com.eignex.klause.solver.result/HeuristicStartStats.completed|{}completed[0]
+        final fun <get-completed>(): kotlin/Boolean // com.eignex.klause.solver.result/HeuristicStartStats.completed.<get-completed>|<get-completed>(){}[0]
+    final val completionNanos // com.eignex.klause.solver.result/HeuristicStartStats.completionNanos|{}completionNanos[0]
+        final fun <get-completionNanos>(): kotlin/Long? // com.eignex.klause.solver.result/HeuristicStartStats.completionNanos.<get-completionNanos>|<get-completionNanos>(){}[0]
+    final val requiredWork // com.eignex.klause.solver.result/HeuristicStartStats.requiredWork|{}requiredWork[0]
+        final fun <get-requiredWork>(): kotlin/Long // com.eignex.klause.solver.result/HeuristicStartStats.requiredWork.<get-requiredWork>|<get-requiredWork>(){}[0]
+    final val workByArm // com.eignex.klause.solver.result/HeuristicStartStats.workByArm|{}workByArm[0]
+        final fun <get-workByArm>(): kotlin.collections/Map<kotlin/String, kotlin/Long> // com.eignex.klause.solver.result/HeuristicStartStats.workByArm.<get-workByArm>|<get-workByArm>(){}[0]
+
+    final fun component1(): kotlin/Long // com.eignex.klause.solver.result/HeuristicStartStats.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/Map<kotlin/String, kotlin/Long> // com.eignex.klause.solver.result/HeuristicStartStats.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.eignex.klause.solver.result/HeuristicStartStats.component3|component3(){}[0]
+    final fun component4(): kotlin/Long? // com.eignex.klause.solver.result/HeuristicStartStats.component4|component4(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ..., kotlin/Boolean = ...): com.eignex.klause.solver.result/HeuristicStartStats // com.eignex.klause.solver.result/HeuristicStartStats.copy|copy(kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Long>;kotlin.Boolean){}[0]
+    final fun copy(kotlin/Long = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ..., kotlin/Boolean = ..., kotlin/Long? = ...): com.eignex.klause.solver.result/HeuristicStartStats // com.eignex.klause.solver.result/HeuristicStartStats.copy|copy(kotlin.Long;kotlin.collections.Map<kotlin.String,kotlin.Long>;kotlin.Boolean;kotlin.Long?){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/HeuristicStartStats.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/HeuristicStartStats.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.result/HeuristicStartStats.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.solver.result/LinearOptimizationResult { // com.eignex.klause.solver.result/LinearOptimizationResult|null[0]
     final val bound // com.eignex.klause.solver.result/LinearOptimizationResult.bound|{}bound[0]
         final fun <get-bound>(): com.eignex.klause.solver.evidence/SourceEvidence? // com.eignex.klause.solver.result/LinearOptimizationResult.bound.<get-bound>|<get-bound>(){}[0]
@@ -16963,7 +16987,7 @@ final class com.eignex.klause.solver.result/PortfolioPhaseStats { // com.eignex.
 }
 
 final class com.eignex.klause.solver.result/PortfolioStats { // com.eignex.klause.solver.result/PortfolioStats|null[0]
-    constructor <init>(kotlin.collections/List<com.eignex.klause.solver.result/ArmSchedule> = ..., com.eignex.klause.solver/ProblemProfile? = ..., kotlin/Int? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Double? = ..., kotlin/Long = ..., kotlin.collections/List<com.eignex.klause.solver.result/BooleanProofStats> = ...) // com.eignex.klause.solver.result/PortfolioStats.<init>|<init>(kotlin.collections.List<com.eignex.klause.solver.result.ArmSchedule>;com.eignex.klause.solver.ProblemProfile?;kotlin.Int?;kotlin.Long?;kotlin.Long?;kotlin.Double?;kotlin.Long;kotlin.collections.List<com.eignex.klause.solver.result.BooleanProofStats>){}[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.solver.result/ArmSchedule> = ..., com.eignex.klause.solver/ProblemProfile? = ..., kotlin/Int? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Double? = ..., kotlin/Long = ..., kotlin.collections/List<com.eignex.klause.solver.result/BooleanProofStats> = ..., kotlin.collections/List<com.eignex.klause.solver.result/HeuristicStartStats> = ...) // com.eignex.klause.solver.result/PortfolioStats.<init>|<init>(kotlin.collections.List<com.eignex.klause.solver.result.ArmSchedule>;com.eignex.klause.solver.ProblemProfile?;kotlin.Int?;kotlin.Long?;kotlin.Long?;kotlin.Double?;kotlin.Long;kotlin.collections.List<com.eignex.klause.solver.result.BooleanProofStats>;kotlin.collections.List<com.eignex.klause.solver.result.HeuristicStartStats>){}[0]
 
     final val arms // com.eignex.klause.solver.result/PortfolioStats.arms|{}arms[0]
         final fun <get-arms>(): kotlin.collections/List<com.eignex.klause.solver.result/ArmSchedule> // com.eignex.klause.solver.result/PortfolioStats.arms.<get-arms>|<get-arms>(){}[0]
@@ -16971,6 +16995,8 @@ final class com.eignex.klause.solver.result/PortfolioStats { // com.eignex.klaus
         final fun <get-baseSliceWork>(): kotlin/Long? // com.eignex.klause.solver.result/PortfolioStats.baseSliceWork.<get-baseSliceWork>|<get-baseSliceWork>(){}[0]
     final val booleanProof // com.eignex.klause.solver.result/PortfolioStats.booleanProof|{}booleanProof[0]
         final fun <get-booleanProof>(): kotlin.collections/List<com.eignex.klause.solver.result/BooleanProofStats> // com.eignex.klause.solver.result/PortfolioStats.booleanProof.<get-booleanProof>|<get-booleanProof>(){}[0]
+    final val heuristicStarts // com.eignex.klause.solver.result/PortfolioStats.heuristicStarts|{}heuristicStarts[0]
+        final fun <get-heuristicStarts>(): kotlin.collections/List<com.eignex.klause.solver.result/HeuristicStartStats> // com.eignex.klause.solver.result/PortfolioStats.heuristicStarts.<get-heuristicStarts>|<get-heuristicStarts>(){}[0]
     final val invocationNanos // com.eignex.klause.solver.result/PortfolioStats.invocationNanos|{}invocationNanos[0]
         final fun <get-invocationNanos>(): kotlin/Long // com.eignex.klause.solver.result/PortfolioStats.invocationNanos.<get-invocationNanos>|<get-invocationNanos>(){}[0]
     final val maxSliceWork // com.eignex.klause.solver.result/PortfolioStats.maxSliceWork|{}maxSliceWork[0]
@@ -16990,7 +17016,8 @@ final class com.eignex.klause.solver.result/PortfolioStats { // com.eignex.klaus
     final fun component6(): kotlin/Double? // com.eignex.klause.solver.result/PortfolioStats.component6|component6(){}[0]
     final fun component7(): kotlin/Long // com.eignex.klause.solver.result/PortfolioStats.component7|component7(){}[0]
     final fun component8(): kotlin.collections/List<com.eignex.klause.solver.result/BooleanProofStats> // com.eignex.klause.solver.result/PortfolioStats.component8|component8(){}[0]
-    final fun copy(kotlin.collections/List<com.eignex.klause.solver.result/ArmSchedule> = ..., com.eignex.klause.solver/ProblemProfile? = ..., kotlin/Int? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Double? = ..., kotlin/Long = ..., kotlin.collections/List<com.eignex.klause.solver.result/BooleanProofStats> = ...): com.eignex.klause.solver.result/PortfolioStats // com.eignex.klause.solver.result/PortfolioStats.copy|copy(kotlin.collections.List<com.eignex.klause.solver.result.ArmSchedule>;com.eignex.klause.solver.ProblemProfile?;kotlin.Int?;kotlin.Long?;kotlin.Long?;kotlin.Double?;kotlin.Long;kotlin.collections.List<com.eignex.klause.solver.result.BooleanProofStats>){}[0]
+    final fun component9(): kotlin.collections/List<com.eignex.klause.solver.result/HeuristicStartStats> // com.eignex.klause.solver.result/PortfolioStats.component9|component9(){}[0]
+    final fun copy(kotlin.collections/List<com.eignex.klause.solver.result/ArmSchedule> = ..., com.eignex.klause.solver/ProblemProfile? = ..., kotlin/Int? = ..., kotlin/Long? = ..., kotlin/Long? = ..., kotlin/Double? = ..., kotlin/Long = ..., kotlin.collections/List<com.eignex.klause.solver.result/BooleanProofStats> = ..., kotlin.collections/List<com.eignex.klause.solver.result/HeuristicStartStats> = ...): com.eignex.klause.solver.result/PortfolioStats // com.eignex.klause.solver.result/PortfolioStats.copy|copy(kotlin.collections.List<com.eignex.klause.solver.result.ArmSchedule>;com.eignex.klause.solver.ProblemProfile?;kotlin.Int?;kotlin.Long?;kotlin.Long?;kotlin.Double?;kotlin.Long;kotlin.collections.List<com.eignex.klause.solver.result.BooleanProofStats>;kotlin.collections.List<com.eignex.klause.solver.result.HeuristicStartStats>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/PortfolioStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/PortfolioStats.hashCode|hashCode(){}[0]
     final fun mergedWith(com.eignex.klause.solver.result/PortfolioStats): com.eignex.klause.solver.result/PortfolioStats // com.eignex.klause.solver.result/PortfolioStats.mergedWith|mergedWith(com.eignex.klause.solver.result.PortfolioStats){}[0]
@@ -17332,18 +17359,23 @@ final class com.eignex.klause.solver.result/SearchStats { // com.eignex.klause.s
 final class com.eignex.klause.solver.result/SharingStats { // com.eignex.klause.solver.result/SharingStats|null[0]
     constructor <init>(kotlin.collections/Map<com.eignex.klause.solver.result/SharingChannel, com.eignex.klause.solver.result/ChannelTraffic> = ...) // com.eignex.klause.solver.result/SharingStats.<init>|<init>(kotlin.collections.Map<com.eignex.klause.solver.result.SharingChannel,com.eignex.klause.solver.result.ChannelTraffic>){}[0]
     constructor <init>(kotlin.collections/Map<com.eignex.klause.solver.result/SharingChannel, com.eignex.klause.solver.result/ChannelTraffic> = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ...) // com.eignex.klause.solver.result/SharingStats.<init>|<init>(kotlin.collections.Map<com.eignex.klause.solver.result.SharingChannel,com.eignex.klause.solver.result.ChannelTraffic>;kotlin.collections.Map<kotlin.String,kotlin.Long>){}[0]
+    constructor <init>(kotlin.collections/Map<com.eignex.klause.solver.result/SharingChannel, com.eignex.klause.solver.result/ChannelTraffic> = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ...) // com.eignex.klause.solver.result/SharingStats.<init>|<init>(kotlin.collections.Map<com.eignex.klause.solver.result.SharingChannel,com.eignex.klause.solver.result.ChannelTraffic>;kotlin.collections.Map<kotlin.String,kotlin.Long>;kotlin.collections.Map<kotlin.String,kotlin.Long>){}[0]
 
     final val channels // com.eignex.klause.solver.result/SharingStats.channels|{}channels[0]
         final fun <get-channels>(): kotlin.collections/Map<com.eignex.klause.solver.result/SharingChannel, com.eignex.klause.solver.result/ChannelTraffic> // com.eignex.klause.solver.result/SharingStats.channels.<get-channels>|<get-channels>(){}[0]
     final val clauses // com.eignex.klause.solver.result/SharingStats.clauses|{}clauses[0]
         final fun <get-clauses>(): kotlin.collections/Map<kotlin/String, kotlin/Long> // com.eignex.klause.solver.result/SharingStats.clauses.<get-clauses>|<get-clauses>(){}[0]
+    final val incumbents // com.eignex.klause.solver.result/SharingStats.incumbents|{}incumbents[0]
+        final fun <get-incumbents>(): kotlin.collections/Map<kotlin/String, kotlin/Long> // com.eignex.klause.solver.result/SharingStats.incumbents.<get-incumbents>|<get-incumbents>(){}[0]
     final val nanos // com.eignex.klause.solver.result/SharingStats.nanos|{}nanos[0]
         final fun <get-nanos>(): kotlin/Long // com.eignex.klause.solver.result/SharingStats.nanos.<get-nanos>|<get-nanos>(){}[0]
 
     final fun component1(): kotlin.collections/Map<com.eignex.klause.solver.result/SharingChannel, com.eignex.klause.solver.result/ChannelTraffic> // com.eignex.klause.solver.result/SharingStats.component1|component1(){}[0]
     final fun component2(): kotlin.collections/Map<kotlin/String, kotlin/Long> // com.eignex.klause.solver.result/SharingStats.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/Long> // com.eignex.klause.solver.result/SharingStats.component3|component3(){}[0]
     final fun copy(kotlin.collections/Map<com.eignex.klause.solver.result/SharingChannel, com.eignex.klause.solver.result/ChannelTraffic> = ...): com.eignex.klause.solver.result/SharingStats // com.eignex.klause.solver.result/SharingStats.copy|copy(kotlin.collections.Map<com.eignex.klause.solver.result.SharingChannel,com.eignex.klause.solver.result.ChannelTraffic>){}[0]
     final fun copy(kotlin.collections/Map<com.eignex.klause.solver.result/SharingChannel, com.eignex.klause.solver.result/ChannelTraffic> = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ...): com.eignex.klause.solver.result/SharingStats // com.eignex.klause.solver.result/SharingStats.copy|copy(kotlin.collections.Map<com.eignex.klause.solver.result.SharingChannel,com.eignex.klause.solver.result.ChannelTraffic>;kotlin.collections.Map<kotlin.String,kotlin.Long>){}[0]
+    final fun copy(kotlin.collections/Map<com.eignex.klause.solver.result/SharingChannel, com.eignex.klause.solver.result/ChannelTraffic> = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ..., kotlin.collections/Map<kotlin/String, kotlin/Long> = ...): com.eignex.klause.solver.result/SharingStats // com.eignex.klause.solver.result/SharingStats.copy|copy(kotlin.collections.Map<com.eignex.klause.solver.result.SharingChannel,com.eignex.klause.solver.result.ChannelTraffic>;kotlin.collections.Map<kotlin.String,kotlin.Long>;kotlin.collections.Map<kotlin.String,kotlin.Long>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/SharingStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/SharingStats.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/SharingStats.toString|toString(){}[0]

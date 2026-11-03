@@ -15,6 +15,107 @@ import kotlin.test.assertTrue
 
 class ComponentLpSolverTest {
     @Test
+    fun `paused numerical children expose only their returned predecessors`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
+            var polls = 0
+            owner.openSolve().use { cursor ->
+                assertIs<LpSolveStep.Paused>(cursor.advance(shouldPause = {
+                    owner.lastMetrics.componentSolves >= 2 && ++polls >= 2
+                }))
+                val paid = owner.lastMetrics
+
+                val guidance = assertNotNull(owner.partialPrimalGuidance())
+
+                assertEquals(listOf(true, false, false), guidance.known.toList())
+                assertEquals(0.5, guidance.coordinates[0])
+                assertEquals(paid, owner.lastMetrics)
+            }
+        }
+    }
+
+    @Test
+    fun `advancing component cursors withhold returned guidance`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            factory = RecordingLpEngineFactory())).use { owner ->
+            var observed = false
+            owner.openSolve().use { cursor ->
+                val step = cursor.advance(shouldPause = {
+                    if (owner.lastMetrics.componentSolves < 2) false else {
+                        observed = true
+                        assertNull(owner.partialPrimalGuidance())
+                        true
+                    }
+                })
+
+                assertIs<LpSolveStep.Paused>(step)
+                assertTrue(observed)
+                assertNotNull(owner.partialPrimalGuidance())
+            }
+        }
+    }
+
+    @Test
+    fun `paused child guidance snapshots own their coordinate buffers`() {
+        val builder = LpBuilder()
+        repeat(3) {
+            val column = builder.addVar(0L, 5L, cost = 1L)
+            builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
+        }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            factory = RecordingLpEngineFactory())).use { owner ->
+            owner.openSolve().use { cursor ->
+                assertIs<LpSolveStep.Paused>(cursor.advance(shouldPause = { owner.lastMetrics.componentSolves >= 2 }))
+                val first = assertNotNull(owner.partialPrimalGuidance())
+                val coordinates = first.coordinates.toList()
+                val known = first.known.toList()
+                first.coordinates.fill(5.0)
+                first.known.fill(false)
+
+                val next = assertNotNull(owner.partialPrimalGuidance())
+
+                assertEquals(known, next.known.toList())
+                assertEquals(coordinates, next.coordinates.toList())
+                assertNull(owner.partialPrimalGuidance(Cancellation { true }))
+            }
+        }
+    }
+
+    @Test
+    fun `completed component points supply fresh guidance without resolving`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0L, 5L, cost = 1L) }
+        builder.addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
+        builder.addRow(intArrayOf(1), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val factory = RecordingLpEngineFactory()
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            factory = factory)).use { owner ->
+            val point = assertNotNull(owner.resolveBounds())
+            val queries = factory.floatAllowances.size
+
+            val guide = assertNotNull(owner.partialPrimalGuidance())
+
+            assertTrue(guide.known.all { it })
+            assertEquals(point.primal.toList(), guide.coordinates.toList())
+            assertEquals(queries, factory.floatAllowances.size)
+        }
+    }
+
+    @Test
     fun `partial guidance marks only returned child coordinates`() {
         val builder = LpBuilder()
         repeat(3) { builder.addVar(0L, 5L, cost = 1L) }

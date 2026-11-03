@@ -17,27 +17,29 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 class ChannelTrajectoryTest {
     @Test
     fun `reconstructed source columns can load outside placeholder execution domains`() {
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 0), IntDomain(0, 2)), emptyArray())
-        val left = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        val right = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         val coordinates = VarRemap(intArrayOf(), intArrayOf(-1, 1))
         val reconstruct = { sample: Sample ->
             Sample(booleanArrayOf(), longArrayOf(sample.intValue(1) + 10, sample.intValue(1)))
         }
 
-        val pair = trajectoryPair(Sample(booleanArrayOf(), longArrayOf(11, 1)), emptyList(),
-            TrajectoryView("left", left, coordinates, reconstruct = reconstruct),
-            TrajectoryView("right", right, coordinates, reconstruct = reconstruct))
+        val view = TrajectoryView("reconstructed", state, coordinates, reconstruct = reconstruct)
 
-        assertEquals("paired", pair.getValue("leftLoad").jsonPrimitive.content)
-        assertEquals("paired", pair.getValue("rightLoad").jsonPrimitive.content)
+        val decline = view.load(Sample(booleanArrayOf(), longArrayOf(11, 1)))
+
+        assertNull(decline)
+        assertEquals(Sample(booleanArrayOf(), longArrayOf(0, 1)), state.assignment.snapshot())
     }
 
     @Test
@@ -46,37 +48,36 @@ class ChannelTrajectoryTest {
             arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
         val sweep = assertNotNull(DefinitionalSweep.fromSource(problem,
             listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true)))))
-        val left = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        val right = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        left.invariants = sweep.network(problem.numIntVars, problem.numBoolVars)
-        right.invariants = ChannelView.SearchedValues.sweep(sweep, Cancellation.Never)
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+        state.invariants = ChannelView.SearchedValues.sweep(sweep, Cancellation.Never)
             ?.network(problem.numIntVars, problem.numBoolVars)
         val coordinates = VarRemap(intArrayOf(0), intArrayOf(0))
-        val maintained = TrajectoryView("maintained", left, coordinates,
-            synchronize = { sweep.sweep(left.assignment, left.rootDomains) })
-        val searched = TrajectoryView("searched", right, coordinates)
+        val searched = TrajectoryView("searched", state, coordinates)
+        assertNull(searched.load(Sample(booleanArrayOf(false), longArrayOf(0))))
 
-        val pair = trajectoryPair(Sample(booleanArrayOf(false), longArrayOf(0)),
-            listOf(Move.BoolFlip(0)), maintained, searched)
+        val candidate = searched.probe(Move.BoolFlip(0))
 
-        val candidate = pair.getValue("candidates").jsonArray.single().jsonObject
-        assertEquals("false", candidate.getValue("pairedDestination").jsonPrimitive.content)
+        assertNull(candidate["decline"])
+        assertEquals("true", candidate.getValue("source").jsonObject.getValue("bools")
+            .jsonArray.single().jsonPrimitive.content)
+        assertEquals("0", candidate.getValue("source").jsonObject.getValue("ints")
+            .jsonArray.single().jsonPrimitive.content)
     }
 
-    @Test
-    fun `an inconsistent searched predicate is not silently extended into a paired state`() {
-        val problem = Problem(1, 1, arrayOf(IntDomain(-1, 2)),
-            arrayOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.LE, 0)))
-        val left = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        val right = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `source loading should reject synchronization that changes a supplied predicate`(maintained: Boolean) {
+        val problem = Problem(1, 1, arrayOf(IntDomain(-1, 2)), emptyArray())
+        val model = LocalSearchModel.open(problem)
+        val state = LocalSearchState(model, Random(0))
         val coordinates = VarRemap(intArrayOf(0), intArrayOf(0))
-        val maintained = TrajectoryView("maintained", left, coordinates,
-            synchronize = { left.assignment.setBool(0, left.assignment.intValue(0) <= 0L) })
-        val searched = TrajectoryView("searched", right, coordinates)
+        val view = TrajectoryView(if (maintained) "maintained" else "searched", state, coordinates,
+            synchronize = { if (maintained) state.assignment.setBool(0, state.assignment.intValue(0) <= 0L) })
 
-        val pair = trajectoryPair(Sample(booleanArrayOf(false), longArrayOf(-1)), emptyList(), maintained, searched)
+        val source = Sample(booleanArrayOf(false), longArrayOf(-1))
 
-        assertEquals("source-round-trip", pair.getValue("leftLoad").jsonPrimitive.content)
-        assertEquals("paired", pair.getValue("rightLoad").jsonPrimitive.content)
+        assertEquals(if (maintained) "source-round-trip" else null, view.load(source))
+        assertEquals(-1L, state.assignment.intValue(0))
+        assertEquals(maintained, state.assignment.boolValue(0))
     }
 }

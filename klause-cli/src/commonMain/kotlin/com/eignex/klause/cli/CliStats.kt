@@ -389,6 +389,13 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         "booleanProof.$index.workerWork" to "${proof.workerWork}",
         proof.decline?.let { "booleanProof.$index.decline" to it },
     ) }
+    val starts = stats.portfolio.heuristicStarts.flatMapIndexed { index, start ->
+        listOf(
+            "heuristicStart.$index.requiredWork" to "${start.requiredWork}",
+            "heuristicStart.$index.completed" to "${start.completed}",
+        ) + listOfNotNull(start.completionNanos?.let { "heuristicStart.$index.completedNs" to "$it" }) +
+            start.workByArm.map { (arm, work) -> "heuristicStart.$index.work.$arm" to "$work" }
+    }
     val schedule = stats.portfolio.arms.map { arm ->
         "arm.${arm.label}" to buildString {
             append("segments=").append(arm.segments).append(" work=").append(arm.work)
@@ -405,6 +412,9 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
             }
             for ((key, value) in arm.sharing.clauses.entries.sortedBy { it.key }) {
                 append(" clause").append(key.replaceFirstChar { it.uppercaseChar() }).append('=').append(value)
+            }
+            for ((key, value) in arm.sharing.incumbents.entries.sortedBy { it.key }) {
+                append(" incumbent").append(key.replaceFirstChar { it.uppercaseChar() }).append('=').append(value)
             }
         }
     }
@@ -454,7 +464,8 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         "alnsBootstrapLsMillis" to "${alns.bootstrapLsMillis}",
         "alnsRepairMillis" to "${alns.repairMillis}",
     )
-    return listOfNotNull(profile, reseeding) + slices + proofs + schedule + phases + lifecycle + failures + inner
+    return listOfNotNull(profile, reseeding) + slices + proofs + starts + schedule + phases + lifecycle +
+        failures + inner
 }
 
 private fun diagnosticString(value: String): String = buildString {
