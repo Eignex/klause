@@ -602,7 +602,8 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         val delta = LpPhaseStats(calls = 1L, nanos = nanos, work = metrics.work,
             outcomes = mapOf((if (available) "AVAILABLE" else "DECLINED") to 1L,
                 "CHILDREN_COMPLETED" to metrics.completed.toLong(),
-                "PREPARATION_WORK" to metrics.preparationWork, "SOLVE_WORK" to metrics.solveWork))
+                "PREPARATION_WORK" to metrics.preparationWork, "SOLVE_WORK" to metrics.solveWork) +
+                (metrics.decline?.let { mapOf("STOP_${it.name}" to 1L) } ?: emptyMap()))
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
 

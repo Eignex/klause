@@ -321,8 +321,19 @@ internal class LpScopedSolver(
         token: Cancellation,
         observe: (LpProbeMetrics) -> Unit,
     ): List<LpDirectionalGain>? {
-        if (closed || workingActive || pendingFloat != null || state !== pointModel.exactState || token()) return null
-        return (solver as? LpDirectionalProbeSolver)?.directionalGains(
+        val reason = when {
+            token() -> LpProbeDecline.CANCELLED
+            closed -> LpProbeDecline.OWNER
+            workingActive || pendingFloat != null -> LpProbeDecline.BUSY
+            state !== pointModel.exactState -> LpProbeDecline.STALE_POINT
+            solver !is LpDirectionalProbeSolver -> LpProbeDecline.OWNER
+            else -> null
+        }
+        if (reason != null) {
+            observe(LpProbeMetrics(0L, 0L, 0, reason))
+            return null
+        }
+        return (solver as LpDirectionalProbeSolver).directionalGains(
             pointModel, columns, splits, allowance, token, observe,
         )
     }

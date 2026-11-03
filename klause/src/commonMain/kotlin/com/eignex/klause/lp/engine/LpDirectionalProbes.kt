@@ -5,7 +5,14 @@ import com.eignex.klause.util.Cancellation
 
 internal data class LpDirectionalGain(val down: Double, val up: Double)
 
-internal data class LpProbeMetrics(val preparationWork: Long, val solveWork: Long, val completed: Int) {
+internal enum class LpProbeDecline { CANCELLED, ALLOWANCE, OWNER, BUSY, STALE_POINT, NO_OPTIMUM, SPLIT, CHILD }
+
+internal data class LpProbeMetrics(
+    val preparationWork: Long,
+    val solveWork: Long,
+    val completed: Int,
+    val decline: LpProbeDecline? = null,
+) {
     val work: Long get() = preparationWork + minOf(solveWork, Long.MAX_VALUE - preparationWork)
 }
 

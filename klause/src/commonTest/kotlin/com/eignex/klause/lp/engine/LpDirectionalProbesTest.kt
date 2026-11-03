@@ -12,6 +12,34 @@ import kotlin.test.assertTrue
 
 class LpDirectionalProbesTest {
     @Test
+    fun `a retained child state supplies complete probe gains after bound resolution`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+        val auxiliary = builder.addVar(0, 1)
+        repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        LpScopedSolver(state).use { owner ->
+            assertTrue(assertNotNull(owner.solveFloat()?.second).optimal)
+            assertTrue(owner.push())
+            assertTrue(owner.assertBound(auxiliary, false, ExactLpSide(ExactLpNumber.of(1L)), 1L))
+            assertTrue(assertNotNull(owner.solveFloat()?.second).optimal)
+            val point = assertNotNull(owner.state.ownerWorkingModel())
+            var decline: LpProbeDecline? = null
+            var completed = 0
+
+            val gains = owner.directionalGains(point, intArrayOf(0, 1), longArrayOf(0, 0),
+                1_000_000L, Cancellation.Never) { decline = it.decline; completed += it.completed }
+
+            assertNotNull(gains, decline.toString())
+            assertEquals(4, completed)
+            assertEquals(1.5, gains[0].down, 1e-7)
+            assertEquals(0.5, gains[0].up, 1e-7)
+            assertEquals(2.5, gains[1].down, 1e-7)
+            assertEquals(0.5, gains[1].up, 1e-7)
+        }
+    }
+
+    @Test
     fun `child probes preserve objective units across sense scale and common constants`() {
         for (sense in listOf(Sense.MINIMIZE, Sense.MAXIMIZE)) for (scale in listOf(1L, 4L)) {
             for (origin in listOf(0L, 7L, -3L)) {

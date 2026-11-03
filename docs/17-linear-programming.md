@@ -227,7 +227,9 @@ LP gains for up to two shortlisted columns. The floating owner stays unchanged;
 scratch solvers spend a positive grant after reserving the caller's normalization
 and history work. Numerical estimates train a separate advisory history, with two
 recent observations per direction before selection. Query work and elapsed time are
-recorded separately, and neither history certifies a branch bound. Explicit root
+recorded separately. Declines distinguish a missing or busy owner, a stale point,
+missing retained optimum, invalid split, exhausted grant and incomplete child solves.
+Neither history certifies a branch bound. Explicit root
 child-order mode instead permits one retained-basis consultation for its selected
 column per hint owner, including across restarts and reseeding.
 

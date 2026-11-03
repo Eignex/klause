@@ -206,9 +206,11 @@ class LpScopedSolverTest {
 
             assertNull(costs)
             assertEquals(0L, work)
+            var decline: LpProbeDecline? = null
             assertNull(owner.directionalGains(pointModel, intArrayOf(x), longArrayOf(0L),
-                100_000L, Cancellation.Never) { work += it.work })
+                100_000L, Cancellation.Never) { work += it.work; decline = it.decline })
             assertEquals(0L, work)
+            assertEquals(LpProbeDecline.STALE_POINT, decline)
         }
     }
 

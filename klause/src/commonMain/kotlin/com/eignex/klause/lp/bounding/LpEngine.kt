@@ -47,6 +47,7 @@ import com.eignex.klause.lp.engine.LpDirectionalCostSolver
 import com.eignex.klause.lp.engine.LpDirectionalGain
 import com.eignex.klause.lp.engine.LpDirectionalProbeSolver
 import com.eignex.klause.lp.engine.LpProbeMetrics
+import com.eignex.klause.lp.engine.LpProbeDecline
 import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPhaseTimer
@@ -1087,10 +1088,12 @@ internal class LpEngine(
         var preparation = 0L
         var solving = 0L
         var completed = 0
+        var decline: LpProbeDecline? = null
         val observe: (LpProbeMetrics) -> Unit = { metrics ->
             preparation = saturatingAdd(preparation, metrics.preparationWork)
             solving = saturatingAdd(solving, metrics.solveWork)
             completed += metrics.completed
+            decline = metrics.decline ?: decline
             noteNodeOverhead(metrics.work)
         }
         val gains = if (nodeUsesTrail) {
@@ -1101,7 +1104,8 @@ internal class LpEngine(
             )
         }
         sink.lp.observeDirectionalProbes(started.elapsedNow().inWholeNanoseconds,
-            LpProbeMetrics(preparation, solving, completed), gains != null)
+            LpProbeMetrics(preparation, solving, completed,
+                decline ?: LpProbeDecline.CHILD.takeIf { gains == null }), gains != null)
         return gains
     }
 
