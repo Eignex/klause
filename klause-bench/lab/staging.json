@@ -1,0 +1,9 @@
+{
+  "main": "com.eignex.klause.bench.lab.CorpusStagingAdapterKt",
+  "classpath": ["klause-bench/build/install/klause-bench/lib/*"],
+  "buildTasks": [":klause-cli:installJvmDist", ":klause-bench:installDist"],
+  "planInputs": ["klause-bench", "build.gradle.kts", "settings.gradle.kts", "gradle.properties", "gradle"],
+  "jvmArgs": ["-Xmx512m", "--enable-native-access=ALL-UNNAMED"],
+  "runtime": {"java": 25, "tools": [], "environment": {}},
+  "workspaceInputs": [".git", "klause-bench/build/install", "klause-cli/build/install", "klause-mzn-lib"]
+}

@@ -157,6 +157,9 @@ class SolveMetricFailureTest {
 
         assertEquals(result.feasible, record.feasible)
         assertEquals("cli", record.command)
-        assertTrue(record.stats.isEmpty())
+        assertTrue(record.stats.filterKeys { !it.startsWith("harness") }.isEmpty())
+        val timings = record.stats.filterKeys { it.startsWith("harness") }
+        assertTrue(timings.isNotEmpty())
+        assertTrue(timings.values.all { value -> value.toLongOrNull()?.let { it >= 0 } == true })
     }
 }

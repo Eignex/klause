@@ -1,0 +1,263 @@
+package com.eignex.klause.propagation
+
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.SharingMemoryObservation
+
+internal const val CAP_ROW_INSPECTION_WORK = 4L
+internal const val CAP_ROW_POLICY_WORK = 32L - CAP_ROW_INSPECTION_WORK
+
+internal interface LearnedCapPolicy {
+    fun alive(index: Int): Boolean
+    fun lbd(index: Int): Int
+    fun prepare(index: Int): Boolean
+    fun keep(index: Int): Boolean
+    fun retire(index: Int): Boolean
+    fun visited()
+}
+
+// Processed handles belong to the heap/survivor prefix or pending retirement; unread handles stay in the suffix.
+// Admissions append, while compaction resets every suspended operation before handles change.
+internal class LearnedCapRanking(private val candidates: IntArrayList) {
+    private var read = 0
+    private var write = 0
+    private var heapSize = 0
+    private var floor = 0L
+    private var sift = 0
+    private var pending = -1
+    private var prepared = -1
+    private var stage = Stage.Collect
+    private var afterSift = Stage.Trim
+    private var retirementRevision = 0L
+    private var observedRetirementRevision = 0L
+    private var cleanupRevision = 0L
+    private var cleanupRead = 0
+    private var afterCleanup = Stage.Collect
+    var passes = 0L
+        private set
+    val modeledBytes: Long get() = 100L
+    val primitiveBytes: Long get() = 68L
+
+    fun reset() {
+        read = 0
+        write = 0
+        heapSize = 0
+        floor = 0L
+        pending = -1
+        prepared = -1
+        sift = 0
+        stage = Stage.Collect
+        afterSift = Stage.Trim
+        observedRetirementRevision = retirementRevision
+        cleanupRevision = retirementRevision
+        cleanupRead = 0
+        afterCleanup = Stage.Collect
+    }
+
+    fun invalidateRetiredHandles() { retirementRevision++ }
+
+    fun sharingMemory(sample: SharingMemoryObservation, protected: Boolean) {
+        sample.owned(this, 68L, protected)
+        sample.ownedReferences(this, 4L, protected)
+    }
+
+    fun advance(cap: Int, fixedFloor: Int, budget: ReclamationPreparation, policy: LearnedCapPolicy) {
+        prepared = -1
+        while (true) {
+            if ((stage == Stage.Collect || stage == Stage.Trim) && observedRetirementRevision != retirementRevision) {
+                afterCleanup = stage
+                cleanupRead = 0
+                cleanupRevision = retirementRevision
+                stage = Stage.Clean
+            }
+            val limit = (cap.toLong() - fixedFloor - floor).coerceAtLeast(0L).toInt()
+            when (stage) {
+                Stage.Collect -> {
+                    if (heapSize > limit) {
+                        stage = Stage.Trim
+                    } else if (read == candidates.size) {
+                        budget.visit(8L)
+                        budget.visit(0L)
+                        candidates.truncateTo(write)
+                        reset()
+                        passes++
+                        return
+                    } else collect(budget, policy)
+                }
+                Stage.Admit -> admit(limit, budget, policy)
+                Stage.Up -> siftUp(budget, policy)
+                Stage.Down -> siftDown(budget, policy)
+                Stage.Retire -> {
+                    budget.visit(if (pending == prepared) 0L else 8L)
+                    budget.visit(0L)
+                    if (policy.alive(pending) && !policy.retire(pending)) {
+                        candidates[write++] = pending
+                        floor++
+                    }
+                    pending = -1
+                    stage = Stage.Trim
+                }
+                Stage.Trim -> trim(limit, budget)
+                Stage.Clean -> clean(budget, policy)
+            }
+        }
+    }
+
+    private fun collect(budget: ReclamationPreparation, policy: LearnedCapPolicy) {
+        val index = candidates[read]
+        budget.visit(CAP_ROW_INSPECTION_WORK)
+        budget.visit(0L)
+        val alive = policy.alive(index)
+        budget.visit(0L)
+        if (!alive) {
+            read++
+            policy.visited()
+            return
+        }
+        val funded = policy.prepare(index)
+        budget.visit(0L)
+        prepared = if (funded) index else -1
+        if (!funded) {
+            candidates[write++] = index
+            floor++
+            stage = Stage.Trim
+        } else if (policy.keep(index)) {
+            candidates[write++] = index
+            floor++
+            stage = Stage.Trim
+        } else {
+            pending = index
+            stage = Stage.Admit
+        }
+        read++
+        policy.visited()
+    }
+
+    private fun admit(limit: Int, budget: ReclamationPreparation, policy: LearnedCapPolicy) {
+        budget.visit(0L)
+        val index = pending
+        val replacement = heapSize >= limit && heapSize > 0 && better(index, candidates[0], policy)
+        budget.visit(0L)
+        if (heapSize < limit) {
+            if (heapSize < write) candidates[write] = candidates[heapSize]
+            candidates[heapSize] = index
+            sift = heapSize++
+            write++
+            afterSift = Stage.Trim
+            stage = Stage.Up
+            pending = -1
+        } else if (replacement) {
+            pending = candidates[0]
+            candidates[0] = index
+            sift = 0
+            afterSift = Stage.Retire
+            stage = Stage.Down
+        } else {
+            pending = index
+            stage = Stage.Retire
+        }
+    }
+
+    private fun siftUp(budget: ReclamationPreparation, policy: LearnedCapPolicy) {
+        if (sift == 0) {
+            stage = afterSift
+            return
+        }
+        budget.visit(8L)
+        budget.visit(0L)
+        val parent = (sift - 1) / 2
+        val move = better(candidates[parent], candidates[sift], policy)
+        budget.visit(0L)
+        if (!move) stage = afterSift else {
+            swap(sift, parent)
+            sift = parent
+            if (afterSift == Stage.Clean) cleanupRead = minOf(cleanupRead, parent)
+        }
+    }
+
+    private fun siftDown(budget: ReclamationPreparation, policy: LearnedCapPolicy) {
+        budget.visit(12L)
+        budget.visit(0L)
+        var child = sift * 2 + 1
+        if (child >= heapSize) {
+            stage = afterSift
+            return
+        }
+        if (child + 1 < heapSize && better(candidates[child], candidates[child + 1], policy)) child++
+        val move = better(candidates[sift], candidates[child], policy)
+        budget.visit(0L)
+        if (!move) stage = afterSift else {
+            swap(sift, child)
+            sift = child
+        }
+    }
+
+    private fun trim(limit: Int, budget: ReclamationPreparation) {
+        if (heapSize <= limit) {
+            stage = Stage.Collect
+            return
+        }
+        budget.visit(12L)
+        budget.visit(0L)
+        pending = candidates[0]
+        heapSize--
+        if (heapSize > 0) candidates[0] = candidates[heapSize]
+        write--
+        if (write > heapSize) candidates[heapSize] = candidates[write]
+        sift = 0
+        afterSift = Stage.Retire
+        stage = if (heapSize > 0) Stage.Down else Stage.Retire
+    }
+
+    private fun clean(budget: ReclamationPreparation, policy: LearnedCapPolicy) {
+        if (cleanupRevision != retirementRevision) {
+            cleanupRevision = retirementRevision
+            cleanupRead = 0
+        }
+        if (cleanupRead == write) {
+            observedRetirementRevision = retirementRevision
+            stage = afterCleanup
+            return
+        }
+        budget.visit(16L)
+        budget.visit(0L)
+        val alive = policy.alive(candidates[cleanupRead])
+        budget.visit(0L)
+        if (alive) {
+            cleanupRead++
+            return
+        }
+        if (cleanupRead >= heapSize) {
+            write--
+            if (cleanupRead < write) candidates[cleanupRead] = candidates[write]
+            floor--
+            return
+        }
+        val nextHeapSize = heapSize - 1
+        val replacement = candidates[nextHeapSize]
+        val moveUp = cleanupRead < nextHeapSize && cleanupRead > 0 &&
+            better(candidates[(cleanupRead - 1) / 2], replacement, policy)
+        budget.visit(0L)
+        heapSize = nextHeapSize
+        candidates[cleanupRead] = replacement
+        write--
+        if (write > heapSize) candidates[heapSize] = candidates[write]
+        if (cleanupRead >= heapSize) return
+        sift = cleanupRead
+        afterSift = Stage.Clean
+        stage = if (moveUp) Stage.Up else Stage.Down
+    }
+
+    private fun better(left: Int, right: Int, policy: LearnedCapPolicy): Boolean {
+        val a = policy.lbd(left)
+        val b = policy.lbd(right)
+        return a < b || (a == b && left < right)
+    }
+
+    private fun swap(left: Int, right: Int) {
+        val value = candidates[left]
+        candidates[left] = candidates[right]
+        candidates[right] = value
+    }
+
+    private enum class Stage { Collect, Admit, Up, Down, Retire, Trim, Clean }
+}

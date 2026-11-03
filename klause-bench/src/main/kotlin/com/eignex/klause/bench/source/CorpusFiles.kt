@@ -1,9 +1,11 @@
 package com.eignex.klause.bench.source
 
+import com.eignex.klause.bench.profile.SourcePreparationCapture
 import com.github.luben.zstd.ZstdInputStreamNoFinalizer
 import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 import java.io.File
 import java.io.InputStream
+import java.io.InterruptedIOException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
@@ -30,10 +32,11 @@ internal object CorpusFiles {
     private const val PROGRESS_EVERY = 1000
 
     private const val DIGEST_BUFFER_BYTES = 1 shl 16
+    private const val MAX_STAGING_BUFFER_BYTES = 1 shl 16
 
     /** Where [withPlainFile] stages decompressed copies: under the cache root (so inside `$HOME`, which a
      *  colima docker VM mounts) and outside every collection directory, so discovery never walks into it. */
-    private val stagingRoot: File get() = File(CorpusFetcher.cacheRoot, ".plain")
+    val stagingRoot: File get() = File(CorpusFetcher.cacheRoot, ".plain")
 
     fun isCompressed(file: File): Boolean = file.name.endsWith(SUFFIX)
 
@@ -54,16 +57,60 @@ internal object CorpusFiles {
     /** Run [block] on a plain-text copy of [file], for a consumer that needs a real path (a docker mount,
      *  a solver that cannot read stdin). A plain [file] is passed through; a compressed one is staged
      *  under its plain name and deleted afterwards. */
-    fun <T> withPlainFile(file: File, block: (File) -> T): T {
+    fun <T> withPlainFile(
+        file: File,
+        checkActive: () -> Unit = {},
+        onCleanup: (Long) -> Unit = {},
+        stagingDirectory: File = stagingRoot,
+        bufferBytes: Int = DEFAULT_BUFFER_SIZE,
+        nanoTime: () -> Long = System::nanoTime,
+        block: (File) -> T,
+    ): T {
+        require(bufferBytes in 1..MAX_STAGING_BUFFER_BYTES)
+        fun checkStaging() {
+            if (Thread.currentThread().isInterrupted) throw InterruptedIOException("Source staging interrupted")
+            checkActive()
+        }
+        checkStaging()
         if (!isCompressed(file)) return block(file)
-        stagingRoot.mkdirs()
-        val dir = Files.createTempDirectory(stagingRoot.toPath(), "plain-").toFile()
-        try {
-            val plain = File(dir, plainPath(file.name))
-            open(file).use { input -> plain.outputStream().use { input.copyTo(it) } }
+        stagingDirectory.mkdirs()
+        checkStaging()
+        val directory = StagedDirectory(Files.createTempDirectory(stagingDirectory.toPath(), "plain-").toFile(),
+            nanoTime, onCleanup)
+        directory.use {
+            checkStaging()
+            val plain = File(it.file, plainPath(file.name))
+            open(file).use { input ->
+                plain.outputStream().use { output ->
+                    val buffer = ByteArray(bufferBytes)
+                    while (true) {
+                        checkStaging()
+                        val count = input.read(buffer)
+                        checkStaging()
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                    }
+                }
+            }
+            checkStaging()
             return block(plain)
-        } finally {
-            dir.deleteRecursively()
+        }
+    }
+
+    private class StagedDirectory(
+        val file: File,
+        val nanoTime: () -> Long,
+        val onCleanup: (Long) -> Unit,
+    ) : AutoCloseable {
+        override fun close() {
+            val cleanupStart = nanoTime()
+            try {
+                SourcePreparationCapture.measure("source-cleanup") {
+                    check(file.deleteRecursively()) { "Cannot remove staged source: $file" }
+                }
+            } finally {
+                onCleanup(nanoTime() - cleanupStart)
+            }
         }
     }
 

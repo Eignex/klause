@@ -7,9 +7,11 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -17,6 +19,22 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LearnedReclamationTest {
+    @Test
+    fun `native compaction should retain a large payload within index scratch`() {
+        val session = PropagationSession(Problem(4096, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(0, 1)))), nativeSat = true)
+        assertTrue(session.usesNativeSat)
+        session.addLearnedClause(Clause(IntArray(4096) { it * 2 }), 2)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+
+        val published = session.explanationState.forgetLearnedClauses(
+            maxWork = 1_000_000L, maxScratchBytes = 8192L) { index, _ -> index == 0 }
+
+        assertTrue(published)
+        assertEquals(1, session.learnedClauseCount)
+        assertEquals(4096, session.learnedClauseLiteralCount(0))
+    }
+
     @Test
     fun `reclamation should release unused payload watches and primitive metadata on both stores`() {
         for (native in listOf(false, true)) {
@@ -101,21 +119,21 @@ class LearnedReclamationTest {
     }
 
     @Test
-    fun `insufficient native arena scratch should preserve the store before publication`() {
-        val session = PropagationSession(Problem(4096, 0, emptyArray(),
-            arrayOf(Clause(intArrayOf(0, 1)))), nativeSat = true)
+    fun `insufficient native index scratch should preserve the store before publication`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = true)
         assertTrue(session.usesNativeSat)
-        session.addLearnedClause(Clause(IntArray(4096) { it * 2 }), 2)
-        assertEquals(4096, session.learnedClauseLiteralCount(0))
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+        assertEquals(2, session.learnedClauseLiteralCount(0))
         val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
         val published = session.explanationState.forgetLearnedClauses(
-            maxWork = 1_000_000L, maxScratchBytes = 8192L) { _, _ -> false }
+            maxWork = 1_000_000L, maxScratchBytes = 32L) { _, _ -> false }
         val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
 
         assertFalse(published)
         assertEquals(1, session.learnedClauseCount)
-        assertEquals(4096, session.learnedClauseLiteralCount(0))
+        assertEquals(2, session.learnedClauseLiteralCount(0))
         assertEquals(before.getValue("learnedArenaCapacityBytes"), after.getValue("learnedArenaCapacityBytes"))
         assertEquals(before.getValue("ownedPrimitiveBytes"), after.getValue("ownedPrimitiveBytes"))
     }
@@ -262,4 +280,45 @@ class LearnedReclamationTest {
             assertEquals(1L, session.learnedLifecycle().getValue("learningClauseAdmitted"))
         }
     }
+
+    @Test
+    fun `native full compaction should release a live row beside already retired payload slots`() {
+        val session = PropagationSession(Problem(4, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = true)
+        repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+        session.maintainCapWindow(1, 65_536L, 1_048_576L, { false }) { it == 0 }
+        assertEquals(1, session.activeLearnedClauseCount)
+        val generation = session.learnedRetirementGeneration
+
+        val published = session.compactLearnedClauses(1_000_000L, 1_048_576L, { false }) { _, _ -> false }
+
+        assertTrue(published)
+        assertEquals(0, session.learnedClauseCount)
+        assertEquals(0, session.activeLearnedClauseCount)
+        assertTrue(session.learnedRetirementGeneration > generation)
+        val observed = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        assertEquals(0L, observed.getValue("learnedPayloadBytes"))
+        session.pinBool(0, false)
+        assertNull(session.boolValue(1))
+        session.popLast()
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 9)
+        session.pinBool(2, false)
+        assertEquals(true, session.boolValue(3))
+    }
+
+    @Test
+    fun `candidate capacity should survive cancellation after funding and trim on retry`() {
+        val candidates = IntArrayList(64)
+        for (value in listOf(7, 2, 9)) candidates.add(value)
+        var work = 0L
+        val cancelled = ReclamationPreparation(11L, 12L, { work >= 11L }, { work += it })
+
+        assertFailsWith<ReclamationPreparation.Deferred> { trimLearnedCandidates(candidates, cancelled) }
+
+        assertEquals(64, candidates.backingData.size)
+        trimLearnedCandidates(candidates, ReclamationPreparation(11L, 12L, { false }, {}))
+        assertEquals(3, candidates.backingData.size)
+        assertEquals(listOf(7, 2, 9), candidates.toIntArray().toList())
+    }
+
 }

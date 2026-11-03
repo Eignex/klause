@@ -36,39 +36,64 @@ internal class SharingMemoryObservation(
     private var protectedSlots = 0L
     private var sharedBytes = 0L
 
-    private class Owner(val identity: Any, val bytes: Long, val slots: Long, var protected: Boolean,
-        var shared: Boolean, val next: Owner?)
+    private class Owner(val identity: Any, val capacity: Long, val references: Boolean, var protectedAmount: Long,
+        var shared: Boolean) {
+        val bytes: Long get() = if (references) 0L else capacity
+        val slots: Long get() = if (references) capacity else 0L
+        var left: Owner? = null
+        var right: Owner? = null
+    }
 
     fun owned(identity: Any, bytes: Long, protected: Boolean = false, shared: Boolean = false) =
-        own(identity, bytes, 0L, protected, shared)
+        own(identity, bytes, 0L, if (protected) bytes else 0L, shared)
 
     fun ownedReferences(identity: Any, slots: Long, protected: Boolean = false) =
-        own(identity, 0L, slots, protected, false)
+        own(identity, 0L, slots, if (protected) slots else 0L, false)
 
-    private fun own(identity: Any, bytes: Long, slots: Long, protected: Boolean, shared: Boolean) {
+    // Pool reports cover an immutable region and its cumulative protected subset.
+    fun ownedPool(identity: Any, bytes: Long, cumulativeProtectedBytes: Long) =
+        own(identity, bytes, 0L, cumulativeProtectedBytes, false, pool = true)
+
+    fun ownedReferencesPool(identity: Any, slots: Long, cumulativeProtectedSlots: Long) =
+        own(identity, 0L, slots, cumulativeProtectedSlots, false, pool = true)
+
+    private fun own(identity: Any, bytes: Long, slots: Long, protectedAmount: Long, shared: Boolean,
+        pool: Boolean = false) {
         require(bytes >= 0L && slots >= 0L)
+        require(protectedAmount >= 0L && protectedAmount <= if (slots == 0L) bytes else slots)
         if (bytes == 0L && slots == 0L) return
         step()
+        val hash = identityHash(identity)
         var owner = owners
+        var parent: Owner? = null
+        var right = false
+        var bit = 0
         while (owner != null) {
             step()
             if (owner.identity === identity && (owner.slots == 0L) == (slots == 0L)) {
+                if (pool) require(owner.bytes == bytes && owner.slots == slots)
                 if (shared && !owner.shared) { owner.shared = true; sharedBytes += owner.bytes }
-                if (protected && !owner.protected) {
-                    owner.protected = true
-                    protectedBytes += owner.bytes
-                    protectedSlots += owner.slots
+                val retained = minOf(protectedAmount, if (slots == 0L) owner.bytes else owner.slots)
+                if (retained > owner.protectedAmount) {
+                    val added = retained - owner.protectedAmount
+                    owner.protectedAmount = retained
+                    if (slots == 0L) protectedBytes += added else protectedSlots += added
                 }
                 return
             }
-            owner = owner.next
+            parent = owner
+            right = bit < Int.SIZE_BITS && hash and (1 shl bit) != 0
+            if (bit < Int.SIZE_BITS) bit++
+            owner = if (right) owner.right else owner.left
         }
         if (scratchEntries >= maxScratchEntries) throw Stopped()
+        step()
         scratchEntries++
-        owners = Owner(identity, bytes, slots, protected, shared, owners)
+        val added = Owner(identity, if (slots == 0L) bytes else slots, slots != 0L, protectedAmount, shared)
+        if (parent == null) owners = added else if (right) parent.right = added else parent.left = added
         ownedBytes += bytes
         ownedSlots += slots
-        if (protected) { protectedBytes += bytes; protectedSlots += slots }
+        if (slots == 0L) protectedBytes += protectedAmount else protectedSlots += protectedAmount
         if (shared) sharedBytes += bytes
     }
 
@@ -82,40 +107,60 @@ internal class SharingMemoryObservation(
         work++
     }
 
-    fun <T : Any> seen(): Seen<T> = Seen()
+    fun <T : Any> seenIdentities(): Seen<T> = Seen(false)
+
+    fun seenIds(): Seen<Int> = Seen(true)
 
     fun <T : Any> retain(seen: Seen<T>, value: T): Boolean {
         step()
+        val hash = seen.hash(value)
         var node = seen.head
+        var parent: Entry<T>? = null
+        var right = false
+        var bit = 0
         while (node != null) {
             step()
-            if (node.value == value) return false
-            node = node.next
+            if (seen.matches(node.value, value)) return false
+            parent = node
+            right = bit < Int.SIZE_BITS && hash and (1 shl bit) != 0
+            if (bit < Int.SIZE_BITS) bit++
+            node = if (right) node.right else node.left
         }
         if (scratchEntries >= maxScratchEntries) throw Stopped()
+        step()
         scratchEntries++
-        seen.head = Entry(value, seen.head)
+        val added = Entry(value)
+        if (parent == null) seen.head = added else if (right) parent.right = added else parent.left = added
         seen.size++
         return true
     }
 
     fun <T : Any> contains(seen: Seen<T>, value: T): Boolean {
         step()
+        val hash = seen.hash(value)
         var node = seen.head
+        var bit = 0
         while (node != null) {
             step()
-            if (node.value == value) return true
-            node = node.next
+            if (seen.matches(node.value, value)) return true
+            val right = bit < Int.SIZE_BITS && hash and (1 shl bit) != 0
+            if (bit < Int.SIZE_BITS) bit++
+            node = if (right) node.right else node.left
         }
         return false
     }
 
-    class Seen<T : Any> {
+    class Seen<T : Any> internal constructor(private val ids: Boolean) {
         internal var head: Entry<T>? = null
         internal var size: Int = 0
+        internal fun hash(value: T): Int = if (ids) value as Int else identityHash(value)
+        internal fun matches(left: T, right: T): Boolean = if (ids) left == right else left === right
     }
 
-    internal class Entry<T : Any>(val value: T, val next: Entry<T>?)
+    internal class Entry<T : Any>(val value: T) {
+        var left: Entry<T>? = null
+        var right: Entry<T>? = null
+    }
 
     fun record(fields: Map<String, Long>) { values.putAll(fields) }
 

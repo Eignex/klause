@@ -109,6 +109,26 @@ Incremental initialization advances each component's iterator with that componen
 as the active publisher. Synchronous initializers run inside the iterator too.
 Root refresh retains the same ownership: facts already established by CP reach
 peers without returning to CP as extra private decisions.
+The trail retains each queued assertion and its next unfinished recipient until
+delivery completes. An indeterminate recipient resumes before later recipients;
+accepted peers receive no duplicate delivery. Retraction discards queued deliveries
+with their abandoned trail state, and pending recipient cursors remain protected
+modeled ownership.
+
+Minimization retains its first-run position while a private LP root layout prepares
+across slices. Paid construction stays in the worker's cumulative work, and a pause
+starts neither numerical consultation nor tree traversal. Incumbent revalidation
+precedes that work. The search and its preparation wrapper report an unfinished root
+layout as pending private preparation. Construction completion, cancellation and retirement follow the
+[LP ownership contract](17-linear-programming.md#root-preparation).
+Eligible retained LP root coordinates can pass directly to the ordinary finite
+traversal as value preferences. Its existing backtracking completes the assignment,
+and complete source checks retain publication authority. This transfer carries no
+LP point, bound or proof authority into a leaf. Before its first incumbent, a retained
+integer guide can keep decisions within one declared factor component of the
+undetermined columns at a time.
+The same frame stack handles conflicts and retraction; all source constraints stay
+active and every component still belongs to complete source checking.
 
 Numerical frontier traversal orders alternatives by inherited checked objective
 bounds, visiting unbounded alternatives first. It keeps both children of every
@@ -364,8 +384,14 @@ failure context, and fresh presolve rebuilds keep the originating cancellation t
 see [presolve](07-presolve.md).
 
 Learned integer rows subscribe to lower/upper bound events in the dynamic watch
-index. Learned-store compaction removes retired subscriptions and remaps surviving
-factor identities; static event and delta-consumer indexes retain their source ids.
+index. A compressed binary index owns one posting per event; its branch masks
+strictly decrease, bounding lookups by the integer key width. A funded removal
+unlinks its leaf and parent without a whole-table copy. Retired subscriptions are
+swap-removed across bounded cleanup slices; surviving subscription order can change.
+Empty event entries release their primitive and reference ownership while other
+integer rows remain live. Learned-store compaction remaps surviving factor identities;
+static event and delta-consumer indexes retain their source ids. Index admission,
+lookup, traversal and remapping retain their work charges.
 
 Boolean-only models journal each pin without integer-state padding. Integer undo
 replays saved domains and interior carves. Unconditional root carves are kept in
@@ -412,6 +438,16 @@ their first establishment while a resumed cursor repeats completed wakes. Fresh
 decision atom cascades use the same pending completion and retract with their pin.
 Bulk allocations, immutable domain construction and non-interruptible propagator
 internals remain atomic.
+
+XOR propagation scans distinct coordinates with their occurrence parity and retains
+the constant contributed by negative literals. Scans and premise construction poll
+the containing finite token and charge visits. Interrupted local scratch is
+discarded before a pin can use it. Completed conflict premises belong to the
+propagation state, so shared projections retain no mutable failure context. Each
+state can retain an immutable pair of unassigned odd-coefficient coordinates. A
+wake checks their current values before scanning the row: two unassigned terms
+preclude a deduction. The pair can survive retraction because every reuse checks
+both current assignments.
 
 Cumulative propagation polls the same token during task, edge-window and start-bound
 scans. Its window scratch belongs to one fire, so interruption discards that scratch

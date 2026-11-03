@@ -2,17 +2,105 @@ package com.eignex.klause.bench.source
 
 import java.io.File
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.ValueSource
 
 class CorpusFilesTest {
+    @ParameterizedTest
+    @CsvSource("false, 8192", "true, 8192", "false, 65536", "true, 65536")
+    fun `staging cancellation removes partial output before returning`(interrupt: Boolean, bufferBytes: Int) {
+        val root = Files.createTempDirectory("corpusfiles").toFile()
+        try {
+            val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeBytes(ByteArray(32 * 1024)) })
+            val staging = File(root, "staging")
+            var partial: File? = null
+            var cleanupNanos: Long? = null
+
+            assertFailsWith<InterruptedIOException> {
+                CorpusFiles.withPlainFile(packed, checkActive = {
+                    val output = staging.walkTopDown().firstOrNull { it.isFile && it.length() > 0L }
+                    if (output != null) {
+                        partial = output
+                        if (interrupt) Thread.currentThread().interrupt()
+                        else throw InterruptedIOException("cancelled")
+                    }
+                }, onCleanup = { cleanupNanos = it }, stagingDirectory = staging,
+                    bufferBytes = bufferBytes) { error("cancelled source") }
+            }
+
+            assertTrue(partial != null)
+            assertFalse(requireNotNull(partial).exists())
+            assertTrue(staging.listFiles().orEmpty().isEmpty())
+            assertTrue(requireNotNull(cleanupNanos) >= 0L)
+            assertEquals(interrupt, Thread.currentThread().isInterrupted)
+            assertTrue(packed.isFile)
+        } finally {
+            Thread.interrupted()
+            root.deleteRecursively()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = [8192, 65536])
+    fun `bounded staging chunks preserve all source bytes`(bufferBytes: Int) {
+        val root = Files.createTempDirectory("corpusfiles").toFile()
+        try {
+            val body = ByteArray(130_003) { (it % 251).toByte() }
+            val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeBytes(body) })
+
+            val observed = CorpusFiles.withPlainFile(packed, stagingDirectory = File(root, "staging"),
+                bufferBytes = bufferBytes) { it.readBytes() }
+
+            assertContentEquals(body, observed)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `failed decoding removes the staging directory`() {
+        val root = Files.createTempDirectory("corpusfiles").toFile()
+        try {
+            val packed = File(root, "inst.cnf.zst").apply { writeText("invalid zstd") }
+            val staging = File(root, "staging")
+
+            assertFailsWith<IOException> {
+                CorpusFiles.withPlainFile(packed, stagingDirectory = staging) { error("invalid source") }
+            }
+
+            assertTrue(staging.listFiles().orEmpty().isEmpty())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `failed consumers release their staged source`() {
+        val root = Files.createTempDirectory("corpusfiles").toFile()
+        try {
+            val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeText("p cnf 0 0\n") })
+            val staging = File(root, "staging")
+
+            assertFailsWith<IllegalStateException> {
+                CorpusFiles.withPlainFile(packed, stagingDirectory = staging) { error("consumer failed") }
+            }
+
+            assertTrue(staging.listFiles().orEmpty().isEmpty())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `unpacking can retain the original compressed cache object`(keepPacked: Boolean) {

@@ -8,8 +8,42 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.TestTimeSource
 
 class PortfolioProgressTest {
+    @Test
+    fun `each accepted incumbent should notify its version`() {
+        val events = mutableListOf<PortfolioEvent>()
+        val worker = trackingWorker("finder", 0, ScriptedSearch({ true }, perSlice = 3) { })
+
+        Portfolio.thompson(listOf(worker), baseSliceWork = 1,
+            diagnostics = PortfolioDiagnostics(1), onProgress = events::add).use {
+            it.minimize(Cancellation.Never)
+        }
+
+        val available = events.filterIsInstance<PortfolioEvent.Lifecycle>()
+            .filter { it.kind == PortfolioLifecycleKind.INCUMBENT_AVAILABLE }
+        assertEquals(listOf(1L, 2L, 3L), available.map { it.version })
+    }
+
+    @Test
+    fun `repeated incumbents should preserve the first availability timestamp`() {
+        val clock = TestTimeSource()
+        val worker = trackingWorker("finder", 0, ScriptedSearch({ true }, perSlice = 3) {
+            clock += 10.nanoseconds
+        })
+        val result = Portfolio.thompson(listOf(worker), baseSliceWork = 1,
+            diagnostics = PortfolioDiagnostics(1)).also {
+            it.runTimeSource = clock
+            it.invocationStarted = clock.markNow()
+        }.use {
+            it.minimize(Cancellation.Never, onImprovement = { clock += 1.nanoseconds })
+        }
+
+        assertEquals(10L, result.stats.portfolio.arms.single().lifecycle.incumbentAvailableNanos)
+    }
+
     @Test
     fun `experimental rewards should not extend an unproductive auxiliary lifetime`() {
         val workers = listOf(

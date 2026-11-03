@@ -26,6 +26,7 @@ class SourceIntDomains internal constructor(
     /** Declared bounds of every column; either side may be open. */
     val bounds: IntBounds,
     private val stated: Array<IntDomain>?,
+    internal val stableEndpoints: Boolean = true,
 ) {
     /** Number of source integer columns. */
     val size: Int get() = bounds.size
@@ -161,7 +162,8 @@ class SourceIntDomains internal constructor(
                 packedOpenLo = packedOpenLo,
                 packedOpenHi = packedOpenHi,
             )
-            return SourceIntDomains(bounds, if (shared) domains else domains.copyOf())
+            return SourceIntDomains(bounds, if (shared) domains else domains.copyOf(),
+                stableEndpoints = !shared)
         }
     }
 }

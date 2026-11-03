@@ -15,6 +15,7 @@ internal class InprocessingSpending(private val kind: InprocessingKind) {
         params: BacktrackParams,
         stats: SearchStatsSink?,
         resumingRoot: Boolean = false,
+        containingWork: Long = Long.MAX_VALUE,
         operation: (InprocessingBudget) -> Unit,
     ) {
         val limit = when (kind) {
@@ -26,7 +27,8 @@ internal class InprocessingSpending(private val kind: InprocessingKind) {
         val repaid = minOf(debt, limit)
         debt -= repaid
         if (repaid > 0L) stats?.noteInprocessing("inprocess${kind.name}DebtRepaid", repaid)
-        val budget = InprocessingBudget(session, params, stats, kind, if (resumingRoot) 0L else limit - repaid)
+        val budget = InprocessingBudget(session, params, stats, kind,
+            if (resumingRoot) 0L else limit - repaid, containingWork)
         if (!resumingRoot && budget.stopped()) return
         budget.note("Runs")
         val start = TimeSource.Monotonic.markNow()
@@ -50,12 +52,14 @@ internal class InprocessingBudget(
     private val stats: SearchStatsSink?,
     private val kind: InprocessingKind,
     val limit: Long,
+    private val containingLimit: Long = Long.MAX_VALUE,
 ) {
     private val start = session.work
     val spent: Long get() = (session.work - start).coerceAtLeast(0L)
-    val cancellation = Cancellation { params.cancellation() || spent >= limit }
+    val remaining: Long get() = (minOf(limit, containingLimit) - spent).coerceAtLeast(0L)
+    val cancellation = Cancellation { params.cancellation() || remaining == 0L }
 
-    fun stopped(): Boolean = spent >= limit || params.cancellation() || session.cancelRequested ||
+    fun stopped(): Boolean = remaining == 0L || params.cancellation() || session.cancelRequested ||
         session.fixpointCancelled || session.isUnsatAtRoot
 
     fun visit(count: Int = 1): Boolean {

@@ -13,6 +13,7 @@ internal data class LearnedReclamation(
     val protectedBytes: Long? = null,
     val work: Long = 0L,
     val protectedLimitExceeded: Boolean = false,
+    val continuationPending: Boolean = false,
 )
 
 internal class ReclamationPreparation(
@@ -26,6 +27,13 @@ internal class ReclamationPreparation(
     var atomicUnits = 0L
         private set
     private var scratch = 0L
+    var progressed = false
+        private set
+
+    fun advanced() { progressed = true }
+    val remainingWork: Long get() = maxWork - work
+
+    fun supports(units: Long, scratchBytes: Long): Boolean = units <= maxWork && scratchBytes <= maxScratchBytes
 
     fun visit(units: Long = 1L, scratchBytes: Long = 0L) {
         if (cancelled() || units > maxWork - work || scratchBytes > maxScratchBytes - scratch) throw Deferred()
@@ -51,7 +59,38 @@ internal class ReclamationPreparation(
     private companion object { const val ATOMIC_PRICE = 32L }
 }
 
+internal fun <T> PropagationState.withLearnedOwnershipBudget(budget: ReclamationPreparation, operation: () -> T): T {
+    nativeEngine?.let { return it.withOwnershipBudget(budget, operation) }
+    val rows = learned.initializedStore
+    return if (rows != null) rows.usingBudget(budget, operation) else operation()
+}
+
+internal fun PropagationState.sweepRetiredLearnedMemory(budget: ReclamationPreparation) {
+    val rows = learned.initializedStore
+    if (nativeEngine == null && rows != null) rows.usingBudget(budget) { sweepRetiredOwners(budget) }
+    else sweepRetiredOwners(budget)
+}
+
+private fun PropagationState.sweepRetiredOwners(budget: ReclamationPreparation) {
+    nativeEngine?.sweepRetiredMetadata(budget)
+    nativeEngine?.sweepRetiredWatches(budget)
+    sweepRetiredGeneralIntegerRows(budget)
+    sweepRetiredGeneralMetadata(budget)
+    if (nativeEngine == null && learned.retiredCount > 0) trimLearnedCandidates(learned.capCandidates, budget)
+    if (!incremental && nativeEngine == null) initializedWatches?.pos?.releaseReservations(budget)
+    sweepRetiredGeneralWatches(budget)
+}
+
 internal fun PropagationState.prepareReclamation(
+    budget: ReclamationPreparation,
+    keep: (Int, Int) -> Boolean,
+): BooleanArray {
+    val rows = learned.initializedStore
+    return if (nativeEngine == null && rows != null) rows.usingBudget(budget) { prepareOwnedRows(budget, keep) }
+    else prepareOwnedRows(budget, keep)
+}
+
+private fun PropagationState.prepareOwnedRows(
     budget: ReclamationPreparation,
     keep: (Int, Int) -> Boolean,
 ): BooleanArray {
@@ -59,18 +98,21 @@ internal fun PropagationState.prepareReclamation(
     budget.visit(scratchBytes = count.toLong() * 29L + baseFactorCount.toLong() * Long.SIZE_BYTES)
     budget.atomic(baseFactorCount.toLong())
     budget.atomic(count.toLong() * 16L)
+    if (selectedRetirements.hasRequests) budget.atomic(selectedRetirements.remapWork)
     val retained = BooleanArray(count)
     collectLearnedReferences(retained) { budget.visit() }
     budget.atomic(boolReason.size.toLong() + intMinReason.size + intMaxReason.size + undo.size * 3L)
     nativeEngine?.prepareReclamation(budget, retained, keep)?.let { return retained }
     for (i in 0 until count) {
         budget.visit()
-        retained[i] = retained[i] || (!learned.retiredOf(i) && (learned.permanent[i] == 1 || keep(i, learned.lbds[i])))
+        retained[i] = retained[i] || (!learned.retiredOf(i) &&
+            (learned.store[i, GeneralLearnedRows.PERMANENT] == 1 || keep(i, learned.store[i, GeneralLearnedRows.LBD])))
     }
     if (factorAttribution != null) budget.atomic(count.toLong() * count)
     budget.atomic(propQueue.size.toLong() * 3L + atoms.dirtyFactors.size * 3L + learned.pendingAttach.size,
         (propQueue.size.toLong() + atoms.dirtyFactors.size) * Int.SIZE_BYTES)
-    budget.atomic(watches.pos.primitiveCapacityBytes, watches.pos.primitiveCapacityBytes * 2L)
+    budget.atomic(watches.pos.primitiveCapacityBytes,
+        (watches.pos.primitiveCapacityBytes + watches.pos.referenceCapacity * Long.SIZE_BYTES) * 2L)
     budget.atomic(watches.pos.size.toLong() * watches.pos.size)
     for (lists in listOf(watches.byLit.asList(), watches.blockersByLit.asList(), atoms.watchersByLit)) {
         for (list in lists) {
@@ -78,21 +120,18 @@ internal fun PropagationState.prepareReclamation(
             budget.atomic(1L + (list?.backingData?.size ?: 0), (list?.backingData?.size?.toLong() ?: 0L) * 8L)
         }
     }
-    if (learned.integerRows != null) {
+    if (intEvents.overflow != null) {
         intEvents.overflow?.let { overflow ->
             budget.atomic(overflow.primitiveCapacityBytes + overflow.size.toLong() * overflow.size,
                 overflow.primitiveCapacityBytes * 2L + overflow.referenceCapacity.toLong() * Long.SIZE_BYTES * 2L)
-            for (value in overflow.valuesInternal) {
-                budget.visit()
-                if (value != null) {
-                    val capacity = (value as IntArrayList).backingData.size.toLong()
-                    budget.atomic(capacity, capacity * Int.SIZE_BYTES)
-                }
+            overflow.forEach({ budget.visit(it) }) { _, posting ->
+                val capacity = posting.backingData.size.toLong()
+                budget.atomic(capacity, capacity * Int.SIZE_BYTES)
             }
         }
     }
-    for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
-        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) {
+    learned.store.prepareRemap(budget)
+    for (column in listOf(learned.units, learned.pendingAttach, learned.capCandidates)) {
         budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
     }
     arithmeticLearningTrace?.let { trace ->
@@ -118,7 +157,25 @@ internal fun PropagationState.ownLearned(sample: com.eignex.klause.util.SharingM
     when (prop) {
         is ClausePropagator -> ints(prop.literals)
         is PseudoBooleanPropagator -> { ints(prop.literals); ints(prop.byWeightDesc); longs(prop.weights) }
-        is LearnedIntegerPropagator -> { ints(prop.row.variables); longs(prop.row.coefficients) }
+        is LearnedIntegerPropagator -> {
+            sample.owned(prop, Int.SIZE_BYTES.toLong(), protected)
+            ints(prop.row.variables)
+            longs(prop.row.coefficients)
+        }
     }
-    ints(refPayloadStore[baseFactorCount + index] as? IntArray)
+    ints(learned.store.payload(index) as? IntArray)
+}
+
+internal val IntArrayList.learnedTrimmingWork: Long
+    get() = if (backingData.size > size.coerceAtLeast(1)) 5L + size.coerceAtLeast(1) * 2L else 0L
+
+internal fun trimLearnedCandidates(candidates: IntArrayList, budget: ReclamationPreparation) {
+    val count = candidates.size.coerceAtLeast(1).toLong()
+    val work = candidates.learnedTrimmingWork
+    val scratch = count * Int.SIZE_BYTES
+    if (work == 0L || !budget.supports(work, scratch)) return
+    budget.visit(work, scratch)
+    budget.visit(0L)
+    candidates.trim()
+    budget.advanced()
 }

@@ -310,7 +310,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
             "root-rebuild-capture-visits", ValueKind.INT,
         )
 
-        /** Total preparation and trial work for a private Boolean generation; zero disables it. */
+        /** Private Boolean work; -1 selects bounded automatic parity admission and zero disables it. */
         val privateRebuildWork: ExecutionOption<Long> = ExecutionOption("private-rebuild-work", ValueKind.LONG)
 
         /** Failed-literal probes per scheduled restart; zero disables probing. */
@@ -640,6 +640,14 @@ class ExecutionOptions private constructor(
 
     /** Whether an arm count or engine-mix count was supplied explicitly. */
     val explicitArms: Boolean get() = listOf("arms", "ls", "bt").any { it in values }
+
+    internal val privateRebuildBudgetOnly: Boolean
+        get() {
+            val overrides = values.keys.filter { it in BACKTRACK_OVERRIDE_KEYS }
+            return overrides.isNotEmpty() && overrides.all {
+                it == "private-rebuild-work" || it == "learned-memory-scratch-bytes"
+            }
+        }
 
     internal fun reader(): ExecutionOptionReader {
         malformed?.let { pipelineConfigError(it) }

@@ -1203,6 +1203,7 @@ private fun executePortfolio(
         ProblemProfile.of(request.problem, request.optimize),
         request.defaultArms,
         explicitArms = request.executionOptions.explicitArms,
+        privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly,
     )
     val scenario = weightedCoreDefaultScenario(baseScenario, request.problem, request.objective,
         request.executionOptions, request.cancellation)
@@ -1244,6 +1245,8 @@ private fun executePortfolio(
         booleanProofTasks = booleanProofTasks,
         fundedCompanions = fundedCompanions,
         bufferedPublications = bufferedPublications,
+
+        privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {
@@ -1266,11 +1269,12 @@ internal fun clausalDefaultScenario(
     profile: ProblemProfile,
     defaultArms: Int,
     explicitArms: Boolean,
+    privateRebuildBudgetOnly: Boolean = false,
 ): PortfolioScenario {
     if (explicitArms || defaultArms != autoArms(1) || scenario.arms != defaultArms) return scenario
     if (scenario.cores != 1 || scenario.kind != Kind.CSP || scenario.engine != EngineMix.MIXED) return scenario
     if (profile.problemClass != ProblemClass.Sat || scenario.btPool != null || scenario.lsPool != null ||
-        scenario.btEdit != null || scenario.annotationArm != null
+        (scenario.btEdit != null && !privateRebuildBudgetOnly) || scenario.annotationArm != null
     ) {
         return scenario
     }

@@ -90,6 +90,7 @@ class PropagationSession private constructor(
 
     internal fun recordProjectionCheck(checker: PropagationSession) {
         state.work += checker.work
+        state.preparationIndexWork += checker.state.preparationIndexWork
         state.propagationNanos += checker.propagationNanos
     }
 
@@ -112,13 +113,19 @@ class PropagationSession private constructor(
     private var retiredPropagationNanos = 0L
     private var retiredPropagationCount = 0L
     private var retiredLifecycle: Map<String, Long> = emptyMap()
+    private var retiredPreparationStatistics: Map<String, Long> = emptyMap()
 
     internal fun releaseRetainedState() {
         val owner = retainedState ?: return
+        if (owner.selectedRetirements.hasRequests) {
+            owner.work += 8L
+            owner.selectedRetirements.release()
+        }
         retiredWork = owner.work
         retiredPropagationNanos = owner.propagationNanos
         retiredPropagationCount = owner.propagations
         retiredLifecycle = learnedLifecycle()
+        retiredPreparationStatistics = preparationStatistics()
         retainedState = null
         levelStates = emptyArray()
         levelTop = 0
@@ -262,10 +269,12 @@ class PropagationSession private constructor(
         lbd: Int,
         origin: Int,
         sourceReplacement: Boolean,
+        ownedLiterals: Boolean = false,
     ): PropagationResult = withRequiredInprocessingCancellation {
         check(canSimplifyRoot)
         val base = state.undoTop
-        val fid = state.addLearnedClause(clause, lbd, permanent = sourceReplacement, origin = origin)
+        val fid = state.addLearnedClause(clause, lbd, permanent = sourceReplacement, origin = origin,
+            ownedLiterals = ownedLiterals)
         state.factorAttribution?.let {
             if (state.nativeEngine == null) it.admit(state.factorAt(fid))
             else if (it.admissionFamilies != 0) it.note(it.admissionFamilies, FactorAttribution.Metric.Learned)
@@ -285,10 +294,8 @@ class PropagationSession private constructor(
         retired.add(factor)
         val native = state.nativeEngine
         if (native != null) native.retireRootSource(factor)
-        else for (literal in literals) {
-            if (state.watches.pos.getOrDefault(state.packWatch(factor, literal), -1) >= 0) {
-                state.removeBoolWatch(factor, literal)
-            }
+        else if (!state.removeInlineBoolWatches(factor, literals.size > 1)) {
+            for (literal in literals) state.removeBoolWatch(factor, literal, onlyIndexed = true)
         }
         if (pendingRootSourceRetirement?.factor == factor) pendingRootSourceRetirement = null
     }
@@ -400,6 +407,13 @@ class PropagationSession private constructor(
         if (token === cancellation || token === Cancellation.Never) cancellation else cancellation or token,
         operation,
     )
+
+    internal fun <T> withProbeInvocation(token: Cancellation, operation: () -> T): T {
+        check(!fixpointCancelled)
+        // A rolled-back probe keeps its completed prefix; its caller supplies the full current scope.
+        probeCancelled = false
+        return usingCancellation(token, operation)
+    }
 
     private fun <T> usingCancellation(token: Cancellation, operation: () -> T): T {
         val previous = cancellation
@@ -652,6 +666,10 @@ class PropagationSession private constructor(
      */
     fun seed(assumptions: Assumptions): PropagationResult {
         bakedUnsat?.let { return it }
+        if (state.selectedRetirements.hasRequests) {
+            state.work += 8L
+            state.selectedRetirements.resetScope()
+        }
         state.undoTo(requireNotNull(levelStates[0]))
         if (levelTop > 1) levelTruncateAfterRoot()
         clearPins()
@@ -1109,27 +1127,131 @@ class PropagationSession private constructor(
     /** Request a bounded learned-store compaction, preserving permanent, live and historical reasons.
      * Cancelled or unfunded preparation leaves the generation intact. */
     fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
+        compactLearnedClauses(65_536L, 1_048_576L, { false }, keep)
+    }
+
+    internal fun compactLearnedClauses(
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+        keep: (learnedIndex: Int, lbd: Int) -> Boolean,
+    ): Boolean {
         val before = learnedClauseCount
-        state.forgetLearnedClauses(cancelled = { cancelRequested }, keep = keep)
+        val published = state.forgetLearnedClauses(maxWork, maxScratchBytes,
+            cancelled = { cancelRequested || cancelled() }, keep = keep)
         if (learnedClauseCount != before) learnedClauseRevision++
+        return published
     }
 
     internal val activeLearnedClauseCount: Int
         get() = retainedState?.let { it.nativeEngine?.activeCount ?: it.learned.activeCount } ?: 0
+
+    internal val learnedRetirementGeneration: Long
+        get() = retainedState?.selectedRetirements?.generation ?: -1L
+
+    internal val hasLearnedRetirementContinuation: Boolean
+        get() = retainedState?.selectedRetirements?.hasContinuation == true
+
+    internal fun queueLearnedRetirement(
+        index: Int,
+        expectedGeneration: Long,
+        maxWork: Long,
+        maxScratchBytes: Long,
+        maxRetainedBytes: Long,
+        cancelled: () -> Boolean,
+    ): LearnedRetirementResult {
+        require(maxWork >= 0L && maxScratchBytes >= 0L && maxRetainedBytes >= 0L)
+        val owner = retainedState ?: return LearnedRetirementResult(LearnedRetirementStatus.ScopeReleased)
+        if (decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot || inprocessingRootPending) {
+            return LearnedRetirementResult(LearnedRetirementStatus.Deferred)
+        }
+        val budget = selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled)
+        return owner.withLearnedOwnershipBudget(budget) {
+            owner.selectedRetirements.capture(index, expectedGeneration, budget, maxRetainedBytes,
+                owner::validateSelectedLearnedRetirement, owner::learnedAdmissionKey)
+        }
+    }
+
+    internal fun authorizeLearnedRetirement(
+        handle: LearnedRetirementHandle,
+        publicationComplete: Boolean,
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+    ): LearnedRetirementResult {
+        val owner = retainedState ?: return LearnedRetirementResult(LearnedRetirementStatus.ScopeReleased, handle)
+        if (!publicationComplete || decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot ||
+            inprocessingRootPending
+        ) {
+            return LearnedRetirementResult(LearnedRetirementStatus.Deferred, handle)
+        }
+        return owner.selectedRetirements.authorize(handle,
+            selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled))
+    }
+
+    internal fun cancelLearnedRetirement(
+        handle: LearnedRetirementHandle,
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+    ): LearnedRetirementResult {
+        val owner = retainedState ?: return LearnedRetirementResult(LearnedRetirementStatus.ScopeReleased, handle)
+        return owner.selectedRetirements.cancel(handle,
+            selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled))
+    }
+
+    internal fun acknowledgeLearnedRetirement(
+        handle: LearnedRetirementHandle,
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+    ): LearnedRetirementResult {
+        val owner = retainedState ?: return LearnedRetirementResult(LearnedRetirementStatus.ScopeReleased, handle)
+        return owner.selectedRetirements.acknowledge(handle,
+            selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled))
+    }
+
+    internal fun advanceLearnedRetirements(
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+        publicationPending: Boolean,
+    ): LearnedRetirementResult {
+        val owner = retainedState ?: return LearnedRetirementResult(LearnedRetirementStatus.ScopeReleased)
+        if (publicationPending || decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot || inprocessingRootPending) {
+            return LearnedRetirementResult(LearnedRetirementStatus.Deferred)
+        }
+        val result = owner.selectedRetirements.advance(
+            selectedRetirementBudget(owner, maxWork, maxScratchBytes, cancelled), owner::retireSelectedLearnedClause)
+        if (result.status == LearnedRetirementStatus.Retired) learnedClauseRevision++
+        return result
+    }
+
+    private fun selectedRetirementBudget(
+        owner: PropagationState,
+        maxWork: Long,
+        maxScratchBytes: Long,
+        cancelled: () -> Boolean,
+    ): ReclamationPreparation {
+        require(maxWork >= 0L && maxScratchBytes >= 0L)
+        return ReclamationPreparation(maxWork, maxScratchBytes, { cancelRequested || cancelled() }) { owner.work += it }
+    }
 
     internal fun maintainCapWindow(
         cap: Int,
         maxWork: Long,
         maxScratchBytes: Long,
         cancelled: () -> Boolean,
+        canDrop: (Int) -> Boolean = { true },
         keep: (Int) -> Boolean,
     ): Int {
         if (retainedState == null || decisionLevel != 0 || fixpointCancelled || isUnsatAtRoot ||
             inprocessingRootPending
         ) return 0
         val retired = state.nativeEngine?.maintainCapWindow(cap, maxWork, maxScratchBytes,
-            { cancelRequested || cancelled() }, keep)
-            ?: state.maintainGeneralCapWindow(cap, maxWork, maxScratchBytes, { cancelRequested || cancelled() }, keep)
+            { cancelRequested || cancelled() }, canDrop, keep)
+            ?: state.maintainGeneralCapWindow(cap, maxWork, maxScratchBytes,
+                { cancelRequested || cancelled() }, canDrop, keep)
         if (retired > 0) learnedClauseRevision++
         return retired
     }
@@ -1187,28 +1309,44 @@ class PropagationSession private constructor(
     ): LearnedReclamation {
         require(softLimitBytes >= 0L && maxWork >= 0L && maxScratchBytes >= 0L)
         val start = work
+        var cleanupProgress = false
+        if (!fixpointCancelled && !inprocessingRootPending && !publicationPending &&
+            learnedClauseCount > activeLearnedClauseCount
+        ) {
+            val cleanup = ReclamationPreparation(maxWork, maxScratchBytes, { cancelRequested }) { state.work += it }
+            try {
+                state.sweepRetiredLearnedMemory(cleanup)
+            } catch (_: ReclamationPreparation.Deferred) {
+                return LearnedReclamation(
+                    if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED,
+                    work = work - start, continuationPending = cleanup.progressed && !cancelRequested)
+            }
+            cleanupProgress = cleanup.progressed
+        }
         val scratchEntries = minOf(maxScratchBytes / 64L, Int.MAX_VALUE.toLong()).toInt()
         fun sample() = sharingMemory((maxWork - (work - start)).coerceAtLeast(0L), scratchEntries)
         fun bytes(values: Map<String, Long>) = values.getValue("ownedPrimitiveBytes") +
             values.getValue("ownedReferenceSlots") * Long.SIZE_BYTES
         val before = sample().completeValues ?: return LearnedReclamation(
-            if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED, work = work - start)
+            if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED, work = work - start,
+            continuationPending = cleanupProgress && !cancelRequested)
         val beforeBytes = bytes(before)
+        val reportedBefore = beforeBytes.takeUnless { cleanupProgress }
         val floor = before.getValue("protectedPrimitiveBytes") +
             before.getValue("protectedReferenceSlots") * Long.SIZE_BYTES
         if (beforeBytes <= softLimitBytes) return LearnedReclamation(ReclamationStatus.WITHIN_LIMIT,
-            beforeBytes, beforeBytes, floor, work - start)
+            reportedBefore, beforeBytes, floor, work - start)
         if (fixpointCancelled || inprocessingRootPending || publicationPending) return LearnedReclamation(
-            ReclamationStatus.DEFERRED, beforeBytes, beforeBytes, floor, work - start,
+            ReclamationStatus.DEFERRED, reportedBefore, beforeBytes, floor, work - start,
             protectedLimitExceeded = floor > softLimitBytes)
-        releaseBuffers()
+        val releasedBuffers = releaseBuffers()
         val count = learnedClauseCount
         val published = state.forgetLearnedClauses(
             (maxWork - (work - start)).coerceAtLeast(0L), maxScratchBytes, { cancelRequested }, { _, _ -> false })
         if (learnedClauseCount != count) learnedClauseRevision++
         if (!published) return LearnedReclamation(
             if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED,
-            beforeBytes, protectedBytes = floor, work = work - start)
+            reportedBefore, protectedBytes = floor, work = work - start)
         val after = sample().completeValues
         val afterBytes = after?.let(::bytes)
         val afterFloor = after?.let {
@@ -1216,11 +1354,11 @@ class PropagationSession private constructor(
         }
         return LearnedReclamation(
             when {
-                learnedClauseCount < count || (afterBytes != null && afterBytes < beforeBytes) ->
-                    ReclamationStatus.RECLAIMED
+                learnedClauseCount < count || releasedBuffers -> ReclamationStatus.RECLAIMED
                 afterFloor != null && afterFloor > softLimitBytes -> ReclamationStatus.PROTECTED_FLOOR
+                afterBytes != null && afterBytes < beforeBytes -> ReclamationStatus.RECLAIMED
                 else -> ReclamationStatus.DEFERRED
-            }, beforeBytes, afterBytes, afterFloor ?: floor, work - start,
+            }, reportedBefore, afterBytes, afterFloor ?: floor, work - start,
             protectedLimitExceeded = (afterFloor ?: floor) > softLimitBytes)
     }
 
@@ -1257,6 +1395,9 @@ class PropagationSession private constructor(
         it.learned.lifecycle.snapshot() + (it.nativeEngine?.capWindowStatistics() ?: it.learned.capWindowStatistics()) +
             (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap())
     } ?: retiredLifecycle
+
+    internal fun preparationStatistics(): Map<String, Long> =
+        retainedState?.preparationStatistics() ?: retiredPreparationStatistics
 
     internal fun configureAttribution(
         enabled: Boolean,

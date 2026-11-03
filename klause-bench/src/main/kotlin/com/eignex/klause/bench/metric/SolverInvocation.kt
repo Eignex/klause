@@ -1,17 +1,20 @@
 package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.profile.SourcePreparationCapture
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.bench.source.SourceStaging
 import com.eignex.klause.bench.tools.CliProfile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import java.io.File
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
@@ -42,6 +45,7 @@ internal object SolverInvocation {
         val captureDirectory: File? = null,
         val measureResources: Boolean = false,
         val completeAssignment: Boolean = false,
+        val sourceStaging: SourceStaging = SourceStaging.CACHE,
     )
 
     /** One subprocess solve: verdict, best objective + time-to-best, proof status, the captured
@@ -88,7 +92,7 @@ internal object SolverInvocation {
         } else {
             emptyMap()
         }
-        return withSourceInput(file, budget) { plain, remaining ->
+        return withSourceInput(file, budget, staging = settings.sourceStaging) { plain, remaining ->
             val cmd = klauseCommand(entry, settings, remaining, optimize, plain)
             try {
                 invoke(
@@ -104,35 +108,84 @@ internal object SolverInvocation {
         }.copy(buildProvenance = InstalledBuild.current)
     }
 
-    internal fun withSourceInput(file: File, budget: Budget, solve: (File, Budget) -> Result): Result {
-        if (!CorpusFiles.isCompressed(file)) return solve(file, budget)
-        val start = System.nanoTime()
-        var preparationMs = 0L
-        val result = CorpusFiles.withPlainFile(file) { plain ->
-            preparationMs = (System.nanoTime() - start) / 1_000_000L
-            val remaining = budget.timeoutMillis - preparationMs
-            val result = if (remaining <= 0L) {
-                Result(
-                    null,
-                    null,
-                    null,
-                    proven = false,
-                    stats = mapOf("sourcePreparationBudgetExhausted" to "true"),
-                    rawOutput = "",
-                    command = "SOURCE_PREPARATION",
-                )
-            } else {
-                solve(plain, Budget(remaining))
+    internal fun withSourceInput(
+        file: File,
+        budget: Budget,
+        nanoTime: () -> Long = System::nanoTime,
+        staging: SourceStaging = SourceStaging.CACHE,
+        decoderIdentity: ((() -> Unit) -> Map<String, String>) = { SourceDecoder.capture(it) },
+        solve: (File, Budget) -> Result,
+    ): Result {
+        val start = nanoTime()
+        val cliDecodesInput = CorpusFiles.isCompressed(file) && staging == SourceStaging.CLI
+        val stagingDirectory = if (staging == SourceStaging.CLI) null else staging.directory
+        var decoder = emptyMap<String, String>()
+        var preparationNanos: Long? = null
+        var cleanupNanos = 0L
+        var cliNanos = 0L
+        var result = Result(null, null, null, proven = false, stats = emptyMap(),
+            rawOutput = "", command = "SOURCE_PREPARATION")
+        fun checkActive() = checkSourceActive(nanoTime() - start, budget)
+        val failure = runCatching {
+            SourcePreparationCapture.span("source-preparation").use { preparation ->
+                fun invokeSource(input: File): Result {
+                    preparation.close()
+                    checkActive()
+                    val cliStart = nanoTime()
+                    preparationNanos = cliStart - start
+                    val remaining = budget.timeoutMillis - (cliStart - start) / NANOS_PER_MILLI
+                    if (remaining <= 0L) throw SourcePreparationTimeout()
+                    try {
+                        result = SourcePreparationCapture.measure("source-cli") { solve(input, Budget(remaining)) }
+                    } finally {
+                        cliNanos = nanoTime() - cliStart
+                    }
+                    return result
+                }
+                if (cliDecodesInput) {
+                    checkActive()
+                    decoder = decoderIdentity(::checkActive)
+                    invokeSource(file)
+                } else {
+                    CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it },
+                        stagingDirectory = stagingDirectory ?: CorpusFiles.stagingRoot,
+                        nanoTime = nanoTime, block = ::invokeSource)
+                }
             }
-            result
+        }.exceptionOrNull()
+        if (failure is Failure) result = failure.result
+        if (failure is SourcePreparationTimeout) {
+            result = result.copy(stats = result.stats + ("sourcePreparationBudgetExhausted" to "true"))
         }
-        return result.copy(
-            stats = result.stats + mapOf(
-            "sourceDecodeMs" to preparationMs.toString(),
-            "sourceInvocationMs" to ((System.nanoTime() - start) / 1_000_000L).toString(),
-        )
-        )
+        val totalNanos = nanoTime() - start
+        val preparationMillis = (preparationNanos ?: (totalNanos - cleanupNanos)) / NANOS_PER_MILLI
+        val decoding = if (cliDecodesInput) emptyMap() else mapOf("sourceDecodeMs" to preparationMillis.toString())
+        result = result.copy(stats = (result.stats - "sourceDecodeMs") + decoder + decoding + mapOf(
+            "sourceStaging" to if (CorpusFiles.isCompressed(file)) staging.key else "plain",
+            "sourceStagingDirectory" to
+                if (CorpusFiles.isCompressed(file)) stagingDirectory?.absolutePath.orEmpty() else "",
+            "sourcePreparationMs" to preparationMillis.toString(),
+            "sourceDecodeLocation" to when {
+                cliDecodesInput -> "cli-frontend"
+                CorpusFiles.isCompressed(file) -> "harness"
+                else -> "none"
+            },
+            "sourceCleanupMs" to (cleanupNanos / NANOS_PER_MILLI).toString(),
+            "sourceCliMs" to (cliNanos / NANOS_PER_MILLI).toString(),
+            "sourceInvocationMs" to (totalNanos / NANOS_PER_MILLI).toString(),
+        ))
+        if (failure != null && (failure !is SourcePreparationTimeout || failure.suppressed.isNotEmpty())) {
+            throw Failure(result, failure.message.orEmpty(), failure)
+        }
+        return result
     }
+
+    private fun checkSourceActive(elapsedNanos: Long, budget: Budget) {
+        if (Thread.currentThread().isInterrupted) throw InterruptedIOException("Source staging interrupted")
+        if (elapsedNanos / NANOS_PER_MILLI >= budget.timeoutMillis) throw SourcePreparationTimeout()
+    }
+
+    private class SourcePreparationTimeout : IOException("Source preparation budget exhausted")
 
     /** The provisioned klause-cli launcher. */
     fun klauseCliBin(): File = File(CorpusFetcher.workspaceRoot(), KLAUSE_CLI_BIN)

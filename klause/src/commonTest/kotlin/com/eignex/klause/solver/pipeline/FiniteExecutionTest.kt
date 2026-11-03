@@ -10,6 +10,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -238,6 +239,111 @@ class FiniteExecutionTest {
                 assertEquals(0, observations.single().tasks)
                 assertTrue(observations.single().workerWork >= observations.single().probeWork)
             }
+        }
+    }
+
+    @Test
+    fun `private rebuild budgets should preserve the default clausal source pool`() {
+        for (options in listOf(
+            ExecutionOptions(ExecutionOption.privateRebuildWork(0L)),
+            ExecutionOptions.parse(listOf("private-rebuild-work=0")),
+            ExecutionOptions(ExecutionOption.learnedMemoryScratchBytes(4_194_304L)),
+            ExecutionOptions.parse(listOf("learned-memory-scratch-bytes=4194304")),
+            ExecutionOptions(ExecutionOption.privateRebuildWork(0L),
+                ExecutionOption.learnedMemoryScratchBytes(4_194_304L)),
+            ExecutionOptions.parse(listOf("private-rebuild-work=0", "learned-memory-scratch-bytes=4194304")),
+            ExecutionOptions(ExecutionOption.privateRebuildWork(-1L),
+                ExecutionOption.learnedMemoryScratchBytes(4_194_304L)),
+            ExecutionOptions.parse(listOf("private-rebuild-work=-1", "learned-memory-scratch-bytes=4194304")),
+        )) {
+            val problem = Problem(2, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ))
+            val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.SAT, completed.verdict)
+            assertEquals(listOf("ls/probsat/plain", "bt/clausal-balanced"),
+                completed.stats.portfolio.arms.map { it.label })
+            assertTrue(completed.stats.portfolio.arms.all { it.faults == 0L && it.failures == 0L })
+        }
+    }
+
+    @Test
+    fun `automatic private rebuilding should reach the source portfolio`() {
+        for (options in listOf(
+            ExecutionOptions(ExecutionOption.arms(2),
+                ExecutionOption.backtrackArmsByLabel(listOf("first-fail")),
+                ExecutionOption.privateRebuildWork(-1L), ExecutionOption.learnedMemoryScratchBytes(4_194_304L)),
+            ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail", "private-rebuild-work=-1",
+                "learned-memory-scratch-bytes=4194304")),
+        )) {
+            val clauses = (0 until 128).flatMap { row ->
+                listOf(1, 2, 4, 7).map { mask ->
+                    Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
+                }
+            } + Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))
+            val problem = Problem(130, 0, emptyArray(), clauses.toTypedArray())
+            val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
+                executionOptions = options, nodeBudget = NodeBudget(5_000),
+            )
+            val samples = mutableListOf<Sample>()
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({ samples += it }, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.SAT, completed.verdict)
+            assertTrue(samples.isNotEmpty())
+            for (sample in samples) {
+                assertEquals(problem.numBoolVars, sample.numBoolVars)
+                assertTrue(clauses.all { clause ->
+                    clause.literals.any { Lit.evaluate(it, sample.boolValue(Lit.variable(it))) }
+                })
+            }
+            val learning = completed.stats.search.learning
+            assertTrue(learning.getValue("privateRebuildAutomaticAdmitted") > 0L)
+            assertTrue(learning.getValue("privateRebuildConsumers") > 0L)
+            assertTrue(learning.getValue("privateRebuildSourceAccepted") > 0L)
+            assertEquals(learning.getValue("privateRebuildConsumers"), learning["privateRebuildRetired"])
+            assertTrue(completed.stats.portfolio.booleanProof.isEmpty())
+            assertTrue(completed.stats.portfolio.arms.all { it.faults == 0L && it.failures == 0L })
+        }
+    }
+
+    @Test
+    fun `explicit source proof tasks should decline private rebuild recipes`() {
+        for (options in listOf(
+            ExecutionOptions(ExecutionOption.arms(2),
+                ExecutionOption.backtrackArmsByLabel(listOf("first-fail")),
+                ExecutionOption.privateRebuildWork(65_536L), ExecutionOption.booleanProofTasks(true)),
+            ExecutionOptions.parse(listOf("arms=2", "bt-arm=first-fail", "private-rebuild-work=65536",
+                "boolean-proof-tasks=true")),
+        )) {
+            val problem = Problem(2, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ))
+            val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
+                executionOptions = options, nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.SAT, completed.verdict)
+            val observation = completed.stats.portfolio.booleanProof.single()
+            assertEquals("worker-model-or-recipe-mismatch", observation.decline)
+            assertEquals(0, observation.tasks)
+            assertEquals(0, observation.probeSegments)
         }
     }
 
