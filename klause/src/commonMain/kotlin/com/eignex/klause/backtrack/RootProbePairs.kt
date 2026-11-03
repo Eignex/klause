@@ -89,15 +89,17 @@ internal class RootProbePairs {
         val variables = session.problem.numBoolVars
         val start = session.work
         var visited = 0
-        for (literal in neighborhood.orEmpty()) {
-            if (visited >= CANDIDATE_LIMIT || session.work - start >= limit || !budget.visit()) return null
-            visited++
-            budget.note("PairCandidates")
-            budget.note("PairNeighborhoodCandidates")
-            val variable = Lit.variable(literal)
-            if (variable >= variables || session.boolValue(variable) != null) continue
-            budget.note("PairNeighborhoodEligible")
-            return Lit.negate(literal)
+        if (neighborhood != null) {
+            for (literal in neighborhood) {
+                if (visited >= CANDIDATE_LIMIT || session.work - start >= limit || !budget.visit()) return null
+                visited++
+                budget.note("PairCandidates")
+                budget.note("PairNeighborhoodCandidates")
+                val variable = Lit.variable(literal)
+                if (variable >= variables || session.boolValue(variable) != null) continue
+                budget.note("PairNeighborhoodEligible")
+                return Lit.negate(literal)
+            }
         }
         for (offset in 1..minOf(variables - 1, CANDIDATE_LIMIT - visited)) {
             if (session.work - start >= limit || !budget.visit()) return null
