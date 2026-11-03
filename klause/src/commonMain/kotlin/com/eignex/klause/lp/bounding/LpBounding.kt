@@ -1489,6 +1489,7 @@ private fun LpEngine.retainedRootLpRelaxationBound(
     }
     val continuation = if (sparseTrialActive) ::retainedRootRemainingWork else null
     retainRootPrimalOwner(relaxation)
+    var pausedBound = Double.NaN
     try {
         while (retainedRootRemainingWork() > 0L && !cancellation()) {
             observeStage("AT_NUMERICAL_QUERY")
@@ -1498,8 +1499,9 @@ private fun LpEngine.retainedRootLpRelaxationBound(
                 observeRootWork(metrics, finished = !propagator.floatPaused)
                 observeSparsePausedProgress()
                 if (!propagator.floatPaused || metrics.workOps == 0L) {
-                    observeStage("QUERY_DECLINED_${propagator.floatTermination?.name ?: "NO_TERMINATION"}")
-                    return Double.NaN
+                    observeStage(if (!pausedBound.isNaN()) "PAUSED_BOUND" else
+                        "QUERY_DECLINED_${propagator.floatTermination?.name ?: "NO_TERMINATION"}")
+                    return pausedBound
                 }
                 if (sparseTrialActive) sink.lp.sparseTrial = sink.lp.sparseTrial +
                     ("RootPauses" to ((sink.lp.sparseTrial["RootPauses"] ?: 0L) + 1L))
@@ -1508,9 +1510,10 @@ private fun LpEngine.retainedRootLpRelaxationBound(
                     observeStage("AT_PAUSED_CERTIFICATION")
                     val lower = retainedRootLowerBound(relaxation.model, null, cancellation, pausedProposal = true)
                     val bound = if (cancellation()) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
-                    if (!bound.isNaN()) {
-                        observeStage("PAUSED_BOUND")
-                        return bound
+                    if (!bound.isNaN() && !cancellation()) {
+                        pausedBound = if (pausedBound.isNaN()) bound else maxOf(pausedBound, bound)
+                        sink.lp.sparseTrial = sink.lp.sparseTrial + ("PausedCertifiedBounds" to
+                            ((sink.lp.sparseTrial["PausedCertifiedBounds"] ?: 0L) + 1L))
                     }
                 }
                 continue
@@ -1533,6 +1536,7 @@ private fun LpEngine.retainedRootLpRelaxationBound(
             val bound = if (stopped) Double.NaN else projectCertifiedLowerBound(relaxation, lower)
             observeStage(
                 when {
+                    bound.isNaN() && !pausedBound.isNaN() -> "PAUSED_BOUND"
                     stopped -> "CANCELLED_AFTER_QUERY"
                     attempt.second == null && !bound.isNaN() -> "PARTIAL_BOUND"
                     attempt.second == null -> "NO_FLOAT_${attempt.first.lastTermination?.name ?: "NO_TERMINATION"}"
@@ -1541,11 +1545,12 @@ private fun LpEngine.retainedRootLpRelaxationBound(
                     else -> "BOUND"
                 },
             )
-            return bound
+            return if (pausedBound.isNaN()) bound else if (bound.isNaN()) pausedBound else
+                maxOf(pausedBound, bound)
         }
         sink.lp.observePrimalPhase("ROOT_QUERY_STOP", rootQueryStopView(), 0L)
-        observeStage("QUERY_LOOP_STOPPED")
-        return Double.NaN
+        observeStage(if (pausedBound.isNaN()) "QUERY_LOOP_STOPPED" else "PAUSED_BOUND")
+        return pausedBound
     } finally {
         val retained = cpAdapter.retainRootProbe(root)
         if (sparseTrialActive) {
