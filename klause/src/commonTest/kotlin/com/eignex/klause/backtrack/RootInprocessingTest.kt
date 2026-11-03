@@ -462,6 +462,201 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `consistent root probes should install a consumed conditional binary`() {
+        for ((native, positive) in listOf(false to false, false to true, true to false, true to true)) {
+            val a = Lit.make(0, positive)
+            val b = Lit.make(1, positive)
+            val c = Lit.make(2, positive)
+            val d = Lit.make(3, positive)
+            val session = PropagationSession(problem(intArrayOf(Lit.negate(a), b),
+                intArrayOf(Lit.negate(a), c), intArrayOf(Lit.negate(b), Lit.negate(c), d)).bake(),
+                nativeSat = native)
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2), null)
+            session.pinBool(3, !positive)
+
+            assertEquals(!positive, session.boolValue(0))
+            assertEquals(setOf(Lit.negate(a), d), assertNotNull(session.boolReasonClause(0)).toSet())
+        }
+    }
+
+    @Test
+    fun `a consistent branch should not assert its implied literals at the root`() {
+        for (native in listOf(false, true)) {
+            val source = problem(intArrayOf(1, 2), intArrayOf(1, 4), intArrayOf(3, 5, 6))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1), null)
+
+            assertEquals(0, session.decisionLevel)
+            for (variable in 0..3) assertNull(session.boolValue(variable))
+            assertEquals(1, session.learnedClauseCount)
+            assertEquals(4, session.problem.numBoolVars)
+            assertEquals(listOf(3, 5, 6), (source.factors[2] as Clause).literals.toList())
+        }
+    }
+
+    @Test
+    fun `direct binary reasons should not be admitted again`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 2)).bake(), nativeSat = native)
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2), null)
+
+            assertEquals(0, session.learnedClauseCount)
+        }
+    }
+
+    @Test
+    fun `a deferred consistent implication should resume without another probe`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 1, inprocessingProbeWork = 256L)
+            val stats = SearchStatsSink()
+            pass.run(session, params, stats, containingWork = 63L)
+            assertTrue(pass.hasContinuation(session))
+            assertEquals(0, session.learnedClauseCount)
+            val probes = stats.inprocessProbes
+
+            pass.continueAtRoot(session, params, stats, containingWork = 256L)
+
+            assertEquals(probes, stats.inprocessProbes)
+            assertEquals(1, session.learnedClauseCount)
+            assertFalse(pass.hasContinuation(session))
+        }
+    }
+
+    @Test
+    fun `own implication history should survive learned compaction`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(1, 4),
+                intArrayOf(3, 5, 6)).bake(), nativeSat = native)
+            val pass = RootProbingPass()
+            val stats = SearchStatsSink()
+            pass.run(session, BacktrackParams(rootProbeBatch = 2), stats)
+            session.forgetLearnedClauses { _, _ -> false }
+            assertEquals(0, session.learnedClauseCount)
+
+            pass.run(session, BacktrackParams(rootProbeBatch = 8), stats)
+
+            assertEquals(0, session.learnedClauseCount)
+            assertEquals(1L, stats.snapshot().learning.getValue("inprocessProbeBinaries"))
+        }
+    }
+
+    @Test
+    fun `optional buffer release should preserve the implication admission bound`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(3, 4),
+                intArrayOf(5, 6), intArrayOf(7, 0)).bake(), nativeSat = native)
+            val pass = RootProbingPass()
+            val stats = SearchStatsSink()
+
+            repeat(80) {
+                pass.run(session, BacktrackParams(rootProbeBatch = 1), stats)
+                session.forgetLearnedClauses { _, _ -> false }
+                pass.releaseRetainedBuffers()
+            }
+
+            assertTrue(stats.snapshot().learning.getValue("inprocessProbeBinaries") in 1L..64L)
+            assertEquals(0, session.learnedClauseCount)
+        }
+    }
+
+    @Test
+    fun `unfundable implication storage should retain failed literal probing`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(0, 2), intArrayOf(0, 3)).bake(), nativeSat = native)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 2, learnedMemoryScratchBytes = 0L)
+
+            pass.run(session, params, null)
+
+            assertEquals(true, session.boolValue(0))
+            assertFalse(pass.hasContinuation(session))
+        }
+    }
+
+    @Test
+    fun `interrupted consistent probes should leave no retained implication`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(1, 4),
+                intArrayOf(3, 5, 6)).bake(), nativeSat = native)
+            val pass = RootProbingPass()
+
+            var cancelled = false
+            val token = Cancellation {
+                if (session.decisionLevel > 0) cancelled = true
+                cancelled
+            }
+
+            pass.run(session, BacktrackParams(rootProbeBatch = 1, cancellation = token), null)
+
+            assertTrue(cancelled)
+            assertEquals(0, session.learnedClauseCount)
+            assertEquals(0, session.decisionLevel)
+            assertFalse(pass.hasContinuation(session))
+            for (variable in 0..3) assertNull(session.boolValue(variable))
+        }
+    }
+
+    @Test
+    fun `reset should cancel an unadmitted consistent implication`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 1, inprocessingProbeWork = 256L)
+            pass.run(session, params, null, containingWork = 63L)
+            assertTrue(pass.hasContinuation(session))
+
+            pass.reset()
+            pass.continueAtRoot(session, params, null, containingWork = 256L)
+
+            assertFalse(pass.hasContinuation(session))
+            assertEquals(0, session.learnedClauseCount)
+        }
+    }
+
+    @Test
+    fun `buffer release should retain an unadmitted consistent implication`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 1, inprocessingProbeWork = 256L)
+            val stats = SearchStatsSink()
+            pass.run(session, params, stats, containingWork = 63L)
+            assertTrue(pass.hasContinuation(session))
+            val probes = stats.inprocessProbes
+
+            pass.releaseRetainedBuffers()
+            pass.continueAtRoot(session, params, stats, containingWork = 256L)
+
+            assertEquals(probes, stats.inprocessProbes)
+            assertEquals(1, session.learnedClauseCount)
+            assertFalse(pass.hasContinuation(session))
+        }
+    }
+
+    @Test
+    fun `buffer release should preserve progress toward a later failed literal`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(8, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(14, 2)), Clause(intArrayOf(14, 3)),
+            ))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+            val pass = RootProbingPass()
+
+            repeat(16) {
+                pass.run(session, BacktrackParams(rootProbeBatch = 1), null)
+                pass.releaseRetainedBuffers()
+            }
+
+            assertEquals(true, session.boolValue(7))
+        }
+    }
+
+    @Test
     fun `completed root probes should preserve saved search phases`() {
         for ((native, conflicting) in listOf(false to false, false to true, true to false, true to true)) {
             val source = if (conflicting) problem(intArrayOf(1, 2), intArrayOf(1, 3))
@@ -693,6 +888,8 @@ class RootInprocessingTest {
             val session = PropagationSession(problem(intArrayOf(0, 2)).bake(), nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             val pass = RootProbingPass()
+            val initial = SharingMemoryObservation(1024L, 128, { false }, {})
+            val baseline = initial.snapshot { pass.retainedMemory(initial, false) }
             pass.run(session, BacktrackParams(rootProbeBatch = 1), null)
             val before = SharingMemoryObservation(1024L, 128, { false }, {})
             val retained = before.snapshot { pass.retainedMemory(before, false) }
@@ -701,8 +898,10 @@ class RootInprocessingTest {
             val after = SharingMemoryObservation(1024L, 128, { false }, {})
             val released = after.snapshot { pass.retainedMemory(after, false) }
 
-            assertTrue(assertNotNull(retained.completeValues).getValue("ownedPrimitiveBytes") >= 8L)
-            assertEquals(0L, assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes"))
+            assertTrue(assertNotNull(retained.completeValues).getValue("ownedPrimitiveBytes") >=
+                assertNotNull(baseline.completeValues).getValue("ownedPrimitiveBytes") + 8L)
+            assertEquals(assertNotNull(baseline.completeValues).getValue("ownedPrimitiveBytes"),
+                assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes"))
         }
     }
 
