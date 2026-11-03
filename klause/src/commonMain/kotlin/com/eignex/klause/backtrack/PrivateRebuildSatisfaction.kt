@@ -444,7 +444,7 @@ internal class PrivateRebuildSatisfaction(
     }
 
     companion object {
-        private const val AUTOMATIC_WORK = 1_048_576L
+        private const val AUTOMATIC_WORK = 4_194_304L
         private const val MIN_AUTOMATIC_RANK = 128
         private const val MIN_AUTOMATIC_FACTORS = 512
         private const val MAX_AUTOMATIC_FACTORS = 32_768
