@@ -33,6 +33,9 @@ internal class TransientIntegerRow private constructor(
         val terms = mutableMapOf<Int, Long>()
         var residual = bound
         var removed = 0
+        var remaining = variables.size - INTEGER_LEARNING_TERMS
+        var preserved = false
+        state.arithmeticLearningTrace?.record("integer.retained.box.attempt")
         for (index in variables.indices) {
             work.visit()
             val variable = variables[index]
@@ -43,14 +46,24 @@ internal class TransientIntegerRow private constructor(
             val declared = if (!available) null else if (coefficient > 0L) bounds.lower(variable)
                 else bounds.upper(variable)
             // Immutable model bounds are axioms; root pins can be call-scoped.
-            if (declared != null && current == declared) {
+            if (declared != null && current == declared && remaining > 0) {
                 residual = subExact(residual, mulExact(coefficient, declared))
                 removed++
-            } else terms[variable] = coefficient
+                remaining--
+            } else {
+                terms[variable] = coefficient
+                if (declared != null && current == declared) preserved = true
+            }
         }
-        if (removed == 0 || terms.size > INTEGER_LEARNING_TERMS) null else {
+        if (removed == 0 || terms.size > INTEGER_LEARNING_TERMS) {
+            state.arithmeticLearningTrace?.record(if (removed == 0) "integer.retained.box.reject.no-extremum"
+                else "integer.retained.box.reject.width")
+            null
+        } else {
             repeat(terms.size * 4 + 8) { work.visit() }
-            IntegerConflictRow.normalized(terms, residual, Lit.NONE)?.derivedFromDeclaredBounds(removed)
+            if (preserved) state.arithmeticLearningTrace?.record("integer.retained.box.preserved")
+            IntegerConflictRow.normalized(terms, residual, Lit.NONE)?.derivedFromDeclaredBounds(removed,
+                if (preserved) DECLARED_BOUND_PRESERVED_TERMS else 0)
         }
     } catch (_: CheckedLongOverflowException) {
         state.arithmeticLearningTrace?.record("integer.retained.box.reject.overflow")

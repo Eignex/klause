@@ -33,7 +33,9 @@ class IntegerConflictRowTest {
         val consequence = requireNotNull(row.declaredBoundConsequence(state))
 
         assertTrue(consequence.minimum(state) > consequence.bound)
-        assertEquals(14, consequence.declaredBoundTerms)
+        assertEquals(1, consequence.declaredBoundTerms)
+        assertEquals(16, consequence.variables.size)
+        assertEquals(DECLARED_BOUND_PRESERVED_TERMS, consequence.declaredBoundModes)
         for (x in 0L..2L) for (y in 0L..2L) for (z in 0L..2L) for (pattern in 0..3) {
             val values = LongArray(17) { variable ->
                 when {

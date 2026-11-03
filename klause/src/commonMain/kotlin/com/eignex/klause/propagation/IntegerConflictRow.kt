@@ -8,6 +8,8 @@ import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
 
 internal const val INTEGER_LEARNING_TERMS = 16
+internal const val DECLARED_BOUND_EARLY = 1
+internal const val DECLARED_BOUND_PRESERVED_TERMS = 2
 
 internal class IntegerConflictRow private constructor(
     override val variables: IntArray,
@@ -19,6 +21,7 @@ internal class IntegerConflictRow private constructor(
     val hasNonOwnerSource: Boolean = false,
     val hasNonOwnerOriginalSource: Boolean = false,
     val declaredBoundTerms: Int = 0,
+    val declaredBoundModes: Int = 0,
 ) : IntegerLearningInequality {
     override fun coefficient(variable: Int): Long {
         val index = variables.indexOf(variable)
@@ -27,7 +30,7 @@ internal class IntegerConflictRow private constructor(
 
     fun derivedThroughTransient(steps: Int): IntegerConflictRow = if (steps == 0) this else
         IntegerConflictRow(variables, coefficients, bound, guard, steps, retainedSources, hasNonOwnerSource,
-            hasNonOwnerOriginalSource, declaredBoundTerms)
+            hasNonOwnerOriginalSource, declaredBoundTerms, declaredBoundModes)
 
     fun derivedFromRetainedSources(
         sources: Int,
@@ -36,11 +39,11 @@ internal class IntegerConflictRow private constructor(
     ): IntegerConflictRow = if (sources == 0 && !nonOwnerSource && !nonOwnerOriginalSource) this else
         IntegerConflictRow(variables, coefficients, bound, guard, transientSteps, sources,
             hasNonOwnerSource || nonOwnerSource, hasNonOwnerOriginalSource || nonOwnerOriginalSource,
-            declaredBoundTerms)
+            declaredBoundTerms, declaredBoundModes)
 
-    fun derivedFromDeclaredBounds(terms: Int): IntegerConflictRow = if (terms == 0) this else
+    fun derivedFromDeclaredBounds(terms: Int, modes: Int = 0): IntegerConflictRow = if (terms == 0) this else
         IntegerConflictRow(variables, coefficients, bound, guard, transientSteps, retainedSources,
-            hasNonOwnerSource, hasNonOwnerOriginalSource, terms)
+            hasNonOwnerSource, hasNonOwnerOriginalSource, terms, declaredBoundModes or modes)
 
     fun subsumes(other: IntegerConflictRow): Boolean =
         (guard == Lit.NONE || guard == other.guard) && bound <= other.bound &&

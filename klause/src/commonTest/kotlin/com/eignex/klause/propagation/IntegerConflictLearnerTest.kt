@@ -44,6 +44,45 @@ import kotlin.test.assertTrue
 
 class IntegerConflictLearnerTest {
     @Test
+    fun `an original only temporary consequence should assert in mapped coordinates`() {
+        val variables = intArrayOf(0, 1) + IntArray(16) { it + 3 }
+        val native = PropagationSession(PropagationProblem(Problem(0, 19, Array(19) {
+            if (it < 3) IntDomain(0, 1) else IntDomain(0, 0)
+        }, arrayOf(
+            Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(2, 1), LinearOp.LE, 0),
+            Linear(IntArray(18) { 1 }, variables, LinearOp.LE, 1),
+        ))), pbLearning = false, attribution = true).apply { enableIntegerRowLearning() }
+        val cp = CpSearchComponent(native, IntArray(19) { it + 7 })
+        val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+
+        assertIs<ComponentResult.Conflict>(shared.push(SearchDecision.IntAtLeast(9, 1)))
+        val learned = assertIs<ConflictAnalyzer.AnalysisResult.LearnedIntegerRow>(cp.lastConflict?.learnedClause)
+        val backjump = assertIs<SearchConflictResolution.Backjump>(cp.resolveConflict(shared)).conflict
+        shared.popTo(backjump.decisionLevel)
+        assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
+
+        assertContentEquals(intArrayOf(2) + IntArray(15) { it + 4 }, learned.row.variables)
+        assertContentEquals(longArrayOf(2) + LongArray(15) { 1L }, learned.row.coefficients)
+        assertEquals(1L, learned.row.bound)
+        assertEquals(0, learned.row.retainedSources)
+        assertEquals(2, learned.row.transientSteps)
+        assertEquals(1, learned.row.declaredBoundTerms)
+        assertEquals(DECLARED_BOUND_EARLY or DECLARED_BOUND_PRESERVED_TERMS, learned.row.declaredBoundModes)
+        assertEquals(0L, shared.intUpperBound(9))
+        val snapshot = native.learnedLifecycle()
+        assertFalse(snapshot.containsKey("learningIntegerChainedSources"))
+        assertEquals(3L, snapshot["learningIntegerDeclaredBoundTerms"])
+        assertEquals(3L, snapshot["learningIntegerDeclaredBoundExtendedTerms"])
+        assertEquals(1L, snapshot["learningIntegerDeclaredBoundExtendedProduced"])
+        assertEquals(1L, snapshot["learningIntegerDeclaredBoundExtendedAdmitted"])
+        assertEquals(1L, snapshot["learningIntegerDeclaredBoundExtendedConsumed"])
+        native.releaseRetainedState()
+        assertEquals(snapshot, native.learnedLifecycle())
+    }
+
+    @Test
     fun `declared bounds should compact a temporary owned consequence at its mapped backjump`() {
         val parentVariables = intArrayOf(0, 9) + IntArray(12) { it + 10 }
         val native = PropagationSession(PropagationProblem(Problem(0, 24, Array(24) { IntDomain(0, 1) }, arrayOf(
@@ -69,17 +108,22 @@ class IntegerConflictLearnerTest {
         shared.popTo(backjump.decisionLevel)
         assertIs<SearchLearnedConflictResult.Resume>(backjump.apply(shared))
 
-        assertContentEquals(intArrayOf(22), learned.row.variables)
-        assertContentEquals(longArrayOf(1), learned.row.coefficients)
-        assertEquals(0L, learned.row.bound)
+        assertContentEquals(intArrayOf(6, 7, 8) + IntArray(12) { it + 10 } + intArrayOf(22), learned.row.variables)
+        assertContentEquals(longArrayOf(1, 1, 1) + LongArray(12) { -1L } + longArrayOf(2), learned.row.coefficients)
+        assertEquals(-11L, learned.row.bound)
         assertEquals(1, learned.row.retainedSources)
         assertEquals(3, learned.row.transientSteps)
-        assertEquals(19, learned.row.declaredBoundTerms)
+        assertEquals(4, learned.row.declaredBoundTerms)
+        assertEquals(DECLARED_BOUND_PRESERVED_TERMS, learned.row.declaredBoundModes)
         assertTrue(learned.row.hasNonOwnerOriginalSource)
         assertEquals(0L, shared.intUpperBound(29))
         val snapshot = native.learnedLifecycle()
         assertEquals(3L, snapshot["learningIntegerNonOwnerOriginalSources"])
-        assertEquals(57L, snapshot["learningIntegerDeclaredBoundTerms"])
+        assertEquals(14L, snapshot["learningIntegerDeclaredBoundTerms"])
+        assertEquals(14L, snapshot["learningIntegerDeclaredBoundExtendedTerms"])
+        assertEquals(1L, snapshot["learningIntegerDeclaredBoundExtendedProduced"])
+        assertEquals(1L, snapshot["learningIntegerDeclaredBoundExtendedAdmitted"])
+        assertEquals(1L, snapshot["learningIntegerDeclaredBoundExtendedConsumed"])
         assertEquals(1L, snapshot["learningIntegerDeclaredBoundProduced"])
         assertEquals(1L, snapshot["learningIntegerDeclaredBoundAdmitted"])
         assertEquals(1L, snapshot["learningIntegerDeclaredBoundConsumed"])
