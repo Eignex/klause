@@ -303,7 +303,8 @@ class LpPrimalContinuationTest {
             var charged = 0L
             LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)),
                 SolveStatsSink("large-buffer-source"), projections = selected,
-                reusePumpPreparation = true, reusePrimalHandoff = true, containingWork = { charged += it }).use { engine ->
+                reusePumpPreparation = true, reusePrimalHandoff = true,
+                containingWork = { charged += it }).use { engine ->
 
                 val guard = LpPrimalContinuation.capture(engine, root, domains, Cancellation.Never, 4L) {}
 
