@@ -20,14 +20,18 @@ internal class Monomial private constructor(private val powers: Map<Int, Int>) :
 
     fun without(variable: Int): Monomial = of(powers.filterKeys { it != variable })
 
-    fun times(other: Monomial): Monomial = of(buildMap {
-        putAll(powers)
-        for ((variable, degree) in other.powers) {
-            val previous = get(variable) ?: 0
-            require(degree <= Int.MAX_VALUE - previous) { "monomial degree overflow" }
-            put(variable, previous + degree)
-        }
-    })
+    fun times(other: Monomial): Monomial {
+        if (variableCount == 0) return other
+        if (other.variableCount == 0) return this
+        return of(buildMap {
+            putAll(powers)
+            for ((variable, degree) in other.powers) {
+                val previous = get(variable) ?: 0
+                require(degree <= Int.MAX_VALUE - previous) { "monomial degree overflow" }
+                put(variable, previous + degree)
+            }
+        })
+    }
 
     fun quotient(divisor: Monomial): Monomial? {
         if (divisor.powers.any { (variable, degree) -> exponent(variable) < degree }) return null
