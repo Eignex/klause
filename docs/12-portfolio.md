@@ -974,6 +974,16 @@ for three structures, skipped when LP is unavailable, the pool is explicit or
 annotated, or execution is parallel or single-engine. See
 [ordinary tableau admission](17-linear-programming.md).
 
+The `lp-default` optimization recipe consumes scoped passive checked-bound gains.
+Two recent samples in each direction of both shortlisted variables permit a learned
+variable choice. Incomplete passive history permits a bounded fresh child-value
+comparison below the root. Complete optimal children for both candidates can change
+selection only when the challenger improves the weaker child bound. Numerical
+values do not train passive history; unavailable advice keeps current scoring.
+History and child probes spend the existing LP allowance; other recipes require an
+explicit directional setting. See
+[finite branching](08-search.md#finite-lp-directional-guidance).
+
 - **Binary packing.** For nonnegative integer capacity rows with an objective that
   rewards items, the default LP recipe takes the conflict-driven slot beside the SAT
   guard.

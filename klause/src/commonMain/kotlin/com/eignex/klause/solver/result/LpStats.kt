@@ -5,6 +5,7 @@ import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpPhaseMetrics
+import com.eignex.klause.lp.engine.LpProbeMetrics
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
@@ -593,6 +594,23 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     fun observeDirectionalBranch(outcome: String) {
         val key = "DIRECTIONAL_BRANCH_NODE"
         val delta = LpPhaseStats(calls = 1L, outcomes = mapOf(outcome to 1L))
+        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+    }
+
+    internal fun observeDirectionalProbes(nanos: Long, metrics: LpProbeMetrics, available: Boolean) {
+        val key = "DIRECTIONAL_PROBES_NODE"
+        val delta = LpPhaseStats(calls = 1L, nanos = nanos, work = metrics.work,
+            outcomes = mapOf((if (available) "AVAILABLE" else "DECLINED") to 1L,
+                "CHILDREN_COMPLETED" to metrics.completed.toLong(),
+                "PREPARATION_WORK" to metrics.preparationWork, "SOLVE_WORK" to metrics.solveWork) +
+                (metrics.decline?.let { mapOf("STOP_${it.name}" to 1L) } ?: emptyMap()))
+        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+    }
+
+    fun observeDirectionalBasis(nanos: Long, work: Long, available: Boolean) {
+        val key = "DIRECTIONAL_BASIS_NODE"
+        val delta = LpPhaseStats(calls = 1L, nanos = nanos, work = work,
+            outcomes = mapOf((if (available) "AVAILABLE" else "DECLINED") to 1L))
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
 
