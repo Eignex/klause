@@ -337,7 +337,8 @@ internal class PrivateRebuildSatisfaction(
         note("ReusedSourceClauses", prepared.reusedSourceClauses.toLong())
         note("BveIndexedFactors", prepared.indexedFactors.toLong())
         note("BveSourceFactors", prepared.sourceFactors.toLong())
-        val selectorWork = if (prepared.preferredFreeColumns.isEmpty()) 0L else {
+        note("FreeSelectorActivity", if (prepared.freeSelectorActivity) 1L else 0L)
+        val selectorWork = if (!prepared.freeSelectorActivity || prepared.preferredFreeColumns.isEmpty()) 0L else {
             PrivateRebuildFreeSelector.initializationWork(
                 prepared.problem.numBoolVars, prepared.preferredFreeColumns.size,
             )
@@ -358,7 +359,7 @@ internal class PrivateRebuildSatisfaction(
             privateRebuildWork = 0L, clauseExchange = null, cutExchange = null, pooledIncumbents = null,
             cancellation = containing or Cancellation { trialSpent() >= privateWorkLimit },
             variableSelector = if (prepared.preferredFreeColumns.isEmpty()) sharedParams.variableSelector
-            else PrivateRebuildFreeSelector(prepared.preferredFreeColumns),
+            else PrivateRebuildFreeSelector(prepared.preferredFreeColumns, prepared.freeSelectorActivity),
             onEvent = null, branchObserver = null, maxDecisions = params.maxDecisions.coerceAtMost(
                 (privateWorkLimit - trialSpent()).coerceAtLeast(0L) / PROPAGATION_WORK_PER_NODE,
             ),

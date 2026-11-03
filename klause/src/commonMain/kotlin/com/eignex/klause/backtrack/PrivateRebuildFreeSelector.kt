@@ -10,37 +10,42 @@ import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.Vsids
 import kotlin.random.Random
 
-internal class PrivateRebuildFreeSelector(private val columns: IntArray) : VariableSelector {
-    private val activity = Vsids()
+internal class PrivateRebuildFreeSelector(private val columns: IntArray, adaptive: Boolean = true) : VariableSelector {
+    private val activity = if (adaptive) Vsids() else null
     private var view: FreeState? = null
 
-    override fun fresh(): VariableSelector = PrivateRebuildFreeSelector(columns)
+    override fun fresh(): VariableSelector = PrivateRebuildFreeSelector(columns, activity != null)
 
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
+        val branching = activity
+        if (branching == null) {
+            for (column in columns) if (session.needsBoolDecision(column)) return VarRef.Bool(column)
+            return InputOrder.pick(session, rng)
+        }
         val state = view?.takeIf { it.session === session } ?: FreeState(session, columns).also { view = it }
-        return activity.pick(state, rng) ?: InputOrder.pick(session, rng)
+        return branching.pick(state, rng) ?: InputOrder.pick(session, rng)
     }
 
     override fun onConflict(varRef: VarRef) {
-        activity.onConflict(varRef, BranchingConflict.Empty)
+        activity?.onConflict(varRef, BranchingConflict.Empty)
     }
 
     override fun onConflict(varRef: VarRef?, conflict: BranchingConflict) {
-        activity.onConflict(varRef, conflict)
+        activity?.onConflict(varRef, conflict)
     }
 
     override fun onConflict(varRef: VarRef, unsat: PropagationResult.Unsat) {
-        activity.onConflict(varRef, BranchingConflict(unsat.conflictBools, unsat.conflictInts))
+        activity?.onConflict(varRef, BranchingConflict(unsat.conflictBools, unsat.conflictInts))
     }
 
     override fun onRestart() {
-        activity.onRestart()
+        activity?.onRestart()
     }
 
-    override val tracksUnassign: Boolean get() = true
+    override val tracksUnassign: Boolean get() = activity != null
 
     override fun onUnassign(varRef: VarRef) {
-        if (varRef is VarRef.Bool && view?.preferred(varRef.varId) == true) activity.onUnassign(varRef)
+        if (varRef is VarRef.Bool && view?.preferred(varRef.varId) == true) activity?.onUnassign(varRef)
     }
 
     private class FreeState(val session: PropagationSession, columns: IntArray) : BranchingState {

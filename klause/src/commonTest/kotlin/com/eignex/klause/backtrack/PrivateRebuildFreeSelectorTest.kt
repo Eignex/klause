@@ -97,4 +97,17 @@ class PrivateRebuildFreeSelectorTest {
 
         assertEquals(first, selected)
     }
+
+    @Test
+    fun `unfunded activity should retain the declared free coordinate order`() {
+        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(Xor(intArrayOf(0, 2, 4, 6), 1)))
+        val session = PropagationSession(problem)
+        val selector = PrivateRebuildFreeSelector(intArrayOf(2, 1), adaptive = false)
+        selector.pick(session, Random(1))
+
+        selector.onConflict(VarRef.Bool(1), BranchingConflict(intArrayOf(1)))
+        val selected = selector.pick(session, Random(1))
+
+        assertEquals(VarRef.Bool(2), selected)
+    }
 }

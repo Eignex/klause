@@ -44,6 +44,7 @@ internal class PrivateRebuildGeneration private constructor(
     val paritySourceRows: Int,
     val paritySourceLiterals: Long,
     val preferredFreeColumns: IntArray,
+    val freeSelectorActivity: Boolean,
 ) {
     fun reconstruct(sample: Sample): Sample = mapping.reconstructFrom(problem, sample)
 
@@ -111,7 +112,7 @@ internal class PrivateRebuildGeneration private constructor(
             val selectorBytes = if (rowView && source.numBoolVars * 2L <= PROPAGATION_WORK_PER_NODE) {
                 PrivateRebuildFreeSelector.modeledBytes(source.numBoolVars)
             } else 0L
-            val bytes = modelEntries * 512L + binaryBytes + (parity?.modeledBytes ?: 0L) + selectorBytes
+            val bytes = modelEntries * 512L + binaryBytes + (parity?.modeledBytes ?: 0L)
             if (bytes > byteLimit) {
                 onDecline("Memory")
                 return null
@@ -264,7 +265,9 @@ internal class PrivateRebuildGeneration private constructor(
                     else -> return null
                 }
             }
-            val privateBytes = bytes + descriptorWork * 8L
+            val baseBytes = bytes + descriptorWork * 8L
+            val freeSelectorActivity = selectorBytes > 0L && selectorBytes <= byteLimit - baseBytes
+            val privateBytes = baseBytes + if (freeSelectorActivity) selectorBytes else 0L
             if (privateBytes > byteLimit) {
                 onDecline("Memory")
                 return null
@@ -302,7 +305,8 @@ internal class PrivateRebuildGeneration private constructor(
                 parity?.newPins ?: 0, affine?.rank ?: 0, affine?.freeColumns ?: 0,
                 if (rowView) checkNotNull(basis).rank else 0, rowLiterals ?: 0L,
                 rowPlan?.triangularRows ?: 0,
-                if (rowView) checkNotNull(parity).coveredClauses else 0, sourceRows, sourceRowLiterals, preferred)
+                if (rowView) checkNotNull(parity).coveredClauses else 0, sourceRows, sourceRowLiterals,
+                preferred, freeSelectorActivity)
         }
     }
 }

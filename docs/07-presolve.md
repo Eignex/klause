@@ -364,8 +364,9 @@ notifications to that private heuristic. When no free coordinate needs a decisio
 source-order fallback retains every remaining pivot decision. Pivots retain their
 original meanings and propagation still decides their values. The membership mask
 and activity heap spend the modeled byte grant; their initialization spends opening
-work before allocation. Fresh consumers own fresh activity. Larger spans retain
-the configured selector.
+work before allocation. A grant that funds the generation without that extra storage
+retains source-ordered free-coordinate selection. Fresh consumers own fresh activity.
+Larger spans retain the configured selector.
 
 A learned binary can close a reciprocal source binary, or two owned binaries can
 supply the pair. Only non-permanent global learning from the canonical worker
