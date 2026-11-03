@@ -14,30 +14,65 @@ class LpDirectionalProbesTest {
     @Test
     fun `child probes preserve objective units across sense scale and common constants`() {
         for (sense in listOf(Sense.MINIMIZE, Sense.MAXIMIZE)) for (scale in listOf(1L, 4L)) {
-            val builder = LpBuilder()
-            val sign = if (sense == Sense.MAXIMIZE) -1L else 1L
-            repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it] * sign) }
-            repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
-            val trail = LpBoundTrail(assertNotNull(builder.build(sense).authoritativeModel()))
-            val objective = trail.state.model.objective
-            assertTrue(trail.replaceObjective(ExactLpObjective(List(objective.size) { objective.cost(it) },
-                scale = ExactLpNumber.of(scale), externalConstant = ExactLpNumber.of(1L shl 60))))
-            val model = assertNotNull(trail.state.ownerWorkingModel())
-            RevisedSimplex(model).use { solver ->
-                assertNotNull(solver.solve())
-                var work = 0L
-                var completed = 0
+            for (origin in listOf(0L, 7L, -3L)) {
+                val builder = LpBuilder()
+                val sign = if (sense == Sense.MAXIMIZE) -1L else 1L
+                repeat(3) { builder.addVar(origin, origin + 1L, cost = longArrayOf(3L, 2L, 4L)[it] * sign) }
+                repeat(3) {
+                    builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 2L * origin + 1L)
+                }
+                val trail = LpBoundTrail(assertNotNull(builder.build(sense).authoritativeModel()))
+                val objective = trail.state.model.objective
+                assertTrue(trail.replaceObjective(ExactLpObjective(List(objective.size) { objective.cost(it) },
+                    scale = ExactLpNumber.of(scale), externalConstant = ExactLpNumber.of(1L shl 60))))
+                val model = assertNotNull(trail.state.ownerWorkingModel())
+                RevisedSimplex(model).use { solver ->
+                    assertNotNull(solver.solve())
+                    var work = 0L
+                    var completed = 0
 
-                val gains = assertNotNull(solver.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
-                    1_000_000L, Cancellation.Never) { work += it.work; completed += it.completed })
+                    val gains = assertNotNull(solver.directionalGains(
+                        model, intArrayOf(0, 1), longArrayOf(origin, origin),
+                        1_000_000L, Cancellation.Never) { work += it.work; completed += it.completed })
 
-                assertEquals(1.5 / scale, gains[0].down, 1e-7)
-                assertEquals(0.5 / scale, gains[0].up, 1e-7)
-                assertEquals(2.5 / scale, gains[1].down, 1e-7)
-                assertEquals(0.5 / scale, gains[1].up, 1e-7)
-                assertEquals(4, completed)
-                assertTrue(work in 1L..1_000_000L)
+                    assertEquals(1.5 / scale, gains[0].down, 1e-7)
+                    assertEquals(0.5 / scale, gains[0].up, 1e-7)
+                    assertEquals(2.5 / scale, gains[1].down, 1e-7)
+                    assertEquals(0.5 / scale, gains[1].up, 1e-7)
+                    assertEquals(4, completed)
+                    assertTrue(work in 1L..1_000_000L)
+                }
             }
+        }
+    }
+
+    @Test
+    fun `cancelled comparisons with a completed child withhold all gains`() {
+        val builder = LpBuilder()
+        repeat(3) { builder.addVar(0, 1, cost = longArrayOf(3L, 2L, 4L)[it]) }
+        repeat(3) { builder.addRow(intArrayOf(it, (it + 1) % 3), longArrayOf(1, 1), Relation.GE, 1L) }
+        val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+        val model = assertNotNull(state.ownerWorkingModel())
+        RevisedSimplex(model).use { parent ->
+            val optimum = assertNotNull(parent.solve())
+            var children = 0
+            var work = 0L
+            var completed = 0
+            val token = Cancellation { children == 2 }
+            val probes = LpDirectionalProbes(state, optimum.basis, 4.5) { child, grant, _ ->
+                children++
+                RevisedSimplex(child, cancellation = token, workLimit = grant)
+            }
+
+            val gains = probes.run(intArrayOf(0, 1), longArrayOf(0, 0), 1_000_000L, token) {
+                work += it.work
+                completed += it.completed
+            }
+
+            assertNull(gains)
+            assertEquals(1, completed)
+            assertTrue(work in 1L..1_000_000L)
+            assertEquals(4.5, assertNotNull(parent.resolveBounds()).objective, 1e-7)
         }
     }
 
