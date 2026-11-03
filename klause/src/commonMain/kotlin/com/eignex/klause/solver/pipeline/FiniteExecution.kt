@@ -1171,8 +1171,7 @@ private fun executePortfolio(
         ),
     )
     if (proofCoverageConfigured && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
-            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
-            plan.scenario.annotationArm != null)) {
+            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null)) {
         pipelineConfigError("portfolio proof coverage requires a curated recipe pool")
     }
     if (deferLpProbes && (plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||

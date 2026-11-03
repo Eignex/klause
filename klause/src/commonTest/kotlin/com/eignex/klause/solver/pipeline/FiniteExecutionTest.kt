@@ -659,6 +659,30 @@ class FiniteExecutionTest {
     }
 
     @Test
+    fun `proof coverage controls should retain the source annotation worker`() {
+        val labels = listOf(emptyList(), listOf("portfolio-proof-workers=complete"),
+            listOf("portfolio-proof-workers=retained"), listOf("portfolio-proof-share=0.75")).map { settings ->
+            val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val hints = SearchHints(listOf(SearchGroup(intArrayOf(0), intArrayOf(0))))
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(longArrayOf(1), longArrayOf(1)), null, null, searchHints = hints)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions.parse(settings), nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.OPTIMAL, completed.verdict)
+            completed.stats.portfolio.arms.map { it.label }
+        }
+
+        assertTrue("bt/annotation" in labels[0])
+        labels.drop(1).forEach { assertEquals(labels[0], it) }
+    }
+
+    @Test
     fun `proof worker scopes should reject unknown policies and explicit recipes`() {
         for (settings in listOf(listOf("portfolio-proof-workers=never"),
             listOf("portfolio-proof-workers=complete", "arms=2"),

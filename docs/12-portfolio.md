@@ -853,8 +853,9 @@ probes, explicit minimum shares and bounded auxiliary trials retain precedence.
 Segment overruns can delay coverage.
 
 `portfolio-proof-share=S` selects a share from 0.5 through 1 for curated single-core
-finite optimization through the solve facade. The default is 0.5. Explicit recipes,
-arm counts, annotations, satisfaction and parallel execution reject this control.
+finite optimization through the solve facade. The default is 0.5. Source search
+annotation workers remain in the curated pool. Explicit recipes, arm counts,
+satisfaction and parallel execution reject this control.
 It changes only the retained proof floor after an incumbent; rewards, reseeding,
 initial probes, minimum shares and worker admission retain their own policies.
 Work diagnostics apply the same share to charged work.
