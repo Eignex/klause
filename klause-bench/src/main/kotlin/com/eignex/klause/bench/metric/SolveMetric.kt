@@ -208,7 +208,7 @@ internal object SolveMetric {
     ): Pair<SolveRecord, String?> {
         val started = timings.start()
         val optimize = timings.measure("harnessObjectiveMs") {
-            SourcePreparationCapture.measure("model-objective") { entry.objective != null }
+            SourcePreparationCapture.measure("model-objective") { entry.optimizes }
         }
         val kind = if (optimize) "optimize" else "satisfy"
         var sourceHashes: Map<String, String> = emptyMap()
