@@ -310,10 +310,10 @@ internal class LpHints(
         variableProbeProposal = false
         proposal ?: return baseline
         charge(2L)
-        observe("VARIABLE_CONSUMED")
-        if (probed) observe("VARIABLE_PROBE_CONSUMED")
-        observe(if (proposal == baseline) "VARIABLE_BASELINE_AGREED" else "VARIABLE_BASELINE_CHANGED")
-        return proposal
+        observe("VARIABLE_WITHHELD")
+        if (probed) observe("VARIABLE_PROBE_WITHHELD")
+        observe(if (proposal == baseline) "VARIABLE_PROPOSAL_AGREED" else "VARIABLE_PROPOSAL_CHANGED")
+        return baseline
     }
 
     val rootVariableChoiceReady: Boolean get() = collect && rootVariableProbes && freshRecord &&
