@@ -450,6 +450,10 @@ restores those activation masks. Unverified cuts remain inactive and require an
 identity row layout. `source-cuts=false` disables this separation in numerical
 frontier traversal. LP certificates cite the nested source rounding
 derivation, and final source checking repeats Boolean substitution independently.
+Numeric views without Boolean coordinates retain immutable premise rows; their
+scopes and integer pins remain checked on every proof. These views carry no
+source-specific extension checker. Boolean-bearing sources reconstruct their
+substituted rows independently.
 Preparation and proof traversal report separate work observations, including
 interrupted queries. Separation and
 proof policy belong to the adapter, outside `lp.engine`.
