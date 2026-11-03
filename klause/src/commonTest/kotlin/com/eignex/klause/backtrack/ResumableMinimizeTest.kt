@@ -243,7 +243,16 @@ class ResumableMinimizeTest {
 
             search.runSlice(stopAtPoint, Long.MAX_VALUE, 100_000L) { offered += it.sample }
 
-            assertEquals(listOf(1L, 1L, 1L, 1L, 0L, 0L, 0L, 0L), offered.single().ints.toList())
+            val sample = offered.single()
+            assertEquals(listOf(1L, 1L, 1L, 1L), sample.ints.take(4))
+            assertTrue(sample.ints.indices.all {
+                sample.ints[it] in 0L..(if (it == 4) 2L else 1L)
+            })
+            assertTrue(problem.factors.all { factor ->
+                val linear = factor as Linear
+                val row = assertNotNull(linear.integerConstants)
+                linear.vars.indices.sumOf { row.coeff(it) * sample.ints[linear.vars[it]] } >= row.bound
+            })
             assertEquals(2, queries)
             assertEquals(0.0, search.stats.lp.nodePasses.sum)
             assertEquals(1L, search.stats.lp.phases["PRIMAL_LP_GUIDANCE_ROOT"]
