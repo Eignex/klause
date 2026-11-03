@@ -335,7 +335,10 @@ page directories keep their first page directly and use a bounded compressed ind
 for later pages. Fixed directory state belongs to propagation preparation.
 Index lookups debit the active
 maintenance grant or the containing propagation ledger. A cached page avoids
-repeated lookups within one page. Empty page headers enter a separate funded
+repeated lookups within one page. Propagation reads both watch positions from one
+live policy page as a primitive pair, preserving the stored columns and cold-lookup
+charges. Missing pages retain both scalar lookup charges and cancellation checks.
+Empty page headers enter a separate funded
 unlink queue after their row arrays release; a revived header survives that queue.
 Directory cleanup does not remap live handles or consume the metadata row-release
 transaction. Ownership reports include unfinished directory nodes and report
