@@ -54,6 +54,9 @@ internal class SharingMemoryObservation(
     fun ownedPool(identity: Any, bytes: Long, cumulativeProtectedBytes: Long) =
         own(identity, bytes, 0L, cumulativeProtectedBytes, false, pool = true)
 
+    fun ownedReferencesPool(identity: Any, slots: Long, cumulativeProtectedSlots: Long) =
+        own(identity, 0L, slots, cumulativeProtectedSlots, false, pool = true)
+
     private fun own(identity: Any, bytes: Long, slots: Long, protectedAmount: Long, shared: Boolean,
         pool: Boolean = false) {
         require(bytes >= 0L && slots >= 0L)
@@ -68,7 +71,7 @@ internal class SharingMemoryObservation(
         while (owner != null) {
             step()
             if (owner.identity === identity && (owner.slots == 0L) == (slots == 0L)) {
-                if (pool) require(owner.bytes == bytes && owner.slots == 0L)
+                if (pool) require(owner.bytes == bytes && owner.slots == slots)
                 if (shared && !owner.shared) { owner.shared = true; sharedBytes += owner.bytes }
                 val retained = minOf(protectedAmount, if (slots == 0L) owner.bytes else owner.slots)
                 if (retained > owner.protectedAmount) {

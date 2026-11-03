@@ -64,8 +64,7 @@ internal fun PropagationState.factorAt(fid: Int): Propagator = when {
 
 /**
  * Register a learned clause and return its assigned factor id: append it to [LearnedClauseDb.store] with its
- * policy columns, grow [PropagationState.refPayloadStore] by one slot so the clause's `refPayload[factorId]`
- * access stays in bounds, and install its initial watches.
+ * policy metadata and mutable payload reference in one stable paged row, and install its initial watches.
  *
  * Does not propagate; [PropagationSession.addLearnedClause] does.
  */
@@ -86,22 +85,24 @@ internal fun PropagationState.addLearnedClause(
             break
         }
     }
-    learned.stages.add(initialStage)
-    work += learned.boolReasonAdmissionWork
-    learned.boolReasons.add(0)
-    addLearnedAdmissionKey()
-    learned.store.add(clause)
+    addGeneralLearnedRow(clause, initialStage, lbd, permanent, origin)
     if (clause.literals.size == 1) learned.units.add(newFid)
-    learned.lbds.add(lbd)
-    learned.permanent.add(if (permanent) 1 else 0)
     work += learned.trackCapObject(learned.size - 1, permanent)
-    learned.tier.add(ClauseTier.UNSET.ordinal)
-    learned.origins.add(origin)
     if (clause.literals.size == 2) learned.binaryClauseCount++ // keep the binary-resolution gate current
-    refPayloadStore.add(null)
     val watchers = clause.initialBoolWatchers
     val blockers = clause.initialBoolWatcherBlockers
-    for (i in watchers.indices) installLitWatch(watchers[i], newFid, blockers?.getOrNull(i) ?: NO_BLOCKER)
+    if (watchers.size == 2 && watchers[0] != watchers[1] &&
+        watchers.all { Lit.variable(it) < problem.numBoolVars }) {
+        val first = watches.byLit[watchers[0]]
+        val second = watches.byLit[watchers[1]]
+        work += watches.pos.putPair(newFid, watchers[0], first.size, watchers[1], second.size)
+        first.add(newFid)
+        second.add(newFid)
+        watches.blockersByLit[watchers[0]].add(blockers?.getOrNull(0) ?: NO_BLOCKER)
+        watches.blockersByLit[watchers[1]].add(blockers?.getOrNull(1) ?: NO_BLOCKER)
+    } else {
+        for (i in watchers.indices) installLitWatch(watchers[i], newFid, blockers?.getOrNull(i) ?: NO_BLOCKER)
+    }
     return newFid
 }
 
@@ -130,19 +131,11 @@ internal fun PropagationState.addLearnedPb(
         watched = true,
     )
     val newFid = totalFactorCount
-    learned.stages.add(0)
-    work += learned.boolReasonAdmissionWork
-    learned.boolReasons.add(0)
-    addLearnedAdmissionKey()
-    learned.store.add(prop)
+    addGeneralLearnedRow(prop, 0, lbd, permanent, OWN_ORIGIN)
     learned.nonClauseCount++
     work++
     work += learned.trackCapObject(learned.size - 1, permanent, LearnedKind.Pb)
-    learned.lbds.add(lbd)
-    learned.permanent.add(if (permanent) 1 else 0)
-    learned.tier.add(ClauseTier.UNSET.ordinal)
-    learned.origins.add(OWN_ORIGIN)
-    refPayloadStore.add(null)
+
     learned.lifecycle.note(LearnedKind.Pb, LearnedStage.Admitted)
     val watched = prop.selectWatched(this)
     arithmeticLearningTrace?.stored(newFid, "pb")
@@ -157,11 +150,7 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     learned.lifecycle.note(LearnedKind.Integer, LearnedStage.Admitted)
     val propagator = LearnedIntegerPropagator(row)
     val factor = totalFactorCount
-    learned.stages.add(0)
-    work += learned.boolReasonAdmissionWork
-    learned.boolReasons.add(0)
-    addLearnedAdmissionKey()
-    learned.store.add(propagator)
+    addGeneralLearnedRow(propagator, 0, lbd, false, OWN_ORIGIN)
     learned.nonClauseCount++
     work++
     work += learned.trackCapObject(learned.size - 1, false, LearnedKind.Integer)
@@ -169,12 +158,8 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     work += rows.admissionWork
     rows.admit(propagator)
     arithmeticLearningTrace?.stored(factor, "integer")
-    learned.lbds.add(lbd)
-    learned.permanent.add(0)
-    learned.tier.add(ClauseTier.UNSET.ordinal)
-    learned.origins.add(OWN_ORIGIN)
-    refPayloadStore.add(null)
-    for (watch in propagator.initialIntEventWatches) intEvents.subscribeMidlife(watch, factor)
+
+    for (watch in propagator.initialIntEventWatches) work += intEvents.subscribeMidlife(watch, factor)
     if (row.guard != Lit.NONE) installLitWatch(row.guard xor 1, factor)
     return factor
 }
@@ -196,20 +181,20 @@ internal fun PropagationState.addLearnedClause(
 
 /** Read-only view of LBDs for tests / introspection. Parallel to [PropagationState.learnedClauses]. */
 internal fun PropagationState.learnedClauseLbd(learnedIndex: Int): Int =
-    nativeEngine?.lbdOf(learnedIndex) ?: learned.lbds[learnedIndex]
+    nativeEngine?.lbdOf(learnedIndex) ?: learned.store[learnedIndex, GeneralLearnedRows.LBD]
 
 /** True iff learned clause [learnedIndex] must survive every forgetting pass. */
 internal fun PropagationState.learnedClausePermanent(learnedIndex: Int): Boolean =
-    nativeEngine?.permanentOf(learnedIndex) ?: (learned.permanent[learnedIndex] == 1)
+    nativeEngine?.permanentOf(learnedIndex) ?: (learned.store[learnedIndex, GeneralLearnedRows.PERMANENT] == 1)
 
 /** The arm learned clause [learnedIndex] was imported from, or [OWN_ORIGIN] for one learned here. */
 internal fun PropagationState.learnedClauseOrigin(learnedIndex: Int): Int =
-    nativeEngine?.originOf(learnedIndex) ?: learned.origins[learnedIndex]
+    nativeEngine?.originOf(learnedIndex) ?: learned.store[learnedIndex, GeneralLearnedRows.ORIGIN]
 
 /** Three-tier DB tier of learned clause [learnedIndex] ([ClauseTier.UNSET] until the
  *  reduction policy classifies it). */
 internal fun PropagationState.learnedClauseTier(learnedIndex: Int): ClauseTier =
-    nativeEngine?.tierOf(learnedIndex) ?: ClauseTier.entries[learned.tier[learnedIndex]]
+    nativeEngine?.tierOf(learnedIndex) ?: ClauseTier.entries[learned.store[learnedIndex, GeneralLearnedRows.TIER]]
 
 /** Set the three-tier DB tier of learned clause [learnedIndex] (promotion / demotion /
  *  initial classification by the reduction policy). */
@@ -218,7 +203,8 @@ internal fun PropagationState.setLearnedClauseTier(learnedIndex: Int, tier: Clau
         it.setTierOf(learnedIndex, tier)
         return
     }
-    learned.tier[learnedIndex] = tier.ordinal
+    if (learned.retiredOf(learnedIndex)) return
+    learned.store[learnedIndex, GeneralLearnedRows.TIER] = tier.ordinal
 }
 
 /** True iff learned clause [learnedIndex] was used (conflict or unit) since the last
@@ -248,7 +234,7 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
     if (idx !in 0 until learned.size || learned.retiredOf(idx)) return
     factorAttribution?.used(learned.store[idx])
     noteLearnedStage(idx, LearnedStage.Consumed, 2)
-    if (!learned.usedOf(idx)) learned.importUses.note(learned.origins[idx])
+    if (!learned.usedOf(idx)) learned.importUses.note(learned.store[idx, GeneralLearnedRows.ORIGIN])
     learned.markUsed(idx)
 }
 
@@ -256,8 +242,8 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
  * Prune the learned-clause database. The [keep] predicate decides per (learnedIndex,
  * lbd) whether to retain that clause; dropped clauses' factor ids vanish and the
  * remaining clauses are renumbered contiguously starting at `problem.numFactors`.
- * The [LearnedClauseDb] columns and the learned tail of [PropagationState.refPayloadStore] are
- * compacted in order; the bool and atom watcher lists, the propagation queues and the per-variable
+ * The [LearnedClauseDb] rows and their mutable payload references are compacted together;
+ * the bool and atom watcher lists, propagation queues and per-variable
  * reason fields have their learned factor ids remapped through `oldFid → newFid` or dropped.
  *
  * Watchers' positions inside each clause's `refPayload[fid]` are watch *indices*
@@ -273,8 +259,7 @@ internal fun PropagationState.forgetLearnedClauses(
 ): Boolean {
     val budget = ReclamationPreparation(maxWork, maxScratchBytes, cancelled) { work += it }
     val retained = try {
-        nativeEngine?.sweepRetiredWatches(budget)
-        sweepRetiredGeneralWatches(budget)
+        sweepRetiredLearnedMemory(budget)
         prepareReclamation(budget, keep)
     } catch (_: ReclamationPreparation.Deferred) {
         return false
@@ -306,7 +291,7 @@ internal fun PropagationState.forgetLearnedClauses(
 
     learned.units.clear()
     learned.integerRows?.let { rows -> work += rows.size.toLong() + 2L; rows.reset() }
-    learned.resetCapIndex()
+    work += learned.resetCapIndex()
     var w = 0
     for (i in 0 until n) {
         work++
@@ -318,19 +303,13 @@ internal fun PropagationState.forgetLearnedClauses(
                 rows.admit(propagator)
             }
             if (propagator is ClausePropagator && propagator.literals.size == 1) learned.units.add(baseFactorCount + w)
-            learned.store[w] = learned.store[i]
-            learned.stages[w] = learned.stages[i]
-            work++
-            learned.boolReasons[w] = learned.boolReasons[i]
-            work++
-            learned.admissions[w] = learned.admissions[i]
-            learned.lbds[w] = learned.lbds[i]
-            learned.permanent[w] = learned.permanent[i]
-            learned.tier[w] = learned.tier[i]
-            learned.origins[w] = learned.origins[i]
-            if (learned.retiredOf(w)) learned.retiredCount++
+            work += learned.store.move(i, w)
+            if (learned.retiredOf(w)) {
+                learned.retiredCount++
+                learned.enqueueRetiredMetadata(w)
+            }
             else {
-                work += learned.trackCapObject(w, learned.permanent[w] == 1, learnedKind(w))
+                work += learned.trackCapObject(w, learned.store[w, GeneralLearnedRows.PERMANENT] == 1, learnedKind(w))
                 if (propagator !is ClausePropagator) {
                     learned.nonClauseCount++
                     work++
@@ -339,27 +318,13 @@ internal fun PropagationState.forgetLearnedClauses(
             w++
         }
     }
-    while (learned.store.size > newCount) learned.store.removeAt(learned.store.size - 1)
-    learned.store = ArrayList(learned.store)
-    learned.stages.truncateTo(newCount)
-    learned.lbds.truncateTo(newCount)
-    learned.permanent.truncateTo(newCount)
-    learned.tier.truncateTo(newCount)
-    learned.origins.truncateTo(newCount)
-
-    // Static-factor entries at [0, problem.numFactors) stay untouched.
+    work += learned.store.truncateTo(newCount)
     val refBase = problem.numFactors
-    var rw = refBase
-    for (i in 0 until n) {
-        work++
-        if (remap[i] >= 0) {
-            refPayloadStore[rw] = refPayloadStore[refBase + i]
-            rw++
-        }
+    learned.integerRows?.let { rows ->
+        work += rows.trimmingWork + 1L
+        rows.trim()
+        if (rows.isEmpty()) learned.integerRows = null
     }
-    while (refPayloadStore.size > rw) refPayloadStore.removeAt(refPayloadStore.size - 1)
-    refPayloadStore = ArrayList(refPayloadStore)
-    learned.integerRows?.let { rows -> work += rows.trimmingWork; rows.trim() }
 
     for (lit in watches.byLit.indices) {
         work++
@@ -408,14 +373,14 @@ internal fun PropagationState.forgetLearnedClauses(
     }
 
     // Renumbering learned fids and shifting list positions invalidates every back pointer.
-    work += watches.pos.size.toLong() * watches.pos.size
-    watches.pos = com.eignex.klause.util.MutableLongIntMap()
+    work++
+    watches.pos = BoolWatchPositionIndex(baseFactorCount)
     for (lit in watches.byLit.indices) {
         work++
         val list = watches.byLit[lit]
         for (i in 0 until list.size) {
             work++
-            watches.pos.put(packWatch(list[i], lit), i)
+            work += watches.pos.put(packWatch(list[i], lit), i)
         }
     }
 
@@ -433,9 +398,7 @@ internal fun PropagationState.forgetLearnedClauses(
     learned.pendingAttach.truncateTo(pending)
     remapQueue(atoms.dirtyFactors, remap, refBase)
     if (intEvents.overflow != null) {
-        val overflow = intEvents.overflow
-        work += (overflow?.primitiveCapacityBytes ?: 0L) + (overflow?.size?.toLong() ?: 0L) * (overflow?.size ?: 0)
-        intEvents.remapLearned(remap, refBase)
+        work += intEvents.remapLearned(remap, refBase)
     }
 
     // The per-variable reason fields record which factor forced each currently-implied
@@ -453,27 +416,24 @@ internal fun PropagationState.forgetLearnedClauses(
         undo.minReason[i] = remappedReason(undo.minReason[i], remap, refBase)
         undo.maxReason[i] = remappedReason(undo.maxReason[i], remap, refBase)
     }
-    work += learned.boolReasons.size.toLong() - w
-    learned.boolReasons.truncateTo(w)
-    for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
-        learned.origins, learned.units, learned.pendingAttach, learned.capCandidates)) column.trim()
-    work += learned.boolReasons.size.toLong() * 2L
-    learned.boolReasons.trim()
-    work += 2L + w.coerceAtLeast(1) * 2L
-    learned.admissions.truncateTo(w)
-    learned.admissions.trim()
+    for (column in listOf(learned.units, learned.pendingAttach, learned.capCandidates)) {
+        work += column.learnedTrimmingWork
+        column.trim()
+    }
     return true
 }
 
-private fun PropagationState.addLearnedAdmissionKey() {
-    val keys = learned.admissions
-    work += 3L + when {
-        keys.size.toLong() * Long.SIZE_BYTES == keys.allocatedBytes -> keys.size * 3L + 1L
-        keys.size == 0 -> 1L
-        else -> 0L
-    }
+private fun PropagationState.addGeneralLearnedRow(
+    propagator: LearnedPropagator,
+    stage: Int,
+    lbd: Int,
+    permanent: Boolean,
+    origin: Int,
+) {
+    val rows = learned.store
+    work += rows.admissionWork + 1L
     check(nextLearnedAdmissionKey < Long.MAX_VALUE)
-    keys.add(nextLearnedAdmissionKey++)
+    rows.add(propagator, stage, lbd, permanent, origin, nextLearnedAdmissionKey++)
 }
 
 internal fun PropagationState.noteLearnedBoolReason(factor: Int, delta: Int) {
@@ -484,9 +444,9 @@ internal fun PropagationState.noteLearnedBoolReason(factor: Int, delta: Int) {
     val index = factor - baseFactorCount
     if (index !in 0 until learned.size) return
     work += 2L
-    val count = learned.boolReasons[index] + delta
+    val count = learned.store[index, GeneralLearnedRows.BOOL_REASONS] + delta
     check(count >= 0)
-    learned.boolReasons[index] = count
+    learned.store[index, GeneralLearnedRows.BOOL_REASONS] = count
 }
 
 /** Rewrite learned-clause factor ids stored in a per-variable reason array through [remap]
@@ -545,14 +505,14 @@ internal fun PropagationState.recheckRetractedLearning(fid: Int) {
 internal fun PropagationState.deferLearnedAttachment(fid: Int) {
     val index = fid - baseFactorCount
     if (index !in 0 until learned.size) return
-    if (learned.stages[index] and 4 != 0) return
-    learned.stages[index] = learned.stages[index] or 4
+    if (learned.store[index, GeneralLearnedRows.STAGES] and 4 != 0) return
+    learned.store[index, GeneralLearnedRows.STAGES] = learned.store[index, GeneralLearnedRows.STAGES] or 4
     learned.pendingAttach.add(fid)
 }
 
 private fun PropagationState.noteLearnedStage(index: Int, stage: LearnedStage, bit: Int) {
-    if (learned.stages[index] and bit != 0) return
-    learned.stages[index] = learned.stages[index] or bit
+    if (learned.store[index, GeneralLearnedRows.STAGES] and bit != 0) return
+    learned.store[index, GeneralLearnedRows.STAGES] = learned.store[index, GeneralLearnedRows.STAGES] or bit
     learned.lifecycle.note(learnedKind(index), stage)
     if (stage == LearnedStage.Consumed) factorAttribution?.consumed(learned.store[index])
 }
@@ -583,7 +543,7 @@ internal fun PropagationState.collectLearnedReferences(retained: BooleanArray, v
     for (i in 0 until learned.pendingAttach.size) {
         visit()
         val fid = learned.pendingAttach[i]
-        if (learned.stages[fid - baseFactorCount] and 2 == 0) protect(fid)
+        if (learned.store[fid - baseFactorCount, GeneralLearnedRows.STAGES] and 2 == 0) protect(fid)
     }
 }
 

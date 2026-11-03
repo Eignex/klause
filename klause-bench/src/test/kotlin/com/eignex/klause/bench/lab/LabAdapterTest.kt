@@ -22,6 +22,38 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LabAdapterTest {
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `unmatched selections should reject the complete plan`(includeMatchedSource: Boolean) {
+        val missing = """{"suite":"dimacs-core","name":"missing-lab-source"}"""
+        val selections = if (includeMatchedSource) {
+            """[{"suite":"dimacs-core","name":"php4"},$missing]"""
+        } else {
+            "[$missing]"
+        }
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            KlauseLabSuite.plan(BenchRequest(parameters = mapOf("selections" to selections)))
+        }
+
+        assertContains(failure.message.orEmpty(), "missing-lab-source")
+    }
+
+    @Test
+    fun `matched selections should retain every source seed and repeat block`() {
+        val cases = KlauseLabSuite.plan(
+            BenchRequest(parameters = mapOf(
+                "selections" to """[{"suite":"dimacs-core","name":"php4"},
+                    {"suite":"mps-core","name":"blend-tiny"}]""",
+                "solver-seeds" to "1,3",
+                "repeats" to "2",
+            )),
+        )
+
+        assertEquals(listOf("php4", "blend-tiny"), cases.map { it.attributes.getValue("problem") }.distinct())
+        assertEquals(8, cases.map { it.id }.distinct().size)
+    }
+
     @Test
     fun `paired propagation controls retain source identity and distinct case identities`() {
         val cases = KlauseLabSuite.plan(
@@ -63,10 +95,11 @@ class LabAdapterTest {
         assertContains(failure.message.orEmpty(), "bench.sourceValidation")
     }
 
-    @Test
-    fun `input only plans reject harness capture without execution`() {
+    @ParameterizedTest
+    @CsvSource("harness-jfr,true", "source-staging,cli")
+    fun `input only plans reject execution controls`(key: String, value: String) {
         assertFailsWith<IllegalArgumentException> {
-            LabSettings(mapOf("input-only" to "true", "harness-jfr" to "true"))
+            LabSettings(mapOf("input-only" to "true", key to value))
         }
     }
 
@@ -123,7 +156,7 @@ class LabAdapterTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["cache", "temporary"])
+    @ValueSource(strings = ["cache", "temporary", "cli"])
     fun `source staging choice remains explicit in comparison controls`(target: String) {
         val settings = LabSettings(mapOf("source-staging" to target))
         val case = BenchCase("case", settings.caseParameters("cp", 3), settings.resources())

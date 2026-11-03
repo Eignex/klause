@@ -519,12 +519,14 @@ class PreparedFactorProjectionsTest {
         session.pinBool(0, true)
         session.pinBool(1, true)
         val work = session.work
+        val preparationWork = session.preparationStatistics()["propagationPreparationIndexWork"] ?: 0L
         var polls = 0
 
         val result = requireNotNull(selection.originalChecks).check(session, Cancellation { ++polls >= 2 })
 
         assertEquals(ComponentCheck.Indeterminate, result)
         assertEquals(work, session.work)
+        assertTrue(session.preparationStatistics().getValue("propagationPreparationIndexWork") > preparationWork)
     }
 
     @Test

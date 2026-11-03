@@ -979,6 +979,15 @@ retirement even when close fails. `SimplexPricingState` owns Devex weights and
 `SimplexObservations` per-solve counters; `RevisedSimplex` coordinates allowance
 charging, recovery and publication.
 
+A retained optimal basis can provide advisory objective costs per unit of a source
+coordinate, using the model's minimization orientation, for at most two basic
+structural columns. Each inverse-transpose row reads
+current nonbasic orientations and reduced costs, then converts column and objective
+scales. The caller funds the complete bounded analysis before allocation or basis
+access. Changed models, unfinished solves, missing directions and cancellation
+retain unavailability. This read preserves the retained optimum and carries no
+bound, infeasibility or certificate authority.
+
 A retained numerical owner can expose a private solve cursor. It suspends between
 iterations, retaining the current phase, factors, artificial seats, pricing state
 and cumulative solve limits. A pause returns no numerical result or certificate.
