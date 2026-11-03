@@ -216,7 +216,8 @@ charged at each step. Infinite cutoffs, the large exact-cutoff path and overflow
 supply no retained scalar. The callback performs no extra domain scan, numerical
 query or certification, and publishes neither a point nor a new pruning bound.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
-history lifetime. It can request [advisory basis costs](#floating-simplex-and-basis-factors)
+history lifetime. An explicitly basis-enabled run can request
+[advisory basis costs](#floating-simplex-and-basis-factors)
 for its selected root column, at most once per hint owner while reliable history is
 absent. It retains that attempt limit across restarts and reseeding. Analysis spends
 the node's unspent query allowance and remaining containing and cumulative allowances;

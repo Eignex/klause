@@ -294,7 +294,7 @@ floating conversion. This completion supplies no fresh LP point or new parent
 observation. Objective-bound pruning can supply progress; pure infeasibility cannot.
 Unsupported or overflowing bounds retain the missing-observation fallback.
 
-The `lp-default` optimization recipe enables the finite consumer; direct
+The `lp-default` optimization recipe enables the passive finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
 and branching must be enabled. The reduced-cost/fractionality scorer supplies its
@@ -306,10 +306,11 @@ before visiting candidates. It performs no numerical query.
 Two recent samples in each direction supply that variable's predicted child gains,
 using each direction's mean cost per unit of fractional movement. The balanced
 `min + max / 6` score ranks finite positive predictions in the shortlist.
-Missing or unreliable history retains the existing variable order. The selected
-variable at the root can request one child-order
-estimate from its retained optimal basis after the actual complementary alternatives
-exist. This attempt is limited to one column and
+Missing or unreliable history retains the existing variable order. Ordinary finite
+workers issue no directional numerical queries. Finite-run construction can explicitly
+enable a root-basis fallback. In that mode the selected root variable can request
+one child-order estimate from its retained optimal basis after the actual
+complementary alternatives exist. This attempt is limited to one column and
 one attempt per hint owner, including across slices, restarts and assumption reseeding.
 An unsupported or unfunded attempt consumes that opportunity and retains the existing
 child order. Reliable history takes precedence and consumes no basis opportunity.

@@ -380,6 +380,17 @@ internal class LpHints(
         estimate: (LpModel, IntArray) -> List<LpDirectionalCost?>?,
     ): Boolean = prepareSide(variable, domain, allowBasis = rootBasis, rootOnly = true, estimate = estimate)
 
+    fun prepareHistorySide(variable: VarRef?, domain: IntDomain?): Boolean {
+        pendingSide = null
+        activeSide = null
+        if (!collect || !directionalGains || !freshRecord || variable == null) return false
+        val value = value(variable, domain)
+        if (!fractional(variable, value)) return false
+        val prediction = directionalPrediction(variable, value) ?: return false
+        return prediction.score > 1e-9 &&
+            rememberSide(variable, value, prediction.down, prediction.up, basis = false)
+    }
+
     fun prepareSide(
         variable: VarRef?,
         domain: IntDomain?,

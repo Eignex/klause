@@ -350,7 +350,7 @@ data class BacktrackParams(
      * all-off [LpPlan] (no LP unless a field is set or [lpConfig] resolves one on).
      */
     val lpPlan: LpPlan = LpPlan(),
-    /** Finite LP variable and child guidance from recent gains, with one bounded root basis estimate as fallback. */
+    /** Finite LP variable and child guidance from recent scoped gains; missing history keeps LP scoring. */
     val lpDirectionalGains: Boolean = false,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,

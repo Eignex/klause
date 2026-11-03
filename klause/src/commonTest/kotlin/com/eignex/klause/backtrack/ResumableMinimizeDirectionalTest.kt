@@ -52,24 +52,30 @@ class ResumableMinimizeDirectionalTest {
     }
 
     @Test
-    fun `finite search consumes at most one root basis estimate across slices`() {
-        val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, arrayOf<Factor>(
-            Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 3L),
-            Linear(longArrayOf(1L, 1L), intArrayOf(1, 2), LinearOp.GE, 2L),
-            Linear(longArrayOf(3L, 1L), intArrayOf(0, 2), LinearOp.GE, 4L),
-        )).bake()
-        val objective = LinearObjective(intCoefficients = longArrayOf(2L, 3L, 4L))
-        val params = BacktrackParams(randomSeed = 3L, maxDecisions = 64L, objectiveBoundSupplier = { 10.0 },
-            lpDirectionalGains = true,
-            lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
-                boundMaxOpsPerNode = 0L))
-        ResumableMinimize(BacktrackSolver(problem), objective, params).use { search ->
-            var slices = 0
-            while (slices++ < 8 && !search.isDone) search.runSlice(Cancellation.Never, 1000L, 8L) {}
+    fun `basis queries require explicit finite search opt in`() {
+        for (basis in listOf(false, true)) {
+            val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, arrayOf<Factor>(
+                Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 3L),
+                Linear(longArrayOf(1L, 1L), intArrayOf(1, 2), LinearOp.GE, 2L),
+                Linear(longArrayOf(3L, 1L), intArrayOf(0, 2), LinearOp.GE, 4L),
+            )).bake()
+            val objective = LinearObjective(intCoefficients = longArrayOf(2L, 3L, 4L))
+            val params = BacktrackParams(randomSeed = 3L, maxDecisions = 64L, objectiveBoundSupplier = { 10.0 },
+                lpDirectionalGains = true,
+                lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
+                    boundMaxOpsPerNode = 0L))
+            val search = if (basis) {
+                ResumableMinimize(BacktrackSolver(problem), objective, params, rootBasisGuidance = true)
+            } else ResumableMinimize(BacktrackSolver(problem), objective, params)
+            search.use {
+                var slices = 0
+                while (slices++ < 8 && !search.isDone) search.runSlice(Cancellation.Never, 1000L, 8L) {}
 
-            val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
-            assertEquals(1L, observations["BASIS_ATTEMPT"] ?: 0L, observations.toString())
-            assertEquals(1L, observations["BASIS_SIDE_CONSUMED"] ?: 0L, observations.toString())
+                val observations = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes.orEmpty()
+                val expected = if (basis) 1L else 0L
+                assertEquals(expected, observations["BASIS_ATTEMPT"] ?: 0L, observations.toString())
+                assertEquals(expected, observations["BASIS_SIDE_CONSUMED"] ?: 0L, observations.toString())
+            }
         }
     }
 
