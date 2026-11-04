@@ -197,7 +197,9 @@ internal class PrivateRebuildParity private constructor(
                 return true
             }
 
-            private fun recordPattern(index: Int, first: Int, second: Int, third: Int, width: Int, columns: Int): Boolean {
+            private fun recordPattern(
+                index: Int, first: Int, second: Int, third: Int, width: Int, columns: Int,
+            ): Boolean {
                 if (!visit(24L)) return false
                 var a = first
                 var b = second
