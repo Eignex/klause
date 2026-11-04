@@ -122,7 +122,7 @@ internal class AlnsWorkerConfig private constructor(
             pooledIncumbents = matchedPools?.solutions,
             acceptanceFor = acceptanceFactory(),
             literalSweep = definitionalSweep,
-            rng = if (workScheduled) Random(seed + index) else Random.Default,
+            rng = Random(seed + index),
         )
         val params = LocalSearchParams(
             randomSeed = seed + index,
