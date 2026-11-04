@@ -2,6 +2,7 @@ package com.eignex.klause.bench.lab
 
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchContext
@@ -9,13 +10,45 @@ import com.eignex.lab.bench.BenchInput
 import com.eignex.lab.bench.BenchInputRoot
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 import java.security.MessageDigest
 import java.util.HexFormat
 
 internal object LabInputs {
     const val RUNTIME = "klause-bench/build/lab-runtime/minizinc"
 
-    fun resolve(ref: ProblemRef, inputOnly: Boolean = false): List<BenchInput> = buildList {
+    fun resolve(ref: ProblemRef, inputOnly: Boolean = false): List<BenchInput> =
+        indexed(ref) ?: materialized(ref, inputOnly)
+
+    /**
+     * [ref]'s inputs from its collections' indexes, without their bytes, when the lab accepts declared hashes. The
+     * lab fetches each by content hash for the case that needs it, and [verify] checks it before the solve. MiniZinc
+     * models stay [materialized]: their include directories and dependency scan need real trees and content.
+     */
+    private fun indexed(ref: ProblemRef): List<BenchInput>? {
+        if (!CorpusFetcher.declaredInputs || ref.format == Format.MINIZINC) return null
+        return (listOf(ref.source to "model") + listOfNotNull(ref.data?.let { it to "data" })).map { (source, role) ->
+            declared(source, role) ?: return null
+        }.distinct()
+    }
+
+    private fun declared(source: ProblemSource, role: String): BenchInput? {
+        val collection = when (source) {
+            is ProblemSource.External -> source.collection
+            is ProblemSource.ExternalIndexed -> source.collection
+            else -> return null
+        }
+        val view = CorpusFetcher.indexed(collection) ?: return null
+        val file = CorpusFetcher.resolve(source) { view.root }
+        val entry = view.entry(file) ?: return null
+        val path = "${collection.id}/${entry.path}"
+        // The materialized path stages such names under the source tree; keep that behaviour for them.
+        if (path.any { it == ':' || it == '\\' || it.isISOControl() }) return null
+        return BenchInput(path, BenchInputRoot.CORPUS, role, entry.sha256)
+    }
+
+    private fun materialized(ref: ProblemRef, inputOnly: Boolean): List<BenchInput> = buildList {
         val model = CorpusFetcher.resolve(ref.source).toPath()
         add(input(model, "model"))
         ref.data?.let { add(input(CorpusFetcher.resolve(it).toPath(), "data")) }
@@ -78,7 +111,7 @@ internal object LabInputs {
                 }
 
                 else -> {
-                    include = false;
+                    include = false
                     index++
                 }
             }
@@ -90,11 +123,39 @@ internal object LabInputs {
         val source = CorpusFetcher.workspaceRoot().toPath().toRealPath()
         val root = if (actual.startsWith(source)) source else CorpusFetcher.cacheRoot.toPath().toRealPath()
         require(actual.startsWith(root)) { "Input outside source and corpus: $actual" }
+        val relative = root.relativize(actual).toString()
+        val sha256 = if (Files.isRegularFile(actual)) hash(actual) else null
+        if (relative.any { it == ':' || it == '\\' || it.isISOControl() }) {
+            requireNotNull(sha256) { "Input directory requires a portable name: $relative" }
+            val name = actual.fileName.toString().map {
+                if (it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it in "._-") it else '_'
+            }.joinToString("").takeLast(160)
+            val staged = source.resolve("klause-bench/build/lab-inputs/$sha256/input-$name")
+            Files.createDirectories(staged.parent)
+            require(staged.parent.toRealPath().startsWith(source)) { "Input staging escapes source" }
+            if (!Files.isRegularFile(staged) || hash(staged) != sha256) {
+                val pending = Files.createTempFile(staged.parent, ".input-", ".tmp")
+                try {
+                    Files.copy(actual, pending, REPLACE_EXISTING)
+                    require(hash(pending) == sha256) { "Input changed while staging: $relative" }
+                    Files.move(pending, staged, ATOMIC_MOVE, REPLACE_EXISTING)
+                } finally {
+                    Files.deleteIfExists(pending)
+                }
+            }
+            require(staged.toRealPath().startsWith(source)) { "Input staging escapes source" }
+            return BenchInput(
+                source.relativize(staged).toString().replace('\\', '/'),
+                BenchInputRoot.SOURCE,
+                role,
+                sha256,
+            )
+        }
         return BenchInput(
-            root.relativize(actual).toString().replace('\\', '/'),
+            relative.replace('\\', '/'),
             if (root == source) BenchInputRoot.SOURCE else BenchInputRoot.CORPUS,
             role,
-            if (Files.isRegularFile(actual)) hash(actual) else null,
+            sha256,
         )
     }
 
@@ -119,7 +180,10 @@ internal object LabInputs {
         }
     }
 
-    fun treeHashes(inputs: List<BenchInput>): Map<String, String> = buildMap {
+    fun treeHashes(
+        inputs: List<BenchInput>,
+        compilerTrees: MutableMap<Path, String> = mutableMapOf(),
+    ): Map<String, String> = buildMap {
         inputs.forEachIndexed { index, input ->
             val root = if (input.root == BenchInputRoot.SOURCE) {
                 CorpusFetcher.workspaceRoot().toPath()
@@ -127,7 +191,14 @@ internal object LabInputs {
                 CorpusFetcher.cacheRoot.toPath()
             }
             val path = root.resolve(input.path)
-            if (Files.isDirectory(path)) put("inputTree.$index", treeHash(path))
+            if (Files.isDirectory(path)) {
+                val hash = if (input.root == BenchInputRoot.SOURCE && input.role == "compiler") {
+                    compilerTrees.getOrPut(path.toRealPath()) { treeHash(path) }
+                } else {
+                    treeHash(path)
+                }
+                put("inputTree.$index", hash)
+            }
         }
     }
 

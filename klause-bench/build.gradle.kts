@@ -1,4 +1,3 @@
-import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.HexFormat
 
@@ -18,6 +17,8 @@ tasks.withType<org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask>().configureEa
     enabled = false
 }
 
+val labMacOs = System.getProperty("os.name").startsWith("Mac")
+
 repositories {
     exclusiveContent {
         forRepository {
@@ -35,8 +36,12 @@ repositories {
         forRepository {
             ivy {
                 name = "miniZincReleases"
-                url = uri("https://github.com/MiniZinc/MiniZincIDE/releases/download")
-                patternLayout { artifact("[revision]/MiniZincIDE-[revision]-[classifier].[ext]") }
+                url = uri(if (labMacOs) "https://github.com/MiniZinc/libminizinc/releases/download"
+                    else "https://github.com/MiniZinc/MiniZincIDE/releases/download")
+                patternLayout {
+                    artifact(if (labMacOs) "[revision]/minizinc-compiler-only-[classifier].[ext]"
+                        else "[revision]/MiniZincIDE-[revision]-[classifier].[ext]")
+                }
                 metadataSources { artifact() }
             }
         }
@@ -48,9 +53,21 @@ val labMiniZinc = configurations.create("labMiniZinc") {
     isCanBeConsumed = false
     isCanBeResolved = true
 }
+val labMiniZincTarget = when {
+    labMacOs -> when (System.getProperty("os.arch")) {
+        "aarch64", "arm64" -> "aarch64-apple-darwin" to "aeb1a25471ad753e67c2a73034b0725dff7c4d011d23cc8c8c91499efdb26f29"
+        "amd64", "x86_64" -> "x86_64-apple-darwin" to "02b7ce514714d57c50865e4c2458169eb76fb18bb789af26b45026a362460d06"
+        else -> null
+    }
+    System.getProperty("os.name") == "Linux" && System.getProperty("os.arch") in setOf("amd64", "x86_64") ->
+        "x86_64-linux-gnu" to "b63dd88491d47b05d0eb0ff4aa1112d1e6f77292c023800b20b98851458ce01c"
+    else -> null
+}
 
 dependencies {
-    add(labMiniZinc.name, "org.minizinc:minizinc:2.10.1:x86_64-linux-gnu@tgz")
+    labMiniZincTarget?.let { (target, _) ->
+        add(labMiniZinc.name, "org.minizinc:minizinc:2.10.1:$target@${if (labMacOs) "tar.gz" else "tgz"}")
+    }
     implementation("com.eignex:lab-bench:$labBenchVersion")
     implementation(project(":klause"))
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.4.21")
@@ -92,27 +109,7 @@ tasks.register<JavaExec>("bench") {
     doFirst { systemProperty("klause.workspace.root", workspaceRoot) }
 }
 
-tasks.register<JavaExec>("intDomainMicrobench") {
-    group = "bench"
-    description = "Run host-sensitive IntDomain representation timing probes."
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.eignex.klause.bench.microbench.IntDomainMicrobench")
-}
 
-tasks.register("dumpSchema", JavaExec::class) {
-    group = "tools"
-    description = "Regenerate bundled JSON SchemaDef sample at smoke-corpus/schema/campaign.json."
-    notCompatibleWithConfigurationCache(
-        "JavaExec.standardOutput is not serialisable into the configuration cache",
-    )
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.eignex.klause.bench.tools.SchemaDumperKt")
-    doFirst {
-        standardOutput = FileOutputStream(
-            layout.projectDirectory.file("smoke-corpus/schema/campaign.json").asFile,
-        )
-    }
-}
 
 tasks.withType<Test> {
     maxHeapSize = "4g"
@@ -120,18 +117,16 @@ tasks.withType<Test> {
 
 val prepareLabRuntime = tasks.register("prepareLabRuntime") {
     group = "build"
-    description = "Stage the pinned Linux x86_64 MiniZinc compiler and standard library for lab jobs."
+    description = "Stage the pinned host MiniZinc compiler and standard library for lab jobs."
     notCompatibleWithConfigurationCache("Uses Gradle archive operations to stage the compiler")
     val destination = layout.buildDirectory.dir("lab-runtime/minizinc")
     val archive = labMiniZinc
-    val checksum = "b63dd88491d47b05d0eb0ff4aa1112d1e6f77292c023800b20b98851458ce01c"
+    val checksum = labMiniZincTarget?.second.orEmpty()
     inputs.files(archive)
     inputs.property("checksum", checksum)
     outputs.dir(destination)
     doLast {
-        require(System.getProperty("os.name") == "Linux" && System.getProperty("os.arch") in setOf("amd64", "x86_64")) {
-            "Lab MiniZinc runtime requires Linux x86_64"
-        }
+        requireNotNull(labMiniZincTarget) { "Lab MiniZinc runtime supports macOS ARM64/x86_64 and Linux x86_64" }
         val file = archive.singleFile
         val digest = MessageDigest.getInstance("SHA-256")
         file.inputStream().use { stream ->
@@ -145,8 +140,11 @@ val prepareLabRuntime = tasks.register("prepareLabRuntime") {
         check(HexFormat.of().formatHex(digest.digest()) == checksum) { "MiniZinc release checksum mismatch" }
         project.sync {
             from(tarTree(resources.gzip(file)))
-            include("*/bin/minizinc", "*/share/minizinc/std/**")
-            eachFile { relativePath = RelativePath(!isDirectory, *relativePath.segments.drop(1).toTypedArray()) }
+            if (labMacOs) include("bin/minizinc", "share/minizinc/std/**")
+            else {
+                include("*/bin/minizinc", "*/share/minizinc/std/**")
+                eachFile { relativePath = RelativePath(!isDirectory, *relativePath.segments.drop(1).toTypedArray()) }
+            }
             includeEmptyDirs = false
             into(destination)
         }
