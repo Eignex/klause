@@ -134,7 +134,10 @@ class BacktrackWorkerConfigTest {
                 pools = SharedPools(clauses = pool, cuts = null, bounds = null, varBounds = null),
             )
 
-            worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+            worker.use {
+                if (objective == null) it.solve(Cancellation.Never)
+                else it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last()
+            }
 
             val stats = assertNotNull(worker.sharingMeter).snapshot()
             assertTrue(stats.channels.getValue(SharingChannel.Clauses).imported > 0L)
