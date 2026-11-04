@@ -67,7 +67,9 @@ internal object KlauseLabSuite : BenchSuite {
         "Frozen catalog workloads and installed CLI solve records",
     )
 
-    override fun plan(request: BenchRequest): List<BenchCase> = plan(request, LabInputs::resolve)
+    override fun plan(request: BenchRequest): List<BenchCase> = plan(request) { ref, inputOnly ->
+        LabInputs.resolve(ref, inputOnly, request.parameters["input-carrier"] == "plain")
+    }
 
     internal fun plan(
         request: BenchRequest,

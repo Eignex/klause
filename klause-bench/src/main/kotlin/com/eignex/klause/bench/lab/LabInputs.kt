@@ -21,8 +21,10 @@ import java.util.HexFormat
 internal object LabInputs {
     const val RUNTIME = "klause-bench/build/lab-runtime/minizinc"
 
-    fun resolve(ref: ProblemRef, inputOnly: Boolean = false): List<BenchInput> =
-        indexed(ref) ?: materialized(ref, inputOnly)
+    fun resolve(ref: ProblemRef, inputOnly: Boolean = false, plainDimacs: Boolean = false): List<BenchInput> {
+        require(!plainDimacs || ref.format == Format.DIMACS) { "Plain input carriers require DIMACS" }
+        return if (plainDimacs) materialized(ref, inputOnly, true) else indexed(ref) ?: materialized(ref, inputOnly)
+    }
 
     /**
      * [ref]'s inputs from its collections' indexes, without their bytes, when the lab accepts declared hashes. The
@@ -60,8 +62,9 @@ internal object LabInputs {
         return BenchInput(path, BenchInputRoot.CORPUS, role, entry.sha256)
     }
 
-    private fun materialized(ref: ProblemRef, inputOnly: Boolean): List<BenchInput> = buildList {
-        val model = materializedSource(ref.source, ref.format)
+    private fun materialized(ref: ProblemRef, inputOnly: Boolean, plainDimacs: Boolean = false): List<BenchInput> = buildList {
+        val source = materializedSource(ref.source, ref.format)
+        val model = if (plainDimacs) CorpusFiles.unpack(source.toFile(), keepPacked = true).toPath() else source
         add(input(model, "model"))
         ref.data?.let { add(input(materializedSource(it, ref.format), "data")) }
         if (ref.format == Format.MINIZINC) {

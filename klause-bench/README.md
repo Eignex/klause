@@ -1566,3 +1566,8 @@ or finish probing without a partition; require actual task observations before
 claiming task use. Probe work is a subset of worker work, while ordinary schedule
 charges retain reservations and coordinator checks. Native closures do not supply
 independent proof checking.
+
+`input-carrier=plain` materializes DIMACS source bytes during planning, retains the packed delivery,
+and hashes the plain file for every arm. This control keeps transport compression outside the CLI
+deadline and gives revisions with different corpus storage a shared input identity. The default
+`input-carrier=stored` preserves the catalog carrier. Other formats reject the plain control.
