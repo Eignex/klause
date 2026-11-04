@@ -845,3 +845,8 @@ on macOS arm64, JDK 25.0.4.1+1, with advisory one-CPU / 4,608 MiB resource recei
 The smaller magic-square source's AllDifferent-only conflicts, compressed-byte
 hash refusal, worker network failure, earlier truncated captures and preparation
 timeouts retain their costs and provenance in the external campaign ledger.
+
+`input-carrier=plain` materializes DIMACS source bytes during planning, retains the packed delivery,
+and hashes the plain file for every arm. This control keeps transport compression outside the CLI
+deadline and gives revisions with different corpus storage a shared input identity. The default
+`input-carrier=stored` preserves the catalog carrier. Other formats reject the plain control.

@@ -17,6 +17,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     val engines = (parameters["engines"] ?: "default").split(',').map { it.trim().lowercase() }.distinct()
     val propagationControls = parameters["propagation-controls"]?.toBooleanStrict() ?: false
     val controls = if (propagationControls) listOf("ordinary", "attributed", "historical-table") else listOf("")
+    val inputCarrier = parameters["input-carrier"] ?: "stored"
     val inputOnly = parameters["input-only"]?.toBooleanStrict() ?: false
     val debug = parameters["debug"]?.toBooleanStrict() ?: true
     val measurement = parameters["measurement"] ?: "none"
@@ -25,6 +26,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     val wallTimeout = (timeout * 2 + 20_999) / 1000 + 2 * compileTimeout + 120
 
     init {
+        require(inputCarrier in setOf("stored", "plain")) { "input-carrier must be stored or plain" }
         require(selections.isNotEmpty())
         if (propagationControls) {
             require(!inputOnly && engines.all {
@@ -69,6 +71,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
     fun caseParameters(engine: String, seed: Long, control: String = ""): Map<String, String> =
         parameters.filterKeys { it.startsWith("param.") || it in setOf("lp", "presolve", "exact") } + mapOf(
             "input-only" to inputOnly.toString(),
+            "input-carrier" to inputCarrier,
             "engine" to engine,
             "seed" to seed.toString(),
             "timeout-ms" to timeout.toString(),
@@ -103,7 +106,7 @@ internal data class LabSettings(val parameters: Map<String, String>) {
 
         val SELECTORS = setOf("suite", "set", "name", "category", "tag", "kind", "per-family", "seed", "max", "balance")
         private val OPTIONS = setOf(
-            "input-only", "selections", "engines", "solver-seeds", "repeats", "cpus", "memory-mib", "timeout-ms", "lp",
+            "input-carrier", "input-only", "selections", "engines", "solver-seeds", "repeats", "cpus", "memory-mib", "timeout-ms", "lp",
             "presolve", "exact", "debug", "measurement", "heap-mib", "gc", "compile-timeout-sec",
             "complete-assignment", "propagation-controls",
         )

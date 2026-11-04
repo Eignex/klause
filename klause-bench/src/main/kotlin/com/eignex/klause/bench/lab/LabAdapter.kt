@@ -67,7 +67,7 @@ internal object KlauseLabSuite : BenchSuite {
         return selectedProblems.flatMap { selected ->
             val ref = selected.ref
             require(ref.source !is ProblemSource.InCode) { "Lab subprocess solves require file-backed inputs" }
-            val inputs = LabInputs.resolve(ref, settings.inputOnly)
+            val inputs = LabInputs.resolve(ref, settings.inputOnly, settings.inputCarrier == "plain")
             val trees = LabInputs.treeHashes(inputs)
             settings.engines.flatMap { engine ->
                 val variant = if (settings.engines.size > 1) "$engine/" else ""

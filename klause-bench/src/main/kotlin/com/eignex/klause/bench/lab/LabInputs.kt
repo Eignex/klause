@@ -3,6 +3,7 @@ package com.eignex.klause.bench.lab
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchContext
 import com.eignex.lab.bench.BenchInput
@@ -15,8 +16,10 @@ import java.util.HexFormat
 internal object LabInputs {
     const val RUNTIME = "klause-bench/build/lab-runtime/minizinc"
 
-    fun resolve(ref: ProblemRef, inputOnly: Boolean = false): List<BenchInput> = buildList {
-        val model = CorpusFetcher.resolve(ref.source).toPath()
+    fun resolve(ref: ProblemRef, inputOnly: Boolean = false, plainDimacs: Boolean = false): List<BenchInput> = buildList {
+        require(!plainDimacs || ref.format == Format.DIMACS) { "Plain input carriers require DIMACS" }
+        val source = CorpusFetcher.resolve(ref.source)
+        val model = (if (plainDimacs) CorpusFiles.unpack(source, keepPacked = true) else source).toPath()
         add(input(model, "model"))
         ref.data?.let { add(input(CorpusFetcher.resolve(it).toPath(), "data")) }
         if (ref.format == Format.MINIZINC) {
