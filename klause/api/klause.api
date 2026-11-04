@@ -10051,6 +10051,7 @@ public abstract interface class com/eignex/klause/propagation/ClauseExchange {
 	public abstract fun onRestart (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSearchClose (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSearchEnd (Lcom/eignex/klause/propagation/PropagationSession;)V
+	public fun onSearchPause (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSearchStart (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun publishGlobal (Lcom/eignex/klause/propagation/SharedClause;)V
 }
@@ -10058,6 +10059,7 @@ public abstract interface class com/eignex/klause/propagation/ClauseExchange {
 public final class com/eignex/klause/propagation/ClauseExchange$DefaultImpls {
 	public static fun onSearchClose (Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/propagation/PropagationSession;)V
 	public static fun onSearchEnd (Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/propagation/PropagationSession;)V
+	public static fun onSearchPause (Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/propagation/PropagationSession;)V
 	public static fun onSearchStart (Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/propagation/PropagationSession;)V
 	public static fun publishGlobal (Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/propagation/SharedClause;)V
 }
