@@ -148,10 +148,10 @@ private class OrCancellation(
         }
     }.toTypedArray()
 
-    override fun invoke(): Boolean = isCancelled()
+    override fun isCancelled(): Boolean = invoke()
 
     // Separate call sites let short compositions inline each ordered receiver independently.
-    override fun isCancelled(): Boolean = when (tokens.size) {
+    override fun invoke(): Boolean = when (tokens.size) {
         0 -> false
         1 -> tokens[0].isCancelled()
         2 -> tokens[0].isCancelled() || tokens[1].isCancelled()
