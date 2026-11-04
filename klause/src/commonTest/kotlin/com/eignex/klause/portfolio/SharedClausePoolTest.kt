@@ -180,7 +180,10 @@ class SharedClausePoolTest {
             assertEquals(1, (0 until count).count {
                 session.learnedClauseLiterals(it).contentEquals(evicted.boolLits)
             })
-            assertTrue(meter.snapshot().channels.getValue(com.eignex.klause.solver.result.SharingChannel.Clauses).duplicates > 0)
+            assertTrue(
+                meter.snapshot().channels
+                    .getValue(com.eignex.klause.solver.result.SharingChannel.Clauses).duplicates > 0
+            )
             assertTrue(meter.snapshot().clauses.getValue("poolCompactions") > 1)
         }
     }
@@ -210,7 +213,9 @@ class SharedClausePoolTest {
 
         assertEquals(pool.drainSince(0).clauses.size, fresh.learnedClauseCount)
         assertTrue(meter.snapshot().clauses.getValue("seenCapacityBytes") < suspended.getValue("seenCapacityBytes"))
-        assertEquals(suspended.getValue("seenCapacityBytes"), meter.snapshot().clauses.getValue("peakSeenCapacityBytes"))
+        assertEquals(
+            suspended.getValue("seenCapacityBytes"), meter.snapshot().clauses.getValue("peakSeenCapacityBytes")
+        )
     }
 
     @Test

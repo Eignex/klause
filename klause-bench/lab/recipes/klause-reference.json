@@ -2,6 +2,7 @@
   "name": "klause-reference",
   "description": "Daily broad check: the default sequential portfolio on up to 3 per family and 60 per suite of every benchmark suite, at 60 s.",
   "base": {},
+  "tags": ["local"],
   "priority": 0,
   "confirm": true,
   "repository": "Eignex/klause",

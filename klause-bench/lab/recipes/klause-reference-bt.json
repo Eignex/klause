@@ -2,6 +2,7 @@
   "name": "klause-reference-bt",
   "description": "Every 3 days: backtracking only on the broad selection at 60 s, to track the CP engine on its own.",
   "base": {},
+  "tags": ["local"],
   "priority": 0,
   "confirm": true,
   "repository": "Eignex/klause",

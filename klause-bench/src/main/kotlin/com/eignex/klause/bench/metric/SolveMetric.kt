@@ -66,6 +66,11 @@ internal data class SolveRecord(
     val stderr: String? = null,
     /** Whether [stderr] contains the whole normalized stream rather than a bounded prefix. */
     val stderrComplete: Boolean = false,
+    /** Stream completion and artifact integrity, independent of the retained prefix. */
+    val stderrCapture: StderrCaptureStatus? = null,
+    /** Bytes supplied to the CLI and output renderer; absent for historical or uncompiled inputs. */
+    val compiledInputHashes: Map<String, String> = emptyMap(),
+    val comparisonControls: Map<String, String> = emptyMap(),
 )
 
 internal object SolveMetric {
@@ -81,16 +86,16 @@ internal object SolveMetric {
         outDir.mkdirs()
         val timestamp = Instant.now().toString()
         val sha = Reports.readGitSha()
-        val name = ref.name.replace('/', '_')
+        val name = Reports.fileStem(ref.name)
         val (rec, raw) = runCatching { Runners.resolve(ref, settings.exact) }.fold(
             { entry ->
                 if (ref.format == Format.MINIZINC) {
                     settings.captureDirectory?.let { directory ->
-                    directory.mkdirs()
-                    val runner = MiniZincRunner()
-                    runner.compileFzn(ref).copyTo(directory.resolve("model.fzn"), overwrite = true)
-                    runner.compileOutput(ref).copyTo(directory.resolve("model.ozn"), overwrite = true)
-                }
+                        directory.mkdirs()
+                        val runner = MiniZincRunner()
+                        runner.compileFzn(ref).copyTo(directory.resolve("model.fzn"), overwrite = true)
+                        runner.compileOutput(ref).copyTo(directory.resolve("model.ozn"), overwrite = true)
+                    }
                 }
                 solve(entry, settings, budget, timestamp, sha)
             },
@@ -202,16 +207,20 @@ internal object SolveMetric {
                 )
             } to r.rawOutput
         }.getOrElse { failure ->
-            val record = errorRecord(entry, settings, budget, kind, timestamp, sha)
+            val invocation = (failure as? SolverInvocation.Failure)?.result
+            val record = (
+                invocation?.let { record(entry, settings, budget, kind, timestamp, sha, it) }
+                ?: errorRecord(entry, settings, budget, kind, timestamp, sha)
+            )
                 .copy(
-                    stats = SolveFailure.stats(failure),
+                    stats = invocation?.stats.orEmpty() + SolveFailure.stats(failure),
                     compilerIdentity = compiler,
                     sourceHashes = sourceHashes,
                     buildProvenance = provenance,
                     buildFingerprint = provenance?.fingerprint,
                 )
             println("?? [${entry.name}] $kind ERROR: ${record.stats["errorMessage"] ?: record.stats["errorClass"]}")
-            record to null
+            record to invocation?.rawOutput
         }
     }
 
@@ -275,6 +284,8 @@ internal object SolveMetric {
             buildFingerprint = r.buildProvenance?.fingerprint,
             stderr = r.stderr,
             stderrComplete = r.stderrComplete,
+            stderrCapture = r.stderrCapture,
+            compiledInputHashes = r.compiledInputHashes,
         )
     }
 
