@@ -171,6 +171,7 @@ internal class PoolClauseExchange(
     private val shareGlobalNogoods: Boolean = true,
     /** Where this arm's clause traffic is recorded; null records nothing. */
     private val meter: SharingMeter? = null,
+    private val exportOnClose: Boolean = true,
 ) : ClauseExchange {
     private var cursor = 0L
     private val seen = LongHashSet()
@@ -248,7 +249,7 @@ internal class PoolClauseExchange(
     override fun onSearchClose(session: PropagationSession) = metered {
         retainSession(session)
         countUses(session)
-        export(session)
+        if (exportOnClose) export(session)
         observe(session)
         if (sessionIdentity == null || sessionIdentity === session.sharingIdentity) {
             sessionIdentity = null

@@ -185,7 +185,8 @@ not the pool generation. Compaction invalidates the drain cursor but preserves
 that filter. Reseeding a retained repair session keeps the filter with its
 learned database. A fresh session releases its backing arrays and reimports the current
 pool; resuming the same session retains both cursor and filter. Retirement drains
-uses, exports remaining glue and releases the filter.
+uses and releases the filter. Backtrack slots publish glue at restarts and search-end
+boundaries without a final close export; private repair exchanges also publish on close.
 
 `inspected` counts entries examined, including duplicates, and
 `translatedLiterals` counts imported literals. `importWork` includes drain visits,

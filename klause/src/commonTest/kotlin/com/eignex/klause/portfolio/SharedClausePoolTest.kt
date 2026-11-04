@@ -5,8 +5,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
-import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.propagation.addLearnedClause
+import com.eignex.klause.solver.result.SharingChannel
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -231,6 +231,23 @@ class SharedClausePoolTest {
 
         assertEquals(1, session.learnedClauseCount)
         assertEquals(1, pool.drainSince(0).clauses.size)
+    }
+
+    @Test
+    fun `closing an exchange follows its final export policy`() {
+        val problem = Problem(4, 0, emptyArray(), emptyList())
+        for (exportOnClose in listOf(false, true)) {
+            val pool = SharedClausePool()
+            val exchange = PoolClauseExchange(pool, exportOnClose = exportOnClose)
+            val session = PropagationSession(problem)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+
+            exchange.onSearchClose(session)
+
+            val peer = PropagationSession(problem)
+            PoolClauseExchange(pool).onSearchStart(peer)
+            assertEquals(if (exportOnClose) 1 else 0, peer.learnedClauseCount)
+        }
     }
 
     @Test

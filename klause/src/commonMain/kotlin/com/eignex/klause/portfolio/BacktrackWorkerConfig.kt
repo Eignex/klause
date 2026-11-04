@@ -84,6 +84,7 @@ internal class BacktrackWorkerConfig(
             params = params.copy(
                 clauseExchange = PoolClauseExchange(
                     it, origin = index, tally = matchedPools.contributions, meter = meter,
+                    exportOnClose = false,
                 ),
             )
             sharing += Contribution.Clause
