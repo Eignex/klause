@@ -181,7 +181,8 @@ class SharedClausePoolTest {
                 session.learnedClauseLiterals(it).contentEquals(evicted.boolLits)
             })
             assertTrue(
-                meter.snapshot().channels.getValue(com.eignex.klause.solver.result.SharingChannel.Clauses).duplicates > 0
+                meter.snapshot().channels
+                    .getValue(com.eignex.klause.solver.result.SharingChannel.Clauses).duplicates > 0
             )
             assertTrue(meter.snapshot().clauses.getValue("poolCompactions") > 1)
         }
