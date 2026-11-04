@@ -2,10 +2,15 @@ package com.eignex.klause.bench.lab
 
 import com.eignex.klause.bench.catalog.Category
 import com.eignex.klause.bench.catalog.Expected
+import com.eignex.klause.bench.catalog.ExternalCollection
+import com.eignex.klause.bench.catalog.FetchMethod
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
+import com.eignex.klause.bench.source.CorpusIndex
+import com.eignex.klause.bench.source.CorpusIndexes
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchInput
 import com.eignex.lab.bench.BenchRequest
@@ -23,6 +28,59 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 
 class LabInputsTest {
+    @Test
+    fun `materialization retains a declared plain input beside its packed member`() {
+        val root = Files.createTempDirectory("declared-input-").toFile()
+        val properties = listOf(
+            "klause.workspace.root", "klause.bench.corpusCache", "klause.bench.corpus.shared",
+            "klause.bench.declaredInputs",
+        ).associateWith(System::getProperty)
+        try {
+            val source = root.resolve("source").apply { mkdirs() }
+            val corpus = root.resolve("corpus").apply { mkdirs() }
+            val collection = corpus.resolve("fixture").apply { mkdirs() }
+            val plain = collection.resolve("model.cnf")
+            val bytes = "p cnf 1 1\n1 0\n".encodeToByteArray()
+            plain.writeBytes(bytes)
+            val packed = CorpusFiles.compress(plain)
+            plain.writeBytes(bytes)
+            CorpusIndexes(corpus).save(CorpusIndex.of("fixture", collection))
+            plain.delete()
+            System.setProperty("klause.workspace.root", source.path)
+            System.setProperty("klause.bench.corpusCache", corpus.path)
+            System.setProperty("klause.bench.corpus.shared", "false")
+            System.setProperty("klause.bench.declaredInputs", "true")
+            val ref = ProblemRef(
+                "model", Format.DIMACS,
+                ProblemSource.External(
+                    ExternalCollection("fixture", "https://example.invalid/fixture.zip", "test", "test", FetchMethod.Zip),
+                    "model.cnf",
+                ),
+                Category.SAT, Expected.Unknown,
+            )
+            val declared = LabInputs.resolve(ref).single()
+            assertEquals("fixture/model.cnf", declared.path)
+            assertTrue(!plain.exists())
+
+            System.setProperty("klause.bench.declaredInputs", "false")
+            val materialized = LabInputs.resolve(ref).single()
+
+            assertContentEquals(bytes, corpus.resolve(declared.path).readBytes())
+            assertEquals("fixture/model.cnf.zst", materialized.path)
+            assertTrue(packed.isFile)
+            LabInputs.verify(
+                BenchCase("fixture", inputs = listOf(declared)),
+                BenchContext(root.toPath(), worktree = source.toPath(), corpusDirectory = corpus.toPath()),
+            )
+            assertEquals(bytes.size + packed.length(), CorpusFetcher.cache().collections().single().bytes)
+        } finally {
+            properties.forEach { (name, value) ->
+                if (value == null) System.clearProperty(name) else System.setProperty(name, value)
+            }
+            root.deleteRecursively()
+        }
+    }
+
     @ParameterizedTest
     @CsvSource(
         "argmax,62060d189d8d76561ad44f9ad64e7ab5275ab78b85da1d25e33bb1edc959a573",
