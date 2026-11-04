@@ -337,8 +337,9 @@ internal class Alns(
                 )
                 val perIterParams = params.copy(
                     maxFlips = iterFlips,
-                    // Null lets the inner solver draw its own per-call seed.
-                    randomSeed = if (params.cancellation.workScheduled()) rng.nextLong() else null,
+                    randomSeed = if (params.randomSeed != null || params.cancellation.workScheduled()) {
+                        rng.nextLong()
+                    } else null,
                     // The iteration's allowance is charged below, whatever its repair spends.
                     nodeBudget = null,
                 )
