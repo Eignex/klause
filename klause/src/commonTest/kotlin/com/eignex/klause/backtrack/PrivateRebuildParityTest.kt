@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.GaussianXor
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
@@ -285,6 +286,9 @@ class PrivateRebuildParityTest {
                             is Clause -> factor.literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
                             is Xor -> factor.literals.count { Lit.evaluate(it, point[Lit.variable(it)]) } % 2 ==
                                 factor.targetParity
+                            is GaussianXor -> factor.constraints.all { row ->
+                                row.literals.count { Lit.evaluate(it, point[Lit.variable(it)]) } % 2 == row.targetParity
+                            }
                             else -> false
                         }
                     }) {
@@ -322,6 +326,9 @@ class PrivateRebuildParityTest {
                         is Clause -> factor.literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
                         is Xor -> factor.literals.count { Lit.evaluate(it, point[Lit.variable(it)]) } % 2 ==
                             factor.targetParity
+                        is GaussianXor -> factor.constraints.all { row ->
+                            row.literals.count { Lit.evaluate(it, point[Lit.variable(it)]) } % 2 == row.targetParity
+                        }
                         else -> false
                     }
                 }) {
@@ -405,6 +412,33 @@ class PrivateRebuildParityTest {
             assertTrue(spent <= allowance)
             for (variable in 0..3) assertNull(session.boolValue(variable))
         }
+    }
+
+    @Test
+    fun `sparse parity discovery should return reconstructable bases within its work grant`() {
+        val rows = 1_024
+        val columns = rows + rows / 2 + 1
+        val clauses = (0 until rows).flatMap { row ->
+            (0..7).filter { it.countOneBits() % 2 != row % 2 }.map { mask ->
+                Clause(IntArray(3) {
+                    val column = if (it == 2) rows + 1 + row / 2 else row + it
+                    Lit.make(column, mask and (1 shl it) == 0)
+                })
+            }
+        }.toTypedArray<Factor>()
+        val session = PropagationSession(Problem(columns, 0, emptyArray(), clauses).bake())
+        var spent = 0L
+
+        val captured = assertNotNull(PrivateRebuildParity.capture(session, 16_777_216L, { work ->
+            if (work > 1_048_576L - spent) false else { spent += work; true }
+        }))
+        val basis = assertNotNull(captured.basis)
+        val point = basis.reconstruct(Sample(BooleanArray(columns) { it % 2 == 0 }, longArrayOf()))
+
+        assertEquals(rows, basis.rank)
+        assertTrue(clauses.all { factor ->
+            (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+        })
     }
 
     @Test

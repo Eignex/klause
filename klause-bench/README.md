@@ -103,15 +103,22 @@ diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
+Ordinary single-core mixed clausal satisfaction admits a bounded automatic private
+parity trial. `param.private-rebuild-work=0` disables it.
+`param.private-rebuild-bytes` bounds private modeled storage independently of canonical
+learned-memory scratch; an explicit shared scratch limit also bounds private storage
+unless a private limit is supplied.
+
 `param.private-rebuild-work=-1` requests automatic parity admission within a
-1,048,576-work cap and the configured scratch grant. It makes one initial-root
+4,194,304-work grant and the configured scratch grant. It makes one initial-root
 attempt on the structurally admitted Boolean cohort; see the
 [admission contract](../docs/07-presolve.md#private-worker-qualification).
-Use explicit zero as the canonical control. The production default remains zero.
+Use explicit zero as the canonical control; ordinary default admission follows the
+source policy above.
 
 `param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
 trial after new global root pins or an owned learned equivalence, with source reduction and a fresh consuming
-worker. Zero is the default. `ProgressPins` excludes baked-root facts;
+worker. Direct backtrack parameters default to zero. `ProgressPins` excludes baked-root facts;
 `RootScanWork` and `RootScanNanos` retain the eligibility cost. An unchanged
 baked root without a captured equivalence keeps its canonical traversal.
 `BinaryScanWork` and `BinaryScanNanos` retain bounded discovery costs;
@@ -197,6 +204,14 @@ coordinate meanings; they do not count eliminated columns.
 `ParityTriangularRows` counts forward-eliminated rows selected per pivot in that
 reduced basis; the remaining rows use free-coordinate expansion. Both
 representations and their selection spend the existing private grants.
+`ParityJointFactors` identifies funded joint affine kernels. `ParityJointModeledBytes`
+is included in `ModeledPrivateBytes`; `ParityJointInitializationWork` counts completed
+cache initialization inside trial propagation work. `OpeningPropagationWork` is also
+a trial-work subset, including a consumer whose opening stops before publication. Joint `Fires`, `Resets`,
+`InsertedRows`, `Reductions`, `Pins`, `Conflicts` and `WideReasons` retain primitive
+per-consumer observations through retirement. `ExpressionRowsUpdated` counts completed
+residual-expression reductions; `ExpressionRowsSkipped` counts expressions without the
+new fact's pivot. A wide pin reason withholds that deduction.
 `ParityPreferredFreeColumns` reports the admitted free-coordinate selection list. Coverage declines name
 incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
 larger widths). Such a miss can retain proved global pins or a mixed view.

@@ -34,10 +34,14 @@ import com.eignex.klause.propagation.Propagator
  * factors posted alongside it, which carry the same parity semantics *with* real LS support,
  * so LS enforces each parity row via those siblings.
  */
-class GaussianXor(
+class GaussianXor internal constructor(
     /** The individual parity constraints forming this Gaussian system. */
     val constraints: List<Xor>,
+    internal val affineSeed: AffineXorSeed?,
 ) : Factor {
+
+    /** Creates a jointly propagated system from its parity rows. */
+    constructor(constraints: List<Xor>) : this(constraints, null)
 
     override fun remap(mapping: VarRemap): Factor = GaussianXor(constraints.map { it.remap(mapping) as Xor })
 
@@ -58,8 +62,10 @@ class GaussianXor(
 
     init {
         require(constraints.isNotEmpty()) { "GaussianXor needs at least one constraint" }
-        val order = LinkedHashSet<Int>()
-        for (c in constraints) for (lit in c.literals) order.add(Lit.variable(lit))
-        variables = BoolVars(order.toIntArray())
+        variables = if (affineSeed != null) BoolVars(affineSeed.variables) else {
+            val order = LinkedHashSet<Int>()
+            for (c in constraints) for (lit in c.literals) order.add(Lit.variable(lit))
+            BoolVars(order.toIntArray())
+        }
     }
 }
