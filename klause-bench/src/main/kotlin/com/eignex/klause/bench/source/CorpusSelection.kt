@@ -185,7 +185,11 @@ internal object CorpusSelection {
          *  needs the collection's bytes; without it discovery may run on the collection's index listing alone. */
         expected: ((File) -> Expected)? = null,
     ): List<ProblemRef> {
-        val paths = if (expected == null && layout is Layout.Flat) CorpusFetcher.selectivePaths(collection) else null
+        val paths = if (expected == null && layout is Layout.Flat) {
+            CorpusFetcher.declaredPaths(collection) ?: CorpusFetcher.selectivePaths(collection)
+        } else {
+            null
+        }
         val root = if (paths == null) {
             if (expected == null) CorpusFetcher.listing(collection) else CorpusFetcher.ensure(collection)
         } else {
@@ -210,7 +214,7 @@ internal object CorpusSelection {
         category: Category,
         format: Format,
     ): List<ProblemRef> {
-        val paths = CorpusFetcher.selectivePaths(collection)
+        val paths = CorpusFetcher.declaredPaths(collection) ?: CorpusFetcher.selectivePaths(collection)
         val root = if (paths == null) {
             CorpusFetcher.listing(collection)
         } else {

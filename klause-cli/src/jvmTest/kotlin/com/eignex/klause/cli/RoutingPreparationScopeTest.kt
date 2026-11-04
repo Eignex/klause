@@ -18,6 +18,21 @@ import kotlin.test.assertTrue
 
 class RoutingPreparationScopeTest {
     @Test
+    fun `a completed routing scope should observe cleared and rearmed deadlines`() {
+        val common = CommonOptions()
+        val stop = common.routingPreparationCancellation()
+        stop.close()
+
+        for ((deadline, expected) in listOf(
+            Long.MIN_VALUE to true, null to false, Long.MAX_VALUE to false, 0L to true, null to false,
+        )) {
+            common.deadlineAtMs = deadline
+
+            assertEquals(expected, stop())
+        }
+    }
+
+    @Test
     fun `closing required admission should stop charging its completed routing ledger`() {
         val common = CommonOptions().apply { engineParams += "presolve-work-limit=1" }
         val stop = common.routingPreparationCancellation()
