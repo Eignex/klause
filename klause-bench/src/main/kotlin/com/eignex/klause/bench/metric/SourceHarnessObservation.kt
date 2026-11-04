@@ -13,22 +13,50 @@ internal data class SourceHarnessCounters(
 
 internal class SourceHarnessObservation(private val read: () -> SourceHarnessCounters) {
     private val initial = runCatching(read).getOrNull()
+    private var prepared: SourceHarnessCounters? = null
+    private var preparationEnded = false
+    private var cleanupStart: SourceHarnessCounters? = null
+
+    fun preparationComplete() {
+        if (preparationEnded) return
+        prepared = runCatching(read).getOrNull()
+        preparationEnded = true
+    }
+
+    fun cleanupStarted() {
+        val snapshot = runCatching(read).getOrNull()
+        if (!preparationEnded) {
+            prepared = snapshot
+            preparationEnded = true
+        }
+        cleanupStart = snapshot
+    }
 
     fun finish(): Map<String, String> {
-        val first = initial ?: return emptyMap()
         val last = runCatching(read).getOrNull() ?: return emptyMap()
+        return counters("sourceHarness", initial, last) +
+            counters("sourcePreparation", initial, if (preparationEnded) prepared else last) +
+            counters("sourceCleanup", cleanupStart, last)
+    }
+
+    private fun counters(
+        prefix: String,
+        first: SourceHarnessCounters?,
+        last: SourceHarnessCounters?,
+    ): Map<String, String> {
+        if (first == null || last == null) return emptyMap()
         return buildMap {
             if (first.threadId != null && first.threadId == last.threadId) {
                 delta(first.threadCpuNanos, last.threadCpuNanos)?.let {
-                    put("sourceHarnessThreadCpuMs", (it / NANOS_PER_MILLI).toString())
+                    put("${prefix}ThreadCpuMs", (it / NANOS_PER_MILLI).toString())
                 }
             }
             if (first.collectors != null && first.collectors == last.collectors) {
                 delta(first.collectionCount, last.collectionCount)?.let {
-                    put("sourceHarnessGcCount", it.toString())
+                    put("${prefix}GcCount", it.toString())
                 }
                 delta(first.collectionTimeMillis, last.collectionTimeMillis)?.let {
-                    put("sourceHarnessGcTimeMs", it.toString())
+                    put("${prefix}GcTimeMs", it.toString())
                 }
             }
         }

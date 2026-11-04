@@ -136,6 +136,7 @@ internal object SolverInvocation {
             SourcePreparationCapture.span("source-preparation").use { preparation ->
                 fun invokeSource(input: File): Result {
                     preparation.close()
+                    observation?.preparationComplete()
                     checkActive()
                     val cliStart = nanoTime()
                     preparationNanos = cliStart - start
@@ -155,7 +156,8 @@ internal object SolverInvocation {
                 } else {
                     CorpusFiles.withPlainFile(file, ::checkActive, { cleanupNanos = it },
                         stagingDirectory = stagingDirectory ?: CorpusFiles.stagingRoot,
-                        nanoTime = nanoTime, block = ::invokeSource)
+                        nanoTime = nanoTime, onCleanupStart = observation?.let { { it.cleanupStarted() } },
+                        block = ::invokeSource)
                 }
             }
         }.exceptionOrNull()

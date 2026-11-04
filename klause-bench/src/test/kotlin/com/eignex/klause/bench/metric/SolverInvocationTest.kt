@@ -220,7 +220,7 @@ class SolverInvocationTest {
             observeHarness = {
                 SourceHarnessObservation {
                     reads++
-                    if (reads == 2) nanos += 2_000_000
+                    if (reads == 3) nanos += 2_000_000
                     SourceHarnessCounters(nanos, threadId = 1)
                 }
             },
@@ -233,6 +233,41 @@ class SolverInvocationTest {
         assertEquals("2", result.stats["sourceObservationFinishMs"])
         assertEquals("10", result.stats["sourceCliMs"])
         assertEquals("12", result.stats["sourceInvocationMs"])
+    }
+
+    @Test
+    fun `preparation sampling spends the remaining CLI allowance`() {
+        var nanos = 0L
+        var reads = 0
+
+        val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000), nanoTime = { nanos },
+            observeHarness = {
+                SourceHarnessObservation {
+                    reads++
+                    if (reads == 2) nanos += 2_000_000
+                    SourceHarnessCounters(nanos, threadId = 1)
+                }
+            },
+        ) { _, remaining ->
+            assertEquals(998L, remaining.timeoutMillis)
+            SolverInvocation.Result(true, null, null, proven = false,
+                stats = emptyMap(), rawOutput = "sat", command = "cli")
+        }
+
+        assertEquals("2", result.stats["sourcePreparationMs"])
+        assertEquals("2", result.stats["sourcePreparationThreadCpuMs"])
+    }
+
+    @Test
+    fun `ordinary invocation omits optional harness counters`() {
+        val result = SolverInvocation.withSourceInput(File("input.cnf"), Budget(1000)) { _, _ ->
+            SolverInvocation.Result(true, null, null, proven = false,
+                stats = emptyMap(), rawOutput = "sat", command = "cli")
+        }
+
+        assertTrue(result.stats.keys.none {
+            it.contains("ThreadCpu") || it.contains("GcCount") || it.contains("GcTime") || it.startsWith("sourceObservation")
+        })
     }
 
     @Test
