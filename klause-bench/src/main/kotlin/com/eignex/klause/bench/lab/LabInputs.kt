@@ -93,6 +93,7 @@ internal object LabInputs {
                 CorpusFiles.unpack(file, keepPacked = true)
                 CorpusFetcher.cache().recordSizesUnder(plain.toFile())
             }
+            return plain
         }
         return file.toPath()
     }

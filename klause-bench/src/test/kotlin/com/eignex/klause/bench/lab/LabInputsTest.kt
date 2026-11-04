@@ -53,7 +53,9 @@ class LabInputsTest {
             val ref = ProblemRef(
                 "model", Format.DIMACS,
                 ProblemSource.External(
-                    ExternalCollection("fixture", "https://example.invalid/fixture.zip", "test", "test", FetchMethod.Zip),
+                    ExternalCollection(
+                        "fixture", "https://example.invalid/fixture.zip", "test", "test", FetchMethod.Zip,
+                    ),
                     "model.cnf",
                 ),
                 Category.SAT, Expected.Unknown,
@@ -66,7 +68,8 @@ class LabInputsTest {
             val materialized = LabInputs.resolve(ref).single()
 
             assertContentEquals(bytes, corpus.resolve(declared.path).readBytes())
-            assertEquals("fixture/model.cnf.zst", materialized.path)
+            assertEquals("fixture/model.cnf", materialized.path)
+            assertEquals(listOf(materialized), LabInputs.resolve(ref))
             assertTrue(packed.isFile)
             LabInputs.verify(
                 BenchCase("fixture", inputs = listOf(declared)),
