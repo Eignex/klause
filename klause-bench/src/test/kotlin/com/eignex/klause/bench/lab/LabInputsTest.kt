@@ -5,9 +5,9 @@ import com.eignex.klause.bench.catalog.Expected
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
-import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.lab.bench.BenchInputRoot
 import java.nio.file.Files
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -19,8 +19,10 @@ class LabInputsTest {
         val previous = System.getProperty("klause.workspace.root")
         try {
             System.setProperty("klause.workspace.root", root.toString())
-            val source = root.resolve("model.cnf").toFile().apply { writeText("p cnf 2 1\n1 -2 0\n") }
-            val packed = CorpusFiles.compress(source)
+            val source = root.resolve("model.cnf").toFile()
+            val packed = root.resolve("model.cnf.zst").toFile().apply {
+                writeBytes(Base64.getDecoder().decode("KLUv/QRIiQAAcCBjbmYgMiAxCjEgLTIgMAr9AOqz"))
+            }
             val ref = ProblemRef("model", Format.DIMACS, ProblemSource.Prepared(packed), Category.SAT, Expected.Unknown)
 
             val input = LabInputs.resolve(ref, inputOnly = true, plainDimacs = true).single()
