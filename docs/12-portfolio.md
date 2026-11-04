@@ -12,8 +12,9 @@ source execution supply retained recipe factories to `PortfolioInvocation` with 
 routing plan and current executable projection. The invocation owns worker slots,
 seed offsets, parallel quotas, scheduler controls, result verification and cleanup;
 mutable services registered with a slot close when the slot is released, and each
-replica gets private state. Native reservations divide the complete family's
-allowance across its slots. Heuristic-only factories carry witness authority, and
+replica gets private state. ALNS operator choices and inner repair seeds derive
+from its worker seed in ordinary and diagnostic schedules. Native reservations
+divide the complete family's allowance across its slots. Heuristic-only factories carry witness authority, and
 `FIXED` rejects multiple cores.
 
 `SourceExecutionPolicy` sets finite arm defaults and LP ceilings before worker
