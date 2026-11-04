@@ -51,11 +51,13 @@ class IndexedPlanningTest {
 
     @Test
     fun `canonical committed inputs preserve identical declared and materialized plans`() = withCache { cache ->
+        val started = System.nanoTime()
         val materialized = File(cache, "materialized")
         val tree = File(materialized, collection.id)
         val plain = File(tree, "set/model.cnf")
         val packed = File("${plain.path}.zst").apply { parentFile.mkdirs() }
         ZstdOutputStreamNoFinalizer(packed.outputStream(), 1).use { it.write("original source".encodeToByteArray()) }
+        println("canonical-fixture-nanos=${System.nanoTime() - started}")
         File(materialized, ".index/${collection.id}.json").apply { parentFile.mkdirs() }.writeText(
             """{"collection":"${collection.id}","files":[
                 {"path":"set/model.cnf.zst","sha256":"${"0".repeat(64)}","bytes":0}
@@ -63,19 +65,23 @@ class IndexedPlanningTest {
         )
         val workspace = File(cache, "workspace")
         CommittedCorpusIndexes.write(CommittedCorpusIndexes.fromSources(collection.id, tree), workspace)
+        println("canonical-index-nanos=${System.nanoTime() - started}")
         val saved = System.getProperty("klause.workspace.root")
         try {
             System.setProperty("klause.workspace.root", workspace.path)
             val declared = planned(materialized, declared = true)
+            println("canonical-declared-nanos=${System.nanoTime() - started}")
             assertFalse(plain.exists())
 
             val actual = planned(materialized, declared = false)
+            println("canonical-materialized-nanos=${System.nanoTime() - started}")
 
             assertEquals(declared, actual)
             assertEquals("${collection.id}/set/model.cnf", actual.single().path)
             assertEquals("original source", plain.readText())
             assertTrue(packed.isFile)
             assertEquals(actual, planned(materialized, declared = false))
+            println("canonical-repeat-nanos=${System.nanoTime() - started}")
         } finally {
             if (saved == null) {
                 System.clearProperty("klause.workspace.root")
