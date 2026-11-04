@@ -294,7 +294,10 @@ the restart transition completes or closes.
 ALNS alternates destroying part of an incumbent with repairing it. Adjacency
 destruction grows breadth-first through factor occurrences; repair scopes release
 both ends of unit Boolean definitions, and caller pins stay in the repair
-assumptions.
+assumptions. Operator choices use the supplied ALNS random stream. When the
+local-search parameters declare a seed, inner repair seeds also draw from that
+stream. Unseeded ordinary invocations allow the inner solver to choose its own
+seeds.
 
 The internal opt-in `SemanticBlockRemoval` selects complete mandatory
 AllDifferent scopes, contiguous windows in a resource's current start order, or
