@@ -16,6 +16,52 @@ import kotlin.time.TimeSource
 
 class CancellationTest {
     @Test
+    fun `or compositions should poll every live predicate in order`() {
+        for (count in 0..8) {
+            for (direct in listOf(false, true)) {
+                val visited = ArrayList<Int>()
+                val token = (0 until count).fold(Cancellation.Never or Cancellation.Never) { previous, index ->
+                    previous or Cancellation {
+                        visited += index
+                        false
+                    }
+                }
+
+                val stopped = if (direct) token.isCancelled() else token()
+
+                assertFalse(stopped)
+                assertEquals((0 until count).toList(), visited)
+            }
+        }
+    }
+
+    @Test
+    fun `or compositions should stop at the first cancelling predicate`() {
+        for (count in 1..8) {
+            for (direct in listOf(false, true)) {
+                val visited = ArrayList<Int>()
+                var cancelAt = 0
+                val token = (0 until count).fold(Cancellation.Never or Cancellation.Never) { previous, index ->
+                    previous or Cancellation {
+                        visited += index
+                        index == cancelAt
+                    }
+                }
+
+                for (index in 0 until count) {
+                    cancelAt = index
+                    visited.clear()
+
+                    val stopped = if (direct) token.isCancelled() else token()
+
+                    assertTrue(stopped)
+                    assertEquals((0..index).toList(), visited)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `adjacent monotonic deadlines should stop before following predicates`() {
         for (reverse in listOf(false, true)) {
             val now = TimeSource.Monotonic.markNow()
