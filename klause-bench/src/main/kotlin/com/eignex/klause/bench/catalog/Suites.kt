@@ -260,6 +260,18 @@ internal object Suites {
                 }
             },
             DynamicSuite(
+                "satcomp-xor-v1",
+                "SAT Competition graph XOR CNFs: 17 pinned satisfiable original and camouflaged encodings",
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.satcompXor,
+                    CorpusSelection.Layout.Flat("", "cnf"),
+                    sel,
+                    Category.SAT,
+                    format = Format.DIMACS,
+                ).map { it.copy(expected = Expected.Sat) }
+            },
+            DynamicSuite(
                 "pb-comp",
                 "Pseudo-Boolean Competition 2024 selected OPB set (fetched; 1/family by default)",
                 defaultPerFamily = 1,
@@ -1090,6 +1102,13 @@ internal object ExternalCollections {
         license = "SAT Competition benchmarks (public for research; cite GBD and the competition proceedings)",
         reason = "40 pinned instances, ~13MB as .cnf.xz; fetched per instance by content hash rather than vendored",
         fetch = FetchMethod.GbdFiles(SatCompCompact.instances),
+    )
+    val satcompXor = ExternalCollection(
+        id = "satcomp-xor-v1",
+        url = "https://benchmark-database.de",
+        license = "SAT Competition benchmarks (public for research; cite GBD and the competition proceedings)",
+        reason = "published small graph parity encodings; fetched by pinned content hash rather than vendored",
+        fetch = FetchMethod.GbdFiles(SatCompXor.instances),
     )
     val pbComp2024 = ExternalCollection(
         id = "pb-comp-2024",
