@@ -280,10 +280,11 @@ class FiniteExecutionTest {
     @Test
     fun `private parity consumers should require an explicit work request`() {
         for ((enabled, options) in listOf(
-            false to ExecutionOptions(),
-            true to ExecutionOptions(ExecutionOption.privateRebuildWork(-1L),
+            false to ExecutionOptions(ExecutionOption.sliceWork(1_000L)),
+            true to ExecutionOptions(ExecutionOption.sliceWork(1_000L), ExecutionOption.privateRebuildWork(-1L),
                 ExecutionOption.privateRebuildBytes(4_194_304L)),
-            true to ExecutionOptions.parse(listOf("private-rebuild-work=-1", "private-rebuild-bytes=4194304")),
+            true to ExecutionOptions.parse(listOf("slice-work=1000",
+                "private-rebuild-work=-1", "private-rebuild-bytes=4194304")),
         )) {
             val parity = (0 until 128).flatMap { row ->
                 listOf(1, 2, 4, 7).map { mask ->
