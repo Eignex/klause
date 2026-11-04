@@ -151,7 +151,7 @@ internal object CorpusFetcher {
         is ProblemSource.ExternalIndexed -> {
             val files = (root ?: ::ensure)(source.collection).walkTopDown()
                 .filter { it.isFile && CorpusFiles.formatExtension(it) == source.ext }
-                .sortedBy { CorpusFiles.plainPath(it.name) }
+                .sortedWith(compareBy<File> { CorpusFiles.plainPath(it.name) }.thenBy { !CorpusFiles.isCompressed(it) })
                 .distinctBy { CorpusFiles.plainPath(it.path) }
                 .toList()
             require(source.index in files.indices) {
