@@ -315,7 +315,10 @@ class CorpusSelectionTest {
             assertEquals(stored, layout.discover(paths).map { it.mznRelPath })
             assertEquals(stored, layout.discover(paths.reversed()).map { it.mznRelPath })
             assertEquals(listOf("COP/Mkp-1.xml.zst"), layout.named(root, listOf("Mkp-1")).map { it.mznRelPath })
-            assertEquals(listOf("COP/Mkp-1.xml.zst"), layout.named(paths.reversed(), listOf("Mkp-1")).map { it.mznRelPath })
+            assertEquals(
+                listOf("COP/Mkp-1.xml.zst"),
+                layout.named(paths.reversed(), listOf("Mkp-1")).map { it.mznRelPath },
+            )
         } finally {
             root.deleteRecursively()
         }
@@ -327,10 +330,11 @@ class CorpusSelectionTest {
         val indexes = directory.listFiles { file -> file.name.endsWith(".tsv.gz") }.orEmpty()
         assertTrue(indexes.isNotEmpty())
         for (file in indexes) {
-            val index = requireNotNull(CommittedCorpusIndexes.load(file.name.removeSuffix(".tsv.gz"), CorpusFetcher.workspaceRoot()))
+            val id = file.name.removeSuffix(".tsv.gz")
+            val index = requireNotNull(CommittedCorpusIndexes.load(id, CorpusFetcher.workspaceRoot()))
             val paths = index.files.mapTo(HashSet()) { it.path }
             val shadowed = paths.filter { "$it${CorpusFiles.SUFFIX}" in paths }
-            assertTrue(shadowed.isEmpty(), "${index.collection} lists plain copies of stored instances: ${shadowed.take(3)}")
+            assertTrue(shadowed.isEmpty(), "$id lists plain copies of stored instances: ${shadowed.take(3)}")
         }
     }
 
