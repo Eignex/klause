@@ -429,7 +429,10 @@ class PrivateRebuildSatisfactionTest {
         for (native in listOf(false, true)) for (mixed in listOf(false, true)) {
             val clauses = (0 until 128).flatMap { row ->
                 listOf(1, 2, 4, 7).map { mask ->
-                    Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
+                    Clause(IntArray(3) {
+                        val column = row + if (mixed) 2 * (row / 16) + it else it
+                        Lit.make(column, mask and (1 shl it) == 0)
+                    })
                 }
             } + if (mixed) listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))) else emptyList()
             val source = Problem(if (mixed) 144 else 130, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()

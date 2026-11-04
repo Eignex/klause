@@ -281,7 +281,7 @@ class FiniteExecutionTest {
     fun `ordinary source defaults should open and retire a private parity consumer`() {
         val parity = (0 until 128).flatMap { row ->
             listOf(1, 2, 4, 7).map { mask ->
-                Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
+                Clause(IntArray(3) { Lit.make(row + 2 * (row / 16) + it, mask and (1 shl it) == 0) })
             }
         }
         val contradiction = listOf(
@@ -290,7 +290,7 @@ class FiniteExecutionTest {
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
             Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
         )
-        val problem = Problem(130, 0, emptyArray(), (parity + contradiction).toTypedArray())
+        val problem = Problem(144, 0, emptyArray(), (parity + contradiction).toTypedArray())
         val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
         val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
             shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
@@ -325,10 +325,10 @@ class FiniteExecutionTest {
         )) {
             val clauses = (0 until 128).flatMap { row ->
                 listOf(1, 2, 4, 7).map { mask ->
-                    Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
+                    Clause(IntArray(3) { Lit.make(row + 2 * (row / 16) + it, mask and (1 shl it) == 0) })
                 }
             } + Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))
-            val problem = Problem(130, 0, emptyArray(), clauses.toTypedArray())
+            val problem = Problem(144, 0, emptyArray(), clauses.toTypedArray())
             val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
