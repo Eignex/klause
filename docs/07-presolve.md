@@ -264,7 +264,9 @@ selects automatic parity admission with a cumulative 4,194,304-work grant and th
 configured scratch grant. It considers only Boolean satisfaction sources with
 128–2,000 columns and 512–32,768 factors. Its first unconditional root performs one
 funded source scan; admission requires a completed basis of rank at least 128 and
-coverage of at least half the source clauses. A miss retains canonical traversal
+coverage of at least half the source clauses. Mixed views additionally require at
+least 16 free coordinates; complete affine views retain their rank and coverage
+admission. A miss retains canonical traversal
 without root-pin BVE or learned-equivalence retries. Explicit zero disables this
 mode; positive work settings retain their bounded manual trials.
 

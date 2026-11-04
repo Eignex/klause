@@ -104,7 +104,10 @@ diagnosis; these observations do not retire the rebuilding objective.
 ## Build and run
 
 Ordinary single-core mixed clausal satisfaction admits a bounded automatic private
-parity trial. `param.private-rebuild-work=0` disables it.
+parity trial. `param.private-rebuild-work=0` disables it. Mixed private views require at least
+16 free coordinates for automatic admission; complete affine views use the ordinary
+rank and coverage requirements. `AutomaticDeclinedSmallMixed` reports a funded
+discovery followed by canonical fallback, without preparing or opening a consumer.
 `param.private-rebuild-bytes` bounds private modeled storage independently of canonical
 learned-memory scratch; an explicit shared scratch limit also bounds private storage
 unless a private limit is supplied.

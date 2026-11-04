@@ -426,13 +426,13 @@ class PrivateRebuildSatisfactionTest {
 
     @Test
     fun `automatic parity admission should publish a checked source point and release its consumer`() {
-        for (native in listOf(false, true)) {
+        for (native in listOf(false, true)) for (mixed in listOf(false, true)) {
             val clauses = (0 until 128).flatMap { row ->
                 listOf(1, 2, 4, 7).map { mask ->
                     Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
                 }
-            } + Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))
-            val source = Problem(130, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+            } + if (mixed) listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))) else emptyList()
+            val source = Problem(if (mixed) 144 else 130, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
 
             val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
                 nativeSat = native, privateRebuildWork = -1L, learnedMemoryScratchBytes = 4_194_304L,
@@ -453,6 +453,33 @@ class PrivateRebuildSatisfactionTest {
             assertEquals(stages.sumOf { learning["privateRebuild$it"] ?: 0L },
                 learning.getValue("privateRebuildChargedWork"))
             assertTrue(learning.getValue("privateRebuildChargedWork") <= 1_048_576L)
+        }
+    }
+
+    @Test
+    fun `automatic small mixed views should retain canonical search after discovery`() {
+        for (native in listOf(false, true)) {
+            val clauses = (0 until 128).flatMap { row ->
+                listOf(1, 2, 4, 7).map { mask ->
+                    Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
+                }
+            } + Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))
+            val source = Problem(130, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+
+            val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+                nativeSat = native, privateRebuildWork = -1L, learnedMemoryScratchBytes = 4_194_304L,
+                variableSelector = InputOrder, valueSelector = IndomainMin,
+            )))
+
+            assertTrue(clauses.all { clause ->
+                clause.literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+            })
+            val learning = result.stats.search.learning
+            assertEquals(1L, learning["privateRebuildAutomaticDeclinedSmallMixed"])
+            assertNull(learning["privateRebuildAttempts"])
+            assertNull(learning["privateRebuildConsumers"])
+            assertEquals(learning.getValue("privateRebuildParityDiscoveryWork"),
+                learning.getValue("privateRebuildChargedWork"))
         }
     }
 
