@@ -82,7 +82,7 @@ internal class PrivateRebuildParity private constructor(
             if (!table.collect(source, session)) return null
             val rowCount = table.countRows() ?: return null
             if (rowCount == 0) { onDecline("NoRows"); return null }
-            val covered = table.coverage() ?: return null
+            val covered = table.coverage(source, session) ?: return null
             val sourceRows = if (table.coveredClauses == source.numFactors) 0 else rowCount
             val words = (source.numBoolVars + 63) ushr 6
             val rowWords = (rowCount + 63) ushr 6
@@ -216,14 +216,27 @@ internal class PrivateRebuildParity private constructor(
                 return count
             }
 
-            fun coverage(): BooleanArray? {
+            fun coverage(source: BakedProblem, session: PropagationSession): BooleanArray? {
                 if (!visit(tags.size * 4L + 8L)) return null
                 val result = BooleanArray(tags.size)
                 var count = 0
                 for (index in tags.indices) {
                     val tag = tags[index]
-                    val covered = tag == -2 || (tag >= 0 &&
+                    var covered = tag == -2 || (tag >= 0 &&
                         (coveredMasks[tag ushr 3] and (1 shl (tag and 7))) != 0)
+                    if (!covered) {
+                        val literals = (source.factors[index] as Clause).literals
+                        if (!visit(literals.size * 2L + 1L)) return null
+                        for (literal in literals) {
+                            val column = Lit.variable(literal)
+                            if (column >= source.numBoolVars) { onDecline("Scope"); return null }
+                            val value = session.boolValue(column)
+                            if (value != null && Lit.evaluate(literal, value)) {
+                                covered = true
+                                break
+                            }
+                        }
+                    }
                     result[index] = covered
                     if (covered) count++
                 }

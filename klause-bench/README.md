@@ -197,8 +197,8 @@ the existing private grants.
 captured affine basis. `AffineGenerationColumns` and `AffineGenerationFreeColumns`
 count its coordinates in a prepared model. These private pivot slots require
 affine reconstruction and cannot receive unprojected canonical learned clauses.
-`ParityBasisColumns` and `ParityCoveredSourceClauses` describe the captured
-linear subsystem. `ParityReducedRows`, `ParityReducedLiterals` and
+`ParityBasisColumns` reports the captured linear rank. `ParityCoveredSourceClauses`
+includes complete encodings and clauses justified by captured global root facts. `ParityReducedRows`, `ParityReducedLiterals` and
 `ParityCoveredClauses` identify a prepared mixed Clause/Xor view with original
 coordinate meanings; they do not count eliminated columns.
 `ParityTriangularRows` counts forward-eliminated rows selected per pivot in that

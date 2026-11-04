@@ -224,6 +224,43 @@ class PrivateRebuildParityTest {
     }
 
     @Test
+    fun `globally satisfied clauses should preserve the complete affine source point set`() {
+        for (width in 2..4) for (phase in 0..1) {
+            val fixedValue = phase != 0
+            val clauses = (0..7).filter { it.countOneBits() % 2 != phase }.map { mask ->
+                Clause(IntArray(3) { Lit.make(it, mask and (1 shl it) == 0) })
+            } + Clause(intArrayOf(Lit.make(4, fixedValue))) + Clause(IntArray(width) { index ->
+                if (index == 0) Lit.make(4, fixedValue) else Lit.make(index - 1, true)
+            })
+            val source = Problem(5, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+            val session = PropagationSession(source)
+            session.seed(Assumptions.None)
+            val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
+                Cancellation.Never, parity = captured))
+            val sourcePoints = mutableSetOf<List<Boolean>>()
+            val liftedPoints = mutableSetOf<List<Boolean>>()
+
+            for (mask in 0..31) {
+                val point = BooleanArray(5) { mask and (1 shl it) != 0 }
+                if (clauses.all { clause -> clause.literals.any { Lit.evaluate(it, point[Lit.variable(it)]) } }) {
+                    sourcePoints.add(point.toList())
+                }
+                if (generation.problem.factors.all { factor ->
+                        (factor as Clause).literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
+                    }) {
+                    val lifted = generation.reconstruct(Sample(point, longArrayOf()))
+                    liftedPoints.add(List(5) { lifted.boolValue(it) })
+                }
+            }
+
+            assertNotNull(captured.affine)
+            assertEquals(8, sourcePoints.size)
+            assertEquals(sourcePoints, liftedPoints)
+        }
+    }
+
+    @Test
     fun `an uncovered clause should prevent elimination of the source parity system`() {
         val clauses = (0..3).flatMap { excluded ->
             val columns = (0..3).filter { it != excluded }

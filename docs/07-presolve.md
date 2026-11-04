@@ -328,12 +328,14 @@ without an additional BVE pivot; its pins are counted separately from eliminated
 columns. Closing or declining releases the captured snapshot with its generation.
 
 When every source clause is covered by complete parity encodings, tautologies or
-canonical global unit facts, the rebuilt model can replace the encoded equations
+clauses satisfied by captured global root facts, the rebuilt model can replace the encoded equations
 with their free-coordinate view. Source column slots remain stable; a private
 pivot slot is fixed to a placeholder and has no canonical literal authority.
 Reconstruction evaluates the owned affine basis from the private free-coordinate
 values, preserving every source solution rather than choosing a source constant.
-The complete coverage proof is required before dropping any encoded clause.
+The coverage scan charges every additional literal check. Reconstruction retains
+the captured global values that justify satisfied clauses. The complete coverage
+proof is required before dropping any encoded clause.
 Uncovered clauses prevent the placeholder view. Canonical learned clauses are
 withheld from the affine view because their pivot literals lack a supported
 projection. The containing grants cover the basis and reconstruction; every
