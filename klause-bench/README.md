@@ -29,21 +29,19 @@ of its members is materialized locally. Each solve verifies its planned input by
 The standard and Linux JVM lab manifests request source snapshots: the lab stages the selected revision as a compact
 Git pack with its original commit identity. Builds and tools use the current revision without requiring ancestors or tags.
 
-Corpus-pack indexes are committed under `klause-bench/corpus-index/<collection>.tsv.gz`
+Corpus input indexes are committed under `klause-bench/corpus-index/<collection>.tsv.gz`
 (`path<TAB>sha256<TAB>bytes`), so declared-input planning makes no network requests and
 transfers no corpus bytes. Regenerate them from complete collection trees with
 `CommittedCorpusIndexes CORPUS_CACHE WORKSPACE [COLLECTION...]` on the bench classpath.
+The generator records original bytes and plain names for compressed members. Materialization follows
+the committed representation, retains packed siblings and verifies the exact input hash and size.
+Committed entries take precedence over cached mirror indexes; stored-form entries remain supported.
 A collection without a committed index falls back to the mirror's index.
 Concurrent planners atomically publish complete listing skeletons and reuse the winning view.
 
-`CommittedCorpusIndexes --mirror COLLECTION...` exports published mirror indexes into
-the lab's `OUT` directory without downloading collection packs or parsing models.
-Use these metadata artifacts to refresh committed indexes against the stored packs;
-existing input checksum enforcement still applies.
-`CommittedCorpusIndexes --catalog SATLIB_COLLECTION...` fetches complete catalog
-collections when no mirror is configured and exports their actual stored-byte indexes
-under `OUT`. This maintenance mode reads file identities without parsing models and
-does not publish packs; it runs separately from offline planning.
+`scripts/capture-corpus-index.sh` accepts `select` filters in a lab profile job. It writes complete
+input indexes, selected source hashes and provenance under `$OUT` without running a solver.
+The installed index generator reads the selection JSONL and verifies each copied source; no JSON shell tool is required.
 
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before

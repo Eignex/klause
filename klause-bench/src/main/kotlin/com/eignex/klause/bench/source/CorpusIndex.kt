@@ -1,11 +1,11 @@
 package com.eignex.klause.bench.source
 
-import com.eignex.klause.bench.catalog.ExternalCollections
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
-import java.net.URI
 import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
@@ -16,13 +16,14 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 
 /**
- * The inventory of one collection exactly as its mirror pack holds it: each file's path relative to the collection
- * root, its sha256 and its size. A lab plan that may declare input hashes (`LAB_DECLARED_INPUTS`) selects from this
+ * The inventory of one collection: each file's path relative to the collection root, its sha256 and its size.
+ * Mirror indexes describe stored bytes; committed input indexes may name their materialized plain counterparts.
+ * A lab plan that may declare input hashes (`LAB_DECLARED_INPUTS`) selects from this
  * index alone, so a fresh node no longer downloads and unpacks every pack a selection touches; the lab fetches each
  * case's own bytes by content hash and verifies them against these hashes before the case runs.
  *
- * An index is trusted only when it describes the stored pack: it is computed from a restored pack, or from a tree
- * whose pack publication this process won, or downloaded from the mirror (see [CorpusFetcher.ensure]).
+ * Mirror indexes come from restored packs, winning pack publications or the mirror (see [CorpusFetcher.ensure]).
+ * Committed input indexes bind the original bytes of those sources; materialization and publication verify them.
  */
 @Serializable
 internal data class CorpusIndex(val collection: String, val files: List<Entry>, val version: Int = VERSION) {
@@ -53,7 +54,7 @@ internal data class CorpusIndex(val collection: String, val files: List<Entry>, 
 
         private val ID = Regex("[A-Za-z0-9][A-Za-z0-9._-]*")
         private val SHA256 = Regex("[a-f0-9]{64}")
-        private val json = Json { ignoreUnknownKeys = true }
+        private val json by lazy { Json { ignoreUnknownKeys = true } }
 
         fun encode(index: CorpusIndex): String = json.encodeToString(serializer(), index)
 
@@ -92,7 +93,8 @@ internal class IndexedCollection(val index: CorpusIndex, val root: File) {
 
 /**
  * Collection indexes committed with the source under `klause-bench/corpus-index/<id>.tsv.gz`: a header line, then
- * one `path<TAB>sha256<TAB>bytes` line per file, exactly [CorpusIndex.of] of the stored pack. Planning reads these
+ * one `path<TAB>sha256<TAB>bytes` line per input. [fromSources] hashes original bytes rather than their compressed
+ * encoding, so recompression preserves input identity. Planning reads these
  * instead of fetching an index or a collection, so a plan needs no network and costs no corpus transfer. A stale entry
  * cannot admit wrong bytes: the lab fetches each case's inputs by these hashes and verifies them before the case runs.
  */
@@ -101,6 +103,31 @@ internal object CommittedCorpusIndexes {
     private const val HEADER = "path\tsha256\tbytes"
 
     fun file(workspace: File, id: String): File = File(workspace, "$DIRECTORY/$id.tsv.gz")
+
+    fun fromSources(id: String, collection: File): CorpusIndex {
+        val files = collection.walkTopDown().onEnter { it.name != ".plain" }.filter { it.isFile }
+            .sortedWith(compareBy(CorpusFiles.storedFirst) { it.relativeTo(collection).invariantSeparatorsPath })
+            .distinctBy { CorpusFiles.plainPath(it.relativeTo(collection).invariantSeparatorsPath) }
+            .map { file ->
+                require(!Files.isSymbolicLink(file.toPath())) { "corpus collection '$id' holds a link: $file" }
+                val digest = MessageDigest.getInstance("SHA-256")
+                var bytes = 0L
+                CorpusFiles.open(file).use { input ->
+                    val buffer = ByteArray(1 shl 16)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        digest.update(buffer, 0, count)
+                        bytes += count
+                    }
+                }
+                CorpusIndex.Entry(
+                    CorpusFiles.plainPath(file.relativeTo(collection).invariantSeparatorsPath),
+                    HexFormat.of().formatHex(digest.digest()), bytes,
+                )
+            }.toList()
+        return CorpusIndex(id, files)
+    }
 
     fun load(id: String, workspace: File? = runCatching { CorpusFetcher.workspaceRoot() }.getOrNull()): CorpusIndex? {
         val file = workspace?.let { file(it, id) }?.takeIf { it.isFile } ?: return null
@@ -136,66 +163,71 @@ internal object CommittedCorpusIndexes {
         }
     }
 
+    fun capture(cache: File, workspace: File, selection: File) {
+        val rows = selection.readLines().filter { it.isNotBlank() }.map { Json.parseToJsonElement(it).jsonObject }
+        require(rows.isNotEmpty()) { "source selection is empty" }
+        val indexes = rows.map { it.getValue("collection").jsonPrimitive.content }.distinct().associateWith { id ->
+            require(id.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))
+            val tree = File(cache, id)
+            require(tree.isDirectory && !File(tree, CorpusStore.SELECTIVE).exists()) {
+                "corpus collection '$id' is not complete"
+            }
+            fromSources(id, tree).also { write(it, workspace) }
+        }
+        File(workspace, "selected-source-hashes.tsv").bufferedWriter().use { manifest ->
+            for (row in rows) {
+                val id = row.getValue("collection").jsonPrimitive.content
+                val problem = row.getValue("problem").jsonPrimitive.content
+                require(problem.none { it.isISOControl() })
+                val source = File(row.getValue("model").jsonPrimitive.content).toPath().toRealPath()
+                val tree = File(cache, id).toPath().toRealPath()
+                require(source.startsWith(tree) && Files.isRegularFile(source)) { "source outside collection '$id'" }
+                val relative = tree.relativize(source).toString().replace(File.separatorChar, '/')
+                val entry = requireNotNull(indexes.getValue(id).entry(relative)) { "selected source is not indexed" }
+                val artifact = "inputs/$id/$relative"
+                val target = File(workspace, artifact)
+                target.parentFile.mkdirs()
+                Files.copy(source, target.toPath(), REPLACE_EXISTING)
+                val digest = MessageDigest.getInstance("SHA-256")
+                target.inputStream().use { input ->
+                    val buffer = ByteArray(1 shl 16)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        digest.update(buffer, 0, count)
+                    }
+                }
+                require(target.length() == entry.bytes && HexFormat.of().formatHex(digest.digest()) == entry.sha256) {
+                    "selected source changed during capture: $id/$relative"
+                }
+                manifest.write("$id\t$problem\t${entry.sha256}\t${entry.bytes}\t$artifact\n")
+            }
+        }
+    }
+
     /** Writes the committed index of every complete collection tree under [cache], or of [ids] alone. */
     @JvmStatic
     fun main(args: Array<String>) {
-        if (args.firstOrNull() == "--catalog") {
-            exportCatalogIndexes(args.drop(1))
-            return
-        }
-        if (args.firstOrNull() == "--mirror") {
-            require(args.size >= 2) { "usage: CommittedCorpusIndexes --mirror COLLECTION..." }
-            val workspace = File(requireNotNull(System.getenv("OUT")) { "OUT is required for mirror metadata" })
-            require(workspace.mkdirs() || workspace.isDirectory) { "cannot create metadata output directory" }
-            val address = System.getenv("LAB_CORPUS_MIRROR") ?: System.getenv("KLAUSE_BENCH_CORPUS_MIRROR")
-            val remote = CorpusMirror(URI(requireNotNull(address) { "corpus mirror is not configured" }))
-            val scratch = Files.createTempDirectory(workspace.toPath(), ".mirror-metadata-").toFile()
-            try {
-                for (id in args.drop(1)) {
-                    val index = requireNotNull(remote.index(id, scratch)) { "published corpus index unavailable: $id" }
-                    write(index, workspace)
-                    File(workspace, "$id.index.json").writeText(CorpusIndex.encode(index))
-                    System.err.println("exported published index $id")
-                }
-            } finally {
-                check(scratch.deleteRecursively()) { "cannot remove metadata scratch directory" }
-            }
-            return
-        }
         require(args.size >= 2) { "usage: CommittedCorpusIndexes CORPUS_CACHE WORKSPACE [COLLECTION...]" }
         val cache = File(args[0])
         val workspace = File(args[1])
+        if (args.getOrNull(2) == "--selection") {
+            require(args.size == 4) { "--selection requires a selection JSONL file" }
+            capture(cache, workspace, File(args[3]))
+            return
+        }
         val ids = args.drop(2).ifEmpty {
             cache.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }.orEmpty().map { it.name }.sorted()
         }
         for (id in ids) {
             val tree = File(cache, id)
+            require(tree.isDirectory) { "corpus collection '$id' is not materialized" }
             if (File(tree, CorpusStore.SELECTIVE).exists()) {
                 System.err.println("skip $id: partial tree")
                 continue
             }
-            write(CorpusIndex.of(id, tree), workspace)
+            write(fromSources(id, tree), workspace)
             System.err.println("indexed $id")
-        }
-    }
-
-    private fun exportCatalogIndexes(ids: List<String>) {
-        require(ids.isNotEmpty()) { "usage: CommittedCorpusIndexes --catalog SATLIB_COLLECTION..." }
-        require(System.getenv("LAB_CORPUS_MIRROR_WRITE") != "true" &&
-            System.getenv("KLAUSE_BENCH_CORPUS_MIRROR_WRITE") != "true") { "catalog export cannot publish packs" }
-        val workspace = File(requireNotNull(System.getenv("OUT")) { "OUT is required for catalog metadata" })
-        require(workspace.mkdirs() || workspace.isDirectory) { "cannot create metadata output directory" }
-        val cache = requireNotNull(System.getenv("LAB_CORPUS")) { "LAB_CORPUS is required for catalog metadata" }
-        System.setProperty("klause.bench.corpusCache", cache)
-        val collections = ExternalCollections.satlib.map { it.first }.associateBy { it.id }
-        for (id in ids) {
-            val collection = requireNotNull(collections[id]) { "unknown SATLIB collection: $id" }
-            val directory = CorpusFetcher.ensure(collection)
-            require(!File(directory, CorpusStore.SELECTIVE).exists()) { "cannot index a partial corpus: $id" }
-            val index = CorpusIndex.of(id, directory)
-            write(index, workspace)
-            File(workspace, "$id.index.json").writeText(CorpusIndex.encode(index))
-            System.err.println("exported catalog index $id")
         }
     }
 }
