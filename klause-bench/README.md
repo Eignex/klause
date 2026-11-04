@@ -110,7 +110,7 @@ learned-memory scratch; an explicit shared scratch limit also bounds private sto
 unless a private limit is supplied.
 
 `param.private-rebuild-work=-1` requests automatic parity admission within a
-67,108,864-work grant and the configured scratch grant. It makes one initial-root
+4,194,304-work grant and the configured scratch grant. It makes one initial-root
 attempt on the structurally admitted Boolean cohort; see the
 [admission contract](../docs/07-presolve.md#private-worker-qualification).
 Use explicit zero as the canonical control; ordinary default admission follows the
@@ -204,9 +204,7 @@ coordinate meanings; they do not count eliminated columns.
 `ParityTriangularRows` counts forward-eliminated rows selected per pivot in that
 reduced basis; the remaining rows use free-coordinate expansion. Both
 representations and their selection spend the existing private grants.
-`ParityJointFactors` identifies funded joint affine kernels. Automatic consumers
-with fewer than 16 free coordinates retain the short-row system without a joint
-kernel; explicit positive trials retain the funding policy. `ParityJointModeledBytes`
+`ParityJointFactors` identifies funded joint affine kernels. `ParityJointModeledBytes`
 is included in `ModeledPrivateBytes`; `ParityJointInitializationWork` counts completed
 cache initialization inside trial propagation work. `OpeningPropagationWork` is also
 a trial-work subset, including a consumer whose opening stops before publication. Joint `Fires`, `Resets`,

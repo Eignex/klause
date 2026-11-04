@@ -302,7 +302,7 @@ class FiniteExecutionTest {
         val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
         assertEquals(FiniteSolveVerdict.UNSAT, completed.verdict)
         val learning = completed.stats.search.learning
-        assertEquals(0L, learning["privateRebuildParityJointFactors"] ?: 0L)
+        assertEquals(1L, learning["privateRebuildParityJointFactors"] ?: 0L)
         assertEquals(1L, learning["privateRebuildAutomaticAttempts"] ?: 0L)
         assertEquals(4_194_304L, learning["privateRebuildAutomaticByteLimit"] ?: 0L)
         assertEquals(1_048_576L,

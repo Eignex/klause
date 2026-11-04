@@ -60,7 +60,6 @@ internal class PrivateRebuildGeneration private constructor(
             onDecline: (String) -> Unit = {},
             learnedBinary: PrivateRebuildBinaryLearning? = null,
             parity: PrivateRebuildParity? = null,
-            jointAffine: Boolean = true,
             passWork: () -> Long = { Long.MAX_VALUE },
         ): PrivateRebuildGeneration? {
             if (!session.canSimplifyRoot || cancellation()) return null
@@ -120,7 +119,7 @@ internal class PrivateRebuildGeneration private constructor(
                 onDecline("Memory")
                 return null
             }
-            val jointBytes = if (rowView && jointAffine) checkNotNull(basis).jointModeledBytes() else 0L
+            val jointBytes = if (rowView) checkNotNull(basis).jointModeledBytes() else 0L
             val jointFunded = jointBytes > 0L && jointBytes <= byteLimit - bytes - selectorBytes
             val fundedBytes = bytes + if (jointFunded) jointBytes else 0L
             cancellation.charge(source.numBoolVars * if (parity == null) 1L else 3L)

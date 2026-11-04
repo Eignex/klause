@@ -260,7 +260,7 @@ trial. Direct parameters use `privateRebuildBytes`, falling back to
 `learnedMemoryScratchBytes` when null.
 
 An explicit `privateRebuildWork=-1`
-selects automatic parity admission with a cumulative 67,108,864-work grant and the
+selects automatic parity admission with a cumulative 4,194,304-work grant and the
 configured scratch grant. It considers only Boolean satisfaction sources with
 128–2,000 columns and 512–32,768 factors. Its first unconditional root performs one
 funded source scan; admission requires a completed basis of rank at least 128 and
@@ -367,9 +367,7 @@ primitive observations. Buffer initialization and every scan, reduction and reas
 visit debit propagation work. A fresh session exposes its live propagation counter
 before its root fixpoint, so work during consumer opening shares the same private
 and containing stop conditions. Stopped opening work remains charged once. Modeled seed, matrix, observation and watch storage
-share the private byte grant after selector reservation. Automatic consumers with
-fewer than 16 free coordinates retain the per-row system without the joint cache;
-explicit positive trials use the funded joint view. An unfunded joint view also
+share the private byte grant after selector reservation; an unfunded joint view
 retains the per-row system. Retirement copies primitive observations before releasing
 the private state.
 The mixed view preserves original coordinate meanings, including its live pivots,
