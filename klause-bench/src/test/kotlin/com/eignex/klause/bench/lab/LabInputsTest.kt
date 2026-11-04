@@ -14,6 +14,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.HexFormat
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -37,7 +38,7 @@ class LabInputsTest {
         }
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "DIMACS input carriers retain original bytes across packed delivery: plain={0}")
     @ValueSource(booleans = [false, true])
     fun `requested DIMACS input carriers retain original bytes across packed delivery`(plain: Boolean) {
         val previous = System.getProperty("klause.workspace.root")
@@ -46,8 +47,7 @@ class LabInputsTest {
             val source = packedFixture.resolve("model.cnf").toFile()
             val packed = packedFixture.resolve("model.cnf.zst").toFile()
             val ref = ProblemRef("model", Format.DIMACS, ProblemSource.Prepared(packed), Category.SAT, Expected.Unknown)
-            val packedHash = MessageDigest.getInstance("SHA-256").digest(packed.readBytes())
-                .joinToString("") { "%02x".format(it) }
+            val packedHash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(packed.readBytes()))
 
             val input = LabInputs.resolve(ref, inputOnly = true, plainDimacs = plain).single()
 
