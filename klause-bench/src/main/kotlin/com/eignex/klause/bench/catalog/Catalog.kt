@@ -90,6 +90,9 @@ internal sealed interface FetchMethod {
      *  compressed inside, e.g. XCSP3 `*.xml.lzma`). */
     data object Zip : FetchMethod
 
+    /** Discover [extension] instances from the ZIP directory and materialize only selected members. */
+    data class SelectiveZip(val extension: String) : FetchMethod
+
     /** Download each of [names] from under [ExternalCollection.url] and [convert] it, (file name, text) to
      *  (instance name, file text) pairs written as `<instance>.<extension>`, for a library whose instances need
      *  translating, such as OR-Library's own text formats into MPS. */

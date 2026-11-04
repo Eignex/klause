@@ -1,10 +1,28 @@
 package com.eignex.klause.bench.source
 
+import com.eignex.klause.bench.catalog.Category
+import com.eignex.klause.bench.catalog.Expected
+import com.eignex.klause.bench.catalog.Format
+import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.corpus
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ProblemKindTest {
+
+    @Test
+    fun `weighted maxsat should be COP`() {
+        val ref = ProblemRef(
+            "conditional-cost",
+            Format.WCNF,
+            corpus("conditional-symmetry/conditional-cost.wcnf"),
+            Category.OPTIMIZATION,
+            Expected.Unknown,
+        )
+
+        assertTrue(ProblemKind.isCop(ref))
+    }
 
     @Test
     fun `single-line solve minimize should be COP`() {

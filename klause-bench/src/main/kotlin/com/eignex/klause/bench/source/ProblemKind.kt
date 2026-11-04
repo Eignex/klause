@@ -5,14 +5,15 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.formats.mps.Mps
 
 /**
- * Classifies CSP/COP from the source objective directive before sampling, without compilation.
+ * Classifies CSP/COP from the format or source objective directive before sampling, without compilation.
  * This keeps capped kind selections full. Formats and in-code builders without objectives
  * are CSP; each format uses the same directive as its runner.
  */
 internal object ProblemKind {
-    /** True iff [ref] is a constraint *optimization* problem (carries an objective directive). */
+    /** True iff [ref] is a constraint *optimization* problem (carries an objective). */
     fun isCop(ref: ProblemRef): Boolean = when (ref.format) {
         Format.DIMACS, Format.JSON_SCHEMA, Format.IN_CODE -> false
+        Format.WCNF -> true
 
         else -> {
             val text = runCatching { CorpusFiles.readText(CorpusFetcher.resolve(ref.source)) }.getOrNull()
