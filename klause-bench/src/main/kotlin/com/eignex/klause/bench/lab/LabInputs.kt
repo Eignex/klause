@@ -93,7 +93,9 @@ internal object LabInputs {
             dependencies(model)
             if (!inputOnly) {
                 val runtime = CorpusFetcher.workspaceRoot().toPath().resolve(RUNTIME)
-                require(Files.isExecutable(runtime.resolve("bin/minizinc"))) { "Run :klause-bench:prepareLabRuntime" }
+                require(Files.isExecutable(runtime.resolve("bin/minizinc"))) {
+                    "Run :klause-bench:prepareLabRuntime"
+                }
                 add(input(runtime, "compiler"))
             }
         }
