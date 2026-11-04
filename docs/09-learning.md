@@ -589,7 +589,11 @@ growth and index insertion. Lookups debit the active maintenance or observation
 grant, or the containing propagation ledger. A fixed-size page cache avoids repeated
 lookups during ranking, with 128 reference slots for General metadata and 512 for
 Native metadata. Initialization work and reference ownership include the allocated
-cache length. Header unlinking clears its cache slot before releasing the page.
+cache length. Fixed primitive key tags identify both cached pages and cached absence;
+their allocation and initialization belong to the same owner and preparation ledger.
+Cold lookup cancellation publishes no cache result. Creating a page replaces its
+matching cached absence. Header unlinking clears the cached page reference before
+release and retains its absence tag.
 A page queue and per-page retirement masks resume row release without scanning
 permanent rows or looking up another page. Retained import/use counters survive
 released metadata. Empty arrays release within their row transaction; empty headers

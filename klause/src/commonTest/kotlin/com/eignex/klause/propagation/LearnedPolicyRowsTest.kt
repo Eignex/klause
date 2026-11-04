@@ -11,6 +11,72 @@ import kotlin.test.assertTrue
 
 class LearnedPolicyRowsTest {
     @Test
+    fun `a released metadata page should remain readable as cached absence without a cold grant`() {
+        val rows = NativeLearnedMetadata()
+        repeat(48) { rows.add(it, false, -1, it.toLong() + 1L) }
+        for (index in 16..31) rows.release(index)
+        rows.sweepDirectory(ReclamationPreparation(256L, 256L, { false }, {}))
+        val budget = ReclamationPreparation(0L, 256L, { false }, {})
+
+        val stage = rows.usingBudget(budget) { rows[16, NativeLearnedMetadata.STAGES] }
+
+        assertEquals(4, stage)
+        assertEquals(0L, budget.work)
+    }
+
+    @Test
+    fun `moving a live row into a cached absent page should publish its metadata`() {
+        val rows = NativeLearnedMetadata()
+        repeat(48) { rows.add(it, false, -1, it.toLong() + 1L) }
+        for (index in 16..31) rows.release(index)
+        rows.sweepDirectory(ReclamationPreparation(256L, 256L, { false }, {}))
+        assertEquals(4, rows[16, NativeLearnedMetadata.STAGES])
+
+        rows.move(32, 16)
+
+        assertEquals(32, rows[16, NativeLearnedMetadata.LBD])
+        assertEquals(33L, rows.admission(16))
+    }
+
+    @Test
+    fun `cancellation during an absent page lookup should not publish a cached result`() {
+        val rows = NativeLearnedMetadata()
+        repeat(20_000) { rows.add(it, false, -1, it.toLong() + 1L) }
+        for (index in 16..31) rows.release(index)
+        rows.sweepDirectory(ReclamationPreparation(256L, 256L, { false }, {}))
+        rows[16_400, NativeLearnedMetadata.LBD]
+        var work = 0L
+        val cancelled = ReclamationPreparation(16L, 256L, { work >= 1L }, { work += it })
+
+        assertFailsWith<ReclamationPreparation.Deferred> {
+            rows.usingBudget(cancelled) { rows[16, NativeLearnedMetadata.STAGES] }
+        }
+
+        assertEquals(1L, work)
+        val funded = ReclamationPreparation(16L, 256L, { false }, {})
+        assertEquals(4, rows.usingBudget(funded) { rows[16, NativeLearnedMetadata.STAGES] })
+        assertTrue(funded.work in 1L..16L)
+    }
+
+    @Test
+    fun `a funded absent page lookup should cache its result`() {
+        val rows = NativeLearnedMetadata()
+        repeat(20_000) { rows.add(it, false, -1, it.toLong() + 1L) }
+        for (index in 16..31) rows.release(index)
+        rows.sweepDirectory(ReclamationPreparation(256L, 256L, { false }, {}))
+        rows[16_400, NativeLearnedMetadata.LBD]
+        val funded = ReclamationPreparation(16L, 256L, { false }, {})
+        assertEquals(4, rows.usingBudget(funded) { rows[16, NativeLearnedMetadata.STAGES] })
+        assertTrue(funded.work in 1L..16L)
+        val cached = ReclamationPreparation(0L, 256L, { false }, {})
+
+        val stage = rows.usingBudget(cached) { rows[16, NativeLearnedMetadata.STAGES] }
+
+        assertEquals(4, stage)
+        assertEquals(0L, cached.work)
+    }
+
+    @Test
     fun `queued metadata release should restore ownership beside a surviving first page`() {
         val rows = LearnedPolicyRows(6, 8, true, null)
         val clause = ClausePropagator(intArrayOf(0, 1), EmptyIntArray, intArrayOf(0, 2))
