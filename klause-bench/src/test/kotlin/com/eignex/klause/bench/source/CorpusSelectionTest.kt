@@ -303,6 +303,38 @@ class CorpusSelectionTest {
     }
 
     @Test
+    fun `Flat layout resolves a plain copy beside the stored form to the stored form in every listing order`() {
+        val root = Files.createTempDirectory("zstpair").toFile()
+        try {
+            val paths = listOf("COP/Mkp-1.xml", "COP/Mkp-1.xml.zst", "COP/Other-2.xml.zst")
+            for (path in paths) File(root, path).apply { parentFile.mkdirs(); writeText("fixture") }
+            val layout = Layout.Flat("COP", "xml")
+            val stored = listOf("COP/Mkp-1.xml.zst", "COP/Other-2.xml.zst")
+
+            assertEquals(stored, layout.discover(root).map { it.mznRelPath })
+            assertEquals(stored, layout.discover(paths).map { it.mznRelPath })
+            assertEquals(stored, layout.discover(paths.reversed()).map { it.mznRelPath })
+            assertEquals(listOf("COP/Mkp-1.xml.zst"), layout.named(root, listOf("Mkp-1")).map { it.mznRelPath })
+            assertEquals(listOf("COP/Mkp-1.xml.zst"), layout.named(paths.reversed(), listOf("Mkp-1")).map { it.mznRelPath })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `committed corpus indexes list no plain copy beside a stored compressed instance`() {
+        val directory = File(CorpusFetcher.workspaceRoot(), CommittedCorpusIndexes.DIRECTORY)
+        val indexes = directory.listFiles { file -> file.name.endsWith(".tsv.gz") }.orEmpty()
+        assertTrue(indexes.isNotEmpty())
+        for (file in indexes) {
+            val index = requireNotNull(CommittedCorpusIndexes.load(file.name.removeSuffix(".tsv.gz"), CorpusFetcher.workspaceRoot()))
+            val paths = index.files.mapTo(HashSet()) { it.path }
+            val shadowed = paths.filter { "$it${CorpusFiles.SUFFIX}" in paths }
+            assertTrue(shadowed.isEmpty(), "${index.collection} lists plain copies of stored instances: ${shadowed.take(3)}")
+        }
+    }
+
+    @Test
     fun `Flat layout should find a compressed instance and name it without the suffix`() {
         val root = Files.createTempDirectory("zstsel").toFile()
         try {

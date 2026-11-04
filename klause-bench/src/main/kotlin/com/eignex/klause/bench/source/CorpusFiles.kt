@@ -43,6 +43,13 @@ internal object CorpusFiles {
     /** [path] without the compression suffix: the name a stored instance has as plain text. */
     fun plainPath(path: String): String = path.removeSuffix(SUFFIX)
 
+    /**
+     * Orders paths by instance and, within one instance, puts the stored compressed form before a plain sibling. A
+     * tree that still holds a plain copy beside its `.zst` then plans exactly like one holding only the stored form,
+     * independent of directory listing order.
+     */
+    val storedFirst: Comparator<String> = compareBy<String> { plainPath(it) }.thenBy { !it.endsWith(SUFFIX) }
+
     /** The format extension of [file], looking past the compression suffix (`foo.mps.zst` → `mps`). */
     fun formatExtension(file: File): String = plainPath(file.name).substringAfterLast('.', "")
 
