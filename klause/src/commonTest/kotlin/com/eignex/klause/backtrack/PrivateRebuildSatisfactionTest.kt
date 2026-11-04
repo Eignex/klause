@@ -447,7 +447,7 @@ class PrivateRebuildSatisfactionTest {
             assertEquals(1L, learning["privateRebuildConsumers"])
             assertEquals(1L, learning["privateRebuildSourceAccepted"])
             assertEquals(1L, learning["privateRebuildRetired"])
-            assertEquals(16_777_216L, learning["privateRebuildAutomaticWorkLimit"])
+            assertEquals(67_108_864L, learning["privateRebuildAutomaticWorkLimit"])
             val stages = listOf("RootScanWork", "ParityDiscoveryWork", "BinaryScanWork", "BinaryHistoryWork",
                 "PreparationWork", "OpeningConstructionWork", "TrialWork", "ReconstructionWork", "SourceCheckWork")
             assertEquals(stages.sumOf { learning["privateRebuild$it"] ?: 0L },

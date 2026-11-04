@@ -452,7 +452,7 @@ data class BacktrackParams(
     val rootRebuildCaptureVisits: Int = 0,
     /**
      * Private Boolean work: zero disables, positive values bound manual trials, and -1 selects
-     * automatic parity admission within a 16,777,216-work grant.
+     * automatic parity admission within a 67,108,864-work grant.
      */
     val privateRebuildWork: Long = 0L,
     /**
