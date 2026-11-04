@@ -41,6 +41,7 @@ Concurrent planners atomically publish complete listing skeletons and reuse the 
 
 `scripts/capture-corpus-index.sh` accepts `select` filters in a lab profile job. It writes complete
 input indexes, selected source hashes and provenance under `$OUT` without running a solver.
+The installed index generator reads the selection JSONL and verifies each copied source; no JSON shell tool is required.
 
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before

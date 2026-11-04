@@ -3,6 +3,8 @@ package com.eignex.klause.bench.source
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.nio.file.FileSystemException
 import java.nio.file.Files
@@ -161,12 +163,59 @@ internal object CommittedCorpusIndexes {
         }
     }
 
+    fun capture(cache: File, workspace: File, selection: File) {
+        val rows = selection.readLines().filter { it.isNotBlank() }.map { Json.parseToJsonElement(it).jsonObject }
+        require(rows.isNotEmpty()) { "source selection is empty" }
+        val indexes = rows.map { it.getValue("collection").jsonPrimitive.content }.distinct().associateWith { id ->
+            require(id.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))
+            val tree = File(cache, id)
+            require(tree.isDirectory && !File(tree, CorpusStore.SELECTIVE).exists()) {
+                "corpus collection '$id' is not complete"
+            }
+            fromSources(id, tree).also { write(it, workspace) }
+        }
+        File(workspace, "selected-source-hashes.tsv").bufferedWriter().use { manifest ->
+            for (row in rows) {
+                val id = row.getValue("collection").jsonPrimitive.content
+                val problem = row.getValue("problem").jsonPrimitive.content
+                require(problem.none { it.isISOControl() })
+                val source = File(row.getValue("model").jsonPrimitive.content).toPath().toRealPath()
+                val tree = File(cache, id).toPath().toRealPath()
+                require(source.startsWith(tree) && Files.isRegularFile(source)) { "source outside collection '$id'" }
+                val relative = tree.relativize(source).toString().replace(File.separatorChar, '/')
+                val entry = requireNotNull(indexes.getValue(id).entry(relative)) { "selected source is not indexed" }
+                val artifact = "inputs/$id/$relative"
+                val target = File(workspace, artifact)
+                target.parentFile.mkdirs()
+                Files.copy(source, target.toPath(), REPLACE_EXISTING)
+                val digest = MessageDigest.getInstance("SHA-256")
+                target.inputStream().use { input ->
+                    val buffer = ByteArray(1 shl 16)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        digest.update(buffer, 0, count)
+                    }
+                }
+                require(target.length() == entry.bytes && HexFormat.of().formatHex(digest.digest()) == entry.sha256) {
+                    "selected source changed during capture: $id/$relative"
+                }
+                manifest.write("$id\t$problem\t${entry.sha256}\t${entry.bytes}\t$artifact\n")
+            }
+        }
+    }
+
     /** Writes the committed index of every complete collection tree under [cache], or of [ids] alone. */
     @JvmStatic
     fun main(args: Array<String>) {
         require(args.size >= 2) { "usage: CommittedCorpusIndexes CORPUS_CACHE WORKSPACE [COLLECTION...]" }
         val cache = File(args[0])
         val workspace = File(args[1])
+        if (args.getOrNull(2) == "--selection") {
+            require(args.size == 4) { "--selection requires a selection JSONL file" }
+            capture(cache, workspace, File(args[3]))
+            return
+        }
         val ids = args.drop(2).ifEmpty {
             cache.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }.orEmpty().map { it.name }.sorted()
         }
