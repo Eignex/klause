@@ -21,9 +21,9 @@ internal class IndexedVector(val size: Int) {
 
     @Suppress("LongParameterList")
     fun dot(indices: IntArray, indexOffset: Int, source: DoubleArray, valueOffset: Int, count: Int): Double =
-        koblas.sparseKernels.dot(indices, indexOffset, source, valueOffset, count, values)
+        koblas.dot(indices, indexOffset, source, valueOffset, count, values)
 
-    fun nrm2(): Double = koblas.sparseKernels.nrm2(indices, 0, count, values)
+    fun nrm2(): Double = koblas.nrm2(indices, 0, count, values)
 
     inline fun forEachStored(block: (Int, Double) -> Unit) {
         for (k in 0 until count) {

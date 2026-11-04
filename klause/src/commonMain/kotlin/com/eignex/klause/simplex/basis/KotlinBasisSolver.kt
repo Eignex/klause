@@ -550,14 +550,14 @@ internal class KotlinBasisSolver(
                 if (transpose) {
                     product[j] = solution.dot(sourceRows, start, sourceValues, start, count)
                 } else {
-                    koblas.sparseKernels.axpy(
-                        product,
-                        solution[j],
+                    koblas.axpy(
                         sourceRows,
                         start,
                         sourceValues,
                         start,
                         count,
+                        solution[j],
+                        product,
                     )
                 }
             }
