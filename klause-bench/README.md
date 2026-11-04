@@ -186,7 +186,10 @@ it is a subset of transfer and preparation work, rather than another total to ad
 
 
 Private parity discovery reports `ParityDiscoveryWork`, `ParityDiscoveryNanos`,
-`ParityRows` and `ParityPins`. Discovery work is a subset of `ChargedWork`,
+`ParityRows` and `ParityPins`. Rows count encodings after global pin substitution;
+Satisfied clauses and false fixed literals are resolved against the captured root snapshot.
+A dimension-only memory refusal can precede table allocation and discovery work.
+Discovery work is a subset of `ChargedWork`,
 separate from canonical root propagation and later `PreparationWork`.
 `ParitySourceRows` and `ParitySourceLiterals` count short source equations posted
 beside the reduced basis in mixed consumers. Their storage and propagation spend

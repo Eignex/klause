@@ -261,6 +261,109 @@ class PrivateRebuildParityTest {
     }
 
     @Test
+    fun `fixed gate inputs should expose reconstructable binary equivalences`() {
+        for (phase in 0..1) {
+            val input = Lit.make(0, phase != 0)
+            val right = Lit.make(1, phase == 0)
+            val output = Lit.make(2, true)
+            val clauses = listOf(
+                Clause(intArrayOf(Lit.negate(input), Lit.negate(right), output)),
+                Clause(intArrayOf(input, Lit.negate(output))),
+                Clause(intArrayOf(right, Lit.negate(output))),
+                Clause(intArrayOf(input)),
+            )
+            val source = Problem(4, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+            val session = PropagationSession(source)
+            session.seed(Assumptions.None)
+            val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
+                Cancellation.Never, parity = captured))
+            val sourcePoints = mutableSetOf<List<Boolean>>()
+            val liftedPoints = mutableSetOf<List<Boolean>>()
+
+            for (mask in 0..15) {
+                val point = BooleanArray(4) { mask and (1 shl it) != 0 }
+                if (clauses.all { clause -> clause.literals.any { Lit.evaluate(it, point[Lit.variable(it)]) } }) {
+                    sourcePoints.add(point.toList())
+                }
+                if (generation.problem.factors.all { factor ->
+                        (factor as Clause).literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
+                    }) {
+                    val lifted = generation.reconstruct(Sample(point, longArrayOf()))
+                    liftedPoints.add(List(4) { lifted.boolValue(it) })
+                }
+            }
+
+            assertNotNull(captured.affine)
+            assertEquals(4, sourcePoints.size)
+            assertEquals(sourcePoints, liftedPoints)
+        }
+    }
+
+    @Test
+    fun `globally false literals should expose parity in wide source clauses`() {
+        for (width in 4..5) for (phase in 0..1) {
+            val firstPin = Lit.make(3, phase != 0)
+            val secondPin = Lit.make(4, phase == 0)
+            val clauses = (0..7).filter { it.countOneBits() % 2 != phase }.map { mask ->
+                Clause(IntArray(width) { index ->
+                    when (index) {
+                        3 -> Lit.negate(firstPin)
+                        4 -> Lit.negate(secondPin)
+                        else -> Lit.make(index, mask and (1 shl index) == 0)
+                    }
+                })
+            } + Clause(intArrayOf(firstPin)) + Clause(intArrayOf(secondPin))
+            val source = Problem(6, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+            val session = PropagationSession(source)
+            session.seed(Assumptions.None)
+            val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
+                Cancellation.Never, parity = captured))
+            val sourcePoints = mutableSetOf<List<Boolean>>()
+            val liftedPoints = mutableSetOf<List<Boolean>>()
+
+            for (mask in 0..63) {
+                val point = BooleanArray(6) { mask and (1 shl it) != 0 }
+                if (clauses.all { clause -> clause.literals.any { Lit.evaluate(it, point[Lit.variable(it)]) } }) {
+                    sourcePoints.add(point.toList())
+                }
+                if (generation.problem.factors.all { factor ->
+                        (factor as Clause).literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
+                    }) {
+                    val lifted = generation.reconstruct(Sample(point, longArrayOf()))
+                    liftedPoints.add(List(6) { lifted.boolValue(it) })
+                }
+            }
+
+            assertNotNull(captured.affine)
+            assertEquals(8, sourcePoints.size)
+            assertEquals(sourcePoints, liftedPoints)
+        }
+    }
+
+    @Test
+    fun `unfunded source dimensions should withhold parity discovery work`() {
+        val clauses = (0 until 128).flatMap { row ->
+            listOf(1, 2, 4, 7).map { mask ->
+                Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
+            }
+        } + List(512) { Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))) }
+        val session = PropagationSession(Problem(130, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake())
+        var spent = 0L
+        val declines = mutableListOf<String>()
+
+        val captured = PrivateRebuildParity.capture(session, 1_048_576L, { work ->
+            spent += work
+            true
+        }, onDecline = { declines += it })
+
+        assertNull(captured)
+        assertEquals(listOf("Memory"), declines)
+        assertEquals(0L, spent)
+    }
+
+    @Test
     fun `an uncovered clause should prevent elimination of the source parity system`() {
         val clauses = (0..3).flatMap { excluded ->
             val columns = (0..3).filter { it != excluded }

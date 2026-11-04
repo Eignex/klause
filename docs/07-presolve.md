@@ -302,7 +302,10 @@ protected columns wait for a fresh root view. This selection is a heuristic, not
 an exhaustive elimination pass.
 
 A bounded source scan can recognize two- and three-column parity equations from
-their complete two- and four-clause Boolean encodings. Each clause excludes one assignment;
+their complete two- and four-clause Boolean encodings. It captures the global pin
+snapshot before grouping clauses, omits satisfied clauses and removes globally
+false literals from their keys. Source column IDs remain unchanged. The same snapshot
+conditions the matrix and reconstruction. Each remaining clause excludes one assignment;
 the complete parity class of exclusions entails the opposite parity equation.
 A preparation-only GF(2) matrix substitutes the canonical global pins and uses
 forward elimination from higher source slots followed by affine back substitution
@@ -319,7 +322,9 @@ refutation authority.
 
 The immutable source identity binds the captured pin snapshot. Its table,
 matrix and snapshot allocation, initialization, probes, elimination and publication
-consume the private work and modeled-memory grants. Complete absence of encoded
+consume the private work and modeled-memory grants. A dimension-only lower bound
+on source entries and table storage can refuse an unfunded source before allocation.
+Complete absence of encoded
 rows parks the immutable-source scan; a completed miss for new pins may retry
 after canonical global pins grow. The private model installs the proved values
 as unit clauses and composes its reconstruction over the fixed source view.
@@ -327,8 +332,8 @@ Canonical search state stays unchanged. A changed fixed view can open a consumer
 without an additional BVE pivot; its pins are counted separately from eliminated
 columns. Closing or declining releases the captured snapshot with its generation.
 
-When every source clause is covered by complete parity encodings, tautologies or
-clauses satisfied by captured global root facts, the rebuilt model can replace the encoded equations
+When each source clause belongs to a complete parity encoding, is tautological or
+is satisfied by captured global root facts, the rebuilt model can replace the encoded equations
 with their free-coordinate view. Source column slots remain stable; a private
 pivot slot is fixed to a placeholder and has no canonical literal authority.
 Reconstruction evaluates the owned affine basis from the private free-coordinate
