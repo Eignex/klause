@@ -214,7 +214,12 @@ a trial-work subset, including a consumer whose opening stops before publication
 per-consumer observations through retirement. `ExpressionRowsUpdated` counts completed
 residual-expression reductions; `ExpressionRowsSkipped` counts expressions without the
 new fact's pivot. A wide pin reason withholds that deduction.
-`ParityPreferredFreeColumns` reports the admitted free-coordinate selection list. Coverage declines name
+`ParityPreferredFreeColumns` reports the admitted free-coordinate selection list.
+`FreeSelectorActivity` identifies funded private conflict activity;
+`AllCoordinateSelectorActivity` identifies automatic joint consumers that admit all
+source coordinates to that activity. `FreeSelectorInitializationWork` charges
+initialization of the eligible coordinates inside opening construction work.
+Coverage declines name
 incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
 larger widths). Such a miss can retain proved global pins or a mixed view.
 `ParityWorkspaceBytes` is the maximum modeled table/matrix/snapshot workspace

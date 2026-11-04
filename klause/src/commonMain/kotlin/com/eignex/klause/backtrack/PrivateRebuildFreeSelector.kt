@@ -10,7 +10,7 @@ import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.Vsids
 import kotlin.random.Random
 
-internal class PrivateRebuildFreeSelector(private val columns: IntArray, adaptive: Boolean = true) : VariableSelector {
+internal class PrivateRebuildFreeSelector(private val columns: IntArray?, adaptive: Boolean = true) : VariableSelector {
     private val activity = if (adaptive) Vsids() else null
     private var view: FreeState? = null
 
@@ -19,7 +19,9 @@ internal class PrivateRebuildFreeSelector(private val columns: IntArray, adaptiv
     override fun pick(session: PropagationSession, rng: Random): VarRef? {
         val branching = activity
         if (branching == null) {
-            for (column in columns) if (session.needsBoolDecision(column)) return VarRef.Bool(column)
+            if (columns != null) for (column in columns) {
+                if (session.needsBoolDecision(column)) return VarRef.Bool(column)
+            }
             return InputOrder.pick(session, rng)
         }
         val state = view?.takeIf { it.session === session } ?: FreeState(session, columns).also { view = it }
@@ -48,9 +50,9 @@ internal class PrivateRebuildFreeSelector(private val columns: IntArray, adaptiv
         if (varRef is VarRef.Bool && view?.preferred(varRef.varId) == true) activity?.onUnassign(varRef)
     }
 
-    private class FreeState(val session: PropagationSession, columns: IntArray) : BranchingState {
+    private class FreeState(val session: PropagationSession, columns: IntArray?) : BranchingState {
         private val preferred = BooleanArray(session.problem.numBoolVars).also { flags ->
-            for (column in columns) flags[column] = true
+            if (columns == null) flags.fill(true) else for (column in columns) flags[column] = true
         }
 
         override val numBoolVars: Int get() = session.problem.numBoolVars

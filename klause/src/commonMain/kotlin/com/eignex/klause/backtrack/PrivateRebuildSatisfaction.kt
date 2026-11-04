@@ -350,9 +350,13 @@ internal class PrivateRebuildSatisfaction(
         note("BveIndexedFactors", prepared.indexedFactors.toLong())
         note("BveSourceFactors", prepared.sourceFactors.toLong())
         note("FreeSelectorActivity", if (prepared.freeSelectorActivity) 1L else 0L)
+        val allCoordinates = automatic && prepared.parityJointFactor >= 0 && prepared.freeSelectorActivity &&
+            prepared.preferredFreeColumns.isNotEmpty()
+        note("AllCoordinateSelectorActivity", if (allCoordinates) 1L else 0L)
         val selectorWork = if (!prepared.freeSelectorActivity || prepared.preferredFreeColumns.isEmpty()) 0L else {
             PrivateRebuildFreeSelector.initializationWork(
-                prepared.problem.numBoolVars, prepared.preferredFreeColumns.size,
+                prepared.problem.numBoolVars,
+                if (allCoordinates) prepared.problem.numBoolVars else prepared.preferredFreeColumns.size,
             )
         }
         val openingWork = prepared.bakeWork.constructionEntries + selectorWork
@@ -371,7 +375,9 @@ internal class PrivateRebuildSatisfaction(
             privateRebuildWork = 0L, clauseExchange = null, cutExchange = null, pooledIncumbents = null,
             cancellation = containing or Cancellation { trialSpent() >= privateWorkLimit },
             variableSelector = if (prepared.preferredFreeColumns.isEmpty()) sharedParams.variableSelector
-            else PrivateRebuildFreeSelector(prepared.preferredFreeColumns, prepared.freeSelectorActivity),
+            else PrivateRebuildFreeSelector(
+                if (allCoordinates) null else prepared.preferredFreeColumns, prepared.freeSelectorActivity,
+            ),
             onEvent = null, branchObserver = null, maxDecisions = params.maxDecisions.coerceAtMost(
                 (privateWorkLimit - trialSpent()).coerceAtLeast(0L) / PROPAGATION_WORK_PER_NODE,
             ),
