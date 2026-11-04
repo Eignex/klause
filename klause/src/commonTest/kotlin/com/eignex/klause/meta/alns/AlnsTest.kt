@@ -1066,6 +1066,34 @@ class AlnsTest {
     }
 
     @Test
+    fun `seeded ordinary repairs should retain a reproducible random stream`() {
+        val problem = selectProblem()
+        val sample = selectOptimum()
+        val seeds = List(2) { mutableListOf<Long?>() }
+        repeat(2) { attempt ->
+            val alns = Alns(
+                inner = bootstrapAt(problem, sample),
+                destroyOperators = listOf(DestroyOperator.Random),
+                repairOperators = listOf(
+                    RepairOperator { context ->
+                        seeds[attempt] += context.params.randomSeed
+                        context.incumbent
+                    },
+                ),
+                minDestroyFraction = 1.0,
+                maxDestroyFraction = 1.0,
+                maxIterations = 3,
+                flipsPerIteration = 1,
+                rng = Random(3),
+            )
+            alns.minimize(selectObjective, LocalSearchParams(randomSeed = 3L, maxInstructions = 3))
+        }
+
+        assertEquals(3, seeds[0].filterNotNull().distinct().size)
+        assertEquals(seeds[0], seeds[1])
+    }
+
+    @Test
     fun `the outer instruction cap should span retained neighborhood slices`() {
         val problem = selectProblem()
         val sample = selectOptimum()
