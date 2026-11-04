@@ -112,7 +112,7 @@ learned-memory scratch; an explicit shared scratch limit also bounds private sto
 unless a private limit is supplied.
 
 `param.private-rebuild-work=-1` requests automatic parity admission within a
-4,194,304-work grant and the configured scratch grant. It makes one initial-root
+16,777,216-work grant and the configured scratch grant. It makes one initial-root
 attempt on the structurally admitted Boolean cohort; see the
 [admission contract](../docs/07-presolve.md#private-worker-qualification).
 Use explicit zero as the canonical control; ordinary default admission follows the

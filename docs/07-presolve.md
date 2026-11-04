@@ -260,7 +260,7 @@ trial. Direct parameters use `privateRebuildBytes`, falling back to
 `learnedMemoryScratchBytes` when null.
 
 An explicit `privateRebuildWork=-1`
-selects automatic parity admission with a cumulative 4,194,304-work grant and the
+selects automatic parity admission with a cumulative 16,777,216-work grant and the
 configured scratch grant. It considers only Boolean satisfaction sources with
 128–2,000 columns and 512–32,768 factors. Its first unconditional root performs one
 funded source scan; admission requires a completed basis of rank at least 128 and
