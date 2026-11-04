@@ -158,6 +158,7 @@ internal object KlauseLabSuite : BenchSuite {
             completeAssignment = p["complete-assignment"]?.toBooleanStrict() ?: false,
             measureResources = p.getValue("measurement") != "none",
             sourceStaging = SourceStaging.parse(p["source-staging"] ?: "cache"),
+            observeSourceHarness = p.getValue("debug").toBooleanStrict(),
         )
         val budget = Budget(p.getValue("timeout-ms").toLong())
         timings.finish("harnessInputSetupMs", inputStarted)
@@ -188,6 +189,7 @@ internal object KlauseLabSuite : BenchSuite {
         }
         val reported = record.copy(
             comparisonControls = comparisonControls(case) + buildMap {
+                put("sourceHarnessObservation", if (settings.observeSourceHarness) "jvm-mxbeans" else "off")
                 provenance?.let { build ->
                     put("runtimeFingerprint", ComparisonProvenance.runtimeFingerprint(build))
                     put("harnessFingerprint", ComparisonProvenance.current.harnessFingerprint)

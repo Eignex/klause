@@ -574,6 +574,22 @@ parent verification, final record encoding/write and lab staging/publication.
 The existing source and subprocess timing boundaries remain separate. Harness
 instrumentation changes its retained byte fingerprint.
 
+Ordinary installed-CLI cases with `debug=true` also sample the harness calling
+thread's CPU time and the harness JVM's GC counters around the source invocation.
+`sourceHarnessThreadCpuMs` excludes child solver CPU; `sourceHarnessGcCount` and
+`sourceHarnessGcTimeMs` cover the parent JVM, including its other threads. These
+also have `sourcePreparation*` and `sourceCleanup*` counterparts. Preparation ends
+before invoking the solver, and cleanup starts when retiring the staged directory,
+including failed preparation. Plain and CLI-delivered inputs omit cleanup counters.
+Counter windows start after probe setup and end during phase/final sampling. The
+sequential counter reads do not assign pauses to an individual IO call or establish
+device waiting. Collector times can overlap and are not pause durations.
+Unsupported, failed or regressing counters are omitted. Observation
+setup and preparation sampling spend source preparation time; cleanup sampling
+spends cleanup time, and final sampling spends whole-source time.
+`sourceObservationSetupMs` and `sourceObservationFinishMs` are included subsets,
+not costs to add again. `debug=false` skips these observations.
+
 `harness-jfr=true` records the ordinary JVM CLI adapter's separate 512 MiB harness
 JVM into `report/harness.jfr`; the default is false. CLI `measurement` remains a
 separate control. The retained harness command and comparison controls identify

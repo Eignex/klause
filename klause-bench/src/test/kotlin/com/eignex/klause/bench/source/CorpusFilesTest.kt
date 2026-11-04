@@ -68,6 +68,22 @@ class CorpusFilesTest {
     }
 
     @Test
+    fun `failed cleanup observation still releases the staged source`() {
+        val root = Files.createTempDirectory("corpusfiles").toFile()
+        try {
+            val packed = CorpusFiles.compress(File(root, "inst.cnf").apply { writeText("p cnf 0 0\n") })
+            val staging = File(root, "staging")
+
+            CorpusFiles.withPlainFile(packed, stagingDirectory = staging,
+                onCleanupStart = { error("observation unavailable") }) { assertTrue(it.isFile) }
+
+            assertTrue(staging.listFiles().orEmpty().isEmpty())
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `failed decoding removes the staging directory`() {
         val root = Files.createTempDirectory("corpusfiles").toFile()
         try {
