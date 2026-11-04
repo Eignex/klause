@@ -9,6 +9,7 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
+import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.target.collectionOf
@@ -51,6 +52,7 @@ internal fun configureLabPaths() {
         System.setProperty("klause.bench.minizinc", Path.of(tree, LabInputs.RUNTIME, "bin/minizinc").toString())
     }
     System.getenv("LAB_CORPUS")?.let { System.setProperty("klause.bench.corpusCache", it) }
+    System.getenv("LAB_DECLARED_INPUTS")?.let { System.setProperty("klause.bench.declaredInputs", it) }
     System.setProperty("klause.bench.cache", "false")
 }
 
@@ -60,42 +62,60 @@ internal object KlauseLabSuite : BenchSuite {
         "Frozen catalog workloads and installed CLI solve records",
     )
 
-    override fun plan(request: BenchRequest): List<BenchCase> {
+    override fun plan(request: BenchRequest): List<BenchCase> = plan(request, LabInputs::resolve)
+
+    internal fun plan(
+        request: BenchRequest,
+        resolveInputs: (ProblemRef, Boolean) -> List<BenchInput>,
+    ): List<BenchCase> {
         val settings = LabSettings(request.parameters)
-        val selectedProblems = settings.selections.flatMap { KlauseCli.selectProblems(it) }
+        val selectedProblems = settings.selections.flatMap { selection ->
+            KlauseCli.selectProblems(selection).also { selected ->
+                require(selected.isNotEmpty()) { "No problems match selection: $selection" }
+            }
+        }
             .distinctBy { it.suite to it.ref.name }
-        return selectedProblems.flatMap { selected ->
+        val resolved = selectedProblems.map { selected ->
             val ref = selected.ref
             require(ref.source !is ProblemSource.InCode) { "Lab subprocess solves require file-backed inputs" }
-            val inputs = LabInputs.resolve(ref, settings.inputOnly)
-            val trees = LabInputs.treeHashes(inputs)
+            selected to resolveInputs(ref, settings.inputOnly)
+        }
+        val compilerTrees = mutableMapOf<Path, String>()
+        return resolved.flatMap { (selected, inputs) ->
+            val ref = selected.ref
+            val trees = LabInputs.treeHashes(inputs, compilerTrees)
             settings.engines.flatMap { engine ->
                 val variant = if (settings.engines.size > 1) "$engine/" else ""
                 settings.seeds.flatMap { seed ->
-                    (0 until settings.repeats).map { repeat ->
-                        BenchCase(
-                            "${selected.suite}/${ref.name}/$engine/$seed/$repeat",
-                            settings.caseParameters(engine, seed),
-                            settings.resources(),
-                            inputs = inputs,
-                            attributes = trees + mapOf(
-                                "suite" to selected.suite,
-                                "comparisonKey" to "${selected.suite}/${ref.name}/$variant$seed/$repeat",
-                                "seed" to seed.toString(),
-                                "budgetMs" to settings.timeout.toString(),
-                                "problem" to ref.name,
-                                "collection" to collectionOf(ref),
-                                "family" to (ref.family ?: ref.name.substringBefore('/')),
-                                "format" to ref.format.name,
-                                "category" to ref.category.name,
-                                "license" to ref.license,
-                                "expected" to ref.expected.toString(),
-                                "tags" to ref.tags.sorted().joinToString(","),
-                                "recordSchema" to "solver-v1",
-                                "repeat" to repeat.toString(),
-                                "validationPolicy" to "reported-result-v1",
-                            ),
-                        )
+                    (0 until settings.repeats).flatMap { repeat ->
+                        settings.controls.map { control ->
+                            val suffix = if (control.isEmpty()) "" else "/$control"
+                            BenchCase(
+                                "${selected.suite}/${ref.name}/$engine/$seed/$repeat$suffix",
+                                settings.caseParameters(engine, seed, control),
+                                settings.resources(),
+                                inputs = inputs,
+                                attributes = trees + mapOf(
+                                    "suite" to selected.suite,
+                                    "comparisonKey" to "${selected.suite}/${ref.name}/$variant$seed/$repeat$suffix",
+                                    "pairKey" to "${selected.suite}/${ref.name}/$variant$seed/$repeat",
+                                    "propagationControl" to control,
+                                    "seed" to seed.toString(),
+                                    "budgetMs" to settings.timeout.toString(),
+                                    "problem" to ref.name,
+                                    "collection" to collectionOf(ref),
+                                    "family" to (ref.family ?: ref.name.substringBefore('/')),
+                                    "format" to ref.format.name,
+                                    "category" to ref.category.name,
+                                    "license" to ref.license,
+                                    "expected" to ref.expected.toString(),
+                                    "tags" to ref.tags.sorted().joinToString(","),
+                                    "recordSchema" to "solver-v1",
+                                    "repeat" to repeat.toString(),
+                                    "validationPolicy" to "reported-result-v1",
+                                ),
+                            )
+                        }
                     }
                 }
             }
@@ -148,11 +168,25 @@ internal object KlauseLabSuite : BenchSuite {
         }
         val provenance = record.buildProvenance?.let { build ->
             build.copy(
+                harness = ComparisonProvenance.current.retained,
                 runtimeOptions = build.runtimeOptions +
                     ("lab.cli.args" to Files.readString(context.outputDirectory.resolve("cli.args"))),
             )
         }
         val retained = record.copy(
+            comparisonControls = comparisonControls(case) + buildMap {
+                provenance?.let { build ->
+                    put("runtimeFingerprint", ComparisonProvenance.runtimeFingerprint(build))
+                    put("harnessFingerprint", ComparisonProvenance.current.harnessFingerprint)
+                    put("libraryFingerprint", ComparisonProvenance.current.libraryFingerprint)
+                }
+                record.compilerIdentity?.let { compiler ->
+                    put(
+                        "compilerFingerprint",
+                        sha256(compiler.copy(executable = "", standardLibrary = "").toString().toByteArray()),
+                    )
+                }
+            },
             buildProvenance = provenance,
             buildFingerprint = provenance?.fingerprint,
             stats = record.stats + mapOf(
@@ -160,9 +194,28 @@ internal object KlauseLabSuite : BenchSuite {
                 "labDebug" to p.getValue("debug"),
             ),
         )
-        val recordPath = context.outputDirectory.resolve("report/${ref.name.replace('/', '_')}.json")
+        val recordPath = context.outputDirectory.resolve("report/${Reports.fileStem(ref.name)}.json")
         Files.writeString(recordPath, Reports.json.encodeToString(SolveRecord.serializer(), retained))
         return retained
+    }
+
+    internal fun comparisonControls(case: BenchCase): Map<String, String> = buildMap {
+        val p = case.parameters
+        put("policy", "matched-source-v1")
+        put("series", p["comparison-series"] ?: "sdk-v1")
+        put("solverSeed", p.getValue("seed"))
+        put("compilerSeed", p["compiler-seed"] ?: "1")
+        put("solverBudgetMs", p.getValue("timeout-ms"))
+        put("compilerTimeoutSeconds", p.getValue("compile-timeout-sec"))
+        put("caseTimeoutSeconds", case.resources.timeoutSeconds.toString())
+        put("cpus", case.resources.cpus.toString())
+        put("memoryMiB", case.resources.memoryMiB.toString())
+        for (key in listOf("heap-mib", "gc", "debug", "measurement", "complete-assignment")) {
+            put(key, p.getValue(key))
+        }
+        put("exact", p["exact"] ?: "false")
+        put("deadlinePolicy", "cli-inclusive-v1")
+        case.attributes["labInputDigest"]?.let { put("inputDigest", it) }
     }
 
     internal fun failure(record: SolveRecord): String? = record.stats["loadError"] ?: record.stats["errorMessage"]
