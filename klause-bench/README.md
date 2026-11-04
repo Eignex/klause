@@ -35,7 +35,6 @@ transfers no corpus bytes. Regenerate them from complete collection trees with
 `CommittedCorpusIndexes CORPUS_CACHE WORKSPACE [COLLECTION...]` on the bench classpath.
 A collection without a committed index falls back to the mirror's index.
 Concurrent planners atomically publish complete listing skeletons and reuse the winning view.
-Materialization retains selected plain counterparts beside packed corpus members so declared plain input paths remain available.
 
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
