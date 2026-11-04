@@ -13,6 +13,7 @@ internal class NativeLearnedMetadata(state: PropagationState? = null) {
     val admissionWork: Long get() = rows.admissionWork
 
     operator fun get(index: Int, column: Int): Int = rows[index, column]
+    fun watchPositions(index: Int): Long = rows.pair(index, WATCH_FIRST, WATCH_SECOND)
     operator fun set(index: Int, column: Int, value: Int) { rows[index, column] = value }
     fun admission(index: Int): Long = rows.admission(index)
     fun add(lbd: Int, permanent: Boolean, origin: Int, admission: Long) =

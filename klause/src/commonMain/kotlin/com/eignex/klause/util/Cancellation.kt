@@ -148,7 +148,20 @@ private class OrCancellation(
         }
     }.toTypedArray()
 
-    override fun isCancelled(): Boolean {
+    override fun isCancelled(): Boolean = invoke()
+
+    // Separate call sites let short compositions inline each ordered receiver independently.
+    override fun invoke(): Boolean = when (tokens.size) {
+        0 -> false
+        1 -> tokens[0].isCancelled()
+        2 -> tokens[0].isCancelled() || tokens[1].isCancelled()
+        3 -> tokens[0].isCancelled() || tokens[1].isCancelled() || tokens[2].isCancelled()
+        4 -> tokens[0].isCancelled() || tokens[1].isCancelled() ||
+            tokens[2].isCancelled() || tokens[3].isCancelled()
+        else -> pollAll()
+    }
+
+    private fun pollAll(): Boolean {
         for (token in tokens) if (token.isCancelled()) return true
         return false
     }

@@ -64,7 +64,7 @@ internal class LearnedPolicyRows(
         return try { operation() } finally { observation = previous }
     }
 
-    private fun locate(index: Int, visit: (Long) -> Unit): Page? {
+    private inline fun locate(index: Int, visit: (Long) -> Unit): Page? {
         if (index == 0) return primary
         val cached = cachedPages[index and CACHE_MASK]
         if (cached?.slot?.key == index) return cached
@@ -85,6 +85,8 @@ internal class LearnedPolicyRows(
 
     private fun pageAt(index: Int): Page? {
         if (index == 0) return primary
+        val cached = cachedPages[index and CACHE_MASK]
+        if (cached?.slot?.key == index) return cached
         return locate(index, ::chargeLookup)
     }
 
@@ -146,6 +148,23 @@ internal class LearnedPolicyRows(
             else -> 0
         }
         return page.values[slot * columns + column]
+    }
+
+    fun pair(index: Int, firstColumn: Int, secondColumn: Int): Long {
+        val page = pageAt(index ushr PAGE_SHIFT)
+        val slot = index and PAGE_MASK
+        if (page == null || page.retained and (1 shl slot) == 0) {
+            val first = when (firstColumn) {
+                STAGES -> retiredFlag
+                ORIGIN -> OWN_ORIGIN
+                else -> 0
+            }
+            // An absent page is not cached, so the second read retains its lookup charge and cancellation.
+            return (first.toLong() shl 32) or (get(index, secondColumn).toLong() and 0xFFFFFFFFL)
+        }
+        val offset = slot * columns
+        return (page.values[offset + firstColumn].toLong() shl 32) or
+            (page.values[offset + secondColumn].toLong() and 0xFFFFFFFFL)
     }
 
     operator fun set(index: Int, column: Int, value: Int) {
