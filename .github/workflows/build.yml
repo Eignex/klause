@@ -61,8 +61,42 @@ jobs:
       # (linuxArm64, macosArm64) are opt-in via -Ptargets.full and build on release.
 
       # Lint runs separately. Native tests have their own job because Kover instruments JVM tests.
+      - name: Qualify original CLI compilation inputs
+        run: |
+          mkdir -p build/cli-input-capture
+          git diff --exit-code -- klause-cli/src
+          ./gradlew :klause-cli:jvmTest :klause-cli:installJvmDist
+          git diff --exit-code -- klause-cli/src
+          tar -czf build/cli-input-capture/original-cli.tar.gz -C klause-cli/build/install/klause-cli-jvm .
+          cp -R klause-cli/build/test-results/jvmTest build/cli-input-capture/original-cli-tests
+          git ls-tree -r HEAD -- klause-cli/src > build/cli-input-capture/original-cli-source-tree.txt
+
       - name: Run JVM tests with coverage
-        run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist
+        run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist :klause-bench:installDist
+
+      - name: Capture CLI inputs after the gate
+        if: always()
+        run: |
+          mkdir -p build/cli-input-capture
+          git diff --binary -- klause-cli/src > build/cli-input-capture/post-gate-source.patch
+          tar -czf build/cli-input-capture/post-gate-sources.tar.gz klause-cli/src/commonMain klause-cli/src/jvmMain
+
+      - name: Upload CLI compilation inputs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-compilation-inputs
+          path: build/cli-input-capture/
+          if-no-files-found: error
+
+      - name: Upload JVM distributions
+        uses: actions/upload-artifact@v7
+        with:
+          name: jvm-distributions
+          path: |
+            klause-cli/build/install/klause-cli-jvm/
+            klause-bench/build/install/klause-bench/
+          if-no-files-found: error
 
       - name: Start the installed JVM CLI
         run: klause-cli/build/install/klause-cli-jvm/bin/klause-cli --version

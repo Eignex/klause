@@ -2,6 +2,7 @@
   "name": "klause-reference-parallel",
   "description": "Every 3 days: the portfolio on 4 cores on the broad selection at 60 s, to track parallel scaling.",
   "base": {},
+  "tags": ["local"],
   "priority": 0,
   "confirm": true,
   "repository": "Eignex/klause",

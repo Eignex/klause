@@ -22,6 +22,102 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LabAdapterTest {
+    @Test
+    fun `planned shared includes remain valid after staging every selected source`() {
+        val root = Files.createTempDirectory("lab-plan-includes-")
+        val previous = System.getProperty("klause.workspace.root")
+        try {
+            System.setProperty("klause.workspace.root", root.toString())
+            val directory = Files.createDirectory(root.resolve("models"))
+            val request = BenchRequest(parameters = mapOf(
+                "selections" to """[{"suite":"mzn-smoke","name":"argmax"},
+                    {"suite":"mzn-smoke","name":"queens"}]""",
+                "input-only" to "true",
+            ))
+
+            val cases = KlauseLabSuite.plan(request) { ref, inputOnly ->
+                val model = Files.writeString(directory.resolve("${ref.name}.mzn"), "solve satisfy;\n")
+                LabInputs.resolve(ref.copy(source = ProblemSource.Prepared(model.toFile()), data = null), inputOnly)
+            }
+
+            assertEquals(2, cases.size)
+            val context = BenchContext(root, worktree = root)
+            cases.forEach { LabInputs.verify(it, context) }
+        } finally {
+            if (previous == null) {
+                System.clearProperty("klause.workspace.root")
+            } else {
+                System.setProperty("klause.workspace.root", previous)
+            }
+            root.toFile().deleteRecursively()
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `unmatched selections should reject the complete plan`(includeMatchedSource: Boolean) {
+        val missing = """{"suite":"dimacs-core","name":"missing-lab-source"}"""
+        val selections = if (includeMatchedSource) {
+            """[{"suite":"dimacs-core","name":"php4"},$missing]"""
+        } else {
+            "[$missing]"
+        }
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            KlauseLabSuite.plan(BenchRequest(parameters = mapOf("selections" to selections)))
+        }
+
+        assertContains(failure.message.orEmpty(), "missing-lab-source")
+    }
+
+    @Test
+    fun `matched selections should retain every source seed and repeat block`() {
+        val cases = KlauseLabSuite.plan(
+            BenchRequest(parameters = mapOf(
+                "selections" to """[{"suite":"dimacs-core","name":"php4"},
+                    {"suite":"mps-core","name":"blend-tiny"}]""",
+                "solver-seeds" to "1,3",
+                "repeats" to "2",
+            )),
+        )
+
+        assertEquals(listOf("php4", "blend-tiny"), cases.map { it.attributes.getValue("problem") }.distinct())
+        assertEquals(8, cases.map { it.id }.distinct().size)
+    }
+
+    @Test
+    fun `paired propagation controls retain source identity and distinct case identities`() {
+        val cases = KlauseLabSuite.plan(
+            BenchRequest(
+                parameters = mapOf(
+            "suite" to "dimacs-core",
+            "name" to "php4",
+            "engines" to "cp",
+            "propagation-controls" to "true",
+        )
+            )
+        )
+
+        assertEquals(3, cases.map { it.id }.distinct().size)
+        assertEquals(1, cases.map { it.inputs }.distinct().size)
+        assertEquals(1, cases.map { it.attributes.getValue("pairKey") }.distinct().size)
+        assertEquals(listOf("false", "true", "true"), cases.map { it.parameters["param.propagation-attribution"] })
+        assertEquals(listOf("false", "false", "true"), cases.map { it.parameters["param.historical-table-reasons"] })
+    }
+
+    @Test
+    fun `paired propagation controls reject conflicting switch overrides`() {
+        assertFailsWith<IllegalArgumentException> {
+            LabSettings(
+                mapOf(
+                "engines" to "cp",
+                "propagation-controls" to "true",
+                "param.historical-table-reasons" to "false",
+            )
+            )
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = ["param.source-validation", "param.source-validation-gzip"])
     fun `source checks are requested from the lab instead of the solver`(key: String) {
@@ -34,10 +130,49 @@ class LabAdapterTest {
     @CsvSource(
         "typo,true", "cpus,0", "memory-mib,2047", "repeats,0", "timeout-ms,0", "engines,no-such-engine",
         "debug,yes", "exact,yes", "measurement,arbitrary", "heap-mib,8192", "gc,arbitrary", "compile-timeout-sec,0",
-        "max,no", "lp,invalid", "presolve,invalid", "param.,value", "complete-assignment,yes",
+        "max,no", "lp,invalid", "presolve,invalid", "param.,value", "complete-assignment,yes", "compiler-seed,3",
     )
     fun `invalid controls fail validation`(key: String, value: String) {
         assertFailsWith<IllegalArgumentException> { LabSettings(mapOf(key to value)) }
+    }
+
+    @Test
+    fun `compiler seed remains explicit in each planned seed and repeat block`() {
+        val cases = KlauseLabSuite.plan(
+            BenchRequest(
+                parameters = mapOf(
+            "suite" to "dimacs-core",
+            "name" to "php4",
+            "compiler-seed" to "1",
+            "solver-seeds" to "1,3",
+            "repeats" to "2",
+        )
+            )
+        )
+
+        assertEquals(4, cases.size)
+        assertEquals(setOf("1"), cases.map { it.parameters["compiler-seed"] }.toSet())
+        assertEquals(setOf("1", "3"), cases.map { it.parameters["seed"] }.toSet())
+        assertEquals(4, cases.map { it.attributes["comparisonKey"] }.toSet().size)
+    }
+
+    @Test
+    fun `comparison controls distinguish resource and deadline policies`() {
+        fun controls(parameters: Map<String, String>): Map<String, String> {
+            val settings = LabSettings(parameters)
+            return KlauseLabSuite.comparisonControls(
+                BenchCase("case", settings.caseParameters("cp", 3), settings.resources()),
+            )
+        }
+        val baseline = controls(emptyMap())
+
+        assertEquals("matched-source-v1", baseline["policy"])
+        assertEquals("3", baseline["solverSeed"])
+        assertEquals("1", baseline["compilerSeed"])
+        assertEquals("cli-inclusive-v1", baseline["deadlinePolicy"])
+        assertEquals("2", controls(mapOf("cpus" to "2"))["cpus"])
+        assertEquals("5000", controls(mapOf("timeout-ms" to "5000"))["solverBudgetMs"])
+        assertEquals("true", controls(mapOf("exact" to "true"))["exact"])
     }
 
     @ParameterizedTest
@@ -60,7 +195,23 @@ class LabAdapterTest {
         val resources = settings.resources()
         assertEquals(202L, resources.timeoutSeconds)
         assertEquals(2, resources.cpus)
-        assertEquals(setOf("platform:linux", "arch:x86_64"), resources.requiredTags)
+        assertEquals(LabSettings.runtimeTags(), resources.requiredTags)
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "Mac OS X,aarch64,mac,arm64",
+        "Mac OS X,arm64,mac,arm64",
+        "Mac OS X,x86_64,mac,x86_64",
+        "Linux,amd64,linux,x86_64",
+    )
+    fun `prepared solver cases retain their build platform`(
+        os: String,
+        arch: String,
+        platform: String,
+        architecture: String,
+    ) {
+        assertEquals(setOf("platform:$platform", "arch:$architecture"), LabSettings.runtimeTags(os, arch))
     }
 
     @Test
