@@ -39,6 +39,9 @@ Committed entries take precedence over cached mirror indexes; stored-form entrie
 A collection without a committed index falls back to the mirror's index.
 Concurrent planners atomically publish complete listing skeletons and reuse the winning view.
 
+`satcomp-xor-v1` selects 17 hash-pinned graph-parity CNFs from the SAT Competition,
+including original and camouflaged encodings.
+
 `scripts/capture-corpus-index.sh` accepts `select` filters in a lab profile job. It writes complete
 input indexes, selected source hashes and provenance under `$OUT` without running a solver.
 The installed index generator reads the selection JSONL and verifies each copied source; no JSON shell tool is required.
