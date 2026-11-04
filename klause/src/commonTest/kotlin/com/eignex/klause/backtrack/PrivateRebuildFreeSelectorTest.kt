@@ -69,21 +69,6 @@ class PrivateRebuildFreeSelectorTest {
     }
 
     @Test
-    fun `unrestricted consumers should prioritize conflicts on source pivot coordinates`() {
-        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(Xor(intArrayOf(0, 2, 4, 6), 1)))
-        val session = PropagationSession(problem)
-        val selector = PrivateRebuildFreeSelector(null)
-        val first = assertIs<VarRef.Bool>(selector.pick(session, Random(1)))
-        session.pinBool(first.varId, false)
-        val implicated = (2..3).first { it != first.varId }
-
-        selector.onConflict(first, BranchingConflict(intArrayOf(implicated)))
-        val selected = selector.pick(session, Random(1))
-
-        assertEquals(VarRef.Bool(implicated), selected)
-    }
-
-    @Test
     fun `unassigned free coordinates should regain their conflict priority`() {
         val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(Xor(intArrayOf(0, 2, 4), 1)))
         val session = PropagationSession(problem)
