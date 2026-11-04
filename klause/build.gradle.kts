@@ -52,8 +52,8 @@ kotlin {
             api("com.eignex:skema:$skemaPin") {
                 version { strictly(skemaPin) }
             }
-            implementation("com.eignex:koblas:0.1.1-20261023.051622-264") {
-                version { strictly("0.1.1-20261023.051622-264") }
+            implementation("com.eignex:koblas:0.1.1-20261104.100730-307") {
+                version { strictly("0.1.1-20261104.100730-307") }
             }
             implementation("com.eignex:kumulant:0.3.4-20261101.114432-127")
             implementation("com.eignex:kpermute:1.3.0")

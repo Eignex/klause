@@ -14,11 +14,11 @@ val koblasJvmArgs = buildList {
 }
 
 val koblasPins = mapOf(
-    "koblas" to "0.1.1-20261023.051622-264",
-    "koblas-jvm" to "0.1.1-20261023.051622-267",
-    "koblas-linuxx64" to "0.1.1-20261023.051622-263",
-    "koblas-linuxarm64" to "0.1.1-20261023.051622-264",
-    "koblas-macosarm64" to "0.1.1-20261023.051354-287",
+    "koblas" to "0.1.1-20261104.100730-307",
+    "koblas-jvm" to "0.1.1-20261104.100730-310",
+    "koblas-linuxx64" to "0.1.1-20261104.100730-305",
+    "koblas-linuxarm64" to "0.1.1-20261104.100730-307",
+    "koblas-macosarm64" to "0.1.1-20261104.100730-329",
 )
 
 val skemaPins = listOf("skema", "skema-jvm", "skema-linuxx64", "skema-linuxarm64", "skema-macosarm64")
