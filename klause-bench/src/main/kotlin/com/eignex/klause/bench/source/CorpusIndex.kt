@@ -52,7 +52,7 @@ internal data class CorpusIndex(val collection: String, val files: List<Entry>, 
 
         private val ID = Regex("[A-Za-z0-9][A-Za-z0-9._-]*")
         private val SHA256 = Regex("[a-f0-9]{64}")
-        private val json = Json { ignoreUnknownKeys = true }
+        private val json by lazy { Json { ignoreUnknownKeys = true } }
 
         fun encode(index: CorpusIndex): String = json.encodeToString(serializer(), index)
 

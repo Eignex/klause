@@ -42,9 +42,18 @@ internal object LabInputs {
             is ProblemSource.ExternalIndexed -> source.collection
             else -> return null
         }
-        val view = CorpusFetcher.indexed(collection) ?: return null
-        val file = CorpusFetcher.resolve(source) { view.root }
-        val entry = view.entry(file) ?: return null
+        val index = CorpusFetcher.knownIndex(collection)
+        val entry = if (source is ProblemSource.External && index != null) {
+            val alternate = if (source.relPath.endsWith(CorpusFiles.SUFFIX)) {
+                CorpusFiles.plainPath(source.relPath)
+            } else {
+                source.relPath + CorpusFiles.SUFFIX
+            }
+            index.entry(source.relPath) ?: index.entry(alternate)
+        } else {
+            val view = CorpusFetcher.indexed(collection) ?: return null
+            view.entry(CorpusFetcher.resolve(source) { view.root })
+        } ?: return null
         val path = "${collection.id}/${entry.path}"
         // The materialized path stages such names under the source tree; keep that behaviour for them.
         if (path.any { it == ':' || it == '\\' || it.isISOControl() }) return null

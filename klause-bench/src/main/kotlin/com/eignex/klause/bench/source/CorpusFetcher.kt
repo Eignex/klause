@@ -78,6 +78,9 @@ internal object CorpusFetcher {
     fun knownIndex(collection: ExternalCollection): CorpusIndex? =
         CommittedCorpusIndexes.load(collection.id) ?: indexes.local(collection.id)
 
+    fun declaredPaths(collection: ExternalCollection): List<String>? =
+        if (declaredInputs) knownIndex(collection)?.files?.map { it.path } else null
+
     /**
      * [collection] by its complete pack index when [declaredInputs] is on and some indexed members are absent locally.
      * A complete local tree needs no listing skeleton. A missing index is fetched from the mirror; the pack itself

@@ -54,7 +54,11 @@ class IndexedPlanningTest {
         val tree = File(materialized, collection.id)
         val plain = File(tree, "set/model.cnf").apply { parentFile.mkdirs(); writeText("original source") }
         val packed = CorpusFiles.compress(plain)
-        CorpusIndexes(materialized).save(CorpusIndex.of(collection.id, tree))
+        File(materialized, ".index/${collection.id}.json").apply { parentFile.mkdirs() }.writeText(
+            """{"collection":"${collection.id}","files":[
+                {"path":"set/model.cnf.zst","sha256":"${"0".repeat(64)}","bytes":0}
+            ]}""",
+        )
         val workspace = File(cache, "workspace")
         CommittedCorpusIndexes.write(CommittedCorpusIndexes.fromSources(collection.id, tree), workspace)
         val saved = System.getProperty("klause.workspace.root")
