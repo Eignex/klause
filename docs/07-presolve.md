@@ -248,8 +248,19 @@ An unsupported or partial observation cannot establish absence of opportunities.
 Qualification of a replacement worker requires the following authority and ownership
 contract. The diagnostic itself creates no replacement or publication authority.
 
-The default private work setting is zero. An explicit `privateRebuildWork=-1`
-selects automatic parity admission with a cumulative 1,048,576-work cap and the
+Direct backtrack parameters default to zero private work. Ordinary single-core mixed
+clausal satisfaction enables one automatic private trial within the source-size bounds
+below. Explicit work settings, worker counts, recipes, heuristic edits and source
+annotations retain their selected policy; enumeration, optimization and an explicit
+Boolean proof-task request do not activate it.
+The automatic source default owns a 4,194,304-byte modeled private grant, separate from
+canonical learned-memory scratch. An explicit `private-rebuild-bytes` sets that private
+grant; otherwise an explicit learned-memory scratch setting also bounds the private
+trial. Direct parameters use `privateRebuildBytes`, falling back to
+`learnedMemoryScratchBytes` when null.
+
+An explicit `privateRebuildWork=-1`
+selects automatic parity admission with a cumulative 4,194,304-work grant and the
 configured scratch grant. It considers only Boolean satisfaction sources with
 128–2,000 columns and 512–32,768 factors. Its first unconditional root performs one
 funded source scan; admission requires a completed basis of rank at least 128 and
@@ -295,7 +306,11 @@ their complete two- and four-clause Boolean encodings. Each clause excludes one 
 the complete parity class of exclusions entails the opposite parity equation.
 A preparation-only GF(2) matrix substitutes the canonical global pins and uses
 forward elimination from higher source slots followed by affine back substitution
-over its free coordinates. This ordering favors earlier slots as free coordinates.
+over its free coordinates. Private column-to-row bitsets select pivots and restrict
+elimination to rows containing the pivot. Row swaps and XOR updates maintain that
+index; its primitive words, reference slots, initialization and visits spend the
+same modeled-byte and work grants. The index is discarded with discovery.
+This ordering favors earlier slots as free coordinates.
 A pivot is globally forced only when its complete free-coordinate dependency
 cancels. Additional Boolean pins are emitted only after complete elimination.
 Incomplete clause groups, duplicate exclusions and partial matrix work grant no
@@ -313,12 +328,14 @@ without an additional BVE pivot; its pins are counted separately from eliminated
 columns. Closing or declining releases the captured snapshot with its generation.
 
 When every source clause is covered by complete parity encodings, tautologies or
-canonical global unit facts, the rebuilt model can replace the encoded equations
+clauses satisfied by captured global root facts, the rebuilt model can replace the encoded equations
 with their free-coordinate view. Source column slots remain stable; a private
 pivot slot is fixed to a placeholder and has no canonical literal authority.
 Reconstruction evaluates the owned affine basis from the private free-coordinate
 values, preserving every source solution rather than choosing a source constant.
-The complete coverage proof is required before dropping any encoded clause.
+The coverage scan charges every additional literal check. Reconstruction retains
+the captured global values that justify satisfied clauses. The complete coverage
+proof is required before dropping any encoded clause.
 Uncovered clauses prevent the placeholder view. Canonical learned clauses are
 withheld from the affine view because their pivot literals lack a supported
 projection. The containing grants cover the basis and reconstruction; every
@@ -339,12 +356,34 @@ clause's excluded assignment, so extra exclusions in an otherwise complete group
 remain constraints. Each replacement row has at most 64 distinct coordinates;
 unsupported widths decline the row view. Row arrays, coefficient projections and
 fresh worker indexes share the containing work and modeled-memory grants.
+A funded mixed consumer owns a residual affine expression for every source coordinate.
+Each independent assigned source fact eliminates one free coordinate from all expressions
+that contain it. The state owns flat coefficient and reason buffers with cached nonzero-word
+counts. Zero residuals imply source values; contradictory assigned values supply conflicts.
+Independent assigned facts supply clause reasons with at most 64 literals; wider pin reasons
+withhold the deduction. Undo or an interrupted update invalidates the cache, which rebuilds
+from the immutable seed and current assignments. Expression updates and checks spend the
+containing propagation-work grant.
+The immutable seed owns its snapshot, while each session owns its matrix and
+primitive observations. Buffer initialization and every scan, reduction and reason
+visit debit propagation work. A fresh session exposes its live propagation counter
+before its root fixpoint, so work during consumer opening shares the same private
+and containing stop conditions. Stopped opening work remains charged once. Modeled seed, matrix, observation and watch storage
+share the private byte grant after selector reservation; an unfunded joint view
+retains the per-row system. Retirement copies primitive observations before releasing
+the private state.
 The mixed view preserves original coordinate meanings, including its live pivots,
 and can retain supported canonical warm clauses through the fixed-value projection.
 Its reduced rows and covered clauses are counted separately from eliminated columns.
 For source spans fitting two scans inside the normalized per-decision charge, the
-private consumer branches on free coordinates in source order before its pivots.
-Pivots retain their original meanings and propagation still decides their values.
+private consumer prefers free coordinates with its own VSIDS conflict activity.
+A filtered branching view preserves source IDs and passes conflict and unassign
+notifications to that private heuristic. When no free coordinate needs a decision,
+source-order fallback retains every remaining pivot decision. Pivots retain their
+original meanings and propagation still decides their values. The membership mask
+and activity heap spend the modeled byte grant; their initialization spends opening
+work before allocation. A grant that funds the generation without that extra storage
+retains source-ordered free-coordinate selection. Fresh consumers own fresh activity.
 Larger spans retain the configured selector.
 
 A learned binary can close a reciprocal source binary, or two owned binaries can

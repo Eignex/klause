@@ -82,13 +82,17 @@ internal class PrivateRebuildParity private constructor(
             if (!table.collect(source, session)) return null
             val rowCount = table.countRows() ?: return null
             if (rowCount == 0) { onDecline("NoRows"); return null }
-            val covered = table.coverage() ?: return null
+            val covered = table.coverage(source, session) ?: return null
             val sourceRows = if (table.coveredClauses == source.numFactors) 0 else rowCount
             val words = (source.numBoolVars + 63) ushr 6
-            val bytes = tableBytes + rowCount * (words * 16L + 128L) + source.numBoolVars * 16L +
+            val rowWords = (rowCount + 63) ushr 6
+            val indexBytes = source.numBoolVars * (rowWords * 8L + 8L)
+            val bytes = tableBytes + rowCount * (words * 16L + 128L) + source.numBoolVars * 16L + indexBytes +
                 sourceRows * 25L + if (sourceRows == 0) 0L else 64L
             if (table.entries * 512L + bytes > byteLimit) { onDecline("Memory"); return null }
-            if (!funded(source.numBoolVars * 3L + rowCount * (words + 3L) + sourceRows * 3L)) return null
+            val initializationWork = source.numBoolVars * (rowWords + 4L) +
+                rowCount * (words + 3L) + sourceRows * 3L
+            if (!funded(initializationWork)) return null
             onWorkspace(bytes)
             val fixed = Array(source.numBoolVars) { session.boolValue(it) }
             val matrix = Matrix(rowCount, source.numBoolVars, words, fixed, sourceRows != 0, funded)
@@ -212,14 +216,27 @@ internal class PrivateRebuildParity private constructor(
                 return count
             }
 
-            fun coverage(): BooleanArray? {
+            fun coverage(source: BakedProblem, session: PropagationSession): BooleanArray? {
                 if (!visit(tags.size * 4L + 8L)) return null
                 val result = BooleanArray(tags.size)
                 var count = 0
                 for (index in tags.indices) {
                     val tag = tags[index]
-                    val covered = tag == -2 || (tag >= 0 &&
+                    var covered = tag == -2 || (tag >= 0 &&
                         (coveredMasks[tag ushr 3] and (1 shl (tag and 7))) != 0)
+                    if (!covered) {
+                        val literals = (source.factors[index] as Clause).literals
+                        if (!visit(literals.size * 2L + 1L)) return null
+                        for (literal in literals) {
+                            val column = Lit.variable(literal)
+                            if (column >= source.numBoolVars) { onDecline("Scope"); return null }
+                            val value = session.boolValue(column)
+                            if (value != null && Lit.evaluate(literal, value)) {
+                                covered = true
+                                break
+                            }
+                        }
+                    }
                     result[index] = covered
                     if (covered) count++
                 }
@@ -254,6 +271,8 @@ internal class PrivateRebuildParity private constructor(
             private val visit: (Long) -> Boolean,
         ) {
             private val masks = Array(rows) { LongArray(words) }
+            private val rowWords = (rows + 63) ushr 6
+            private val columnRows = Array(columns) { LongArray(rowWords) }
             private val rhs = IntArray(rows)
             private val pivotColumns = IntArray(rows)
             private var added = 0
@@ -273,10 +292,11 @@ internal class PrivateRebuildParity private constructor(
             }
 
             private fun column(row: Int, column: Int): Boolean {
-                if (!visit(3L)) return false
+                if (!visit(5L)) return false
                 val value = fixed[column]
                 if (value == null) {
                     masks[row][column ushr 6] = masks[row][column ushr 6] or (1L shl (column and 63))
+                    columnRows[column][row ushr 6] = columnRows[column][row ushr 6] or (1L shl (row and 63))
                 } else if (value) rhs[row] = rhs[row] xor 1
                 return true
             }
@@ -285,20 +305,9 @@ internal class PrivateRebuildParity private constructor(
                 var pivot = 0
                 for (column in columns - 1 downTo 0) {
                     if (!visit(1L)) return null
-                    var selected = pivot
-                    while (selected < masks.size) {
-                        if (!visit(2L)) return null
-                        if (has(selected, column)) break
-                        selected++
-                    }
+                    val selected = select(column, pivot) ?: return null
                     if (selected == masks.size) continue
-                    if (!visit(6L)) return null
-                    val row = masks[pivot]
-                    masks[pivot] = masks[selected]
-                    masks[selected] = row
-                    val parity = rhs[pivot]
-                    rhs[pivot] = rhs[selected]
-                    rhs[selected] = parity
+                    if (!swapRows(pivot, selected)) return null
                     if (!visit(1L)) return null
                     pivotColumns[pivot] = column
                     if (!eliminate(pivot, column)) return null
@@ -308,16 +317,79 @@ internal class PrivateRebuildParity private constructor(
                 return pins(pivot, onDecline)
             }
 
-            private fun eliminate(pivot: Int, column: Int): Boolean {
-                for (row in pivot + 1 until masks.size) {
+            private fun select(column: Int, first: Int): Int? {
+                val candidates = columnRows[column]
+                val firstWord = first ushr 6
+                for (word in firstWord until rowWords) {
+                    if (!visit(2L)) return null
+                    val bits = if (word == firstWord) candidates[word] and (-1L shl (first and 63))
+                    else candidates[word]
+                    if (bits != 0L) return word * 64 + bits.countTrailingZeroBits()
+                }
+                return masks.size
+            }
+
+            private fun swapRows(first: Int, second: Int): Boolean {
+                if (first == second) return true
+                for (word in 0 until words) {
                     if (!visit(2L)) return false
-                    if (!has(row, column)) continue
-                    for (word in 0..(column ushr 6)) {
-                        if (!visit(3L)) return false
-                        masks[row][word] = masks[row][word] xor masks[pivot][word]
+                    var changed = masks[first][word] xor masks[second][word]
+                    while (changed != 0L) {
+                        if (!visit(6L)) return false
+                        val column = word * 64 + changed.countTrailingZeroBits()
+                        changed = changed and (changed - 1L)
+                        val rows = columnRows[column]
+                        rows[first ushr 6] = rows[first ushr 6] xor (1L shl (first and 63))
+                        rows[second ushr 6] = rows[second ushr 6] xor (1L shl (second and 63))
                     }
-                    if (!visit(1L)) return false
-                    rhs[row] = rhs[row] xor rhs[pivot]
+                }
+                if (!visit(6L)) return false
+                val row = masks[first]
+                masks[first] = masks[second]
+                masks[second] = row
+                val parity = rhs[first]
+                rhs[first] = rhs[second]
+                rhs[second] = parity
+                return true
+            }
+
+            private fun eliminate(pivot: Int, column: Int): Boolean {
+                val first = pivot + 1
+                val firstWord = first ushr 6
+                for (word in firstWord until rowWords) {
+                    if (!visit(2L)) return false
+                    var bits = columnRows[column][word]
+                    if (word == firstWord) bits = bits and (-1L shl (first and 63))
+                    while (bits != 0L) {
+                        if (!visit(2L)) return false
+                        val row = word * 64 + bits.countTrailingZeroBits()
+                        bits = bits and (bits - 1L)
+                        if (!subtract(row, pivot, column)) return false
+                    }
+                }
+                return true
+            }
+
+            private fun subtract(row: Int, pivot: Int, column: Int): Boolean {
+                for (word in 0..(column ushr 6)) {
+                    if (!visit(3L)) return false
+                    val changed = masks[pivot][word]
+                    masks[row][word] = masks[row][word] xor changed
+                    if (!toggleColumns(row, word, changed)) return false
+                }
+                if (!visit(1L)) return false
+                rhs[row] = rhs[row] xor rhs[pivot]
+                return true
+            }
+
+            private fun toggleColumns(row: Int, word: Int, changed: Long): Boolean {
+                var bits = changed
+                while (bits != 0L) {
+                    if (!visit(4L)) return false
+                    val column = word * 64 + bits.countTrailingZeroBits()
+                    bits = bits and (bits - 1L)
+                    val rows = columnRows[column]
+                    rows[row ushr 6] = rows[row ushr 6] xor (1L shl (row and 63))
                 }
                 return true
             }
@@ -397,9 +469,6 @@ internal class PrivateRebuildParity private constructor(
                 }
                 return true
             }
-
-            private fun has(row: Int, column: Int): Boolean =
-                masks[row][column ushr 6] and (1L shl (column and 63)) != 0L
         }
     }
 }
