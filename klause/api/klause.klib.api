@@ -1663,6 +1663,7 @@ abstract interface com.eignex.klause.propagation/ClauseExchange { // com.eignex.
     abstract fun onRestart(com.eignex.klause.propagation/PropagationSession) // com.eignex.klause.propagation/ClauseExchange.onRestart|onRestart(com.eignex.klause.propagation.PropagationSession){}[0]
     open fun onSearchClose(com.eignex.klause.propagation/PropagationSession) // com.eignex.klause.propagation/ClauseExchange.onSearchClose|onSearchClose(com.eignex.klause.propagation.PropagationSession){}[0]
     open fun onSearchEnd(com.eignex.klause.propagation/PropagationSession) // com.eignex.klause.propagation/ClauseExchange.onSearchEnd|onSearchEnd(com.eignex.klause.propagation.PropagationSession){}[0]
+    open fun onSearchPause(com.eignex.klause.propagation/PropagationSession) // com.eignex.klause.propagation/ClauseExchange.onSearchPause|onSearchPause(com.eignex.klause.propagation.PropagationSession){}[0]
     open fun onSearchStart(com.eignex.klause.propagation/PropagationSession) // com.eignex.klause.propagation/ClauseExchange.onSearchStart|onSearchStart(com.eignex.klause.propagation.PropagationSession){}[0]
     open fun publishGlobal(com.eignex.klause.propagation/SharedClause) // com.eignex.klause.propagation/ClauseExchange.publishGlobal|publishGlobal(com.eignex.klause.propagation.SharedClause){}[0]
 }

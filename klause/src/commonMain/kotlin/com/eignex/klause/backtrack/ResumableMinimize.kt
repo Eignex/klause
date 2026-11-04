@@ -150,6 +150,7 @@ internal class ResumableMinimize(
     private var initialCandidate = initialCandidate
     private var initialPoolVersion = 0L
     private var replaced = false
+    private var clauseExchangeEnded = false
 
     // Unproved leaf coverage cannot become infeasibility or optimality, including under shared cutoffs.
     private var sawIndeterminateLeaf = false
@@ -577,6 +578,7 @@ internal class ResumableMinimize(
         publishClausePrimalCandidate()?.let { onIncumbent(it.withSourceSemantics(problem.semantics)) }
         if (!rootIsExhausted && !slice.begin(sliceMillis, sliceNodes)) return null
         rootRoundingAttempted = false
+        clauseExchangeEnded = false
         // A counted budget only means something if the search polls on a counted cadence: the run stops
         // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
         // different node on a faster machine and every counter downstream would follow.
@@ -590,7 +592,7 @@ internal class ResumableMinimize(
                     is StepEvent.Terminal -> return e.result
 
                     StepEvent.Paused -> {
-                        params.clauseExchange?.onSearchEnd(session)
+                        if (!clauseExchangeEnded) params.clauseExchange?.onSearchPause(session)
                         slice.noteOverspend()
                         // Restarts sample root fixings too, but an arm that restarts rarely would show none of its own.
                         sink.search.observeRootFixed(session.rootFixedVariableCount())
@@ -1629,6 +1631,8 @@ internal class ResumableMinimize(
         }
 
         override fun onCancellation(context: SearchContext): SearchRunDisposition {
+            clauseExchangeEnded = true
+            params.clauseExchange?.onSearchEnd(session)
             return if (pausable) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
         }
     }

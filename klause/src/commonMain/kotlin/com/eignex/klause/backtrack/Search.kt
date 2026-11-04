@@ -455,6 +455,7 @@ internal class CpSatisfactionTraversal(
             finishQuery()
             return outcome
         }
+        traversal.clauseExchangeEnded = false
         return when (val event = checkNotNull(run).next()) {
             is SearchRunEvent.Satisfied -> {
                 val sample = completion.sample(event.model, cp)
@@ -478,7 +479,7 @@ internal class CpSatisfactionTraversal(
             }
 
             SearchRunEvent.Paused -> if (slice != null) {
-                params.clauseExchange?.onSearchEnd(cp.session)
+                if (!traversal.clauseExchangeEnded) params.clauseExchange?.onSearchPause(cp.session)
                 null
             } else {
                 finishQuery()
@@ -562,6 +563,7 @@ private class CpSatisfactionTraversalPolicy(
     SearchRunLifecycle {
     private val restart = RestartSchedule.from(params)
     var retainedRoot = false
+    var clauseExchangeEnded = false
 
     private val session: PropagationSession get() = cp.session
     val brancher = BacktrackBrancher(
@@ -670,6 +672,8 @@ private class CpSatisfactionTraversalPolicy(
     }
 
     override fun onCancellation(context: SearchContext): SearchRunDisposition {
+        clauseExchangeEnded = true
+        params.clauseExchange?.onSearchEnd(session)
         return if (slice?.pauses() == true) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
     }
 }
