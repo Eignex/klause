@@ -266,7 +266,8 @@ class SolverInvocationTest {
         }
 
         assertTrue(result.stats.keys.none {
-            it.contains("ThreadCpu") || it.contains("GcCount") || it.contains("GcTime") || it.startsWith("sourceObservation")
+            it.contains("ThreadCpu") || it.contains("GcCount") ||
+                it.contains("GcTime") || it.startsWith("sourceObservation")
         })
     }
 
