@@ -4,6 +4,7 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.WorkspaceChecksums
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchContext
@@ -50,9 +51,9 @@ internal object LabInputs {
     }
 
     private fun materialized(ref: ProblemRef, inputOnly: Boolean): List<BenchInput> = buildList {
-        val model = CorpusFetcher.resolve(ref.source).toPath()
+        val model = materializedSource(ref.source)
         add(input(model, "model"))
-        ref.data?.let { add(input(CorpusFetcher.resolve(it).toPath(), "data")) }
+        ref.data?.let { add(input(materializedSource(it), "data")) }
         if (ref.format == Format.MINIZINC) {
             val collectionIncludes = CorpusFetcher.includeDirs(ref.source).map { it.toPath() }
             val directories = (listOf(model.parent) + collectionIncludes).distinct()
@@ -80,6 +81,21 @@ internal object LabInputs {
             }
         }
     }.distinct()
+
+    private fun materializedSource(source: ProblemSource): Path {
+        val file = CorpusFetcher.resolve(source)
+        if ((source is ProblemSource.External || source is ProblemSource.ExternalIndexed) &&
+            CorpusFiles.isCompressed(file)
+        ) {
+            // A declared index can name the plain counterpart of a packed cache member.
+            val plain = Path.of(CorpusFiles.plainPath(file.path))
+            if (!Files.isRegularFile(plain)) {
+                CorpusFiles.unpack(file, keepPacked = true)
+                CorpusFetcher.cache().recordSizesUnder(plain.toFile())
+            }
+        }
+        return file.toPath()
+    }
 
     internal fun includeNames(source: String): List<String> = buildList {
         var index = 0
