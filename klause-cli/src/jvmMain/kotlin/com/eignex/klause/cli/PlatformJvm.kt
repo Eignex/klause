@@ -10,6 +10,13 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.GZIPInputStream
 import kotlin.system.exitProcess
 
+private val timeOriginNanos = System.nanoTime()
+
+internal actual fun nowMillis(): Long = elapsedMonotonicMillis(timeOriginNanos, System.nanoTime())
+
+internal fun elapsedMonotonicMillis(originNanos: Long, readingNanos: Long): Long =
+    (readingNanos - originNanos) / 1_000_000L
+
 internal actual fun cliProp(name: String): String? =
     System.getProperty(name) ?: System.getenv(name.uppercase().replace('.', '_'))
 
