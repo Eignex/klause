@@ -13,6 +13,7 @@ import com.eignex.klause.bench.source.CorpusIndexes
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.lab.bench.BenchInput
 import com.eignex.lab.bench.BenchInputRoot
+import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 import java.io.File
 import java.nio.file.Files
 import java.security.MessageDigest
@@ -52,8 +53,9 @@ class IndexedPlanningTest {
     fun `canonical committed inputs preserve identical declared and materialized plans`() = withCache { cache ->
         val materialized = File(cache, "materialized")
         val tree = File(materialized, collection.id)
-        val plain = File(tree, "set/model.cnf").apply { parentFile.mkdirs(); writeText("original source") }
-        val packed = CorpusFiles.compress(plain)
+        val plain = File(tree, "set/model.cnf")
+        val packed = File("${plain.path}.zst").apply { parentFile.mkdirs() }
+        ZstdOutputStreamNoFinalizer(packed.outputStream(), 1).use { it.write("original source".encodeToByteArray()) }
         File(materialized, ".index/${collection.id}.json").apply { parentFile.mkdirs() }.writeText(
             """{"collection":"${collection.id}","files":[
                 {"path":"set/model.cnf.zst","sha256":"${"0".repeat(64)}","bytes":0}
