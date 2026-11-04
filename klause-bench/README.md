@@ -34,6 +34,7 @@ Corpus-pack indexes are committed under `klause-bench/corpus-index/<collection>.
 transfers no corpus bytes. Regenerate them from complete collection trees with
 `CommittedCorpusIndexes CORPUS_CACHE WORKSPACE [COLLECTION...]` on the bench classpath.
 A collection without a committed index falls back to the mirror's index.
+Concurrent planners atomically publish complete listing skeletons and reuse the winning view.
 
 `CommittedCorpusIndexes --mirror COLLECTION...` exports published mirror indexes into
 the lab's `OUT` directory without downloading collection packs or parsing models.

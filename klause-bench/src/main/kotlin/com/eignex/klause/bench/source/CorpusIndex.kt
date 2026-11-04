@@ -5,8 +5,7 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.net.URI
-import java.nio.file.DirectoryNotEmptyException
-import java.nio.file.FileAlreadyExistsException
+import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
 import java.nio.file.StandardCopyOption.REPLACE_EXISTING
@@ -220,10 +219,9 @@ internal class CorpusIndexes(private val root: File) {
                 }
                 try {
                     Files.move(staging.toPath(), tree.toPath(), ATOMIC_MOVE)
-                } catch (_: FileAlreadyExistsException) {
-                    // A concurrent planner built the same view.
-                } catch (_: DirectoryNotEmptyException) {
-                    // A concurrent planner built the same view.
+                } catch (failure: FileSystemException) {
+                    // Atomic directory renames can report a concurrent winner as a generic filesystem error.
+                    if (!tree.isDirectory) throw failure
                 }
             } finally {
                 staging.deleteRecursively()
