@@ -14,19 +14,19 @@ val koblasJvmArgs = buildList {
 }
 
 val koblasPins = mapOf(
-    "koblas" to "0.1.1-20261104.100730-307",
-    "koblas-jvm" to "0.1.1-20261104.100730-310",
-    "koblas-linuxx64" to "0.1.1-20261104.100730-305",
-    "koblas-linuxarm64" to "0.1.1-20261104.100730-307",
-    "koblas-macosarm64" to "0.1.1-20261104.100730-329",
+    "koblas" to "0.1.1-20261104.113808-308",
+    "koblas-jvm" to "0.1.1-20261104.113808-311",
+    "koblas-linuxx64" to "0.1.1-20261104.113808-306",
+    "koblas-linuxarm64" to "0.1.1-20261104.113808-308",
+    "koblas-macosarm64" to "0.1.1-20261104.113808-330",
 )
 
 val skemaPins = listOf("skema", "skema-jvm", "skema-linuxx64", "skema-linuxarm64", "skema-macosarm64")
     .associateWith { "0.4.0" }
 
-val kumulantPins = mapOf("jvm" to 127, "linuxx64" to 127, "linuxarm64" to 127, "macosarm64" to 126)
+val kumulantPins = mapOf("jvm" to 128, "linuxx64" to 128, "linuxarm64" to 128, "macosarm64" to 127)
     .mapKeys { (module, _) -> "kumulant-$module" }
-    .mapValues { (_, build) -> "0.3.4-20261101.114432-$build" }
+    .mapValues { (_, build) -> "0.3.4-20261104.121321-$build" }
 
 if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
     // Lab builds retain complete distributions; each fresh tree discards its incremental indexes.
