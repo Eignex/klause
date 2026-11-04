@@ -62,7 +62,11 @@ internal object LabInputs {
         return BenchInput(path, BenchInputRoot.CORPUS, role, entry.sha256)
     }
 
-    private fun materialized(ref: ProblemRef, inputOnly: Boolean, plainDimacs: Boolean = false): List<BenchInput> = buildList {
+    private fun materialized(
+        ref: ProblemRef,
+        inputOnly: Boolean,
+        plainDimacs: Boolean = false,
+    ): List<BenchInput> = buildList {
         val source = materializedSource(ref.source, ref.format)
         val model = if (plainDimacs) CorpusFiles.unpack(source.toFile(), keepPacked = true).toPath() else source
         add(input(model, "model"))

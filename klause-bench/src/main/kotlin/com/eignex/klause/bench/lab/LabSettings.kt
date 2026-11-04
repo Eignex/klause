@@ -127,7 +127,8 @@ internal data class LabSettings(val parameters: Map<String, String>) {
 
         val SELECTORS = setOf("suite", "set", "name", "category", "tag", "kind", "per-family", "seed", "max", "balance")
         private val OPTIONS = setOf(
-            "input-carrier", "input-only", "selections", "engines", "solver-seeds", "repeats", "cpus", "memory-mib", "timeout-ms", "lp",
+            "input-carrier", "input-only", "selections", "engines", "solver-seeds", "repeats", "cpus", "memory-mib",
+            "timeout-ms", "lp",
             "presolve", "exact", "debug", "measurement", "heap-mib", "gc", "compile-timeout-sec",
             "complete-assignment", "propagation-controls", "compiler-seed", "comparison-series",
             "source-staging", "harness-jfr",
