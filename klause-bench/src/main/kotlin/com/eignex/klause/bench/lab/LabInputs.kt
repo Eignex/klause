@@ -16,7 +16,11 @@ import java.util.HexFormat
 internal object LabInputs {
     const val RUNTIME = "klause-bench/build/lab-runtime/minizinc"
 
-    fun resolve(ref: ProblemRef, inputOnly: Boolean = false, plainDimacs: Boolean = false): List<BenchInput> = buildList {
+    fun resolve(
+        ref: ProblemRef,
+        inputOnly: Boolean = false,
+        plainDimacs: Boolean = false,
+    ): List<BenchInput> = buildList {
         require(!plainDimacs || ref.format == Format.DIMACS) { "Plain input carriers require DIMACS" }
         val source = CorpusFetcher.resolve(ref.source)
         val model = (if (plainDimacs) CorpusFiles.unpack(source, keepPacked = true) else source).toPath()
