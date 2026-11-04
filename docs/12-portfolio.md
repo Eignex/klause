@@ -278,8 +278,9 @@ traffic/work/use counters remain inexpensive. Each sample has separate
 Posting protection checks stop after finding a required owner; the full allocated
 capacity remains counted.
 Cancellation boundaries export glue through `onSearchEnd`. Other cooperative
-pauses use `onSearchPause` to drain use counters and observe retained memory without
-publishing clauses. Both retain the duplicate filter; `onSearchClose` releases it.
+pauses use `onSearchPause` to observe retained memory without publishing clauses or
+draining scheduler credit. Uses remain pending until a restart, cancellation boundary
+or uncancelled close. Both pause hooks retain the duplicate filter; `onSearchClose` releases it.
 Clause accounting is reported per worker in `ArmSchedule.sharing.clauses` and as
 `clause*` fields in the CLI arm record. Pool payload belongs to one shared pool;
 primitive payload arrays are counted once by identity. A private owner of disjoint

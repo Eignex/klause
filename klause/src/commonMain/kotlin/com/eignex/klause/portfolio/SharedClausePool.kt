@@ -554,7 +554,6 @@ internal class PoolClauseExchange(
 
     override fun onSearchPause(session: PropagationSession) = metered {
         retainSession(session)
-        if (!session.cancelRequested) countUses(session)
         observe(session)
     }
 
