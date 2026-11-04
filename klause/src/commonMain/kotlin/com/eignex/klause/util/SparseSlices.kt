@@ -1,9 +1,14 @@
 package com.eignex.klause.util
 
 import com.eignex.koblas.DimensionMismatch
-import com.eignex.koblas.sparse.SparsePrimitives
+import kotlin.math.abs
 
-// Validation and ordered diagnostics belong to the solver; arithmetic leaves use koblas primitives.
+// Every entry point validates windows, indices and buffer aliasing before its first write, then runs an
+// allocation-free loop over the caller's slices. A workspace is a dense accumulator, a mark array and a
+// nonzero epoch: an entry whose mark differs from the epoch is stale and is overwritten rather than added to,
+// and the touched list names what an epoch reached, so clearing costs what was written rather than the
+// dimension. A cleared mark is zero, which is why an epoch never is. Scatter and gather indices must be unique
+// within their slices; checking that without scratch would cost quadratic work or a full-dimension scan.
 internal object SparseSlices {
     const val ARITHMETIC_NONFINITE: Int = 1
 
@@ -29,10 +34,18 @@ internal object SparseSlices {
             accumulator, marks, epoch, touched, touchedOffset, touchedCount,
         )
 
-        return SparsePrimitives.scatterWorkspace(
-            alpha, indices, indexOffset, values, valueOffset, count,
-            accumulator, marks, epoch, touched, touchedOffset, touchedCount,
-        )
+        var total = touchedCount
+        for (k in 0 until count) {
+            val index = indices[indexOffset + k]
+            if (marks[index] != epoch) {
+                accumulator[index] = 0.0
+                marks[index] = epoch
+                touched[touchedOffset + total] = index
+                total++
+            }
+            accumulator[index] += alpha * values[valueOffset + k]
+        }
+        return total
     }
 
     @Suppress("LongParameterList")
@@ -61,11 +74,26 @@ internal object SparseSlices {
             accumulator, marks, epoch, touched, touchedOffset, touchedCount,
         )
 
-        return SparsePrimitives.scatterWorkspaceChecked(
-            alpha, indices, indexOffset, values, valueOffset, count,
-            accumulator, marks, epoch, touched, touchedOffset, touchedCount,
-            arithmeticStatus, statusOffset, ARITHMETIC_NONFINITE, ARITHMETIC_NONZERO_PRODUCT_UNDERFLOW,
-        )
+        // Findings are OR-ed into the status rather than thrown, so one pass reports everything a column showed.
+        var status = arithmeticStatus[statusOffset]
+        var total = touchedCount
+        for (k in 0 until count) {
+            val index = indices[indexOffset + k]
+            if (marks[index] != epoch) {
+                accumulator[index] = 0.0
+                marks[index] = epoch
+                touched[touchedOffset + total] = index
+                total++
+            }
+            val value = values[valueOffset + k]
+            val product = alpha * value
+            val updated = accumulator[index] + product
+            if (!product.isFinite() || !updated.isFinite()) status = status or ARITHMETIC_NONFINITE
+            if (alpha != 0.0 && value != 0.0 && product == 0.0) status = status or ARITHMETIC_NONZERO_PRODUCT_UNDERFLOW
+            accumulator[index] = updated
+        }
+        arithmeticStatus[statusOffset] = status
+        return total
     }
 
     @Suppress("LongParameterList")
@@ -90,7 +118,7 @@ internal object SparseSlices {
             outValues,
             outValueOffset,
         )
-        return SparsePrimitives.gatherWorkspace(
+        return gather(
             touched, touchedOffset, touchedCount, accumulator,
             outIndices, outIndexOffset, outValues, outValueOffset,
             compactExactZeros, marks = null,
@@ -125,7 +153,7 @@ internal object SparseSlices {
         )
         requireDistinct(marks, touched, "marks and touched")
         requireDistinct(marks, outIndices, "marks and output indices")
-        return SparsePrimitives.gatherWorkspace(
+        return gather(
             touched, touchedOffset, touchedCount, accumulator,
             outIndices, outIndexOffset, outValues, outValueOffset,
             compactExactZeros, marks,
@@ -140,7 +168,11 @@ internal object SparseSlices {
         requireDistinct(touched, marks, "touched and marks")
         validateIndices(touched, touchedOffset, touchedCount, values.size, "touched")
 
-        SparsePrimitives.clearWorkspace(touched, touchedOffset, touchedCount, values, marks)
+        for (k in 0 until touchedCount) {
+            val index = touched[touchedOffset + k]
+            values[index] = 0.0
+            marks[index] = 0
+        }
     }
 
     // Ordered multiply then add/subtract preserves intermediate diagnostics; a BLAS dot may fuse or reassociate.
@@ -202,14 +234,16 @@ internal object SparseSlices {
         requireWindow(rowIndices.size, indexOffset, count, "row indices")
         requireWindow(values.size, valueOffset, count, "values")
         validateIndices(rowIndices, indexOffset, count, activeRows.size, "row indices")
-        return SparsePrimitives.activeMaximum(
-            rowIndices,
-            indexOffset,
-            values,
-            valueOffset,
-            count,
-            activeRows,
-        )
+        // A nonfinite entry answers NaN at once, since a magnitude comparison against it would be arbitrary, and
+        // no active entry answers zero, so an empty column is distinguishable from one whose first entry won.
+        var maximum = 0.0
+        for (k in 0 until count) {
+            if (!activeRows[rowIndices[indexOffset + k]]) continue
+            val value = values[valueOffset + k]
+            if (!value.isFinite()) return Double.NaN
+            maximum = maxOf(maximum, abs(value))
+        }
+        return maximum
     }
 
     @Suppress("LongParameterList")
@@ -241,11 +275,57 @@ internal object SparseSlices {
         requireNonoverlap(rowIndices, indexOffset, count, outPositions, outOffset, count, "row indices and candidates")
         validateIndices(rowIndices, indexOffset, count, activeRows.size, "row indices")
 
-        return SparsePrimitives.selectPivotCandidates(
-            rowIndices, indexOffset, values, valueOffset, count, activeRows,
-            absoluteTolerance, relativeThreshold * columnMaximum, outPositions, outOffset,
-        )
+        // Two finite factors can still overflow, and a NaN cutoff would fail every comparison and report a
+        // numerically broken column as merely unpivotable.
+        val relativeCutoff = relativeThreshold * columnMaximum
+        require(relativeCutoff.isFinite()) {
+            "relative cutoff must be finite, got  * "
+        }
+        var written = 0
+        for (k in 0 until count) {
+            if (!activeRows[rowIndices[indexOffset + k]]) continue
+            val value = values[valueOffset + k]
+            if (!value.isFinite() || value == 0.0) continue
+            val magnitude = abs(value)
+            if (magnitude >= absoluteTolerance && magnitude >= relativeCutoff) {
+                outPositions[outOffset + written] = k
+                written++
+            }
+        }
+        return written
     }
+}
+
+// Emission follows the touched order, the order entries were first reached; compaction is the one place an
+// exact structural zero is dropped. Passing marks clears each entry as it is read, leaving the workspace reusable.
+@Suppress("LongParameterList")
+private fun gather(
+    touched: IntArray,
+    touchedOffset: Int,
+    touchedCount: Int,
+    accumulator: DoubleArray,
+    outIndices: IntArray,
+    outIndexOffset: Int,
+    outValues: DoubleArray,
+    outValueOffset: Int,
+    compactExactZeros: Boolean,
+    marks: IntArray?,
+): Int {
+    var written = 0
+    for (k in 0 until touchedCount) {
+        val index = touched[touchedOffset + k]
+        val value = accumulator[index]
+        if (!compactExactZeros || value != 0.0) {
+            outIndices[outIndexOffset + written] = index
+            outValues[outValueOffset + written] = value
+            written++
+        }
+        if (marks != null) {
+            accumulator[index] = 0.0
+            marks[index] = 0
+        }
+    }
+    return written
 }
 
 @Suppress("LongParameterList")

@@ -18,6 +18,7 @@ import com.eignex.klause.util.argsortBy
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
+import com.eignex.koblas.sparse.dotColumn
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
@@ -576,7 +577,7 @@ internal class RevisedSimplex(
 
     // Uncharged pricing reads the current owner so an unscaled fallback cannot retain a retired CSC generation.
     internal fun columnDot(y: DoubleArray, j: Int): Double = if (j < n) {
-        koblas.sparseKernels.dotColumn(columns, j, y)
+        koblas.dotColumn(columns, j, y)
     } else {
         y[j - n]
     }
@@ -839,7 +840,7 @@ internal class RevisedSimplex(
 
     private fun denseColumn(column: Int): DoubleArray = qualityRhs.also { dense ->
         dense.fill(0.0)
-        koblas.sparseKernels.scatter(
+        koblas.scatter(
             rowIdx,
             colPtr[column],
             colVal,
@@ -850,14 +851,14 @@ internal class RevisedSimplex(
     }
 
     private fun sparseAxpy(destination: DoubleArray, alpha: Double, column: Int) {
-        koblas.sparseKernels.axpy(
-            destination,
-            alpha,
+        koblas.axpy(
             rowIdx,
             colPtr[column],
             colVal,
             colPtr[column],
             columnNnz(column),
+            alpha,
+            destination,
         )
     }
 
@@ -2342,7 +2343,7 @@ internal class RevisedSimplex(
         if (changed) {
             val change = boundChange
             ftranDense(rhs, change, rhsVec, boundUpdateFtran = true)
-            koblas.vectorKernels.axpy(out, 0, 1.0, change, 0, m)
+            koblas.axpy(out, 0, 1.0, change, 0, m)
             work.add(m)
         }
         return out.all { it.isFinite() }
