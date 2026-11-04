@@ -307,7 +307,8 @@ internal class PrivateRebuildSatisfaction(
         pendingParity = null
         val prepared = PrivateRebuildGeneration.prepare(session,
             privateByteLimit - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(), token,
-            onDecline = { note("Declined$it") }, learnedBinary = binary, parity = parity) {
+            onDecline = { note("Declined$it") }, learnedBinary = binary, parity = parity,
+            jointAffine = !automatic || (parity?.basis?.freeColumns ?: 0) >= MIN_AUTOMATIC_JOINT_FREE_COLUMNS) {
             (privateWorkLimit - trialSpent()).coerceAtLeast(0L) / 2L
         }
         note("PreparationNanos", start.elapsedNow().inWholeNanoseconds)
@@ -479,6 +480,7 @@ internal class PrivateRebuildSatisfaction(
 
     companion object {
         private const val AUTOMATIC_WORK = 67_108_864L
+        private const val MIN_AUTOMATIC_JOINT_FREE_COLUMNS = 16
         private const val MIN_AUTOMATIC_RANK = 128
         private const val MIN_AUTOMATIC_FACTORS = 512
         private const val MAX_AUTOMATIC_FACTORS = 32_768

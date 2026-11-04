@@ -367,7 +367,9 @@ primitive observations. Buffer initialization and every scan, reduction and reas
 visit debit propagation work. A fresh session exposes its live propagation counter
 before its root fixpoint, so work during consumer opening shares the same private
 and containing stop conditions. Stopped opening work remains charged once. Modeled seed, matrix, observation and watch storage
-share the private byte grant after selector reservation; an unfunded joint view
+share the private byte grant after selector reservation. Automatic consumers with
+fewer than 16 free coordinates retain the per-row system without the joint cache;
+explicit positive trials use the funded joint view. An unfunded joint view also
 retains the per-row system. Retirement copies primitive observations before releasing
 the private state.
 The mixed view preserves original coordinate meanings, including its live pivots,

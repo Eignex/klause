@@ -204,7 +204,9 @@ coordinate meanings; they do not count eliminated columns.
 `ParityTriangularRows` counts forward-eliminated rows selected per pivot in that
 reduced basis; the remaining rows use free-coordinate expansion. Both
 representations and their selection spend the existing private grants.
-`ParityJointFactors` identifies funded joint affine kernels. `ParityJointModeledBytes`
+`ParityJointFactors` identifies funded joint affine kernels. Automatic consumers
+with fewer than 16 free coordinates retain the short-row system without a joint
+kernel; explicit positive trials retain the funding policy. `ParityJointModeledBytes`
 is included in `ModeledPrivateBytes`; `ParityJointInitializationWork` counts completed
 cache initialization inside trial propagation work. `OpeningPropagationWork` is also
 a trial-work subset, including a consumer whose opening stops before publication. Joint `Fires`, `Resets`,
