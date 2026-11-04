@@ -248,16 +248,11 @@ An unsupported or partial observation cannot establish absence of opportunities.
 Qualification of a replacement worker requires the following authority and ownership
 contract. The diagnostic itself creates no replacement or publication authority.
 
-Direct backtrack parameters default to zero private work. Ordinary single-core mixed
-clausal satisfaction enables one automatic private trial within the source-size bounds
-below. Explicit work settings, worker counts, recipes, heuristic edits and source
-annotations retain their selected policy; enumeration, optimization and an explicit
-Boolean proof-task request do not activate it.
-The automatic source default owns a 4,194,304-byte modeled private grant, separate from
-canonical learned-memory scratch. An explicit `private-rebuild-bytes` sets that private
-grant; otherwise an explicit learned-memory scratch setting also bounds the private
-trial. Direct parameters use `privateRebuildBytes`, falling back to
-`learnedMemoryScratchBytes` when null.
+Private rebuilding is opt-in. Direct backtrack parameters and source execution
+default to zero private work. Private-byte settings alone do not activate a trial.
+An explicit `private-rebuild-bytes` sets the modeled private grant independently of
+canonical learned-memory scratch. Direct parameters use `privateRebuildBytes`, falling
+back to `learnedMemoryScratchBytes` when null.
 
 An explicit `privateRebuildWork=-1`
 selects automatic parity admission with a cumulative 4,194,304-work grant and the

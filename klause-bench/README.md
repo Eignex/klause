@@ -103,8 +103,8 @@ diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
-Ordinary single-core mixed clausal satisfaction admits a bounded automatic private
-parity trial. `param.private-rebuild-work=0` disables it. Mixed private views require at least
+Private rebuilding is opt-in; source execution defaults to zero private work.
+`param.private-rebuild-work=0` disables it. Mixed private views require at least
 16 free coordinates for automatic admission; complete affine views use the ordinary
 rank and coverage requirements. `AutomaticDeclinedSmallMixed` reports a funded
 discovery followed by canonical fallback, without preparing or opening a consumer.
@@ -116,8 +116,8 @@ unless a private limit is supplied.
 4,194,304-work grant and the configured scratch grant. It makes one initial-root
 attempt on the structurally admitted Boolean cohort; see the
 [admission contract](../docs/07-presolve.md#private-worker-qualification).
-Use explicit zero as the canonical control; ordinary default admission follows the
-source policy above.
+Use explicit zero as the canonical control. To keep canonical scratch separate from
+a 4 MiB private trial, also set `param.private-rebuild-bytes=4194304`.
 
 `param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
 trial after new global root pins or an owned learned equivalence, with source reduction and a fresh consuming
