@@ -75,17 +75,18 @@ internal object CorpusFetcher {
 
     private val indexes: CorpusIndexes get() = CorpusIndexes(storageRoot)
 
+    fun knownIndex(collection: ExternalCollection): CorpusIndex? =
+        CommittedCorpusIndexes.load(collection.id) ?: indexes.local(collection.id)
+
     /**
      * [collection] by its complete pack index when [declaredInputs] is on and some indexed members are absent locally.
-     * A complete local tree keeps byte authority. A missing local index is fetched from the mirror; the pack itself
+     * A complete local tree needs no listing skeleton. A missing index is fetched from the mirror; the pack itself
      * is never downloaded here. Returns null when declared inputs are off or no index describes the pack.
      */
     fun indexed(collection: ExternalCollection): IndexedCollection? {
         if (!declaredInputs) return null
         // A committed index keeps planning offline; the mirror is only a fallback for collections without one.
-        val index = indexes.local(
-            collection.id,
-        ) ?: CommittedCorpusIndexes.load(collection.id) ?: mirror?.let { remote ->
+        val index = knownIndex(collection) ?: mirror?.let { remote ->
             storageRoot.mkdirs()
             runCatching { remote.index(collection.id, storageRoot) }.onFailure {
                 System.err.println("corpus index of '${collection.id}' unavailable: ${it.javaClass.simpleName}")

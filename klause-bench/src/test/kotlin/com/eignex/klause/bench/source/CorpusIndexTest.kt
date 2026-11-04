@@ -1,10 +1,13 @@
 package com.eignex.klause.bench.source
 
+import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import java.io.File
 import java.nio.file.FileSystemException
 import java.nio.file.Files
+import java.security.MessageDigest
+import java.util.HexFormat
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -13,6 +16,31 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class CorpusIndexTest {
+    @ParameterizedTest
+    @ValueSource(ints = [1, 12])
+    fun `input indexes retain original bytes across compressed encodings`(level: Int) {
+        val root = Files.createTempDirectory("inputindex").toFile()
+        try {
+            val bytes = "original source bytes\n".encodeToByteArray()
+            root.resolve("model.cnf").writeText("stale plain sibling")
+            ZstdOutputStreamNoFinalizer(root.resolve("model.cnf.zst").outputStream(), level)
+                .setChecksum(level == 12)
+                .use { it.write(bytes) }
+
+            val index = CommittedCorpusIndexes.fromSources("fixture", root)
+
+            assertEquals(
+                listOf(CorpusIndex.Entry(
+                    "model.cnf", HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),
+                    bytes.size.toLong(),
+                )),
+                index.files,
+            )
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test
     fun `an index lists what the pack holds and survives its wire form`() {
         val root = Files.createTempDirectory("corpusindex").toFile()

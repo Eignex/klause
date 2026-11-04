@@ -4,11 +4,13 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.WorkspaceChecksums
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchContext
 import com.eignex.lab.bench.BenchInput
 import com.eignex.lab.bench.BenchInputRoot
+import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
@@ -50,9 +52,9 @@ internal object LabInputs {
     }
 
     private fun materialized(ref: ProblemRef, inputOnly: Boolean): List<BenchInput> = buildList {
-        val model = CorpusFetcher.resolve(ref.source).toPath()
+        val model = materializedSource(ref.source, ref.format)
         add(input(model, "model"))
-        ref.data?.let { add(input(CorpusFetcher.resolve(it).toPath(), "data")) }
+        ref.data?.let { add(input(materializedSource(it, ref.format), "data")) }
         if (ref.format == Format.MINIZINC) {
             val collectionIncludes = CorpusFetcher.includeDirs(ref.source).map { it.toPath() }
             val directories = (listOf(model.parent) + collectionIncludes).distinct()
@@ -80,6 +82,30 @@ internal object LabInputs {
             }
         }
     }.distinct()
+
+    private fun materializedSource(source: ProblemSource, format: Format): Path {
+        val file = CorpusFetcher.resolve(source)
+        if (format == Format.MINIZINC) return file.toPath()
+        val collection = when (source) {
+            is ProblemSource.External -> source.collection
+            is ProblemSource.ExternalIndexed -> source.collection
+            else -> return file.toPath()
+        }
+        val index = CorpusFetcher.knownIndex(collection) ?: return file.toPath()
+        val relative = file.relativeTo(File(CorpusFetcher.cacheRoot, collection.id)).invariantSeparatorsPath
+        val entry = index.entry(relative) ?: index.entry(CorpusFiles.plainPath(relative)) ?: return file.toPath()
+        if (entry.path.endsWith(CorpusFiles.SUFFIX)) return file.toPath()
+        val materialized = if (entry.path == relative) file else {
+            val plainPresent = File(CorpusFiles.plainPath(file.path)).isFile
+            CorpusFiles.unpack(file, keepPacked = true).also {
+                if (!plainPresent) CorpusFetcher.cache().recordSizesUnder(it)
+            }
+        }
+        require(materialized.length() == entry.bytes && hash(materialized.toPath()) == entry.sha256) {
+            "Input checksum mismatch: ${collection.id}/${entry.path}"
+        }
+        return materialized.toPath()
+    }
 
     internal fun includeNames(source: String): List<String> = buildList {
         var index = 0
