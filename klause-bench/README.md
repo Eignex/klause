@@ -26,8 +26,14 @@ Execution verifies the planned file and directory identities before each solve.
 Declared-input planning uses the complete corpus-pack index even when only a subset
 of its members is materialized locally. Each solve verifies its planned input bytes.
 
-The standard JVM lab manifests request source snapshots with the selected revision's files and original Git commit identity.
-Their builds and tools use the current revision without requiring ancestors or tags.
+The standard and Linux JVM lab manifests request source snapshots: the lab stages the selected revision as a compact
+Git pack with its original commit identity. Builds and tools use the current revision without requiring ancestors or tags.
+
+Corpus-pack indexes are committed under `klause-bench/corpus-index/<collection>.tsv.gz`
+(`path<TAB>sha256<TAB>bytes`), so declared-input planning makes no network requests and
+transfers no corpus bytes. Regenerate them from complete collection trees with
+`CommittedCorpusIndexes CORPUS_CACHE WORKSPACE [COLLECTION...]` on the bench classpath.
+A collection without a committed index falls back to the mirror's index.
 
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
@@ -543,6 +549,10 @@ the default is `cache`. Decoding, staging and cleanup spend the same source allo
 for either choice. The comparison record retains the policy, actual staging root
 and CLI arguments. Identity preparation, checking and reporting remain in case/job
 costs outside the source invocation; comparing invocation times alone omits them.
+WCNF subprocess operation metadata selects minimization without building a second
+weighted model in the harness. In-process consumers build the model and its exact
+penalty objective together on first access. The CLI parses and validates its original
+source; original-source hashing and the containing source allowance still apply.
 `lab/frozen.json` executes the ordinary adapter over `cases`, a JSON array of retained
 single-model `BenchCase` templates for DIMACS, WCNF or MPS. Each template retains its
 packed corpus path/hash and declares `sourcePlainSha256` in its attributes. Planning
@@ -578,6 +588,22 @@ the JVM child adapter through comparison-record assembly, excluding JVM startup,
 parent verification, final record encoding/write and lab staging/publication.
 The existing source and subprocess timing boundaries remain separate. Harness
 instrumentation changes its retained byte fingerprint.
+
+Ordinary installed-CLI cases with `debug=true` also sample the harness calling
+thread's CPU time and the harness JVM's GC counters around the source invocation.
+`sourceHarnessThreadCpuMs` excludes child solver CPU; `sourceHarnessGcCount` and
+`sourceHarnessGcTimeMs` cover the parent JVM, including its other threads. These
+also have `sourcePreparation*` and `sourceCleanup*` counterparts. Preparation ends
+before invoking the solver, and cleanup starts when retiring the staged directory,
+including failed preparation. Plain and CLI-delivered inputs omit cleanup counters.
+Counter windows start after probe setup and end during phase/final sampling. The
+sequential counter reads do not assign pauses to an individual IO call or establish
+device waiting. Collector times can overlap and are not pause durations.
+Unsupported, failed or regressing counters are omitted. Observation
+setup and preparation sampling spend source preparation time; cleanup sampling
+spends cleanup time, and final sampling spends whole-source time.
+`sourceObservationSetupMs` and `sourceObservationFinishMs` are included subsets,
+not costs to add again. `debug=false` skips these observations.
 
 `harness-jfr=true` records the ordinary JVM CLI adapter's separate 512 MiB harness
 JVM into `report/harness.jfr`; the default is false. CLI `measurement` remains a

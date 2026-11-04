@@ -64,6 +64,7 @@ internal object CorpusFiles {
         stagingDirectory: File = stagingRoot,
         bufferBytes: Int = DEFAULT_BUFFER_SIZE,
         nanoTime: () -> Long = System::nanoTime,
+        onCleanupStart: (() -> Unit)? = null,
         block: (File) -> T,
     ): T {
         require(bufferBytes in 1..MAX_STAGING_BUFFER_BYTES)
@@ -76,7 +77,7 @@ internal object CorpusFiles {
         stagingDirectory.mkdirs()
         checkStaging()
         val directory = StagedDirectory(Files.createTempDirectory(stagingDirectory.toPath(), "plain-").toFile(),
-            nanoTime, onCleanup)
+            nanoTime, onCleanup, onCleanupStart)
         directory.use {
             checkStaging()
             val plain = File(it.file, plainPath(file.name))
@@ -101,10 +102,12 @@ internal object CorpusFiles {
         val file: File,
         val nanoTime: () -> Long,
         val onCleanup: (Long) -> Unit,
+        val onCleanupStart: (() -> Unit)?,
     ) : AutoCloseable {
         override fun close() {
             val cleanupStart = nanoTime()
             try {
+                runCatching { onCleanupStart?.invoke() }
                 SourcePreparationCapture.measure("source-cleanup") {
                     check(file.deleteRecursively()) { "Cannot remove staged source: $file" }
                 }

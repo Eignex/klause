@@ -18,6 +18,31 @@ import kotlin.test.assertTrue
 
 class LpScopedSolverTest {
     @Test
+    fun `unavailable child probes report the guard without constructing a numerical owner`() {
+        for (valueMode in listOf(false, true)) {
+            for (cancelled in listOf(false, true)) {
+                val factory = RecordingLpEngineFactory()
+                LpScopedSolver(LpExactState(lowerBoundModel()), context = LpSolveContext(factory)).use { owner ->
+                    val point = assertNotNull(owner.state.ownerWorkingModel())
+                    var metrics: LpProbeMetrics? = null
+
+                    val source = LpProbeSource(point, Basis(IntArray(0), emptyArray()))
+                    val gains = if (valueMode) {
+                        owner.directionalValues(source, intArrayOf(0), longArrayOf(0), 1000L,
+                            Cancellation { cancelled }) { metrics = it }
+                    } else owner.directionalGains(point, intArrayOf(0), longArrayOf(0), 1000L,
+                        Cancellation { cancelled }) { metrics = it }
+
+                    assertNull(gains)
+                    assertTrue(factory.calls.isEmpty())
+                    val reason = if (cancelled) LpProbeDecline.CANCELLED else LpProbeDecline.OWNER
+                    assertEquals(LpProbeMetrics(0L, 0L, 0, reason), metrics)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `reading paused dual proposals does not construct a numerical owner`() {
         val factory = RecordingLpEngineFactory()
         LpScopedSolver(LpExactState(lowerBoundModel()), context = LpSolveContext(factory)).use { owner ->

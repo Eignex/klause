@@ -67,7 +67,7 @@ internal fun LpEngine.pickRootComponent(session: PropagationSession, cancellatio
     return VarRef.IntVar(variable)
 }
 
-private fun LpEngine.retainRootComponentValues(
+internal fun LpEngine.retainRootComponentValues(
     targets: RootPrimalTargets,
     order: RootComponentOrder,
     group: Int,
