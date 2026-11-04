@@ -40,6 +40,10 @@ Concurrent planners atomically publish complete listing skeletons and reuse the 
 the lab's `OUT` directory without downloading collection packs or parsing models.
 Use these metadata artifacts to refresh committed indexes against the stored packs;
 existing input checksum enforcement still applies.
+`CommittedCorpusIndexes --catalog SATLIB_COLLECTION...` fetches complete catalog
+collections when no mirror is configured and exports their actual stored-byte indexes
+under `OUT`. This maintenance mode reads file identities without parsing models and
+does not publish packs; it runs separately from offline planning.
 
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before

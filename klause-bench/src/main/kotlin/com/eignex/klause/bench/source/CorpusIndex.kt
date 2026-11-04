@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.source
 
+import com.eignex.klause.bench.catalog.ExternalCollections
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
@@ -138,6 +139,10 @@ internal object CommittedCorpusIndexes {
     /** Writes the committed index of every complete collection tree under [cache], or of [ids] alone. */
     @JvmStatic
     fun main(args: Array<String>) {
+        if (args.firstOrNull() == "--catalog") {
+            exportCatalogIndexes(args.drop(1))
+            return
+        }
         if (args.firstOrNull() == "--mirror") {
             require(args.size >= 2) { "usage: CommittedCorpusIndexes --mirror COLLECTION..." }
             val workspace = File(requireNotNull(System.getenv("OUT")) { "OUT is required for mirror metadata" })
@@ -171,6 +176,26 @@ internal object CommittedCorpusIndexes {
             }
             write(CorpusIndex.of(id, tree), workspace)
             System.err.println("indexed $id")
+        }
+    }
+
+    private fun exportCatalogIndexes(ids: List<String>) {
+        require(ids.isNotEmpty()) { "usage: CommittedCorpusIndexes --catalog SATLIB_COLLECTION..." }
+        require(System.getenv("LAB_CORPUS_MIRROR_WRITE") != "true" &&
+            System.getenv("KLAUSE_BENCH_CORPUS_MIRROR_WRITE") != "true") { "catalog export cannot publish packs" }
+        val workspace = File(requireNotNull(System.getenv("OUT")) { "OUT is required for catalog metadata" })
+        require(workspace.mkdirs() || workspace.isDirectory) { "cannot create metadata output directory" }
+        val cache = requireNotNull(System.getenv("LAB_CORPUS")) { "LAB_CORPUS is required for catalog metadata" }
+        System.setProperty("klause.bench.corpusCache", cache)
+        val collections = ExternalCollections.satlib.map { it.first }.associateBy { it.id }
+        for (id in ids) {
+            val collection = requireNotNull(collections[id]) { "unknown SATLIB collection: $id" }
+            val directory = CorpusFetcher.ensure(collection)
+            require(!File(directory, CorpusStore.SELECTIVE).exists()) { "cannot index a partial corpus: $id" }
+            val index = CorpusIndex.of(id, directory)
+            write(index, workspace)
+            File(workspace, "$id.index.json").writeText(CorpusIndex.encode(index))
+            System.err.println("exported catalog index $id")
         }
     }
 }
