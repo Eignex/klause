@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.net.URI
 import java.nio.file.FileSystemException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption.ATOMIC_MOVE
@@ -137,6 +138,25 @@ internal object CommittedCorpusIndexes {
     /** Writes the committed index of every complete collection tree under [cache], or of [ids] alone. */
     @JvmStatic
     fun main(args: Array<String>) {
+        if (args.firstOrNull() == "--mirror") {
+            require(args.size >= 2) { "usage: CommittedCorpusIndexes --mirror COLLECTION..." }
+            val workspace = File(requireNotNull(System.getenv("OUT")) { "OUT is required for mirror metadata" })
+            require(workspace.mkdirs() || workspace.isDirectory) { "cannot create metadata output directory" }
+            val address = System.getenv("LAB_CORPUS_MIRROR") ?: System.getenv("KLAUSE_BENCH_CORPUS_MIRROR")
+            val remote = CorpusMirror(URI(requireNotNull(address) { "corpus mirror is not configured" }))
+            val scratch = Files.createTempDirectory(workspace.toPath(), ".mirror-metadata-").toFile()
+            try {
+                for (id in args.drop(1)) {
+                    val index = requireNotNull(remote.index(id, scratch)) { "published corpus index unavailable: $id" }
+                    write(index, workspace)
+                    File(workspace, "$id.index.json").writeText(CorpusIndex.encode(index))
+                    System.err.println("exported published index $id")
+                }
+            } finally {
+                check(scratch.deleteRecursively()) { "cannot remove metadata scratch directory" }
+            }
+            return
+        }
         require(args.size >= 2) { "usage: CommittedCorpusIndexes CORPUS_CACHE WORKSPACE [COLLECTION...]" }
         val cache = File(args[0])
         val workspace = File(args[1])

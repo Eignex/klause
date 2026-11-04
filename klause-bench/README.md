@@ -36,6 +36,11 @@ transfers no corpus bytes. Regenerate them from complete collection trees with
 A collection without a committed index falls back to the mirror's index.
 Concurrent planners atomically publish complete listing skeletons and reuse the winning view.
 
+`CommittedCorpusIndexes --mirror COLLECTION...` exports published mirror indexes into
+the lab's `OUT` directory without downloading collection packs or parsing models.
+Use these metadata artifacts to refresh committed indexes against the stored packs;
+existing input checksum enforcement still applies.
+
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
 copying those paths. Compiler verification receipts live beside private worktrees, use fresh inode/change-time
