@@ -1,7 +1,9 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.bool.AffineXorPropagator
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.ClausePropagator
+import com.eignex.klause.factor.bool.GaussianXor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -59,6 +61,7 @@ class PropagationSession private constructor(
     historicalTables: Boolean = false,
     costAware: Boolean = false,
     reasonPreflight: Boolean = false,
+    onPropagationWork: ((() -> Long) -> Unit)? = null,
 ) {
     /** Construct a private propagation projection over [problem]. */
     constructor(
@@ -80,9 +83,10 @@ class PropagationSession private constructor(
         historicalTables: Boolean = false,
         costAware: Boolean = false,
         reasonPreflight: Boolean = false,
+        onPropagationWork: ((() -> Long) -> Unit)? = null,
     ) : this(projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection,
         cumulativeUnarySubsets = cumulativeUnarySubsets, attribution = attribution, historicalTables = historicalTables,
-        costAware = costAware, reasonPreflight = reasonPreflight)
+        costAware = costAware, reasonPreflight = reasonPreflight, onPropagationWork = onPropagationWork)
 
     internal fun checkSelectedProjection(
         checks: SelectedProjectionChecks? = projection.selection?.originalChecks,
@@ -429,6 +433,7 @@ class PropagationSession private constructor(
     }
 
     init {
+        onPropagationWork?.invoke { work }
         val conflict = if (preparedState == null) {
             if (!state.seeded) state.conflictLevels ?: EmptyIntArray
             else state.runToFixpoint(allFactors = true, cancellation = cancellation)
@@ -1397,6 +1402,16 @@ class PropagationSession private constructor(
             (it.factorAttribution?.snapshot() ?: emptyMap()) + (it.propagationSchedule?.snapshot() ?: emptyMap())
         if (it.integerRowLearning) counts + ("learningIntegerSessions" to 1L) else counts
     } ?: retiredLifecycle
+
+    internal fun affineParityStatistics(factorId: Int): Map<String, Long> {
+        val owner = retainedState ?: return emptyMap()
+        check((problem.factors[factorId] as? GaussianXor)?.affineSeed != null)
+        return (owner.refPayload[factorId] as? AffineXorPropagator.Cache)?.observations() ?: mapOf(
+            "Fires" to 0L, "Resets" to 0L, "InsertedRows" to 0L, "Reductions" to 0L,
+            "Pins" to 0L, "Conflicts" to 0L, "WideReasons" to 0L, "InitializationWork" to 0L,
+            "ExpressionRowsUpdated" to 0L, "ExpressionRowsSkipped" to 0L,
+        )
+    }
 
     internal fun preparationStatistics(): Map<String, Long> =
         retainedState?.preparationStatistics() ?: retiredPreparationStatistics

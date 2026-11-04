@@ -1198,9 +1198,10 @@ private fun executePortfolio(
 
         is PortfolioPlan.Execute -> Unit
     }
+    val profile = ProblemProfile.of(request.problem, request.optimize)
     val baseScenario = clausalDefaultScenario(
         plan.scenario,
-        ProblemProfile.of(request.problem, request.optimize),
+        profile,
         request.defaultArms,
         explicitArms = request.executionOptions.explicitArms,
         privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly,
@@ -1245,7 +1246,6 @@ private fun executePortfolio(
         booleanProofTasks = booleanProofTasks,
         fundedCompanions = fundedCompanions,
         bufferedPublications = bufferedPublications,
-
         privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly,
     )
     val start = TimeSource.Monotonic.markNow()

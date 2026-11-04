@@ -949,10 +949,13 @@ alone supplies no authority; source validation and conditional proof admission s
 
 Recipes select workers from model structure. Explicit pools, heuristic backtrack
 edits and source annotations retain their requested composition. In single-core
-mixed clausal satisfaction, private-rebuild work and learned-memory scratch settings
+mixed clausal satisfaction, private-rebuild work/byte and learned-memory scratch settings
 alone preserve the default two-worker pool and its complete-search time reservation.
 Captured option keys distinguish these resource settings from heuristic edits;
-custom backtrack edit callbacks retain their selected composition. Defaults live in
+custom backtrack edit callbacks retain their selected composition. Private rebuilding
+requires an explicit nonzero work setting; private-byte settings alone do not activate
+it. The private grant remains separate from canonical learned-memory allowances and
+the complete-search time reservation. Defaults live in
 [portfolio construction](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio).
 
 ### Model-specific worker recipes

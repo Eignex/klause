@@ -245,6 +245,8 @@ class FiniteExecutionTest {
     @Test
     fun `private rebuild budgets should preserve the default clausal source pool`() {
         for (options in listOf(
+            ExecutionOptions(ExecutionOption.privateRebuildBytes(4_194_304L)),
+            ExecutionOptions.parse(listOf("private-rebuild-bytes=4194304")),
             ExecutionOptions(ExecutionOption.privateRebuildWork(0L)),
             ExecutionOptions.parse(listOf("private-rebuild-work=0")),
             ExecutionOptions(ExecutionOption.learnedMemoryScratchBytes(4_194_304L)),
@@ -276,6 +278,53 @@ class FiniteExecutionTest {
     }
 
     @Test
+    fun `private parity consumers should require an explicit work request`() {
+        for ((enabled, options) in listOf(
+            false to ExecutionOptions(ExecutionOption.sliceWork(1_000L)),
+            true to ExecutionOptions(ExecutionOption.sliceWork(1_000L), ExecutionOption.privateRebuildWork(-1L),
+                ExecutionOption.privateRebuildBytes(4_194_304L)),
+            true to ExecutionOptions.parse(listOf("slice-work=1000",
+                "private-rebuild-work=-1", "private-rebuild-bytes=4194304")),
+        )) {
+            val parity = (0 until 128).flatMap { row ->
+                listOf(1, 2, 4, 7).map { mask ->
+                    Clause(IntArray(3) { Lit.make(row + 2 * (row / 16) + it, mask and (1 shl it) == 0) })
+                }
+            }
+            val contradiction = listOf(
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
+            )
+            val problem = Problem(144, 0, emptyArray(), (parity + contradiction).toTypedArray())
+            val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = options, nodeBudget = NodeBudget(50_000),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.UNSAT, completed.verdict)
+            val learning = completed.stats.search.learning
+            val consumers = if (enabled) 1L else 0L
+            assertEquals(consumers, learning["privateRebuildParityJointFactors"] ?: 0L)
+            assertEquals(consumers, learning["privateRebuildAutomaticAttempts"] ?: 0L)
+            assertEquals(if (enabled) 4_194_304L else 0L,
+                learning["privateRebuildAutomaticByteLimit"] ?: 0L)
+            assertEquals(if (enabled) 1_048_576L else 0L,
+                learning["privateRebuildAutomaticCanonicalScratchLimit"] ?: 0L)
+            assertEquals(consumers, learning["privateRebuildConsumers"] ?: 0L)
+            assertEquals(consumers, learning["privateRebuildRetired"] ?: 0L)
+            assertEquals(listOf("ls/probsat/plain", "bt/clausal-balanced"),
+                completed.stats.portfolio.arms.map { it.label })
+            assertTrue(completed.stats.portfolio.arms.all { it.faults == 0L && it.failures == 0L })
+        }
+    }
+
+    @Test
     fun `automatic private rebuilding should reach the source portfolio`() {
         for (options in listOf(
             ExecutionOptions(ExecutionOption.arms(2),
@@ -286,10 +335,10 @@ class FiniteExecutionTest {
         )) {
             val clauses = (0 until 128).flatMap { row ->
                 listOf(1, 2, 4, 7).map { mask ->
-                    Clause(IntArray(3) { Lit.make(row + it, mask and (1 shl it) == 0) })
+                    Clause(IntArray(3) { Lit.make(row + 2 * (row / 16) + it, mask and (1 shl it) == 0) })
                 }
             } + Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))
-            val problem = Problem(130, 0, emptyArray(), clauses.toTypedArray())
+            val problem = Problem(144, 0, emptyArray(), clauses.toTypedArray())
             val shape = FiniteSolveShape(problem, false, false, null, null, 0, null)
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,

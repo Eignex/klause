@@ -248,12 +248,20 @@ An unsupported or partial observation cannot establish absence of opportunities.
 Qualification of a replacement worker requires the following authority and ownership
 contract. The diagnostic itself creates no replacement or publication authority.
 
-The default private work setting is zero. An explicit `privateRebuildWork=-1`
-selects automatic parity admission with a cumulative 1,048,576-work cap and the
+Private rebuilding is opt-in. Direct backtrack parameters and source execution
+default to zero private work. Private-byte settings alone do not activate a trial.
+An explicit `private-rebuild-bytes` sets the modeled private grant independently of
+canonical learned-memory scratch. Direct parameters use `privateRebuildBytes`, falling
+back to `learnedMemoryScratchBytes` when null.
+
+An explicit `privateRebuildWork=-1`
+selects automatic parity admission with a cumulative 4,194,304-work grant and the
 configured scratch grant. It considers only Boolean satisfaction sources with
 128–2,000 columns and 512–32,768 factors. Its first unconditional root performs one
 funded source scan; admission requires a completed basis of rank at least 128 and
-coverage of at least half the source clauses. A miss retains canonical traversal
+coverage of at least half the source clauses. Mixed views additionally require at
+least 16 free coordinates; complete affine views retain their rank and coverage
+admission. A miss retains canonical traversal
 without root-pin BVE or learned-equivalence retries. Explicit zero disables this
 mode; positive work settings retain their bounded manual trials.
 
@@ -291,11 +299,18 @@ protected columns wait for a fresh root view. This selection is a heuristic, not
 an exhaustive elimination pass.
 
 A bounded source scan can recognize two- and three-column parity equations from
-their complete two- and four-clause Boolean encodings. Each clause excludes one assignment;
+their complete two- and four-clause Boolean encodings. It captures the global pin
+snapshot before grouping clauses, omits satisfied clauses and removes globally
+false literals from their keys. Source column IDs remain unchanged. The same snapshot
+conditions the matrix and reconstruction. Each remaining clause excludes one assignment;
 the complete parity class of exclusions entails the opposite parity equation.
 A preparation-only GF(2) matrix substitutes the canonical global pins and uses
 forward elimination from higher source slots followed by affine back substitution
-over its free coordinates. This ordering favors earlier slots as free coordinates.
+over its free coordinates. Private column-to-row bitsets select pivots and restrict
+elimination to rows containing the pivot. Row swaps and XOR updates maintain that
+index; its primitive words, reference slots, initialization and visits spend the
+same modeled-byte and work grants. The index is discarded with discovery.
+This ordering favors earlier slots as free coordinates.
 A pivot is globally forced only when its complete free-coordinate dependency
 cancels. Additional Boolean pins are emitted only after complete elimination.
 Incomplete clause groups, duplicate exclusions and partial matrix work grant no
@@ -304,7 +319,9 @@ refutation authority.
 
 The immutable source identity binds the captured pin snapshot. Its table,
 matrix and snapshot allocation, initialization, probes, elimination and publication
-consume the private work and modeled-memory grants. Complete absence of encoded
+consume the private work and modeled-memory grants. A dimension-only lower bound
+on source entries and table storage can refuse an unfunded source before allocation.
+Complete absence of encoded
 rows parks the immutable-source scan; a completed miss for new pins may retry
 after canonical global pins grow. The private model installs the proved values
 as unit clauses and composes its reconstruction over the fixed source view.
@@ -312,13 +329,15 @@ Canonical search state stays unchanged. A changed fixed view can open a consumer
 without an additional BVE pivot; its pins are counted separately from eliminated
 columns. Closing or declining releases the captured snapshot with its generation.
 
-When every source clause is covered by complete parity encodings, tautologies or
-canonical global unit facts, the rebuilt model can replace the encoded equations
+When each source clause belongs to a complete parity encoding, is tautological or
+is satisfied by captured global root facts, the rebuilt model can replace the encoded equations
 with their free-coordinate view. Source column slots remain stable; a private
 pivot slot is fixed to a placeholder and has no canonical literal authority.
 Reconstruction evaluates the owned affine basis from the private free-coordinate
 values, preserving every source solution rather than choosing a source constant.
-The complete coverage proof is required before dropping any encoded clause.
+The coverage scan charges every additional literal check. Reconstruction retains
+the captured global values that justify satisfied clauses. The complete coverage
+proof is required before dropping any encoded clause.
 Uncovered clauses prevent the placeholder view. Canonical learned clauses are
 withheld from the affine view because their pivot literals lack a supported
 projection. The containing grants cover the basis and reconstruction; every
@@ -339,12 +358,34 @@ clause's excluded assignment, so extra exclusions in an otherwise complete group
 remain constraints. Each replacement row has at most 64 distinct coordinates;
 unsupported widths decline the row view. Row arrays, coefficient projections and
 fresh worker indexes share the containing work and modeled-memory grants.
+A funded mixed consumer owns a residual affine expression for every source coordinate.
+Each independent assigned source fact eliminates one free coordinate from all expressions
+that contain it. The state owns flat coefficient and reason buffers with cached nonzero-word
+counts. Zero residuals imply source values; contradictory assigned values supply conflicts.
+Independent assigned facts supply clause reasons with at most 64 literals; wider pin reasons
+withhold the deduction. Undo or an interrupted update invalidates the cache, which rebuilds
+from the immutable seed and current assignments. Expression updates and checks spend the
+containing propagation-work grant.
+The immutable seed owns its snapshot, while each session owns its matrix and
+primitive observations. Buffer initialization and every scan, reduction and reason
+visit debit propagation work. A fresh session exposes its live propagation counter
+before its root fixpoint, so work during consumer opening shares the same private
+and containing stop conditions. Stopped opening work remains charged once. Modeled seed, matrix, observation and watch storage
+share the private byte grant after selector reservation; an unfunded joint view
+retains the per-row system. Retirement copies primitive observations before releasing
+the private state.
 The mixed view preserves original coordinate meanings, including its live pivots,
 and can retain supported canonical warm clauses through the fixed-value projection.
 Its reduced rows and covered clauses are counted separately from eliminated columns.
 For source spans fitting two scans inside the normalized per-decision charge, the
-private consumer branches on free coordinates in source order before its pivots.
-Pivots retain their original meanings and propagation still decides their values.
+private consumer prefers free coordinates with its own VSIDS conflict activity.
+A filtered branching view preserves source IDs and passes conflict and unassign
+notifications to that private heuristic. When no free coordinate needs a decision,
+source-order fallback retains every remaining pivot decision. Pivots retain their
+original meanings and propagation still decides their values. The membership mask
+and activity heap spend the modeled byte grant; their initialization spends opening
+work before allocation. A grant that funds the generation without that extra storage
+retains source-ordered free-coordinate selection. Fresh consumers own fresh activity.
 Larger spans retain the configured selector.
 
 A learned binary can close a reciprocal source binary, or two owned binaries can

@@ -103,15 +103,25 @@ diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
+Private rebuilding is opt-in; source execution defaults to zero private work.
+`param.private-rebuild-work=0` disables it. Mixed private views require at least
+16 free coordinates for automatic admission; complete affine views use the ordinary
+rank and coverage requirements. `AutomaticDeclinedSmallMixed` reports a funded
+discovery followed by canonical fallback, without preparing or opening a consumer.
+`param.private-rebuild-bytes` bounds private modeled storage independently of canonical
+learned-memory scratch; an explicit shared scratch limit also bounds private storage
+unless a private limit is supplied.
+
 `param.private-rebuild-work=-1` requests automatic parity admission within a
-1,048,576-work cap and the configured scratch grant. It makes one initial-root
+4,194,304-work grant and the configured scratch grant. It makes one initial-root
 attempt on the structurally admitted Boolean cohort; see the
 [admission contract](../docs/07-presolve.md#private-worker-qualification).
-Use explicit zero as the canonical control. The production default remains zero.
+Use explicit zero as the canonical control. To keep canonical scratch separate from
+a 4 MiB private trial, also set `param.private-rebuild-bytes=4194304`.
 
 `param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
 trial after new global root pins or an owned learned equivalence, with source reduction and a fresh consuming
-worker. Zero is the default. `ProgressPins` excludes baked-root facts;
+worker. Direct backtrack parameters default to zero. `ProgressPins` excludes baked-root facts;
 `RootScanWork` and `RootScanNanos` retain the eligibility cost. An unchanged
 baked root without a captured equivalence keeps its canonical traversal.
 `BinaryScanWork` and `BinaryScanNanos` retain bounded discovery costs;
@@ -179,7 +189,10 @@ it is a subset of transfer and preparation work, rather than another total to ad
 
 
 Private parity discovery reports `ParityDiscoveryWork`, `ParityDiscoveryNanos`,
-`ParityRows` and `ParityPins`. Discovery work is a subset of `ChargedWork`,
+`ParityRows` and `ParityPins`. Rows count encodings after global pin substitution;
+Satisfied clauses and false fixed literals are resolved against the captured root snapshot.
+A dimension-only memory refusal can precede table allocation and discovery work.
+Discovery work is a subset of `ChargedWork`,
 separate from canonical root propagation and later `PreparationWork`.
 `ParitySourceRows` and `ParitySourceLiterals` count short source equations posted
 beside the reduced basis in mixed consumers. Their storage and propagation spend
@@ -190,13 +203,21 @@ the existing private grants.
 captured affine basis. `AffineGenerationColumns` and `AffineGenerationFreeColumns`
 count its coordinates in a prepared model. These private pivot slots require
 affine reconstruction and cannot receive unprojected canonical learned clauses.
-`ParityBasisColumns` and `ParityCoveredSourceClauses` describe the captured
-linear subsystem. `ParityReducedRows`, `ParityReducedLiterals` and
+`ParityBasisColumns` reports the captured linear rank. `ParityCoveredSourceClauses`
+includes complete encodings and clauses justified by captured global root facts. `ParityReducedRows`, `ParityReducedLiterals` and
 `ParityCoveredClauses` identify a prepared mixed Clause/Xor view with original
 coordinate meanings; they do not count eliminated columns.
 `ParityTriangularRows` counts forward-eliminated rows selected per pivot in that
 reduced basis; the remaining rows use free-coordinate expansion. Both
 representations and their selection spend the existing private grants.
+`ParityJointFactors` identifies funded joint affine kernels. `ParityJointModeledBytes`
+is included in `ModeledPrivateBytes`; `ParityJointInitializationWork` counts completed
+cache initialization inside trial propagation work. `OpeningPropagationWork` is also
+a trial-work subset, including a consumer whose opening stops before publication. Joint `Fires`, `Resets`,
+`InsertedRows`, `Reductions`, `Pins`, `Conflicts` and `WideReasons` retain primitive
+per-consumer observations through retirement. `ExpressionRowsUpdated` counts completed
+residual-expression reductions; `ExpressionRowsSkipped` counts expressions without the
+new fact's pivot. A wide pin reason withholds that deduction.
 `ParityPreferredFreeColumns` reports the admitted free-coordinate selection list. Coverage declines name
 incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
 larger widths). Such a miss can retain proved global pins or a mixed view.

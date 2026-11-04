@@ -76,7 +76,7 @@ internal fun Factor.buildPropagatorProjection(preparation: FactorProjectionPrepa
 
     is Element -> ElementPropagator(boolVars, intVars, idx, result, arr, arrIsVars, indexOffset)
 
-    is GaussianXor -> GaussianXorPropagator(constraints, boolVars)
+    is GaussianXor -> affineSeed?.let { AffineXorPropagator(it) } ?: GaussianXorPropagator(constraints, boolVars)
 
     is GlobalCardinality -> GlobalCardinalityPropagator(
         boolVars,

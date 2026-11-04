@@ -11,6 +11,11 @@ import kotlin.test.assertTrue
 
 class BacktrackParamsTest {
     @Test
+    fun `private byte grants should be nonnegative`() {
+        assertFailsWith<IllegalArgumentException> { BacktrackParams(privateRebuildBytes = -1L) }
+    }
+
+    @Test
     fun `LP free workers should admit cumulative unary subsets`() {
         for (config in listOf(null, LpConfig.OFF)) {
             for (plan in listOf(LpPlan(), LpPlan(branching = false, rootCutHarvest = false))) {
