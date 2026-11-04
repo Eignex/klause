@@ -28,7 +28,8 @@ internal class LearnedPolicyRows(
 
     private val directory = MutableIntObjectIndex<Page>()
     private var primary: Page? = Page(INITIAL_CAPACITY, columns, objectColumns)
-    private val cachedPages = arrayOfNulls<Page>(CACHE_SIZE)
+    private val cachedPages = arrayOfNulls<Page>(if (objectColumns) GENERAL_CACHE_SIZE else NATIVE_CACHE_SIZE)
+    private val cachedKeys = IntArray(cachedPages.size) { -1 }
     private var retiredHead: Page? = null
     private var retiredTail: Page? = null
     private var emptyHead: Page? = null
@@ -43,10 +44,12 @@ internal class LearnedPolicyRows(
         private set
     private val rowBytes: Long get() = columns.toLong() * Int.SIZE_BYTES + Long.SIZE_BYTES
     private val rowWork: Long get() = rowBytes / Int.SIZE_BYTES + if (objectColumns) 2L else 0L
-    val primitiveBytes: Long get() = 25L + allocatedBytes + pageCount * 12L + directory.primitiveCapacityBytes
-    val referenceCapacity: Long get() = 12L + CACHE_SIZE + directory.referenceCapacity + pageCount * 7L +
+    val primitiveBytes: Long get() = 25L + cachedKeys.size * Int.SIZE_BYTES + allocatedBytes + pageCount * 12L +
+        directory.primitiveCapacityBytes
+    val referenceCapacity: Long get() = 13L + cachedPages.size + directory.referenceCapacity + pageCount * 7L +
         if (objectColumns) allocatedBytes / rowBytes * 2L else 0L
-    val preparationWork: Long get() = INITIAL_CAPACITY * rowWork * 2L + CACHE_SIZE * 2L + 80L
+    val preparationWork: Long get() = INITIAL_CAPACITY * rowWork * 2L + cachedPages.size * 2L + 80L +
+        cachedKeys.size * 2L + 8L
     val hasEmptyReservation: Boolean get() = size == 0 && primary?.capacity?.let { it > 0 } == true
     val hasRetiredRows: Boolean get() = retiredHead != null
     val retiredHeadIndex: Int
@@ -64,13 +67,19 @@ internal class LearnedPolicyRows(
         return try { operation() } finally { observation = previous }
     }
 
-    private fun locate(index: Int, visit: (Long) -> Unit): Page? {
+    private inline fun locate(index: Int, visit: (Long) -> Unit): Page? {
         if (index == 0) return primary
-        val cached = cachedPages[index and CACHE_MASK]
-        if (cached?.slot?.key == index) return cached
+        val cached = index and cachedPages.lastIndex
+        if (cachedKeys[cached] == index) return cachedPages[cached]
         val page = directory.lookup(index, visit)
-        cachedPages[index and CACHE_MASK] = page
+        cache(index, page)
         return page
+    }
+
+    private fun cache(index: Int, page: Page?) {
+        val slot = index and cachedPages.lastIndex
+        cachedPages[slot] = page
+        cachedKeys[slot] = index
     }
 
     private fun chargeLookup(units: Long) {
@@ -85,6 +94,8 @@ internal class LearnedPolicyRows(
 
     private fun pageAt(index: Int): Page? {
         if (index == 0) return primary
+        val cached = index and cachedPages.lastIndex
+        if (cachedKeys[cached] == index) return cachedPages[cached]
         return locate(index, ::chargeLookup)
     }
 
@@ -114,7 +125,7 @@ internal class LearnedPolicyRows(
                 created.slot = directory.getOrPutSlot(index) { created }
                 allocated(directory.lastWork)
                 directoryIdentity = Any()
-                cachedPages[index and CACHE_MASK] = created
+                cache(index, created)
             }
             pageCount++
             allocatedBytes += created.bytes
@@ -293,7 +304,7 @@ internal class LearnedPolicyRows(
         }
         pageCount--
         allocationIdentity = Any()
-        val cached = key(page) and CACHE_MASK
+        val cached = key(page) and cachedPages.lastIndex
         if (cachedPages[cached] === page) cachedPages[cached] = null
     }
 
@@ -375,7 +386,7 @@ internal class LearnedPolicyRows(
         fun observe(index: Int, page: Page): Boolean {
             if (index != 0) {
                 repeat(2) { sample.step() }
-                cachedPages[index and CACHE_MASK] = page
+                cache(index, page)
             }
             for (slot in 0 until page.capacity) {
                 sample.step()
@@ -391,8 +402,8 @@ internal class LearnedPolicyRows(
         val retained = directory.protectedCapacity({ units -> repeat(units.toInt()) { sample.step() } }) {
             index, page -> observe(index, page)
         }
-        sample.owned(this, 25L, protectedRows)
-        sample.ownedReferences(this, 12L + CACHE_SIZE, protectedRows)
+        sample.owned(this, 25L + cachedKeys.size * Int.SIZE_BYTES, protectedRows)
+        sample.ownedReferences(this, 13L + cachedPages.size, protectedRows)
         sample.ownedPool(allocationIdentity, allocatedBytes + pageCount * 12L, protectedBytes)
         sample.ownedReferencesPool(allocationIdentity, pageCount * 7L +
             (if (objectColumns) allocatedBytes / rowBytes * 2L else 0L), protectedReferences)
@@ -408,8 +419,8 @@ internal class LearnedPolicyRows(
         const val TIER = 2
         const val STAGES = 4
         const val ORIGIN = 5
-        const val CACHE_SIZE = 128
-        const val CACHE_MASK = CACHE_SIZE - 1
+        const val GENERAL_CACHE_SIZE = 128
+        const val NATIVE_CACHE_SIZE = 512
         const val INITIAL_CAPACITY = 8
         const val PAGE_SHIFT = 4
         const val PAGE_SIZE = 1 shl PAGE_SHIFT
