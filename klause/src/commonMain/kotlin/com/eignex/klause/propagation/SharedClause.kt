@@ -74,7 +74,7 @@ interface ClauseExchange {
      *  exchanges that publish only at restarts. */
     fun onSearchEnd(session: PropagationSession) {}
 
-    /** Observe retained state at a cooperative pause without exchanging clauses or draining use credit.
+    /** Notify a cooperative pause so the exchange can apply its publication and observation policy.
      *  Cancellation boundaries use [onSearchEnd] instead. Default no-op. */
     fun onSearchPause(session: PropagationSession) {}
 

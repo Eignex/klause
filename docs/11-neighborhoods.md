@@ -304,6 +304,11 @@ local-search parameters declare a seed, inner repair seeds also draw from that
 stream. Unseeded ordinary invocations allow the inner solver to choose its own
 seeds.
 
+The portfolio ALNS worker retains a private clause pool across repair queries.
+Cooperative pauses observe its retained memory without publishing glue or draining
+use credit. Restarts, cancellation boundaries and uncancelled close collect the
+remaining uses and eligible clauses within their existing work limits.
+
 The internal opt-in `SemanticBlockRemoval` selects complete mandatory
 AllDifferent scopes, contiguous windows in a resource's current start order, or
 placement contact blocks within two hops. Resource packets include start,
