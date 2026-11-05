@@ -59,12 +59,12 @@ class ClauseDbTest {
         val before = session.work
 
         forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 0, tieredLearnedDb = true,
-            learnedMemoryWork = 128L, cancellation = Cancellation { session.work - before >= 57L }))
+            learnedMemoryWork = 128L, cancellation = Cancellation { session.work - before >= 58L }))
 
         assertEquals(ClauseTier.UNSET, session.learnedClauseTier(0))
         assertFalse(session.learnedClauseUsedSinceReduction(0))
         assertTrue(session.isLearnedClause(0))
-        assertEquals(57L, session.work - before)
+        assertEquals(58L, session.work - before)
     }
 
     @Test

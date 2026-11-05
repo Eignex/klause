@@ -59,6 +59,8 @@ class NativeLearnedMetadataTest {
         metadata[1, NativeLearnedMetadata.STAGES] = 15
         metadata[1, NativeLearnedMetadata.BOOL_REASONS] = 2
         metadata[1, NativeLearnedMetadata.WATCH_SECOND] = 8
+        metadata.setEpoch(1, NativeLearnedMetadata.CLASSIFIED_EPOCH, 42L)
+        metadata.setEpoch(1, NativeLearnedMetadata.USED_EPOCH, 43L)
         metadata.truncateTo(1)
 
         metadata.add(2, true, 20, 42L)
@@ -66,6 +68,8 @@ class NativeLearnedMetadataTest {
         assertEquals(0, metadata[1, NativeLearnedMetadata.STAGES])
         assertEquals(0, metadata[1, NativeLearnedMetadata.BOOL_REASONS])
         assertEquals(0, metadata[1, NativeLearnedMetadata.WATCH_SECOND])
+        assertEquals(0L, metadata.epoch(1, NativeLearnedMetadata.CLASSIFIED_EPOCH))
+        assertEquals(0L, metadata.epoch(1, NativeLearnedMetadata.USED_EPOCH))
         assertEquals(2, metadata[1, NativeLearnedMetadata.LBD])
         assertEquals(42L, metadata.admission(1))
     }

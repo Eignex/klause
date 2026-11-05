@@ -571,8 +571,13 @@ ranking cursor. Each metadata row retains its last classification and actual-use
 epochs. A funded row transaction catches up missed idle demotions before classification;
 use in the preceding epoch retains its ordinary promotion and protection. New rows
 start at their admission epoch, and core tiers persist. The four extra integer columns
-and the scalar epoch belong to modeled native metadata ownership. Admission, use and
-classification debit their timestamp work, and cancellation precedes policy mutation.
+and the scalar epoch and activation flag belong to modeled native metadata ownership.
+Admission, use and classification debit their timestamp work, and cancellation
+precedes policy mutation.
+Before the first funded epoch, fresh zeroed rows and the ordinary reuse flag encode
+admission and use at epoch zero without timestamp writes. Epoch activation follows
+the ranking step's existing cancellation boundary; an unavailable first scan publishes
+no policy epoch. After activation, admissions and actual uses record their epochs.
 An unfunded next-row transaction suspends the cursor for a later grant. A completed
 row classification retains its pending admission while heap comparisons wait;
 cleanup comparisons finish before publishing their candidate mutations.
