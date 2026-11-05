@@ -575,6 +575,19 @@ The record contains only its exact source identity and arithmetic limits. Every
 mapping checks the current model namespace, assumptions, guards, column geometry
 and any derived proof. Changed limits or a different immutable source reject the
 record. Eviction and replacement release it without retaining a prior generation.
+After input retention, a pool can capture one primitive ordered column layout and
+completed source-to-column row projections. The layout records source kinds and
+IDs for canonical unit-scale, zero-offset columns; every remap validates the whole
+layout once against its current immutable source map before any projected row is
+used. A changed layout discards projections and retains their arithmetic-input
+validation. Affine layouts, auxiliary proof definitions and mappings that construct
+a derived proof keep full numerical mapping. Capture, binding, replacement and
+invalidation debit the same LP allowance, with cancellation withholding publication.
+Layouts and row projections share the pool's storage ceiling. Each projected row
+keeps private coefficient buffers and returns a fresh cut with copied arrays;
+source guards and assumptions stay current, and numerical owners normalize rows
+for their own origins and bases. No source map, prior layout chain, witness or
+numerical result is retained by a projection.
 Selection considers efficacy, parallelism,
 orthogonality, age and row caps; separators check actual column integrality, so
 continuous columns decline. Root harvesting caps retained cuts at the original row

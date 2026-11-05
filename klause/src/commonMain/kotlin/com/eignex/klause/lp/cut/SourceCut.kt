@@ -19,8 +19,11 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.exactRhs
 import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.remapSources
+import com.eignex.klause.lp.relaxation.CutColumnBinding
+import com.eignex.klause.lp.relaxation.CutColumnLayout
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.layoutFor
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
@@ -144,15 +147,37 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
 
 internal sealed interface SourceCutPreparation {
     val storageUnits: Long
+    val projection: Boolean get() = false
+    val supportsProjection: Boolean get() = false
 
     companion object {
         const val STORAGE_UNITS = 16L
     }
 }
 
-private class PreparedSourceCutInput(val source: SourceCut, val terms: Int, val bits: Int) : SourceCutPreparation {
+private open class PreparedSourceCutInput(val source: SourceCut, val terms: Int, val bits: Int) : SourceCutPreparation {
     override val storageUnits: Long get() = SourceCutPreparation.STORAGE_UNITS
+    override val supportsProjection: Boolean = source.provenance.auxiliaryDefinitions.isEmpty() &&
+        source.projectedPreparationUnits <= source.preparationExtent
 }
+
+private class PreparedSourceCutProjection(
+    val input: PreparedSourceCutInput,
+    val layout: CutColumnLayout,
+    cut: Cut,
+) : PreparedSourceCutInput(input.source, input.terms, input.bits) {
+    private val columns = cut.cols.copyOf()
+    private val coefficients = cut.coeffs.copyOf()
+    private val bound = cut.rhs
+    override val projection: Boolean get() = true
+    override val storageUnits: Long get() = source.projectedPreparationUnits
+
+    fun cut(proof: CutProvenance): Cut = Cut(columns, coefficients, source.relation, bound,
+        global = proof.global, provenance = proof, family = source.family)
+}
+
+internal fun SourceCutPreparation.withoutProjection(): SourceCutPreparation =
+    (this as? PreparedSourceCutProjection)?.input ?: this
 
 internal class SourceCut(
     val expression: CutExpression,
@@ -162,6 +187,8 @@ internal class SourceCut(
     val family: CutFamily = provenance.family,
 ) {
     internal val preparationExtent: Long get() = provenance.storageUnits + expression.storageUnits + 1L
+    internal val projectedPreparationUnits: Long
+        get() = SourceCutPreparation.STORAGE_UNITS + expression.storageUnits + 8L
 
     val key: String by lazy(LazyThreadSafetyMode.PUBLICATION) {
         val definitions = provenance.auxiliaryDefinitions
@@ -190,6 +217,7 @@ internal class SourceCut(
         limits: CutMappingLimits = CutMappingLimits(),
         preparation: SourceCutPreparation? = null,
         onPrepared: ((SourceCutPreparation) -> Unit)? = null,
+        columnBinding: CutColumnBinding? = null,
     ): CutMapping<Cut> {
         val prepared = (preparation as? PreparedSourceCutInput)?.takeIf {
             it.source === this && it.terms == limits.terms && it.bits == limits.bits
@@ -204,6 +232,12 @@ internal class SourceCut(
                 expression.terms.values.any { !limits.accepts(it) })
         ) {
             return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
+        }
+        if (prepared is PreparedSourceCutProjection && columnBinding?.layoutFor(map) === prepared.layout) {
+            if (original.facts.any { !it.global && !map.isActive(it.premise) }) {
+                return CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD)
+            }
+            return CutMapping.Mapped(prepared.cut(original))
         }
         val mapping = LinkedHashMap<CutSource, CutSource>()
         for ((source, definition) in original.auxiliaryDefinitions) {
@@ -288,8 +322,16 @@ internal class SourceCut(
                 family = family,
             ),
         )
-        if (prepared == null && onPrepared != null && original === this.provenance) {
-            onPrepared(PreparedSourceCutInput(this, limits.terms, limits.bits))
+        if (onPrepared != null && original === this.provenance) {
+            val layout = columnBinding?.layoutFor(map)
+            val next = if (layout != null && proof === this.provenance &&
+                this.provenance.auxiliaryDefinitions.isEmpty() && projectedPreparationUnits <= preparationExtent
+            ) {
+                val input = (prepared as? PreparedSourceCutProjection)?.input ?: prepared
+                    ?: PreparedSourceCutInput(this, limits.terms, limits.bits)
+                PreparedSourceCutProjection(input, layout, result.value)
+            } else if (prepared == null) PreparedSourceCutInput(this, limits.terms, limits.bits) else null
+            if (next != null) onPrepared(next)
         }
         return result
     }
