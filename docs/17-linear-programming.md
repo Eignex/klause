@@ -592,6 +592,12 @@ replacement generation receives its own lifetime. Remaining installed cuts keep
 their ordinary source checks and scope retraction. Retirement only weakens the
 relaxation, retaining cut definitions and checked coverage. An empty selected mask
 stays distinct from the ordinary all-cut recipe and cannot reinstall expired rows.
+The combined generated-and-point frontier also tracks complete usable points while
+an incumbent is available. Four such points whose bound cannot close that incumbent
+retire the installed recipe. An actual cut-attributed conflict, bound or inherited-bound
+prune, attained optimum or limit closure resets this streak. Missing incumbents,
+closing bounds and incomplete scans do not advance it. The empty mask preserves
+the numerical owner and checked source definitions without replaying retired cuts.
 After discovery retires, installed-row scans omit objective projection and candidate
 comparison vectors. Their point projection, activity checks and age state still
 debit the scoring and containing source allowances.
