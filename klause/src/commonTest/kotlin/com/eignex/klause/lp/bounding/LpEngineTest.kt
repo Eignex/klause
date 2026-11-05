@@ -378,6 +378,27 @@ class LpEngineTest {
     }
 
     @Test
+    fun `default consumers should earn selective preparation from completed LP builds`() {
+        val problem = boundedProblem().bake()
+        val objective = LinearObjective(intCoefficients = LongArray(3) { 2L })
+        val projections = FactorProjectionProviders.Default.prepare(problem)
+        val sink = SolveStatsSink("default-earned-preparation")
+
+        repeat(32) {
+            LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+                projections = projections).use { engine ->
+                assertEquals(3.0, engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList()))
+            }
+        }
+
+        val phases = sink.snapshot().lp.phases
+        assertTrue(phases.filterKeys { it.startsWith("TEMPLATE_FUNDING_") }.values.sumOf { it.calls } > 0L)
+        assertTrue(phases.filterKeys { it.startsWith("TEMPLATE_PREPARATION_") }.values.sumOf {
+            it.outcomes["FACTORS_REUSED"] ?: 0L
+        } > 0L)
+    }
+
+    @Test
     fun `cancelled template preparation charges the containing LP allowance`() {
         val problem = boundedProblem().bake()
         var work = 0L

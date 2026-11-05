@@ -100,7 +100,7 @@ order. A failed match uses selective reconstruction; a source revision alone can
 authorize reuse. The new source binding owns no predecessor snapshot, so repeated
 compatible preparations retain no generation chain.
 
-Complete-index reuse is the default source-preparation policy. Explicit admitted
+Earned selective reuse is the default source-preparation policy. Admitted
 preparation validates row identity and exact bound sides before retaining selective
 metadata and enabling pump assembly reuse. Node engines own their numerical
 component partitions. Ordinary node, primal and shaving consumers
