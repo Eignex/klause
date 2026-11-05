@@ -51,6 +51,11 @@ internal class NativeSatState(private val state: PropagationState) {
     private var capCalls = 0L
     private var capWork = 0L
     private var capVisits = 0L
+    internal val capWindowPending: Boolean get() = capRanking.hasPending
+    internal val capTraversalVisits: Long get() = capVisits
+    internal val capContinuationCursor: Long get() = capRanking.continuationCursor
+    internal val capContinuationHeap: Long get() = capRanking.continuationHeap
+    internal val capContinuationOperation: Long get() = capRanking.continuationOperation
     private var capBoundaryDefers = 0L
     private var capPreparationDefers = 0L
     private var capPendingReplayCalls = 0L
@@ -98,7 +103,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private fun isRetired(handle: Int): Boolean = if (handle < baseCount) {
         retiredRootSources?.contains(handle) == true
-    } else retiredOf(handle - baseCount)
+    } else retiredCount != 0 && retiredOf(handle - baseCount)
 
     fun retireRootSource(factor: Int) {
         check(factor in 0 until baseCount)
@@ -540,7 +545,7 @@ internal class NativeSatState(private val state: PropagationState) {
         val length = literalCountOf(index)
         budget.visit(work + 8L)
         budget.visit(0L)
-        return length <= 1 || metadata[index, NativeLearnedMetadata.STAGES] and 2 != 0 ||
+        return length <= 1 || metadata[index, NativeLearnedMetadata.STAGES] and 3 == 2 ||
             metadata[index, NativeLearnedMetadata.BOOL_REASONS] > 0
     }
 
@@ -798,6 +803,11 @@ internal class NativeSatState(private val state: PropagationState) {
                 return false
             }
             val h = rechecks[recheckHead]
+            state.work++
+            if (isRetired(h)) {
+                recheckHead++
+                continue
+            }
             var unit = -1
             var open = 0
             for (k in 0 until clauseLen(h)) {
@@ -900,13 +910,14 @@ internal class NativeSatState(private val state: PropagationState) {
             state.work++
             val entry = entries[wi]
             val h = entry.toInt()
-            if (isRetired(h)) {
+            val blocker = (entry ushr 32).toInt()
+            val satisfied = litTrue(blocker)
+            if ((!satisfied || h < baseCount) && isRetired(h)) {
                 state.work += watchRemovalWork(falseLit)
                 removeWatchAt(falseLit, wi)
                 continue
             }
-            val blocker = (entry ushr 32).toInt()
-            if (litTrue(blocker)) {
+            if (satisfied) {
                 wi++
                 continue
             }

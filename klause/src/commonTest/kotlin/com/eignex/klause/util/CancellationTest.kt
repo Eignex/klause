@@ -16,6 +16,37 @@ import kotlin.time.TimeSource
 
 class CancellationTest {
     @Test
+    fun `or compositions should poll every cardinality in order until stopped`() {
+        for (size in 0..6) {
+            for (stop in -1 until size) {
+                val visited = ArrayList<Int>()
+                val token = (0 until size).fold(Cancellation.Never or Cancellation.Never) { previous, index ->
+                    previous or Cancellation {
+                        visited += index
+                        index == stop
+                    }
+                }
+
+                assertEquals(stop >= 0, token())
+
+                val end = if (stop < 0) size else stop + 1
+                assertEquals((0 until end).toList(), visited)
+            }
+        }
+    }
+
+    @Test
+    fun `or compositions should poll repeated predicates at each position`() {
+        var polls = 0
+        val repeated = Cancellation { ++polls == 3 }
+        val token = (repeated or repeated) or (repeated or repeated)
+
+        assertTrue(token())
+
+        assertEquals(3, polls)
+    }
+
+    @Test
     fun `adjacent monotonic deadlines should stop before following predicates`() {
         for (reverse in listOf(false, true)) {
             val now = TimeSource.Monotonic.markNow()
