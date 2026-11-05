@@ -121,23 +121,33 @@ class LinearAuthorityAggregateCutsTest {
         val source = SourceProofContext(scope.copy(objective = SourceObjective("triangle", ObjectiveSense.MAXIMIZE)),
             setOf(x, y, real) + triangle, premises,
             triangle.associateWith { BigFraction.ONE } + mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
-        val capture = LinearAuthorityCapture(8, 20_000L, 1_000_000L, Cancellation.Never)
-        LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
-            authority.capture = capture
-            authority.advanceWithGeneratedCutAging(source, Cancellation.Never)
-            val preparations = authority.preparations
-            repeat(2) { authority.advanceWithGeneratedCutAging(source, Cancellation.Never) }
-            assertNull(authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
+        for (usefulness in listOf(false, true)) {
+            val capture = LinearAuthorityCapture(8, 20_000L, 1_000_000L, Cancellation.Never)
+            LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+                authority.capture = capture
+                if (usefulness) authority.advanceWithGeneratedCutUse(source, Cancellation.Never, BigFraction.ZERO)
+                    else authority.advanceWithGeneratedCutAging(source, Cancellation.Never)
+                val preparations = authority.preparations
+                repeat(2) {
+                    if (usefulness) authority.advanceWithGeneratedCutUse(source, Cancellation.Never, BigFraction.ZERO)
+                        else authority.advanceWithGeneratedCutAging(source, Cancellation.Never)
+                }
+                assertNull(authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
 
-            val result = authority.advanceWithGeneratedCutAging(source, Cancellation.Never)
+                val result = if (usefulness)
+                    authority.advanceWithGeneratedCutUse(source, Cancellation.Never, BigFraction.ZERO)
+                    else authority.advanceWithGeneratedCutAging(source, Cancellation.Never)
 
-            assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
-            assertEquals(preparations, authority.preparations)
-            assertEquals(false, capture.records.last().cuts.single().installed)
-            assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
-                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
-            assertEquals(SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+                assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
+                assertEquals(if (usefulness) 1L else null,
+                    authority.cutObservations()["numericalCutSelectionUnproductiveRecipeRetired"])
+                assertEquals(preparations, authority.preparations)
+                assertEquals(false, capture.records.last().cuts.single().installed)
+                assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+                    assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            }
         }
     }
 
