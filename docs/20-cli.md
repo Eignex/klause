@@ -86,9 +86,9 @@ The `source-cuts`, `source-point-cuts` and `source-aggregate-cuts` Boolean param
 configure [source cut selection](17-linear-programming.md#cuts) in direct numerical
 frontiers and admitted numerical companions of ordinary linear sources. Finite
 worker recipes do not interpret these controls; admission and lifetime are separate.
-Enabling both point and aggregate controls waits for a checked incumbent before
-preparing cuts, then proposes bounded generated cuts at a completed current point.
-Each scoring round adds at most one violated checked cut; installed rows age against
+Enabling both point and aggregate controls proposes bounded generated cuts from a
+completed no-cut point, without an intermediate current-cut query. Each scoring
+round adds at most one violated checked cut; installed rows age against
 point activity and actual downstream use. Point-only selection uses current cut
 families.
 

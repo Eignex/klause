@@ -19,10 +19,10 @@ internal class LinearAuthorityTemplate private constructor(
         point: Map<SourceCoordinate, Double>, cancellation: Cancellation,
         onWork: (Long) -> Unit, onCost: (Long, Long) -> Unit,
     ): LinearAuthorityTemplate? {
-        val original = cuts ?: return null
+        val original = cuts
         val directed = LinearAuthorityCuts.prepareAtPoint(numeric, cancellation, point,
-            65_536L - original.work, onWork) ?: return null
-        if (cancellation() || (directed.rows.isEmpty() && original.rows.isNotEmpty())) return null
+            65_536L - (original?.work ?: 0L), onWork) ?: return null
+        if (cancellation() || (directed.rows.isEmpty() && original?.rows?.isNotEmpty() == true)) return null
         onCost(directed.rows.size.toLong(), 128L + directed.rows.sumOf {
             128L + it.owners.size * 32L + (it.inequality.coefficients.values + it.inequality.rhs).sumOf { value ->
                 64L + (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 7L) / 8L

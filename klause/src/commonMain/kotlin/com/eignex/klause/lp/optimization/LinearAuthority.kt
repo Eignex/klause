@@ -169,16 +169,9 @@ internal class LinearAuthority(
 
     fun advanceWithPointGeneratedCuts(
         source: SourceProofContext, cancellation: Cancellation, incumbent: BigFraction?,
-    ): LinearAuthorityResult {
-        if (aggregateCuts && additionalCuts.isEmpty() && incumbent == null) {
-            val key = "numericalCutSelectionIncumbentUnavailable"
-            cutEligibility[key] = (cutEligibility[key] ?: 0L) + 1L
-            return advance(source, cancellation, cuts = false)
-        }
-        return advanceWithSelectedCuts(source, cancellation, generatedFirst = false,
-            pointAggregates = aggregateCuts && additionalCuts.isEmpty(),
-            retireUnproductive = aggregateCuts && additionalCuts.isEmpty(), incumbent = incumbent)
-    }
+    ): LinearAuthorityResult = advanceWithSelectedCuts(source, cancellation, generatedFirst = false,
+        pointAggregates = aggregateCuts && additionalCuts.isEmpty(),
+        retireUnproductive = aggregateCuts && additionalCuts.isEmpty(), incumbent = incumbent)
 
     private fun advanceWithSelectedCuts(
         source: SourceProofContext, cancellation: Cancellation, generatedFirst: Boolean,
@@ -189,7 +182,7 @@ internal class LinearAuthority(
             .also { pointPolicy = it }
         if (pointFallback === template && template?.matches(source) == true) {
             policy.observe("CurrentFallbackQueries")
-            return advance(source, cancellation, cuts = true)
+            return advance(source, cancellation, cuts = !pointAggregates || template?.cuts != null)
         }
         if (pointFamily !== template || template?.matches(source) != true || template?.cuts == null) {
             pointMask = null
@@ -207,11 +200,13 @@ internal class LinearAuthority(
             var point: Pair<LinearAuthorityQuery, List<BigFraction>>? = null
             pointListener = { query, values -> if (point == null) point = query to values }
             val baselineMask = pointMask
+            val baselineCuts = !pointAggregates || baselineMask != null
             policy.observe("BaseQueries")
+            if (!baselineCuts) policy.observe("NoCutBaseQueries")
             deferAggregatePreparation = baselineMask == null && !generatedFirst
             boundedAggregateRecipe = baselineMask == null && generatedFirst
             val base = try {
-                advance(source, cancellation, cuts = true, cutMask = baselineMask)
+                advance(source, cancellation, cuts = baselineCuts, cutMask = baselineMask)
             } finally {
                 deferAggregatePreparation = false
                 boundedAggregateRecipe = false
@@ -233,8 +228,8 @@ internal class LinearAuthority(
                 return base
             }
             pointFamily = family
-            if (family.cuts == null ||
-                !prepared.matches(source, cuts = true, cutMask = baselineMask,
+            if ((family.cuts == null && !pointAggregates) ||
+                !prepared.matches(source, cuts = baselineCuts, cutMask = baselineMask,
                     checkUnselectedCuts = checkUnselectedCuts(baselineMask),
                     retainMaskedCuts = retainMaskedCuts(baselineMask))) {
                 policy.observe("PointUnavailable")
@@ -242,7 +237,7 @@ internal class LinearAuthority(
             }
             val baselineFamily = family
             val baselineQuery = prepared
-            val currentRows = checkNotNull(family.cuts).rows
+            val currentRows = family.cuts?.rows.orEmpty()
             if (generatedFirst && baselineMask == null && currentRows.isNotEmpty() && currentRows.size <= 64 &&
                 prepared.activeCuts == currentRows.size && prepared.checkedCuts.size == currentRows.size &&
                 currentRows.any {
@@ -265,11 +260,11 @@ internal class LinearAuthority(
             var preparedGenerated = false
             val generatedRecipe = currentRows.isNotEmpty() && currentRows.size <= 64 &&
                 currentRows.all { it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR }
-            if (!generatedRecipe && !checkNotNull(family.cuts).pointDirected && directedFamily !== family &&
+            if (!generatedRecipe && family.cuts?.pointDirected != true && directedFamily !== family &&
                 pointMask == null &&
-                (aggregateCuts || checkNotNull(family.cuts).rows.any { it.mixed })) {
+                (aggregateCuts || currentRows.any { it.mixed })) {
                 directedFamily = family
-                cutLifecycle.families = checkNotNull(family.cuts).rows.mapTo(HashSet()) { it.family }
+                cutLifecycle.families = currentRows.mapTo(HashSet()) { it.family }
                 val refined = cutLifecycle.containing("POINT_SELECTION") {
                     preparePointFamily(source, family, prepared, observed.second, cancellation,
                         ordinaryTried = generatedFirst || pointAggregates, pointAggregates = pointAggregates)
@@ -284,14 +279,15 @@ internal class LinearAuthority(
                 } else policy.observe("PointPreparationUnavailable")
             }
             val selected = cutLifecycle.containing("POINT_SELECTION") {
+                val rows = family.cuts?.rows.orEmpty()
                 if (preparedGenerated) {
-                    policy.prepareGenerated(checkNotNull(family.cuts).rows, prepared.checkedCuts, cancellation,
+                    policy.prepareGenerated(rows, prepared.checkedCuts, cancellation,
                         trackUsefulness = retireUnproductive)
                 } else {
-                    policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
+                    policy.select(rows, prepared.coordinates, prepared.costs,
                         prepared.checkedCuts, observed.second, pointMask.orEmpty().intersect(prepared.checkedCuts),
                         cancellation, adoptCurrent = baselineMask == null && family === baselineFamily &&
-                            prepared.activeCuts == checkNotNull(family.cuts).rows.size,
+                            family.cuts != null && prepared.activeCuts == rows.size,
                         usefulnessOpportunity = usefulnessOpportunity, trackSelectedUsefulness = retireUnproductive)
                 }
             }
