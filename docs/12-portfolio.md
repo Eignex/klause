@@ -277,7 +277,7 @@ traffic/work/use counters remain inexpensive. Each sample has separate
 4,096 deduplication entries by default; zero is permitted).
 Posting protection checks stop after finding a required owner; the full allocated
 capacity remains counted.
-Cancellation boundaries export glue through `onSearchEnd`. Other cooperative
+Cancellation and exhausted optimization slices export glue through `onSearchEnd`. Other cooperative
 pauses use `onSearchPause` to observe retained memory without publishing clauses or
 draining scheduler credit. Uses remain pending until a restart, cancellation boundary
 or uncancelled close. Both pause hooks retain the duplicate filter; `onSearchClose` releases it.
