@@ -89,7 +89,7 @@ internal class LinearAuthority(
     private var pointListener: ((LinearAuthorityQuery, List<BigFraction>) -> Unit)? = null
     private var pointPolicy: LinearAuthorityPointCuts? = null
     private var pointFamily: LinearAuthorityTemplate? = null
-    private var pointFallback: LinearAuthorityTemplate? = null
+    private var pointFallback: LinearAuthorityQuery? = null
     private var directedFamily: LinearAuthorityTemplate? = null
     private var pointMask: Set<Int>? = null
     private var deferAggregatePreparation = false
@@ -180,13 +180,15 @@ internal class LinearAuthority(
     ): LinearAuthorityResult {
         val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe)
             .also { pointPolicy = it }
-        if (pointFallback === template && template?.matches(source) == true) {
+        val fallbackCuts = !pointAggregates || template?.cuts != null
+        if (pointFamily === template && template?.matches(source) == true &&
+            pointFallback?.matches(source, cuts = fallbackCuts) == true) {
             policy.observe("CurrentFallbackQueries")
-            return advance(source, cancellation, cuts = !pointAggregates || template?.cuts != null)
+            return advance(source, cancellation, cuts = fallbackCuts)
         }
+        pointFallback = null
         if (pointFamily !== template || template?.matches(source) != true || template?.cuts == null) {
             pointMask = null
-            pointFallback = null
             pointRound = null
             pointFamily = template
         }
@@ -300,7 +302,7 @@ internal class LinearAuthority(
                 template = baselineFamily
                 query = baselineQuery
                 pointFamily = baselineFamily
-                pointFallback = baselineFamily
+                pointFallback = baselineQuery
                 directedFamily = null
                 policy.releaseCandidates()
                 policy.observe("CurrentFallback")

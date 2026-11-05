@@ -22,6 +22,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -51,6 +52,98 @@ class LinearAuthorityPointCutsTest {
         "real lower" to SourcePremise(SourceInequality(mapOf(mixedReal to BigFraction.MINUS_ONE), BigFraction.ZERO)),
         "integer lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
     ), mapOf(x to BigFraction.ONE))
+
+    @Test
+    fun `numeric scope changes should retry a nonseparating point recipe`() {
+        val triangle = (1..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = nonseparating.premises.toMutableMap()
+        premises["coupled"] = SourcePremise(SourceInequality(
+            mapOf(x to BigFraction.ONE, mixedReal to BigFraction.ONE), BigFraction.ofLong(3)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val half = BigFraction.ofLong(2).reciprocal()
+        val quarter = BigFraction.ofLong(4).reciprocal()
+        val root = SourceProofContext(nonseparating.scope, nonseparating.coordinates + triangle, premises,
+            (triangle + x).associateWith { BigFraction.ONE } +
+                (triangle.first() to half) + (mixedReal to quarter.negated()))
+        val conditions = listOf(
+            SourceCondition(upper = mapOf(mixedReal to half)) to BigFraction.ofLong(23) * quarter * half,
+            SourceCondition(integerRows = listOf(SourceInequality(
+                mapOf(x to BigFraction.ONE, triangle.first() to BigFraction.MINUS_ONE), BigFraction.ONE))) to
+                BigFraction.ofLong(11) * quarter)
+        for ((condition, baseline) in conditions) {
+            val child = root.atScope(root.scope.copy(condition = condition))
+            for (prime in listOf(false, true)) {
+                LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+                    val initial = authority.advanceWithPointGeneratedCuts(root, Cancellation.Never, BigFraction.ZERO)
+                    assertEquals(SourceValue.Rational(BigFraction.ofLong(3)),
+                        assertIs<SourceClaim.Bound>(assertNotNull(initial.bound).claim).value)
+                    assertEquals(1L, authority.cutObservations()["numericalCutSelectionCurrentFallback"])
+                    val preparations = authority.preparations
+                    val scoring = authority.cutObservations()["numericalCutSelectionWork"]
+                    authority.advanceWithPointGeneratedCuts(root, Cancellation.Never, BigFraction.ZERO)
+                    assertEquals(preparations, authority.preparations)
+                    assertEquals(scoring, authority.cutObservations()["numericalCutSelectionWork"])
+                    if (prime) {
+                        val current = authority.advance(child, Cancellation.Never, cuts = false)
+                        assertEquals(SourceValue.Rational(baseline),
+                            assertIs<SourceClaim.Bound>(assertNotNull(current.bound).claim).value)
+                    }
+
+                    val result = authority.advanceWithPointGeneratedCuts(child, Cancellation.Never, BigFraction.ZERO)
+
+                    assertEquals(SourceValue.Rational(BigFraction.ofLong(21) * quarter * half),
+                        assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                    assertTrue(result.cutBoundFamilies.isNotEmpty())
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(child.withLinearAuthority()).verify(assertNotNull(result.bound)))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `retrying a changed fallback scope should preserve the operation limited bound`() {
+        val triangle = (1..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = nonseparating.premises.toMutableMap()
+        premises["coupled"] = SourcePremise(SourceInequality(
+            mapOf(x to BigFraction.ONE, mixedReal to BigFraction.ONE), BigFraction.ofLong(3)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val half = BigFraction.ofLong(2).reciprocal()
+        val quarter = BigFraction.ofLong(4).reciprocal()
+        val root = SourceProofContext(nonseparating.scope, nonseparating.coordinates + triangle, premises,
+            (triangle + x).associateWith { BigFraction.ONE } +
+                (triangle.first() to half) + (mixedReal to quarter.negated()))
+        val conditions = listOf(
+            SourceCondition(upper = mapOf(mixedReal to half)) to BigFraction.ofLong(23) * quarter * half,
+            SourceCondition(integerRows = listOf(SourceInequality(
+                mapOf(x to BigFraction.ONE, triangle.first() to BigFraction.MINUS_ONE), BigFraction.ONE))) to
+                BigFraction.ofLong(11) * quarter)
+        for ((condition, baseline) in conditions) {
+            val child = root.atScope(root.scope.copy(condition = condition))
+            val budget = SourceLpBudget(maxOperations = 2)
+            LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+                authority.advanceWithPointGeneratedCuts(root, Cancellation.Never, BigFraction.ZERO)
+
+                val result = authority.advanceWithPointGeneratedCuts(child, Cancellation.Never, BigFraction.ZERO)
+
+                assertEquals(2, budget.operations)
+                assertEquals(SourceValue.Rational(baseline),
+                    assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(child.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            }
+        }
+    }
 
     @Test
     fun `a fully retired point recipe should release its inactive query rows`() {

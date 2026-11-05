@@ -643,7 +643,8 @@ At the first available point, point selection can replace its unselected candida
 definitions with independently chosen nearer continuous endpoints. Exact premises
 still authorize every row. The replacement shares the original generation's work
 limit and retains the source-row template; unavailable preparation leaves its prior
-candidates intact. Each immutable template attempts this preparation once.
+candidates intact. Each retained candidate generation attempts this preparation once.
+A new scope can start another generation after a nonseparating fallback.
 Point scoring admits at most one additional checked cut at each usable point.
 An addition waits for its completed selected query before enabling another scan
 at the next point. Only a strictly stronger checked bound, a checked incumbent or
@@ -1685,8 +1686,11 @@ Selection admits at most one newly violated checked cut before the optional quer
 The internal generated-mask entry can instead initialize a bounded generated recipe
 and start installed-row aging without replacing its numerical owner.
 A trial that admits no candidate retains
-its base template, checked query and numerical owner for later queries of that
-template. Successful selection retains its checked mask instead.
+its base template, checked query and numerical owner for later queries in that
+exact source scope. Numeric bounds and integer-row assumptions participate in
+fallback matching; a changed scope retries separation even when its template is
+compatible. The fallback retains immutable query data and no extra numerical owner.
+Successful selection retains its checked mask instead.
 Integer-only templates and aggregate-only cut families with at most 64 fully checked
 installed cuts adopt that mask directly from the current recipe, without another
 LP query or a root miss.
