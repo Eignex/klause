@@ -1242,6 +1242,9 @@ class PropagationSession private constructor(
         return ReclamationPreparation(maxWork, maxScratchBytes, { cancelRequested || cancelled() }) { owner.work += it }
     }
 
+    internal val nativeCapWindowPending: Boolean get() = state.nativeEngine?.capWindowPending == true
+    internal val nativeCapTraversalVisits: Long get() = state.nativeEngine?.capTraversalVisits ?: 0L
+
     internal fun maintainCapWindow(
         cap: Int,
         maxWork: Long,
