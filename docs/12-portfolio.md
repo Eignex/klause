@@ -1039,8 +1039,11 @@ satisfaction workers harvest root cuts only with an explicit `lp-root-cuts=true`
 Curated backtrack-only clausal and pseudo-Boolean satisfaction pools enable bounded
 [root maintenance](09-learning.md#restarts-phases-and-inprocessing) on every complete worker.
 Each safe-root slice shares a 4,096-work grant: cheap simplification receives 256 work,
-and up to two failed-literal probes share 3,072 work with an 8,192-work per-probe
-ceiling. Consistent-probe binary capture is disabled in this pool; explicit
+and up to two failed-literal probes share 3,072 work. The per-probe ceiling is 8,192
+work for clausal pools and 2,048 for pseudo-Boolean pools. Clausal pools give
+subsumption and vivification zero class grants; pseudo-Boolean pools retain their
+recipe's auxiliary grants inside the shared ceiling.
+Consistent-probe binary capture is disabled in this pool; explicit
 `root-probe-implications=true` enables it without changing failed-literal probes or
 cheap binary maintenance. Root scans examine at most 256 clauses per slice. Natural-root scheduling
 uses a 32-work interval, eight-clause growth and a 32-work cooldown. Clausal pools

@@ -500,13 +500,17 @@ class PortfolioCompositionTest {
                     assertTrue(arm.rootSimplification)
                     assertEquals(256, arm.rootSimplifyBatch)
                     assertEquals(2, arm.rootProbeBatch)
-                    assertEquals(8192L, arm.rootProbeWork)
+                    assertEquals(if (problemClass == ProblemClass.Sat) 8192L else 2048L, arm.rootProbeWork)
                     assertFalse(arm.rootProbeImplications)
                     assertEquals(problemClass == ProblemClass.Sat, arm.rootProbeBinaryGate)
                     assertEquals(problemClass == ProblemClass.PseudoBoolean, arm.rootProbeGeneralGate)
                     assertEquals(4096L, arm.inprocessingWork)
                     assertEquals(256L, arm.inprocessingRootWork)
                     assertEquals(3072L, arm.inprocessingProbeWork)
+                    assertEquals(if (problemClass == ProblemClass.Sat) 0L else Long.MAX_VALUE,
+                        arm.inprocessingSubsumeWork)
+                    assertEquals(if (problemClass == ProblemClass.Sat) 0L else Long.MAX_VALUE,
+                        arm.inprocessingVivifyWork)
                     assertEquals(32768L, arm.inprocessingProbeInterval)
                     assertEquals(32L, arm.inprocessingInterval)
                     assertEquals(8, arm.inprocessingGrowth)
@@ -607,7 +611,8 @@ class PortfolioCompositionTest {
         val scenario = PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK).copy(
             btEdit = {
                 it.copy(rootSimplification = false, rootProbeBatch = 0,
-                    rootProbeImplications = true, rootProbeGeneralGate = false, inprocessingWork = 17L)
+                    rootProbeImplications = true, rootProbeGeneralGate = false, rootProbeWork = 23L,
+                    inprocessingWork = 17L, inprocessingSubsumeWork = 13L, inprocessingVivifyWork = 19L)
             },
         )
         val facts = ProblemFacts.assumed(Kind.CSP, ProblemClass.PseudoBoolean)
@@ -618,7 +623,8 @@ class PortfolioCompositionTest {
         assertTrue(params.isNotEmpty())
         assertTrue(params.all {
             !it.rootSimplification && it.rootProbeBatch == 0 &&
-                it.rootProbeImplications && !it.rootProbeGeneralGate && it.inprocessingWork == 17L
+                it.rootProbeImplications && !it.rootProbeGeneralGate && it.rootProbeWork == 23L &&
+                it.inprocessingWork == 17L && it.inprocessingSubsumeWork == 13L && it.inprocessingVivifyWork == 19L
         })
     }
 

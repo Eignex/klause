@@ -374,8 +374,7 @@ internal object PortfolioComposition {
                 val defaults = if (boundedRoot) {
                     rootParams.boundedRootMaintenance(
                         warmupWork = if (clausal) 4096L else 0L,
-                        binaryGate = clausal,
-                        generalGate = !clausal,
+                        clausal = clausal,
                     )
                 } else {
                     rootParams
@@ -401,19 +400,20 @@ internal object PortfolioComposition {
 
     private fun BacktrackParams.boundedRootMaintenance(
         warmupWork: Long,
-        binaryGate: Boolean,
-        generalGate: Boolean,
+        clausal: Boolean,
     ): BacktrackParams = copy(
         rootSimplification = true,
         rootSimplifyBatch = 256,
         rootProbeBatch = 2,
-        rootProbeWork = 8192L,
+        rootProbeWork = if (clausal) 8192L else 2048L,
         rootProbeImplications = false,
-        rootProbeBinaryGate = binaryGate,
-        rootProbeGeneralGate = generalGate,
+        rootProbeBinaryGate = clausal,
+        rootProbeGeneralGate = !clausal,
         inprocessingWork = 4096L,
         inprocessingRootWork = 256L,
         inprocessingProbeWork = 3072L,
+        inprocessingSubsumeWork = if (clausal) 0L else inprocessingSubsumeWork,
+        inprocessingVivifyWork = if (clausal) 0L else inprocessingVivifyWork,
         inprocessingProbeInterval = 32768L,
         inprocessingInterval = 32L,
         inprocessingGrowth = 8,
