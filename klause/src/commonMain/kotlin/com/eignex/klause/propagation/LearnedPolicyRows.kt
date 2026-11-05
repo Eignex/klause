@@ -409,7 +409,7 @@ internal class LearnedPolicyRows(
             retained.second + if (protectedRows) 1L else 0L)
     }
 
-    private companion object {
+    internal companion object {
         const val LBD = 0
         const val PERMANENT = 1
         const val TIER = 2
