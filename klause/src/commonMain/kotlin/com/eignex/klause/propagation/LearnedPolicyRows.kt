@@ -87,8 +87,11 @@ internal class LearnedPolicyRows(
         if (index == 0) return primary
         val cached = cachedPages[index and CACHE_MASK]
         if (cached?.slot?.key == index) return cached
-        return locate(index, ::chargeLookup)
+        return lookupPage(index)
     }
+
+    // Isolate cold traversal so JVM inlining can focus on cache hits.
+    private fun lookupPage(index: Int): Page? = locate(index, ::chargeLookup)
 
     private fun allocationWork(page: Page?, required: Int): Long = when {
         page == null -> capacityFor(required) * rowWork * 2L + 8L
