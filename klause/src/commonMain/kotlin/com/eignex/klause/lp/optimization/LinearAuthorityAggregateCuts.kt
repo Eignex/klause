@@ -282,18 +282,20 @@ internal object LinearAuthorityAggregateCuts {
         cut: LinearAuthorityCut, point: Map<SourceCoordinate, Double>, meter: AggregateMeter,
         observe: (String, Long) -> Unit,
     ): Boolean? {
-        meter.reserve(1L, 128L + cut.inequality.supportSize * 64L)
+        meter.reserve(1L, 256L)
         var activity = 0.0
         var normSquared = 0.0
-        for ((id, value) in cut.inequality.coefficients) {
-            meter.reserve(4L)
-            val coordinate = point[id] ?: run {
-                observe("AggregatePairPointUnavailable", 1L)
-                return null
-            }
+        val complete = cut.inequality.forEachCoefficient { id, value ->
+            meter.reserve(4L, 32L)
+            val coordinate = point[id] ?: return@forEachCoefficient false
             val coefficient = value.toDouble()
             activity += coefficient * coordinate
             normSquared += coefficient * coefficient
+            true
+        }
+        if (!complete) {
+            observe("AggregatePairPointUnavailable", 1L)
+            return null
         }
         meter.reserve(1L)
         val efficacy = (activity - cut.inequality.rhs.toDouble()) / sqrt(normSquared)

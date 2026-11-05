@@ -113,6 +113,9 @@ callers check scope and semantic identity separately. Traversal and producer ret
 use the caller's allowance.
 Internal singleton lookups expose captured coordinates and scalar values without
 returning map entries; iterator storage and lookup work use the caller's allowance.
+Internal inequality coefficient traversal exposes captured coordinates and values,
+stops on consumer refusal and returns no map or entries. Setup and visits use the
+caller's allowance.
 Each verification run lazily captures the immutable context's coordinate, premise
 and objective views once, so individual proof lookups do not copy the full source.
 
