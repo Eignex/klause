@@ -43,7 +43,7 @@ internal interface InprocessingPass {
 
     fun releaseRetainedBuffers() = reset()
 
-    fun optionalWorkDue(nonInprocessingWork: Long, params: BacktrackParams): Boolean = true
+    fun optionalWorkDue(session: PropagationSession, nonInprocessingWork: Long, params: BacktrackParams): Boolean = true
 
     fun rootPublished() = Unit
 
@@ -233,7 +233,7 @@ internal class Inprocessing(
                         if (containingWork == 0L) return@withInprocessingCancellation
                         val pass = passes[nextPass]
                         nextPass = (nextPass + 1) % passes.size
-                        if (ordinaryDue && pass.optionalWorkDue(work, params)) {
+                        if (ordinaryDue && pass.optionalWorkDue(session, work, params)) {
                             pass.run(session, params, stats, containingWork)
                         } else if (pass.hasContinuation(session)) {
                             pass.continueAtRoot(session, params, stats, containingWork)

@@ -355,6 +355,112 @@ class InprocessingTest {
     }
 
     @Test
+    fun `unproductive probes should leave cheap maintenance on its base schedule`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem().bake(), nativeSat = native)
+            val cheap = CountingPass(work = 50L)
+            val stats = SearchStatsSink()
+            val loop = Inprocessing(listOf(RootProbingPass(), cheap), cadence = 1, stats = stats)
+            val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+                inprocessingProbeInterval = 100L)
+            loop.onRestart(session, params)
+            repeat(3) {
+                session.chargeInprocessingWork(100L)
+                loop.onRestart(session, params)
+            }
+
+            session.chargeInprocessingWork(100L)
+            loop.onRestart(session, params)
+
+            assertEquals(4L, stats.inprocessProbes)
+            assertEquals(5, cheap.runs)
+            session.chargeInprocessingWork(100L)
+            loop.onRestart(session, params)
+            assertEquals(5L, stats.inprocessProbes)
+            assertEquals(6, cheap.runs)
+        }
+    }
+
+    @Test
+    fun `buffer release should preserve unproductive probe backoff`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem().bake(), nativeSat = native)
+            val stats = SearchStatsSink()
+            val loop = Inprocessing(listOf(RootProbingPass()), cadence = 1, stats = stats)
+            val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+                inprocessingProbeInterval = 100L)
+            loop.onRestart(session, params)
+            repeat(3) {
+                session.chargeInprocessingWork(100L)
+                loop.onRestart(session, params)
+            }
+
+            assertTrue(loop.releaseRetainedBuffers())
+            session.chargeInprocessingWork(100L)
+            loop.onRestart(session, params)
+
+            assertEquals(4L, stats.inprocessProbes)
+        }
+    }
+
+    @Test
+    fun `new root facts should restore the minimum probe interval`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem().bake(), nativeSat = native)
+            val stats = SearchStatsSink()
+            val loop = Inprocessing(listOf(RootProbingPass()), cadence = 1, stats = stats)
+            val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+                inprocessingProbeInterval = 100L)
+            loop.onRestart(session, params)
+            repeat(3) {
+                session.chargeInprocessingWork(100L)
+                loop.onRestart(session, params)
+            }
+
+            session.addLearnedClause(Clause(intArrayOf(Lit.make(0, true))), 1)
+            session.chargeInprocessingWork(100L)
+            loop.onRestart(session, params)
+
+            assertEquals(5L, stats.inprocessProbes)
+        }
+    }
+
+    @Test
+    fun `scope reset should discard unproductive probe backoff`() {
+        val session = session()
+        val stats = SearchStatsSink()
+        val loop = Inprocessing(listOf(RootProbingPass()), cadence = 1, stats = stats)
+        val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+            inprocessingProbeInterval = 100L)
+        loop.onRestart(session, params)
+        repeat(3) {
+            session.chargeInprocessingWork(100L)
+            loop.onRestart(session, params)
+        }
+
+        loop.reset()
+        loop.onRestart(session, params)
+        session.chargeInprocessingWork(100L)
+        loop.onRestart(session, params)
+
+        assertEquals(6L, stats.inprocessProbes)
+    }
+
+    @Test
+    fun `probe backoff should not wrap large work intervals`() {
+        val session = session()
+        val pass = RootProbingPass()
+        val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+            inprocessingProbeInterval = Long.MAX_VALUE)
+        assertTrue(pass.optionalWorkDue(session, 0L, params))
+        repeat(4) { pass.run(session, params, null, Long.MAX_VALUE) }
+
+        val due = pass.optionalWorkDue(session, Long.MAX_VALUE, params)
+
+        assertFalse(due)
+    }
+
+    @Test
     fun `buffer release should preserve the optional probe interval`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem().bake(), nativeSat = native)

@@ -772,11 +772,15 @@ Each of the four classes has a separate work ceiling inside the scheduled slice'
 total ceiling. Each pass receives the containing remainder after earlier passes;
 its remaining optional work is the smaller of that remainder and its class grant
 after debt repayment. Zero withholds that class.
-`inprocessingProbeInterval` spaces optional probe slices by non-inprocessing work
+`inprocessingProbeInterval` sets the minimum spacing of optional probe slices by non-inprocessing work
 while cheap maintenance keeps its shared root schedule. The first eligible slice
 needs no preceding interval. Probe, maintenance, publication and cleanup work cannot
 fund the next slice; pending funded continuations resume before this optional gate.
-Buffer release preserves the interval clock, and reseeding renews its origin. Completed atomic copying, sorting and
+Four attempted slices without an admitted consequence double that spacing, up to
+32 times the minimum. An admitted unit or binary, or a new unconditional root fact,
+restores the minimum. A slice with no attempted probe does not earn backoff.
+Zero spacing retains the shared schedule. Buffer release preserves the interval
+clock and backoff, and reseeding renews their origin. Completed atomic copying, sorting and
 compaction can overspend; the class and scheduled loop repay their respective debt
 before admitting more work. Separate containing and per-class debt-added and
 debt-repaid counters retain those charges without adding work. Reseeding resets

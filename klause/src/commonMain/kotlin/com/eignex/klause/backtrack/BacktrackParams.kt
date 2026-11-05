@@ -466,7 +466,7 @@ data class BacktrackParams(
     val privateRebuildBytes: Long? = null,
     /** Capture conditional binaries from completed consistent root probes; failed-literal units remain enabled. */
     val rootProbeImplications: Boolean = true,
-    /** Non-inprocessing work between optional probing slices; zero follows the shared root trigger. */
+    /** Minimum non-inprocessing work between optional probing slices; zero follows the shared root trigger. */
     val inprocessingProbeInterval: Long = 0L,
 ) : SolverParams {
     init {

@@ -307,6 +307,9 @@ internal class RootProbingPass : InprocessingPass {
     private var preparationLeft = 0
     private var offeredWork = 0L
     private var lastProbeWork = -1L
+    private var unproductiveSlices = 0
+    private var intervalMultiplier = 1
+    private var observedRootPins = 0
     private val implications = RootProbeImplications()
     override val spending = InprocessingSpending(InprocessingKind.Probe)
 
@@ -322,15 +325,27 @@ internal class RootProbingPass : InprocessingPass {
         implications.releaseRetainedBuffers()
     }
 
-    override fun optionalWorkDue(nonInprocessingWork: Long, params: BacktrackParams): Boolean {
+    override fun optionalWorkDue(
+        session: PropagationSession,
+        nonInprocessingWork: Long,
+        params: BacktrackParams,
+    ): Boolean {
         offeredWork = nonInprocessingWork
-        return lastProbeWork < 0L ||
-            (nonInprocessingWork - lastProbeWork).coerceAtLeast(0L) >= params.inprocessingProbeInterval
+        if (session.canSimplifyRoot) {
+            val pins = session.explanationState.boolPinOrder.size
+            if (pins > observedRootPins) resetBackoff()
+            observedRootPins = pins
+        }
+        if (lastProbeWork < 0L || params.inprocessingProbeInterval == 0L) return true
+        val elapsed = (nonInprocessingWork - lastProbeWork).coerceAtLeast(0L)
+        return elapsed / params.inprocessingProbeInterval >= intervalMultiplier
     }
 
     private fun resetCursors() {
         offeredWork = 0L
         lastProbeWork = -1L
+        resetBackoff()
+        observedRootPins = 0
         literalCursor = 0L
         endpointCursor = 0L
         preferEndpoint = false
@@ -344,7 +359,7 @@ internal class RootProbingPass : InprocessingPass {
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
         sample.ownedReferences(this, if (neighborhood == null) 1L else 2L, protected)
-        sample.owned(this, 2L * Long.SIZE_BYTES, protected)
+        sample.owned(this, 2L * Long.SIZE_BYTES + 3L * Int.SIZE_BYTES, protected)
         implications.retainedMemory(sample, protected)
         neighborhood?.let { sample.owned(it, it.size.toLong() * Int.SIZE_BYTES, protected) }
     }
@@ -360,7 +375,9 @@ internal class RootProbingPass : InprocessingPass {
     ) {
         if (!session.canSimplifyRoot) return
         spending.run(session, params, stats, containingWork = containingWork) { budget ->
+            val admissions = implications.admissionCount
             implications.advance(session, params, budget)
+            if (implications.admissionCount > admissions) resetBackoff()
         }
     }
 
@@ -403,25 +420,51 @@ internal class RootProbingPass : InprocessingPass {
     ) {
         if (!session.canSimplifyRoot || params.rootProbeWork <= 0L) return
         spending.run(session, params, stats, containingWork = containingWork) { budget ->
+            val admissions = implications.admissionCount
             if (implications.advance(session, params, budget) && !budget.stopped()) {
                 val before = session.work
                 try {
-                    probe(session, params, budget)
+                    val progress = probe(session, params, budget)
+                    if (implications.admissionCount == admissions) observeProgress(progress, params, budget)
                 } finally {
                     if (session.work > before) lastProbeWork = offeredWork
                 }
             }
+            if (implications.admissionCount > admissions) resetBackoff()
         }
     }
 
-    private fun probe(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget) {
+    private fun resetBackoff() {
+        unproductiveSlices = 0
+        intervalMultiplier = 1
+    }
+
+    private fun observeProgress(progress: ProbeProgress, params: BacktrackParams, budget: InprocessingBudget) {
+        if (progress == ProbeProgress.Productive) resetBackoff()
+        if (progress != ProbeProgress.Unproductive || params.inprocessingProbeInterval == 0L) return
+        budget.note("UnproductiveSlices")
+        unproductiveSlices++
+        if (unproductiveSlices < PROBE_BACKOFF_SLICES) return
+        unproductiveSlices = 0
+        if (intervalMultiplier < PROBE_BACKOFF_LIMIT) {
+            intervalMultiplier *= 2
+            budget.note("Backoffs")
+        }
+    }
+
+    private fun probe(
+        session: PropagationSession,
+        params: BacktrackParams,
+        budget: InprocessingBudget,
+    ): ProbeProgress {
         val variables = session.rootProbeVariableCount
         val literalCandidates = 2L * variables
         val endpointCandidates = 2L * session.problem.numIntVars
         val candidates = literalCandidates + endpointCandidates
-        if (candidates == 0L) return
+        if (candidates == 0L) return ProbeProgress.Unattempted
         preparationLeft = PROBE_NEIGHBORHOOD_CLAUSES
         var attempted = 0
+        var progress = ProbeProgress.Unattempted
         var examined = 0
         var literalsExamined = 0L
         var endpointsExamined = 0L
@@ -475,6 +518,7 @@ internal class RootProbingPass : InprocessingPass {
                 implications.reserve(params, budget)
             val pins = session.explanationState.boolPinOrder.size
             attempted++
+            if (progress == ProbeProgress.Unattempted) progress = ProbeProgress.Unproductive
             budget.note("Eligible")
             budget.probe()
             val result = probe(session, params.rootProbeWork, {
@@ -495,15 +539,17 @@ internal class RootProbingPass : InprocessingPass {
                     session.addRootDerivedClause(Clause(intArrayOf(unit)), 1, OWN_ORIGIN, false)
                     budget.note("AttachmentWork", session.work - before + 3L)
                     budget.note("Units")
+                    progress = ProbeProgress.Productive
                     if (endpoint) budget.note("EndpointUnits")
                     if (nearby != null) neighborhood = null
                 }
                 else -> {
                     budget.note("Consistent")
-                    if (!implications.advance(session, params, budget)) return
+                    if (!implications.advance(session, params, budget)) return progress
                 }
             }
         }
+        return progress
     }
 
     private fun complement(
@@ -554,7 +600,11 @@ internal class RootProbingPass : InprocessingPass {
     }
 }
 
+private enum class ProbeProgress { Unattempted, Unproductive, Productive }
+
 private const val PROBE_NEIGHBORHOOD_CLAUSES = 16
 private const val PROBE_NEIGHBORHOOD_LITERALS = 8
+private const val PROBE_BACKOFF_SLICES = 4
+private const val PROBE_BACKOFF_LIMIT = 32
 
 internal const val ROOT_LITERAL_LIMIT = 8192

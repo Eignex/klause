@@ -1044,8 +1044,9 @@ ceiling. Consistent-probe binary capture is disabled in this pool; explicit
 `root-probe-implications=true` enables it without changing failed-literal probes or
 cheap binary maintenance. Root scans examine at most 256 clauses per slice. Natural-root scheduling
 uses a 32-work interval, eight-clause growth and a 32-work cooldown, with no warmup.
-After the first eligible probe slice, optional probing requires 32,768 additional
-non-inprocessing work. Cheap scans and pending continuations keep their own eligibility;
+After the first eligible probe slice, optional probing requires at least 32,768 additional
+non-inprocessing work. Unproductive slices back off this interval; admitted consequences
+and new unconditional root facts restore the minimum. Cheap scans and pending continuations keep their own eligibility;
 `inprocessing-probe-interval=0` follows the shared root trigger instead.
 These allowances remain inside each worker's containing slice. The
 `root-maintenance=false` option retains stock root defaults without changing explicit

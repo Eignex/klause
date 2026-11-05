@@ -331,7 +331,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val inprocessingWork: ExecutionOption<Long> = ExecutionOption("inprocessing-work", ValueKind.LONG)
         /** Cheap root scan work ceiling. */
         val inprocessingRootWork: ExecutionOption<Long> = ExecutionOption("inprocessing-root-work", ValueKind.LONG)
-        /** Non-inprocessing work between optional probing slices; zero follows the shared root trigger. */
+        /** Minimum non-inprocessing work between optional probing slices; zero follows the shared root trigger. */
         val inprocessingProbeInterval: ExecutionOption<Long> = ExecutionOption(
             "inprocessing-probe-interval", ValueKind.LONG,
         )

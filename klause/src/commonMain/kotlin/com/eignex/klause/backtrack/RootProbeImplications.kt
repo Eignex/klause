@@ -19,6 +19,7 @@ internal class RootProbeImplications {
     private var admissions = 0
 
     val hasContinuation: Boolean get() = pending != 0L
+    val admissionCount: Int get() = admissions
 
     fun reserve(params: BacktrackParams, budget: InprocessingBudget): Boolean {
         if (!params.rootProbeImplications || admissions >= ADMISSION_LIMIT) return false
