@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.CutAuxiliaryDefinition
 import com.eignex.klause.lp.engine.CutExpression
 import com.eignex.klause.lp.engine.CutPremise
 import com.eignex.klause.lp.engine.CutProofFact
@@ -234,6 +235,47 @@ class SourceCutTest {
             CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT),
             source.toCut(map, CutMappingLimits(bits = 32)),
         )
+    }
+
+    @Test
+    fun `repeated mapping should exclude unused auxiliary definitions`() {
+        val auxiliary = CutSource(CutSourceKind.AUXILIARY, 0)
+        val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 1L, true)
+        val expression = CutExpression(mapOf(x to BigFraction.ONE))
+        val proof = CutProvenance(modelToken, 0, emptyList(),
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+            auxiliaryDefinitions = mapOf(auxiliary to definition))
+        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, proof)
+        val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
+        var prepared: SourceCutPreparation? = null
+        assertNotNull(source.toCut(map, onPrepared = { prepared = it }).orNull())
+
+        val result = assertNotNull(source.toCut(map, preparation = prepared).orNull())
+
+        assertTrue(assertNotNull(result.provenance).auxiliaryDefinitions.isEmpty())
+    }
+
+    @Test
+    fun `prepared input should rebind equivalent auxiliary definitions to the current columns`() {
+        val original = CutSource(CutSourceKind.AUXILIARY, 0)
+        val first = CutSource(CutSourceKind.AUXILIARY, 1)
+        val next = CutSource(CutSourceKind.AUXILIARY, 2)
+        val definition = CutAuxiliaryDefinition(listOf(1L), emptyList(), 1L, true)
+        val expression = CutExpression(mapOf(original to BigFraction.ONE))
+        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, emptyList(),
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+            auxiliaryDefinitions = mapOf(original to definition)))
+        val firstMap = CutSourceMap(modelToken, 0, listOf(CutColumnSource(first)),
+            auxiliaryDefinitions = mapOf(first to definition))
+        var prepared: SourceCutPreparation? = null
+        assertNotNull(source.toCut(firstMap, onPrepared = { prepared = it }).orNull())
+        val nextMap = CutSourceMap(modelToken, 1, listOf(null, CutColumnSource(next)),
+            auxiliaryDefinitions = mapOf(next to definition))
+
+        val result = assertNotNull(source.toCut(nextMap, preparation = assertNotNull(prepared)).orNull())
+
+        assertEquals(1, result.cols.single())
+        assertEquals(mapOf(next to definition), assertNotNull(result.provenance).auxiliaryDefinitions)
     }
 
     @Test

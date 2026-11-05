@@ -288,7 +288,7 @@ internal class SourceCut(
                 family = family,
             ),
         )
-        if (prepared == null && onPrepared != null && original === provenance) {
+        if (prepared == null && onPrepared != null && original === this.provenance) {
             onPrepared(PreparedSourceCutInput(this, limits.terms, limits.bits))
         }
         return result
