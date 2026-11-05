@@ -509,6 +509,7 @@ data class BacktrackParams(
 
 // Additional native scheduling bounds can disrupt LP branch guidance.
 internal val BacktrackParams.useCumulativeUnarySubsets: Boolean
-    get() = lpPlan.copy(branching = true, rootCutHarvest = true).hasDefaultNumericalSettings() && lpConfig.let { config ->
-        config == null || (config.emphasis == LpEmphasis.OFF && config.overrides.values.none { it })
-    }
+    get() = lpPlan.copy(branching = true, rootCutHarvest = true).hasDefaultNumericalSettings() &&
+        lpConfig.let { config ->
+            config == null || (config.emphasis == LpEmphasis.OFF && config.overrides.values.none { it })
+        }
