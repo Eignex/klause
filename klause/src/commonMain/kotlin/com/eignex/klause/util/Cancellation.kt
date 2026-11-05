@@ -149,7 +149,12 @@ private class OrCancellation(
     }.toTypedArray()
 
     override fun isCancelled(): Boolean {
-        for (token in tokens) if (token.isCancelled()) return true
+        // Separate leading dispatch sites so unlike predicates do not share one loop call profile.
+        if (tokens.isEmpty()) return false
+        if (tokens[0].isCancelled()) return true
+        if (tokens.size == 1) return false
+        if (tokens[1].isCancelled()) return true
+        for (index in 2 until tokens.size) if (tokens[index].isCancelled()) return true
         return false
     }
 
