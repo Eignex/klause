@@ -319,6 +319,9 @@ to its fixed maximum; full compaction trims a partial last page. Empty pages rel
 without changing live clause handles. Reductions compact their handle and reference columns without
 copying surviving literal arrays. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
+When the learned retirement count is zero, watch propagation can exclude learned
+retirement without reading each row's metadata. Root-source retirement is checked
+independently.
 
 A bounded window over non-permanent
 learned clauses retains the lowest LBD and stable-handle keys after permanent and
@@ -587,8 +590,9 @@ page belongs directly to its owner; later pages use a bounded sparse index. Fixe
 startup ownership belongs to state preparation, and admissions fund subsequent
 growth and index insertion. Lookups debit the active maintenance or observation
 grant, or the containing propagation ledger. A fixed-size page cache avoids repeated
-lookups during ranking; its reference allocation belongs to fixed preparation and
-modeled ownership. Header unlinking clears its cache slot before releasing the page.
+lookups during ranking, with 128 reference slots for General metadata and 512 for
+Native metadata. Initialization work and reference ownership include the allocated
+cache length. Header unlinking clears its cache slot before releasing the page.
 A page queue and per-page retirement masks resume row release without scanning
 permanent rows or looking up another page. Retained import/use counters survive
 released metadata. Empty arrays release within their row transaction; empty headers
