@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.addExact
@@ -126,7 +127,7 @@ internal fun LpModel.columnNeighborhood(seeds: IntArray, maxRows: Int, rowIndex:
     val takenRows = IntArrayList()
     val takenCols = IntArrayList()
     val rowSeen = IntHashSet()
-    val colQueue = ArrayDeque<Int>()
+    val colQueue = IntArrayDeque()
     fun takeCol(j: Int) {
         if (colMap[j] >= 0) return
         colMap[j] = takenCols.size

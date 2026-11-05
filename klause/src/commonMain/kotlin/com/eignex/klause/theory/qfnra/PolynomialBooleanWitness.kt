@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.FALSE
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.TRUE
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.UNASSIGNED
+import com.eignex.util.collections.IntArrayDeque
 
 internal class PolynomialBooleanWitness(
     private val nodes: List<FormulaNode>,
@@ -14,7 +15,7 @@ internal class PolynomialBooleanWitness(
     private val supported = IntArray(nodes.size) { arithmetic.step(); UNASSIGNED }
     private val trueChildren = IntArray(nodes.size)
     private val falseChildren = IntArray(nodes.size)
-    private val pending = ArrayDeque<Int>()
+    private val pending = IntArrayDeque()
     private val queued = BooleanArray(nodes.size)
 
     fun changed(index: Int) {

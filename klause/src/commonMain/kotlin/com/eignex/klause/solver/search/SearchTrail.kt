@@ -50,8 +50,9 @@ internal class SearchTrail {
             "sharedReasonReferenceSlots" to boolReasons.referenceCapacity.toLong(),
         ))
         sample.owned(boolReasons, boolReasons.primitiveCapacityBytes, protected = true)
-        sample.ownedReferences(boolReasons.valueStorageIdentity, boolReasons.referenceCapacity.toLong(),
-            protected = true)
+        sample.ownedReferences(
+            boolReasons.valueStorageIdentity, boolReasons.referenceCapacity.toLong(), protected = true,
+        )
         sample.ownedReferences(pendingAssertions, pendingAssertions.capacity.toLong(), protected = true)
         for (assertion in pendingAssertions) {
             sample.step()

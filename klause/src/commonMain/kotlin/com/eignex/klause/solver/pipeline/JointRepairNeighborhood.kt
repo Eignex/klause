@@ -4,6 +4,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.IntArrayDeque
 import kotlin.math.abs
 import kotlin.math.round
 
@@ -47,7 +48,7 @@ internal class JointRepairNeighborhood private constructor(
         val selected = linkedSetOf(seed)
         val seenColumns = hashSetOf(seed)
         val seenRows = HashSet<Int>()
-        val queue = ArrayDeque<Int>().also { it.addLast(seed) }
+        val queue = IntArrayDeque().also { it.addLast(seed) }
         var visits = 0
         while (queue.isNotEmpty() && selected.size < count && visits < MAX_SELECTION_VISITS) {
             val column = queue.removeFirst()

@@ -10,6 +10,7 @@ import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.lowering.polynomialDistinctEncoding
 import com.eignex.klause.lowering.polynomialSelectionEncoding
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.collections.IntArrayDeque
 
 internal data class PolynomialAtom(val polynomial: Polynomial, val relation: PolynomialRelation) {
     fun holds(sign: Int): Boolean = when (relation) {
@@ -109,7 +110,7 @@ internal class PolynomialFormula private constructor(
     ): List<PolynomialAtom>? {
         val result = ArrayList<PolynomialAtom>()
         val indices = if (atomIndices != null) ArrayList<Int>() else null
-        val pending = ArrayDeque<Int>()
+        val pending = IntArrayDeque()
         val visited = HashSet<Int>()
         pending.addLast(root)
         while (pending.isNotEmpty()) {
@@ -161,7 +162,7 @@ internal class PolynomialFormula private constructor(
 
     fun witnessAtoms(arithmetic: PolynomialArithmetic, maximumAtoms: Int): List<PolynomialAtom>? {
         val result = ArrayList<PolynomialAtom>()
-        val pending = ArrayDeque<Int>()
+        val pending = IntArrayDeque()
         val visited = HashSet<Int>()
         pending.addLast(root)
         while (pending.isNotEmpty()) {

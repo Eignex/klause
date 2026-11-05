@@ -22,6 +22,7 @@ import com.eignex.klause.theory.qfnra.PolynomialSigns.ZERO_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.relationSigns
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.shl
@@ -2112,7 +2113,7 @@ private fun solveBooleans(
         arithmetic.step()
         PolynomialFormula.UNASSIGNED
     }
-    val decisions = ArrayDeque<Int>()
+    val decisions = IntArrayDeque()
     while (true) {
         arithmetic.step()
         when (formula.truth(values, atomValues, arithmetic)) {
@@ -2132,7 +2133,7 @@ private fun solveBooleans(
                 var changed = false
                 while (decisions.isNotEmpty()) {
                     arithmetic.step()
-                    val variable = decisions.last()
+                    val variable = decisions[decisions.size - 1]
                     if (values[variable] == PolynomialFormula.FALSE) {
                         values[variable] = PolynomialFormula.TRUE
                         changed = true

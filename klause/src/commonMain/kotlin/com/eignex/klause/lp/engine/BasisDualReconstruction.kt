@@ -6,6 +6,7 @@ import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.basis.RationalBasisStats
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.math.abs
 
@@ -37,8 +38,8 @@ private class BasisDualRun(
     private val activeEquation: BooleanArray
     private val rowDegree: IntArray
     private val equationDegree: IntArray
-    private val rows = ArrayDeque<Int>()
-    private val columns = ArrayDeque<Int>()
+    private val rows = IntArrayDeque()
+    private val columns = IntArrayDeque()
     private val deferred = ArrayList<Deferred>()
     private var peeledRows = 0
     private var peeledColumns = 0

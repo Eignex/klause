@@ -12,6 +12,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ScanMeter
+import com.eignex.util.collections.MutableIntIntMap
 
 // One lane owns these block revisions. Counts retract dropped occurrences, so neither duplicate factors
 // nor successive rewrites retain historical columns. An interrupted tracker cannot publish a revision.
@@ -20,7 +21,7 @@ internal class LinearInputRevision(
     private val pass: PresolvePass,
     private val cancellation: Cancellation,
 ) {
-    private val columns = HashMap<Int, Int>()
+    private val columns = MutableIntIntMap()
     private val ranges = HashMap<Int, Pair<Long?, Long?>>()
     private var dirty = true
     private var complete = true
@@ -72,10 +73,12 @@ internal class LinearInputRevision(
         if (!dirty) return revision
         val work = ScanMeter(cancellation)
         var changed = false
-        for (v in columns.keys) {
-            if (!work.visit(1L)) break
-            val next = range(v)
-            if (ranges.put(v, next) != next) changed = true
+        run {
+            columns.forEach { v, _ ->
+                if (!work.visit(1L)) return@run
+                val next = range(v)
+                if (ranges.put(v, next) != next) changed = true
+            }
         }
         complete = work.check()
         if (!complete) {
@@ -120,11 +123,11 @@ internal class LinearInputRevision(
             for (k in 0 until row.size) {
                 if (!work.visit(1L)) return false
                 val v = Term.intVar(row.ref(k))
-                val count = (columns[v] ?: 0) + direction
+                val count = columns.getOrDefault(v, 0) + direction
                 if (count == 0) {
                     columns.remove(v)
                     ranges.remove(v)
-                } else columns[v] = count
+                } else columns.put(v, count)
             }
         }
         if (relevant) revision++
