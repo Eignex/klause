@@ -9,16 +9,20 @@ internal object CommittedCorpusInputs {
 
     private val collectionPattern = Regex("[a-z0-9-]+")
     private val digestPattern = Regex("[a-f0-9]{64}")
-    private var indexes: MutableMap<String, List<Entry>>? = null
-    val isPlanning: Boolean get() = indexes != null
-
-    fun <T> planning(operation: () -> T): T {
-        val previous = indexes
-        indexes = LinkedHashMap()
-        return try { operation() } finally { indexes = previous }
+    private class Scope {
+        val indexes = HashMap<String, List<Entry>>()
     }
 
-    fun entries(collection: ExternalCollection): List<Entry> = checkNotNull(indexes).getOrPut(collection.id) {
+    private var scope: Scope? = null
+    val isPlanning: Boolean get() = scope != null
+
+    fun <T> planning(operation: () -> T): T {
+        val previous = scope
+        scope = Scope()
+        return try { operation() } finally { scope = previous }
+    }
+
+    fun entries(collection: ExternalCollection): List<Entry> = checkNotNull(scope).indexes.getOrPut(collection.id) {
         require(collection.id.matches(collectionPattern)) { "Invalid collection identity" }
         val file = File(CorpusFetcher.workspaceRoot(), "klause-bench/corpus-index/${collection.id}.tsv.gz")
         require(file.isFile) { "Missing committed corpus index: ${collection.id}" }
