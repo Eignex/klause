@@ -564,7 +564,10 @@ class PortfolioCompositionTest {
     @Test
     fun `other model classes should retain their root maintenance defaults`() {
         val scenario = PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK)
-        for (problemClass in ProblemClass.entries.filter { it != ProblemClass.Sat && it != ProblemClass.PseudoBoolean }) {
+        val otherClasses = ProblemClass.entries.filter {
+            it != ProblemClass.Sat && it != ProblemClass.PseudoBoolean
+        }
+        for (problemClass in otherClasses) {
             val facts = ProblemFacts.assumed(Kind.CSP, problemClass)
 
             val params = PortfolioComposition.compose(scenario, facts).filterIsInstance<BacktrackWorkerConfig>()
