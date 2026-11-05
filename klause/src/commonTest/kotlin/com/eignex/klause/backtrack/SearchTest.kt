@@ -32,7 +32,7 @@ class SearchTest {
     )
 
     @Test
-    fun `a cooperative pause should observe sharing without ending the search`() {
+    fun `an active traversal pause should notify the sharing publication boundary`() {
         val events = mutableListOf<String>()
         val exchange = object : ClauseExchange {
             override fun onRestart(session: PropagationSession) = Unit
@@ -48,7 +48,7 @@ class SearchTest {
             slice = TraversalSlice(pauses = { true }, beforeBranch = { true }),
         ).use { it.next() }
 
-        assertEquals(listOf("pause"), events)
+        assertEquals(listOf("end"), events)
     }
 
     @Test

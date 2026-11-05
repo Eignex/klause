@@ -227,28 +227,28 @@ class SharedClausePoolTest {
     }
 
     @Test
-    fun `cooperative pause publication should follow the exchange policy`() {
-        for (publishOnPause in listOf(false, true)) for (native in listOf(false, true)) {
+    fun `a cooperative pause should withhold learned clause publication`() {
+        for (native in listOf(false, true)) {
             val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
             val pool = SharedClausePool()
-            val exchange = PoolClauseExchange(pool, publishOnPause = publishOnPause)
+            val exchange = PoolClauseExchange(pool)
             val session = PropagationSession(problem, nativeSat = native)
             exchange.onSearchStart(session)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
 
             exchange.onSearchPause(session)
 
-            assertEquals(if (publishOnPause) 1 else 0, pool.drainSince(0).clauses.size)
+            assertTrue(pool.drainSince(0).clauses.isEmpty())
         }
     }
 
     @Test
-    fun `a private cooperative pause should retain peer use credit until search end`() {
+    fun `a cooperative pause should retain peer use credit until search end`() {
         for (native in listOf(false, true)) {
             val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
             val pool = SharedClausePool(booleanOnly = true)
             val tally = ContributionTally()
-            val exchange = PoolClauseExchange(pool, origin = 1, tally = tally, publishOnPause = false)
+            val exchange = PoolClauseExchange(pool, origin = 1, tally = tally)
             val session = PropagationSession(problem, nativeSat = native)
             pool.publish(listOf(boolClause(0, 1)), origin = 2)
             exchange.onSearchStart(session)
@@ -319,7 +319,7 @@ class SharedClausePoolTest {
         val problem = Problem(boolVars, 0, emptyArray(), emptyList())
         val pool = SharedClausePool(cap = 4, measureMemory = true, memorySampleWork = sampleWork)
         val meter = SharingMeter()
-        val exchange = PoolClauseExchange(pool, origin = 1, meter = meter, publishOnPause = false)
+        val exchange = PoolClauseExchange(pool, origin = 1, meter = meter)
         val session = PropagationSession(problem)
         exchange.onSearchStart(session)
         repeat(retained) { i ->

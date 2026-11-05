@@ -451,7 +451,6 @@ internal class PoolClauseExchange(
     private val shareGlobalNogoods: Boolean = true,
     /** Where this arm's clause traffic is recorded; null records nothing. */
     private val meter: SharingMeter? = null,
-    private val publishOnPause: Boolean = true,
 ) : ClauseExchange {
     private var cursor = 0L
     private val seen = LongHashSet()
@@ -459,7 +458,7 @@ internal class PoolClauseExchange(
 
     internal fun conditioned(): ClauseExchange {
         val exchange = PoolClauseExchange(pool, origin, tally, maxLbd, maxLen,
-            skipPermanent = true, shareGlobalNogoods = false, meter = meter, publishOnPause = publishOnPause)
+            skipPermanent = true, shareGlobalNogoods = false, meter = meter)
         return object : ClauseExchange by exchange, ConditionedClauseExchange {}
     }
 
@@ -553,15 +552,9 @@ internal class PoolClauseExchange(
         onRestart(session)
     }
 
-    override fun onSearchPause(session: PropagationSession) {
-        if (publishOnPause) {
-            onSearchEnd(session)
-        } else {
-            metered {
-                retainSession(session)
-                observe(session)
-            }
-        }
+    override fun onSearchPause(session: PropagationSession) = metered {
+        retainSession(session)
+        observe(session)
     }
 
     override fun onSearchEnd(session: PropagationSession) = metered {

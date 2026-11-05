@@ -151,6 +151,7 @@ internal class ResumableMinimize(
     private var initialPoolVersion = 0L
     private var replaced = false
     private var clauseExchangeEnded = false
+    private var pausedDuringPreparation = false
 
     // Unproved leaf coverage cannot become infeasibility or optimality, including under shared cutoffs.
     private var sawIndeterminateLeaf = false
@@ -592,7 +593,10 @@ internal class ResumableMinimize(
                     is StepEvent.Terminal -> return e.result
 
                     StepEvent.Paused -> {
-                        if (!clauseExchangeEnded) params.clauseExchange?.onSearchPause(session)
+                        if (!clauseExchangeEnded) {
+                            if (pausedDuringPreparation) params.clauseExchange?.onSearchPause(session)
+                            else params.clauseExchange?.onSearchEnd(session)
+                        }
                         slice.noteOverspend()
                         // Restarts sample root fixings too, but an arm that restarts rarely would show none of its own.
                         sink.search.observeRootFixed(session.rootFixedVariableCount())
@@ -725,6 +729,7 @@ internal class ResumableMinimize(
      * Visible to the enclosing solver, which streams it from [BacktrackSolver.improvements].
      */
     fun runUntilEvent(): StepEvent {
+        pausedDuringPreparation = false
         try {
             done?.let { return StepEvent.Terminal(it) }
             check(!closed) { "search is closed" }
@@ -758,7 +763,7 @@ internal class ResumableMinimize(
                 publishClausePrimalCandidate()?.let {
                     return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
                 }
-                if (!primal.isDone && pausable && sliceCancelled()) return StepEvent.Paused
+                if (!primal.isDone && pausable && sliceCancelled()) return preparationPause()
                 if (primal.isDone) primal.close()
             }
             if (firstRun) {
@@ -767,7 +772,7 @@ internal class ResumableMinimize(
                 initial?.let {
                     return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
                 }
-                if (rootLayoutPending) return StepEvent.Paused
+                if (rootLayoutPending) return preparationPause()
             } else if (rootRoundingPending && !rootRoundingAttempted) {
                 rootPrimalWork(rootLpBudget())?.let {
                     return StepEvent.Incumbent(it.withSourceSemantics(problem.semantics))
@@ -775,7 +780,7 @@ internal class ResumableMinimize(
             }
             if (rootRoundingPending) {
                 slice.charge()
-                if (lpEngine.rootRoundingQueryPaused || sliceExpired()) return StepEvent.Paused
+                if (lpEngine.rootRoundingQueryPaused || sliceExpired()) return preparationPause()
             }
             unboundedLeaf?.let { return terminal(terminalUnbounded(it)) }
             if (treeBudgetExhausted) return terminal(terminalBudget())
@@ -784,6 +789,11 @@ internal class ResumableMinimize(
             closeAfter(failure)
             throw failure
         }
+    }
+
+    private fun preparationPause(): StepEvent {
+        pausedDuringPreparation = true
+        return StepEvent.Paused
     }
 
     private fun traversalEvent(): StepEvent {

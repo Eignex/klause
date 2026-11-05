@@ -139,7 +139,7 @@ internal class AlnsWorkerConfig private constructor(
             backtrackParams = BacktrackParams(
                 randomSeed = seed + index,
                 clauseExchange = PoolClauseExchange(repairClauses, skipPermanent = true,
-                    shareGlobalNogoods = false, meter = meter, publishOnPause = false),
+                    shareGlobalNogoods = false, meter = meter),
                 nodeBudget = nodeBudget,
                 toleranceCheck = toleranceCheck,
             ),

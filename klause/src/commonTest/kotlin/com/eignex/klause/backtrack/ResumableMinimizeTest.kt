@@ -591,7 +591,7 @@ class ResumableMinimizeTest {
     }
 
     @Test
-    fun `paused root queries finish before the worker starts discrete traversal`() {
+    fun `paused root queries observe sharing before starting discrete traversal`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
             settings = ProblemSettings(lpCeilingTableauCells = 1L)).bake()
@@ -624,7 +624,13 @@ class ResumableMinimizeTest {
                 }
             }
         }
-        val params = BacktrackParams(maxDecisions = 0L,
+        val sharingEvents = mutableListOf<String>()
+        val exchange = object : ClauseExchange {
+            override fun onRestart(session: PropagationSession) = Unit
+            override fun onSearchEnd(session: PropagationSession) { sharingEvents += "end" }
+            override fun onSearchPause(session: PropagationSession) { sharingEvents += "pause" }
+        }
+        val params = BacktrackParams(maxDecisions = 0L, clauseExchange = exchange,
             lpConfig = LpConfig.parse("default,+sparse-trial"),
             lpPlan = LpPlan(rootCutHarvest = false))
         val offered = ArrayList<Sample>()
@@ -637,6 +643,7 @@ class ResumableMinimizeTest {
 
         BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
             search.runSlice(stopAtWitness, Long.MAX_VALUE, 5_000L, accept)
+            assertEquals(listOf("pause"), sharingEvents)
             search.runSlice(stopAtWitness, Long.MAX_VALUE, 100_000L, accept)
             search.runSlice(stopAtWitness, Long.MAX_VALUE, 100_000L, accept)
         }

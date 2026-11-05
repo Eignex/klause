@@ -67,15 +67,14 @@ interface ClauseExchange {
      *  Default no-op for non-pooled exchanges. */
     fun onSearchStart(session: PropagationSession) {}
 
-    /** Export-only hook fired when a search ends without a clean restart boundary — a slice-truncated
-     *  ([com.eignex.klause.backtrack.BacktrackParams.cancellation]) segment of a single-threaded
-     *  portfolio. The trail may not be at root, so this must not import (an imported clause's literals
+    /** Export-only hook at an active-search pause or cancellation without a clean restart boundary.
+     *  The trail may not be at root, so this must not import (an imported clause's literals
      *  could be all-false mid-search); exporting the learned DB is level-independent. Default no-op for
      *  exchanges that publish only at restarts. */
     fun onSearchEnd(session: PropagationSession) {}
 
-    /** Notify a cooperative pause so the exchange can apply its publication and observation policy.
-     *  Cancellation boundaries use [onSearchEnd] instead. Default no-op. */
+    /** Observe retained state at a preparation pause without exchanging clauses or draining use credit.
+     *  Active-search and cancellation boundaries use [onSearchEnd] instead. Default no-op. */
     fun onSearchPause(session: PropagationSession) {}
 
     /** Release worker-private exchange state when the owning search is retired, after its final use drain.

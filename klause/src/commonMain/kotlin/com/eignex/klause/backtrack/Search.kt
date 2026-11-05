@@ -479,7 +479,7 @@ internal class CpSatisfactionTraversal(
             }
 
             SearchRunEvent.Paused -> if (slice != null) {
-                if (!traversal.clauseExchangeEnded) params.clauseExchange?.onSearchPause(cp.session)
+                if (!traversal.clauseExchangeEnded) params.clauseExchange?.onSearchEnd(cp.session)
                 null
             } else {
                 finishQuery()
