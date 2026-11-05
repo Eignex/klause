@@ -54,7 +54,7 @@ class LinearAuthorityPointCutsTest {
 
     @Test
     fun `a fully retired point recipe should release its inactive query rows`() {
-        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val triangle = (1..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val premises = mixedMaximum.premises.toMutableMap()
         for ((index, coordinate) in triangle.withIndex()) {
             premises["nonnegative $index"] = SourcePremise(SourceInequality(
@@ -97,7 +97,7 @@ class LinearAuthorityPointCutsTest {
 
     @Test
     fun `retired point compaction should preserve its checked bound across funding pauses`() {
-        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val triangle = (1..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val premises = mixedMaximum.premises.toMutableMap()
         for ((index, coordinate) in triangle.withIndex()) {
             premises["nonnegative $index"] = SourcePremise(SourceInequality(
