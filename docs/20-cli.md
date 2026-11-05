@@ -127,7 +127,7 @@ this is separate from heap measurements and diagnostic payload-category sums.
 - `--lp <ceiling>`: relaxation ceiling with the same levels and `+/-<technique>`
   deltas. `preparation=disabled|object|index|admitted` selects source-template retention
   across finite presolve and consuming LP engines independently of that intensity.
-  Complete-index reuse is the default; selective admission requires `preparation=admitted`.
+  Earned selective reuse is the default; `preparation=index` selects complete-index reuse.
   Arms choose intensity below it. `--lp-pricing` selects zero-objective
   entering policy. Native arithmetic routes reject explicit LP flags.
 - `--exact`: continuous float interpretation and zero source tolerance for the
