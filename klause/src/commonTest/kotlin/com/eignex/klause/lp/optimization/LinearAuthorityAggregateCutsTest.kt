@@ -644,6 +644,24 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `an unavailable pair score should not suppress a later complete point`() {
+        val source = SourceProofContext(scope, setOf(x, y, real),
+            linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right)))
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+        val point = mapOf(x to 0.75, real to 1.5)
+        assertTrue(LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            limits = limits, point = point).isEmpty())
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            limits = limits, point = point + (y to 0.75)).single()
+
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
+            cut.inequality)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `point directed pair preparation should retain a later separating proposal before its pool fills`() {
         val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)

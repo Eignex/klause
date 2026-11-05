@@ -766,9 +766,13 @@ recipe slice takes at most one quarter of the generation's remaining work and
 allocation, capped at 16,384 work and 256 KiB, leaving capacity for continuous-row
 aggregation. When that slice retains no cut, point-directed discovery first tries
 base pairs without half rounding or deeper continuations. This pass takes at most
-half the remaining work and allocation, within the existing per-attempt caps.
-The pass yields its first completed separating proposal for checking without
-deeper discovery.
+half the remaining work and may spend the remaining allocation, within the
+existing per-attempt caps. The pass yields its first completed separating proposal
+for checking without deeper discovery. An unavailable base-pair point score
+records only that pair's source ordinals in a funded set local to this invocation.
+The fallback skips that identical pair instead of deriving an unscorable proposal
+again. Set storage, insertions and lookups debit the containing allowance; no proof,
+bound or scope authority is retained by the set.
 An empty pass leaves its spent work charged and resumes ordinary discovery with
 the remaining allowance, including half rounding and three- or four-row continuations.
 A partial pass cannot establish complete coverage. Across the integer recipe slice

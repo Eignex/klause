@@ -160,6 +160,7 @@ internal object LinearAuthorityAggregateCuts {
                     charge("AggregateInteger" + stop.reason, 1L)
                 }
             }
+            var unavailableBasePairs: HashSet<Long>? = null
             fun preparePairs(
                 pairMeter: AggregateMeter, pairCharge: (String, Long) -> Unit, pairExtension: PairExtension?,
                 firstOnly: Boolean = false,
@@ -177,6 +178,15 @@ internal object LinearAuthorityAggregateCuts {
                             if (other.hasInteger && other.term.owner <= row.term.owner) continue
                             pairMeter.reserve(1L, 64L)
                             if (!paired.add(other.term.owner)) continue
+                            val unavailable = unavailableBasePairs
+                            if (pairExtension != null && unavailable != null) {
+                                pairMeter.reserve(1L, 32L)
+                                val key = (row.term.owner.toLong() shl 32) or other.term.owner.toLong()
+                                if (key in unavailable) {
+                                    observe("AggregatePairPointUnavailableReuse", 1L)
+                                    continue
+                                }
+                            }
                             if (candidates.size >= maximumCandidates) stopAggregate("RetentionLimit")
                             observe("AggregatePairAttempts", 1L)
                             val pivot = other.coefficients.getValue(id)
@@ -196,6 +206,14 @@ internal object LinearAuthorityAggregateCuts {
                                     else separates(initial, point, pairMeter, observe)
                                 if (separating == null) {
                                     eligibilityKnown = false
+                                    if (pairExtension == null) {
+                                        val unavailable = unavailableBasePairs ?: run {
+                                            pairMeter.reserve(1L, 128L)
+                                            HashSet<Long>().also { unavailableBasePairs = it }
+                                        }
+                                        pairMeter.reserve(1L, 64L)
+                                        unavailable += (row.term.owner.toLong() shl 32) or other.term.owner.toLong()
+                                    }
                                     continue
                                 }
                                 if (!separating) {
@@ -216,7 +234,7 @@ internal object LinearAuthorityAggregateCuts {
             if (point != null && candidates.isEmpty()) {
                 meter.reserve(1L, 128L)
                 val baseLimits = attemptLimits.copy(work = minOf(attemptLimits.work, meter.remainingWork / 2L),
-                    allocation = minOf(attemptLimits.allocation, meter.remainingAllocation / 2L))
+                    allocation = minOf(attemptLimits.allocation, meter.remainingAllocation))
                 val baseMeter = AggregateMeter(baseLimits, derivedStop, charge)
                 val baseCharge: (String, Long) -> Unit = { name, count ->
                     when (name) {
