@@ -1175,6 +1175,22 @@ For Native profiles, request `:klause:linkLpProfileReleaseExecutableLinuxX64`.
 Prepare only the target used by a separate runtime job. Combined preparation links
 Native before staging JVM profiles. Template preparation profiles use the JVM task.
 
+`DefinitionValuesProfile` compares the production definition cache's Boolean validity
+array with equivalent packed `Bits` storage. It runs three fresh JVMs, warms both
+arms, alternates their order across seven pairs, and verifies evaluation checksums,
+final values and pending definitions outside timing. Each pair uses identical inputs
+and operation counts. Sequential and random reads cover 64, 4,096 and 65,536 nodes
+with cached, mixed-invalidation and reset-heavy workloads. Flag byte counts exclude
+object headers and the unchanged values and pending-bit storage. These microbenchmarks
+do not establish solver throughput or Native performance.
+
+```sh
+deploy/lab profile --repo Eignex/klause --build :klause:stageLpProfileJvm \
+  --classpath klause/build/lp-profile/jvm/classes \
+  --classpath 'klause/build/lp-profile/jvm/lib/*' \
+  com.eignex.klause.bench.profile.DefinitionValuesProfile REF 'Definition cache flags'
+```
+
 MIPLIB template profiles also require `:klause-bench:installDist`.
 
 Template changes are comma-separated `cold,unchanged,bound,objective,row,cancel,affine,namespace,finite,origin,guard`;
