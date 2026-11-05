@@ -900,13 +900,14 @@ internal class NativeSatState(private val state: PropagationState) {
             state.work++
             val entry = entries[wi]
             val h = entry.toInt()
-            if (isRetired(h)) {
+            val blocker = (entry ushr 32).toInt()
+            val satisfied = litTrue(blocker)
+            if ((!satisfied || h < baseCount) && isRetired(h)) {
                 state.work += watchRemovalWork(falseLit)
                 removeWatchAt(falseLit, wi)
                 continue
             }
-            val blocker = (entry ushr 32).toInt()
-            if (litTrue(blocker)) {
+            if (satisfied) {
                 wi++
                 continue
             }
