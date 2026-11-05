@@ -72,8 +72,8 @@ class LinearAuthorityPointCutsTest {
                 (triangle.first() to half) + (mixedReal to quarter.negated()))
         val conditions = listOf(
             SourceCondition(upper = mapOf(mixedReal to half)) to BigFraction.ofLong(23) * quarter * half,
-            SourceCondition(integerRows = listOf(SourceInequality(
-                mapOf(x to BigFraction.ONE, triangle.first() to BigFraction.MINUS_ONE), BigFraction.ONE))) to
+            SourceCondition().integerBound(SourceInequality(
+                mapOf(x to BigFraction.ONE, triangle.first() to BigFraction.MINUS_ONE), BigFraction.ONE)) to
                 BigFraction.ofLong(11) * quarter)
         for ((condition, baseline) in conditions) {
             val child = root.atScope(root.scope.copy(condition = condition))
@@ -125,8 +125,8 @@ class LinearAuthorityPointCutsTest {
                 (triangle.first() to half) + (mixedReal to quarter.negated()))
         val conditions = listOf(
             SourceCondition(upper = mapOf(mixedReal to half)) to BigFraction.ofLong(23) * quarter * half,
-            SourceCondition(integerRows = listOf(SourceInequality(
-                mapOf(x to BigFraction.ONE, triangle.first() to BigFraction.MINUS_ONE), BigFraction.ONE))) to
+            SourceCondition().integerBound(SourceInequality(
+                mapOf(x to BigFraction.ONE, triangle.first() to BigFraction.MINUS_ONE), BigFraction.ONE)) to
                 BigFraction.ofLong(11) * quarter)
         for ((condition, baseline) in conditions) {
             val child = root.atScope(root.scope.copy(condition = condition))
