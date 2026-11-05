@@ -482,6 +482,55 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `point base discovery should yield one checked proposal without complete coverage`() {
+        val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(x, y, real, a, b, otherReal), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right),
+            "other left" to SourcePremise(SourceInequality(
+                mapOf(a to BigFraction.ofLong(2), otherReal to BigFraction.ONE), BigFraction.ofLong(3))),
+            "other right" to SourcePremise(SourceInequality(
+                mapOf(b to BigFraction.ofLong(2), otherReal to BigFraction.MINUS_ONE), BigFraction.ZERO))))
+        val observations = mutableMapOf<String, Long>()
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            maximumCandidates = 64, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            point = mapOf(x to 0.75, y to 0.75, real to 1.5, a to 0.75, b to 0.75, otherReal to 1.5)).single()
+
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
+            cut.inequality)
+        assertEquals(setOf(0, 1), cut.owners)
+        assertEquals(1L, observations["AggregatePairIncomplete"])
+        assertNull(observations["AggregatePairBaseComplete"])
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `ordinary source pair discovery should retain its checked batch`() {
+        val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val source = SourceProofContext(scope, setOf(x, y, real, a, b, otherReal), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right),
+            "other left" to SourcePremise(SourceInequality(
+                mapOf(a to BigFraction.ofLong(2), otherReal to BigFraction.ONE), BigFraction.ofLong(3))),
+            "other right" to SourcePremise(SourceInequality(
+                mapOf(b to BigFraction.ofLong(2), otherReal to BigFraction.MINUS_ONE), BigFraction.ZERO))))
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never, maximumCandidates = 64)
+
+        assertEquals(2, cuts.size)
+        assertEquals(setOf(setOf(0, 1), setOf(2, 3)), cuts.map { it.owners }.toSet())
+        for (cut in cuts) {
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+    }
+
+    @Test
     fun `a later base pair should separate within the grant spent before half discovery`() {
         val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)

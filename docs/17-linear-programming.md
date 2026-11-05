@@ -767,7 +767,8 @@ allocation, capped at 16,384 work and 256 KiB, leaving capacity for continuous-r
 aggregation. When that slice retains no cut, point-directed discovery first tries
 base pairs without half rounding or deeper continuations. This pass takes at most
 half the remaining work and allocation, within the existing per-attempt caps.
-Completed separating proposals return for checking without deeper discovery.
+The pass yields its first completed separating proposal for checking without
+deeper discovery.
 An empty pass leaves its spent work charged and resumes ordinary discovery with
 the remaining allowance, including half rounding and three- or four-row continuations.
 A partial pass cannot establish complete coverage. Across the integer recipe slice

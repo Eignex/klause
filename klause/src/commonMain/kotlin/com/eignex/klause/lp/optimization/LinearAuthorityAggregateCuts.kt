@@ -162,7 +162,8 @@ internal object LinearAuthorityAggregateCuts {
             }
             fun preparePairs(
                 pairMeter: AggregateMeter, pairCharge: (String, Long) -> Unit, pairExtension: PairExtension?,
-            ) {
+                firstOnly: Boolean = false,
+            ): Boolean {
                 for (row in rows) {
                     pairMeter.reserve(1L)
                     if (!row.hasInteger) continue
@@ -206,9 +207,11 @@ internal object LinearAuthorityAggregateCuts {
                             val retained = cut ?: continue
                             pairMeter.reserve(1L, 128L + retained.inequality.supportSize * 64L)
                             candidates += retained
+                            if (firstOnly) return false
                         }
                     }
                 }
+                return true
             }
             if (point != null && candidates.isEmpty()) {
                 meter.reserve(1L, 128L)
@@ -223,8 +226,8 @@ internal object LinearAuthorityAggregateCuts {
                     }
                 }
                 try {
-                    preparePairs(baseMeter, baseCharge, null)
-                    observe("AggregatePairBaseComplete", 1L)
+                    val complete = preparePairs(baseMeter, baseCharge, null, firstOnly = true)
+                    observe(if (complete) "AggregatePairBaseComplete" else "AggregatePairBaseYielded", 1L)
                 } catch (stop: AggregateStop) {
                     eligibilityKnown = false
                     observe("AggregatePairBase" + stop.reason, 1L)
