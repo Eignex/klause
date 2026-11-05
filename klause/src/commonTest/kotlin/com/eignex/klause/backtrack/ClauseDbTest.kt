@@ -20,6 +20,76 @@ import kotlin.test.assertTrue
 class ClauseDbTest {
 
     @Test
+    fun `native idle tiers should age before a suspended ranking pass finishes`() {
+        val session = PropagationSession(chainProblem().bake(), nativeSat = true)
+        repeat(8) { session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 3) }
+        val params = BacktrackParams(maxLearnedClauses = 1, tieredLearnedDb = true, learnedMemoryWork = 96L)
+
+        repeat(2) {
+            val before = session.work
+            forgetIfOverCap(session, params)
+            assertTrue(session.work - before <= 96L)
+        }
+
+        assertTrue(session.isLearnedClause(0))
+        assertFalse(session.isLearnedClause(1))
+        assertEquals(0L, session.learnedLifecycle().getValue("learnedCapRankedPasses"))
+    }
+
+    @Test
+    fun `native admission should start a fresh tier lifetime after earlier epochs`() {
+        val session = PropagationSession(chainProblem().bake(), nativeSat = true)
+        session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 9, permanent = true)
+        val params = BacktrackParams(maxLearnedClauses = 0, tieredLearnedDb = true, learnedMemoryWork = 128L)
+        repeat(4) { forgetIfOverCap(session, params) }
+        session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 3)
+
+        forgetIfOverCap(session, params)
+
+        assertTrue(session.isLearnedClause(1))
+        assertEquals(ClauseTier.LOCAL, session.learnedClauseTier(1))
+        forgetIfOverCap(session, params)
+        assertFalse(session.isLearnedClause(1))
+    }
+
+    @Test
+    fun `native epoch cancellation should preserve unpublished tier classification`() {
+        val session = PropagationSession(chainProblem().bake(), nativeSat = true)
+        session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 3)
+        val before = session.work
+
+        forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 0, tieredLearnedDb = true,
+            learnedMemoryWork = 128L, cancellation = Cancellation { session.work - before >= 58L }))
+
+        assertEquals(ClauseTier.UNSET, session.learnedClauseTier(0))
+        assertFalse(session.learnedClauseUsedSinceReduction(0))
+        assertTrue(session.isLearnedClause(0))
+        assertEquals(58L, session.work - before)
+    }
+
+    @Test
+    fun `native recent use should survive delayed first tier classification`() {
+        val session = PropagationSession(Problem(6, 0, emptyArray(), arrayOf(Clause(intArrayOf(8, 10)))),
+            nativeSat = true)
+        repeat(7) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 3) }
+        session.addLearnedClause(Clause(intArrayOf(4, 6)), 3)
+        val params = BacktrackParams(maxLearnedClauses = 1, tieredLearnedDb = true, learnedMemoryWork = 96L)
+        repeat(16) {
+            if ((session.learnedLifecycle()["learnedCapVisits"] ?: 0L) < 7L) forgetIfOverCap(session, params)
+        }
+        assertEquals(7L, session.learnedLifecycle().getValue("learnedCapVisits"))
+        session.pinBool(2, false)
+        session.popToLevel(0)
+        session.pinBool(5, true)
+        session.popToLevel(0)
+
+        forgetIfOverCap(session, params.copy(learnedMemoryWork = 256L))
+
+        assertTrue(session.isLearnedClause(7))
+        assertEquals(ClauseTier.MID, session.learnedClauseTier(7))
+    }
+
+    @Test
     fun `cap selection and physical cleanup should share one work grant`() {
         for (native in listOf(false, true)) for (tiered in listOf(false, true)) {
             val session = PropagationSession(chainProblem().bake(), nativeSat = native)

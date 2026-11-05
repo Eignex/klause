@@ -7,6 +7,7 @@ internal const val CAP_ROW_INSPECTION_WORK = 4L
 internal const val CAP_ROW_POLICY_WORK = 32L - CAP_ROW_INSPECTION_WORK
 
 internal interface LearnedCapPolicy {
+    fun entered() {}
     fun alive(index: Int): Boolean
     fun lbd(index: Int): Int
     fun prepare(index: Int): Boolean
@@ -77,6 +78,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
                     } else if (read == candidates.size) {
                         budget.visit(8L)
                         budget.visit(0L)
+                        policy.entered()
                         candidates.truncateTo(write)
                         reset()
                         passes++
@@ -89,6 +91,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
                 Stage.Retire -> {
                     budget.visit(if (pending == prepared) 0L else 8L)
                     budget.visit(0L)
+                    policy.entered()
                     if (policy.alive(pending) && !policy.retire(pending)) {
                         candidates[write++] = pending
                         floor++
@@ -96,7 +99,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
                     pending = -1
                     stage = Stage.Trim
                 }
-                Stage.Trim -> trim(limit, budget)
+                Stage.Trim -> trim(limit, budget, policy)
                 Stage.Clean -> clean(budget, policy)
             }
         }
@@ -106,6 +109,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         val index = candidates[read]
         budget.visit(CAP_ROW_INSPECTION_WORK)
         budget.visit(0L)
+        policy.entered()
         val alive = policy.alive(index)
         budget.visit(0L)
         if (!alive) {
@@ -134,6 +138,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
 
     private fun admit(limit: Int, budget: ReclamationPreparation, policy: LearnedCapPolicy) {
         budget.visit(0L)
+        policy.entered()
         val index = pending
         val replacement = heapSize >= limit && heapSize > 0 && better(index, candidates[0], policy)
         budget.visit(0L)
@@ -164,6 +169,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         }
         budget.visit(8L)
         budget.visit(0L)
+        policy.entered()
         val parent = (sift - 1) / 2
         val move = better(candidates[parent], candidates[sift], policy)
         budget.visit(0L)
@@ -177,6 +183,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
     private fun siftDown(budget: ReclamationPreparation, policy: LearnedCapPolicy) {
         budget.visit(12L)
         budget.visit(0L)
+        policy.entered()
         var child = sift * 2 + 1
         if (child >= heapSize) {
             stage = afterSift
@@ -191,13 +198,14 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         }
     }
 
-    private fun trim(limit: Int, budget: ReclamationPreparation) {
+    private fun trim(limit: Int, budget: ReclamationPreparation, policy: LearnedCapPolicy) {
         if (heapSize <= limit) {
             stage = Stage.Collect
             return
         }
         budget.visit(12L)
         budget.visit(0L)
+        policy.entered()
         pending = candidates[0]
         heapSize--
         if (heapSize > 0) candidates[0] = candidates[heapSize]
@@ -220,6 +228,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         }
         budget.visit(16L)
         budget.visit(0L)
+        policy.entered()
         val alive = policy.alive(candidates[cleanupRead])
         budget.visit(0L)
         if (alive) {

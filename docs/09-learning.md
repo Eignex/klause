@@ -319,6 +319,9 @@ to its fixed maximum; full compaction trims a partial last page. Empty pages rel
 without changing live clause handles. Reductions compact their handle and reference columns without
 copying surviving literal arrays. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
+When the learned retirement count is zero, watch propagation can exclude learned
+retirement without reading each row's metadata. Root-source retirement is checked
+independently.
 
 A bounded window over non-permanent
 learned clauses retains the lowest LBD and stable-handle keys after permanent and
@@ -563,11 +566,23 @@ a whole-store selection buffer. Permanent clauses, protected reasons and policy 
 reduce the heap quota. A pending eviction that gains protection also consumes that
 quota before the next heap step. Mid rows
 survive their demotion window, and classification clears survivor reuse flags.
+Native tier policy advances by funded over-cap restart epochs independently of the
+ranking cursor. Each metadata row retains its last classification and actual-use
+epochs. A funded row transaction catches up missed idle demotions before classification;
+use in the preceding epoch retains its ordinary promotion and protection. New rows
+start at their admission epoch, and core tiers persist. The four extra integer columns
+and the scalar epoch and activation flag belong to modeled native metadata ownership.
+Admission, use and classification debit their timestamp work, and cancellation
+precedes policy mutation.
+Before the first funded epoch, fresh zeroed rows and the ordinary reuse flag encode
+admission and use at epoch zero without timestamp writes. Epoch activation follows
+the ranking step's existing cancellation boundary; an unavailable first scan publishes
+no policy epoch. After activation, admissions and actual uses record their epochs.
 An unfunded next-row transaction suspends the cursor for a later grant. A completed
 row classification retains its pending admission while heap comparisons wait;
 cleanup comparisons finish before publishing their candidate mutations.
 Current or historical reasons can retain additional rows above the soft cap.
-Native post-undo replay protects its queued clause handles and learned units without
+Native post-undo replay protects queued first assertions and learned units without
 freezing unrelated retirement. Incomplete trail propagation, conflicts and root
 publication still defer the window.
 An empty General integer-row cache detaches its obsolete event overflow index in a
