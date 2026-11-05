@@ -510,7 +510,19 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     private var templateRows = 0L
     private var templateBounds = 0L
     private var templateExactBounds = 0L
+    private var templateBoundChecks = 0L
+    private var templateBoundColumnWork = 0L
+    private var templateRowsOmitted = 0L
+    private var templateBoundRowsSeen = false
     val cutLifecycle = LpCutStats { key, delta ->
+        phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
+    }
+
+    fun observeTemplateFunding(nanos: Long, work: Long, completedUnits: Long, recorded: Boolean) {
+        val key = "TEMPLATE_FUNDING_${probeRoute.name}"
+        val outcome = if (recorded) "RECORDED" else "RETAINED"
+        val delta = LpPhaseStats(calls = 1L, nanos = nanos, work = work,
+            outcomes = mapOf(outcome to 1L, "COMPLETED_UNITS_SUM" to completedUnits))
         phases[key] = (phases[key] ?: LpPhaseStats()).mergedWith(delta)
     }
 
@@ -546,7 +558,9 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         templateRetainedUnits += retainedUnits
     }
 
-    fun observeTemplateUse(rows: Int = 0, bounds: Int = 0, exactBounds: Int = 0) {
+    fun observeTemplateUse(
+        rows: Int = 0, bounds: Int = 0, exactBounds: Int = 0, boundChecks: Int = 0, rowsOmitted: Int = 0,
+    ) {
         if (!templateAssemblySeen) {
             templateAssemblySeen = true
             phases.getOrPut("TEMPLATE_ASSEMBLY_${probeRoute.name}") { LpPhaseStats() }
@@ -554,6 +568,15 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         templateRows += rows
         templateBounds += bounds
         templateExactBounds += exactBounds
+        if (boundChecks > 0 || rowsOmitted > 0) templateBoundRowsSeen = true
+        templateBoundChecks += boundChecks
+        templateRowsOmitted += rowsOmitted
+    }
+
+    fun observeTemplateBoundStorageWork(work: Long) {
+        observeTemplateUse()
+        templateBoundRowsSeen = true
+        templateBoundColumnWork += work
     }
 
     private fun phaseSnapshot(): Map<String, LpPhaseStats> {
@@ -581,11 +604,19 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
             }
             if (templateAssemblySeen) {
                 val key = "TEMPLATE_ASSEMBLY_${probeRoute.name}"
-                put(key, getValue(key).mergedWith(LpPhaseStats(outcomes = mapOf(
-                    "ROWS" to templateRows,
-                    "BOUNDS" to templateBounds,
-                    "EXACT_BOUND_OBJECTS" to templateExactBounds,
-                ))))
+                put(key, getValue(key).mergedWith(LpPhaseStats(
+                    work = templateBoundChecks + templateBoundColumnWork,
+                    outcomes = buildMap {
+                        put("ROWS", templateRows)
+                        put("BOUNDS", templateBounds)
+                        put("EXACT_BOUND_OBJECTS", templateExactBounds)
+                        if (templateBoundRowsSeen) {
+                            put("BOUND_ROW_CHECKS", templateBoundChecks)
+                            put("BOUND_COLUMN_WORK", templateBoundColumnWork)
+                            put("SOURCE_ROWS_OMITTED", templateRowsOmitted)
+                        }
+                    },
+                )))
             }
         }
     }

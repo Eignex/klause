@@ -27,6 +27,7 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.VarStatus
 import com.eignex.klause.lp.engine.continueExactLp
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
@@ -40,9 +41,25 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SparseLpAdmissionTest {
+    @Test
+    fun `disabled source preparation should remain disabled during sparse admission`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+            settings = ProblemSettings(lpCeilingTableauCells = 1L)).bake()
+        var admission: SparseLpAdmission? = null
+
+        sequence<Unit> {
+            admission = prepareSparseLpAdmission(problem, LinearObjective(intCoefficients = longArrayOf(1, 2)),
+                sourcePreparation = LpSourcePreparation.DISABLED)
+        }.forEach { }
+
+        assertNull(requireNotNull(requireNotNull(admission).sourceLayout).preparationTemplates)
+    }
+
     @Test
     fun `paid sparse source layout starts numerical preparation without another assembly slice`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },

@@ -15,6 +15,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
@@ -45,6 +46,27 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePipelineTest {
+    @Test
+    fun `disabled source templates should leave presolve LP solving active`() {
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 10) }, arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
+        ))
+
+        val result = FinitePipeline.prepare(FinitePipelineRequest(
+            source, FiniteEngine.BACKTRACK,
+            objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1)),
+            presolveConfig = PresolveConfig.parse("off,+lp-harvest"),
+            sourcePreparation = LpSourcePreparation.DISABLED,
+        ))
+
+        val stats = assertNotNull(result.presolve).lpStats
+        assertTrue(stats.rootPasses.sum > 0.0)
+        assertTrue(stats.phases.keys.none { it.startsWith("TEMPLATE_PREPARATION_") })
+        assertTrue(stats.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
+            .all { phase -> phase.outcomes.values.all { it == 0L } })
+    }
+
     @Test
     fun `completed root SAC refutations should survive finite projection and optional stops`() {
         val source = Problem(

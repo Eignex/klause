@@ -50,8 +50,12 @@ propagator-only symmetry does not change that eligibility. Explicit `+lp-harvest
 nonclausal sources and optimization keep harvest eligibility.
 [Wide-integer pre-bake bounds](#pre-bake-lp-bounds) use a separate safety gate.
 
-LP harvest carries compatible immutable source-row and exact-bound templates across
-finite rebuilds through the selected projections. Unchanged definitions retain their
+The finite invocation carries its source-template policy through pre-bake LP checks,
+harvest and the consuming workers. Disabling templates keeps those LP calls and their
+allowances, but skips template capture and use.
+LP harvest eagerly prepares compatible immutable source-row and exact-bound templates
+for its later engine consumer. The selected projections carry these definitions
+across finite rebuilds. Unchanged definitions retain their
 buffers; changed bounds, rows, objectives and component joins replace the affected
 component snapshots. Namespace remaps and semantic-scope changes require fresh
 bindings. The later model-facing LP consumers instantiate their own mutable owners

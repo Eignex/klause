@@ -208,6 +208,7 @@ fun lpHarvestReporting(
             randomSeed = randomSeed,
         ),
         sink,
+        eagerSourcePreparation = true,
     )
     if (engine.lpRelaxer == null) return LpHarvestResult(problem, LpHarvestReport(), sink.snapshot().lp)
     // A certified-infeasible root relaxation proves the whole problem has no solution; fold it in as an

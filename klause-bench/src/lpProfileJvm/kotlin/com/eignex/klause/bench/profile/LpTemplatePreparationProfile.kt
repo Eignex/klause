@@ -1,8 +1,10 @@
 package com.eignex.klause.bench.profile
 
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lp.engine.LpExactState
@@ -11,13 +13,17 @@ import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpRetainedSources
+import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.authoritativeWithTemplates
+import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.sun.management.OperatingSystemMXBean
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -33,16 +39,21 @@ import kotlin.time.Duration.Companion.seconds
 internal object LpTemplatePreparationProfile {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.size in 4..5)
+        require(args.size in 4..6)
         val route = args.getOrElse(4) { "standalone" }.also {
             require(it in listOf("standalone", "retained"))
         }
+        val availableChanges = listOf("cold", "unchanged", "bound", "objective", "row", "cancel",
+            "affine", "namespace", "finite", "origin", "guard")
+        val changes = args.getOrNull(5)?.split(',')?.also {
+            require(it.isNotEmpty() && it.distinct().size == it.size && it.all(availableChanges::contains))
+        } ?: availableChanges
         val file = if (args[0].startsWith("selection=")) {
             val line = File(args[0].removePrefix("selection=")).readLines().single { it.isNotBlank() }
             val selected = Json.parseToJsonElement(line).jsonObject
             require(selected.getValue("suite").jsonPrimitive.content == "miplib3")
             require(selected.getValue("format").jsonPrimitive.content == "MPS")
-            require(selected.getValue("problem").jsonPrimitive.content in listOf("p0033", "p0201"))
+            require(selected.getValue("problem").jsonPrimitive.content in listOf("p0033", "mod008", "p0201"))
             File(selected.getValue("model").jsonPrimitive.content).also {
                 require(it.nameWithoutExtension == selected.getValue("problem").jsonPrimitive.content)
             }
@@ -59,8 +70,8 @@ internal object LpTemplatePreparationProfile {
         val parseStart = System.nanoTime()
         val compiled = Mps.parse(bytes.decodeToString()).toProblem()
         val parseNs = System.nanoTime() - parseStart
-        val source = compiled.model
-        require(source.numRealVars == 0 && source.numIntVars >= 2)
+        val originalSource = compiled.model
+        require(originalSource.numRealVars == 0 && originalSource.numIntVars >= 2)
         val objective = requireNotNull(compiled.objective).toLinearObjective()
             .let { if (compiled.maximize) it.negated() else it }
         val stop = Cancellation.after(120.seconds)
@@ -73,33 +84,63 @@ internal object LpTemplatePreparationProfile {
         }
         fun readAllocatedBytes(): Long? =
             allocations?.getThreadAllocatedBytes(Thread.currentThread().threadId())?.takeIf { it >= 0L }
+        val process = ManagementFactory.getOperatingSystemMXBean() as? OperatingSystemMXBean
+        val compilation = ManagementFactory.getCompilationMXBean()?.takeIf { it.isCompilationTimeMonitoringSupported }
         val modes = listOf("disabled", "object", "index", "candidate")
         out.resolve("runs.jsonl").bufferedWriter().use { writer ->
             repeat(repeats + 1) { round ->
-                for (change in listOf("cold", "unchanged", "bound", "objective", "row", "cancel")) {
+                for (change in changes) {
                     val signatures = HashMap<String, List<String>>()
                     for (offset in modes.indices) {
                         val mode = modes[(round + offset) % modes.size]
                         val startBytes = readAllocatedBytes()
                         val startCpu = cpu?.currentThreadCpuTime?.takeIf { it >= 0L }
+                        val startProcessCpu = process?.processCpuTime?.takeIf { it >= 0L }
+                        val startCompilationMs = compilation?.totalCompilationTime?.takeIf { it >= 0L }
+                        val startEpochMillis = System.currentTimeMillis()
                         val start = System.nanoTime()
+                        val source = if (change == "guard") {
+                            val bound = Math.addExact(Math.addExact(originalSource.finiteIntDomain(0).min,
+                                originalSource.finiteIntDomain(1).min), 1L)
+                            Problem(originalSource.numBoolVars + 1, originalSource.numIntVars,
+                                Array(originalSource.numIntVars) { originalSource.finiteIntDomain(it) },
+                                originalSource.factors + ReifiedLinear(originalSource.numBoolVars,
+                                    longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, bound),
+                                settings = originalSource.settings, semantics = originalSource.semantics)
+                        } else originalSource
                         val selected = FactorProjectionProviders.Default.prepare(source)
                         val changedSource = when (change) {
                             "bound" -> Problem(source.numBoolVars, source.numIntVars,
                                 Array(source.numIntVars) { index ->
                                     val domain = source.finiteIntDomain(index)
                                     if (index == 0) IntDomain(domain.min, domain.max - 1) else domain
-                                }, source.factors, semantics = source.semantics)
+                                }, source.factors, settings = source.settings, semantics = source.semantics)
                             "row" -> source.withFactors(source.factors.copyOf().also { factors ->
                                 val mapping = VarRemap(IntArray(source.numBoolVars) { it },
                                     IntArray(source.numIntVars) { if (it == 0) 1 else if (it == 1) 0 else it })
                                 factors[0] = factors[0].remap(mapping)
                             })
+                            "origin" -> Problem(source.numBoolVars, source.numIntVars,
+                                Array(source.numIntVars) { index ->
+                                    val domain = source.finiteIntDomain(index)
+                                    if (index == 0) IntDomain(Math.addExact(domain.min, 1L),
+                                        Math.addExact(domain.max, 1L)) else domain
+                                }, source.factors, settings = source.settings, semantics = source.semantics)
+                            "finite" -> source.bake(selected, stop)
                             else -> source
                         }
-                        val changedObjective = if (change == "objective") objective.copy(
-                            intCoefficients = objective.intCoefficients.also { it[0] += 1L },
-                        ) else objective
+                        val changedSelection = when (change) {
+                            "namespace" -> selected.projected(source, IntArray(source.numFactors) { it },
+                                VarRemap(IntArray(source.numBoolVars) { it }, IntArray(source.numIntVars) { it }))
+                            "finite" -> checkNotNull((changedSource as BakedProblem).factorProjections)
+                            else -> null
+                        }
+                        val changedObjective = when (change) {
+                            "objective" -> objective.copy(
+                                intCoefficients = objective.intCoefficients.also { it[0] += 1L })
+                            "affine" -> objective.copy(constant = Math.addExact(objective.constant, 7L))
+                            else -> objective
+                        }
                         val sink = LpStatsSink()
                         var work = 0L
                         val meter = WorkMeter { work += it }
@@ -112,12 +153,24 @@ internal object LpTemplatePreparationProfile {
                         var assemblyBytes: Long? = 0L
                         var importSolveRetirementBytes: Long? = 0L
                         var retainedUnits = 0L
+                        var rawAttempts = 0L
+                        var finiteAttempts = 0L
+                        var alternateNamespaceAttempts = 0L
+                        var trueGuardAttempts = 0L
+                        var falseGuardAttempts = 0L
+                        var firstModelColumns: Int? = null
+                        var firstModelRows: Int? = null
+                        var firstModelNonzeros: Int? = null
+                        var minimumModelRows: Int? = null
+                        var maximumModelRows: Int? = null
                         var coldNs = 0L
                         val results = ArrayList<String>()
                         repeat(steps) consumers@ { step ->
                             check(!stop())
-                            val view = (if (step % 2 == 1) changedSource else source)
-                                .let { it.withFactors(it.factors.copyOf()) }
+                            val current = if (step % 2 == 1) changedSource else source
+                            val view = if (current is BakedProblem) current else {
+                                current.withFactors(current.factors.copyOf())
+                            }
                             val cost = if (step % 2 == 1) changedObjective else objective
                             val opening = System.nanoTime()
                             val openingBytes = readAllocatedBytes()
@@ -131,7 +184,18 @@ internal object LpTemplatePreparationProfile {
                             }
                             val selectedView = if (change == "cold") {
                                 FactorProjectionProviders.Default.prepare(view)
-                            } else selected.forEngineView(view)
+                            } else (changedSelection?.takeIf { step % 2 == 1 } ?: selected).forEngineView(view)
+                            if (view is BakedProblem) finiteAttempts++ else rawAttempts++
+                            if (change == "namespace" && step % 2 == 1) alternateNamespaceAttempts++
+                            val rootDomains = RootDomains(view)
+                            val domains = if (change == "guard") {
+                                val pin = step % 2 == 1
+                                if (pin) trueGuardAttempts++ else falseGuardAttempts++
+                                object : RelaxationDomains by rootDomains {
+                                    override fun boolValue(varId: Int): Boolean? =
+                                        if (varId == source.numBoolVars - 1) pin else rootDomains.boolValue(varId)
+                                }
+                            } else rootDomains
                             val consumerToken = if (change == "cancel" && step % 2 == 1) {
                                 object : Cancellation {
                                     override fun isCancelled(): Boolean = true
@@ -141,13 +205,16 @@ internal object LpTemplatePreparationProfile {
                             val consumer = CpToLpRelaxation(view, cost,
                                 projections = selectedView, templateStats = sink,
                                 reuseSourceTemplates = mode != "disabled", reuseTemplateIndexes = mode != "object",
-                                reuseTemplateMetadata = mode == "candidate", preparationCancellation = consumerToken)
+                                reuseTemplateMetadata = mode == "candidate",
+                                earnTemplatePreparation = mode == "candidate" && route == "standalone",
+                                omitBoundRows = mode == "candidate" && route == "standalone",
+                                preparationCancellation = consumerToken)
                             val result = try {
                                 if (route == "retained") {
                                     LpScopedSolver(LpExactState(LpRetainedSources.emptyModel()),
                                         cancellation = consumerToken).use { owner ->
                                         val sources = LpRetainedSources(view, consumer)
-                                        val edit = sources.prepare(owner.state, RootDomains(view), consumerToken)
+                                        val edit = sources.prepare(owner.state, domains, consumerToken)
                                             ?: if (consumerToken()) throw LpAssemblyCancelled()
                                             else error("retained source import declined")
                                         val assertions = requireNotNull(edit.boundAssertions(0L, consumerToken))
@@ -162,7 +229,17 @@ internal object LpTemplatePreparationProfile {
                                         }
                                     }
                                 } else {
-                                    val relaxation = consumer.build(RootDomains(view), cancellation = consumerToken)
+                                    val relaxation = consumer.build(domains, cancellation = consumerToken)
+                                    check(relaxation.objectiveConstant == cost.constant)
+                                    minimumModelRows = minimumModelRows?.let { minOf(it, relaxation.model.m) }
+                                        ?: relaxation.model.m
+                                    maximumModelRows = maximumModelRows?.let { maxOf(it, relaxation.model.m) }
+                                        ?: relaxation.model.m
+                                    if (step == 0) {
+                                        firstModelColumns = relaxation.model.n
+                                        firstModelRows = relaxation.model.m
+                                        firstModelNonzeros = relaxation.model.csc.rowIdx.size
+                                    }
                                     finishAssembly()
                                     val solving = System.nanoTime()
                                     val exact = requireNotNull(relaxation.authoritativeWithTemplates(token) {
@@ -183,13 +260,21 @@ internal object LpTemplatePreparationProfile {
                             }
                             importSolveRetirementBytes = sumBytes(importSolveRetirementBytes,
                                 assemblyEndBytes, readAllocatedBytes())
-                            retainedUnits = maxOf(retainedUnits, consumer.preparationTemplates?.storageUnits ?: 0L)
+                            retainedUnits = maxOf(retainedUnits, selectedView.lpPreparationStorageUnits)
                             results.add("${result.verdict}:${result.lowerBound}:${result.witness?.objective}")
                             if (step == 0) coldNs = System.nanoTime() - start
                         }
                         val phases = sink.snapshot().phases
                         val totalNs = System.nanoTime() - start
                         val endCpu = cpu?.currentThreadCpuTime?.takeIf { it >= 0L }
+                        val endProcessCpu = process?.processCpuTime?.takeIf { it >= 0L }
+                        val endCompilationMs = compilation?.totalCompilationTime?.takeIf { it >= 0L }
+                        val processCpuNs = if (startProcessCpu != null && endProcessCpu != null) {
+                            endProcessCpu - startProcessCpu
+                        } else null
+                        val compilationMs = if (startCompilationMs != null && endCompilationMs != null) {
+                            endCompilationMs - startCompilationMs
+                        } else null
                         val threadCpuNs = if (startCpu != null && endCpu != null) endCpu - startCpu else null
                         val allocatedBytes = sumBytes(0L, startBytes, readAllocatedBytes())
                         val measuredAssemblyBytes = assemblyBytes
@@ -200,18 +285,37 @@ internal object LpTemplatePreparationProfile {
                         signatures[mode] = results
                         val preparation = phases["TEMPLATE_PREPARATION_NODE"]
                         val assembly = phases["TEMPLATE_ASSEMBLY_NODE"]
+                        val funding = phases["TEMPLATE_FUNDING_NODE"]
                         val record = buildJsonObject {
                             put("source", file.name)
                             put("route", route)
                             put("sourceSha256", hash)
+                            put("sourceIntegerVariables", source.numIntVars)
+                            put("sourceBooleanVariables", source.numBoolVars)
+                            put("sourceFactors", source.numFactors)
+                            put("firstModelColumns", firstModelColumns)
+                            put("firstModelRows", firstModelRows)
+                            put("firstModelNonzeros", firstModelNonzeros)
+                            put("minimumModelRows", minimumModelRows)
+                            put("maximumModelRows", maximumModelRows)
                             put("parseNs", parseNs)
                             put("round", round)
                             put("warmup", round == 0)
                             put("mode", mode)
                             put("change", change)
+                            put("derivedGuardSource", change == "guard")
+                            put("rawSourceAttempts", rawAttempts)
+                            put("finiteSourceAttempts", finiteAttempts)
+                            put("alternateNamespaceAttempts", alternateNamespaceAttempts)
+                            put("trueGuardAttempts", trueGuardAttempts)
+                            put("falseGuardAttempts", falseGuardAttempts)
                             put("steps", steps)
                             put("totalNs", totalNs)
                             put("threadCpuNs", threadCpuNs)
+                            put("processCpuNs", processCpuNs)
+                            put("compilationMs", compilationMs)
+                            put("startedEpochMillis", startEpochMillis)
+                            put("finishedEpochMillis", System.currentTimeMillis())
                             put("coldSetupAndConsumerNs", coldNs)
                             put("assemblyIncludingPreparationNs", assemblyNs)
                             put("solveAndCertificationNs", solveNs)
@@ -220,14 +324,23 @@ internal object LpTemplatePreparationProfile {
                             put("importSolveRetirementThreadBytes", measuredImportBytes)
                             put("otherThreadBytes", otherBytes)
                             put("totalWork", work)
-                            put("preparationNs", preparation?.nanos ?: 0L)
-                            put("preparationWork", preparation?.work ?: 0L)
-                            put("indexesReused", preparation?.outcomes?.get("INDEXES_REUSED") ?: 0L)
-                            put("componentsDirty", preparation?.outcomes?.get("COMPONENTS_DIRTY") ?: 0L)
-                            put("rowsAssembled", assembly?.outcomes?.get("ROWS") ?: 0L)
-                            put("boundsAssembled", assembly?.outcomes?.get("BOUNDS") ?: 0L)
-                            put("exactBoundsAdopted", assembly?.outcomes?.get("EXACT_BOUND_OBJECTS") ?: 0L)
+                            put("preparationNs", preparation?.nanos)
+                            put("preparationWork", preparation?.work)
+                            put("indexesReused", preparation?.outcomes?.get("INDEXES_REUSED"))
+                            put("componentsDirty", preparation?.outcomes?.get("COMPONENTS_DIRTY"))
+                            put("rowsAssembled", assembly?.outcomes?.get("ROWS"))
+                            put("boundsAssembled", assembly?.outcomes?.get("BOUNDS"))
+                            put("exactBoundsAdopted", assembly?.outcomes?.get("EXACT_BOUND_OBJECTS"))
+                            put("boundRowChecks", assembly?.outcomes?.get("BOUND_ROW_CHECKS"))
+                            put("sourceRowsOmitted", assembly?.outcomes?.get("SOURCE_ROWS_OMITTED"))
+                            put("fundingCalls", funding?.calls)
+                            put("fundingWork", funding?.work)
+                            put("constructionRecords", funding?.outcomes?.get("RECORDED"))
+                            put("observedConstructionUnits", funding?.outcomes?.get("COMPLETED_UNITS_SUM"))
                             put("peakRetainedTemplateUnits", retainedUnits)
+                            put("retainedUnitsScope",
+                                "largest selected publication slot, not a simultaneous process peak")
+                            put("recordedWorkIsCompleteSolverWork", false)
                             put("nativeResults", results.joinToString(","))
                             put("independentProofCheck", false)
                         }

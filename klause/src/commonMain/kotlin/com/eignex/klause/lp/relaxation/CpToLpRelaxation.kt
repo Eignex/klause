@@ -287,6 +287,8 @@ internal fun LpRelaxation.withModel(
     reboundModel: LpModel,
     sources: CutSourceMap? = sourceMap?.withBounds(reboundModel),
     remap: LpLayoutRemap? = null,
+    objectiveConstant: Long = this.objectiveConstant,
+    preparationTemplates: LpPreparationTemplates? = null,
 ): LpRelaxation {
     require(remap == null || remap.retainedColumns.size == model.n) { "column removal requires source metadata" }
     val gates = remap?.let { gatedRows.indices.filter { index -> it.row(gatedRows[index]) >= 0 } }
@@ -322,6 +324,7 @@ internal fun LpRelaxation.withModel(
         realUpperRows = if (remap == null) realUpperRows else realUpperRows.mapNotNull { (row, variable) ->
             remap.row(row).takeIf { it >= 0 }?.let { it to variable }
         }.toMap(),
+        preparationTemplates = preparationTemplates,
     )
 }
 
@@ -683,6 +686,8 @@ internal class CpToLpRelaxation(
     private val preparationCancellation: Cancellation = Cancellation.Never,
     private val reuseTemplateIndexes: Boolean = true,
     private val reuseTemplateMetadata: Boolean = false,
+    private val earnTemplatePreparation: Boolean = false,
+    private val omitBoundRows: Boolean = false,
     private val onTemplateWork: (Long) -> Unit = {},
 ) {
     private val elementIndexes = elementIndexes?.toSet()
@@ -705,11 +710,12 @@ internal class CpToLpRelaxation(
         var work = 0L
         try {
             preparationTemplates = projections.prepareLpTemplates(objective, cancellation,
-                reuseTemplateIndexes, reuseTemplateMetadata) {
+                reuseTemplateIndexes, reuseTemplateMetadata, earned = earnTemplatePreparation,
+                compileBoundRows = omitBoundRows) {
                 work = it
+                onTemplateWork(it)
             }
         } finally {
-            onTemplateWork(work)
             val templates = preparationTemplates
             templateStats?.observeTemplatePreparation(
                 start.elapsedNow().inWholeNanoseconds, work, prepared = templates != null,
@@ -721,6 +727,28 @@ internal class CpToLpRelaxation(
                 componentsDirty = templates?.let { it.components.size - it.reusedComponents } ?: 0,
                 retainedUnits = templates?.storageUnits ?: 0L,
             )
+        }
+        if (cancellation()) throw LpAssemblyCancelled()
+    }
+
+    private fun recordConstruction(relaxation: LpRelaxation, cancellation: Cancellation) {
+        if (!reuseSourceTemplates || !earnTemplatePreparation || projections == null ||
+            preparationTemplates != null
+        ) return
+        if (problem.numRealVars != 0 || !projections.builtInRelaxation) return
+        val model = relaxation.model
+        if (model.n == 0 || model.doubleView != null || model.exactState != null) return
+        val extent = model.n.toLong() + model.m + model.csc.rowIdx.size
+        var work = 0L
+        val started = TimeSource.Monotonic.markNow()
+        var recorded = false
+        try {
+            recorded = projections.recordLpConstruction(extent, cancellation) {
+                work += it
+                onTemplateWork(it)
+            }
+        } finally {
+            templateStats?.observeTemplateFunding(started.elapsedNow().inWholeNanoseconds, work, extent, recorded)
         }
         if (cancellation()) throw LpAssemblyCancelled()
     }
@@ -825,7 +853,10 @@ internal class CpToLpRelaxation(
         val assembler = Assembler(domains, cancellation = token)
         var complete = false
         return try {
-            assembler.assemble(extraCuts).also { complete = true }
+            assembler.assemble(extraCuts).also {
+                recordConstruction(it, token)
+                complete = true
+            }
         } finally {
             if (!complete) onDiscardedAssembly?.invoke(assembler.constructionSize)
         }
@@ -839,7 +870,10 @@ internal class CpToLpRelaxation(
     ): Iterator<Unit> = sequence {
         // The caller supplies a containing lifetime because this builder spans invocations.
         prepareTemplates(cancellation)
-        Assembler(domains, cancellation = cancellation).preparation(emptyList(), onWork, onComplete)
+        Assembler(domains, cancellation = cancellation).preparation(emptyList(), onWork) { relaxation ->
+            recordConstruction(relaxation, cancellation)
+            onComplete(relaxation)
+        }
             .forEach { yield(Unit) }
     }.iterator()
 
@@ -936,12 +970,25 @@ internal class CpToLpRelaxation(
         private val cancellation: Cancellation = Cancellation.Never,
         private val region: LpEmissionRegion? = null,
         private val columnDomains: RelaxationDomains = domains,
-    ) : ExactRelaxationBuilder, SharedIndexChoices {
+    ) : ExactRelaxationBuilder, SharedIndexChoices, LpBoundRowBuilder {
         private val builder = LpBuilder()
         val constructionSize: Long get() = builder.constructionSize
         private val exactRows = ExactRelaxationRows()
         private var templateRows = 0
         private var templateBounds = 0
+        private val columnBounds = if (omitBoundRows && preparationTemplates?.hasBoundConditions == true &&
+            region == null && !gated
+        ) {
+            val slots = problem.numIntVars.toLong() * 2L
+            try {
+                cancellation.charge(slots)
+                onTemplateWork(slots)
+                checkCancellation()
+                LongArray(problem.numIntVars) to LongArray(problem.numIntVars)
+            } finally {
+                templateStats?.observeTemplateBoundStorageWork(slots)
+            }
+        } else null
         private val intCol = IntArray(if (region == null) problem.numIntVars else 0) { -1 }
         private val boolCol = IntArray(if (region == null) problem.numBoolVars else 0) { -1 }
         private val realCol = IntArray(if (region == null) problem.numRealVars else 0) { -1 }
@@ -1180,12 +1227,16 @@ internal class CpToLpRelaxation(
                         it.statedLower == intBounds.hasLower(intVar) && it.statedUpper == intBounds.hasUpper(intVar)
                 }
                 if (template != null) templateBounds++
+                val lower = if (openHi) intBounds.lower(intVar) else template?.lower ?: dom.min
+                val upper = template?.upper ?: dom.max
+                columnBounds?.let {
+                    it.first[intVar] = lower
+                    it.second[intVar] = upper
+                }
                 c = if (openHi) {
-                    builder.addOpenAboveVar(template?.lower?.takeIf { it == intBounds.lower(intVar) }
-                        ?: intBounds.lower(intVar), intCost(intVar), tag = intVar)
+                    builder.addOpenAboveVar(lower, intCost(intVar), tag = intVar)
                 } else {
-                    builder.addVar(template?.lower ?: dom.min, template?.upper ?: dom.max,
-                        intCost(intVar), tag = intVar)
+                    builder.addVar(lower, upper, intCost(intVar), tag = intVar)
                 }
                 if (region == null) intCol[intVar] = c else sparseIntCol.put(intVar, c)
                 colVarId.add(intVar)
@@ -1436,8 +1487,10 @@ internal class CpToLpRelaxation(
                 // contribute nothing here — they are handled by the separators and the blocks above.
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
                     factor.lpHullEnabled(hullFlags, elementIndexes)
-                if (preparationTemplates?.emit(problem, factorId, this@Assembler, linearProjection) == true) {
-                    templateRows += preparationTemplates?.factors?.get(factorId)?.rows?.size ?: 0
+                val omitted = preparationTemplates?.emit(problem, factorId, this@Assembler, linearProjection) ?: -1
+                if (omitted >= 0) {
+                    templateRows += (preparationTemplates?.factors?.get(factorId)?.rows?.size ?: 0) - omitted
+                    if (omitted > 0) templateStats?.observeTemplateUse(rowsOmitted = omitted)
                     attributeRows(factorId)
                     continue
                 } else if (projections == null) {
@@ -1715,6 +1768,38 @@ internal class CpToLpRelaxation(
         override fun hullEnabled(): Boolean = currentHullEnabled
 
         override fun liveDomain(intVar: Int): IntDomain = domains.intDomain(intVar)
+
+        override fun boundRowImplied(variable: Int, relation: LinearOp, threshold: Long): Boolean {
+            val snapshot = columnBounds ?: return false
+            try {
+                cancellation.charge(1L)
+                onTemplateWork(1L)
+                checkCancellation()
+                val root = problem.rootDomainOf(variable)
+                val bounds = problem.intBounds
+                val rootImplied = when (relation) {
+                    LinearOp.LE -> bounds.hasUpper(variable) && root.max <= threshold
+                    LinearOp.GE -> bounds.hasLower(variable) && root.min >= threshold
+                    LinearOp.EQ -> bounds.hasLower(variable) && bounds.hasUpper(variable) &&
+                        root.min == threshold && root.max == threshold
+                    LinearOp.NE -> false
+                }
+                if (!rootImplied) return false
+                intColumn(variable)
+                val lower = snapshot.first[variable]
+                val upper = snapshot.second[variable]
+                val implied = when (relation) {
+                    LinearOp.LE -> upper <= threshold
+                    LinearOp.GE -> lower >= threshold
+                    LinearOp.EQ -> lower == threshold && upper == threshold
+                    LinearOp.NE -> false
+                }
+                checkCancellation()
+                return implied
+            } finally {
+                templateStats?.observeTemplateUse(boundChecks = 1)
+            }
+        }
 
         override fun liveBool(boolVar: Int): Boolean? = domains.boolValue(boolVar)
 

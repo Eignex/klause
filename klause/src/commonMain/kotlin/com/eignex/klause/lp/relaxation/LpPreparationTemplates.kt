@@ -87,7 +87,15 @@ internal fun LpRelaxation.authoritativeWithTemplates(
 
 private class LpTemplateImportCancelled : RuntimeException()
 
-internal class LpSourceRowTemplate(private val row: LinearRow) {
+internal interface LpBoundRowBuilder {
+    fun boundRowImplied(variable: Int, relation: LinearOp, threshold: Long): Boolean
+}
+
+private class LpSourceBoundRow(val variable: Int, val relation: LinearOp, val threshold: Long)
+
+internal enum class LpSourceRowUse { REPLAYED, IMPLIED }
+
+internal class LpSourceRowTemplate(private val row: LinearRow, compileBoundRows: Boolean = false) {
     private val compactExact = row is ExactLinear && !row.strict && row.activator == LinearRow.ALWAYS &&
         row.isIntegerOnly && row.constants.let {
             it is IntegerConstants && it.bound in -9_007_199_254_740_992L..9_007_199_254_740_992L &&
@@ -112,15 +120,39 @@ internal class LpSourceRowTemplate(private val row: LinearRow) {
         integers != null -> row.bound
         else -> 0L
     }
-    val storageUnits: Long = 2L + (integers?.size ?: 0) * 2L
+    private val boundCondition = if (compileBoundRows) compileBoundCondition() else null
+    val hasBoundCondition: Boolean get() = boundCondition != null
+    val needsBoundCondition: Boolean get() = boundCondition == null && integers?.size == 1 &&
+        row.relation != LinearOp.NE && requireNotNull(coefficients)[0].let {
+            it == 1L || (it == -1L && bound != Long.MIN_VALUE)
+        }
+    val storageUnits: Long = 3L + (integers?.size ?: 0) * 2L + if (boundCondition == null) 0L else 4L
 
-    fun emit(builder: RelaxationBuilder, projection: LinearLpProjection) {
+    private fun compileBoundCondition(): LpSourceBoundRow? {
+        if (integers?.size != 1 || row.relation == LinearOp.NE) return null
+        val coefficient = requireNotNull(coefficients)[0]
+        if (coefficient == 1L) return LpSourceBoundRow(integers[0], row.relation, bound)
+        if (coefficient != -1L || bound == Long.MIN_VALUE) return null
+        val relation = when (row.relation) {
+            LinearOp.LE -> LinearOp.GE
+            LinearOp.GE -> LinearOp.LE
+            else -> row.relation
+        }
+        return LpSourceBoundRow(integers[0], relation, -bound)
+    }
+
+    fun emit(builder: RelaxationBuilder, projection: LinearLpProjection): LpSourceRowUse {
+        val condition = boundCondition
+        if (condition != null && (builder as? LpBoundRowBuilder)?.boundRowImplied(
+                condition.variable, condition.relation, condition.threshold) == true
+        ) return LpSourceRowUse.IMPLIED
         if (integers != null) {
-            if (row.relation == LinearOp.NE) return
+            if (row.relation == LinearOp.NE) return LpSourceRowUse.REPLAYED
             val columns = IntArray(integers.size) { builder.intColumn(integers[it]) }
             builder.row(columns, requireNotNull(coefficients), row.relation, bound)
         } else if (row is ExactLinear) row.emitExactLpRelaxation(builder)
         else row.emitLpRelaxation(builder, projection)
+        return LpSourceRowUse.REPLAYED
     }
 }
 
@@ -200,7 +232,8 @@ internal class LpFactorTemplate(
     private val integerVariables = factor.intVars
     private val booleanVariables = factor.boolVars
     val supportSize: Int get() = integerVariables.size + booleanVariables.size
-    val storageUnits: Long = 4L + supportSize + (rows?.sumOf { it.storageUnits } ?: 0L)
+    val hasBoundConditions: Boolean = rows?.any { it.hasBoundCondition } == true
+    val storageUnits: Long = 5L + supportSize + (rows?.sumOf { it.storageUnits } ?: 0L)
 
     fun reference(index: Int): Int = if (index < integerVariables.size) {
         Term.ofIntVar(integerVariables[index])
@@ -233,18 +266,26 @@ internal class LpPreparationTemplates private constructor(
     val reusedComponents: Int,
     val storageUnits: Long,
     val reusedIndexes: Boolean = false,
-) {
+    val hasBoundConditions: Boolean = false,
+    private val boundRowsCompiled: Boolean = false,
+) : LpPreparationState {
     fun bound(variable: Int): LpIntegerBoundTemplate? = bounds[variable]
 
-    fun emit(problem: Problem, factorId: Int, builder: RelaxationBuilder, projection: LinearLpProjection): Boolean {
+    fun sharesScope(namespace: Any, problem: Problem): Boolean = this.namespace === namespace &&
+        semantics == problem.semantics && finite == (problem is BakedProblem) &&
+        source.numBoolVars == problem.numBoolVars && source.numIntVars == problem.numIntVars &&
+        source.numRealVars == problem.numRealVars
+
+    fun emit(problem: Problem, factorId: Int, builder: RelaxationBuilder, projection: LinearLpProjection): Int {
         require(source === problem) { "LP templates belong to a different prepared source" }
-        val rows = factors[factorId].rows ?: return false
-        rows.forEach { it.emit(builder, projection) }
-        return true
+        val rows = factors[factorId].rows ?: return -1
+        var omitted = 0
+        for (row in rows) if (row.emit(builder, projection) == LpSourceRowUse.IMPLIED) omitted++
+        return omitted
     }
 
     companion object {
-        private const val MAX_UNITS = 262_144L
+        const val MAX_UNITS = 262_144L
 
         fun prepare(
             selection: PreparedFactorProjections,
@@ -256,6 +297,8 @@ internal class LpPreparationTemplates private constructor(
             onWork: (Long) -> Unit = {},
             reuseIndexes: Boolean = true,
             reuseMetadata: Boolean = false,
+            workLimit: Long? = null,
+            compileBoundRows: Boolean = false,
         ): LpPreparationTemplates? {
             val problem = selection.problem
             // Continuous and custom projections keep their own authority and preparation path.
@@ -269,6 +312,7 @@ internal class LpPreparationTemplates private constructor(
             var pendingColumnWork = 0L
             try {
                 fun visit(count: Long = 1L): Boolean {
+                    if (workLimit != null && count > workLimit - units) return false
                     units += count
                     token.charge(count)
                     return units + pendingColumnWork <= MAX_UNITS && !token()
@@ -278,7 +322,8 @@ internal class LpPreparationTemplates private constructor(
                     return visit()
                 }
                 fun unchanged(): Boolean {
-                    if (old == null || old.objectiveIndependent || old.factors.size != problem.numFactors ||
+                    if (old == null || (compileBoundRows && !old.boundRowsCompiled) ||
+                        old.objectiveIndependent || old.factors.size != problem.numFactors ||
                         old.objectiveConstant != (objective?.constant ?: 0L)
                     ) return false
                     for (index in old.factors.indices) {
@@ -305,7 +350,9 @@ internal class LpPreparationTemplates private constructor(
                     return true
                 }
                 fun rebind(): LpPreparationTemplates? {
-                    if (old == null || old.factors.size != problem.numFactors) return null
+                    if (old == null || old.factors.size != problem.numFactors ||
+                        (compileBoundRows && !old.boundRowsCompiled)
+                    ) return null
                     if (old.rowScope !== rowScope) for (index in old.factors.indices) {
                         if (!visit() || old.factors[index].factor !== problem.factors[index]) return null
                     }
@@ -334,7 +381,7 @@ internal class LpPreparationTemplates private constructor(
                         problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
                         0L, true, old.factors, changedBounds ?: old.bounds,
                         emptyList(), old.source !== problem, old.factors.size, reusedBounds,
-                        0, old.storageUnits, changedBounds == null)
+                        0, old.storageUnits, changedBounds == null, old.hasBoundConditions, old.boundRowsCompiled)
                 }
                 if (reuseMetadata) {
                     val rebound = rebind()
@@ -347,20 +394,29 @@ internal class LpPreparationTemplates private constructor(
                             problem, namespace, rowScope, problem.semantics, problem is BakedProblem,
                             it.objectiveConstant, false, it.factors, it.bounds, it.components,
                             it.source !== problem, it.factors.size, it.bounds.size, it.components.size,
-                            it.storageUnits, true)
+                            it.storageUnits, true, it.hasBoundConditions, it.boundRowsCompiled)
                     }
                 }
                 if (units + pendingColumnWork > MAX_UNITS || token()) return null
                 val oldFactors = HashMap<Factor, LpFactorTemplate>()
                 for (entry in old?.factors.orEmpty()) {
                     if (!visit()) return null
-                    oldFactors[entry.factor] = entry
+                    var reusable = true
+                    if (compileBoundRows && old?.boundRowsCompiled != true) for (row in entry.rows.orEmpty()) {
+                        if (!visit()) return null
+                        if (row.needsBoundCondition) {
+                            reusable = false
+                            break
+                        }
+                    }
+                    if (reusable) oldFactors[entry.factor] = entry
                 }
                 var reusedFactors = 0
                 val factors = ArrayList<LpFactorTemplate>()
                 val bounds = LinkedHashMap<Int, LpIntegerBoundTemplate>()
                 var reusedBounds = 0
-                var storage = 0L
+                var storage = 1L
+                var hasBoundConditions = false
                 for ((factorId, factor) in problem.factors.withIndex()) {
                     if (!visit()) return null
                     val retained = oldFactors[factor]?.takeIf { it.factor === factor }
@@ -375,11 +431,12 @@ internal class LpPreparationTemplates private constructor(
                         ) null else if (factor is ExactLinear) listOf(factor)
                         else factor.impliedLinearRows.takeIf { it.isNotEmpty() }
                         val rows = declared?.map { row ->
-                            if (!visit(1L + row.size)) return null
-                            LpSourceRowTemplate(row)
+                            if (!visit(1L + row.size + if (compileBoundRows) 1L else 0L)) return null
+                            LpSourceRowTemplate(row, compileBoundRows)
                         }
                         LpFactorTemplate(factor, rows)
                     }
+                    hasBoundConditions = hasBoundConditions || entry.hasBoundConditions
                     storage += entry.storageUnits
                     if (storage > MAX_UNITS) return null
                     factors.add(entry)
@@ -408,7 +465,8 @@ internal class LpPreparationTemplates private constructor(
                     if (!visit()) return null
                     return LpPreparationTemplates(problem, namespace, rowScope, problem.semantics,
                         problem is BakedProblem, 0L, true, factors, bounds, emptyList(),
-                        old != null && old.source !== problem, reusedFactors, reusedBounds, 0, storage)
+                        old != null && old.source !== problem, reusedFactors, reusedBounds, 0, storage,
+                        hasBoundConditions = hasBoundConditions, boundRowsCompiled = compileBoundRows)
                 }
                 val unchangedIncidence = old != null && !old.objectiveIndependent &&
                     old.factors.size == factors.size && factors.indices.all {
@@ -486,7 +544,8 @@ internal class LpPreparationTemplates private constructor(
                     if (reuseMetadata) 0L else objective?.constant ?: 0L, reuseMetadata,
                     factors, bounds, components, old != null && old.source !== problem,
                     reusedFactors, reusedBounds,
-                    reusedComponents, storage)
+                    reusedComponents, storage, hasBoundConditions = hasBoundConditions,
+                    boundRowsCompiled = compileBoundRows)
             } finally {
                 onWork(units)
             }

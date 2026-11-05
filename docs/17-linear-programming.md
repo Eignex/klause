@@ -56,6 +56,16 @@ its own columns; the numerical builder copies coefficients into its private rows
 Guarded rows read the current pin on every emission. Bounds, premises and numerical
 owners belong to the current build.
 Templates retain neither a basis nor a checked claim.
+Within a feasibility-pump invocation, admitted preparation can retain its completed
+root assembly for later distance objectives. Reuse requires a compact discrete
+layout without auxiliary columns or row premises, cheaper objective mapping than
+completed construction, and a combined 262,144-unit storage ceiling. The invocation
+keeps its source and propagated root fixed. Shared finite domain tables require
+contiguous input domains and retain a bounded endpoint snapshot; changed bounds
+or holes retire the assembly before another objective consumes it. Stable source
+declarations need no repeated domain scan. Each objective gets private costs and
+a fresh numerical solver; preparation, declined mapping and interrupted work spend
+the same LP allowance. Pinning and source acceptance still check each proposal.
 Exact bound columns materialize only when an import needs them. Each endpoint
 definition retains one completed normalized column; changing an open upper side
 replaces the cached column without linking prior versions. Preparation reserves
@@ -90,10 +100,37 @@ order. A failed match uses selective reconstruction; a source revision alone can
 authorize reuse. The new source binding owns no predecessor snapshot, so repeated
 compatible preparations retain no generation chain.
 
-An internal selective-metadata preparation mode validates row identity and exact
-bound sides before retaining the row index. Explicit component-owned and admitted
-sparse-trial engines select this mode and own their numerical component partitions.
-Other node engines keep the ordinary mode. A selected view whose handoff checked
+Complete-index reuse is the default source-preparation policy. Explicit admitted
+preparation validates row identity and exact bound sides before retaining selective
+metadata and enabling pump assembly reuse. Node engines own their numerical
+component partitions. Ordinary node, primal and shaving consumers
+carry disabled, object, complete-index and admitted controls through
+objective-specific engines and standalone sparse admission. `LpPlan.sourcePreparation`
+selects this policy, and an explicit `LpConfig.sourcePreparation` overrides it
+without enabling numerical techniques. The finite pipeline carries the same choice
+through pre-bake LP checks and harvest before constructing the engine. Admitted construction
+first completes its LP without speculative metadata and marks the existing
+namespace token. A later completed consumer can allocate a 16-unit source-scoped
+record and accumulate construction work. The marker carries no work credit or
+numerical state. A preparation attempt spends
+no more inspection work than those completed builds supplied. Deferred exact columns
+debit the consuming LP when materialized; their potential storage remains within the
+262,144-unit ceiling. A failed attempt requires further completed construction
+before retrying; its inspection and replacement record still spend the current
+allowance. Admission work supplies no additional solver grant. Component-owned and
+admitted sparse-trial engines keep their explicit preparation route. LP harvest
+also eagerly prepares definitions for its later engine bake.
+Admitted ordinary consumers compile unary integer bound conditions into source rows.
+The stated source root bounds and the constructed column bounds must both imply a
+condition before the row is omitted. An open required side or a widened constructed
+bound keeps its row. Row and bound changes use the current source binding. Each
+check spends the current allowance. Regional, gated
+and component-owned root layouts retain their row definitions. A later consumer
+that can omit bound rows compiles missing conditions within its allowance, retaining
+unrelated row and endpoint definitions. Interrupted compilation preserves the last
+complete snapshot; repeated consumers reuse the completed conditions. Numerical owners and
+source row maps are assembled independently for the emitted rows.
+A selected view whose handoff checked
 ordered factor identities carries the same immutable layout token, so subsequent
 template preparations need no duplicate row scan. Other rewrites and explicit
 namespace remaps carry fresh tokens and validate their actual factor identities.
@@ -113,7 +150,11 @@ An identical stable source-domain table authorizes endpoint metadata reuse witho
 a repeated scan. Shared domain arrays require endpoint checks, including raw views
 carrying a finite session's table; model identity or type alone supplies no such proof.
 The ordinary mode retains its complete-match check. Both modes publish only completed immutable
-snapshots within the same containing allowance and storage cap.
+snapshots within the same containing allowance and storage cap. Admission records
+share those source/finite publication slots and keep no predecessor. Their capture
+and replacement debit the containing allowance before publication; cancellation
+withholds the record and the next consumer. Construction funding has its own phase
+observation and supplies neither a checked result nor source-acceptance authority.
 
 Template construction polls and charges the containing token, including failed
 attempts, and caps visits and retained storage at 262,144 modeled units each.

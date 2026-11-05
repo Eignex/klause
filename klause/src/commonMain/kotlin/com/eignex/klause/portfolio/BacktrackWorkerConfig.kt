@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.meta.coreguided.CoreRefinementMode
@@ -241,11 +242,14 @@ internal fun BacktrackRecipe.editing(edit: ((BacktrackParams) -> BacktrackParams
 /** Cap this recipe under [ceiling] (the `--lp` ceiling): each LP arm's config is `cappedUnder` it —
  *  emphasis lowered and the ceiling's per-technique overrides applied — so no arm runs LP above what the
  *  user permitted, and `--lp aggressive,-cuts` / `off,+energetic` toggle individual techniques across the
- *  pool. Non-LP arms keep no LP; an all-`AGGRESSIVE`, no-override ceiling is a no-op. */
+ *  pool. An explicit preparation policy also reaches raw LP plans. Non-LP arms keep no LP;
+ *  an all-`AGGRESSIVE`, no-override ceiling is a no-op. */
 internal fun BacktrackRecipe.capLp(ceiling: LpConfig): BacktrackRecipe = BacktrackRecipe(label) { seed, onEvent ->
     val p = build(seed, onEvent)
     val intended = p.lpConfig
-    if (intended == null) p else p.copy(lpConfig = intended.cappedUnder(ceiling))
+    if (intended != null) p.copy(lpConfig = intended.cappedUnder(ceiling))
+    else if (ceiling.sourcePreparation == null || p.lpPlan == LpPlan()) p
+    else p.copy(lpPlan = p.lpPlan.copy(sourcePreparation = ceiling.sourcePreparation))
 }
 
 /** This recipe with every arm it builds spending [budget], the solve-spanning node allowance. A null
