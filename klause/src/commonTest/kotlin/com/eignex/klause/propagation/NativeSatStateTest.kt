@@ -6,6 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -23,6 +24,102 @@ class NativeSatStateTest {
     )
 
     private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
+
+    @Test
+    fun `satisfied learned blockers should resume propagation after backtracking`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.pinBool(1, true)
+        session.pinBool(0, false)
+        session.popToLevel(0)
+
+        session.pinBool(1, false)
+
+        assertEquals(true, session.boolValue(0))
+    }
+
+    @Test
+    fun `satisfied retired watches should stay inert after backtracking`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        repeat(2) { session.maintainCapWindow(0, 40L, 64L, { false }) { false } }
+        session.pinBool(1, true)
+        session.pinBool(0, false)
+        session.popToLevel(0)
+
+        session.pinBool(0, false)
+
+        assertNull(session.boolValue(1))
+        assertEquals(0, session.activeLearnedClauseCount)
+    }
+
+    @Test
+    fun `dormant retired watches should release through bounded cleanup`() {
+        val session = session(4, or(2, true, 3, true))
+        val baseline = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        repeat(2) { session.maintainCapWindow(0, 40L, 64L, { false }) { false } }
+        session.pinBool(1, true)
+        session.pinBool(0, false)
+        val native = assertNotNull(session.explanationState.nativeEngine)
+
+        repeat(16) {
+            val budget = ReclamationPreparation(32L, 64L, { false }, {})
+            try { native.sweepRetiredWatches(budget) } catch (_: ReclamationPreparation.Deferred) { }
+            assertTrue(budget.work <= 32L)
+        }
+
+        val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        assertEquals(baseline.getValue("sessionWatchCapacityBytes"), after.getValue("sessionWatchCapacityBytes"))
+    }
+
+    @Test
+    fun `cancelled cleanup should retain dormant watch ownership`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        repeat(2) { session.maintainCapWindow(0, 40L, 64L, { false }) { false } }
+        session.pinBool(1, true)
+        session.pinBool(0, false)
+        val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        val native = assertNotNull(session.explanationState.nativeEngine)
+        var work = 0L
+        val budget = ReclamationPreparation(32L, 64L, { work >= 4L }, { work += it })
+
+        assertFailsWith<ReclamationPreparation.Deferred> { native.sweepRetiredWatches(budget) }
+
+        val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        assertEquals(before.getValue("sessionWatchCapacityBytes"), after.getValue("sessionWatchCapacityBytes"))
+        assertEquals(4L, work)
+    }
+
+    @Test
+    fun `root source retirement should remain effective with no retired learned clauses`() {
+        val source = or(0, true, 1, true)
+        val session = session(4, source)
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9)
+        session.retireRootSource(0, source)
+
+        session.pinBool(0, false)
+        session.pinBool(2, false)
+
+        assertNull(session.boolValue(1))
+        assertEquals(true, session.boolValue(3))
+    }
+
+    @Test
+    fun `a learned retirement after compaction should stop its watched implication`() {
+        val session = session(6, or(4, true, 5, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        repeat(2) { session.maintainCapWindow(0, 40L, 64L, { false }) { false } }
+        session.forgetLearnedClauses { _, _ -> true }
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9)
+
+        repeat(2) { session.maintainCapWindow(0, 40L, 64L, { false }) { false } }
+        session.pinBool(2, false)
+
+        assertNull(session.boolValue(3))
+        assertEquals(0, session.activeLearnedClauseCount)
+    }
 
     @Test
     fun `a borrowed clause array should remain independent of its native payload`() {

@@ -173,6 +173,10 @@ arithmetic. Rebuilding, reseeding or resuming never renews them. Atomic work can
 overspend an allowance; its charge remains and the next polling boundary stops
 optional work. Resource exhaustion does not establish search-space exhaustion.
 
+The CLI platform clock reports whole milliseconds since one process origin. That
+origin is fixed before loading and shared by deadline construction and every later
+poll; clearing or rearming a deadline does not replace the clock.
+
 ### Configuration and lifetime
 
 `ExecutionOptions` distinguishes `auto`, `unlimited` and a nonnegative remaining
