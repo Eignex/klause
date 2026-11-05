@@ -241,9 +241,10 @@ outlive the invocation that checked them.
 
 ## Numerical dependencies
 
-Klause owns LU, reach, pivot policy, Forrest–Tomlin updates, checked arithmetic and
-scratch lifetime. Koblas supplies validated CSC containers, vector/indexed kernels
-and sparse primitives; Kumulant supplies online statistics and adaptive bandits.
+Klause owns LU, reach, pivot policy, Forrest–Tomlin updates, checked arithmetic,
+scratch lifetime and the workspace scatter, gather and pivot-candidate slices in
+`util.SparseSlices`. Koblas supplies validated CSC containers and vector/indexed
+kernels; Kumulant supplies online statistics and adaptive bandits.
 Neither selects models, routes or result semantics.
 
 The [root build](../build.gradle.kts) pins immutable timestamps for KMP roots and

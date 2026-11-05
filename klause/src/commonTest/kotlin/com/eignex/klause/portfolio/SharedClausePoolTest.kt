@@ -227,6 +227,45 @@ class SharedClausePoolTest {
     }
 
     @Test
+    fun `a cooperative pause should withhold learned clause publication`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
+            val pool = SharedClausePool()
+            val exchange = PoolClauseExchange(pool)
+            val session = PropagationSession(problem, nativeSat = native)
+            exchange.onSearchStart(session)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
+
+            exchange.onSearchPause(session)
+
+            assertTrue(pool.drainSince(0).clauses.isEmpty())
+        }
+    }
+
+    @Test
+    fun `a cooperative pause should retain peer use credit until search end`() {
+        for (native in listOf(false, true)) {
+            val problem = Problem(4, 0, emptyArray(), listOf(Clause(intArrayOf(0, 1))))
+            val pool = SharedClausePool(booleanOnly = true)
+            val tally = ContributionTally()
+            val exchange = PoolClauseExchange(pool, origin = 1, tally = tally)
+            val session = PropagationSession(problem, nativeSat = native)
+            pool.publish(listOf(boolClause(0, 1)), origin = 2)
+            exchange.onSearchStart(session)
+            session.pinBool(0, false)
+            val credited = HashMap<Pair<Contribution, Int>, Double>()
+
+            exchange.onSearchPause(session)
+            tally.drain { kind, origin, amount -> credited[kind to origin] = amount }
+            assertTrue(credited.isEmpty())
+            exchange.onSearchEnd(session)
+            tally.drain { kind, origin, amount -> credited[kind to origin] = amount }
+
+            assertEquals(mapOf((Contribution.Clause to 2) to 1.0), credited)
+        }
+    }
+
+    @Test
     fun `a duplicate at capacity should preserve the generation`() {
         val pool = SharedClausePool(cap = 2)
         val clause = boolClause(0, 1)
@@ -287,7 +326,7 @@ class SharedClausePoolTest {
             pool.publish(listOf(boolClause(i * 2, 1)), origin = 2)
             exchange.onRestart(session)
         }
-        exchange.onSearchEnd(session)
+        exchange.onSearchPause(session)
         val suspended = meter.snapshot().clauses
         assertEquals(1L, suspended.getValue("memorySampleComplete"),
             "work=${suspended["memorySampleWork"]}/$sampleWork scratch=${suspended["memorySampleScratchEntries"]}/4096")

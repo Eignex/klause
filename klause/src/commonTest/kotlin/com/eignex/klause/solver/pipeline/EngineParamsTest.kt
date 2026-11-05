@@ -54,9 +54,12 @@ class EngineParamsTest {
             "learned-memory-bytes=4096", "learned-memory-work=1234", "learned-memory-scratch-bytes=789",
         )
 
-        val fixed = applyFixedBacktrackParams(base, EngineParams(settings), allowSelectors = true)
+        val fixed = applyFixedBacktrackParams(base, EngineParams(settings + "private-rebuild-bytes=456"),
+            allowSelectors = true)
         val worker = applyBacktrackParams(base, EngineParams(settings))
 
+        assertEquals(456L, fixed.privateRebuildBytes)
+        assertEquals(null, base.privateRebuildBytes)
         assertEquals(null, base.learnedMemoryBytes)
         for (configured in listOf(fixed, worker)) {
             assertEquals(4096L, configured.learnedMemoryBytes)

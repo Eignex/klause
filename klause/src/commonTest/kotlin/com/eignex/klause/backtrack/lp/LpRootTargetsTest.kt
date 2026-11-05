@@ -28,6 +28,117 @@ import kotlin.test.assertTrue
 class LpRootTargetsTest {
 
     @Test
+    fun `restarted root hints replay owned coordinates without reviving stale readers`() {
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+        )).bake()
+        val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
+        val session = PropagationSession(problem)
+        val relaxation = CpToLpRelaxation(problem, objective).build(session)
+        val factory = RecordingLpEngineFactory()
+        val sink = SolveStatsSink("replayed-root-value-order")
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), sink, LpSolveContext(factory)).use { engine ->
+            engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
+                primal = DoubleArray(relaxation.model.n) { 1.0 },
+                sourceProblem = problem, auxiliaryPoint = true)
+            assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+            engine.rootRoundingWarmStart = null
+            assertNotNull(engine.pickRootComponent(session, Cancellation.Never))
+            val expired = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L))
+            engine.restartRootPrimalTargets()
+            assertNull(engine.rootPrimalTargets)
+
+            val refreshed = engine.refreshRootPrimalTargets(session, Cancellation.Never)
+            val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
+
+            assertTrue(refreshed)
+            assertEquals(listOf(1L, 0L), ordered)
+            assertEquals(listOf(0L, 1L), expired.toList())
+            assertTrue(factory.calls.isEmpty())
+            assertEquals(1L, sink.snapshot().lp.phases["PRIMAL_RESTART_REPLAY_ROOT"]
+                ?.outcomes?.get("RETAINED"))
+            assertEquals(1L, sink.snapshot().lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]
+                ?.outcomes?.get("RESTART_REPLAY_OFFERED"))
+        }
+    }
+
+    @Test
+    fun `clearing root hints discards pending restart coordinates`() {
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+        val session = PropagationSession(problem)
+        val relaxation = CpToLpRelaxation(problem, objective).build(session)
+        val factory = RecordingLpEngineFactory()
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("discarded-restart-value-order"),
+            LpSolveContext(factory)).use { engine ->
+            engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
+                primal = DoubleArray(relaxation.model.n) { 1.0 },
+                sourceProblem = problem, auxiliaryPoint = true)
+            assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+            engine.rootRoundingWarmStart = null
+            engine.restartRootPrimalTargets()
+
+            engine.clearRootPrimalTargets()
+            val refreshed = engine.refreshRootPrimalTargets(session, Cancellation.Never)
+            val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
+
+            assertFalse(refreshed)
+            assertNull(engine.rootPrimalTargets)
+            assertEquals(listOf(0L, 1L), ordered)
+            assertTrue(factory.calls.isEmpty())
+        }
+    }
+
+    @Test
+    fun `pending restart hints wait for a funded uncancelled owning root`() {
+        for (guard in listOf("spent", "cancelled", "foreign", "nested")) {
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
+            val session = PropagationSession(problem)
+            val relaxation = CpToLpRelaxation(problem, objective).build(session)
+            val factory = RecordingLpEngineFactory()
+            var allowance = 1_000_000L
+            LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                    rootCutHarvest = false)), SolveStatsSink("guarded-restart-value-order"),
+                LpSolveContext(factory), nodeWorkAllowance = { allowance }).use { engine ->
+                engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
+                    primal = DoubleArray(relaxation.model.n) { 1.0 },
+                    sourceProblem = problem, auxiliaryPoint = true)
+                assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+                engine.rootRoundingWarmStart = null
+                engine.restartRootPrimalTargets()
+                if (guard == "spent") allowance = 0L
+                if (guard == "nested") session.pinInt(0, 1L)
+                val requested = if (guard == "foreign") {
+                    PropagationSession(Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyList()))
+                } else session
+
+                val declined = engine.refreshRootPrimalTargets(requested,
+                    Cancellation { guard == "cancelled" })
+
+                assertFalse(declined, guard)
+                assertNull(engine.rootPrimalTargets, guard)
+                assertEquals(listOf(0L, 1L),
+                    engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList(), guard)
+                allowance = 1_000_000L
+                session.popToLevel(0)
+                assertTrue(engine.refreshRootPrimalTargets(session, Cancellation.Never), guard)
+                assertEquals(listOf(1L, 0L),
+                    engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList(), guard)
+                assertTrue(factory.calls.isEmpty(), guard)
+            }
+        }
+    }
+
+    @Test
     fun `completed component preferences take precedence over auxiliary root coordinates`() {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),

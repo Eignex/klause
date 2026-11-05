@@ -43,6 +43,13 @@ internal object CorpusFiles {
     /** [path] without the compression suffix: the name a stored instance has as plain text. */
     fun plainPath(path: String): String = path.removeSuffix(SUFFIX)
 
+    /**
+     * Orders paths by instance and, within one instance, puts the stored compressed form before a plain sibling. A
+     * tree that still holds a plain copy beside its `.zst` then plans exactly like one holding only the stored form,
+     * independent of directory listing order.
+     */
+    val storedFirst: Comparator<String> = compareBy<String> { plainPath(it) }.thenBy { !it.endsWith(SUFFIX) }
+
     /** The format extension of [file], looking past the compression suffix (`foo.mps.zst` → `mps`). */
     fun formatExtension(file: File): String = plainPath(file.name).substringAfterLast('.', "")
 
@@ -64,6 +71,7 @@ internal object CorpusFiles {
         stagingDirectory: File = stagingRoot,
         bufferBytes: Int = DEFAULT_BUFFER_SIZE,
         nanoTime: () -> Long = System::nanoTime,
+        onCleanupStart: (() -> Unit)? = null,
         block: (File) -> T,
     ): T {
         require(bufferBytes in 1..MAX_STAGING_BUFFER_BYTES)
@@ -76,7 +84,7 @@ internal object CorpusFiles {
         stagingDirectory.mkdirs()
         checkStaging()
         val directory = StagedDirectory(Files.createTempDirectory(stagingDirectory.toPath(), "plain-").toFile(),
-            nanoTime, onCleanup)
+            nanoTime, onCleanup, onCleanupStart)
         directory.use {
             checkStaging()
             val plain = File(it.file, plainPath(file.name))
@@ -101,10 +109,12 @@ internal object CorpusFiles {
         val file: File,
         val nanoTime: () -> Long,
         val onCleanup: (Long) -> Unit,
+        val onCleanupStart: (() -> Unit)?,
     ) : AutoCloseable {
         override fun close() {
             val cleanupStart = nanoTime()
             try {
+                runCatching { onCleanupStart?.invoke() }
                 SourcePreparationCapture.measure("source-cleanup") {
                     check(file.deleteRecursively()) { "Cannot remove staged source: $file" }
                 }

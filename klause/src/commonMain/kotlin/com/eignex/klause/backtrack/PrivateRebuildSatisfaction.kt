@@ -26,6 +26,7 @@ internal class PrivateRebuildSatisfaction(
     private val solver: BacktrackSolver,
     private val params: BacktrackParams,
 ) : ResumableSolve {
+    private val privateByteLimit = params.privateRebuildBytes ?: params.learnedMemoryScratchBytes
     private val automatic = params.privateRebuildWork < 0L
     private val privateWorkLimit = if (automatic) AUTOMATIC_WORK else params.privateRebuildWork
     private val lifetime = params.cancellation.lifetimeCancellation()
@@ -51,6 +52,7 @@ internal class PrivateRebuildSatisfaction(
     private val canonical = ResumableSatisfaction(solver, sharedParams, ownsWorkDebt = false, atRoot = ::atRoot)
     private var generation: PrivateRebuildGeneration? = null
     private var consumer: ResumableSatisfaction? = null
+    private var openingPropagationWork: (() -> Long)? = null
     private var retiredStats = SolveStats.EMPTY
     private var retiredClauseWork = 0L
     private var debt = 0L
@@ -68,7 +70,16 @@ internal class PrivateRebuildSatisfaction(
         get() {
             if (closed) return retainedStats
             val total = canonical.stats.mergedWith(retiredStats).mergedWith(consumer?.stats ?: SolveStats.EMPTY)
-            return total.copy(search = total.search.copy(learning = total.search.learning + observations))
+            val joint = consumer?.affineParityStatistics().orEmpty()
+            if (joint.isEmpty()) return total.copy(
+                search = total.search.copy(learning = total.search.learning + observations),
+            )
+            val learning = (total.search.learning + observations).toMutableMap()
+            for ((key, value) in joint) {
+                val name = "privateRebuildParityJoint$key"
+                learning[name] = saturatedWork(learning[name] ?: 0L, value)
+            }
+            return total.copy(search = total.search.copy(learning = learning))
         }
 
     private fun note(key: String, value: Long = 1L) {
@@ -83,6 +94,8 @@ internal class PrivateRebuildSatisfaction(
             parityAttempted = true
             note("AutomaticAttempts")
             note("AutomaticWorkLimit", privateWorkLimit)
+            note("AutomaticByteLimit", privateByteLimit)
+            note("AutomaticCanonicalScratchLimit", params.learnedMemoryScratchBytes)
             return captureParity(session)
         }
         if (!parityAttempted) {
@@ -112,7 +125,7 @@ internal class PrivateRebuildSatisfaction(
         binaryCount = session.learnedClauseCount
         binaryRevision = session.learnedClauseRevision
         val historyBytes = PrivateRebuildBinaryLearning.MAX_RELATIONS * Long.SIZE_BYTES.toLong()
-        if (params.learnedMemoryScratchBytes < PrivateRebuildBinaryLearning.SCRATCH_BYTES + historyBytes) return false
+        if (privateByteLimit < PrivateRebuildBinaryLearning.SCRATCH_BYTES + historyBytes) return false
         var spent = 0L
         val allowance = minOf(PrivateRebuildBinaryLearning.SCAN_WORK,
             (privateWorkLimit - trialSpent()).coerceAtLeast(0L))
@@ -154,7 +167,7 @@ internal class PrivateRebuildSatisfaction(
         val allowance = (privateWorkLimit - trialSpent()).coerceAtLeast(0L)
         val start = TimeSource.Monotonic.markNow()
         val captured = PrivateRebuildParity.capture(session,
-            params.learnedMemoryScratchBytes - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(),
+            privateByteLimit - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(),
             visit = { work ->
                 if (work > allowance - spent || session.cancelRequested || lifetime() || rootCancellation()) false
                 else { spent += work; charge(work); true }
@@ -182,6 +195,11 @@ internal class PrivateRebuildSatisfaction(
         if (automatic && ((captured.basis?.rank ?: 0) < MIN_AUTOMATIC_RANK ||
                 captured.coveredClauses * 2L < solver.problem.numFactors)) {
             note("AutomaticDeclinedStructure")
+            return false
+        }
+        if (automatic && captured.affine == null &&
+            (captured.basis?.freeColumns ?: 0) < MIN_AUTOMATIC_MIXED_FREE_COLUMNS) {
+            note("AutomaticDeclinedSmallMixed")
             return false
         }
         if (automatic) note("AutomaticAdmitted")
@@ -272,7 +290,7 @@ internal class PrivateRebuildSatisfaction(
     }
 
     private fun trialSpent(): Long = saturatedWork(chargedPrivateWork,
-        saturatedWork(retiredClauseWork, consumer?.clauseWork ?: 0L))
+        saturatedWork(retiredClauseWork, consumer?.clauseWork ?: openingPropagationWork?.invoke() ?: 0L))
 
     private fun charge(work: Long) {
         chargedPrivateWork = saturatedWork(chargedPrivateWork, work)
@@ -293,7 +311,7 @@ internal class PrivateRebuildSatisfaction(
         val parity = pendingParity
         pendingParity = null
         val prepared = PrivateRebuildGeneration.prepare(session,
-            params.learnedMemoryScratchBytes - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(), token,
+            privateByteLimit - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(), token,
             onDecline = { note("Declined$it") }, learnedBinary = binary, parity = parity) {
             (privateWorkLimit - trialSpent()).coerceAtLeast(0L) / 2L
         }
@@ -314,6 +332,8 @@ internal class PrivateRebuildSatisfaction(
         note("ParityReducedRows", prepared.parityReducedRows.toLong())
         note("ParityReducedLiterals", prepared.parityReducedLiterals)
         note("ParityTriangularRows", prepared.parityTriangularRows.toLong())
+        note("ParityJointFactors", if (prepared.parityJointFactor >= 0) 1L else 0L)
+        note("ParityJointModeledBytes", prepared.parityJointModeledBytes)
         note("ParityCoveredClauses", prepared.parityCoveredClauses.toLong())
         note("ParitySourceRows", prepared.paritySourceRows.toLong())
         note("ParitySourceLiterals", prepared.paritySourceLiterals)
@@ -334,8 +354,16 @@ internal class PrivateRebuildSatisfaction(
         note("ReusedSourceClauses", prepared.reusedSourceClauses.toLong())
         note("BveIndexedFactors", prepared.indexedFactors.toLong())
         note("BveSourceFactors", prepared.sourceFactors.toLong())
-        charge(prepared.bakeWork.constructionEntries)
-        note("OpeningConstructionWork", prepared.bakeWork.constructionEntries)
+        note("FreeSelectorActivity", if (prepared.freeSelectorActivity) 1L else 0L)
+        val selectorWork = if (!prepared.freeSelectorActivity || prepared.preferredFreeColumns.isEmpty()) 0L else {
+            PrivateRebuildFreeSelector.initializationWork(
+                prepared.problem.numBoolVars, prepared.preferredFreeColumns.size,
+            )
+        }
+        val openingWork = prepared.bakeWork.constructionEntries + selectorWork
+        charge(openingWork)
+        note("OpeningConstructionWork", openingWork)
+        note("FreeSelectorInitializationWork", selectorWork)
         if (token()) {
             generation = null
             root = null
@@ -348,26 +376,38 @@ internal class PrivateRebuildSatisfaction(
             privateRebuildWork = 0L, clauseExchange = null, cutExchange = null, pooledIncumbents = null,
             cancellation = containing or Cancellation { trialSpent() >= privateWorkLimit },
             variableSelector = if (prepared.preferredFreeColumns.isEmpty()) sharedParams.variableSelector
-            else PrivateRebuildFreeSelector(prepared.preferredFreeColumns),
+            else PrivateRebuildFreeSelector(prepared.preferredFreeColumns, prepared.freeSelectorActivity),
             onEvent = null, branchObserver = null, maxDecisions = params.maxDecisions.coerceAtMost(
                 (privateWorkLimit - trialSpent()).coerceAtLeast(0L) / PROPAGATION_WORK_PER_NODE,
             ),
             maxLearnedClauses = minOf(params.maxLearnedClauses ?: 256, 256),
         )
         val openingStart = TimeSource.Monotonic.markNow()
+        var openingRecorded = false
         try {
-            consumer = ResumableSatisfaction(BacktrackSolver(prepared.problem), privateParams, ownsWorkDebt = false)
+            consumer = ResumableSatisfaction(BacktrackSolver(prepared.problem), privateParams, ownsWorkDebt = false,
+                affineFactorId = prepared.parityJointFactor, onPropagationWork = { openingPropagationWork = it })
         } catch (stopped: SearchInitializationCancelled) {
             val decisions = stopped.stats.search.nodes.sum.toLong()
                 .coerceAtMost(Long.MAX_VALUE / PROPAGATION_WORK_PER_NODE) * PROPAGATION_WORK_PER_NODE
-            retiredClauseWork = saturatedWork(retiredClauseWork,
-                saturatedWork(decisions, stopped.stats.search.propagationWork.sum.toLong()))
+            val stoppedWork = saturatedWork(decisions, stopped.stats.search.propagationWork.sum.toLong())
+            retiredClauseWork = saturatedWork(retiredClauseWork, stoppedWork)
+            note("TrialWork", stoppedWork)
+            openingRecorded = true
             retiredStats = retiredStats.mergedWith(stopped.stats)
             generation = null
             root = null
             note("OpeningStopped")
             return
         } finally {
+            val readOpeningWork = openingPropagationWork
+            openingPropagationWork = null
+            val propagationWork = readOpeningWork?.invoke() ?: 0L
+            note("OpeningPropagationWork", propagationWork)
+            if (consumer == null && !openingRecorded) {
+                retiredClauseWork = saturatedWork(retiredClauseWork, propagationWork)
+                note("TrialWork", propagationWork)
+            }
             note("OpeningNanos", openingStart.elapsedNow().inWholeNanoseconds)
         }
         note("Consumers")
@@ -397,6 +437,7 @@ internal class PrivateRebuildSatisfaction(
         try {
             search.close()
         } finally {
+            for ((key, value) in search.affineParityStatistics()) note("ParityJoint$key", value)
             note("TrialWork", search.clauseWork)
             retiredClauseWork = saturatedWork(retiredClauseWork, search.clauseWork)
             retiredStats = retiredStats.mergedWith(search.stats)
@@ -430,6 +471,7 @@ internal class PrivateRebuildSatisfaction(
             } finally {
                 root = null
                 generation = null
+                openingPropagationWork = null
                 pendingBinary = null
                 pendingParity = null
                 attemptedBinaryPairs = longArrayOf()
@@ -441,7 +483,8 @@ internal class PrivateRebuildSatisfaction(
     }
 
     companion object {
-        private const val AUTOMATIC_WORK = 1_048_576L
+        private const val AUTOMATIC_WORK = 4_194_304L
+        private const val MIN_AUTOMATIC_MIXED_FREE_COLUMNS = 16
         private const val MIN_AUTOMATIC_RANK = 128
         private const val MIN_AUTOMATIC_FACTORS = 512
         private const val MAX_AUTOMATIC_FACTORS = 32_768

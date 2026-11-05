@@ -7,6 +7,8 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.engine.LpSolveContext
+import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
@@ -28,6 +30,26 @@ class SearchTest {
         intDomains = arrayOf(*domains),
         factors = arrayOf<Factor>(),
     )
+
+    @Test
+    fun `a cooperative pause should observe sharing without ending the search`() {
+        val events = mutableListOf<String>()
+        val exchange = object : ClauseExchange {
+            override fun onRestart(session: PropagationSession) = Unit
+            override fun onSearchEnd(session: PropagationSession) { events += "end" }
+            override fun onSearchPause(session: PropagationSession) { events += "pause" }
+        }
+
+        CpSatisfactionTraversal(
+            problemOf(IntDomain(0, 1)).bake(),
+            BacktrackParams(clauseExchange = exchange),
+            sink = null,
+            solveContext = LpSolveContext.Production,
+            slice = TraversalSlice(pauses = { true }, beforeBranch = { true }),
+        ).use { it.next() }
+
+        assertEquals(listOf("pause"), events)
+    }
 
     @Test
     fun `a non-enumerable domain decision should split at the bounds midpoint`() {

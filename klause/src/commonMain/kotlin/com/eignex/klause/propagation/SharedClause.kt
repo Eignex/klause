@@ -74,8 +74,12 @@ interface ClauseExchange {
      *  exchanges that publish only at restarts. */
     fun onSearchEnd(session: PropagationSession) {}
 
+    /** Observe retained state at a cooperative pause without exchanging clauses or draining use credit.
+     *  Cancellation boundaries use [onSearchEnd] instead. Default no-op. */
+    fun onSearchPause(session: PropagationSession) {}
+
     /** Release worker-private exchange state when the owning search is retired, after its final use drain.
-     *  Suspension uses [onSearchEnd] and retains that state for resumption. */
+     *  [onSearchEnd] and [onSearchPause] retain that state for resumption. */
     fun onSearchClose(session: PropagationSession) {}
 
     /** Publish a globally-valid nogood (an LP Farkas infeasibility certificate) to the shared pool

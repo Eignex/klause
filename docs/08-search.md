@@ -122,7 +122,15 @@ precedes that work. The search and its preparation wrapper report an unfinished 
 layout as pending private preparation. Construction completion, cancellation and retirement follow the
 [LP ownership contract](17-linear-programming.md#root-preparation).
 Eligible retained LP root coordinates can pass directly to the ordinary finite
-traversal as value preferences. Its existing backtracking completes the assignment,
+traversal as value preferences. Integer guides with known fractional coordinates
+can first fund a private component-rounding trial; its progress survives a slice
+boundary within the existing allowance. Known-column masks gate admission and LP
+preferences; unknown variables keep their ordinary fallback values. Guides without
+known fractional targets keep their direct handoff. The private probe prepares its
+partition against its own root domains. After greedy directions decline, its bounded
+repair can revisit an earlier pin within that component while retaining completed
+earlier components and pending alternatives across slices. Every completed proposal still needs
+the ordinary source acceptance check. Its existing backtracking completes the assignment,
 and complete source checks retain publication authority. This transfer carries no
 LP point, bound or proof authority into a leaf. Before its first incumbent, a retained
 integer guide can keep decisions within one declared factor component of the
@@ -131,9 +139,13 @@ under the same funded allowance. A ready guide lets CP seek its first incumbent
 before those queries resume; inherited checked bounds remain available.
 The same frame stack handles conflicts and retraction; all source constraints stay
 active and every component still belongs to complete source checking. A restart
-expires the guide. At its restored root, a traversal that consumed component
-ordering may request fresh preferences from the current LP owner; the request
-rechecks the root model and state, charges its transport and renews no allowance.
+expires the guide's reader handle. At its restored root, a traversal that consumed
+component ordering first requests fresh preferences from the current LP owner.
+The request rechecks the root model and state, charges its transport and renews no
+allowance. If that lookup declines, the same engine can replay its already-owned
+coordinate buffers through a fresh reader handle as value preferences. Replay
+spends the remaining allowance and carries no numerical authority. Explicit guide
+retirement and engine closure release the pending buffers.
 
 Numerical frontier traversal orders alternatives by inherited checked objective
 bounds, visiting unbounded alternatives first. It keeps both children of every
@@ -387,6 +399,10 @@ stateless propagation projections and occurrence indexes; incremental payloads,
 scratch, watchers and failure contexts belong to each state. Undo discards pending
 failure context, and fresh presolve rebuilds keep the originating cancellation token;
 see [presolve](07-presolve.md).
+An owned affine seed lets joint parity propagation share immutable source rows
+while keeping its assigned-fact basis and observations per state. The
+[private worker contract](07-presolve.md#private-worker-qualification) defines
+its grants, cache reset and bounded reasons.
 
 Learned integer rows subscribe to lower/upper bound events in the dynamic watch
 index. A compressed binary index owns one posting per event; its branch masks

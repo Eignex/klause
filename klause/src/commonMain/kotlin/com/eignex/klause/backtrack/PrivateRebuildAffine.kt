@@ -1,5 +1,7 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.factor.bool.AffineXorSeed
+import com.eignex.klause.factor.bool.GaussianXor
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
@@ -97,6 +99,31 @@ internal class PrivateRebuildAffine(
             literals += width
         }
         return RowPlan(forward, literals, triangularRows)
+    }
+
+    fun jointModeledBytes(): Long = if (rank == 0 ||
+        AffineXorSeed.initializationWork(coordinates.size, freeColumns) > Int.MAX_VALUE
+    ) 0L else AffineXorSeed.modeledBytes(coordinates.size, rank, freeColumns)
+
+    fun jointRows(cancellation: Cancellation, rows: Array<Factor>): GaussianXor? {
+        cancellation.charge(coordinates.size * 8L + rank * (words * 2L + 10L) + 32L)
+        if (cancellation()) return null
+        val used = BooleanArray(coordinates.size)
+        val constraints = ArrayList<Xor>(rank)
+        for (factor in rows) {
+            val row = factor as Xor
+            cancellation.charge(row.literals.size + 1L)
+            if (cancellation()) return null
+            for (literal in row.literals) used[Lit.variable(literal)] = true
+            constraints.add(row)
+        }
+        val variables = IntArray(used.count { it })
+        var next = 0
+        for (variable in used.indices) if (used[variable]) variables[next++] = variable
+        val seed = AffineXorSeed(coordinates.copyOf(), rhs.copyOf(rank),
+            Array(rank) { dependencies[it].copyOf() }, freeColumns, variables)
+        val result = GaussianXor(constraints, seed)
+        return result.takeUnless { cancellation() }
     }
 
     fun materializeRows(

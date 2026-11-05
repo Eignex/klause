@@ -12,8 +12,9 @@ source execution supply retained recipe factories to `PortfolioInvocation` with 
 routing plan and current executable projection. The invocation owns worker slots,
 seed offsets, parallel quotas, scheduler controls, result verification and cleanup;
 mutable services registered with a slot close when the slot is released, and each
-replica gets private state. Native reservations divide the complete family's
-allowance across its slots. Heuristic-only factories carry witness authority, and
+replica gets private state. ALNS operator choices and inner repair seeds derive
+from its worker seed in ordinary and diagnostic schedules. Native reservations
+divide the complete family's allowance across its slots. Heuristic-only factories carry witness authority, and
 `FIXED` rejects multiple cores.
 
 `SourceExecutionPolicy` sets finite arm defaults and LP ceilings before worker
@@ -276,6 +277,10 @@ traffic/work/use counters remain inexpensive. Each sample has separate
 4,096 deduplication entries by default; zero is permitted).
 Posting protection checks stop after finding a required owner; the full allocated
 capacity remains counted.
+Cancellation and exhausted optimization slices export glue through `onSearchEnd`. Other cooperative
+pauses use `onSearchPause` to observe retained memory without publishing clauses or
+draining scheduler credit. Uses remain pending until a restart, cancellation boundary
+or uncancelled close. Both pause hooks retain the duplicate filter; `onSearchClose` releases it.
 Clause accounting is reported per worker in `ArmSchedule.sharing.clauses` and as
 `clause*` fields in the CLI arm record. Pool payload belongs to one shared pool;
 primitive payload arrays are counted once by identity. A private owner of disjoint
@@ -948,10 +953,14 @@ alone supplies no authority; source validation and conditional proof admission s
 
 Recipes select workers from model structure. Explicit pools, heuristic backtrack
 edits and source annotations retain their requested composition. In single-core
-mixed clausal satisfaction, private-rebuild work and learned-memory scratch settings
+mixed clausal satisfaction, private-rebuild work/byte and learned-memory scratch settings
 alone preserve the default two-worker pool and its complete-search time reservation.
 Captured option keys distinguish these resource settings from heuristic edits;
-custom backtrack edit callbacks retain their selected composition. Defaults live in
+custom backtrack edit callbacks retain their selected composition. The ordinary
+two-worker clausal pool admits a bounded automatic private parity trial without
+changing canonical learned-memory allowances or complete-search time reservation.
+Explicit private work zero disables it; caller scratch and private-byte settings bound
+the private preparation. Defaults live in
 [portfolio construction](../klause/src/commonMain/kotlin/com/eignex/klause/portfolio).
 
 ### Model-specific worker recipes

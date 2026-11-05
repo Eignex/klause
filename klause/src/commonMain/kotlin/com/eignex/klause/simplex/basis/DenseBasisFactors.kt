@@ -2,6 +2,7 @@ package com.eignex.klause.simplex.basis
 
 import com.eignex.koblas.DenseMatrix
 import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.dense.ger
 import com.eignex.koblas.koblas
 import kotlin.math.abs
 

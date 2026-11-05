@@ -113,7 +113,7 @@ internal object CorpusSelection {
          *  e.g. XCSP3, where `AircraftAssemblyLine-1-178-00-0_c23` groups under `AircraftAssemblyLine`
          *  via the series prefix, so `per-family` samples across series instead of near-identical
          *  parameterizations. A `*.ext.zst` file is the same instance stored compressed, named without the
-         *  suffix; when both forms are present the instance is listed once. */
+         *  suffix; when both forms are present the instance is listed once, as its stored compressed form. */
         data class Flat(
             val subDir: String,
             val ext: String,
@@ -122,7 +122,7 @@ internal object CorpusSelection {
             fun discover(paths: List<String>): List<Discovered> {
                 val prefix = if (subDir.isEmpty()) "" else "$subDir/"
                 return paths.filter { it.startsWith(prefix) && CorpusFiles.plainPath(it).endsWith(".$ext") }
-                    .sortedBy(CorpusFiles::plainPath)
+                    .sortedWith(CorpusFiles.storedFirst)
                     .map { path ->
                         val name = CorpusFiles.plainPath(path.removePrefix(prefix)).removeSuffix(".$ext")
                         Discovered(name, path, familyKey = familyOf(name))
@@ -149,8 +149,8 @@ internal object CorpusSelection {
                     val plain = File(base, "$name.$ext")
                     val compressed = File(base, "$name.$ext${CorpusFiles.SUFFIX}")
                     val source = when {
-                        plain.isFile -> plain
                         compressed.isFile -> compressed
+                        plain.isFile -> plain
                         else -> return@mapNotNull null
                     }
                     Discovered(name, source.relativeTo(root).path, familyKey = familyOf(name))
@@ -162,7 +162,7 @@ internal object CorpusSelection {
                 if (!base.isDirectory) return emptyList()
                 return base.walkTopDown()
                     .filter { it.isFile && CorpusFiles.formatExtension(it) == ext }
-                    .sortedBy { CorpusFiles.plainPath(it.relativeTo(base).path) }
+                    .sortedWith(compareBy(CorpusFiles.storedFirst) { it.relativeTo(base).invariantSeparatorsPath })
                     .map {
                         val name = CorpusFiles.plainPath(it.relativeTo(base).path).removeSuffix(".$ext")
                         Discovered(name, it.relativeTo(root).path, familyKey = familyOf(name))
@@ -185,7 +185,11 @@ internal object CorpusSelection {
          *  needs the collection's bytes; without it discovery may run on the collection's index listing alone. */
         expected: ((File) -> Expected)? = null,
     ): List<ProblemRef> {
-        val paths = if (expected == null && layout is Layout.Flat) CorpusFetcher.selectivePaths(collection) else null
+        val paths = if (expected == null && layout is Layout.Flat) {
+            CorpusFetcher.declaredPaths(collection) ?: CorpusFetcher.selectivePaths(collection)
+        } else {
+            null
+        }
         val root = if (paths == null) {
             if (expected == null) CorpusFetcher.listing(collection) else CorpusFetcher.ensure(collection)
         } else {
@@ -210,7 +214,7 @@ internal object CorpusSelection {
         category: Category,
         format: Format,
     ): List<ProblemRef> {
-        val paths = CorpusFetcher.selectivePaths(collection)
+        val paths = CorpusFetcher.declaredPaths(collection) ?: CorpusFetcher.selectivePaths(collection)
         val root = if (paths == null) {
             CorpusFetcher.listing(collection)
         } else {

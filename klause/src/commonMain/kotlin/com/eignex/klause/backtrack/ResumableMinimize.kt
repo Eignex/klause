@@ -8,6 +8,7 @@ import com.eignex.klause.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.backtrack.lp.orderRootValues
 import com.eignex.klause.backtrack.lp.pickRootComponent
 import com.eignex.klause.backtrack.lp.prepareRootComponentOrder
+import com.eignex.klause.backtrack.lp.prepareRootComponentTrial
 import com.eignex.klause.backtrack.selector.IndomainBest
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
@@ -149,6 +150,7 @@ internal class ResumableMinimize(
     private var initialCandidate = initialCandidate
     private var initialPoolVersion = 0L
     private var replaced = false
+    private var clauseExchangeEnded = false
 
     // Unproved leaf coverage cannot become infeasibility or optimality, including under shared cutoffs.
     private var sawIndeterminateLeaf = false
@@ -576,6 +578,7 @@ internal class ResumableMinimize(
         publishClausePrimalCandidate()?.let { onIncumbent(it.withSourceSemantics(problem.semantics)) }
         if (!rootIsExhausted && !slice.begin(sliceMillis, sliceNodes)) return null
         rootRoundingAttempted = false
+        clauseExchangeEnded = false
         // A counted budget only means something if the search polls on a counted cadence: the run stops
         // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
         // different node on a faster machine and every counter downstream would follow.
@@ -589,7 +592,10 @@ internal class ResumableMinimize(
                     is StepEvent.Terminal -> return e.result
 
                     StepEvent.Paused -> {
-                        params.clauseExchange?.onSearchEnd(session)
+                        if (!clauseExchangeEnded) {
+                            if (sliceCancelled()) params.clauseExchange?.onSearchEnd(session)
+                            else params.clauseExchange?.onSearchPause(session)
+                        }
                         slice.noteOverspend()
                         // Restarts sample root fixings too, but an arm that restarts rarely would show none of its own.
                         sink.search.observeRootFixed(session.rootFixedVariableCount())
@@ -1228,7 +1234,12 @@ internal class ResumableMinimize(
         if (pending.primal == null) {
             lpEngine.retainRootPartialPrimalGuidance(pending.relaxation, rootToken)
         }
-        if (!lpEngine.retainRootPrimalTargets(rootToken)) return false
+        val guide = lpEngine.rootRoundingWarmStart ?: return false
+        if (guide.primal == null || rootToken()) return false
+        if (lpEngine.rootPrimalTargets?.coordinates !== guide.primal &&
+            !lpEngine.retainRootPrimalTargets(rootToken)
+        ) return false
+        if (lpEngine.prepareRootComponentTrial(objective, rootToken) || rootToken()) return false
         rootRoundingPending = false
         lpEngine.rootRoundingInterrupted = false
         lpEngine.rootRoundingWarmStart = null
@@ -1623,6 +1634,8 @@ internal class ResumableMinimize(
         }
 
         override fun onCancellation(context: SearchContext): SearchRunDisposition {
+            clauseExchangeEnded = true
+            params.clauseExchange?.onSearchEnd(session)
             return if (pausable) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
         }
     }
