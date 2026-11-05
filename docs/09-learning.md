@@ -566,11 +566,18 @@ a whole-store selection buffer. Permanent clauses, protected reasons and policy 
 reduce the heap quota. A pending eviction that gains protection also consumes that
 quota before the next heap step. Mid rows
 survive their demotion window, and classification clears survivor reuse flags.
+Native tier policy advances by funded over-cap restart epochs independently of the
+ranking cursor. Each metadata row retains its last classification and actual-use
+epochs. A funded row transaction catches up missed idle demotions before classification;
+use in the preceding epoch retains its ordinary promotion and protection. New rows
+start at their admission epoch, and core tiers persist. The four extra integer columns
+and the scalar epoch belong to modeled native metadata ownership. Admission, use and
+classification debit their timestamp work, and cancellation precedes policy mutation.
 An unfunded next-row transaction suspends the cursor for a later grant. A completed
 row classification retains its pending admission while heap comparisons wait;
 cleanup comparisons finish before publishing their candidate mutations.
 Current or historical reasons can retain additional rows above the soft cap.
-Native post-undo replay protects its queued clause handles and learned units without
+Native post-undo replay protects queued first assertions and learned units without
 freezing unrelated retirement. Incomplete trail propagation, conflicts and root
 publication still defer the window.
 An empty General integer-row cache detaches its obsolete event overflow index in a

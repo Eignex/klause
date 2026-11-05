@@ -36,7 +36,8 @@ private fun forgetWindow(session: PropagationSession, params: BacktrackParams, c
             !session.learnedClausePermanent(index) && session.learnedClauseLbd(index) > params.lbdGlueThreshold &&
                 (!params.tieredLearnedDb || (session.learnedClauseTier(index) == ClauseTier.LOCAL &&
                     !session.learnedClauseUsedSinceReduction(index)))
-        }) { index ->
+        }, glueThreshold = if (params.tieredLearnedDb) params.lbdGlueThreshold else -1,
+        midThreshold = params.midLbdThreshold) { index ->
         val lbd = session.learnedClauseLbd(index)
         if (!params.tieredLearnedDb) {
             lbd <= params.lbdGlueThreshold
