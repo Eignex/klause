@@ -323,6 +323,21 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `point separation should withhold a cut when a coordinate is unavailable`() {
+        val source = SourceProofContext(scope, setOf(x, y, real),
+            linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right)))
+        val events = mutableMapOf<String, Long>()
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            { name, count -> events[name] = (events[name] ?: 0L) + count },
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.75, real to 1.5))
+
+        assertTrue(cuts.isEmpty())
+        assertEquals(1L, events["AggregatePairPointUnavailable"])
+        assertEquals(1L, events["AggregatePairIncomplete"])
+    }
+
+    @Test
     fun `point directed pair preparation should retain a later separating proposal before its pool fills`() {
         val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
