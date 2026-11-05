@@ -2,8 +2,8 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.collections.IntArrayList
 
 internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
     val rows = learned.initializedStore

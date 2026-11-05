@@ -6,10 +6,10 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.binarySearchLong
+import com.eignex.util.arrays.binarySearchLong
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.LongHashSet
 
 // `<extension>` (positive/negative table) lowering for the XCSP3 front-end.
 //

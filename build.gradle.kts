@@ -28,6 +28,9 @@ val kumulantPins = mapOf("jvm" to 130, "linuxx64" to 130, "linuxarm64" to 130, "
     .mapKeys { (module, _) -> "kumulant-$module" }
     .mapValues { (_, build) -> "0.3.4-20261105.142345-$build" }
 
+val utilPins = listOf("util", "util-jvm", "util-linuxx64", "util-linuxarm64", "util-macosarm64")
+    .associateWith { "0.0.1-20261105.212118-9" }
+
 if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
     // Lab builds retain complete distributions; each fresh tree discards its incremental indexes.
     gradle.projectsEvaluated {
@@ -39,13 +42,16 @@ if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
     }
 }
 
-// Koblas and Kumulant use timestamped snapshots; this endpoint is outside the conventions'
+// Koblas, Kumulant and Util use timestamped snapshots; this endpoint is outside the conventions'
 // default repository set.
 allprojects {
     val targetProject = this
     // Direct consumers need platform constraints because timestamped KMP roots redirect to mutable snapshots.
-    configurations.matching { it.name == "commonMainImplementation" || it.name == "implementation" }.all {
-        for ((module, pinned) in koblasPins + skemaPins + kumulantPins) {
+    configurations.matching {
+        it.name == "commonMainApi" || it.name == "commonMainImplementation" || it.name == "implementation"
+    }.all {
+        val pins = if (name == "commonMainApi") utilPins else koblasPins + skemaPins + kumulantPins + utilPins
+        for ((module, pinned) in pins) {
             targetProject.dependencies.constraints.add(name, "com.eignex:$module:$pinned") {
                 version { strictly(pinned) }
             }

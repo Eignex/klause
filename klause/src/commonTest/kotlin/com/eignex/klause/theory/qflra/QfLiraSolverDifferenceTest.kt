@@ -24,9 +24,9 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

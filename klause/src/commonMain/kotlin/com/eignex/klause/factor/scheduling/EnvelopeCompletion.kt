@@ -6,19 +6,19 @@ import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.binarySearchInt
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.subExact
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.subExact
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 
 internal class EnvelopeCompletion(
     private val state: LocalSearchState,

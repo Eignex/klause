@@ -8,7 +8,7 @@ import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CharSource
+import com.eignex.util.io.CharSource
 import kotlin.coroutines.cancellation.CancellationException
 
 internal fun parseSmtLibSource(

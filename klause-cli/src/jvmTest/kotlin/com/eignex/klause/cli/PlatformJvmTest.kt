@@ -1,5 +1,7 @@
 package com.eignex.klause.cli
 
+import com.eignex.util.platform.sampleHeap
+import com.eignex.util.platform.startHeapPeakSampler
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue

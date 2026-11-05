@@ -3,18 +3,18 @@ package com.eignex.klause.presolve
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.signum
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.signum
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 
 /**
  * One step of recovering the columns a pass eliminated, stated as data rather than as a closure.
@@ -378,7 +378,7 @@ internal fun SourceRebuilds.asSampleLift(): ((Sample) -> Sample)? = if (isEmpty)
             val finite = if (ints.all { it.fitsLong() }) {
                 LongArray(ints.size) { ints[it].toLongExact() }
             } else {
-                EmptyLongArray
+                emptyLongArray()
             }
             sample.copy(bools = if (sourceBools == bools.size) bools else bools.copyOf(sourceBools),
                 ints = finite, exactInts = ints.toList())

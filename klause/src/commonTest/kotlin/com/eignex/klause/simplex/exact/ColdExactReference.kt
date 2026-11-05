@@ -2,12 +2,12 @@
 
 package com.eignex.klause.simplex.exact
 
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_TWO
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_TWO
+import com.eignex.util.numbers.bigIntOf
 
 internal enum class RationalFeasibility { FEASIBLE, INFEASIBLE, UNKNOWN }
 
@@ -472,7 +472,7 @@ private class SimplexState<F>(
 private class ObjectiveBlocker(val row: Int, val upper: Boolean)
 
 private class SparseTableau<F>(private val ops: FracOps<F>, m: Int, total: Int) {
-    private val cols = Array(m) { EmptyIntArray }
+    private val cols = Array(m) { emptyIntArray() }
     private val vals = Array(m) { EmptyFracs }
     private val sizes = IntArray(m)
     private val colRows = arrayOfNulls<IntArrayList>(total)
@@ -579,7 +579,7 @@ private class SparseTableau<F>(private val ops: FracOps<F>, m: Int, total: Int) 
     }
 
     fun columnRows(j: Int): IntArray {
-        val list = colRows[j] ?: return EmptyIntArray
+        val list = colRows[j] ?: return emptyIntArray()
         seenTick++
         var w = 0
         for (k in 0 until list.size) {

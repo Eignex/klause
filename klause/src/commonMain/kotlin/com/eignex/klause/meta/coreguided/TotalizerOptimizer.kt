@@ -16,7 +16,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SatisfyResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.satisfyUnderAssumptions
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.util.collections.MutableIntIntMap
 
 /**
  * Threshold-chain core-guided MaxSAT optimiser for **unweighted** problems. Builds

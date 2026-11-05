@@ -2,14 +2,14 @@ package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.times
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.unaryMinus
 
 internal class ToleranceLinearRow(
     val terms: List<Pair<Int, BigFraction>>,

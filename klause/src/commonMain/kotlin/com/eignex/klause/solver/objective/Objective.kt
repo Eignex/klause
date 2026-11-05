@@ -1,17 +1,18 @@
 package com.eignex.klause.solver.objective
+
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toDouble
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toDouble
 
 /**
  * Anything the local-search internals can score an assignment by; "lower is better".
@@ -75,8 +76,8 @@ interface IncrementalObjective : Objective {
  * evaluation reads the owned coefficients directly.
  */
 class LinearObjective(
-    boolWeights: LongArray = EmptyLongArray,
-    intCoefficients: LongArray = EmptyLongArray,
+    boolWeights: LongArray = emptyLongArray(),
+    intCoefficients: LongArray = emptyLongArray(),
     val constant: Long = 0L,
     /**
      * Objective coefficient of each LP-only continuous (real) variable, indexed by real var id (size
@@ -84,7 +85,7 @@ class LinearObjective(
      * resolved by the LP at nodes and leaves, not by [evaluateLong] — the integer/Boolean methods here
      * cover only the discrete part.
      */
-    realCoefficients: DoubleArray = EmptyDoubleArray,
+    realCoefficients: DoubleArray = emptyDoubleArray(),
 ) : Objective {
     private var capturedSourcePairing: SourceObjectivePairing? = null
     private var capturedBinaryIntegerSource: BinaryIntegerObjectiveSource? = null

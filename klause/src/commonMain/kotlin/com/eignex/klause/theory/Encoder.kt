@@ -8,8 +8,8 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BigInt
 import kotlin.jvm.JvmInline
 
 /** A consumer's relation language, independent of its numerical execution policy. */

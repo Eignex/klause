@@ -11,8 +11,8 @@ import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.ir.complemented
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.subExact
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.subExact
 
 internal fun LinearRow.emitLpRelaxation(builder: RelaxationBuilder, projection: LinearLpProjection? = null) {
     when (constants) {

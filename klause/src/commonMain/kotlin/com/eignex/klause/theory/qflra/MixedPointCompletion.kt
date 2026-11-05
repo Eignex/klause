@@ -5,7 +5,7 @@ import com.eignex.klause.lp.engine.reconstructRational
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.bigIntOf
 import kotlin.math.round
 
 internal fun completeMixedPoint(

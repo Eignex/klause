@@ -6,7 +6,7 @@ import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntDisjointSet
+import com.eignex.util.collections.IntDisjointSet
 
 internal fun completeMixedRealComponents(
     columns: Int,

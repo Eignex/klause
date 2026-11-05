@@ -35,10 +35,10 @@ import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

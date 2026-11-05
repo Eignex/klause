@@ -6,21 +6,21 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.MutableIntLongMap
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toDouble
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.IntIntMap
+import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toDouble
+import com.eignex.util.numbers.unaryMinus
 import kotlin.math.abs
 
 // Integer and Boolean definitions share a topological order and retain separate coordinate spaces.
@@ -40,12 +40,12 @@ internal class FunctionalObjective internal constructor(
      *  is a bool cone var (evaluated through [boolNodes]) or a bare bool leaf; empty for a pure-int
      *  objective (the FlatZinc/XCSP3 case), non-empty for a bool-weighted objective over AND/OR
      *  indicators (OPB product terms, `array_bool_and`). */
-    private val boolTerms: IntArray = EmptyIntArray,
-    private val boolTermCoeffs: LongArray = EmptyLongArray,
+    private val boolTerms: IntArray = emptyIntArray(),
+    private val boolTermCoeffs: LongArray = emptyLongArray(),
     /** Bool defining nodes (AND/OR folds) in topological order. */
     boolNodes: List<BoolFold> = emptyList(),
     /** Bool decision (leaf) variables the bool cone reads. */
-    val boolLeafVars: IntArray = EmptyIntArray,
+    val boolLeafVars: IntArray = emptyIntArray(),
     definitions: List<Definition> = emptyList(),
     internal val booleanCostSweep: DefinitionalSweep? = null,
 ) : IncrementalObjective {

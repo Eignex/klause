@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntHashSet
 
 internal class PropagationIndexes(
     val boolOccurrences: Array<IntArray>,
@@ -67,15 +67,15 @@ internal class PropagationIndexes(
             val nonInts = arrayOfNulls<IntArray>(intCounts.size)
             yield(null)
             for (v in bools.indices) {
-                bools[v] = if (boolCounts[v] == 0) EmptyIntArray else IntArray(boolCounts[v])
-                nonBools[v] = if (nonBoolCounts[v] == 0) EmptyIntArray else IntArray(nonBoolCounts[v])
+                bools[v] = if (boolCounts[v] == 0) emptyIntArray() else IntArray(boolCounts[v])
+                nonBools[v] = if (nonBoolCounts[v] == 0) emptyIntArray() else IntArray(nonBoolCounts[v])
                 boolCounts[v] = 0
                 nonBoolCounts[v] = 0
                 if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
             for (v in ints.indices) {
-                ints[v] = if (intCounts[v] == 0) EmptyIntArray else IntArray(intCounts[v])
-                nonInts[v] = if (nonIntCounts[v] == 0) EmptyIntArray else IntArray(nonIntCounts[v])
+                ints[v] = if (intCounts[v] == 0) emptyIntArray() else IntArray(intCounts[v])
+                nonInts[v] = if (nonIntCounts[v] == 0) emptyIntArray() else IntArray(nonIntCounts[v])
                 intCounts[v] = 0
                 nonIntCounts[v] = 0
                 if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)

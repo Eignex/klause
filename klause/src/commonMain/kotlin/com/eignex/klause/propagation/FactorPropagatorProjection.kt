@@ -19,8 +19,8 @@ import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.lowering.gridAbsoluteValueTable
 import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.propagation.difference.DifferenceSystemPropagator
-import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.PermutationGroup
+import com.eignex.util.collections.LongHashSet
 
 /** Builds the propagation-engine view of immutable factor data. */
 internal fun Factor.propagatorProjection(

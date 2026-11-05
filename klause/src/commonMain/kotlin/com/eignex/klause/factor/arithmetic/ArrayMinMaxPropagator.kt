@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 internal class ArrayMinMaxPropagator(
     private val result: Int,

@@ -31,8 +31,8 @@ import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.theory.qfnra.PolynomialFormula
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

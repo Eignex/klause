@@ -2,9 +2,9 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.binarySearchLong
+import com.eignex.util.arrays.binarySearchLong
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 /** Register [atomId] in the watched index (idempotent per threshold/kind). */
 internal fun PropagationState.markAtomWatched(atomId: Int) {

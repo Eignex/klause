@@ -15,8 +15,8 @@ import com.eignex.klause.lowering.scaleIntComb
 import com.eignex.klause.lowering.sumIntCombs
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.maxOf
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.maxOf
+import com.eignex.util.numbers.parseBigInt
 import kotlin.math.abs
 
 /** The sort a term is folded to by [evalTerm]. */

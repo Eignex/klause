@@ -1,5 +1,7 @@
 package com.eignex.klause.util
 
+import com.eignex.util.numbers.shl
+
 // The Luby restart sequence 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8, … (Luby, Sinclair, Zuckerman,
 // "Optimal speedup of Las Vegas algorithms", IPL 1993, https://doi.org/10.1016/0020-0190(93)90029-9),
 // universally optimal up to a log factor for Las Vegas algorithms with an unknown runtime

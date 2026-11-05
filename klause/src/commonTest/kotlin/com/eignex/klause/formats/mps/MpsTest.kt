@@ -2,9 +2,9 @@ package com.eignex.klause.formats.mps
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.perCharSource
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

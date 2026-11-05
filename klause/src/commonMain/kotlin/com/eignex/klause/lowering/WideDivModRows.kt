@@ -4,14 +4,14 @@ import com.eignex.klause.factor.arithmetic.DivModExpression
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.WideDivMod
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.negate
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.negate
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
 
 internal fun wideDivModRows(factor: WideDivMod): List<Linear> {
     fun row(operands: List<Pair<DivModExpression, BigInt>>, op: LinearOp, bound: BigInt): Linear {

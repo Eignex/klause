@@ -7,17 +7,17 @@ import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactSimplexBound
 import com.eignex.klause.simplex.exact.Frac128
 import com.eignex.klause.simplex.exact.Frac128Ops
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.PollStride
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.shl
-import com.eignex.klause.util.shr
-import com.eignex.klause.util.toLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.shl
+import com.eignex.util.numbers.shr
+import com.eignex.util.numbers.toLong
+import com.eignex.util.numbers.toLongExact
 
 internal data class ReconstructionLimits(
     val maxCoordinates: Int = 4096,

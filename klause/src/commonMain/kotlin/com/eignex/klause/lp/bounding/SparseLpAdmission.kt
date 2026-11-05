@@ -24,8 +24,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal const val SPARSE_LP_MAX_WORK = 150_000_000L
 internal const val SPARSE_LP_MAX_ALLOCATION = 2L * 1024L * 1024L * 1024L

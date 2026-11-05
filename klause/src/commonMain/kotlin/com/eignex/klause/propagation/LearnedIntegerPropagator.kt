@@ -4,12 +4,12 @@ import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
 
 internal class LearnedIntegerPropagator(val row: IntegerConflictRow) : LearnedPropagator {
     // Admission owns this propagator, so its cache owner can unlink it without scanning other rows.
     internal var retentionSlot = -1
-    override val boolVars: IntArray = if (row.guard == Lit.NONE) EmptyIntArray else intArrayOf(Lit.variable(row.guard))
+    override val boolVars: IntArray = if (row.guard == Lit.NONE) emptyIntArray() else intArrayOf(Lit.variable(row.guard))
     override val intVars: IntArray = row.variables
     private val linear = LinearPropagator(boolVars, intVars, row.coefficients, row.variables, LinearOp.LE, row.bound)
     override val initialIntEventWatches: IntArray = linear.initialIntEventWatches

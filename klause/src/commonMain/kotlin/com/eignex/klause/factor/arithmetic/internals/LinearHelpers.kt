@@ -9,10 +9,10 @@ import com.eignex.klause.propagation.boundAt
 import com.eignex.klause.propagation.boundEstablishment
 import com.eignex.klause.propagation.boundEstablishmentLevel
 import com.eignex.klause.propagation.lazyReasonSlots
-import com.eignex.klause.util.Int128
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.argsortByIntKey
+import com.eignex.util.arrays.argsortByIntKey
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.Int128
 import kotlin.math.abs
 
 internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: LongArray, vars: IntArray) {

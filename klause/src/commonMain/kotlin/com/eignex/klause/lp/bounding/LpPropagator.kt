@@ -42,9 +42,9 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.explainAtoms
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.numbers.BIG_ONE
 
 internal data class LpEffortProfile(
     val iterations: Int = 0,

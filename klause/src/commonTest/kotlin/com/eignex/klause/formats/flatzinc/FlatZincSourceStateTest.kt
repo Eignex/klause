@@ -11,10 +11,10 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.shl
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

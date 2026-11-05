@@ -11,9 +11,9 @@ import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.abs
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.abs
 import kotlin.uuid.Uuid
 
 internal fun Problem.hasCompleteAbsSource(): Boolean = factors.any { it is Abs || it is AffineAbs } &&

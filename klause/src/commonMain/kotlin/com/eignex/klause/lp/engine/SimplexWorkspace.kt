@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.IndexedVector
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 internal class SimplexWorkspace(m: Int, numVars: Int) {
     val dualRhs = DoubleArray(m)

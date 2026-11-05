@@ -10,15 +10,15 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.parseBigInt
+import java.math.BigInteger
+import java.security.MessageDigest
+import java.util.HexFormat
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import java.math.BigInteger
-import java.security.MessageDigest
-import java.util.HexFormat
 
 @Serializable
 internal data class ResidualCutoff(

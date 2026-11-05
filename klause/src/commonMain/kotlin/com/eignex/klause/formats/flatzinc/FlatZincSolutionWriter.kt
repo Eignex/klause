@@ -5,8 +5,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.algebraicRealValue
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.parseBigInt
 
 /** Render one solved sample in FlatZinc output format. */
 fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObjective: Boolean = false): String =

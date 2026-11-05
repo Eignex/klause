@@ -18,7 +18,7 @@ import com.eignex.klause.solver.projection.FloatGridDefinition
 import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntDisjointSet
+import com.eignex.util.collections.IntDisjointSet
 
 internal class FlatZincGridGeometry(
     val definition: FloatGridDefinition?,

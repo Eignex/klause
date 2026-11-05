@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.result
 
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.compareTo
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.compareTo
 
 /** Core-search observations in the invocation's original objective units; telemetry carries no proof authority. */
 data class CoreGuidedStats(

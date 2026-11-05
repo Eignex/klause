@@ -8,7 +8,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.bigIntOf
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

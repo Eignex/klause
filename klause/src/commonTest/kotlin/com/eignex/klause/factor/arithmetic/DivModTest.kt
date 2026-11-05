@@ -6,10 +6,10 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

@@ -8,19 +8,19 @@ import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.maxOf
-import com.eignex.klause.util.minOf
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.maxOf
+import com.eignex.util.numbers.minOf
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
+import com.eignex.util.numbers.unaryMinus
 
 internal class AffineAbsPropagator(private val factor: AffineAbs) : Propagator {
     private val lowerRows = factor.linearForm.rows

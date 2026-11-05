@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 /**
  * Mid-life presolve factor overlay for [PropagationState.incremental] mode: a dedicated

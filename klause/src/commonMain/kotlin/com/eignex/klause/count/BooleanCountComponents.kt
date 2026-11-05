@@ -7,13 +7,13 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_TWO
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.IntDisjointSet
-import com.eignex.klause.util.isZero
-import com.eignex.klause.util.times
+import com.eignex.util.collections.IntDisjointSet
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_TWO
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.times
 
 internal class BooleanCountComponents private constructor(
     private val source: BakedProblem,

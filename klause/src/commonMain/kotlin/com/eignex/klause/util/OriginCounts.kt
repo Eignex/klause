@@ -1,5 +1,8 @@
 package com.eignex.klause.util
 
+import com.eignex.util.numbers.maxOf
+import com.eignex.util.numbers.toLong
+
 /**
  * Counts per origin: how often something imported from each source was put to use where it landed. Used for
  * shared clauses and cuts, so a source is measured by what its contributions did rather than by how many it sent.

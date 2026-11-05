@@ -12,7 +12,7 @@ import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.bigIntOf
 
 internal fun Distinct.propagationView(): Propagator {
     if (variables.reals.isNotEmpty()) return NoPropagator

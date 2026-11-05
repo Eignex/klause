@@ -8,8 +8,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.Bits
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.Bits
 
 /**
  * Channels integer variables to fresh Boolean bits so XOR-hash counting / sampling can range over
@@ -75,7 +75,7 @@ internal object IntBitChannel {
             }
             if (width == 0) {
                 // Singleton domain: the value is constant, so it contributes no bits to hash over.
-                bitsPerVar.add(EmptyIntArray)
+                bitsPerVar.add(emptyIntArray())
                 continue
             }
 

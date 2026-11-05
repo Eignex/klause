@@ -14,7 +14,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.parseBigInt
 import java.math.BigInteger
 
 internal class ComponentAllowance(

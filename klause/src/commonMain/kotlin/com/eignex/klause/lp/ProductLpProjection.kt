@@ -2,8 +2,8 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.mulExact
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.mulExact
 
 /**
  * LP relaxation — the four McCormick envelope inequalities `(a−aL)(b−bL) ≥ 0`, `(a−aH)(b−bH) ≥ 0`,

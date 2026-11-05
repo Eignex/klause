@@ -8,7 +8,7 @@ import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.Int128
+import com.eignex.util.numbers.Int128
 
 internal class ProductInvariant(private val a: Int, private val b: Int, private val result: Int) : Invariant {
 

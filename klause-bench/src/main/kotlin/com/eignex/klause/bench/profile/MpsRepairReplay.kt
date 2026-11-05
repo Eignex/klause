@@ -11,13 +11,14 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.TheoryParams
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -25,7 +26,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import kotlin.time.Duration.Companion.milliseconds
 
 internal object MpsRepairReplay {
     private const val PIPELINE = "com.eignex.klause.solver.pipeline."

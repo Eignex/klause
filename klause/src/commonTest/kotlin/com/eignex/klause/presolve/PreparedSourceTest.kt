@@ -13,8 +13,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.prepareOpenSource
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolvePreparationStage
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals

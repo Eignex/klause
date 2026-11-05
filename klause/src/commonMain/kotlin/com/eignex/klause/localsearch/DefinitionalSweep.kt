@@ -19,14 +19,14 @@ import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.toSortedIntArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.MutableIntIntMap
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.collections.toSortedIntArray
 
 /**
  * Topologically ordered functional definitions consumed by [LocalSearchSolver]. The engine-side,
@@ -403,8 +403,8 @@ class DefinitionalSweep internal constructor(
         termCoeffs: LongArray,
         constant: Long,
         minimize: Boolean,
-        boolTerms: IntArray = EmptyIntArray,
-        boolTermCoeffs: LongArray = EmptyLongArray,
+        boolTerms: IntArray = emptyIntArray(),
+        boolTermCoeffs: LongArray = emptyLongArray(),
     ): IncrementalObjective? = functionalObjective(
         terms,
         termCoeffs,
@@ -620,7 +620,7 @@ class DefinitionalSweep internal constructor(
         ) : SweepNode {
             override val out: Int get() = node.out
             override val outIsBool: Boolean get() = false
-            override val boolInputs: IntArray get() = EmptyIntArray
+            override val boolInputs: IntArray get() = emptyIntArray()
             override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long =
                 domains[node.out].clamp(node.compute { id -> assignment.intValue(id) })
         }
@@ -637,7 +637,7 @@ class DefinitionalSweep internal constructor(
         ) : SweepNode {
             override val outIsBool: Boolean get() = true
             override val intInputs: IntArray get() = vars
-            override val boolInputs: IntArray get() = EmptyIntArray
+            override val boolInputs: IntArray get() = emptyIntArray()
             override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long {
                 var sum = 0L
                 for (k in vars.indices) sum += coeffs[k] * assignment.intValue(vars[k])
@@ -660,7 +660,7 @@ class DefinitionalSweep internal constructor(
         ) : SweepNode {
             override val outIsBool: Boolean get() = true
             override val intInputs: IntArray = intArrayOf(x)
-            override val boolInputs: IntArray get() = EmptyIntArray
+            override val boolInputs: IntArray get() = emptyIntArray()
             override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long {
                 val v = assignment.intValue(x)
                 var lo = 0
@@ -685,7 +685,7 @@ class DefinitionalSweep internal constructor(
             private val b: Int,
         ) : SweepNode {
             override val outIsBool: Boolean get() = false
-            override val intInputs: IntArray get() = EmptyIntArray
+            override val intInputs: IntArray get() = emptyIntArray()
             override val boolInputs: IntArray = intArrayOf(b)
             override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long =
                 domains[out].clamp(if (assignment.boolValue(b)) 1L else 0L)
@@ -700,7 +700,7 @@ class DefinitionalSweep internal constructor(
             internal val isAnd: Boolean,
         ) : SweepNode {
             override val outIsBool: Boolean get() = true
-            override val intInputs: IntArray get() = EmptyIntArray
+            override val intInputs: IntArray get() = emptyIntArray()
             override val boolInputs: IntArray = IntArray(ins.size) { Lit.variable(ins[it]) }
             override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long {
                 var acc = isAnd
@@ -727,7 +727,7 @@ class DefinitionalSweep internal constructor(
             override val outIsBool: Boolean get() = false
             override val intInputs: IntArray =
                 if (arrVars != null) intArrayOf(idx) + arrVars else intArrayOf(idx)
-            override val boolInputs: IntArray get() = EmptyIntArray
+            override val boolInputs: IntArray get() = emptyIntArray()
             override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long {
                 // The array position is a domain value; only an in-range one indexes the array, so
                 // narrow to Int after the range guard (an out-of-Int-range value is out of range).
@@ -961,7 +961,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
             val result = arrayOfNulls<IntArray>(slots)
             yield(null)
             for (v in result.indices) {
-                result[v] = if (counts[v] == 0) EmptyIntArray else IntArray(counts[v])
+                result[v] = if (counts[v] == 0) emptyIntArray() else IntArray(counts[v])
                 counts[v] = 0
                 if ((v + 1) % INITIALIZATION_BATCH == 0) yield(null)
             }

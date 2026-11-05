@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 internal object CoverColumnDominance {
     private const val MAX_COLUMNS = 200_000

@@ -1,7 +1,7 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.unaryMinus
 
 /**
  * The constants one factor holds — the coefficients of a weighted sum, the weights of an objective.

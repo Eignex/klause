@@ -2,22 +2,22 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.isZero
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.negate
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.rem
-import com.eignex.klause.util.signum
-import com.eignex.klause.util.times
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.negate
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.remainderOf
+import com.eignex.util.numbers.signum
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.unaryMinus
 
 /**
  * Whether the constraint system is unsatisfiable over its **genuinely open** ranges, decided in exact
@@ -75,10 +75,10 @@ private fun divisibilityFails(row: Row): Boolean {
     var g = BIG_ZERO
     for (c in row.coeffs.values) g = gcd(g, c.abs())
     if (g.isZero() || g == BIG_ONE) return false
-    return !(row.bound % g).isZero()
+    return !(row.bound.remainderOf(g)).isZero()
 }
 
-private tailrec fun gcd(a: BigInt, b: BigInt): BigInt = if (b.isZero()) a else gcd(b, a % b)
+private tailrec fun gcd(a: BigInt, b: BigInt): BigInt = if (b.isZero()) a else gcd(b, a.remainderOf(b))
 
 /** A row `Σ coeffs·vars ⟨op⟩ bound` in exact arithmetic, mutable so substitution can rewrite it. */
 private class Row(val coeffs: MutableMap<Int, BigInt>, var bound: BigInt, val equality: Boolean)
@@ -243,10 +243,10 @@ private const val MAX_ROW_TERMS = 512
 
 private fun floorDiv(a: BigInt, b: BigInt): BigInt {
     val q = a / b
-    return if (a % b != BIG_ZERO && (a.signum() < 0) != (b.signum() < 0)) q - BIG_ONE else q
+    return if (a.remainderOf(b) != BIG_ZERO && (a.signum() < 0) != (b.signum() < 0)) q - BIG_ONE else q
 }
 
 private fun ceilDiv(a: BigInt, b: BigInt): BigInt {
     val q = a / b
-    return if (a % b != BIG_ZERO && (a.signum() < 0) == (b.signum() < 0)) q + BIG_ONE else q
+    return if (a.remainderOf(b) != BIG_ZERO && (a.signum() < 0) == (b.signum() < 0)) q + BIG_ONE else q
 }

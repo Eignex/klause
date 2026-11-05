@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
 import kotlin.time.TimeSource
 
 /**
@@ -59,8 +59,8 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     // carrying a stored level, which the same atom can hit repeatedly across reasons. Caching by
     // atom id with an epoch stamp keeps those repeats O(1); atomLevelEpoch is bumped per analysis
     // to invalidate.
-    private var atomLevelMemo = EmptyIntArray
-    private var atomLevelStamp = EmptyIntArray
+    private var atomLevelMemo = emptyIntArray()
+    private var atomLevelStamp = emptyIntArray()
     private var atomLevelEpoch = 0
 
     /** Bool vars seen during the last analysis (the VSIDS bump set). Valid only when the
@@ -166,7 +166,7 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
             val fallbackClause: Learned,
         ) : LearnedConstraint {
             override val asserting: Boolean = true
-            override val guardLiterals: IntArray = EmptyIntArray
+            override val guardLiterals: IntArray = emptyIntArray()
         }
 
         /** Analysis couldn't produce a usable nogood (no conflict reason, or a conflict at the root). */

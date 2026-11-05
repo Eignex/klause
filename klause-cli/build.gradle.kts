@@ -61,6 +61,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation("com.eignex:util:0.0.1-20261105.212118-9")
             implementation(project(":klause"))
             // KMP logger for `-v` progress output (custom stderr writer).
             implementation("co.touchlab:kermit:2.1.0")

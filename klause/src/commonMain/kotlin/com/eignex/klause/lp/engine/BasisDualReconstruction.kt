@@ -6,7 +6,7 @@ import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.basis.RationalBasisStats
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.math.abs
 
 private class BasisDualStop(val reason: String) : RuntimeException()

@@ -22,7 +22,7 @@ import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntHashSet
 
 /**
  * Cost tier of a presolve pass. A [PresolveEmphasis] enables a set of tiers, so the level dial is "how

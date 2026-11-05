@@ -3,10 +3,10 @@ package com.eignex.klause.propagation
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.binarySearchInt
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 /**
  * Runs the propagation engine over an immutable `Problem` and reports deductions beyond [assumptions].
@@ -40,7 +40,7 @@ private fun collectRootPropagation(
     skipExpensiveBake: Boolean,
 ): PropagationResult {
     if (!state.seeded) {
-        val levels = state.conflictLevels ?: EmptyIntArray
+        val levels = state.conflictLevels ?: emptyIntArray()
         return PropagationResult.Unsat(
             state.extractConflictBools(levels),
             state.extractConflictInts(levels),
@@ -145,7 +145,7 @@ internal fun PropagationState.rootDeductions(assumptions: Assumptions): Propagat
         intHoleVarIds = intHoleIds.toIntArray(),
         intHoleValues = intHoleValues.toLongArray(),
         intSetKeys = intSetKeys.toIntArray(),
-        intSetOffsets = if (intSetKeys.isEmpty()) EmptyIntArray else intSetOffsets.toIntArray(),
+        intSetOffsets = if (intSetKeys.isEmpty()) emptyIntArray() else intSetOffsets.toIntArray(),
         intSetValues = intSetValues.toLongArray(),
     )
 }

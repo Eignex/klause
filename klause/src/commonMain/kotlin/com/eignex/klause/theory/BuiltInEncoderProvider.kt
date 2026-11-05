@@ -1,11 +1,11 @@
 package com.eignex.klause.theory
 
 import com.eignex.klause.factor.arithmetic.Abs
-import com.eignex.klause.factor.arithmetic.ExactRealEquality
 import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.DivMod
+import com.eignex.klause.factor.arithmetic.ExactRealEquality
 import com.eignex.klause.factor.arithmetic.GridAbs
 import com.eignex.klause.factor.arithmetic.GridArithmetic
 import com.eignex.klause.factor.arithmetic.GridArrayMinMax
@@ -40,7 +40,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.hasCompleteDifferenceCoverage
 import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.theory.qflra.exactTheoryOwnable
-import com.eignex.klause.util.BIG_ONE
+import com.eignex.util.numbers.BIG_ONE
 
 /** Built-in encoders for every factor kind, with exact, guarded and finite-conditioned semantics. */
 object BuiltInEncoderProvider : EncoderProvider {

@@ -12,11 +12,11 @@ import com.eignex.klause.propagation.freeBooleanProbeCandidates
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatedImplicationGraph
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.klause.util.PollStride
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.MutableIntIntMap
+import com.eignex.util.collections.MutableLongIntMap
 
 /**
  * Binary implication graph presolve. Harvests `lit -> lit` implications the way [Probing] pins a

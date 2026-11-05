@@ -6,8 +6,8 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntHashSet
 
 /**
  * Propagation-engine projection of an immutable `Problem`. It owns the propagator table and every
@@ -166,7 +166,7 @@ class PropagationProblem private constructor(
     private inline fun retain(src: IntArray, keep: (Int) -> Boolean): IntArray {
         var kept = 0
         for (fid in src) if (keep(fid)) kept++
-        if (kept == 0) return EmptyIntArray
+        if (kept == 0) return emptyIntArray()
         val out = IntArray(kept)
         var k = 0
         for (fid in src) if (keep(fid)) out[k++] = fid
@@ -176,7 +176,7 @@ class PropagationProblem private constructor(
     private inline fun invert(slots: Int, include: (Int) -> Boolean, vars: (Factor) -> IntArray): Array<IntArray> {
         val counts = IntArray(slots)
         problem.factors.forEachIndexed { fid, factor -> if (include(fid)) for (v in vars(factor)) counts[v]++ }
-        val out = Array(slots) { if (counts[it] == 0) EmptyIntArray else IntArray(counts[it]) }
+        val out = Array(slots) { if (counts[it] == 0) emptyIntArray() else IntArray(counts[it]) }
         val cursor = IntArray(slots)
         problem.factors.forEachIndexed { fid, factor ->
             if (include(fid)) for (v in vars(factor)) out[v][cursor[v]++] = fid

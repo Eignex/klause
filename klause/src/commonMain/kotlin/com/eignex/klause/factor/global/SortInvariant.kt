@@ -5,8 +5,8 @@ import com.eignex.klause.factor.global.internals.proposeRandomSwaps
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableLongIntMap
 
 internal class SortInvariant(private val xs: IntArray, private val ys: IntArray) : Invariant {
 

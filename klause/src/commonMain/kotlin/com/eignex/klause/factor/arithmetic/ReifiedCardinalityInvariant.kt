@@ -9,7 +9,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.IntLongMap
+import com.eignex.util.collections.IntLongMap
 
 internal class ReifiedCardinalityInvariant(
     private val auxBoolVar: Int,

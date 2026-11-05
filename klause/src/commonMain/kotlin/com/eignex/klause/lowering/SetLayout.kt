@@ -1,6 +1,6 @@
 package com.eignex.klause.lowering
 
-import com.eignex.klause.util.binarySearchInt
+import com.eignex.util.arrays.binarySearchInt
 
 internal class SetLayout(val universe: IntArray, val indicatorBoolIds: IntArray) {
     init {

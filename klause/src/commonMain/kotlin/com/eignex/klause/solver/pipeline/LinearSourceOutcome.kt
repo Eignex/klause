@@ -12,9 +12,9 @@ import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.LinearSourceWitness
 import com.eignex.klause.solver.validation.capturedSourceSlack
 import com.eignex.klause.solver.validation.checkLinearSourceWitness
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.parseBigInt
 
 /** Conclusion under the captured linear source certification and acceptance policy. */
 enum class LinearSourceConclusion {

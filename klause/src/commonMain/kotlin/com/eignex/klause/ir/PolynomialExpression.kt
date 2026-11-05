@@ -1,12 +1,12 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.isZero
-import com.eignex.klause.util.signum
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.signum
+import com.eignex.util.numbers.unaryMinus
 
 /** Immutable engine-neutral polynomial syntax over the coordinate scope supplied by its owner. */
 sealed interface PolynomialExpression {

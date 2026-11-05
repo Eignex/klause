@@ -32,9 +32,9 @@ import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
 import java.io.File
 import java.util.Base64
 import kotlin.time.Duration.Companion.seconds

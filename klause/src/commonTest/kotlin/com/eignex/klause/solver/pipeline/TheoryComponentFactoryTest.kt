@@ -7,7 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
-import com.eignex.klause.util.Bits
+import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertIs
 

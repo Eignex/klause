@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.MutableIntObjectIndex
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.arrays.emptyIntArray
 
 internal class LearnedPolicyRows(
     private val columns: Int,
@@ -251,7 +251,7 @@ internal class LearnedPolicyRows(
     private fun discard(page: Page) {
         if (page.capacity == 0) return
         allocatedBytes -= page.bytes
-        page.values = EmptyIntArray
+        page.values = emptyIntArray()
         page.admissions = longArrayOf()
         if (objectColumns) { page.propagators = emptyArray(); page.payloads = emptyArray() }
         page.retained = 0

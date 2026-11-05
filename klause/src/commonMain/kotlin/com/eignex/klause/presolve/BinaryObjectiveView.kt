@@ -8,11 +8,11 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.toLongExact
 
 internal class BinaryObjectiveView(
     val factors: List<Factor>,

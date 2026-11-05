@@ -9,7 +9,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.withSourceSemantics
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
 
 /**
  * Everything needed to count / sample one family of XOR-hash cells over a fixed projection of a
@@ -90,8 +90,8 @@ internal class CellContext private constructor(
                 bools = base.allBoolVars()
                 ints = IntArray(base.numIntVars) { it }
             } else {
-                bools = boolSet?.distinct()?.toIntArray() ?: EmptyIntArray
-                ints = intSet?.distinct()?.toIntArray() ?: EmptyIntArray
+                bools = boolSet?.distinct()?.toIntArray() ?: emptyIntArray()
+                ints = intSet?.distinct()?.toIntArray() ?: emptyIntArray()
             }
             return build(base, bools, ints)
         }

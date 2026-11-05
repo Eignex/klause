@@ -13,8 +13,8 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 /**
  * Layered multi-valued decision diagram acceptance. The diagram has `n+1` state layers

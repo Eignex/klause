@@ -11,8 +11,8 @@ import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.exclusionLiteral
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 internal class CircuitPropagator(private val succ: IntArray, private val n: Int) : Propagator {
 

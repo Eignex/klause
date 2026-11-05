@@ -8,8 +8,8 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

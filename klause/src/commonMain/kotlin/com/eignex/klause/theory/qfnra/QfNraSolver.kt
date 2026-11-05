@@ -22,9 +22,9 @@ import com.eignex.klause.theory.qfnra.PolynomialSigns.ZERO_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.relationSigns
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.shl
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.shl
 
 internal data class QfNraParams(
     val cancellation: Cancellation = Cancellation.Never,

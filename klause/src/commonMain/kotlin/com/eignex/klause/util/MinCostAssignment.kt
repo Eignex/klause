@@ -1,5 +1,13 @@
 package com.eignex.klause.util
 
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.subExact
+
 /**
  * Exact minimum-cost bipartite assignment over [Long] costs — the AllDifferent Lagrangian
  * subproblem. Assigns each of [numVars] variables a distinct value from `0 until numValues`, minimizing
@@ -55,7 +63,7 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
     /** A complete assignment (all variables matched) at [cost], or [infeasible] when none exists. */
     class Result(val feasible: Boolean, val cost: Long, val assignedValue: IntArray) {
         companion object {
-            fun infeasible(): Result = Result(false, 0L, EmptyIntArray)
+            fun infeasible(): Result = Result(false, 0L, emptyIntArray())
         }
     }
 

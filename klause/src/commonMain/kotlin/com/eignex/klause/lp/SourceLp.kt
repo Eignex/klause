@@ -30,7 +30,7 @@ import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.TimeSource.Monotonic

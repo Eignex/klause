@@ -25,9 +25,9 @@ import com.eignex.klause.lowering.LayeredMddData
 import com.eignex.klause.lowering.packLayeredMdd
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.tseitinOr
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableLongIntMap
 
 // XCSP3 global-constraint family emitters.
 
@@ -1118,8 +1118,8 @@ internal fun Compiler.Builder.noOverlapMulti(e: XmlElement, originsText: String)
             Diffn(
                 xs = IntArray(origins.size) { origins[it][0] },
                 ys = IntArray(origins.size) { origins[it][1] },
-                widths = EmptyLongArray,
-                heights = EmptyLongArray,
+                widths = emptyLongArray(),
+                heights = emptyLongArray(),
                 widthVars = IntArray(lengths.size) { lengths[it][0] },
                 heightVars = IntArray(lengths.size) { lengths[it][1] },
                 nonStrict = true,

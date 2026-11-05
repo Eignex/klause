@@ -8,7 +8,7 @@ import com.eignex.klause.presolve.BoundedVariableElimination
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 internal class PrivateRebuildNeighborhood private constructor(
     private val source: Problem,

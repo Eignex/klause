@@ -4,15 +4,15 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 
 internal class GridArrayMinMaxInvariant(private val factor: GridArrayMinMax) : Invariant {
     private val bounds = (1 until factor.coordinates.size).map { factor.comparison(it, equality = false) }

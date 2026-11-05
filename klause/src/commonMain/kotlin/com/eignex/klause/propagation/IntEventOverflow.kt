@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntObjectIndex
+import com.eignex.util.collections.IntArrayList
 
 internal class IntEventOverflow {
     private val entries = MutableIntObjectIndex<IntArrayList>()

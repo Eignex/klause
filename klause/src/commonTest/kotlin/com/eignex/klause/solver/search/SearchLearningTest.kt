@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.collections.IntArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

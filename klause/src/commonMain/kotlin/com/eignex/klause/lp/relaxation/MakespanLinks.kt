@@ -5,13 +5,13 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntLongMap
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.addExact
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
 
 /**
  * Verified "`w ≥ v + c`" links harvested once from a problem's factors: two-variable `Linear` rows with

@@ -9,18 +9,18 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
+import com.eignex.util.numbers.unaryMinus
 
 internal class AffineAbsInvariant(private val factor: AffineAbs) : Invariant {
     private val branches = listOf(

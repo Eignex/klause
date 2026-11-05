@@ -7,12 +7,12 @@ import com.eignex.klause.lp.lattice.mixedEchelonHermite
 import com.eignex.klause.lp.lattice.originalBounds
 import com.eignex.klause.lp.lattice.sparseIntRow
 import com.eignex.klause.lp.lattice.triangularBounds
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.toLong
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.toLong
 
 /**
  * Bounds a model's own equality structure implies, for the sides a relaxation leaves open.

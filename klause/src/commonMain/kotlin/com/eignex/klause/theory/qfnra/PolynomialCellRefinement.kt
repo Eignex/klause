@@ -12,7 +12,7 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal sealed interface PolynomialCellScope {
     val source: PolynomialRealFormula

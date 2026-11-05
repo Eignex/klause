@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.table.TablePropagator
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntHashSet
 import kotlin.time.TimeSource
 
 internal class HistoricalTableReason(private val state: PropagationState) {

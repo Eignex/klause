@@ -3,7 +3,7 @@ package com.eignex.klause.theory
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BigInt
 import kotlin.jvm.JvmInline
 
 internal class EncodingConditions(

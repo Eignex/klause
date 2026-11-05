@@ -7,14 +7,14 @@ import com.eignex.klause.factor.arithmetic.WideDivMod
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.toWide
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.div
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.isZero
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.toLongExact
 
 internal fun Compiler.Builder.retainedEuclideanDivMod(a: IntComb, b: IntComb, quotient: Boolean): IntComb {
     val bw = b.toWide()

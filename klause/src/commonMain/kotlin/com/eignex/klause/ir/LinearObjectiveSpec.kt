@@ -1,18 +1,19 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyLongArray
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.arrays.emptyLongArray
+
 
 /** Immutable linear objective coefficients produced by lowering. */
 class LinearObjectiveSpec(
     /** Weight of each Boolean variable when true, indexed by Boolean variable id. */
-    boolWeights: LongArray = EmptyLongArray,
+    boolWeights: LongArray = emptyLongArray(),
     /** Coefficient of each integer variable, indexed by integer variable id. */
-    intCoefficients: LongArray = EmptyLongArray,
+    intCoefficients: LongArray = emptyLongArray(),
     /** Constant term. */
     val constant: Long = 0L,
     /** Coefficient of each LP-only real variable, indexed by real variable id. */
-    realCoefficients: DoubleArray = EmptyDoubleArray,
+    realCoefficients: DoubleArray = emptyDoubleArray(),
 ) {
     internal val boolWeightValues: LongArray = boolWeights.copyOf()
 

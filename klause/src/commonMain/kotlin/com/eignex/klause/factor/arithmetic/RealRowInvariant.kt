@@ -6,7 +6,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.IntIntMap
+import com.eignex.util.collections.IntIntMap
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor

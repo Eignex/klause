@@ -11,7 +11,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.magnitudeBitLength
 
 // The fields a feedback consumer reads from a completed query; Full is the inspection archive's shape.
 internal data class LinearAuthorityFeedbackRequest(

@@ -8,9 +8,9 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.boundLiteral
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.lazyReason
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
 
 /**
  * CP propagator for [Diffn]: a compulsory-part sweep over both axes for the constant-size case

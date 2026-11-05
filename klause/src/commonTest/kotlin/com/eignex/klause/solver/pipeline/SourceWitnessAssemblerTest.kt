@@ -27,8 +27,8 @@ import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.TypedSearchValueKey
-import com.eignex.klause.util.Bits
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

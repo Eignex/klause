@@ -11,13 +11,13 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.EncodingAffineExpression
 import com.eignex.klause.theory.EncodingLinearTerm
 import com.eignex.klause.theory.LinearEncodingFormula
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.isZero
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.negate
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.negate
 
 internal fun divModLinearFormula(relation: DivMod, divisor: BigInt): LinearEncodingFormula {
     fun row(terms: List<Pair<Int, BigInt>>, op: LinearOp, bound: BigInt = bigIntOf(0)): LinearEncodingFormula =

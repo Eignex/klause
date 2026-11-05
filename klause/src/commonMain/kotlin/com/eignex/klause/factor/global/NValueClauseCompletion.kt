@@ -11,15 +11,15 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Assignment
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.negate
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.negate
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 
 internal class NValueClauseCompletion(
     private val state: LocalSearchState,

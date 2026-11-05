@@ -8,9 +8,9 @@ import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.isConstant
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.toLongExact
 
 private fun powerExponent(term: IntComb): Int {
     val value = when (term) {

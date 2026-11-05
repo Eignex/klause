@@ -9,9 +9,9 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedStage
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
 
 /**
  * Invoke [action] with the *other* literal of every binary clause that contains [lit].
@@ -56,7 +56,7 @@ internal fun PropagationState.factorAt(fid: Int): Propagator = when {
 
     nativeEngine != null -> {
         val literals = nativeEngine.literalsOf(fid - baseFactorCount)
-        ClausePropagator(literals.litVars(), EmptyIntArray, literals)
+        ClausePropagator(literals.litVars(), emptyIntArray(), literals)
     }
 
     else -> learned.store[fid - baseFactorCount]
@@ -123,7 +123,7 @@ internal fun PropagationState.addLearnedPb(
     learned.lifecycle.note(LearnedKind.Pb, LearnedStage.Constructed)
     val prop = PseudoBooleanPropagator(
         literals.litVars(),
-        EmptyIntArray,
+        emptyIntArray(),
         weights.copyOf(),
         literals.copyOf(),
         PbOp.GE,
@@ -176,7 +176,7 @@ internal fun PropagationState.addLearnedClause(
     // and policy columns, not the general learned database.
     nativeEngine?.let { return it.addLearned(clause.literals, lbd, permanent, origin, ownedLiterals) }
     val literals = if (ownedLiterals) clause.literals else clause.literals.copyOf()
-    return addLearnedClause(ClausePropagator(literals.litVars(), EmptyIntArray, literals), lbd, permanent, origin)
+    return addLearnedClause(ClausePropagator(literals.litVars(), emptyIntArray(), literals), lbd, permanent, origin)
 }
 
 /** Read-only view of LBDs for tests / introspection. Parallel to [PropagationState.learnedClauses]. */

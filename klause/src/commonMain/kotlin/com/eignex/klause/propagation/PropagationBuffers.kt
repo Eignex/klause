@@ -2,11 +2,11 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.util.Bits
-import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.collections.Bits
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableLongIntMap
 
 internal class PropagationBuffers(
     val boolAssigned: Bits,

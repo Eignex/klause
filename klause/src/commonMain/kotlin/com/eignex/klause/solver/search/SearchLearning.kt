@@ -2,8 +2,8 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.solver.result.GLUE_LBD
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.collections.IntArrayList
 import kotlin.time.TimeSource
 
 internal class SearchLearning(

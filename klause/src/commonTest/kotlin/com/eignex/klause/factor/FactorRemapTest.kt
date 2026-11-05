@@ -36,8 +36,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

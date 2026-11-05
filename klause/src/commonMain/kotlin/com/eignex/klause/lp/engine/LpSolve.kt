@@ -7,15 +7,15 @@ import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactSimplexBound
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.shl
-import com.eignex.klause.util.toLongExact
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.shl
+import com.eignex.util.numbers.toLongExact
+import com.eignex.util.numbers.unaryMinus
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 

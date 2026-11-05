@@ -20,11 +20,11 @@ import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntScale
 import com.eignex.klause.model.IntSum
 import com.eignex.klause.model.SetCard
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.toLongExact
 
 /**
  * Affine-fragment lift for [Lowering]. Rewrites a tree of [IntExpr] so the

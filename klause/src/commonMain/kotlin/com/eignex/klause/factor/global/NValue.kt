@@ -14,8 +14,8 @@ import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
 
 /**
  * `nvalue(n, xs)` — `n` equals the count of distinct values appearing in [xs], excluding [exceptSet]. Plus
@@ -36,9 +36,9 @@ class NValue(
     /** How [n] relates to the actual distinct-value count. */
     val mode: Mode = Mode.Eq,
     /** Per-index presence literals; empty for the non-opt fast path. */
-    override val presents: IntArray = EmptyIntArray,
+    override val presents: IntArray = emptyIntArray(),
     /** Values omitted from the distinct-value count. */
-    val exceptSet: LongArray = EmptyLongArray,
+    val exceptSet: LongArray = emptyLongArray(),
 ) : Factor,
     OptionalFactor {
 

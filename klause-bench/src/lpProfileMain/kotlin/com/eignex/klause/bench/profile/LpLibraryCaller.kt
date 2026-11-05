@@ -7,8 +7,8 @@ import com.eignex.klause.formats.mps.toExactSourceProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.toLinearObjective
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BIG_ONE
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource.Monotonic

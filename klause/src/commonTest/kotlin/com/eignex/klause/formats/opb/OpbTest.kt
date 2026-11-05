@@ -5,10 +5,10 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
-import com.eignex.klause.util.parseBigInt
 import com.eignex.klause.util.perCharSource
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

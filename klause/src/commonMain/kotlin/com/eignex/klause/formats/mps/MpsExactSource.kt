@@ -10,10 +10,10 @@ import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.lowerLinearSource
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 
 /** Compile the canonical MPS source through shared exact views, defaulting to zero feasibility slack. */
 fun MpsModel.toExactSourceProblem(

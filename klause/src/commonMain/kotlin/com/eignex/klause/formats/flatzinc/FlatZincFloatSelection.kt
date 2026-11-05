@@ -5,7 +5,7 @@ import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
-import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.util.numbers.CheckedLongOverflowException
 import kotlin.math.abs
 import kotlin.math.round
 

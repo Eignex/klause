@@ -3,8 +3,8 @@ package com.eignex.klause.propagation
 import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedLifecycle
 import com.eignex.klause.solver.search.LearnedStage
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.OriginCounts
+import com.eignex.util.collections.IntArrayList
 
 /**
  * Learned-constraint database for [PropagationState]: the constraints learned during search plus the

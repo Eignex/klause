@@ -3,7 +3,7 @@ package com.eignex.klause.factor.table.internals
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.propagation.ExtensionalSupportCounts
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.util.binarySearchLong
+import com.eignex.util.arrays.binarySearchLong
 
 internal class MddPathWeights private constructor(
     private val seq: IntArray,

@@ -1,7 +1,7 @@
 package com.eignex.klause.arithmetic.difference
 
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 /** How often a relaxation sweep looks at the budget: often enough to land inside one pass over a large
  *  edge set, rarely enough that the check does not show up against the relaxation itself. */

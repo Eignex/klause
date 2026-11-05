@@ -1,9 +1,9 @@
 package com.eignex.klause.factor
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 internal object OptPresence {
     // Factor constructors call this to extend boolVars so the propagation engine wakes on presence changes.
@@ -11,7 +11,7 @@ internal object OptPresence {
     // presence variable would otherwise enter every occurrence list once per position and be flipped once
     // per position by the moves that walk a factor's scope (an even count cancelling out to no move).
     fun presenceVarIds(presents: IntArray): IntArray {
-        if (presents.isEmpty()) return EmptyIntArray
+        if (presents.isEmpty()) return emptyIntArray()
         val seen = IntHashSet(presents.size)
         val out = IntArrayList(presents.size)
         for (lit in presents) {

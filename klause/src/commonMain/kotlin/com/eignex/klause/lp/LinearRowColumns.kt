@@ -4,7 +4,7 @@ import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.WideConstants
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BigInt
 
 internal val LinearRow.intVars: IntArray
     get() = (0 until size).filter { Term.isInt(ref(it)) }.map { Term.intVar(ref(it)) }.toIntArray()

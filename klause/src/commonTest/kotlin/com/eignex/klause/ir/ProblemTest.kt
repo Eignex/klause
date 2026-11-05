@@ -3,7 +3,7 @@ package com.eignex.klause.ir
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.Bits
+import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

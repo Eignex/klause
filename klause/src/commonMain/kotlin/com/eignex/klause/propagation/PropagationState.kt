@@ -8,16 +8,16 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.Bits
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.collections.MutableLongIntMap
 import kotlin.time.TimeSource
 
 /** Sentinel for [PropagationState.propagateAtomsForVar]'s carved-value parameter. */
@@ -1106,7 +1106,7 @@ class PropagationState private constructor(
     internal fun runToFixpoint(
         allFactors: Boolean,
         initialFactor: Int = -1,
-        initialFactors: IntArray = EmptyIntArray,
+        initialFactors: IntArray = emptyIntArray(),
         cancellation: Cancellation = Cancellation.Never,
         skipExpensiveBake: Boolean = false,
     ): IntArray? {
@@ -1127,7 +1127,7 @@ class PropagationState private constructor(
         finiteWork.cancellation = cancellation
         try {
             if (initialFactor >= 0 || nativeEngine != null) {
-                return drainFixpoint(false, initialFactor, EmptyIntArray, cancellation, false)
+                return drainFixpoint(false, initialFactor, emptyIntArray(), cancellation, false)
             }
             return fireQueue(cancellation !== Cancellation.Never, 0, cancellation, false)
         } finally {
@@ -1550,9 +1550,9 @@ class PropagationState private constructor(
      * array for a non-consuming factor.
      */
     fun drainIntEventDirtyVars(factorId: Int): IntArray {
-        if (intEvents.dirtyVars.isEmpty()) return EmptyIntArray
-        val list = intEvents.dirtyVars[factorId] ?: return EmptyIntArray
-        if (list.size == 0) return EmptyIntArray
+        if (intEvents.dirtyVars.isEmpty()) return emptyIntArray()
+        val list = intEvents.dirtyVars[factorId] ?: return emptyIntArray()
+        if (list.size == 0) return emptyIntArray()
         val out = list.toIntArray()
         list.clear()
         intEvents.dirtyMark[factorId]?.clear()

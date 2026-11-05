@@ -1,9 +1,9 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableLongIntMap
 
 // The interior-hole carve record: the per-var (value, level, reason) of each interior hole carved
 // out of a variable's domain during search. Bound atoms carry their establishment level/reason on

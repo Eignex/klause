@@ -2,7 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 internal enum class ReclamationStatus { WITHIN_LIMIT, RECLAIMED, PROTECTED_FLOOR, DEFERRED, CANCELLED }
 

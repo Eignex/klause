@@ -1,7 +1,7 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.util.Bits
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.Bits
+import com.eignex.util.collections.IntArrayList
 
 // A state borrows the live node prefix until its synchronous move or probe returns.
 internal class DefinitionTraversal(val network: InvariantNetwork) {
@@ -44,10 +44,10 @@ internal class DefinitionTraversal(val network: InvariantNetwork) {
         val lastWord = nodes[nodes.size - 1] ushr 6
         var word = start ushr 6
         if (word > lastWord) return -1
-        var candidates = marked.words[word] and pending.words[word] and (-1L shl (start and 63))
+        var candidates = marked.getWord(word) and pending.getWord(word) and (-1L shl (start and 63))
         while (candidates == 0L) {
             if (++word > lastWord) return -1
-            candidates = marked.words[word] and pending.words[word]
+            candidates = marked.getWord(word) and pending.getWord(word)
         }
         return (word shl 6) + candidates.countTrailingZeroBits()
     }

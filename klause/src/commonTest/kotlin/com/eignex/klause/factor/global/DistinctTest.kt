@@ -14,9 +14,9 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.validation.verifyRealCoordinates
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

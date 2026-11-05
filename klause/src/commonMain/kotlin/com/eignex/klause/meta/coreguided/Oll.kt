@@ -14,8 +14,8 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntIntMap
 
 /**
  * Shared relax-by-selector scaffolding for the core-guided MaxSAT drivers [CoreGuidedOptimizer]

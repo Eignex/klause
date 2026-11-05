@@ -34,19 +34,19 @@ import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.intdomain.intDomainFromRuns
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.Bits
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.bigIntOf
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
+import com.eignex.util.collections.Bits
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 
 class ProblemJsonTest {
     private val json = ProblemJson.default

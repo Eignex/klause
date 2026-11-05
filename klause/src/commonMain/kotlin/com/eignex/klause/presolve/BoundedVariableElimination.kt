@@ -3,8 +3,8 @@ package com.eignex.klause.presolve
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 /**
  * Bounded variable elimination (BVE) over the pure-SAT part of the model. A Boolean

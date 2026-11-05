@@ -1,6 +1,6 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

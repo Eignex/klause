@@ -1,6 +1,6 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.IntArrayDeque
+import com.eignex.util.collections.IntArrayDeque
 
 internal class PropagationSchedule {
     private val costs = LongArray(FactorFamily.entries.size)

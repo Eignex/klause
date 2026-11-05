@@ -12,13 +12,13 @@ import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SparseSlices
-import com.eignex.klause.util.argsortBy
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
 import com.eignex.koblas.sparse.dotColumn
+import com.eignex.util.arrays.argsortBy
+import com.eignex.util.collections.IntArrayList
 import kotlin.math.abs
 import kotlin.time.TimeSource
 

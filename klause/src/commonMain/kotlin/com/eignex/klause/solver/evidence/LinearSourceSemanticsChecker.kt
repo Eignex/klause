@@ -8,8 +8,8 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BIG_ONE
 
 /** Complete exact checker for a source consisting solely of declared coordinates and affine premises. */
 class LinearSourceSemanticsChecker(

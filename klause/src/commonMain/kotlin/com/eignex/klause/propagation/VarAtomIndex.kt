@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 // Per-var atom index, segregated by kind and sorted ascending by threshold. A bound
 // move flips a contiguous threshold range per kind, so wakeups visit exactly the

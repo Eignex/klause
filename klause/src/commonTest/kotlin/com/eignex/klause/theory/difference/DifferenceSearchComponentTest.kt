@@ -20,10 +20,10 @@ import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -386,7 +386,7 @@ class DifferenceSearchComponentTest {
 
     @Test
     fun `abandoned root paths should publish no partial bound`() {
-        val open = com.eignex.klause.util.Bits.full(2)
+        val open = com.eignex.util.collections.Bits.full(2)
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
@@ -410,7 +410,7 @@ class DifferenceSearchComponentTest {
 
     @Test
     fun `reset root facts should recompute unconditional consequences`() {
-        val open = com.eignex.klause.util.Bits.full(2)
+        val open = com.eignex.util.collections.Bits.full(2)
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
@@ -540,7 +540,7 @@ class DifferenceSearchComponentTest {
 
     @Test
     fun `transient bounds should never become unconditional guard reasons`() {
-        val open = com.eignex.klause.util.Bits.full(1)
+        val open = com.eignex.util.collections.Bits.full(1)
         val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), open, open),

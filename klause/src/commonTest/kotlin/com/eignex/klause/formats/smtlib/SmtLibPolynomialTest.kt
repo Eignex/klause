@@ -9,11 +9,11 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

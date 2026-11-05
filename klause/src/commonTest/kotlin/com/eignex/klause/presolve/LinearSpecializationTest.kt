@@ -16,7 +16,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.factorAt
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

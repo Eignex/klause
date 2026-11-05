@@ -4,7 +4,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.MoveSizeDistribution
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntHashSet
 
 /**
  * Targeted-kick perturbation. A random walk over the variable–factor occurrence graph starting at a

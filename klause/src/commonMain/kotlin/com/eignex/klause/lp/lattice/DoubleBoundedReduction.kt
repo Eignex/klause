@@ -1,11 +1,11 @@
 package com.eignex.klause.lp.lattice
 
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
 
 /** One exact row whose activity is bounded on both sides. */
 internal class DoubleBoundedRow(val coefficients: SparseIntRow, val lower: BigInt, val upper: BigInt) {

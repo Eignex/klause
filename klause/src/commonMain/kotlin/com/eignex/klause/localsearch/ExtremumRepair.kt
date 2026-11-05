@@ -2,10 +2,10 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
 
 internal fun extremumRepair(
     state: LocalSearchState,

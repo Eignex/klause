@@ -9,10 +9,10 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntIntMap
+import com.eignex.util.collections.MutableIntIntMap
 
 /**
  * `diffn(xs, ys, widths, heights)` — pairwise non-overlapping 2D rectangles. Each rectangle
@@ -74,12 +74,12 @@ class Diffn(
         sink.constLongs(heights)
         sink.intVars(xs)
         sink.intVars(ys)
-        sink.intVars(widthVars ?: EmptyIntArray)
-        sink.intVars(heightVars ?: EmptyIntArray)
+        sink.intVars(widthVars ?: emptyIntArray())
+        sink.intVars(heightVars ?: emptyIntArray())
     }
 
     override val variables: VarList = SpanIntVars(
-        xs + ys + (widthVars ?: EmptyIntArray) + (heightVars ?: EmptyIntArray),
+        xs + ys + (widthVars ?: emptyIntArray()) + (heightVars ?: emptyIntArray()),
     )
 
     /** Whether the search can resize rectangles (var dimensions present). */

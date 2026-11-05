@@ -25,9 +25,9 @@ import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
 import com.eignex.kumulant.stat.summary.SumResult
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import kotlin.test.Test

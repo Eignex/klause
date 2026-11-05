@@ -10,7 +10,7 @@ import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.presolveLinearRows
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.LongArrayList
 import kotlin.math.abs
 
 /**

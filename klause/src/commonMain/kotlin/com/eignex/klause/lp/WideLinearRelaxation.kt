@@ -3,9 +3,9 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.compareTo
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.compareTo
 
 internal class NumericalLinearRow(val coefficients: List<BigFraction>, val rhs: BigFraction)
 

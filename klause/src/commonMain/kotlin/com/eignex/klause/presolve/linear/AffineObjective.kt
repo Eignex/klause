@@ -3,10 +3,10 @@ package com.eignex.klause.presolve.linear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
 
 internal class AffineObjective(private val source: LinearObjective, private val cancellation: Cancellation) {
     private val coefficients = HashMap<Int, Long>()

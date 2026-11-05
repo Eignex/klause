@@ -8,13 +8,13 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntLongMap
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
 import kotlin.math.abs
 
 /**

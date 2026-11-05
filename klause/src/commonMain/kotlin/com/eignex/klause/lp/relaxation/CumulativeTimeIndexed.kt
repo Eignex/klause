@@ -2,8 +2,8 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 /**
  * Time-indexed `x_{i,t}` relaxation of one scheduling [view] over the bounded horizon

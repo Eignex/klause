@@ -1,9 +1,10 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.EmptyBooleanArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.util.collections.BitSet
+import com.eignex.util.collections.DynamicBits
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntIntMap
 
 /**
  * The [ConflictAnalyzer]'s view of the frozen implication graph that [ClauseMinimizer] walks:
@@ -35,8 +36,8 @@ internal interface ReasonGraph {
  * per analyzer) instead of reallocating per analysis.
  */
 internal class ClauseMinimizer(private val state: PropagationState, private val graph: ReasonGraph) {
-    private var inClause = EmptyBooleanArray
-    private var toDrop = EmptyBooleanArray
+    private var inClause = DynamicBits()
+    private var toDrop = DynamicBits()
     private val redundancyCache = MutableIntIntMap()
 
     // Reusable explicit-stack buffers for the iterative [isRedundant] DFS (cleared per call),
@@ -48,17 +49,15 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
 
     // Marks variables currently on the [isRedundant] DFS path, so a back-edge (atom antecedent
     // graphs can be cyclic) is detected as a cycle rather than re-pushed forever.
-    private var onPath = EmptyBooleanArray
+    private var onPath = DynamicBits()
 
     /** Run both minimization passes on [learned] and return the (possibly shorter) clause. */
     fun reduce(learned: IntArrayList, currentLevel: Int): IntArrayList =
         binaryMinimize(minimize(learned, currentLevel), currentLevel)
 
-    /** Return [arr] if already ≥ [n], else a fresh array; either way clear `[0, n)` to false. */
-    private fun scratch(arr: BooleanArray, n: Int): BooleanArray {
-        val a = if (arr.size >= n) arr else BooleanArray(n)
-        a.fill(false, 0, n)
-        return a
+    private fun scratch(bits: DynamicBits, n: Int): DynamicBits = bits.also {
+        it.resize(n)
+        it.clear()
     }
 
     /**
@@ -174,7 +173,7 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
      * Cached per variable for the duration of a single [minimize] call, which keeps the total
      * work linear in the implication graph reached.
      */
-    private fun isRedundant(root: Int, inClause: BooleanArray, cache: MutableIntIntMap): Boolean {
+    private fun isRedundant(root: Int, inClause: BitSet, cache: MutableIntIntMap): Boolean {
         val numBoolVars = state.problem.numBoolVars
         val cachedRoot = cache.getOrDefault(root, -1)
         if (cachedRoot >= 0) return cachedRoot == 1
@@ -275,7 +274,7 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
         v: Int,
         antecedents: IntArray,
         start: Int,
-        inClause: BooleanArray,
+        inClause: BitSet,
         cache: MutableIntIntMap,
     ): Boolean {
         val bools = state.problem.numBoolVars

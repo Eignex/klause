@@ -33,8 +33,8 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

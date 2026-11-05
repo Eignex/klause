@@ -23,8 +23,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

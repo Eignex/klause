@@ -8,7 +8,7 @@ import com.eignex.klause.factor.bool.GaussianXor
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BigInt
 import kotlinx.serialization.Serializable
 
 // Literals are `Lit` codes; `reified` is the Boolean variable equivalent to the body.

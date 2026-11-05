@@ -5,8 +5,8 @@ import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.solver.result.PresolveInvocationStats
 import com.eignex.klause.solver.result.PresolvePreparationStats
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.collections.IntHashSet
 
 private const val ROOT_CONSTRUCTION_WEIGHT = 53L
 private const val ROOT_PROPAGATION_WEIGHT = 53L

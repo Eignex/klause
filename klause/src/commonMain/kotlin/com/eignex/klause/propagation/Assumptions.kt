@@ -1,13 +1,13 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Solver
-import com.eignex.klause.util.EmptyBooleanArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.binarySearchInt
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.arrays.emptyBooleanArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
 
 /**
  * Per-call constraint on the solver: pin specific variables to specific values for the
@@ -256,7 +256,7 @@ class Assumptions internal constructor(
     companion object {
         /** The empty assumption set (nothing pinned). */
         val None: Assumptions =
-            Assumptions(EmptyIntArray, EmptyBooleanArray, EmptyIntArray, EmptyLongArray)
+            Assumptions(emptyIntArray(), emptyBooleanArray(), emptyIntArray(), emptyLongArray())
 
         /** Map-based factory. Call sites use `Assumptions(bools = mapOf(0 to true))`;
          *  internally normalises to the primitive sorted-array form. */

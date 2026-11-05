@@ -8,9 +8,9 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lowering.wideDivModRows
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

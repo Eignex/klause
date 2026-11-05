@@ -157,8 +157,8 @@ class PreparedSourcePlanObjectiveBindingTest {
             maximize = true,
         )
         val coefficient = QuadraticCoefficient.of(
-            com.eignex.klause.util.bigIntOf(1),
-            com.eignex.klause.util.bigIntOf(3),
+            com.eignex.util.numbers.bigIntOf(1),
+            com.eignex.util.numbers.bigIntOf(3),
         )
         val objective = QuadraticObjectiveSpec(
             listOf(

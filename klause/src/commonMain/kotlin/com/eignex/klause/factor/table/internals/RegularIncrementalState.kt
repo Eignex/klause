@@ -7,7 +7,7 @@ import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevLongArray
 import com.eignex.klause.propagation.excludeIntValues
 import com.eignex.klause.propagation.lazyReason
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.LongArrayList
 
 /*
  * Reversible, delta-driven GAC for [Regular]. Each layer keeps DFA states forward-reachable

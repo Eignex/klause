@@ -29,10 +29,10 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.model.SchemaEntry
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.bigIntOf
 import com.eignex.skema.SchemaDef
 import com.eignex.skema.SchemaJson
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
 import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertEquals

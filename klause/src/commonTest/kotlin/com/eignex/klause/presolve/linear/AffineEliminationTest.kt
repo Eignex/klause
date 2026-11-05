@@ -26,8 +26,8 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

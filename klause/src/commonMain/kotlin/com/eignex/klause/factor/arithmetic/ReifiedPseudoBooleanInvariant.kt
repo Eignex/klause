@@ -12,7 +12,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.IntLongMap
+import com.eignex.util.collections.IntLongMap
 
 internal class ReifiedPseudoBooleanInvariant(
     private val auxBoolVar: Int,

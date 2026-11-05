@@ -22,10 +22,10 @@ import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.search.SearchInvocationResources
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.time.TimeSource
 
 internal class LinearIncumbentCompletion(

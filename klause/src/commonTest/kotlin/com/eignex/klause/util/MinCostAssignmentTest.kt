@@ -1,5 +1,6 @@
 package com.eignex.klause.util
 
+import com.eignex.util.numbers.CheckedLongOverflowException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

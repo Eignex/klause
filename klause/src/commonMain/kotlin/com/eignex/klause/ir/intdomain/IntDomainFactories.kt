@@ -3,8 +3,8 @@ package com.eignex.klause.ir.intdomain
 import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.defaultDomainStorageSettings
-import com.eignex.klause.util.Bits
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.Bits
+import com.eignex.util.collections.LongArrayList
 
 /**
  * Build a domain from a non-empty sorted-distinct survivor array. Picks the most compact rep:

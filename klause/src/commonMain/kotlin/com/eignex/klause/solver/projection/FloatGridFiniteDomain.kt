@@ -6,10 +6,10 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 
 internal fun lowerGridFiniteDomain(
     factor: RealFiniteDomain,

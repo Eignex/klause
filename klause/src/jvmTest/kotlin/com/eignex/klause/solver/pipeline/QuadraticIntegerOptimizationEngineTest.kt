@@ -14,14 +14,14 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.parseBigInt
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class QuadraticIntegerOptimizationEngineTest(private val engine: FiniteEngine) {

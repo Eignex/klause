@@ -10,9 +10,9 @@ import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.boolPinnedAt
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongHashSet
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongHashSet
 
 /** CP propagation logic for `all_different`. */
 internal class AllDifferentPropagator(
@@ -62,7 +62,7 @@ internal class AllDifferentPropagator(
      * that are definitely absent contribute nothing to a distinctness violation and are left out.
      */
     private fun presencePremises(state: PropagationState): IntArray {
-        if (presents.isEmpty()) return EmptyIntArray
+        if (presents.isEmpty()) return emptyIntArray()
         val out = IntArrayList()
         for (i in presents.indices) {
             if (definitelyPresentPropFn(i, state)) out.add(Lit.negate(presents[i]))

@@ -4,16 +4,16 @@ import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.splitWhitespace
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_TEN
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
-import com.eignex.klause.util.lineSequence
-import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.times
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
+import com.eignex.util.io.lineSequence
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_TEN
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.unaryMinus
 
 /** Raised when an MPS file is malformed or uses a construct outside the supported subset. */
 class MpsFormatException(msg: String) : FormatException("MPS", msg)

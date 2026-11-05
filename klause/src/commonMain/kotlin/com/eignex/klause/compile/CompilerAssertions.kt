@@ -6,6 +6,17 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.factor.circuit.Circuit as CircuitFactor
+import com.eignex.klause.factor.global.AllDifferent as AllDifferentFactor
+import com.eignex.klause.factor.global.GlobalCardinality as GccFactor
+import com.eignex.klause.factor.global.Increasing as IncreasingFactor
+import com.eignex.klause.factor.global.Inverse as InverseFactor
+import com.eignex.klause.factor.global.NValue as NValueFactor
+import com.eignex.klause.factor.global.Sort as SortFactor
+import com.eignex.klause.factor.global.SymmetricAllDifferent as SymmetricAllDifferentFactor
+import com.eignex.klause.factor.scheduling.Cumulative as CumulativeFactor
+import com.eignex.klause.factor.scheduling.Diffn as DiffnFactor
+import com.eignex.klause.factor.table.Regular as RegularFactor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -60,19 +71,8 @@ import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.model.VariableCumulativeExpr
 import com.eignex.klause.model.XorExpr
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.factor.circuit.Circuit as CircuitFactor
-import com.eignex.klause.factor.global.AllDifferent as AllDifferentFactor
-import com.eignex.klause.factor.global.GlobalCardinality as GccFactor
-import com.eignex.klause.factor.global.Increasing as IncreasingFactor
-import com.eignex.klause.factor.global.Inverse as InverseFactor
-import com.eignex.klause.factor.global.NValue as NValueFactor
-import com.eignex.klause.factor.global.Sort as SortFactor
-import com.eignex.klause.factor.global.SymmetricAllDifferent as SymmetricAllDifferentFactor
-import com.eignex.klause.factor.scheduling.Cumulative as CumulativeFactor
-import com.eignex.klause.factor.scheduling.Diffn as DiffnFactor
-import com.eignex.klause.factor.table.Regular as RegularFactor
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.arrays.emptyIntArray
 
 /**
  * Top-level constraint assertion handlers for [Lowering]. The DSL drops a tree of
@@ -219,7 +219,7 @@ internal fun Lowering.assertFloatLinear(constraint: FloatLinearConstraint) {
     val variables = IntArray(constraint.varNames.size) { realVarIdByName.getValue(constraint.varNames[it]) }
     val (operation, strict) = floatComparison(constraint.op)
     truncatedFloatRows += factors.size
-    factors += Linear(EmptyIntArray, EmptyDoubleArray, variables, constraint.coeffs.copyOf(),
+    factors += Linear(emptyIntArray(), emptyDoubleArray(), variables, constraint.coeffs.copyOf(),
         operation, constraint.bound, strict)
 }
 

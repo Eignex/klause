@@ -34,8 +34,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BigInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 

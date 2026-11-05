@@ -14,8 +14,8 @@ import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

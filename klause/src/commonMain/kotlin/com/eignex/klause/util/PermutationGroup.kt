@@ -1,5 +1,8 @@
 package com.eignex.klause.util
 
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.numbers.plus
+
 /**
  * Permutations over `[0, n)` and the group they generate, for symmetry handling. A permutation is an
  * `IntArray` of length `n` mapping each point to its image; composition is `(a ∘ b)(i) = a(b(i))`.

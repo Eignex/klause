@@ -4,8 +4,8 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.IntegerConstants
+import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
@@ -15,14 +15,14 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.complemented
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.toLongExact
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.toLongExact
+import com.eignex.util.numbers.unaryMinus
 
 // Replacement kernels require the whole factor, rather than one of its implied rows.
 internal fun Factor.equivalentLinear(visit: () -> Unit = {}): Linear? {

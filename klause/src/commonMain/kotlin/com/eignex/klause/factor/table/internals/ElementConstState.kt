@@ -14,11 +14,11 @@ import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.inDomainAt
 import com.eignex.klause.propagation.lazyReason
 import com.eignex.klause.propagation.restrictIntToSurvivors
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableLongIntMap
-import com.eignex.klause.util.toSortedLongArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableLongIntMap
+import com.eignex.util.collections.toSortedLongArray
 
 /*
  * Reversible GAC for the constant-array element constraint `result = arr(idx)`.

@@ -5,12 +5,12 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MinCostAssignment
-import com.eignex.klause.util.MutableLongIntMap
-import com.eignex.klause.util.mulExact
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableLongIntMap
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.mulExact
 
 /**
  * The objective-weighted AllDifferent bound as an LP cut. For an AllDifferent over variables `V`, the

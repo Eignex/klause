@@ -5,8 +5,8 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.forEachCandidate
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.MutableIntObjectMap
 
 internal class RegularInvariant(
     private val seq: IntArray,

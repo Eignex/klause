@@ -24,19 +24,19 @@ import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.ExactIntegerSum
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.IntSwapSet
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.toDouble
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.IntSwapSet
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.toDouble
 import kotlin.random.Random
 
 /** Initial weight for factors the model declared implied (redundant / symmetry-breaking). An
@@ -129,7 +129,7 @@ class LocalSearchState private constructor(
 
     // Factors that read a continuous column; their floating-point sums drift and are refreshed from scratch.
     private val realFactors: IntArray by lazy(LazyThreadSafetyMode.NONE) {
-        if (problem.numRealVars == 0) EmptyIntArray else realFactorIds()
+        if (problem.numRealVars == 0) emptyIntArray() else realFactorIds()
     }
 
     // Real-set moves applied since the real rows were last re-summed from scratch.
@@ -156,7 +156,7 @@ class LocalSearchState private constructor(
     private val cumulativeFactors: IntArray by lazy(LazyThreadSafetyMode.NONE) {
         problem.factors.indices.filter { problem.factors[it] is Cumulative }.toIntArray()
     }
-    private var cumulativeFractions: DoubleArray = EmptyDoubleArray
+    private var cumulativeFractions: DoubleArray = emptyDoubleArray()
     private val hasVariableElements: Boolean by lazy(LazyThreadSafetyMode.NONE) {
         problem.factors.any { it is Element && it.arrIsVars }
     }
@@ -251,7 +251,7 @@ class LocalSearchState private constructor(
     // Coordinates include definition outputs so a NO_WRITE inverse cannot strand a probe's output.
     private val probeSlots = IntArrayList()
     private val probeSlotSet = IntHashSet()
-    private var savedValuesScratch: LongArray = EmptyLongArray
+    private var savedValuesScratch: LongArray = emptyLongArray()
     private val moveIntSeeds = IntArrayList(2)
     private val moveBoolSeeds = IntArrayList(2)
     private var definitionTraversal: DefinitionTraversal? = null

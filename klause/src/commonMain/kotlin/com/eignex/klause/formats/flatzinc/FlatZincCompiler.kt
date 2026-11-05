@@ -18,13 +18,13 @@ import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.lowering.FloatRepresentation
-import com.eignex.klause.util.CharReader
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.StringCharSource
-import com.eignex.klause.util.binarySearchInt
-import com.eignex.klause.util.toSortedIntArray
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.toSortedIntArray
+import com.eignex.util.io.CharReader
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
 
 /** Compile parsed FlatZinc AST into solver data structures. */
 internal class FlatZincCompiler(

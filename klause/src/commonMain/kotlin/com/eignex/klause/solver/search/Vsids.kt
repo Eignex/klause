@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.util.IndexedMaxHeap
+import com.eignex.util.collections.IndexedMaxHeap
 import kotlin.random.Random
 
 /**

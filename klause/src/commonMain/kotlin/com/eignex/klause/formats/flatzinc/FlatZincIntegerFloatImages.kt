@@ -6,11 +6,11 @@ import com.eignex.klause.formats.flatzinc.FlatZincCompiler.IntegerFloatImage
 import com.eignex.klause.formats.flatzinc.FlatZincCompiler.IntegerFloatProduct
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLong
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLong
 
 internal fun FlatZincCompiler.collectIntegerFloatProduct(c: FznConstraint): Boolean {
     if (c in integerFloatProducts) return false

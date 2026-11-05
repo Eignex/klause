@@ -13,8 +13,8 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.times
+import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

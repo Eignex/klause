@@ -4,6 +4,7 @@ import com.eignex.klause.solver.result.PresolveEffortStats
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.util.process.printErrorLine
 
 internal fun presolveStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val p = stats.presolve ?: return emptyList()
@@ -93,5 +94,5 @@ private fun presolveSizeStatPairs(
 }
 
 internal fun printPresolveDiagnostics(stats: PresolveStats?) {
-    for ((key, value) in presolveStatPairs(SolveStats(presolve = stats))) errPrintln("  $key=$value")
+    for ((key, value) in presolveStatPairs(SolveStats(presolve = stats))) printErrorLine("  $key=$value")
 }

@@ -31,10 +31,10 @@ import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.Vsids
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 import kotlin.coroutines.cancellation.CancellationException
 
 internal class RetainedLinearQueries(

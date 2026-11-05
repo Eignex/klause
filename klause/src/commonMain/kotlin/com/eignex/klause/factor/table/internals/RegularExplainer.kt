@@ -4,8 +4,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.inDomainAt
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 /**
  * Reasons for [com.eignex.klause.factor.table.Regular] deductions as cuts of the layered automaton graph over the
