@@ -49,7 +49,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     objective: LinearObjective?,
     cancellation: Cancellation = Cancellation.Never,
     workAllowance: Long = SPARSE_LP_MAX_WORK,
-    sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
+    sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
 ): SparseLpAdmission {
     val columns = problem.numIntVars.toLong() + problem.numBoolVars + problem.numRealVars
     val rows = problem.factors.size.toLong()
