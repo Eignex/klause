@@ -18,6 +18,7 @@ import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.provesUnbounded
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.portfolio.AttributedImprovement
@@ -697,6 +698,9 @@ private fun FiniteSolveRequest.preparationRequest(
     protectObjective: Boolean = false,
 ): FinitePipelineRequest {
     val preparationStop = if (shape.sourceInvocation == null) presolveCancellation else presolveCancellation or stop
+    val sourcePreparation = (sourceControls as? SourceFiniteControls.Backtrack)?.params?.let {
+        it.lpConfig?.sourcePreparation ?: it.lpPlan.sourcePreparation
+    } ?: lpConfig.sourcePreparation ?: LpSourcePreparation.INDEX
     return FinitePipelineRequest(
         problem = shape.finiteProblem, componentPlan = shape.componentPlan, preparedPlan = shape.preparedPlan,
         engine = engine, objective = shape.linearObjective,
@@ -709,6 +713,7 @@ private fun FiniteSolveRequest.preparationRequest(
             presolveBudget?.orSpent(preparationStop or stop) ?: (preparationStop or stop)
         } else stop,
         presolveBudget = presolveBudget, zeroObjectivePricing = zeroObjectivePricing, randomSeed = randomSeed,
+        sourcePreparation = sourcePreparation,
     )
 }
 
@@ -1198,16 +1203,20 @@ private fun executePortfolio(
 
         is PortfolioPlan.Execute -> Unit
     }
+    val profile = ProblemProfile.of(request.problem, request.optimize)
     val baseScenario = clausalDefaultScenario(
         plan.scenario,
-        ProblemProfile.of(request.problem, request.optimize),
+        profile,
         request.defaultArms,
         explicitArms = request.executionOptions.explicitArms,
         privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly,
     )
-    val scenario = weightedCoreDefaultScenario(baseScenario, request.problem, request.objective,
+    val privateScenario = privateRebuildDefaultScenario(
+        baseScenario, request.problem, profile, request.executionOptions,
+        enumerating = request.allSolutions || (request.solutionCap ?: 1L) > 1L)
+    val scenario = weightedCoreDefaultScenario(privateScenario, request.problem, request.objective,
         request.executionOptions, request.cancellation)
-    if (scenario !== baseScenario) {
+    if (scenario !== privateScenario) {
         request.onPortfolioEvent?.invoke("portfolio", SearchEvent.WorkerAdmission("core-guided/weighted-default",
             admitted = true, requirements = "bounded early trial with historical-reason refinement",
             declines = emptyList(), selected = true))
@@ -1245,8 +1254,8 @@ private fun executePortfolio(
         booleanProofTasks = booleanProofTasks,
         fundedCompanions = fundedCompanions,
         bufferedPublications = bufferedPublications,
-
-        privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly,
+        privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly ||
+            privateScenario !== baseScenario,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

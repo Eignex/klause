@@ -7,11 +7,15 @@ import com.eignex.klause.bench.catalog.FetchMethod
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.source.CommittedCorpusIndexes
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.CorpusIndex
 import com.eignex.klause.bench.source.CorpusIndexes
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.lab.bench.BenchInput
 import com.eignex.lab.bench.BenchInputRoot
+import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
+import org.junit.jupiter.api.BeforeAll
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
 import java.security.MessageDigest
@@ -19,9 +23,18 @@ import java.util.HexFormat
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class IndexedPlanningTest {
+    companion object {
+        @BeforeAll
+        @JvmStatic
+        fun initializeCodec() {
+            ZstdOutputStreamNoFinalizer(ByteArrayOutputStream(), 1).use { it.write(ByteArray(0)) }
+        }
+    }
+
     /** Fetching this collection fails at once, so a plan that touches its bytes fails the test. */
     private val collection = ExternalCollection(
         "indexed-fixture",
@@ -47,26 +60,96 @@ class IndexedPlanningTest {
     )
 
     @Test
-    fun `named archive selection preserves indexed provenance without fetching bytes`() = withCache { cache ->
-        val suite = Catalog.dynamicSuites.first { it.id == "smtlib-qflra" }
-        val archive = requireNotNull(suite.sourceLayout)
+    fun `canonical committed inputs preserve identical declared and materialized plans`() = withCache { cache ->
         val materialized = File(cache, "materialized")
-        val tree = File(materialized, archive.collection.id)
-        for (path in listOf("a/one.smt2", "b/two.smt2.zst", "unrelated/other.smt2")) {
-            File(tree, "${archive.layout.subDir}/$path").apply { parentFile.mkdirs() }.writeText("fixture")
-        }
-        val indexed = File(cache, "indexed")
-        CorpusIndexes(indexed).save(CorpusIndex.of(archive.collection.id, tree))
-        val names = listOf("b/two", "a/one", "missing/three")
-        val expected = withProperties(materialized, declared = false) {
-            Catalog.uncapped(suite.id).problems.associateBy { it.name }.let { all -> names.mapNotNull(all::get) }
-        }
-        val actual = withProperties(indexed, declared = true) { Catalog.named(suite.id, names) }
-        assertEquals(expected, actual)
-        assertFalse(
-            File(indexed, archive.collection.id).exists(),
-            "exact lookup must use the index without fetching corpus bytes",
+        val tree = File(materialized, collection.id)
+        val plain = File(tree, "set/model.cnf")
+        val packed = File("${plain.path}.zst").apply { parentFile.mkdirs() }
+        ZstdOutputStreamNoFinalizer(packed.outputStream(), 1).use { it.write("original source".encodeToByteArray()) }
+        File(materialized, ".index/${collection.id}.json").apply { parentFile.mkdirs() }.writeText(
+            """{"collection":"${collection.id}","files":[
+                {"path":"set/model.cnf.zst","sha256":"${"0".repeat(64)}","bytes":0}
+            ]}""",
         )
+        val workspace = File(cache, "workspace")
+        CommittedCorpusIndexes.write(CommittedCorpusIndexes.fromSources(collection.id, tree), workspace)
+        val saved = System.getProperty("klause.workspace.root")
+        try {
+            System.setProperty("klause.workspace.root", workspace.path)
+            val declared = planned(materialized, declared = true)
+            assertFalse(plain.exists())
+
+            val actual = planned(materialized, declared = false)
+
+            assertEquals(declared, actual)
+            assertEquals("${collection.id}/set/model.cnf", actual.single().path)
+            assertEquals("original source", plain.readText())
+            assertTrue(packed.isFile)
+            assertEquals(actual, planned(materialized, declared = false))
+        } finally {
+            if (saved == null) {
+                System.clearProperty("klause.workspace.root")
+            } else {
+                System.setProperty("klause.workspace.root", saved)
+            }
+        }
+    }
+
+    @Test
+    fun `canonical input materialization refuses changed original bytes`() = withCache { cache ->
+        val materialized = File(cache, "materialized")
+        val tree = File(materialized, collection.id)
+        val plain = File(tree, "set/model.cnf").apply { parentFile.mkdirs(); writeText("original source") }
+        CorpusFiles.compress(plain)
+        val workspace = File(cache, "workspace")
+        CommittedCorpusIndexes.write(CommittedCorpusIndexes.fromSources(collection.id, tree), workspace)
+        plain.writeText("modified source")
+        CorpusFiles.compress(plain)
+        val saved = System.getProperty("klause.workspace.root")
+        try {
+            System.setProperty("klause.workspace.root", workspace.path)
+
+            assertFailsWith<IllegalArgumentException> { planned(materialized, declared = false) }
+        } finally {
+            if (saved == null) {
+                System.clearProperty("klause.workspace.root")
+            } else {
+                System.setProperty("klause.workspace.root", saved)
+            }
+        }
+    }
+
+    @Test
+    fun `named archive selection preserves indexed provenance without fetching bytes`() = withCache { cache ->
+        val saved = System.getProperty("klause.workspace.root")
+        try {
+            System.setProperty("klause.workspace.root", cache.path)
+            val suite = Catalog.dynamicSuites.first { it.id == "smtlib-qflra" }
+            val archive = requireNotNull(suite.sourceLayout)
+            val materialized = File(cache, "materialized")
+            val tree = File(materialized, archive.collection.id)
+            for (path in listOf("a/one.smt2", "b/two.smt2.zst", "unrelated/other.smt2")) {
+                File(tree, "${archive.layout.subDir}/$path").apply { parentFile.mkdirs() }.writeText("fixture")
+            }
+            val indexed = File(cache, "indexed")
+            CorpusIndexes(indexed).save(CorpusIndex.of(archive.collection.id, tree))
+            val names = listOf("b/two", "a/one", "missing/three")
+            val expected = withProperties(materialized, declared = false) {
+                Catalog.uncapped(suite.id).problems.associateBy { it.name }.let { all -> names.mapNotNull(all::get) }
+            }
+            val actual = withProperties(indexed, declared = true) { Catalog.named(suite.id, names) }
+            assertEquals(expected, actual)
+            assertFalse(
+                File(indexed, archive.collection.id).exists(),
+                "exact lookup must use the index without fetching corpus bytes",
+            )
+        } finally {
+            if (saved == null) {
+                System.clearProperty("klause.workspace.root")
+            } else {
+                System.setProperty("klause.workspace.root", saved)
+            }
+        }
     }
 
     @Test

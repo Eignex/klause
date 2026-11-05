@@ -5,6 +5,7 @@ import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.OriginCounts
@@ -20,11 +21,16 @@ import kotlin.math.sqrt
 internal class CutPool(
     val maxCuts: Int = DEFAULT_MAX_CUTS,
     private val maxConsecutiveInactive: Int = DEFAULT_MAX_CONSECUTIVE_INACTIVE,
+    private val prepareSources: Boolean = false,
+    private val cancellation: Cancellation = Cancellation.Never,
+    private val onPreparationWork: (Long) -> Unit = {},
     private val observe: (CutFamily, String, String) -> Unit = { _, _, _ -> },
 ) {
     private val seen = HashSet<Any>()
     private val entries = ArrayList<Entry>()
     private val cosineIndex = MutableIntLongMap()
+    var preparationStorageUnits: Long = 0L
+        private set
 
     private class Entry(
         var cut: Cut?,
@@ -34,7 +40,10 @@ internal class CutPool(
         val origin: Int = NO_ORIGIN,
         var activity: Double = 0.0,
         var inactiveCount: Int = 0,
-    )
+    ) {
+        var mappedOnce = false
+        var preparation: SourceCutPreparation? = null
+    }
 
     private data class ScoredCut(val cut: Cut, val norm: Double, val score: Double, val origin: Int)
 
@@ -98,6 +107,8 @@ internal class CutPool(
             if (source != null) {
                 seen.remove(mixed.key)
                 mixed.key = key
+                releasePreparation(mixed)
+                mixed.mappedOnce = false
                 mixed.source = source
                 mixed.cut = cut
                 seen.add(key)
@@ -114,15 +125,60 @@ internal class CutPool(
         val declines = HashMap<CutMappingDecline, Int>()
         for (entry in entries) {
             val wasActive = entry.cut != null
-            val mapped = entry.source?.toCut(map) ?: CutMapping.Declined(CutMappingDecline.MISSING_PROVENANCE)
-            entry.cut = mapped.orNull()
+            val mapped = remapEntry(entry, map)
+            entry.cut = mapped?.orNull()
             val family = entry.source?.family ?: CutFamily.UNSPECIFIED
-            observe(family, "REMAP", if (mapped is CutMapping.Declined) mapped.reason.name else "MAPPED")
+            observe(family, "REMAP", when (mapped) {
+                null -> "CANCELLED"
+                is CutMapping.Declined -> mapped.reason.name
+                is CutMapping.Mapped -> "MAPPED"
+            })
             if (wasActive && entry.cut == null) observe(family, "RETRACTION", "UNAVAILABLE")
             if (!wasActive && entry.cut != null) observe(family, "RETRACTION", "REACTIVATED")
             if (mapped is CutMapping.Declined) declines[mapped.reason] = (declines[mapped.reason] ?: 0) + 1
         }
         return declines.toMap()
+    }
+
+    private fun remapEntry(entry: Entry, map: CutSourceMap): CutMapping<Cut>? {
+        val source = entry.source ?: return CutMapping.Declined(CutMappingDecline.MISSING_PROVENANCE)
+        if (prepareSources && cancellation()) return null
+        val prepared = entry.preparation
+        if (prepared != null) {
+            onPreparationWork(1L)
+            if (cancellation()) return null
+        }
+        val eligible = prepareSources && entry.mappedOnce && prepared == null
+        val room = preparationStorageUnits <= MAX_PREPARATION_UNITS - SourceCutPreparation.STORAGE_UNITS
+        val capture: ((SourceCutPreparation) -> Unit)? = if (eligible && room &&
+            source.preparationExtent >= SourceCutPreparation.STORAGE_UNITS
+        ) {
+            { next ->
+                onPreparationWork(next.storageUnits)
+                if (!cancellation() && next.storageUnits <= MAX_PREPARATION_UNITS - preparationStorageUnits) {
+                    entry.preparation = next
+                    preparationStorageUnits += next.storageUnits
+                    observe(source.family, "PREPARATION", "RETAINED")
+                } else {
+                    observe(source.family, "PREPARATION", "CANCELLED")
+                }
+            }
+        } else null
+        val result = source.toCut(map, preparation = prepared, onPrepared = capture)
+        if (prepareSources && cancellation()) return null
+        if (result is CutMapping.Mapped) {
+            entry.mappedOnce = true
+            if (prepared != null) observe(source.family, "PREPARATION", "REUSED")
+        }
+        return result
+    }
+
+    private fun releasePreparation(entry: Entry) {
+        val prepared = entry.preparation ?: return
+        onPreparationWork(1L)
+        preparationStorageUnits -= prepared.storageUnits
+        entry.preparation = null
+        observe(entry.source?.family ?: CutFamily.UNSPECIFIED, "PREPARATION", "RETIRED")
     }
 
     fun exportGlobalCuts(): List<SharedCut> = entries.mapNotNull { entry ->
@@ -159,8 +215,11 @@ internal class CutPool(
         }
         entries.removeAll {
             (it.inactiveCount >= maxConsecutiveInactive).also { retired ->
-                if (retired) observe(it.source?.family ?: it.cut?.family ?: CutFamily.UNSPECIFIED,
-                    "RETIREMENT", "INACTIVE")
+                if (retired) {
+                    releasePreparation(it)
+                    observe(it.source?.family ?: it.cut?.family ?: CutFamily.UNSPECIFIED,
+                        "RETIREMENT", "INACTIVE")
+                }
             }
         }
         rebuildSeen()
@@ -172,6 +231,7 @@ internal class CutPool(
         entries.sortByDescending { it.activity }
         while (entries.size > maxCuts) {
             val entry = entries.removeAt(entries.size - 1)
+            releasePreparation(entry)
             observe(entry.source?.family ?: entry.cut?.family ?: CutFamily.UNSPECIFIED, "RETIREMENT", "CAPACITY")
         }
         rebuildSeen()
@@ -318,6 +378,7 @@ internal class CutPool(
          * pathological over-harvest. The reported cut count ([size]) reflects any eviction.
          */
         const val DEFAULT_MAX_CUTS: Int = 2048
+        private const val MAX_PREPARATION_UNITS = 262_144L
 
         /** Minimum normalised violation for [select] to add a cut (efficacy floor). */
         const val MIN_EFFICACY: Double = 1e-4

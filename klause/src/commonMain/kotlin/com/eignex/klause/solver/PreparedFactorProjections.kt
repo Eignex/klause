@@ -21,6 +21,9 @@ import com.eignex.klause.lp.BuiltInRelaxationProjectionProvider
 import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.RelaxationProjection
+import com.eignex.klause.lp.relaxation.LpPreparationAdmission
+import com.eignex.klause.lp.relaxation.LpPreparationNamespace
+import com.eignex.klause.lp.relaxation.LpPreparationState
 import com.eignex.klause.lp.relaxation.LpPreparationTemplates
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.FactorProjectionPreparation
@@ -56,24 +59,84 @@ class PreparedFactorProjections internal constructor(
         Array(problem.numFactors) { providers.encoder.select(problem.factors[it], target) }
     },
 ) {
-    private var lpTemplateNamespace: Any = Any()
+    private var lpTemplateNamespace = LpPreparationNamespace()
     private var lpTemplateRows: Any = Any()
-    private var lpSourceTemplateCache = AtomicReference<LpPreparationTemplates?>(null)
-    private var lpFiniteTemplateCache = AtomicReference<LpPreparationTemplates?>(null)
+    private var lpSourceTemplateCache = AtomicReference<LpPreparationState?>(null)
+    private var lpFiniteTemplateCache = AtomicReference<LpPreparationState?>(null)
+
+    private val lpTemplateCache: AtomicReference<LpPreparationState?>
+        get() = if (problem is BakedProblem) lpFiniteTemplateCache else lpSourceTemplateCache
+
+    internal val lpPreparationStorageUnits: Long
+        get() = when (val current = lpTemplateCache.load()) {
+            is LpPreparationTemplates -> current.storageUnits
+            is LpPreparationAdmission -> LpPreparationAdmission.STORAGE_UNITS
+            is LpPreparationNamespace -> 1L
+            null -> 0L
+        }
 
     internal fun prepareLpTemplates(
         objective: LinearObjective?, token: Cancellation, reuseIndexes: Boolean = true,
         reuseMetadata: Boolean = false,
+        earned: Boolean = false,
+        compileBoundRows: Boolean = false,
         onWork: (Long) -> Unit = {},
     ): LpPreparationTemplates? {
-        val cache = if (problem is BakedProblem) lpFiniteTemplateCache else lpSourceTemplateCache
+        if (earned && (problem.numRealVars != 0 || !builtInRelaxation)) return null
+        val cache = lpTemplateCache
         val previous = cache.load()
-        val next = LpPreparationTemplates.prepare(this, lpTemplateNamespace, lpTemplateRows, objective,
-            previous, token, onWork,
-            reuseIndexes, reuseMetadata)
-            ?: return null
+        val old = (previous as? LpPreparationTemplates)?.takeIf { it.sharesScope(lpTemplateNamespace, problem) }
+        val demand = (previous as? LpPreparationAdmission)?.takeIf { it.matches(lpTemplateNamespace, problem) }
+        var work = 0L
+        val next: LpPreparationState? = try {
+            if (earned) {
+                token.charge(1L)
+                work++
+            }
+            if (token() || (earned && old == null && (demand == null || demand.paidUnits < demand.requiredUnits))) {
+                null
+            } else {
+                val prepared = LpPreparationTemplates.prepare(this, lpTemplateNamespace, lpTemplateRows, objective,
+                    old, token, { work += it }, reuseIndexes, reuseMetadata,
+                    if (earned && old == null) checkNotNull(demand).paidUnits else null, compileBoundRows)
+                if (prepared == null && earned && demand != null && !token()) {
+                    token.charge(LpPreparationAdmission.STORAGE_UNITS)
+                    work += LpPreparationAdmission.STORAGE_UNITS
+                    if (token()) null else demand.afterFailure(lpTemplateNamespace, problem)
+                } else prepared
+            }
+        } finally {
+            onWork(work)
+        }
+        if (token() || next == null) return null
         cache.compareAndSet(previous, next)
-        return next
+        return next as? LpPreparationTemplates
+    }
+
+    internal fun recordLpConstruction(completedUnits: Long, token: Cancellation, onWork: (Long) -> Unit): Boolean {
+        if (completedUnits <= 0L || problem.numRealVars != 0 || !builtInRelaxation || token()) return false
+        val cache = lpTemplateCache
+        val previous = cache.load()
+        if ((previous as? LpPreparationTemplates)?.sharesScope(lpTemplateNamespace, problem) == true) return false
+        val old = (previous as? LpPreparationAdmission)?.takeIf { it.matches(lpTemplateNamespace, problem) }
+        if (previous !== lpTemplateNamespace && old == null) {
+            try {
+                token.charge(1L)
+            } finally {
+                onWork(1L)
+            }
+            return !token() && cache.compareAndSet(previous, lpTemplateNamespace)
+        }
+        val paid = old?.paidUnits ?: 0L
+        val nextPaid = paid + minOf(completedUnits, Long.MAX_VALUE - paid)
+        val next = try {
+            token.charge(LpPreparationAdmission.STORAGE_UNITS)
+            if (token()) null else if (old == null) LpPreparationAdmission(lpTemplateNamespace, problem, nextPaid)
+            else LpPreparationAdmission(lpTemplateNamespace, problem, nextPaid, old.requiredUnits)
+        } finally {
+            onWork(LpPreparationAdmission.STORAGE_UNITS)
+        }
+        return !token() && next != null && cache.compareAndSet(previous, next)
     }
 
     private fun inheritLpTemplates(source: PreparedFactorProjections): PreparedFactorProjections = apply {

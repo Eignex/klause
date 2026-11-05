@@ -84,8 +84,8 @@ public final class com/eignex/klause/arithmetic/real/ExactRealValuesKt {
 
 public final class com/eignex/klause/backtrack/BacktrackParams : com/eignex/klause/solver/SolverParams {
 	public fun <init> ()V
-	public fun <init> (Lkotlin/jvm/functions/Function0;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/ValueSelector;IILjava/lang/Long;ZZZZZJZLjava/lang/Integer;Ljava/lang/Long;JJIZIZIZIIZIIJJJJJJJIJLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/incumbent/IncumbentSource;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;ZLcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Long;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/lp/cut/CutExchange;Ljava/lang/Boolean;Ljava/lang/Boolean;ZZZZZZZIJLcom/eignex/klause/solver/search/SearchBranchAttemptObserver;JZJ)V
-	public synthetic fun <init> (Lkotlin/jvm/functions/Function0;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/ValueSelector;IILjava/lang/Long;ZZZZZJZLjava/lang/Integer;Ljava/lang/Long;JJIZIZIZIIZIIJJJJJJJIJLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/incumbent/IncumbentSource;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;ZLcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Long;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/lp/cut/CutExchange;Ljava/lang/Boolean;Ljava/lang/Boolean;ZZZZZZZIJLcom/eignex/klause/solver/search/SearchBranchAttemptObserver;JZJIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lkotlin/jvm/functions/Function0;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/ValueSelector;IILjava/lang/Long;ZZZZZJZLjava/lang/Integer;Ljava/lang/Long;JJIZIZIZIIZIIJJJJJJJIJLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/incumbent/IncumbentSource;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;ZLcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Long;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/lp/cut/CutExchange;Ljava/lang/Boolean;Ljava/lang/Boolean;ZZZZZZZIJLcom/eignex/klause/solver/search/SearchBranchAttemptObserver;JLjava/lang/Long;ZJ)V
+	public synthetic fun <init> (Lkotlin/jvm/functions/Function0;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/ValueSelector;IILjava/lang/Long;ZZZZZJZLjava/lang/Integer;Ljava/lang/Long;JJIZIZIZIIZIIJJJJJJJIJLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/incumbent/IncumbentSource;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;ZLcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Long;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/lp/cut/CutExchange;Ljava/lang/Boolean;Ljava/lang/Boolean;ZZZZZZZIJLcom/eignex/klause/solver/search/SearchBranchAttemptObserver;JLjava/lang/Long;ZJIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lkotlin/jvm/functions/Function0;
 	public final fun component10 ()I
 	public final fun component11 ()Ljava/lang/Long;
@@ -160,12 +160,13 @@ public final class com/eignex/klause/backtrack/BacktrackParams : com/eignex/klau
 	public final fun component74 ()J
 	public final fun component75 ()Lcom/eignex/klause/solver/search/SearchBranchAttemptObserver;
 	public final fun component76 ()J
-	public final fun component77 ()Z
-	public final fun component78 ()J
+	public final fun component77 ()Ljava/lang/Long;
+	public final fun component78 ()Z
+	public final fun component79 ()J
 	public final fun component8 ()Lcom/eignex/klause/backtrack/selector/ValueSelector;
 	public final fun component9 ()I
-	public final fun copy (Lkotlin/jvm/functions/Function0;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/ValueSelector;IILjava/lang/Long;ZZZZZJZLjava/lang/Integer;Ljava/lang/Long;JJIZIZIZIIZIIJJJJJJJIJLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/incumbent/IncumbentSource;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;ZLcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Long;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/lp/cut/CutExchange;Ljava/lang/Boolean;Ljava/lang/Boolean;ZZZZZZZIJLcom/eignex/klause/solver/search/SearchBranchAttemptObserver;JZJ)Lcom/eignex/klause/backtrack/BacktrackParams;
-	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/BacktrackParams;Lkotlin/jvm/functions/Function0;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/ValueSelector;IILjava/lang/Long;ZZZZZJZLjava/lang/Integer;Ljava/lang/Long;JJIZIZIZIIZIIJJJJJJJIJLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/incumbent/IncumbentSource;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;ZLcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Long;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/lp/cut/CutExchange;Ljava/lang/Boolean;Ljava/lang/Boolean;ZZZZZZZIJLcom/eignex/klause/solver/search/SearchBranchAttemptObserver;JZJIIILjava/lang/Object;)Lcom/eignex/klause/backtrack/BacktrackParams;
+	public final fun copy (Lkotlin/jvm/functions/Function0;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/ValueSelector;IILjava/lang/Long;ZZZZZJZLjava/lang/Integer;Ljava/lang/Long;JJIZIZIZIIZIIJJJJJJJIJLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/incumbent/IncumbentSource;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;ZLcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Long;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/lp/cut/CutExchange;Ljava/lang/Boolean;Ljava/lang/Boolean;ZZZZZZZIJLcom/eignex/klause/solver/search/SearchBranchAttemptObserver;JLjava/lang/Long;ZJ)Lcom/eignex/klause/backtrack/BacktrackParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/BacktrackParams;Lkotlin/jvm/functions/Function0;JLjava/lang/Long;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/backtrack/selector/VariableSelector;Lcom/eignex/klause/backtrack/selector/ValueSelector;IILjava/lang/Long;ZZZZZJZLjava/lang/Integer;Ljava/lang/Long;JJIZIZIZIIZIIJJJJJJJIJLkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/solver/incumbent/IncumbentSource;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;ZLcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Long;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/lp/cut/CutExchange;Ljava/lang/Boolean;Ljava/lang/Boolean;ZZZZZZZIJLcom/eignex/klause/solver/search/SearchBranchAttemptObserver;JLjava/lang/Long;ZJIIILjava/lang/Object;)Lcom/eignex/klause/backtrack/BacktrackParams;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAdaptiveRestart ()Z
 	public fun getAssumptions ()Lcom/eignex/klause/propagation/Assumptions;
@@ -219,6 +220,7 @@ public final class com/eignex/klause/backtrack/BacktrackParams : com/eignex/klau
 	public final fun getPbObjectiveCutoff ()Z
 	public final fun getPhaseSaving ()Z
 	public final fun getPooledIncumbents ()Lcom/eignex/klause/solver/incumbent/IncumbentSource;
+	public final fun getPrivateRebuildBytes ()Ljava/lang/Long;
 	public final fun getPrivateRebuildWork ()J
 	public final fun getPropagationAttribution ()Z
 	public final fun getPropagationCancelFloor ()I
@@ -6355,11 +6357,12 @@ public final class com/eignex/klause/lp/bounding/LpAutoConfig {
 public final class com/eignex/klause/lp/bounding/LpConfig {
 	public static final field Companion Lcom/eignex/klause/lp/bounding/LpConfig$Companion;
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/lp/bounding/LpEmphasis;Ljava/util/Map;)V
-	public synthetic fun <init> (Lcom/eignex/klause/lp/bounding/LpEmphasis;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/lp/bounding/LpEmphasis;Ljava/util/Map;Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;)V
+	public synthetic fun <init> (Lcom/eignex/klause/lp/bounding/LpEmphasis;Ljava/util/Map;Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun cappedUnder (Lcom/eignex/klause/lp/bounding/LpConfig;)Lcom/eignex/klause/lp/bounding/LpConfig;
 	public final fun getEmphasis ()Lcom/eignex/klause/lp/bounding/LpEmphasis;
 	public final fun getOverrides ()Ljava/util/Map;
+	public final fun getSourcePreparation ()Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;
 	public final fun resolved (Lcom/eignex/klause/lp/bounding/LpTechnique;)Z
 }
 
@@ -6404,8 +6407,8 @@ public final class com/eignex/klause/lp/bounding/LpParams {
 
 public final class com/eignex/klause/lp/bounding/LpPlan {
 	public fun <init> ()V
-	public fun <init> (ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZ)V
-	public synthetic fun <init> (ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;)V
+	public synthetic fun <init> (ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
 	public final fun component10 ()Z
 	public final fun component11 ()Z
@@ -6452,12 +6455,13 @@ public final class com/eignex/klause/lp/bounding/LpPlan {
 	public final fun component49 ()Z
 	public final fun component5 ()Z
 	public final fun component50 ()Z
+	public final fun component51 ()Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;
 	public final fun component6 ()J
 	public final fun component7 ()J
 	public final fun component8 ()Z
 	public final fun component9 ()Z
-	public final fun copy (ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZ)Lcom/eignex/klause/lp/bounding/LpPlan;
-	public static synthetic fun copy$default (Lcom/eignex/klause/lp/bounding/LpPlan;ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZIILjava/lang/Object;)Lcom/eignex/klause/lp/bounding/LpPlan;
+	public final fun copy (ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;)Lcom/eignex/klause/lp/bounding/LpPlan;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lp/bounding/LpPlan;ZIIIZJJZZZZIZZZZZZZZZZZZDJDZZZZIZZZIZIZZZZZZZZZZZZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;IILjava/lang/Object;)Lcom/eignex/klause/lp/bounding/LpPlan;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAutoOffReprobe ()Z
 	public final fun getBooleanRlt ()Z
@@ -6508,6 +6512,7 @@ public final class com/eignex/klause/lp/bounding/LpPlan {
 	public final fun getRootBudgetMillis ()J
 	public final fun getRootCutHarvest ()Z
 	public final fun getRootMaxWork ()J
+	public final fun getSourcePreparation ()Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;
 	public final fun getTable ()Z
 	public final fun getVariableShaving ()Z
 	public final fun getWarmStart ()Z
@@ -6627,6 +6632,16 @@ public final class com/eignex/klause/lp/optimization/LinearPinnedObjective : com
 public final class com/eignex/klause/lp/optimization/LinearPinnedRefutation : com/eignex/klause/solver/evidence/SourceDerivation$Extension {
 	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
 	public final fun getConflict ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
+}
+
+public final class com/eignex/klause/lp/relaxation/LpSourcePreparation : java/lang/Enum {
+	public static final field ADMITTED Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;
+	public static final field DISABLED Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;
+	public static final field INDEX Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;
+	public static final field OBJECT Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;
+	public static fun values ()[Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;
 }
 
 public final class com/eignex/klause/meta/coreguided/CoreRefinementMode : java/lang/Enum {
@@ -9938,8 +9953,8 @@ public final class com/eignex/klause/presolve/PresolvePass$Stage : java/lang/Enu
 
 public final class com/eignex/klause/presolve/PresolvePipeline {
 	public static final field INSTANCE Lcom/eignex/klause/presolve/PresolvePipeline;
-	public final fun run (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;)Lcom/eignex/klause/presolve/PresolveOutcome;
-	public static synthetic fun run$default (Lcom/eignex/klause/presolve/PresolvePipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveOutcome;
+	public final fun run (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;)Lcom/eignex/klause/presolve/PresolveOutcome;
+	public static synthetic fun run$default (Lcom/eignex/klause/presolve/PresolvePipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveOutcome;
 }
 
 public final class com/eignex/klause/presolve/PresolveTiming : java/lang/Enum {
@@ -10055,6 +10070,7 @@ public abstract interface class com/eignex/klause/propagation/ClauseExchange {
 	public abstract fun onRestart (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSearchClose (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSearchEnd (Lcom/eignex/klause/propagation/PropagationSession;)V
+	public fun onSearchPause (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun onSearchStart (Lcom/eignex/klause/propagation/PropagationSession;)V
 	public fun publishGlobal (Lcom/eignex/klause/propagation/SharedClause;)V
 }
@@ -10062,6 +10078,7 @@ public abstract interface class com/eignex/klause/propagation/ClauseExchange {
 public final class com/eignex/klause/propagation/ClauseExchange$DefaultImpls {
 	public static fun onSearchClose (Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/propagation/PropagationSession;)V
 	public static fun onSearchEnd (Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/propagation/PropagationSession;)V
+	public static fun onSearchPause (Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/propagation/PropagationSession;)V
 	public static fun onSearchStart (Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/propagation/PropagationSession;)V
 	public static fun publishGlobal (Lcom/eignex/klause/propagation/ClauseExchange;Lcom/eignex/klause/propagation/SharedClause;)V
 }
@@ -12354,6 +12371,7 @@ public final class com/eignex/klause/solver/pipeline/ExecutionOption$Companion {
 	public final fun getPresolveProbePerVar ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPresolveProbeTotal ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPresolveStructuralImpact ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
+	public final fun getPrivateRebuildBytes ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPrivateRebuildWork ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getPropagationAttribution ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
 	public final fun getReasonPreflight ()Lcom/eignex/klause/solver/pipeline/ExecutionOption;
@@ -12476,8 +12494,8 @@ public final class com/eignex/klause/solver/pipeline/FinitePipelinePreparation {
 }
 
 public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;Z)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;ZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;Ljava/lang/Long;Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/pipeline/PreparedSourcePlan;ZLcom/eignex/klause/lp/relaxation/LpSourcePreparation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getComponentPlan ()Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
@@ -12490,6 +12508,7 @@ public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
 	public final fun getRandomSeed ()Ljava/lang/Long;
 	public final fun getSolutionSetSensitive ()Z
 	public final fun getSolveCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getSourcePreparation ()Lcom/eignex/klause/lp/relaxation/LpSourcePreparation;
 	public final fun getTransformObjective ()Z
 	public final fun getZeroObjectivePricing ()Lcom/eignex/klause/lp/engine/LpZeroObjectivePricing;
 }

@@ -17,6 +17,7 @@ import com.eignex.klause.lp.engine.forEachRationalColumn
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
@@ -48,6 +49,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     objective: LinearObjective?,
     cancellation: Cancellation = Cancellation.Never,
     workAllowance: Long = SPARSE_LP_MAX_WORK,
+    sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
 ): SparseLpAdmission {
     val columns = problem.numIntVars.toLong() + problem.numBoolVars + problem.numRealVars
     val rows = problem.factors.size.toLong()
@@ -84,7 +86,11 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     if (reservation > SPARSE_LP_MAX_ALLOCATION) return decline("Storage")
     assemblyWork = 32L * (entries + rows + columns)
     val relaxation = try {
-        val relaxer = CpToLpRelaxation(problem, objective, deferred = true)
+        val relaxer = CpToLpRelaxation(problem, objective, deferred = true,
+            reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
+            reuseTemplateIndexes = sourcePreparation != LpSourcePreparation.OBJECT,
+            reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
+            earnTemplatePreparation = sourcePreparation == LpSourcePreparation.ADMITTED)
         relaxer.preparation().forEach {
             if (cancellation()) return decline("Cancelled")
             yield(Unit)

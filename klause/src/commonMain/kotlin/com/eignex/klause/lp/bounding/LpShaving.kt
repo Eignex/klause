@@ -9,7 +9,6 @@ import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.certifiedTightObjectiveLowerBound
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.newTableauCutSolver
-import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.rootDomainOf
@@ -190,8 +189,8 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellati
         else PropagationProblem(prob, selected))
     if (session.isUnsatAtRoot) return null
     val relaxation = try {
-        CpToLpRelaxation(prob, LinearObjective(intCoefficients = coeffs), projections = selected,
-            templateStats = sink.lp).build(session, cancellation = token)
+        primalRelaxer(LinearObjective(intCoefficients = coeffs), prob, selected)
+            .build(session, cancellation = token)
     } catch (_: LpAssemblyCancelled) {
         return null
     }
@@ -227,8 +226,7 @@ private fun LpEngine.safeMax(prob: Problem, coeffs: LongArray, token: Cancellati
  *  [PropagationSession] bake — the no-bake analog of [safeMin], for pre-bake OBBT on wide domains. */
 private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Double? {
     val relaxation = try {
-        CpToLpRelaxation(problem, LinearObjective(intCoefficients = coeffs), projections = projections,
-            templateStats = sink.lp).build(RootDomains(problem), cancellation = token)
+        primalRelaxer(LinearObjective(intCoefficients = coeffs)).build(RootDomains(problem), cancellation = token)
     } catch (_: CheckedLongOverflowException) {
         return null
     } catch (_: LpAssemblyCancelled) {

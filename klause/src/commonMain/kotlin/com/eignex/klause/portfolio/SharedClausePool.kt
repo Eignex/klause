@@ -552,6 +552,11 @@ internal class PoolClauseExchange(
         onRestart(session)
     }
 
+    override fun onSearchPause(session: PropagationSession) = metered {
+        retainSession(session)
+        observe(session)
+    }
+
     override fun onSearchEnd(session: PropagationSession) = metered {
         retainSession(session)
         if (!session.cancelRequested) {

@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
+
 /**
  * The resolved per-technique LP-relaxation plan for a backtracking solve, carried as [LpParams.lpPlan]
  * beside the intent [LpParams.lpConfig]. [LpAutoConfig.resolve] OR-es the structurally-applicable
@@ -410,6 +412,8 @@ data class LpPlan(
     val rootCutHarvest: Boolean = true,
     /** Retain immutable component owners for node bounds and dispatch tableau cuts within each block. */
     val componentOwnership: Boolean = false,
+    /** Source-template retention and admission, independent of the enabled numerical techniques. */
+    val sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
 ) {
     /**
      * Whether Gomory integrality cuts actually run: [gomory] permits them, [cuts] admits the

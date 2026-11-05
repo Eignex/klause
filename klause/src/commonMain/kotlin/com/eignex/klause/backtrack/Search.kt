@@ -184,6 +184,8 @@ internal class CpSatisfactionTraversal(
     preparedSession: PropagationSession? = null,
     preparedSeed: PropagationResult? = null,
     private val rebindable: Boolean = false,
+    onRelease: ((PropagationSession) -> Unit)? = null,
+    onPropagationWork: ((() -> Long) -> Unit)? = null,
 ) : AutoCloseable {
     private val resources = SearchInvocationResources()
     private val lpResources = ArrayList<LpSearchResource>()
@@ -199,6 +201,7 @@ internal class CpSatisfactionTraversal(
             costAware = params.costAwarePropagation,
             reasonPreflight = params.reasonPreflight,
             cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
+            onPropagationWork = onPropagationWork,
         )).also {
             if (params.integerRowLearning) it.enableIntegerRowLearning()
             it.configureAttribution(params.propagationAttribution, params.historicalTableReasons,
@@ -280,6 +283,7 @@ internal class CpSatisfactionTraversal(
                     cp.session.sharedLearningPosition = null
                 }
             })
+            onRelease?.let { capture -> resources.own(AutoCloseable { capture(cp.session) }) }
             cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
                 .flatMap { it.enforcingFiniteFactors(problem) }.toSet())
             deferredRoot = deferredInitialization &&
@@ -351,6 +355,8 @@ internal class CpSatisfactionTraversal(
     val initializationCancelled: Boolean get() = cp.session.fixpointCancelled
 
     fun propagationWork(): Long = cp.session.work
+
+    fun affineParityStatistics(factorId: Int): Map<String, Long> = cp.session.affineParityStatistics(factorId)
 
     fun splitLiteral(): Int? {
         check(rebindable && !closed)
@@ -449,6 +455,7 @@ internal class CpSatisfactionTraversal(
             finishQuery()
             return outcome
         }
+        traversal.clauseExchangeEnded = false
         return when (val event = checkNotNull(run).next()) {
             is SearchRunEvent.Satisfied -> {
                 val sample = completion.sample(event.model, cp)
@@ -472,7 +479,7 @@ internal class CpSatisfactionTraversal(
             }
 
             SearchRunEvent.Paused -> if (slice != null) {
-                params.clauseExchange?.onSearchEnd(cp.session)
+                if (!traversal.clauseExchangeEnded) params.clauseExchange?.onSearchPause(cp.session)
                 null
             } else {
                 finishQuery()
@@ -556,6 +563,7 @@ private class CpSatisfactionTraversalPolicy(
     SearchRunLifecycle {
     private val restart = RestartSchedule.from(params)
     var retainedRoot = false
+    var clauseExchangeEnded = false
 
     private val session: PropagationSession get() = cp.session
     val brancher = BacktrackBrancher(
@@ -664,6 +672,8 @@ private class CpSatisfactionTraversalPolicy(
     }
 
     override fun onCancellation(context: SearchContext): SearchRunDisposition {
+        clauseExchangeEnded = true
+        params.clauseExchange?.onSearchEnd(session)
         return if (slice?.pauses() == true) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
     }
 }

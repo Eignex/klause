@@ -10,8 +10,10 @@ class SatCompCompactTest {
 
     @Test
     fun `instances should be distinct content hashes`() {
-        assertTrue(instances.all { it.hash.matches(Regex("[0-9a-f]{32}")) })
-        assertEquals(instances.size, instances.map { it.hash }.distinct().size)
+        for (collection in listOf(instances, SatCompXor.instances)) {
+            assertTrue(collection.all { it.hash.matches(Regex("[0-9a-f]{32}")) })
+            assertEquals(collection.size, collection.map { it.hash }.distinct().size)
+        }
     }
 
     @Test
@@ -22,7 +24,9 @@ class SatCompCompactTest {
 
     @Test
     fun `instance paths should be distinct names a set file can hold`() {
-        assertTrue(instances.all { it.relPath.matches(Regex("[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\\.cnf")) })
-        assertEquals(instances.size, instances.map { it.relPath }.distinct().size)
+        for (collection in listOf(instances, SatCompXor.instances)) {
+            assertTrue(collection.all { it.relPath.matches(Regex("[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\\.cnf")) })
+            assertEquals(collection.size, collection.map { it.relPath }.distinct().size)
+        }
     }
 }

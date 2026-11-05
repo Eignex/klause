@@ -1,5 +1,6 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.SharedClause
@@ -8,6 +9,8 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SharingChannel
@@ -15,9 +18,30 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class BacktrackWorkerConfigTest {
+    @Test
+    fun `raw LP recipes should inherit preparation policy without changing techniques`() {
+        val params = BacktrackParams(lpPlan = LpPlan(bounding = true, rootMaxWork = 1234L))
+        val recipe = BacktrackRecipe("raw") { _, _ -> params }
+
+        val actual = recipe.capLp(LpConfig.parse("aggressive,preparation=disabled")).build(0L, null)
+
+        assertEquals(params.lpPlan.copy(sourcePreparation = LpSourcePreparation.DISABLED), actual.lpPlan)
+    }
+
+    @Test
+    fun `preparation policy should leave a non LP recipe unchanged`() {
+        val params = BacktrackParams()
+        val recipe = BacktrackRecipe("plain") { _, _ -> params }
+
+        val actual = recipe.capLp(LpConfig.parse("aggressive,preparation=disabled")).build(0L, null)
+
+        assertSame(params, actual)
+    }
+
 
     private fun signalsOf(recipe: BacktrackRecipe, objective: LinearObjective?, pools: SharedPools): Set<Signal> {
         val problem = Problem(

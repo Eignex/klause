@@ -6,6 +6,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.propagation.ClauseExchange
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -48,6 +50,23 @@ class ResumableMinimizeNodeSliceTest {
             search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = budget) { }
             search.stats.search.nodes.sum
         }
+    }
+
+    @Test
+    fun `an exhausted optimization slice should publish learned clauses`() {
+        val events = mutableListOf<String>()
+        val exchange = object : ClauseExchange {
+            override fun onRestart(session: PropagationSession) = Unit
+            override fun onSearchEnd(session: PropagationSession) { events += "end" }
+            override fun onSearchPause(session: PropagationSession) { events += "pause" }
+        }
+        val search = BacktrackSolver(problem().bake()).resumable(
+            objective(), BacktrackParams(randomSeed = 0L, clauseExchange = exchange),
+        )
+
+        search.use { it.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = 8L) { } }
+
+        assertEquals(listOf("end"), events)
     }
 
     @Test

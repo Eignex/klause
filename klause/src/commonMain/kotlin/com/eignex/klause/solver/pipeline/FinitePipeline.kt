@@ -2,6 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -71,6 +72,8 @@ class FinitePipelineRequest(
     },
     /** Whether the objective is the complete cost and permits exact affine substitution. */
     val transformObjective: Boolean = true,
+    /** Source-template policy shared by finite presolve and the consuming LP engines. */
+    val sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
 ) {
     /** Finite projection data selected by [preparedPlan]. */
     val componentPlan: ComponentPlan = requireNotNull(preparedPlan.execution.finiteLinear) {
@@ -187,6 +190,7 @@ object FinitePipeline {
             request.zeroObjectivePricing,
             request.randomSeed,
             plan.factorProjections,
+            request.sourcePreparation,
         )
         val bakedModel = if (outcome.stats.infeasible) {
             outcome.problem

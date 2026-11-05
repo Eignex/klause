@@ -24,10 +24,14 @@ class SourceExecutionPolicy(
     val explicitPresolve: Boolean = false,
 ) {
     /** Requested optional LP ceiling, including per-technique overrides. */
-    val lpCeiling: LpConfig? = lpCeiling?.let { LpConfig(it.emphasis, it.overrides.toMap()) }
+    val lpCeiling: LpConfig? = lpCeiling?.let {
+        LpConfig(it.emphasis, it.overrides.toMap(), it.sourcePreparation)
+    }
 
     /** Application default LP ceiling for portfolio routes. */
-    val portfolioLpCeiling: LpConfig? = portfolioLpCeiling?.let { LpConfig(it.emphasis, it.overrides.toMap()) }
+    val portfolioLpCeiling: LpConfig? = portfolioLpCeiling?.let {
+        LpConfig(it.emphasis, it.overrides.toMap(), it.sourcePreparation)
+    }
 
     init {
         if (portfolioArms != null && portfolioArms <= 0) {
@@ -132,7 +136,7 @@ class SourceExecutionPolicy(
             ) {
                 pipelineConfigError("--lp: engine 'fixed' accepts only off")
             }
-            return LpConfig.OFF
+            return lpCeiling?.takeIf { it.sourcePreparation != null } ?: LpConfig.OFF
         }
         val ceiling = lpCeiling ?: portfolioLpCeiling
         return if (fallback != null && ceiling != null) {

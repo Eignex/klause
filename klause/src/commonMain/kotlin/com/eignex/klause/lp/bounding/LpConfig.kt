@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.bounding
 
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
+
 /**
  * Cost tier of an LP-relaxation technique — the LP analogue of
  * [com.eignex.klause.presolve.PresolveTiming]. [LpEmphasis] enables a *set* of tiers, so the
@@ -188,8 +190,13 @@ enum class LpEmphasis(
  *
  * @property emphasis the cost ceiling — the highest [LpTiming] tier any technique may run at.
  * @property overrides per-technique force-on/off that wins over the emphasis (the benchmarking toggle).
+ * @property sourcePreparation source-template policy override, or null to preserve the resolved plan.
  */
-class LpConfig(val emphasis: LpEmphasis = LpEmphasis.DEFAULT, val overrides: Map<LpTechnique, Boolean> = emptyMap()) {
+class LpConfig(
+    val emphasis: LpEmphasis = LpEmphasis.DEFAULT,
+    val overrides: Map<LpTechnique, Boolean> = emptyMap(),
+    val sourcePreparation: LpSourcePreparation? = null,
+) {
 
     /** Whether [technique] is permitted: an explicit override wins, else its tier ≤ the emphasis. */
     fun resolved(technique: LpTechnique): Boolean = overrides[technique]
@@ -201,7 +208,7 @@ class LpConfig(val emphasis: LpEmphasis = LpEmphasis.DEFAULT, val overrides: Map
      *  win over the arm's own; an all-`AGGRESSIVE`, no-override ceiling leaves the arm unchanged. */
     fun cappedUnder(ceiling: LpConfig): LpConfig {
         val capped = if (emphasis.ordinal <= ceiling.emphasis.ordinal) emphasis else ceiling.emphasis
-        return LpConfig(capped, overrides + ceiling.overrides)
+        return LpConfig(capped, overrides + ceiling.overrides, ceiling.sourcePreparation ?: sourcePreparation)
     }
 
     /** Predefined configs and the spec-string [parse]r. */
@@ -232,9 +239,22 @@ class LpConfig(val emphasis: LpEmphasis = LpEmphasis.DEFAULT, val overrides: Map
          *  - `all` — every ordinary technique forced on; sparse trials require their explicit option;
          *  - a bare comma-separated technique-id list — each forced on, all others off (force-exactly).
          *
-         * An unknown token throws.
+         * `preparation=disabled|object|index|admitted` selects source-template policy independently
+         * of these numerical techniques. An unknown or repeated preparation token throws.
          */
         fun parse(spec: String?): LpConfig {
+            val tokens = spec?.trim()?.lowercase().orEmpty().split(",").map { it.trim() }
+            val preparation = tokens.filter { it.startsWith("preparation=") }
+            check(preparation.size <= 1) { "LP preparation policy must be specified once" }
+            val mode = preparation.singleOrNull()?.substringAfter("=")?.let { raw ->
+                LpSourcePreparation.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
+                    ?: error("unknown LP preparation policy $raw; expected disabled|object|index|admitted")
+            }
+            val config = parseTechniques(tokens.filterNot { it.startsWith("preparation=") }.joinToString(","))
+            return if (mode == null) config else LpConfig(config.emphasis, config.overrides, mode)
+        }
+
+        private fun parseTechniques(spec: String?): LpConfig {
             val s = spec?.trim()?.lowercase().orEmpty()
             if (s.isEmpty()) return AUTO
             if (s == "all") return LpConfig(LpEmphasis.AGGRESSIVE,

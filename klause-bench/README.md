@@ -29,16 +29,26 @@ of its members is materialized locally. Each solve verifies its planned input by
 The standard and Linux JVM lab manifests request source snapshots: the lab stages the selected revision as a compact
 Git pack with its original commit identity. Builds and tools use the current revision without requiring ancestors or tags.
 
-Corpus-pack indexes are committed under `klause-bench/corpus-index/<collection>.tsv.gz`
+Corpus input indexes are committed under `klause-bench/corpus-index/<collection>.tsv.gz`
 (`path<TAB>sha256<TAB>bytes`), so declared-input planning makes no network requests and
 transfers no corpus bytes. Regenerate them from complete collection trees with
 `CommittedCorpusIndexes CORPUS_CACHE WORKSPACE [COLLECTION...]` on the bench classpath.
+The generator records original bytes and plain names for compressed members. Materialization follows
+the committed representation, retains packed siblings and verifies the exact input hash and size.
+Committed entries take precedence over cached mirror indexes; stored-form entries remain supported.
 A collection without a committed index falls back to the mirror's index.
 Concurrent planners atomically publish complete listing skeletons and reuse the winning view.
 
 `lab/source-identity.json` accepts `cases` containing at most eight selected
 single-model corpus inputs and their packed hashes. It verifies each lab-fetched
 input and records its decoded SHA-256 and byte count without parsing or solving it.
+
+`satcomp-xor-v1` selects 17 hash-pinned graph-parity CNFs from the SAT Competition,
+including original and camouflaged encodings.
+
+`scripts/capture-corpus-index.sh` accepts `select` filters in a lab profile job. It writes complete
+input indexes, selected source hashes and provenance under `$OUT` without running a solver.
+The installed index generator reads the selection JSONL and verifies each copied source; no JSON shell tool is required.
 
 The JVM lab manifests declare the installed distributions, compiler assets, scripts, frozen problem sets, fixtures and Git metadata
 needed in private workspaces. The lab computes planner identities against the complete verified build before
@@ -100,15 +110,25 @@ diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
+Ordinary single-core mixed clausal satisfaction admits a bounded automatic private
+parity trial. `param.private-rebuild-work=0` disables it. Mixed private views require at least
+16 free coordinates for automatic admission; complete affine views use the ordinary
+rank and coverage requirements. `AutomaticDeclinedSmallMixed` reports a funded
+discovery followed by canonical fallback, without preparing or opening a consumer.
+`param.private-rebuild-bytes` bounds private modeled storage independently of canonical
+learned-memory scratch; an explicit shared scratch limit also bounds private storage
+unless a private limit is supplied.
+
 `param.private-rebuild-work=-1` requests automatic parity admission within a
-1,048,576-work cap and the configured scratch grant. It makes one initial-root
+4,194,304-work grant and the configured scratch grant. It makes one initial-root
 attempt on the structurally admitted Boolean cohort; see the
 [admission contract](../docs/07-presolve.md#private-worker-qualification).
-Use explicit zero as the canonical control. The production default remains zero.
+Use explicit zero as the canonical control; ordinary default admission follows the
+source policy above.
 
 `param.private-rebuild-work=65536` selects a bounded private Boolean satisfaction
 trial after new global root pins or an owned learned equivalence, with source reduction and a fresh consuming
-worker. Zero is the default. `ProgressPins` excludes baked-root facts;
+worker. Direct backtrack parameters default to zero. `ProgressPins` excludes baked-root facts;
 `RootScanWork` and `RootScanNanos` retain the eligibility cost. An unchanged
 baked root without a captured equivalence keeps its canonical traversal.
 `BinaryScanWork` and `BinaryScanNanos` retain bounded discovery costs;
@@ -176,7 +196,10 @@ it is a subset of transfer and preparation work, rather than another total to ad
 
 
 Private parity discovery reports `ParityDiscoveryWork`, `ParityDiscoveryNanos`,
-`ParityRows` and `ParityPins`. Discovery work is a subset of `ChargedWork`,
+`ParityRows` and `ParityPins`. Rows count encodings after global pin substitution;
+Satisfied clauses and false fixed literals are resolved against the captured root snapshot.
+A dimension-only memory refusal can precede table allocation and discovery work.
+Discovery work is a subset of `ChargedWork`,
 separate from canonical root propagation and later `PreparationWork`.
 `ParitySourceRows` and `ParitySourceLiterals` count short source equations posted
 beside the reduced basis in mixed consumers. Their storage and propagation spend
@@ -187,13 +210,21 @@ the existing private grants.
 captured affine basis. `AffineGenerationColumns` and `AffineGenerationFreeColumns`
 count its coordinates in a prepared model. These private pivot slots require
 affine reconstruction and cannot receive unprojected canonical learned clauses.
-`ParityBasisColumns` and `ParityCoveredSourceClauses` describe the captured
-linear subsystem. `ParityReducedRows`, `ParityReducedLiterals` and
+`ParityBasisColumns` reports the captured linear rank. `ParityCoveredSourceClauses`
+includes complete encodings and clauses justified by captured global root facts. `ParityReducedRows`, `ParityReducedLiterals` and
 `ParityCoveredClauses` identify a prepared mixed Clause/Xor view with original
 coordinate meanings; they do not count eliminated columns.
 `ParityTriangularRows` counts forward-eliminated rows selected per pivot in that
 reduced basis; the remaining rows use free-coordinate expansion. Both
 representations and their selection spend the existing private grants.
+`ParityJointFactors` identifies funded joint affine kernels. `ParityJointModeledBytes`
+is included in `ModeledPrivateBytes`; `ParityJointInitializationWork` counts completed
+cache initialization inside trial propagation work. `OpeningPropagationWork` is also
+a trial-work subset, including a consumer whose opening stops before publication. Joint `Fires`, `Resets`,
+`InsertedRows`, `Reductions`, `Pins`, `Conflicts` and `WideReasons` retain primitive
+per-consumer observations through retirement. `ExpressionRowsUpdated` counts completed
+residual-expression reductions; `ExpressionRowsSkipped` counts expressions without the
+new fact's pivot. A wide pin reason withholds that deduction.
 `ParityPreferredFreeColumns` reports the admitted free-coordinate selection list. Coverage declines name
 incomplete or extra binary/ternary groups and unsupported clause widths (8 includes
 larger widths). Such a miss can retain proved global pins or a mixed view.

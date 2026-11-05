@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
@@ -118,6 +119,7 @@ object PresolvePipeline {
         presolveBudget: PresolveBudget? = null,
         zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
         randomSeed: Long? = null,
+        sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
     ): PresolveOutcome = run(
         prepareSource(
             problem, config, linearObjective, solutionSetSensitive, cancellation, presolveBudget, finiteLane = true,
@@ -128,6 +130,7 @@ object PresolvePipeline {
         cancellation,
         zeroObjectivePricing,
         randomSeed,
+        sourcePreparation = sourcePreparation,
     )
 
     /**
@@ -147,6 +150,7 @@ object PresolvePipeline {
         zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
         randomSeed: Long? = null,
         projections: PreparedFactorProjections? = null,
+        sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
     ): PresolveOutcome {
         val problem = prepared.source
         val sourceProblem = prepared.problem
@@ -197,7 +201,7 @@ object PresolvePipeline {
             val wide = needsWideDomainLp(sourceProblem)
             val result = if (!prepared.infeasible && wide) {
                 lpRootInfeasibleReporting(
-                    sourceProblem, objective, LpPlan(bounding = true), token,
+                    sourceProblem, objective, LpPlan(bounding = true, sourcePreparation = sourcePreparation), token,
                     zeroObjectivePricing, randomSeed, projections = sourceProjections,
                 ).also { if (it.infeasible) observation.preparationRefuted() }
             } else {
@@ -233,7 +237,8 @@ object PresolvePipeline {
                 preBakeSlice(cancellation, presolveBudget), output = { it.problem },
             ) { token, _ ->
                 lpRootBoundsReporting(
-                    sourceProblem, objective, LpPlan(bounding = true), token, zeroObjectivePricing, randomSeed,
+                    sourceProblem, objective, LpPlan(bounding = true, sourcePreparation = sourcePreparation), token,
+                    zeroObjectivePricing, randomSeed,
                     minimumSpan = sourceProblem.settings.largeSpanThreshold, projections = sourceProjections,
                 )
             }
@@ -348,7 +353,7 @@ object PresolvePipeline {
                     lpHarvestReporting(
                         pre.problem,
                         currentObjective ?: LinearObjective(),
-                        it,
+                        it.copy(sourcePreparation = sourcePreparation),
                         bakeConfig,
                         cancellation,
                         zeroObjectivePricing,

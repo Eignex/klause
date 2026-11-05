@@ -35,6 +35,26 @@ import kotlin.test.assertTrue
 
 class MpsModeTest {
     @Test
+    fun `disabled source templates should preserve prepared MPS search results`() {
+        val relative = "klause-bench/smoke-corpus/lp-component-split/cover-2x3.mps"
+        val source = listOf(File(relative), File("../$relative")).first { it.isFile }
+
+        val text = capture {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact",
+                "--presolve", "off,+lp-harvest", "--lp", "aggressive,-cuts,preparation=disabled",
+                "--param", "lp-component-ownership=true", "--param", "bt-arm=lp-aggressive",
+                "--param", "arms=1", "-r", "3", "--param", "max-decisions=1000", source.absolutePath)))
+        }
+
+        assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        assertTrue("o 4" in text.lines(), text)
+        assertFalse("lpPhase_TEMPLATE_PREPARATION_" in text, text)
+        val uses = Regex("lpPhase_TEMPLATE_ASSEMBLY_[A-Z]+_[A-Z_]+=(\\d+)").findAll(text)
+            .sumOf { it.groupValues[1].toLong() }
+        assertEquals(0L, uses, text)
+    }
+
+    @Test
     fun `prepared MPS search should consume templates retained from LP harvest`() {
         val relative = "klause-bench/smoke-corpus/lp-component-split/cover-2x3.mps"
         val source = listOf(File(relative), File("../$relative")).first { it.isFile }

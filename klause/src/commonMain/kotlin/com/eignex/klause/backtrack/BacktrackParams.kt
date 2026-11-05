@@ -450,7 +450,10 @@ data class BacktrackParams(
     val reasonPreflight: Boolean = false,
     /** Bounded propositional rebuild diagnostics within root simplification; zero disables capture. */
     val rootRebuildCaptureVisits: Int = 0,
-    /** Total private Boolean work: zero disables rebuilding; -1 selects bounded automatic parity admission. */
+    /**
+     * Private Boolean work: zero disables, positive values bound manual trials, and -1 selects
+     * automatic parity admission within a 4,194,304-work grant.
+     */
     val privateRebuildWork: Long = 0L,
     /**
      * Inline diagnostic observer for attempted shared decisions, before propagation can refute them.
@@ -459,6 +462,8 @@ data class BacktrackParams(
     val branchObserver: SearchBranchAttemptObserver? = null,
     /** Non-inprocessing work after the first eligible complete root before optional slices; zero disables warmup. */
     val inprocessingWarmupWork: Long = 0L,
+    /** Private modeled-byte grant; null shares [learnedMemoryScratchBytes]. */
+    val privateRebuildBytes: Long? = null,
     /** Capture conditional binaries from completed consistent root probes; failed-literal units remain enabled. */
     val rootProbeImplications: Boolean = true,
     /** Non-inprocessing work between optional probing slices; zero follows the shared root trigger. */
@@ -469,6 +474,7 @@ data class BacktrackParams(
         require(privateRebuildWork in -1L..1_048_576L) {
             "private rebuild work must be -1 (automatic) or in 0..1048576"
         }
+        require(privateRebuildBytes == null || privateRebuildBytes >= 0L)
         require(learnedMemoryBytes == null || learnedMemoryBytes >= 0L)
         require(learnedMemoryWork >= 0L && learnedMemoryScratchBytes >= 0L)
         require(rootSimplifyBatch > 0) { "root simplification batch must be positive" }

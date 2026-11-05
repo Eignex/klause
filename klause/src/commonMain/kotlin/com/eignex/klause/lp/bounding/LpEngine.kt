@@ -63,6 +63,7 @@ import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpAuxiliarySources
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.relaxation.exactLeafResult
 import com.eignex.klause.lp.relaxation.floatReals
@@ -157,6 +158,9 @@ internal class LpEngine(
     private val nodeWorkAllowance: () -> Long? = { null },
     private val containingWork: (Long) -> Unit = {},
     private val rootQueryPolicy: LpRootQueryPolicy = LpRootQueryPolicy.SHARED_WORK,
+    internal val sourcePreparation: LpSourcePreparation =
+        params0.lpConfig?.sourcePreparation ?: params0.lpPlan.sourcePreparation,
+    private val eagerSourcePreparation: Boolean = false,
 ) : AutoCloseable {
     init {
         projections?.requireSource(problem)
@@ -286,6 +290,8 @@ internal class LpEngine(
                 } ?: nodeQueryWorkBudget() }
             } else nodeWorkAllowance,
             containingWork = { work -> if (rootProbe) chargeWork(work) },
+            sourcePreparation = sourcePreparation,
+            eagerSourcePreparation = eagerSourcePreparation,
         ).also { it.structuralCutSupport = structuralCutSupport }
     }
 
@@ -805,12 +811,29 @@ internal class LpEngine(
                 elementIndexes = elementIndexes,
                 templateStats = sink.lp,
                 preparationCancellation = params.cancellation,
-                reuseTemplateMetadata = retainedRootEnabled,
+                reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
+                reuseTemplateIndexes = sourcePreparation != LpSourcePreparation.OBJECT,
+                reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
+                earnTemplatePreparation = !retainedRootEnabled && !eagerSourcePreparation &&
+                    sourcePreparation == LpSourcePreparation.ADMITTED,
+                omitBoundRows = !retainedRootEnabled && sourcePreparation == LpSourcePreparation.ADMITTED,
                 onTemplateWork = ::noteNodeOverhead,
             )
         } else {
             null
         }
+
+    internal fun primalRelaxer(
+        objective: LinearObjective,
+        source: Problem = problem,
+        selected: PreparedFactorProjections? = projections,
+    ): CpToLpRelaxation = CpToLpRelaxation(source, objective, projections = selected, templateStats = sink.lp,
+        reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
+        reuseTemplateIndexes = sourcePreparation != LpSourcePreparation.OBJECT,
+        reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
+        earnTemplatePreparation = !eagerSourcePreparation && sourcePreparation == LpSourcePreparation.ADMITTED,
+        omitBoundRows = sourcePreparation == LpSourcePreparation.ADMITTED,
+        onTemplateWork = ::noteNodeOverhead)
 
     /** The active relaxer. Rebuilt once by [pruneIneffectiveHulls] when a hull is dropped; otherwise the
      *  [params]-resolved one for the whole search. */
@@ -822,9 +845,12 @@ internal class LpEngine(
         private set
 
     // Source premises keep local cuts dormant until their complete guards hold again.
-    val cutPool = CutPool(observe = { family, stage, outcome ->
-        sink.lp.cutLifecycle.event(family, stage, outcome)
-    })
+    val cutPool = CutPool(
+        prepareSources = sourcePreparation == LpSourcePreparation.ADMITTED,
+        cancellation = params.cancellation,
+        onPreparationWork = ::noteNodeOverhead,
+        observe = { family, stage, outcome -> sink.lp.cutLifecycle.event(family, stage, outcome) },
+    )
 
     /** The global cuts folded into every node's relaxation — the live contents of [cutPool]. */
     val lpGlobalCuts: List<Cut> get() = cutPool.cuts().filter { it.global }
@@ -1773,7 +1799,7 @@ internal class LpEngine(
             val plan = with(LpAutoConfig) {
                 prepare(problem, config, requestedPlan, objective, params.cancellation,
                     sparseTrialAllowed = projections?.builtInRelaxation != false,
-                    sparseTrialWork = retainedRootRemainingWork()) { admission ->
+                    sparseTrialWork = retainedRootRemainingWork(), sourcePreparation = sourcePreparation) { admission ->
                     elementIndexes = admission.elementIndexes
                     admission.sparseTrial?.let { trial ->
                         sparseTrialActive = trial.admitted

@@ -23,6 +23,32 @@ import kotlin.test.assertTrue
 
 class PrivateRebuildSatisfactionTest {
     @Test
+    fun `an independent private byte grant should preserve the canonical scratch limit`() {
+        val clauses = (0..3).flatMap { excluded ->
+            val columns = (0..3).filter { it != excluded }
+            val rhs = if (excluded == 0) 1 else 0
+            (0..7).filter { it.countOneBits() % 2 != rhs }.map { mask ->
+                Clause(IntArray(3) { Lit.make(columns[it], mask and (1 shl it) == 0) })
+            }
+        }.toTypedArray<Factor>()
+        val source = Problem(4, 0, emptyArray(), clauses).bake()
+        for (privateBytes in listOf(null, 1_048_576L)) {
+            val params = BacktrackParams(privateRebuildWork = 65_536L,
+                learnedMemoryScratchBytes = 0L, privateRebuildBytes = privateBytes)
+
+            val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(params))
+
+            assertEquals(0L, params.learnedMemoryScratchBytes)
+            assertEquals(if (privateBytes == null) 0L else 1L,
+                result.stats.search.learning["privateRebuildConsumers"] ?: 0L)
+            assertTrue(clauses.all { factor ->
+                (factor as Clause).literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+            })
+        }
+    }
+
+
+    @Test
     fun `proved parity pins should reach a consuming worker and a checked source witness`() {
         for (native in listOf(false, true)) {
             val clauses = (0..3).flatMap { excluded ->
@@ -400,6 +426,41 @@ class PrivateRebuildSatisfactionTest {
 
     @Test
     fun `automatic parity admission should publish a checked source point and release its consumer`() {
+        for (native in listOf(false, true)) for (mixed in listOf(false, true)) {
+            val clauses = (0 until 128).flatMap { row ->
+                listOf(1, 2, 4, 7).map { mask ->
+                    Clause(IntArray(3) {
+                        val column = row + if (mixed) 2 * (row / 16) + it else it
+                        Lit.make(column, mask and (1 shl it) == 0)
+                    })
+                }
+            } + if (mixed) listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))) else emptyList()
+            val source = Problem(if (mixed) 144 else 130, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+
+            val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+                nativeSat = native, privateRebuildWork = -1L, learnedMemoryScratchBytes = 4_194_304L,
+                variableSelector = InputOrder, valueSelector = IndomainMin,
+            )))
+
+            assertTrue(clauses.all { clause ->
+                clause.literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+            })
+            val learning = result.stats.search.learning
+            assertEquals(1L, learning["privateRebuildAutomaticAdmitted"])
+            assertEquals(1L, learning["privateRebuildConsumers"])
+            assertEquals(1L, learning["privateRebuildSourceAccepted"])
+            assertEquals(1L, learning["privateRebuildRetired"])
+            assertEquals(4_194_304L, learning["privateRebuildAutomaticWorkLimit"])
+            val stages = listOf("RootScanWork", "ParityDiscoveryWork", "BinaryScanWork", "BinaryHistoryWork",
+                "PreparationWork", "OpeningConstructionWork", "TrialWork", "ReconstructionWork", "SourceCheckWork")
+            assertEquals(stages.sumOf { learning["privateRebuild$it"] ?: 0L },
+                learning.getValue("privateRebuildChargedWork"))
+            assertTrue(learning.getValue("privateRebuildChargedWork") <= 1_048_576L)
+        }
+    }
+
+    @Test
+    fun `automatic small mixed views should retain canonical search after discovery`() {
         for (native in listOf(false, true)) {
             val clauses = (0 until 128).flatMap { row ->
                 listOf(1, 2, 4, 7).map { mask ->
@@ -417,16 +478,11 @@ class PrivateRebuildSatisfactionTest {
                 clause.literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
             })
             val learning = result.stats.search.learning
-            assertEquals(1L, learning["privateRebuildAutomaticAdmitted"])
-            assertEquals(1L, learning["privateRebuildConsumers"])
-            assertEquals(1L, learning["privateRebuildSourceAccepted"])
-            assertEquals(1L, learning["privateRebuildRetired"])
-            assertEquals(1_048_576L, learning["privateRebuildAutomaticWorkLimit"])
-            val stages = listOf("RootScanWork", "ParityDiscoveryWork", "BinaryScanWork", "BinaryHistoryWork",
-                "PreparationWork", "OpeningConstructionWork", "TrialWork", "ReconstructionWork", "SourceCheckWork")
-            assertEquals(stages.sumOf { learning["privateRebuild$it"] ?: 0L },
+            assertEquals(1L, learning["privateRebuildAutomaticDeclinedSmallMixed"])
+            assertNull(learning["privateRebuildAttempts"])
+            assertNull(learning["privateRebuildConsumers"])
+            assertEquals(learning.getValue("privateRebuildParityDiscoveryWork"),
                 learning.getValue("privateRebuildChargedWork"))
-            assertTrue(learning.getValue("privateRebuildChargedWork") <= 1_048_576L)
         }
     }
 

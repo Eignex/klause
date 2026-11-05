@@ -35,6 +35,7 @@ import com.eignex.klause.lp.prepareRootBoxes
 import com.eignex.klause.lp.prepareStatesBothBounds
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CumulativeRelaxation
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.prepareCandidateArcCount
 import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.lp.relaxation.schedulingViews
@@ -162,6 +163,7 @@ object LpAutoConfig {
         cancellation: Cancellation = Cancellation.Never,
         sparseTrialAllowed: Boolean = true,
         sparseTrialWork: Long = SPARSE_LP_MAX_WORK,
+        sourcePreparation: LpSourcePreparation = config.sourcePreparation ?: base.sourcePreparation,
         observe: ((LpAdmission) -> Unit)? = null,
     ): LpPlan {
         var visits = 0
@@ -359,6 +361,7 @@ object LpAutoConfig {
         val structuralCuts = cuts && (cutEligible || pseudoBoolean)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         var plan = base.copy(
+            sourcePreparation = sourcePreparation,
             bounding = base.bounding || lpActive,
             cuts = base.cuts || cuts,
             // LP learning rides on the bounding path: the objective-bound reason is built from the
@@ -403,7 +406,8 @@ object LpAutoConfig {
             structApplicable && config.resolved(LpTechnique.BOUNDING)
         ) {
             if (sparseTrialAllowed) prepareSparseLpAdmission(problem, objective, cancellation,
-                minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK))
+                minOf(sparseTrialWork, base.rootMaxWork.takeIf { it > 0L } ?: SPARSE_LP_MAX_WORK),
+                sourcePreparation)
             else SparseLpAdmission(mapOf("DeclineProjection" to 1L))
         } else null
         if (sparse?.admitted == true) {
@@ -413,7 +417,7 @@ object LpAutoConfig {
                 rootBudgetFraction = base.rootBudgetFraction, rootBudgetMillis = base.rootBudgetMillis,
                 lpWorkBudgetFraction = base.lpWorkBudgetFraction, boundMaxPivots = base.boundMaxPivots,
                 boundEvery = base.boundEvery, warmStart = base.warmStart, branching = base.branching,
-                componentOwnership = base.componentOwnership,
+                componentOwnership = base.componentOwnership, sourcePreparation = sourcePreparation,
             )
         }
         observe?.invoke(LpAdmission(rows, baseCols, cells, structApplicable,
