@@ -10,7 +10,7 @@ internal class LearnedPolicyRows(
     private val objectColumns: Boolean,
     private val state: PropagationState?,
 ) {
-    private class Page(capacity: Int, columns: Int, objectColumns: Boolean) {
+    internal class Page(capacity: Int, columns: Int, objectColumns: Boolean) {
         var values = IntArray(capacity * columns)
         var admissions = LongArray(capacity)
         var propagators: Array<LearnedPropagator?>? = if (objectColumns) arrayOfNulls(capacity) else null
@@ -142,7 +142,8 @@ internal class LearnedPolicyRows(
         allocationIdentity = Any()
     }
 
-    operator fun get(index: Int, column: Int): Int {
+    @Suppress("NOTHING_TO_INLINE")
+    internal inline operator fun get(index: Int, column: Int): Int {
         val page = pageAt(index ushr PAGE_SHIFT)
         val slot = index and PAGE_MASK
         if (page == null || page.retained and (1 shl slot) == 0) return when (column) {
@@ -153,7 +154,8 @@ internal class LearnedPolicyRows(
         return page.values[slot * columns + column]
     }
 
-    operator fun set(index: Int, column: Int, value: Int) {
+    @Suppress("NOTHING_TO_INLINE")
+    internal inline operator fun set(index: Int, column: Int, value: Int) {
         checkNotNull(pageAt(index ushr PAGE_SHIFT)).values[(index and PAGE_MASK) * columns + column] = value
     }
 
