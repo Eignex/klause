@@ -657,6 +657,99 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `four unproductive points should retire a tight generated recipe`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+            SourceDerivation.Premise("aggregate"), family = CutFamily.SOURCE_AGGREGATION))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        var installed = selection.prepareGenerated(rows, setOf(0), Cancellation.Never, trackUsefulness = true)
+        repeat(3) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ONE), setOf(0),
+                listOf(BigFraction.ONE), installed, Cancellation.Never, usefulnessOpportunity = true)
+        }
+        assertEquals(setOf(0), installed)
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ONE), setOf(0),
+            listOf(BigFraction.ONE), installed, Cancellation.Never, usefulnessOpportunity = true)
+
+        assertTrue(selected.isEmpty())
+        assertEquals(1L, selection.observations["numericalCutSelectionUnproductiveRecipeRetired"])
+    }
+
+    @Test
+    fun `missing usefulness opportunities should preserve a tight generated recipe`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+            SourceDerivation.Premise("aggregate"), family = CutFamily.SOURCE_AGGREGATION))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        var installed = selection.prepareGenerated(rows, setOf(0), Cancellation.Never, trackUsefulness = true)
+
+        repeat(8) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ONE), setOf(0),
+                listOf(BigFraction.ONE), installed, Cancellation.Never)
+        }
+
+        assertEquals(setOf(0), installed)
+        assertNull(selection.observations["numericalCutSelectionUnproductiveRecipeRetired"])
+    }
+
+    @Test
+    fun `only a matching recipe and family use should reset usefulness aging`() {
+        for ((used, sameGeneration) in listOf(CutFamily.SOURCE_AGGREGATION to true,
+            CutFamily.GOMORY to true, CutFamily.SOURCE_AGGREGATION to false)) {
+            val rows = listOf(LinearAuthorityCut(0,
+                SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("aggregate"), family = CutFamily.SOURCE_AGGREGATION))
+            val selection = LinearAuthorityPointCuts(SourceLpBudget())
+            var installed = selection.prepareGenerated(rows, setOf(0), Cancellation.Never, trackUsefulness = true)
+            repeat(3) {
+                installed = selection.select(rows, listOf(x), listOf(BigFraction.ONE), setOf(0),
+                    listOf(BigFraction.ONE), installed, Cancellation.Never, usefulnessOpportunity = true)
+            }
+
+            selection.observeUse(if (sameGeneration) rows else rows.toMutableList(), used)
+            val selected = selection.select(rows, listOf(x), listOf(BigFraction.ONE), setOf(0),
+                listOf(BigFraction.ONE), installed, Cancellation.Never, usefulnessOpportunity = true)
+
+            assertEquals(if (used == CutFamily.SOURCE_AGGREGATION && sameGeneration) setOf(0) else emptySet(), selected)
+        }
+    }
+
+    @Test
+    fun `an interrupted usefulness observation should preserve the retirement streak`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+            SourceDerivation.Premise("aggregate"), family = CutFamily.SOURCE_AGGREGATION))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        var installed = selection.prepareGenerated(rows, setOf(0), Cancellation.Never, trackUsefulness = true)
+        repeat(3) {
+            installed = selection.select(rows, listOf(x), listOf(BigFraction.ONE), setOf(0),
+                listOf(BigFraction.ONE), installed, Cancellation.Never, usefulnessOpportunity = true)
+        }
+
+        val selected = selection.select(rows, listOf(x), listOf(BigFraction.ONE), setOf(0),
+            listOf(BigFraction.ONE), installed, Cancellation { true }, usefulnessOpportunity = true)
+
+        assertEquals(setOf(0), selected)
+        assertEquals(3L, selection.observations["numericalCutSelectionUsefulnessOpportunities"])
+    }
+
+    @Test
+    fun `incumbent aware initialization should preserve the one operation checked bound`() {
+        val budget = SourceLpBudget(maxOperations = 1)
+        val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithGeneratedCutUse(nonseparating, Cancellation.Never, BigFraction.ZERO)
+        }
+
+        assertEquals(1, budget.operations)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+            (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+        assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(nonseparating.withLinearAuthority())
+            .verify(assertNotNull(result.bound)))
+    }
+
+    @Test
     fun `generated recipe selection should require complete checked coverage`() {
         val rows = List(2) { index -> LinearAuthorityCut(index,
             SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
