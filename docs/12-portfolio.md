@@ -1050,8 +1050,9 @@ probing requires 32,768 additional non-inprocessing work. Clausal pools enable
 `root-probe-binary-gate`: Native workers without root facts or known binary clauses
 scan new learned binaries before admitting global probes. Cheap scans and pending
 continuations keep their own eligibility.
-Pseudo-Boolean pools enable `root-probe-general-gate`, which prioritizes new short
-learned clauses when Boolean General workers have no root facts or known binary hints.
+Pseudo-Boolean pools enable `root-probe-general-gate`, which admits one initial
+global batch under the existing grants, then prioritizes new short learned clauses
+when Boolean General workers have no root facts or known binary hints.
 It preserves ordinary rotation after either signal and leaves integer endpoints unchanged.
 `inprocessing-probe-interval=0` follows the shared root trigger instead.
 These allowances remain inside each worker's containing slice. The

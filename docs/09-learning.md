@@ -744,8 +744,11 @@ An exhausted unchanged neighborhood does no further scanning, and preparation al
 does not start the optional probe interval. Scope reset clears the binary hint;
 required consequence publication retains its separate eligibility.
 `rootProbeGeneralGate` applies a separate heuristic to Boolean General states without
-root facts or known binaries: it examines new learned clauses of two to eight literals
-before admitting global probes. General constraints can propagate without a binary,
+root facts or known binaries. One initial global batch uses the ordinary probe and
+containing grants; later slices examine new learned clauses of two to eight literals
+before admitting global probes. An unfunded slice retains that initial opportunity,
+and optional buffer release preserves its exhaustion until scope reset.
+General constraints can propagate without a binary,
 so this admission is optional rather than a propagation impossibility test. Integer
 endpoint rotation retains its ordinary policy. A root fact or binary hint reopens
 global rotation; exhausted preparation does not delay new learned candidates by the

@@ -578,48 +578,104 @@ class RootInprocessingTest {
     }
 
     @Test
-    fun `General admission should restrict only requested Boolean General global probes`() {
+    fun `General admission should finish its initial global batch before restricting probes`() {
         for ((native, gate) in listOf(false to true, false to false, true to true)) {
             val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
             val stats = SearchStatsSink()
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 2,
+                rootProbeImplications = false, rootProbeGeneralGate = gate)
 
-            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1,
-                rootProbeImplications = false, rootProbeGeneralGate = gate), stats)
+            pass.run(session, params, stats)
+            assertEquals(2L, stats.inprocessProbes)
+            pass.releaseRetainedBuffers()
+            pass.run(session, params, stats)
 
-            assertEquals(if (!native && gate) 0L else 1L, stats.inprocessProbes)
+            assertEquals(if (!native && gate) 2L else 4L, stats.inprocessProbes)
             assertEquals(0, session.decisionLevel)
             assertEquals(0, session.learnedClauseCount)
         }
     }
 
     @Test
-    fun `a new General learned neighborhood should prove a root fact without waiting for an interval`() {
-        val source = Problem(3, 0, emptyArray(), arrayOf<Factor>(
-            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(0, 2, 4), PbOp.LE, 1),
-            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(1, 2, 4), PbOp.GE, 2),
+    fun `a new General learned neighborhood should prove a root fact after exploratory probing`() {
+        val source = Problem(4, 0, emptyArray(), arrayOf<Factor>(
+            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(2, 4, 6), PbOp.LE, 1),
+            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(3, 4, 6), PbOp.GE, 2),
         ))
         val session = PropagationSession(source.bake(), nativeSat = false)
         val pass = RootProbingPass()
         val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
             rootProbeGeneralGate = true, inprocessingProbeInterval = 10000L)
         val stats = SearchStatsSink()
-        for (variable in 0..2) assertNull(session.boolValue(variable))
+        for (variable in 0..3) assertNull(session.boolValue(variable))
         assertTrue(pass.optionalWorkDue(0L, params))
         pass.run(session, params, stats)
         val work = session.work
         pass.run(session, params, stats)
         assertEquals(work, session.work)
-        assertEquals(0L, stats.inprocessProbes)
+        assertEquals(1L, stats.inprocessProbes)
+        assertFalse(pass.optionalWorkDue(9999L, params))
 
-        session.addLearnedClause(Clause(intArrayOf(1, 2, 4)), 3)
-        assertTrue(pass.optionalWorkDue(0L, params))
+        session.addLearnedClause(Clause(intArrayOf(3, 4, 6)), 3)
+        assertTrue(pass.optionalWorkDue(10000L, params))
         pass.run(session, params, stats)
+
+        assertEquals(2L, stats.inprocessProbes)
+        assertEquals(false, session.boolValue(1))
+        assertTrue(session.learnedLifecycle().getValue("learningClauseConsumed") > 0L)
+        assertFalse(pass.optionalWorkDue(19999L, params))
+        assertTrue(pass.optionalWorkDue(20000L, params))
+    }
+
+    @Test
+    fun `General admission should preserve useful initial probing without binary hints`() {
+        val source = Problem(3, 0, emptyArray(), arrayOf<Factor>(
+            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(0, 2, 4), PbOp.LE, 1),
+            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(1, 2, 4), PbOp.GE, 2),
+        ))
+        val session = PropagationSession(source.bake(), nativeSat = false)
+        val stats = SearchStatsSink()
+
+        RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1,
+            rootProbeImplications = false, rootProbeGeneralGate = true), stats)
 
         assertEquals(1L, stats.inprocessProbes)
         assertEquals(false, session.boolValue(0))
         assertTrue(session.learnedLifecycle().getValue("learningClauseConsumed") > 0L)
-        assertFalse(pass.optionalWorkDue(9999L, params))
-        assertTrue(pass.optionalWorkDue(10000L, params))
+        assertEquals(0, session.decisionLevel)
+    }
+
+    @Test
+    fun `General admission should retain its exploratory batch when a slice is unfunded`() {
+        val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = false)
+        val stats = SearchStatsSink()
+        val pass = RootProbingPass()
+        val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false, rootProbeGeneralGate = true)
+
+        pass.run(session, params, stats, containingWork = 0L)
+        assertEquals(0L, stats.inprocessProbes)
+        pass.run(session, params, stats)
+
+        assertEquals(1L, stats.inprocessProbes)
+        assertEquals(0, session.decisionLevel)
+    }
+
+    @Test
+    fun `scope reset should renew General exploratory probing`() {
+        val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = false)
+        val stats = SearchStatsSink()
+        val pass = RootProbingPass()
+        val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false, rootProbeGeneralGate = true)
+        pass.run(session, params, stats)
+        pass.run(session, params, stats)
+        assertEquals(1L, stats.inprocessProbes)
+
+        pass.reset()
+        pass.run(session, params, stats)
+
+        assertEquals(2L, stats.inprocessProbes)
+        assertEquals(0, session.decisionLevel)
     }
 
     @Test

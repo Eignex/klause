@@ -308,6 +308,7 @@ internal class RootProbingPass : InprocessingPass {
     private var offeredWork = 0L
     private var lastProbeWork = -1L
     private var learnedBinarySeen = false
+    private var generalExplored = false
     private val implications = RootProbeImplications()
     override val spending = InprocessingSpending(InprocessingKind.Probe)
 
@@ -333,6 +334,7 @@ internal class RootProbingPass : InprocessingPass {
         offeredWork = 0L
         lastProbeWork = -1L
         learnedBinarySeen = false
+        generalExplored = false
         literalCursor = 0L
         endpointCursor = 0L
         preferEndpoint = false
@@ -346,7 +348,7 @@ internal class RootProbingPass : InprocessingPass {
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
         sample.ownedReferences(this, if (neighborhood == null) 1L else 2L, protected)
-        sample.owned(this, 2L * Long.SIZE_BYTES + 1L, protected)
+        sample.owned(this, 2L * Long.SIZE_BYTES + 2L, protected)
         implications.retainedMemory(sample, protected)
         neighborhood?.let { sample.owned(it, it.size.toLong() * Int.SIZE_BYTES, protected) }
     }
@@ -438,15 +440,17 @@ internal class RootProbingPass : InprocessingPass {
         var endpointsExamined = 0L
         val priorCancelled = session.probeCancelled
         val generalGate = params.rootProbeGeneralGate && !session.usesNativeSat && session.problem.numIntVars == 0
+        val exploreGeneral = generalGate && !generalExplored
         while (attempted < params.rootProbeBatch && examined < minOf(candidates, ROOT_LITERAL_LIMIT.toLong())) {
             val rootPins = session.explanationState.boolPinOrder.size
             val withoutRootSignal = rootPins == 0 &&
                 !session.explanationState.hasBinaryClauses && !learnedBinarySeen
             val binariesOnly = params.rootProbeBinaryGate && session.usesNativeSat && withoutRootSignal
-            val neighborhoodOnly = binariesOnly || (generalGate && withoutRootSignal)
+            val neighborhoodOnly = binariesOnly || (generalGate && !exploreGeneral && withoutRootSignal)
             if (generalGate) {
                 budget.note(when {
                     rootPins > 0 -> "GeneralRootFacts"
+                    withoutRootSignal && exploreGeneral -> "GeneralExploration"
                     withoutRootSignal -> "GeneralNeighborhoodOnly"
                     else -> "GeneralBinaryHint"
                 })
@@ -510,6 +514,7 @@ internal class RootProbingPass : InprocessingPass {
                 implications.reserve(params, budget)
             val pins = session.explanationState.boolPinOrder.size
             attempted++
+            if (exploreGeneral && withoutRootSignal) generalExplored = true
             lastProbeWork = offeredWork
             budget.note("Eligible")
             budget.probe()
