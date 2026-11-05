@@ -22,8 +22,8 @@ import com.eignex.klause.lp.engine.remapSources
 import com.eignex.klause.lp.relaxation.CutColumnBinding
 import com.eignex.klause.lp.relaxation.CutColumnLayout
 import com.eignex.klause.lp.relaxation.CutSourceMap
-import com.eignex.klause.lp.relaxation.layoutFor
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.layoutFor
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.BIG_ZERO
@@ -187,7 +187,8 @@ internal class SourceCut(
     val family: CutFamily = provenance.family,
 ) {
     internal val preparationExtent: Long get() = provenance.storageUnits + expression.storageUnits + 1L
-    internal val projectedPreparationUnits: Long get() = SourceCutPreparation.STORAGE_UNITS + expression.storageUnits + 8L
+    internal val projectedPreparationUnits: Long
+        get() = SourceCutPreparation.STORAGE_UNITS + expression.storageUnits + 8L
 
     val key: String by lazy(LazyThreadSafetyMode.PUBLICATION) {
         val definitions = provenance.auxiliaryDefinitions

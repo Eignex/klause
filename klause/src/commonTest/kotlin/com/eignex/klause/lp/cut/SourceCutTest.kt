@@ -296,7 +296,8 @@ class SourceCutTest {
     fun `projected rows should require every current conditional premise`() {
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
         val guards = listOf(CutPremise.Bound(expression, true, BigFraction.ONE), CutPremise.Literal(1),
-            CutPremise.Excluded(x, BigFraction.ofLong(2)), CutPremise.ObjectiveCutoff(expression, BigFraction.ofLong(5)))
+            CutPremise.Excluded(x, BigFraction.ofLong(2)),
+            CutPremise.ObjectiveCutoff(expression, BigFraction.ofLong(5)))
         val facts = listOf(CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
             CutProofFact(CutPremise.Integral(expression), true)) + guards.map { CutProofFact(it, false) }
         val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0, facts,

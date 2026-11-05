@@ -6,8 +6,8 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.relaxation.CutColumnBinding
 import com.eignex.klause.lp.relaxation.CutColumnLayout
 import com.eignex.klause.lp.relaxation.CutSourceMap
-import com.eignex.klause.lp.relaxation.layoutFor
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.layoutFor
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.MutableIntLongMap
@@ -193,7 +193,9 @@ internal class CutPool(
         if (prepareSources && cancellation()) return null
         if (result is CutMapping.Mapped) {
             entry.mappedOnce = true
-            if (prepared != null) observe(source.family, if (prepared.projection) "PROJECTION" else "PREPARATION", "REUSED")
+            if (prepared != null) {
+                observe(source.family, if (prepared.projection) "PROJECTION" else "PREPARATION", "REUSED")
+            }
         }
         return result
     }
@@ -224,7 +226,8 @@ internal class CutPool(
         preparationStorageUnits -= prepared.storageUnits
         entry.preparation = null
         if (prepared.supportsProjection) projectionCandidates--
-        observe(entry.source?.family ?: CutFamily.UNSPECIFIED, if (prepared.projection) "PROJECTION" else "PREPARATION", "RETIRED")
+        observe(entry.source?.family ?: CutFamily.UNSPECIFIED,
+            if (prepared.projection) "PROJECTION" else "PREPARATION", "RETIRED")
         if (projectionCandidates == 0) releaseColumnLayout()
     }
 

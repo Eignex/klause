@@ -36,7 +36,7 @@ internal class CutColumnLayout private constructor(private val kinds: IntArray, 
 
     companion object {
         private fun canonical(column: CutColumnSource?): Boolean = column == null ||
-            column.scale == BigFraction.ONE && column.offset.isZero
+            (column.scale == BigFraction.ONE && column.offset.isZero)
 
         fun capture(
             map: CutSourceMap,

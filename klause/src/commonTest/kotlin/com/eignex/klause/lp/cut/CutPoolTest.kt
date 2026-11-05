@@ -97,7 +97,10 @@ class CutPoolTest {
         var work = 0L
         val events = ArrayList<Pair<String, String>>()
         val pool = CutPool(prepareSources = true, cancellation = Cancellation { cancelled },
-            onPreparationWork = { work += it; if (cancelProjection && it >= source.projectedPreparationUnits) cancelled = true },
+            onPreparationWork = {
+                work += it
+                if (cancelProjection && it >= source.projectedPreparationUnits) cancelled = true
+            },
             observe = { _, stage, outcome -> events.add(stage to outcome) })
         assertTrue(pool.add(source, map))
         repeat(2) { pool.remap(map) }
