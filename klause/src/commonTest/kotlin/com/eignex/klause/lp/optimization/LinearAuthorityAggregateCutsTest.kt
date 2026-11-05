@@ -100,7 +100,7 @@ class LinearAuthorityAggregateCutsTest {
         val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
             authority.capture = capture
 
-            authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, null)
+            authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, BigFraction.ZERO)
         }
 
         assertTrue(capture.records.first().cuts.isEmpty())
@@ -120,7 +120,7 @@ class LinearAuthorityAggregateCutsTest {
         val budget = SourceLpBudget(maxOperations = 1)
 
         val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
-            authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, null)
+            authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, BigFraction.ZERO)
         }
 
         assertEquals(1, budget.operations)
@@ -128,6 +128,32 @@ class LinearAuthorityAggregateCutsTest {
             assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
         assertEquals(SourceEvidenceCheck.Checked,
             SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+    }
+
+    @Test
+    fun `point generated discovery should wait for an incumbent`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right)),
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+        val budget = SourceLpBudget()
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            val deferred = authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, null)
+
+            assertEquals(1, budget.operations)
+            assertNull(authority.cutObservations()["numericalCutAggregatePairAttempts"])
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal()),
+                assertIs<SourceClaim.Bound>(assertNotNull(deferred.bound).claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(deferred.bound)))
+
+            val result = authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, BigFraction.ZERO)
+
+            assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+            assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+        }
     }
 
     @Test

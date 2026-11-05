@@ -157,6 +157,7 @@ internal class LinearAuthorityPointCuts(
         cancellation: Cancellation,
         adoptCurrent: Boolean = false,
         usefulnessOpportunity: Boolean = false,
+        trackSelectedUsefulness: Boolean = false,
     ): Set<Int> {
         adoptedCurrent = false
         if (rows.isEmpty()) return installed
@@ -169,7 +170,7 @@ internal class LinearAuthorityPointCuts(
             managedCurrent = false
             managedInstalled = false
             retainedLayout = false
-            trackUsefulness = false
+            trackUsefulness = trackSelectedUsefulness
             unproductivePoints = 0
             utilityFamilies = emptySet()
             inactiveScans.clear()
@@ -231,6 +232,7 @@ internal class LinearAuthorityPointCuts(
                 managedCurrent = true
                 managedInstalled = true
                 retainedLayout = true
+                utilityFamilies = if (trackUsefulness) visitedFamilies else emptySet()
                 observe("RetainedLayout", rows.size.toLong())
                 observe("AdoptedInstalled", rows.size.toLong())
                 return checked.toSet()
@@ -342,8 +344,10 @@ internal class LinearAuthorityPointCuts(
                     }
                 }
                 if (trackUsefulness) {
-                    unproductivePoints = if (usefulnessOpportunity) minOf(4, unproductivePoints + 1) else 0
-                    if (usefulnessOpportunity) observe("UsefulnessOpportunities")
+                    utilityFamilies = visitedFamilies
+                    val opportunity = usefulnessOpportunity && installed.isNotEmpty()
+                    unproductivePoints = if (opportunity) minOf(4, unproductivePoints + 1) else 0
+                    if (opportunity) observe("UsefulnessOpportunities")
                 }
                 val unproductive = trackUsefulness && unproductivePoints >= 4
                 val expired = if (unproductive) installed else observedInactive.filterValues { it >= 4 }.keys
@@ -359,6 +363,7 @@ internal class LinearAuthorityPointCuts(
                     utilityFamilies = emptySet()
                     observe("UnproductiveRecipeRetired")
                     for (id in expired) onCut(rows[id].family, "POINT_UNPRODUCTIVE_RETIRED", 1L)
+                    return emptySet()
                 }
                 cooldown = if (managedInstalled) 0 else 7
             }
