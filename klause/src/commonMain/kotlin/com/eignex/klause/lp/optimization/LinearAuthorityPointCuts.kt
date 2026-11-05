@@ -88,6 +88,47 @@ internal class LinearAuthorityPointCuts(
         }
     }
 
+    fun prepareGenerated(
+        rows: List<LinearAuthorityCut>, checked: Set<Int>, cancellation: Cancellation,
+    ): Set<Int> {
+        adoptedCurrent = false
+        if (rows.isEmpty() || rows.size > maximumCuts || checked.size != rows.size) return emptySet()
+        val meter = Meter(cancellation)
+        val visitedFamilies = HashSet<CutFamily>()
+        try {
+            val allocation = 512L + rows.size * 128L
+            if (budget.funding?.remainingAllocation?.let { allocation > it } == true ||
+                !meter.charge(rows.size * 4L + inactiveScans.size, allocation) ||
+                rows.indices.any { it !in checked } || rows.none {
+                    it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR
+                }) return emptySet()
+            val selected = checked.toSet()
+            family = rows
+            cooldown = 0
+            misses = 0
+            retired = false
+            managedCurrent = true
+            managedInstalled = false
+            retainedLayout = true
+            inactiveScans.clear()
+            observe("GeneratedRecipeSelected", selected.size.toLong())
+            for (row in rows) {
+                visitedFamilies.add(row.family)
+                onCut(row.family, "POINT_SELECTED", 1L)
+            }
+            return selected
+        } finally {
+            budget.observe(preparation = meter.work)
+            observe("Work", meter.work)
+            observe("Allocation", meter.allocation)
+            for (family in visitedFamilies) {
+                onCut(family, "POINT_SELECTION_WORK", meter.work)
+                onCut(family, "POINT_SELECTION_ALLOCATION", meter.allocation)
+            }
+            if (meter.limited) observe("WorkLimited")
+        }
+    }
+
     fun select(
         rows: List<LinearAuthorityCut>,
         coordinates: List<SourceCoordinate>,
