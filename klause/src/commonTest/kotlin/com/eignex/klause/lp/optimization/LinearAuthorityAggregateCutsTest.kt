@@ -300,6 +300,29 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `point separation should retain a wide checked cut within its allocation grant`() {
+        val coordinates = (0 until 48).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val first = SourceInequality(coordinates.take(24).associateWith { BigFraction.ofLong(2) } +
+            (real to BigFraction.ONE), BigFraction.ofLong(24))
+        val second = SourceInequality(coordinates.drop(24).associateWith { BigFraction.ofLong(2) } +
+            (real to BigFraction.MINUS_ONE), BigFraction.ofLong(23))
+        val source = SourceProofContext(scope, (coordinates + real).toSet(),
+            linkedMapOf("left" to SourcePremise(first), "right" to SourcePremise(second)))
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(allocation = 45_500L)
+        var allocation = 0L
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            { name, count -> if (name == "AggregateAllocation") allocation += count }, maximumCandidates = 1,
+            limits = limits, point = coordinates.associateWith { 47.0 / 96.0 } + (real to 0.5)).single()
+
+        assertEquals(SourceInequality(coordinates.associateWith { BigFraction.ONE }, BigFraction.ofLong(23)),
+            cut.inequality)
+        assertTrue(allocation <= limits.allocation)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
     fun `point directed pair preparation should retain a later separating proposal before its pool fills`() {
         val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
