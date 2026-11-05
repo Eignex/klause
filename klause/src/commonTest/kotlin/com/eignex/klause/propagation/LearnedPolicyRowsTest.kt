@@ -80,6 +80,7 @@ class LearnedPolicyRowsTest {
     fun `an unfunded cold lookup should preserve metadata for a later grant`() {
         val rows = NativeLearnedMetadata()
         repeat(20_000) { rows.add(it, false, -1, it.toLong() + 1L) }
+        assertEquals(0, rows[65_552, NativeLearnedMetadata.LBD])
         val budget = ReclamationPreparation(0L, 256L, { false }, {})
 
         assertFailsWith<ReclamationPreparation.Deferred> {
