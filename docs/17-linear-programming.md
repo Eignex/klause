@@ -100,7 +100,7 @@ order. A failed match uses selective reconstruction; a source revision alone can
 authorize reuse. The new source binding owns no predecessor snapshot, so repeated
 compatible preparations retain no generation chain.
 
-Complete-index reuse is the default source-preparation policy. Explicit admitted
+Earned selective reuse is the default source-preparation policy. Admitted
 preparation validates row identity and exact bound sides before retaining selective
 metadata and enabling pump assembly reuse. Node engines own their numerical
 component partitions. Ordinary node, primal and shaving consumers
@@ -117,9 +117,11 @@ no more inspection work than those completed builds supplied. Deferred exact col
 debit the consuming LP when materialized; their potential storage remains within the
 262,144-unit ceiling. A failed attempt requires further completed construction
 before retrying; its inspection and replacement record still spend the current
-allowance. Admission work supplies no additional solver grant. Component-owned and
-admitted sparse-trial engines keep their explicit preparation route. LP harvest
-also eagerly prepares definitions for its later engine bake.
+allowance. Admission work supplies no additional solver grant. Numerical recipe and
+repair eligibility ignore the preparation choice in an otherwise unchanged default
+plan. It neither creates an LP owner nor disables an LP-free proof path.
+Component-owned and admitted sparse-trial engines keep their explicit preparation
+route. LP harvest also eagerly prepares definitions for its later engine bake.
 Admitted ordinary consumers compile unary integer bound conditions into source rows.
 The stated source root bounds and the constructed column bounds must both imply a
 condition before the row is omitted. An open required side or a widened constructed
@@ -575,6 +577,19 @@ The record contains only its exact source identity and arithmetic limits. Every
 mapping checks the current model namespace, assumptions, guards, column geometry
 and any derived proof. Changed limits or a different immutable source reject the
 record. Eviction and replacement release it without retaining a prior generation.
+After input retention, a pool can capture one primitive ordered column layout and
+completed source-to-column row projections. The layout records source kinds and
+IDs for canonical unit-scale, zero-offset columns; every remap validates the whole
+layout once against its current immutable source map before any projected row is
+used. A changed layout discards projections and retains their arithmetic-input
+validation. Affine layouts, auxiliary proof definitions and mappings that construct
+a derived proof keep full numerical mapping. Capture, binding, replacement and
+invalidation debit the same LP allowance, with cancellation withholding publication.
+Layouts and row projections share the pool's storage ceiling. Each projected row
+keeps private coefficient buffers and returns a fresh cut with copied arrays;
+source guards and assumptions stay current, and numerical owners normalize rows
+for their own origins and bases. No source map, prior layout chain, witness or
+numerical result is retained by a projection.
 Selection considers efficacy, parallelism,
 orthogonality, age and row caps; separators check actual column integrality, so
 continuous columns decline. Root harvesting caps retained cuts at the original row

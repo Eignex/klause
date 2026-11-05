@@ -4,7 +4,13 @@ set -euo pipefail
 : "${OUT:?lab output directory is required}"
 : "${JAVA_HOME:?lab JDK root is required}"
 source_name="${1:?source fixture is required}"
+recording="${6:-jfr}"
+[[ $# -le 6 && ( "$recording" == jfr || "$recording" == none ) ]] || {
+  echo 'recording must be jfr or none' >&2
+  exit 2
+}
 mkdir -p "$OUT"
+printf '%s\n' "$recording" > "$OUT/recording.txt"
 case "$source_name" in
   cover-2x3|cover-3x3)
     source_argument="$LAB_WORKTREE/klause-bench/smoke-corpus/lp-component-split/$source_name.mps"
@@ -36,15 +42,20 @@ if command -v lscpu >/dev/null; then lscpu > "$OUT/cpu.txt"; fi
 find "$LAB_WORKTREE/klause/build/lp-profile/jvm" -type f -print0 | sort -z | xargs -0 sha256sum > "$OUT/jvm-sha256.txt"
 profile_scopes=()
 if [[ -n "${5:-}" ]]; then profile_scopes=("$5"); fi
+recording_args=()
+if [[ "$recording" == jfr ]]; then
+  recording_args=("-XX:StartFlightRecording=filename=$OUT/profile.jfr,settings=profile,dumponexit=true")
+fi
 profile_status=0
 /usr/bin/time -v -o "$OUT/resources.txt" \
   "${JAVA_HOME:+$JAVA_HOME/bin/}java" -Xmx512m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC \
   --enable-native-access=ALL-UNNAMED --add-modules=jdk.incubator.vector \
-  "-XX:StartFlightRecording=filename=$OUT/profile.jfr,settings=profile,dumponexit=true" \
+  "${recording_args[@]}" \
   -cp "$LAB_WORKTREE/klause/build/lp-profile/jvm/classes:$LAB_WORKTREE/klause/build/lp-profile/jvm/lib/*" \
   com.eignex.klause.bench.profile.LpTemplatePreparationProfile "$source_argument" "$source_hash" \
   "${2:-3}" "${3:-32}" "${4:-standalone}" "${profile_scopes[@]}" || profile_status=$?
 printf '%s\n' "$profile_status" > "$OUT/numerical.exit"
+if [[ "$recording" == none ]]; then exit "$profile_status"; fi
 analysis_status=0
 JAVA_TOOL_OPTIONS='-Xmx512m -XX:ActiveProcessorCount=1 -XX:+UseSerialGC' \
   /usr/bin/time -v -o "$OUT/allocation-analysis-resources.txt" \

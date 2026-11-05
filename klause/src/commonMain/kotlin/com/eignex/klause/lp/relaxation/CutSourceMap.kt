@@ -90,6 +90,7 @@ internal class CutSourceMap(
     }
     val auxiliaryDefinitions: Map<CutSource, CutAuxiliaryDefinition> get() = auxiliarySnapshot.toMap()
     val columns: List<CutColumnSource?> get() = columnSnapshot.toList()
+    val columnCount: Int get() = columnSnapshot.size
     val fixed: Map<CutSource, BigFraction> get() = fixedSnapshot.toMap()
     val assumptions: Set<String> get() = assumptionSnapshot.toSet()
     fun column(index: Int): CutColumnSource? = columnSnapshot.getOrNull(index)

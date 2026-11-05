@@ -1168,7 +1168,7 @@ They require Linux x86_64; the lab supplies `LAB_WORKTREE` and `OUT`.
 |---|---|
 | `lp-lifecycle-profile.sh` | `mps-NAME [repeats] [jvm\|native\|both] [mode] [source-sha256 highs-revision]` |
 | `lp-lifecycle-qualification.sh` | `jvm\|native [repeats]` |
-| `lp-template-preparation-profile.sh` | `cover-2x3\|cover-3x3\|miplib3-p0033\|miplib3-p0201 [repeats] [steps] [standalone\|retained]` |
+| `lp-template-preparation-profile.sh` | `cover-2x3\|cover-3x3\|miplib3-p0033\|miplib3-mod008\|miplib3-p0201 [repeats] [steps] [standalone\|retained] [changes] [jfr\|none]` |
 
 Lifecycle repeats range from one to five and default to three. Available modes are
 `lifecycle`, `claims`, `precision`, `checkpoint`, `checkpoint-feasibility` and
@@ -1181,6 +1181,12 @@ Prepare only the target used by a separate runtime job. Combined preparation lin
 Native before staging JVM profiles. Template preparation profiles use the JVM task.
 
 MIPLIB template profiles also require `:klause-bench:installDist`.
+
+Template changes are comma-separated `cold,unchanged,bound,objective,row,cancel,affine,namespace,finite,origin,guard`;
+omitting them selects all changes. Recording defaults to `jfr`. Use `none` for
+uninstrumented preparation and consuming-LP measurements; `recording.txt` retains
+the choice, and allocation-sample extraction runs only with JFR. Direct lifecycle
+measurements do not establish ordinary CLI source performance or independent source proofs.
 
 The qualification script runs Afiro, Adlittle, Avgas and Blending sequentially in
 `checkpoint-feasibility` mode, retaining one output directory per source. Profile

@@ -3,7 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.bounding.LpConfig
-import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
@@ -498,6 +498,6 @@ internal class PrivateRebuildSatisfaction(
                 problem.rootDeductions is PropagationResult.Implied &&
                 params.assumptions.isEmpty && params.assumptions.deductions.isEmpty &&
                 params.componentFactory == null && params.lpConfig in listOf(null, LpConfig.OFF) &&
-                params.lpPlan == LpPlan()
+                params.lpPlan.hasDefaultNumericalSettings()
     }
 }

@@ -3,8 +3,11 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.relaxation.CutColumnBinding
+import com.eignex.klause.lp.relaxation.CutColumnLayout
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.layoutFor
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.MutableIntLongMap
@@ -29,6 +32,8 @@ internal class CutPool(
     private val seen = HashSet<Any>()
     private val entries = ArrayList<Entry>()
     private val cosineIndex = MutableIntLongMap()
+    private var columnLayout: CutColumnLayout? = null
+    private var projectionCandidates = 0
     var preparationStorageUnits: Long = 0L
         private set
 
@@ -123,9 +128,10 @@ internal class CutPool(
 
     fun remap(map: CutSourceMap): Map<CutMappingDecline, Int> {
         val declines = HashMap<CutMappingDecline, Int>()
+        val columns = bindColumns(map)
         for (entry in entries) {
             val wasActive = entry.cut != null
-            val mapped = remapEntry(entry, map)
+            val mapped = remapEntry(entry, map, columns)
             entry.cut = mapped?.orNull()
             val family = entry.source?.family ?: CutFamily.UNSPECIFIED
             observe(family, "REMAP", when (mapped) {
@@ -140,7 +146,34 @@ internal class CutPool(
         return declines.toMap()
     }
 
-    private fun remapEntry(entry: Entry, map: CutSourceMap): CutMapping<Cut>? {
+    private fun bindColumns(map: CutSourceMap): CutColumnBinding? {
+        if (!prepareSources || projectionCandidates == 0 || cancellation()) return null
+        columnLayout?.let { previous ->
+            val bound = previous.bind(map, cancellation, onPreparationWork)
+            if (bound != null || cancellation()) return bound
+            for (entry in entries) {
+                val prepared = entry.preparation ?: continue
+                if (!prepared.projection) continue
+                onPreparationWork(1L)
+                val input = prepared.withoutProjection()
+                preparationStorageUnits += input.storageUnits - prepared.storageUnits
+                entry.preparation = input
+                observe(entry.source?.family ?: CutFamily.UNSPECIFIED, "PROJECTION", "INVALIDATED")
+            }
+            releaseColumnLayout()
+            return null
+        }
+        val bound = CutColumnLayout.capture(map, MAX_PREPARATION_UNITS - preparationStorageUnits,
+            cancellation, onPreparationWork) ?: return null
+        val layout = requireNotNull(bound.layoutFor(map))
+        if (layout.storageUnits > MAX_PREPARATION_UNITS - preparationStorageUnits || cancellation()) return null
+        columnLayout = layout
+        preparationStorageUnits += layout.storageUnits
+        observe(CutFamily.UNSPECIFIED, "PROJECTION_LAYOUT", "RETAINED")
+        return bound
+    }
+
+    private fun remapEntry(entry: Entry, map: CutSourceMap, columns: CutColumnBinding?): CutMapping<Cut>? {
         val source = entry.source ?: return CutMapping.Declined(CutMappingDecline.MISSING_PROVENANCE)
         if (prepareSources && cancellation()) return null
         val prepared = entry.preparation
@@ -148,29 +181,43 @@ internal class CutPool(
             onPreparationWork(1L)
             if (cancellation()) return null
         }
-        val eligible = prepareSources && entry.mappedOnce && prepared == null
-        val room = preparationStorageUnits <= MAX_PREPARATION_UNITS - SourceCutPreparation.STORAGE_UNITS
-        val capture: ((SourceCutPreparation) -> Unit)? = if (eligible && room &&
-            source.preparationExtent >= SourceCutPreparation.STORAGE_UNITS
-        ) {
-            { next ->
-                onPreparationWork(next.storageUnits)
-                if (!cancellation() && next.storageUnits <= MAX_PREPARATION_UNITS - preparationStorageUnits) {
-                    entry.preparation = next
-                    preparationStorageUnits += next.storageUnits
-                    observe(source.family, "PREPARATION", "RETAINED")
-                } else {
-                    observe(source.family, "PREPARATION", "CANCELLED")
-                }
-            }
+        val upgrade = columns != null && prepared?.supportsProjection == true && !prepared.projection
+        val units = if (upgrade) source.projectedPreparationUnits else SourceCutPreparation.STORAGE_UNITS
+        val eligible = prepareSources && entry.mappedOnce && (prepared == null || upgrade)
+        val room = units <= MAX_PREPARATION_UNITS - preparationStorageUnits + (prepared?.storageUnits ?: 0L)
+        val capture: ((SourceCutPreparation) -> Unit)? = if (eligible && room && source.preparationExtent >= units) {
+            { next -> retainPreparation(entry, prepared, next) }
         } else null
-        val result = source.toCut(map, preparation = prepared, onPrepared = capture)
+        val binding = if (prepared?.projection == true || upgrade) columns else null
+        val result = source.toCut(map, preparation = prepared, onPrepared = capture, columnBinding = binding)
         if (prepareSources && cancellation()) return null
         if (result is CutMapping.Mapped) {
             entry.mappedOnce = true
-            if (prepared != null) observe(source.family, "PREPARATION", "REUSED")
+            if (prepared != null) {
+                observe(source.family, if (prepared.projection) "PROJECTION" else "PREPARATION", "REUSED")
+            }
         }
         return result
+    }
+
+    private fun retainPreparation(entry: Entry, previous: SourceCutPreparation?, next: SourceCutPreparation) {
+        val family = entry.source?.family ?: CutFamily.UNSPECIFIED
+        onPreparationWork(next.storageUnits)
+        if (previous != null) onPreparationWork(1L)
+        val available = MAX_PREPARATION_UNITS - preparationStorageUnits + (previous?.storageUnits ?: 0L)
+        if (cancellation() || next.storageUnits > available) {
+            observe(family, if (next.projection) "PROJECTION" else "PREPARATION", "CANCELLED")
+            return
+        }
+        if (previous == null) {
+            if (next.supportsProjection) projectionCandidates++
+        } else {
+            preparationStorageUnits -= previous.storageUnits
+            observe(family, if (previous.projection) "PROJECTION" else "PREPARATION", "RETIRED")
+        }
+        entry.preparation = next
+        preparationStorageUnits += next.storageUnits
+        observe(family, if (next.projection) "PROJECTION" else "PREPARATION", "RETAINED")
     }
 
     private fun releasePreparation(entry: Entry) {
@@ -178,7 +225,18 @@ internal class CutPool(
         onPreparationWork(1L)
         preparationStorageUnits -= prepared.storageUnits
         entry.preparation = null
-        observe(entry.source?.family ?: CutFamily.UNSPECIFIED, "PREPARATION", "RETIRED")
+        if (prepared.supportsProjection) projectionCandidates--
+        observe(entry.source?.family ?: CutFamily.UNSPECIFIED,
+            if (prepared.projection) "PROJECTION" else "PREPARATION", "RETIRED")
+        if (projectionCandidates == 0) releaseColumnLayout()
+    }
+
+    private fun releaseColumnLayout() {
+        val layout = columnLayout ?: return
+        onPreparationWork(1L)
+        preparationStorageUnits -= layout.storageUnits
+        columnLayout = null
+        observe(CutFamily.UNSPECIFIED, "PROJECTION_LAYOUT", "RETIRED")
     }
 
     fun exportGlobalCuts(): List<SharedCut> = entries.mapNotNull { entry ->

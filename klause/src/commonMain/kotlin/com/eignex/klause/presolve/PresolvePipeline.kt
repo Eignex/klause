@@ -119,7 +119,7 @@ object PresolvePipeline {
         presolveBudget: PresolveBudget? = null,
         zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
         randomSeed: Long? = null,
-        sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
+        sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
     ): PresolveOutcome = run(
         prepareSource(
             problem, config, linearObjective, solutionSetSensitive, cancellation, presolveBudget, finiteLane = true,
@@ -150,7 +150,7 @@ object PresolvePipeline {
         zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
         randomSeed: Long? = null,
         projections: PreparedFactorProjections? = null,
-        sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
+        sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
     ): PresolveOutcome {
         val problem = prepared.source
         val sourceProblem = prepared.problem

@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ResumableSolve
@@ -18,7 +19,12 @@ internal class BooleanProofRecipe(
 ) {
     val problem: BakedProblem get() = solver.problem
 
+    private companion object {
+        val defaultNumericalPlan = LpPlan()
+    }
+
     private fun normalized(): BacktrackParams = params.copy(
+        lpPlan = if (params.lpPlan.hasDefaultNumericalSettings()) defaultNumericalPlan else params.lpPlan,
         randomSeed = null, nodeBudget = null, cancellation = Cancellation.Never, assumptions = Assumptions.None,
         onEvent = null, clauseExchange = null, cutExchange = null, nativeSat = params.nativeSat ?: true,
     )
@@ -35,7 +41,7 @@ internal class BooleanProofRecipe(
     fun matches(other: BooleanProofRecipe): Boolean = normalized() == other.normalized()
 
     fun conditioned(): BacktrackParams? {
-        if (params.lpConfig != null || params.lpPlan != LpPlan()) return null
+        if (params.lpConfig != null || !params.lpPlan.hasDefaultNumericalSettings()) return null
         if (params.cutExchange != null && params.cutExchange !is PoolCutExchange) return null
         val exchange = params.clauseExchange
         if (exchange != null && exchange !is PoolClauseExchange) return null

@@ -413,7 +413,7 @@ data class LpPlan(
     /** Retain immutable component owners for node bounds and dispatch tableau cuts within each block. */
     val componentOwnership: Boolean = false,
     /** Source-template retention and admission, independent of the enabled numerical techniques. */
-    val sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
+    val sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
 ) {
     /**
      * Whether Gomory integrality cuts actually run: [gomory] permits them, [cuts] admits the
@@ -425,4 +425,11 @@ data class LpPlan(
 
     /** Whether MIR cuts actually run, on the same terms as [gomoryEnabled]. */
     val mirEnabled: Boolean get() = cuts && mir
+}
+
+internal fun LpPlan.hasDefaultNumericalSettings(): Boolean =
+    this == DefaultNumericalPlans.byPreparation[sourcePreparation.ordinal]
+
+private object DefaultNumericalPlans {
+    val byPreparation = LpSourcePreparation.entries.map { LpPlan(sourcePreparation = it) }
 }
