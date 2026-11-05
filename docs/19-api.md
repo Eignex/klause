@@ -122,6 +122,9 @@ Coverage is defined by [nonlinear integer](16-nonlinear-arithmetic.md),
 
 ## Compatibility and implementation surfaces
 
+The library declares JVM, Linux x64, Linux ARM64 and macOS ARM64 targets for every
+build. Its Native ABI reference covers all three Native targets.
+
 The JVM and Kotlin/Native API dumps record published descriptors, but publication
 alone does not make a type an extension contract. Unlisted mechanisms in the packages
 above are implementation APIs.

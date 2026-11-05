@@ -27,19 +27,15 @@ eignexPublish {
 // the platforms where a solver's startup time and thread use are the point. JavaScript, Wasm, Windows
 // Native and Apple mobile are not published.
 //
-// Default is host-only (jvm + linuxX64): the targets whose tests run on the linux runner, so
-// local build/check and CI use the same target set. The release builds every target via -Ptargets.full.
-val fullTargets = providers.gradleProperty("targets.full").isPresent
+// A stable target set keeps ABI validation aligned with the published library surface.
 
 val skemaPin = "0.4.0"
 
 kotlin {
     jvm()
     linuxX64()
-    if (fullTargets) {
-        linuxArm64()
-        macosArm64()
-    }
+    linuxArm64()
+    macosArm64()
     applyDefaultHierarchyTemplate()
 
     sourceSets {
