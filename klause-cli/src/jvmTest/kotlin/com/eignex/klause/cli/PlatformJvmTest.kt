@@ -1,12 +1,28 @@
 package com.eignex.klause.cli
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PlatformJvmTest {
 
     private val transientBytes = 16 * 1024 * 1024
+
+    @Test
+    fun `elapsed clock milliseconds should discard a fractional remainder`() {
+        assertEquals(1L, elapsedMonotonicMillis(17L, 1_000_026L))
+    }
+
+    @Test
+    fun `a short clock interval should survive a wrapped nano reading`() {
+        assertEquals(1L, elapsedMonotonicMillis(Long.MAX_VALUE - 500_000L, Long.MIN_VALUE + 499_999L))
+    }
+
+    @Test
+    fun `a negative clock interval should truncate toward zero`() {
+        assertEquals(0L, elapsedMonotonicMillis(1_000_000L, 1L))
+    }
 
     @Test
     fun `the jvm heap sample should report a live figure bounded by what is committed`() {

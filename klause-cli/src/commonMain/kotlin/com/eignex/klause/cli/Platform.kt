@@ -3,7 +3,6 @@ package com.eignex.klause.cli
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.readText
-import kotlin.time.TimeSource
 
 // Platform seams for the CLI: the complete list of what differs between the JVM
 // distribution and the native executables. Everything else is common code.
@@ -54,10 +53,8 @@ internal inline fun <T> CharSource.useSource(read: (CharSource) -> T): T =
 /** Read [path] fully into a [String] through [openFileSource], for a consumer that needs the whole text. */
 internal fun readTextFile(path: String): String = openFileSource(path).useSource { it.readText() }
 
-private val timeOrigin = TimeSource.Monotonic.markNow()
-
 /** Monotonic clock for deadlines — only ever compared against itself. */
-internal fun nowMillis(): Long = timeOrigin.elapsedNow().inWholeMilliseconds
+internal expect fun nowMillis(): Long
 
 internal fun fileName(path: String): String = path.substringAfterLast('/').substringAfterLast('\\')
 

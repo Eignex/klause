@@ -34,6 +34,7 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
     private var afterCleanup = Stage.Collect
     var passes = 0L
         private set
+    val hasPending: Boolean get() = read > 0 || stage != Stage.Collect
     val modeledBytes: Long get() = 100L
     val primitiveBytes: Long get() = 68L
 
