@@ -205,8 +205,10 @@ internal class LinearAuthority(
             }
             if (base.paused || base.evidence != null || base.incumbent != null || cancellation()) return base
             val value = ((base.bound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
-            val usefulnessOpportunity = retireUnproductive && incumbent != null && (value == null ||
-                if (source.scope.objective?.sense == ObjectiveSense.MAXIMIZE) value > incumbent else value < incumbent)
+            if (incumbent != null && value != null &&
+                if (source.scope.objective?.sense == ObjectiveSense.MAXIMIZE) value <= incumbent else value >= incumbent
+            ) return base
+            val usefulnessOpportunity = retireUnproductive && incumbent != null
             val observed = point ?: run {
                 policy.observe("PointUnavailable")
                 return base
