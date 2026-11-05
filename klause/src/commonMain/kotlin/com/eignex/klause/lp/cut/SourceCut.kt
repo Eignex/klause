@@ -93,12 +93,14 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
 
     fun accepts(proof: CutProvenance): Boolean {
         var remaining = terms
+        val definitions = proof.auxiliaryDefinitions
         fun expression(value: CutExpression): Boolean {
-            remaining -= value.terms.size + 1
-            return remaining >= 0 && accepts(value.constant) && value.terms.values.all { accepts(it) } &&
-                value.terms.keys.all { it.kind != CutSourceKind.AUXILIARY || it in proof.auxiliaryDefinitions }
+            val coefficients = value.terms
+            remaining -= coefficients.size + 1
+            return remaining >= 0 && accepts(value.constant) && coefficients.values.all { accepts(it) } &&
+                coefficients.keys.all { it.kind != CutSourceKind.AUXILIARY || it in definitions }
         }
-        for ((source, definition) in proof.auxiliaryDefinitions) {
+        for ((source, definition) in definitions) {
             remaining -= definition.role.size + definition.required.size + 1
             if (remaining < 0 || source.kind != CutSourceKind.AUXILIARY || definition.role.isEmpty() ||
                 definition.required.size % 2 != 0 || definition.presentUpper < 0L ||
@@ -118,7 +120,7 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
                 is CutPremise.Integral -> expression(premise.expression)
 
                 is CutPremise.Fixed -> accepts(premise.value) &&
-                    (premise.source.kind != CutSourceKind.AUXILIARY || premise.source in proof.auxiliaryDefinitions)
+                    (premise.source.kind != CutSourceKind.AUXILIARY || premise.source in definitions)
 
                 is CutPremise.Excluded -> premise.source.kind == CutSourceKind.INTEGER && accepts(premise.value)
 
@@ -252,7 +254,7 @@ internal class SourceCut(
             provenance.auxiliaryDefinitions,
             family,
         )
-        if (!limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
+        if (proof !== original && !limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         return CutMapping.Mapped(
             Cut(
                 values.keys.toIntArray(),

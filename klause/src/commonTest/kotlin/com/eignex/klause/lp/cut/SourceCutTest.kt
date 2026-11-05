@@ -237,6 +237,21 @@ class SourceCutTest {
     }
 
     @Test
+    fun `synthesized conclusion should spend the proof expansion budget`() {
+        val source = SourceCut(
+            CutExpression(mapOf(x to BigFraction.ONE)),
+            Relation.LE,
+            BigFraction.ONE,
+            CutProvenance(modelToken, 0, emptyList()),
+        )
+        val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
+
+        val result = source.toCut(map, CutMappingLimits(terms = 1))
+
+        assertEquals(CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT), result)
+    }
+
+    @Test
     fun `guarded parent row should stay guarded through real assembly and tableau generation`() {
         val problem = Problem(
             0,
