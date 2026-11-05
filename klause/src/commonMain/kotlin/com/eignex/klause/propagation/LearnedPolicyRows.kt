@@ -91,7 +91,13 @@ internal class LearnedPolicyRows(
     }
 
     // Isolate cold traversal so JVM inlining can focus on cache hits.
-    private fun lookupPage(index: Int): Page? = locate(index, ::chargeLookup)
+    private fun lookupPage(index: Int): Page? {
+        val sample = observation
+        if (sample != null) return locate(index) { units -> repeat(units.toInt()) { sample.step() } }
+        val active = budget
+        if (active != null) return locate(index) { units -> active.visit(units) }
+        return locate(index) { units -> state?.let { it.work += units } }
+    }
 
     private fun allocationWork(page: Page?, required: Int): Long = when {
         page == null -> capacityFor(required) * rowWork * 2L + 8L
