@@ -1637,7 +1637,9 @@ definitions retain its numerical layout. Changed row layouts invalidate numerica
 cursors through the ordinary compatibility checks. Changed activity invalidates completed guidance before
 reusing the owner and its basis.
 Completed base bounds survive a paused or declined separation round. Checked base
-incumbents and terminals bypass extra separation. The ordinary default activates
+incumbents and terminals bypass extra separation. A completed checked base bound
+that closes the supplied incumbent also returns before selection or retirement work.
+The ordinary default activates
 all accepted source cuts.
 
 ### Tolerance recovery

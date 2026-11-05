@@ -152,6 +152,44 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `a closing base bound should return before generated cut scoring`() {
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
+            "lower x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "lower y" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        for (sense in listOf(ObjectiveSense.MINIMIZE, ObjectiveSense.MAXIMIZE)) {
+            val direction = if (sense == ObjectiveSense.MAXIMIZE) BigFraction.ONE else BigFraction.MINUS_ONE
+            val expected = direction * BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()
+            val source = SourceProofContext(scope.copy(objective = SourceObjective("triangle", sense)),
+                setOf(x, y, real) + triangle, premises, triangle.associateWith { direction } +
+                    mapOf(x to direction.negated(), y to direction.negated()))
+            for (cutoff in listOf(null, expected)) {
+                val budget = SourceLpBudget()
+                LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+                    val result = authority.advanceWithGeneratedCutUse(source, Cancellation.Never, cutoff)
+
+                    assertEquals(SourceValue.Rational(expected),
+                        assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                    assertNull(result.evidence)
+                    assertNull(result.incumbent)
+                    assertTrue(result.fractional.isNotEmpty())
+                    assertEquals(1, budget.operations)
+                    val scoring = authority.cutObservations()["numericalCutSelectionWork"]
+                    if (cutoff == null) assertTrue(assertNotNull(scoring) > 0L) else assertNull(scoring)
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+                }
+            }
+        }
+    }
+
+    @Test
     fun `retiring a fully selected aggregate family should preserve its numerical owner`() {
         val residual = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
