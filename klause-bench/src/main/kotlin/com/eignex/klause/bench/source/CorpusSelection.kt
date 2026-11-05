@@ -132,6 +132,19 @@ internal object CorpusSelection {
                     .distinctBy { it.name }
                     .toList()
             }
+
+            fun discover(paths: List<String>): List<Discovered> {
+                val prefix = subDir.trim('/').let { if (it.isEmpty()) "" else "$it/" }
+                return paths.asSequence()
+                    .filter { it.startsWith(prefix) && CorpusFiles.formatExtension(File(it)) == ext }
+                    .sortedBy { CorpusFiles.plainPath(it) }
+                    .map { path ->
+                        val name = CorpusFiles.plainPath(path.removePrefix(prefix)).removeSuffix(".$ext")
+                        Discovered(name, path, familyKey = familyOf(name))
+                    }
+                    .distinctBy { it.name }
+                    .toList()
+            }
         }
     }
 
@@ -146,8 +159,14 @@ internal object CorpusSelection {
         /** Resolve an instance's oracle from its resolved instance [File] (e.g. parse directives). */
         expected: (File) -> Expected = { Expected.Unknown },
     ): List<ProblemRef> {
-        val root = CorpusFetcher.ensure(collection)
-        val discovered = layout.discover(root)
+        val planning = CommittedCorpusInputs.isPlanning
+        val root = if (planning) File(CorpusFetcher.cacheRoot, collection.id) else CorpusFetcher.ensure(collection)
+        val discovered = if (planning) {
+            require(format == Format.DIMACS && layout is Layout.Flat) { "Planning requires flat DIMACS metadata" }
+            layout.discover(CommittedCorpusInputs.entries(collection).map { it.path })
+        } else {
+            layout.discover(root)
+        }
         // Reject empty discovery so a mismatched archive layout cannot look like a completed measurement.
         require(discovered.isNotEmpty()) {
             "corpus '${collection.id}' yielded no instances under '$layout' in $root: " +
@@ -160,7 +179,7 @@ internal object CorpusSelection {
                 format = format,
                 source = ProblemSource.External(collection, d.mznRelPath),
                 category = category,
-                expected = expected(File(root, d.mznRelPath)),
+                expected = if (planning) Expected.Unknown else expected(File(root, d.mznRelPath)),
                 data = d.dznRelPath?.let { ProblemSource.External(collection, it) },
                 license = collection.license,
                 family = d.family,
