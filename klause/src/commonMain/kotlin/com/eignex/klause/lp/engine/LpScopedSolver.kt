@@ -62,6 +62,12 @@ internal class LpScopedSolver(
         override val workScheduled: Boolean get() = floatInvocation.workScheduled()
     }
     val floatPaused: Boolean get() = pendingFloat != null
+    val pausedTrialProgress: Map<String, Long>
+        get() {
+            requireAvailable()
+            if (closed || pendingFloat == null) return emptyMap()
+            return solver?.trialProgress.orEmpty()
+        }
     val floatFundingStopped: Boolean get() = floatPaused &&
         (lastFloatTermination == LpFloatTermination.WORK || lastFloatTermination == LpFloatTermination.PIVOTS)
     private var closed = false
@@ -138,6 +144,13 @@ internal class LpScopedSolver(
         }
         solver = prepared(state, token, workBudget = available)?.first ?: return false
         return true
+    }
+
+    fun pausedDualProposal(token: Cancellation): DoubleArray? {
+        requireAvailable()
+        val pending = pendingFloat ?: return null
+        if (closed || pending.cursor.isAdvancing || token()) return null
+        return solver?.pausedDualProposal(token)
     }
 
     fun partialPrimalGuidance(token: Cancellation): LpPrimalGuidance? {
@@ -298,6 +311,56 @@ internal class LpScopedSolver(
         if (token()) return null
         lastResult = certified
         return certified
+    }
+
+    fun directionalGains(
+        pointModel: LpModel,
+        columns: IntArray,
+        splits: LongArray,
+        allowance: Long,
+        token: Cancellation,
+        observe: (LpProbeMetrics) -> Unit,
+    ): List<LpDirectionalGain>? {
+        val reason = when {
+            token() -> LpProbeDecline.CANCELLED
+            closed -> LpProbeDecline.OWNER
+            workingActive || pendingFloat != null -> LpProbeDecline.BUSY
+            state !== pointModel.exactState -> LpProbeDecline.STALE_POINT
+            solver !is LpDirectionalProbeSolver -> LpProbeDecline.OWNER
+            else -> null
+        }
+        if (reason != null) {
+            observe(LpProbeMetrics(0L, 0L, 0, reason))
+            return null
+        }
+        return (solver as LpDirectionalProbeSolver).directionalGains(
+            pointModel, columns, splits, allowance, token, observe,
+        )
+    }
+
+    fun directionalValues(
+        source: LpProbeSource,
+        columns: IntArray,
+        splits: LongArray,
+        allowance: Long,
+        token: Cancellation,
+        observe: (LpProbeMetrics) -> Unit,
+    ): List<LpDirectionalValues>? {
+        val reason = when {
+            token() -> LpProbeDecline.CANCELLED
+            closed -> LpProbeDecline.OWNER
+            workingActive || pendingFloat != null -> LpProbeDecline.BUSY
+            state !== source.model.exactState -> LpProbeDecline.STALE_POINT
+            solver !is LpDirectionalValueSolver -> LpProbeDecline.OWNER
+            else -> null
+        }
+        if (reason != null) {
+            observe(LpProbeMetrics(0L, 0L, 0, reason))
+            return null
+        }
+        return (solver as LpDirectionalValueSolver).directionalValues(
+            source, columns, splits, allowance, token, observe,
+        )
     }
 
     fun directionalCosts(

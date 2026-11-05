@@ -7,6 +7,8 @@ import com.eignex.klause.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.backtrack.lp.orderRootValues
 import com.eignex.klause.backtrack.lp.pickRootComponent
+import com.eignex.klause.backtrack.lp.prepareRootComponentOrder
+import com.eignex.klause.backtrack.lp.prepareRootComponentTrial
 import com.eignex.klause.backtrack.selector.IndomainBest
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
@@ -345,6 +347,7 @@ internal class ResumableMinimize(
     private var firstRun = true
     private var rootRoundingPending = false
     private var rootRoundingAttempted = false
+    private var restartRootTargetsPending = false
     private var treeBudgetExhausted = false
     private val inprocessing = Inprocessing.from(params, sink.search)
     private val learnedMemory = LearnedMemoryMaintenance()
@@ -698,6 +701,7 @@ internal class ResumableMinimize(
         firstRun = true
         rootRoundingPending = false
         rootLayoutPending = false
+        restartRootTargetsPending = false
         lpEngine.discardRootLayoutPreparation()
         lpEngine.rootRoundingWarmStart = null
         lpEngine.rootRoundingInterrupted = false
@@ -1225,7 +1229,12 @@ internal class ResumableMinimize(
         if (pending.primal == null) {
             lpEngine.retainRootPartialPrimalGuidance(pending.relaxation, rootToken)
         }
-        if (!lpEngine.retainRootPrimalTargets(rootToken)) return false
+        val guide = lpEngine.rootRoundingWarmStart ?: return false
+        if (guide.primal == null || rootToken()) return false
+        if (lpEngine.rootPrimalTargets?.coordinates !== guide.primal &&
+            !lpEngine.retainRootPrimalTargets(rootToken)
+        ) return false
+        if (lpEngine.prepareRootComponentTrial(objective, rootToken) || rootToken()) return false
         rootRoundingPending = false
         lpEngine.rootRoundingInterrupted = false
         lpEngine.rootRoundingWarmStart = null
@@ -1331,7 +1340,9 @@ internal class ResumableMinimize(
 
         override fun onRestart() {
             lpHints?.resetHistory()
-            lpEngine.clearRootPrimalTargets()
+            restartRootTargetsPending = incumbents.current() == null &&
+                lpEngine.rootPrimalTargets?.components?.offered == true
+            lpEngine.restartRootPrimalTargets()
         }
 
         override fun pick(session: PropagationSession): VarRef? {
@@ -1378,7 +1389,17 @@ internal class ResumableMinimize(
             // Persistent LP fixings may use only a cutoff that survives every later repair.
             val lpBound = if (rebindable) externalBound else effectiveBound
             lpHints?.beginNode(context.decisionLevel, lpBound)
-            val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1, singleObj?.ascending ?: true)
+            if (restartRootTargetsPending && context.decisionLevel == 0 && incumbents.current() == null) {
+                restartRootTargetsPending = false
+                lpEngine.refreshRootPrimalTargets(session, params.cancellation)
+            }
+            val deferSimplex = incumbents.current() == null &&
+                lpEngine.prepareRootComponentOrder(session, params.cancellation) != null
+            if (deferSimplex) {
+                sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", "NODE_QUERY_DEFERRED", 0L)
+            }
+            val pruned = lpEngine.pruneNode(session, lpBound, singleObj?.varId ?: -1,
+                singleObj?.ascending ?: true, deferSimplex = deferSimplex)
             lpHints?.finishNode(lpEngine.cpAdapter.currentModel?.exactState)
             if (!pruned) {
                 return SearchNodeDisposition.Expand

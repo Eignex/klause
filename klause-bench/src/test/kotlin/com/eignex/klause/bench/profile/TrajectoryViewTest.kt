@@ -17,6 +17,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -114,20 +116,21 @@ class TrajectoryViewTest {
         assertEquals("candidate-filter", candidate.getValue("decline").jsonPrimitive.content)
     }
 
-    @Test
-    fun `random boundary measures underlying draws without advancing the stream`() {
+    @ParameterizedTest
+    @ValueSource(ints = [0, 1, 31, 10000])
+    fun `random boundary measures underlying draws without advancing the stream`(draws: Int) {
         val state = view(1, 1).state
         val before = trajectoryRandomBoundary(state)
         val again = trajectoryRandomBoundary(state)
 
-        state.rng.nextInt()
+        repeat(draws) { state.rng.nextInt() }
         val after = trajectoryRandomBoundary(state)
 
         assertEquals(before, again)
         val key = "nextIntDrawBoundaryModulo2To32"
         val first = before.getValue(key).jsonPrimitive.content.toLong()
         val second = after.getValue(key).jsonPrimitive.content.toLong()
-        assertEquals(1L, (second - first) and 0xffffffffL)
+        assertEquals(draws.toLong(), (second - first) and 0xffffffffL)
     }
 
     private fun view(scale: Long, seed: Long): TrajectoryView {

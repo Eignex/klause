@@ -76,18 +76,27 @@ internal object CorpusFetcher {
     private val indexes: CorpusIndexes get() = CorpusIndexes(storageRoot)
 
     /**
-     * [collection] by its index alone, or null when its bytes are already local (the tree is then authoritative and
-     * cheap), when [declaredInputs] is off, or when no index describes its pack. A missing local index is fetched from
-     * the mirror; the pack itself is never downloaded here.
+     * [collection] by its complete pack index when [declaredInputs] is on and some indexed members are absent locally.
+     * A complete local tree keeps byte authority. A missing local index is fetched from the mirror; the pack itself
+     * is never downloaded here. Returns null when declared inputs are off or no index describes the pack.
      */
     fun indexed(collection: ExternalCollection): IndexedCollection? {
-        if (!declaredInputs || present(collection.id)) return null
-        val index = indexes.local(collection.id) ?: mirror?.let { remote ->
+        if (!declaredInputs) return null
+        // A committed index keeps planning offline; the mirror is only a fallback for collections without one.
+        val index = indexes.local(
+            collection.id,
+        ) ?: CommittedCorpusIndexes.load(collection.id) ?: mirror?.let { remote ->
             storageRoot.mkdirs()
             runCatching { remote.index(collection.id, storageRoot) }.onFailure {
                 System.err.println("corpus index of '${collection.id}' unavailable: ${it.javaClass.simpleName}")
             }.getOrNull()?.also(indexes::save)
         } ?: return null
+        val local = File(cacheRoot, collection.id)
+        if (local.isDirectory && !File(local, CorpusStore.SELECTIVE).exists() &&
+            index.files.all { File(local, it.path).isFile }
+        ) {
+            return null
+        }
         return indexes.view(index)
     }
 
@@ -106,8 +115,10 @@ internal object CorpusFetcher {
         if (present(collection.id)) return null
         return zipCollections.getOrPut(collection) {
             CorpusZipCollection(
-                URI(collection.url), method.extension,
-                requireNotNull(collection.maxFileMb).toLong() * 1024 * 1024, downloads,
+                URI(collection.url),
+                method.extension,
+                requireNotNull(collection.maxFileMb).toLong() * 1024 * 1024,
+                downloads,
             )
         }
     }
@@ -127,16 +138,20 @@ internal object CorpusFetcher {
             require(it.isFile) { "vendored file missing: ${source.workspaceRelPath}" }
         }
 
-        is ProblemSource.External -> (if (root == null && selectiveZip(source.collection) != null) {
-            member(source.collection, source.relPath)
-        } else stored(File((root ?: ::ensure)(source.collection), source.relPath))).also {
+        is ProblemSource.External -> (
+            if (root == null && selectiveZip(source.collection) != null) {
+                member(source.collection, source.relPath)
+            } else {
+                stored(File((root ?: ::ensure)(source.collection), source.relPath))
+            }
+            ).also {
             require(it.isFile) { "instance '${source.relPath}' not found in collection '${source.collection.id}'" }
         }
 
         is ProblemSource.ExternalIndexed -> {
             val files = (root ?: ::ensure)(source.collection).walkTopDown()
                 .filter { it.isFile && CorpusFiles.formatExtension(it) == source.ext }
-                .sortedBy { CorpusFiles.plainPath(it.name) }
+                .sortedWith(compareBy<File> { CorpusFiles.plainPath(it.name) }.thenBy { !CorpusFiles.isCompressed(it) })
                 .distinctBy { CorpusFiles.plainPath(it.path) }
                 .toList()
             require(source.index in files.indices) {
@@ -203,16 +218,24 @@ internal object CorpusFetcher {
             log("fetching '${collection.id}' (${collection.license}) — ${collection.reason}")
             when (val method = collection.fetch) {
                 is FetchMethod.GitClone -> gitClone(collection, method, dir)
+
                 FetchMethod.Tarball -> tarball(collection, dir)
+
                 FetchMethod.Tar -> tar(collection, dir)
+
                 FetchMethod.TarballZst -> tarballZst(collection, dir)
+
                 FetchMethod.Zip -> zip(collection, dir)
+
                 is FetchMethod.SelectiveZip -> zip(collection, dir)
+
                 is FetchMethod.ZipMember -> {
                     CorpusZipSelection(downloads).fetch(URI(collection.url), method, dir)
                     compress(dir)
                 }
+
                 is FetchMethod.Files -> files(collection, method, dir)
+
                 is FetchMethod.GbdFiles -> gbdFiles(collection, method, dir)
             }
             collection.extensionless?.let { (marker, ext) -> nameBare(dir, marker, ext) }

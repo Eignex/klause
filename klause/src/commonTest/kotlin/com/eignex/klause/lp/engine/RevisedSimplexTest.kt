@@ -343,6 +343,31 @@ class RevisedSimplexTest {
     }
 
     @Test
+    fun `complete child values remain available after a bound only parent iterate`() {
+        val model = assertNotNull(LpExactState(assertNotNull(coverModel().authoritativeModel())).ownerWorkingModel())
+        RevisedSimplex(model).use { owner ->
+            val point = owner.openSolve(LpFloatAllowance(1_000_000L, 1)).use { cursor ->
+                assertNotNull(assertIs<LpSolveStep.Completed<FloatLpResult?>>(cursor.advance()).value)
+            }
+            assertFalse(point.optimal)
+            val metrics = owner.lastMetrics
+            var completed = 0
+            var work = 0L
+
+            val values = owner.directionalValues(LpProbeSource(model, point.basis), intArrayOf(0, 1), longArrayOf(0, 0),
+                1_000_000L, Cancellation.Never) { completed += it.completed; work += it.work }
+
+            assertNotNull(values)
+            assertEquals(listOf(LpDirectionalValues(8.0, 8.0), LpDirectionalValues(8.0, 8.0)), values)
+            assertEquals(4, completed)
+            assertTrue(work in 1L..1_000_000L)
+            assertEquals(metrics, owner.lastMetrics)
+            assertNull(owner.directionalGains(model, intArrayOf(0, 1), longArrayOf(0, 0),
+                1_000_000L, Cancellation.Never) {})
+        }
+    }
+
+    @Test
     fun `a solve stopped at its pivot budget should still bound the optimum from below`() {
         val full = assertNotNull(RevisedSimplex(coverModel()).solve(null))
         assertTrue(full.pivots >= 2, "fixture must cost more than one pivot to cap meaningfully")

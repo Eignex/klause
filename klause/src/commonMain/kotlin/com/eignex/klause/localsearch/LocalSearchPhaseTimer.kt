@@ -12,6 +12,7 @@ internal class LocalSearchPhaseTimer(
         "seeding" to 0L,
         "selection" to 0L,
         "application" to 0L,
+        "publication" to 0L,
         "other" to 0L,
     )
     private var phase: String = "other"
@@ -25,7 +26,24 @@ internal class LocalSearchPhaseTimer(
         "prepared" to 0L,
         "indexed" to 0L,
         "generic" to 0L,
+        "selection-picks" to 0L,
+        "selection-interruptions" to 0L,
+        "selection-interrupted-ns" to 0L,
     )
+
+    fun measureScoringPick(pick: () -> Move?): Move? {
+        recordObjectiveScoring("selection-picks")
+        val start = now()
+        try {
+            return pick()
+        } catch (interrupted: LocalSearchScoringInterrupted) {
+            recordObjectiveScoring("selection-interruptions")
+            val elapsed = (now() - start).coerceAtLeast(0L)
+            val previous = objectiveScoring.getValue("selection-interrupted-ns")
+            objectiveScoring["selection-interrupted-ns"] = previous + minOf(elapsed, Long.MAX_VALUE - previous)
+            throw interrupted
+        }
+    }
 
     fun recordObjectiveScoring(outcome: String) {
         val previous = objectiveScoring.getValue(outcome)
@@ -58,6 +76,18 @@ internal class LocalSearchPhaseTimer(
         if (!running) return
         accrue()
         running = false
+    }
+
+    fun <T> measurePublication(action: () -> T): T {
+        val wasRunning = running
+        val previous = enter("publication")
+        if (!wasRunning) resume()
+        try {
+            return action()
+        } finally {
+            if (!wasRunning) pause()
+            enter(previous)
+        }
     }
 
     fun snapshot(): Map<String, Long> {

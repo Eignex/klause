@@ -7,6 +7,8 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.corpus
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.runner.MiniZincIdentityEvidence
+import com.eignex.klause.bench.runner.MiniZincIdentityFailure
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
 import kotlinx.serialization.decodeFromString
@@ -76,6 +78,26 @@ class SolveMetricFailureTest {
         assertEquals(2, record.processors)
         assertEquals(17, record.seed)
         assertEquals(1000, record.budgetMs)
+    }
+
+    @Test
+    fun `caught discovery failures retain their evidence as infrastructure load errors on disk`() {
+        val evidence = MiniZincIdentityEvidence(
+            phase = "--version",
+            command = listOf("minizinc", "--version"),
+            startedAt = "timestamp",
+            outcome = "timed-out",
+            elapsedNs = 123,
+            timeoutNs = 100,
+        )
+
+        val record = persisted(MiniZincIdentityFailure(evidence))
+
+        assertEquals(evidence, record.compilerDiscovery)
+        assertEquals("LOAD", record.command)
+        assertTrue("loadError" in record.stats)
+        assertFalse("unsupported" in record.stats)
+        assertNull(record.compilerIdentity)
     }
 
     @Test
@@ -157,6 +179,9 @@ class SolveMetricFailureTest {
 
         assertEquals(result.feasible, record.feasible)
         assertEquals("cli", record.command)
-        assertTrue(record.stats.isEmpty())
+        assertTrue(record.stats.filterKeys { !it.startsWith("harness") }.isEmpty())
+        val timings = record.stats.filterKeys { it.startsWith("harness") }
+        assertTrue(timings.isNotEmpty())
+        assertTrue(timings.values.all { value -> value.toLongOrNull()?.let { it >= 0 } == true })
     }
 }

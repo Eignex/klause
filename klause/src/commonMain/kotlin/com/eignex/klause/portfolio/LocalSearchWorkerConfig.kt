@@ -37,6 +37,7 @@ internal class LocalSearchWorkerConfig private constructor(
     private val seedOffset: Int,
     private val numericalCompletion: Boolean,
     private val toleranceCheck: ((Sample) -> Boolean)?,
+    private val bufferedPublications: Boolean,
 ) :
     WorkerConfig {
 
@@ -47,28 +48,33 @@ internal class LocalSearchWorkerConfig private constructor(
         reportPhaseTimes: Boolean = false,
         seedOffset: Int = 0,
         numericalCompletion: Boolean = false,
-    ) : this(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, numericalCompletion, null)
+    ) : this(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, numericalCompletion, null, false)
+
+    fun withBufferedPublications(): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset,
+            numericalCompletion, toleranceCheck, true)
 
     fun withToleranceCheck(check: (Sample) -> Boolean): LocalSearchWorkerConfig =
         LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset,
-            numericalCompletion, check)
+            numericalCompletion, check, bufferedPublications)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
         LocalSearchWorkerConfig(recipe, budget, reportResiduals, reportPhaseTimes, seedOffset,
-            numericalCompletion, toleranceCheck)
+            numericalCompletion, toleranceCheck, bufferedPublications)
 
     fun withNumericalCompletion(): LocalSearchWorkerConfig =
-        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, true, toleranceCheck)
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, seedOffset, true,
+            toleranceCheck, bufferedPublications)
 
     override val label: String get() = recipe.label
 
     override fun withLsResiduals(): LocalSearchWorkerConfig =
         LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes, seedOffset,
-            numericalCompletion, toleranceCheck)
+            numericalCompletion, toleranceCheck, bufferedPublications)
 
     override fun withLsPhaseTimes(): LocalSearchWorkerConfig =
         LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true, seedOffset,
-            numericalCompletion, toleranceCheck)
+            numericalCompletion, toleranceCheck, bufferedPublications)
 
     internal fun materializeObjectiveCoordinates(
         view: ObjectiveCoordinateView,
@@ -176,7 +182,12 @@ internal class LocalSearchWorkerConfig private constructor(
             withInstructionBudget = { p, limit ->
                 p.copy(maxInstructions = minOf(p.maxInstructions ?: Long.MAX_VALUE, limit))
             },
-        ).bindEvidence(evidenceModel)
+        ).bindEvidence(evidenceModel).also { worker ->
+            if (bufferedPublications && matchedPools != null) {
+                worker.publicationExchange = matchedPools.solutions
+                worker.sharingMeter = SharingMeter()
+            }
+        }
     }
 
     companion object {

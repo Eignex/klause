@@ -21,6 +21,37 @@ import kotlin.test.assertTrue
 
 class SharedCpPremisesTest {
     @Test
+    fun `complete nested peer premises should share publication reconstruction`() {
+        val native = PropagationSession(Problem(1, 8, Array(8) { IntDomain(0, 10) },
+            Array(7) { Linear(intArrayOf(1, -1), intArrayOf(it, it + 1), LinearOp.LE, 0) }),
+            pbLearning = false)
+        val peer = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                if (decision == SearchDecision.Bool(0)) context.publish(SearchDecision.IntAtLeast(0, 3),
+                    SearchAtomPremise.All(listOf(SearchAtomPremise.All(listOf(
+                        SearchAtomPremise.Asserted(SearchDecision.Bool(0)))))))
+                else ComponentResult.Consistent
+        }
+        val shared = SearchSession(listOf(peer, CpSearchComponent(native)), atoms = SearchAtomRegistry(1))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(0)))
+        for (variable in 1..7) native.sharedBoundPremise(variable, false, shared, { it }, 0)
+        val memo = CpPublicationPremises(native, shared, { it }, rootLevel = 0)
+        val beforeMemo = native.work
+
+        val retained = (1..7).map { memo.bound(it, upper = false) }
+        val memoWork = native.work - beforeMemo
+        val beforeFresh = native.work
+        val fresh = (1..7).map { native.sharedBoundPremise(it, false, shared, { it }, 0) }
+        val freshWork = native.work - beforeFresh
+
+        for (premise in retained + fresh) {
+            assertContentEquals(intArrayOf(1), assertNotNull(shared.explainAtoms(premise)).literals)
+        }
+        assertTrue(memoWork < freshWork, "memo=$memoWork fresh=$freshWork")
+    }
+
+    @Test
     fun `shared decision chains should explain with less reconstruction work`() {
         val native = PropagationSession(Problem(0, 8, Array(8) { IntDomain(0, 10) },
             Array(7) { Linear(intArrayOf(1, -1), intArrayOf(it, it + 1), LinearOp.LE, 0) }),
@@ -47,15 +78,15 @@ class SharedCpPremisesTest {
 
     @Test
     fun `inherited unavailable leaves should remain unavailable across publication proofs`() {
-        for (wrapped in listOf(false, true)) {
+        for (depth in 0..3) {
             val native = PropagationSession(Problem(0, 4, Array(4) { IntDomain(0, 10) },
                 Array(3) { Linear(intArrayOf(1, -1), intArrayOf(it, it + 1), LinearOp.LE, 0) }),
                 pbLearning = false)
+            var inherited: SearchAtomPremise = SearchAtomPremise.Unavailable
+            repeat(depth) { inherited = SearchAtomPremise.All(listOf(inherited)) }
             val peer = object : SearchComponent {
                 override fun initialize(context: SearchContext): ComponentResult = context.publish(
-                    SearchDecision.IntAtLeast(0, 3),
-                    if (wrapped) SearchAtomPremise.All(listOf(SearchAtomPremise.Unavailable))
-                    else SearchAtomPremise.Unavailable)
+                    SearchDecision.IntAtLeast(0, 3), inherited)
             }
             val shared = SearchSession(listOf(peer, CpSearchComponent(native)), atoms = SearchAtomRegistry(0))
             assertIs<ComponentResult.Consistent>(shared.initialize())
@@ -66,4 +97,145 @@ class SharedCpPremisesTest {
             for (premise in premises) assertNull(shared.explainAtoms(premise))
         }
     }
+
+    @Test
+    fun `unavailable proof branch should not replace an independent named premise`() {
+        val native = PropagationSession(Problem(2, 4, Array(4) { IntDomain(0, 10) }, arrayOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+            Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.LE, 0),
+        )), pbLearning = false)
+        val peer = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult = when (decision) {
+                SearchDecision.Bool(0) -> context.publish(
+                    SearchDecision.IntAtLeast(0, 3), SearchAtomPremise.All(listOf(SearchAtomPremise.Unavailable)),
+                )
+                SearchDecision.Bool(2) -> context.publish(
+                    SearchDecision.IntAtLeast(2, 4), SearchAtomPremise.Asserted(decision),
+                )
+                else -> ComponentResult.Consistent
+            }
+        }
+        val shared = SearchSession(listOf(peer, CpSearchComponent(native)), atoms = SearchAtomRegistry(2))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(2)))
+        val publication = CpPublicationPremises(native, shared, { it }, rootLevel = 0)
+
+        val unavailable = publication.bound(1, upper = false)
+        val named = publication.bound(3, upper = false)
+        val unavailableAgain = publication.bound(1, upper = false)
+        val namedAgain = publication.bound(3, upper = false)
+
+        assertNull(shared.explainAtoms(unavailable))
+        assertContentEquals(intArrayOf(3), assertNotNull(shared.explainAtoms(named)).literals)
+        assertNull(shared.explainAtoms(unavailableAgain))
+        assertContentEquals(intArrayOf(3), assertNotNull(shared.explainAtoms(namedAgain)).literals)
+    }
+
+    @Test
+    fun `independent inherited bounds should preserve both equality premises`() {
+        val native = PropagationSession(Problem(2, 2, Array(2) { IntDomain(0, 10) }, arrayOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+        )), pbLearning = false)
+        val peer = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult = when (decision) {
+                SearchDecision.Bool(0) -> context.publish(
+                    SearchDecision.IntAtLeast(0, 3), SearchAtomPremise.Asserted(decision),
+                )
+                SearchDecision.Bool(2) -> context.publish(
+                    SearchDecision.IntAtMost(0, 3), SearchAtomPremise.Asserted(decision),
+                )
+                else -> ComponentResult.Consistent
+            }
+        }
+        val shared = SearchSession(listOf(peer, CpSearchComponent(native)), atoms = SearchAtomRegistry(2))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(2)))
+        val publication = CpPublicationPremises(native, shared, { it }, rootLevel = 0)
+
+        val equality = SearchAtomPremise.All(listOf(
+            publication.bound(1, upper = false), publication.bound(1, upper = true),
+        ))
+
+        assertContentEquals(intArrayOf(1, 3), assertNotNull(shared.explainAtoms(equality)).literals.sortedArray())
+    }
+
+    @Test
+    fun `inactive inherited assertions should not supply publication reasons`() {
+        val native = PropagationSession(Problem(2, 2, Array(2) { IntDomain(0, 10) }, arrayOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+        )), pbLearning = false)
+        val peer = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                if (decision == SearchDecision.Bool(2)) context.publish(
+                    SearchDecision.IntAtLeast(0, 3), SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                ) else ComponentResult.Consistent
+        }
+        val shared = SearchSession(listOf(peer, CpSearchComponent(native)), atoms = SearchAtomRegistry(2))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(2)))
+        val publication = CpPublicationPremises(native, shared, { it }, rootLevel = 0)
+
+        val first = publication.bound(1, upper = false)
+        val repeated = publication.bound(1, upper = false)
+
+        assertNull(shared.explainAtoms(first))
+        assertNull(shared.explainAtoms(repeated))
+    }
+
+
+    @Test
+    fun `branched inherited proofs should retain unavailable siblings`() {
+        val native = PropagationSession(Problem(1, 2, Array(2) { IntDomain(0, 10) }, arrayOf(
+            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+        )), pbLearning = false)
+        val peer = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                if (decision == SearchDecision.Bool(0)) context.publish(
+                    SearchDecision.IntAtLeast(0, 3), SearchAtomPremise.All(listOf(
+                        SearchAtomPremise.Asserted(decision), SearchAtomPremise.Unavailable,
+                    )),
+                ) else ComponentResult.Consistent
+        }
+        val shared = SearchSession(listOf(peer, CpSearchComponent(native)), atoms = SearchAtomRegistry(1))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(0)))
+        val publication = CpPublicationPremises(native, shared, { it }, rootLevel = 0)
+
+        val first = publication.bound(1, upper = false)
+        val repeated = publication.bound(1, upper = false)
+
+        assertNull(shared.explainAtoms(first))
+        assertNull(shared.explainAtoms(repeated))
+    }
+
+
+    @Test
+    fun `native deductions should preserve distinct named bounds`() {
+        val native = PropagationSession(Problem(2, 3, Array(3) { IntDomain(0, 10) }, arrayOf(
+            Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+        )), pbLearning = false)
+        val peer = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult = when (decision) {
+                SearchDecision.Bool(0) -> context.publish(
+                    SearchDecision.IntAtLeast(0, 2), SearchAtomPremise.Asserted(decision),
+                )
+                SearchDecision.Bool(2) -> context.publish(
+                    SearchDecision.IntAtLeast(1, 3), SearchAtomPremise.Asserted(decision),
+                )
+                else -> ComponentResult.Consistent
+            }
+        }
+        val shared = SearchSession(listOf(peer, CpSearchComponent(native)), atoms = SearchAtomRegistry(2))
+        assertIs<ComponentResult.Consistent>(shared.initialize())
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(shared.push(SearchDecision.Bool(2)))
+        val publication = CpPublicationPremises(native, shared, { it }, rootLevel = 0)
+
+        val premise = publication.bound(2, upper = false)
+
+        assertContentEquals(intArrayOf(1, 3), assertNotNull(shared.explainAtoms(premise)).literals.sortedArray())
+    }
+
 }

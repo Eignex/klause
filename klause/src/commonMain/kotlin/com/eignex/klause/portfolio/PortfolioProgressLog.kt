@@ -33,8 +33,8 @@ internal class PortfolioProgressLog(workers: List<PortfolioWorker>) {
         lifecycle[arm] = when (kind) {
             PortfolioLifecycleKind.CREATED -> old
             PortfolioLifecycleKind.FIRST_QUERY -> old.copy(firstQueryNanos = old.firstQueryNanos ?: nanos)
-            PortfolioLifecycleKind.INCUMBENT_AVAILABLE -> old.copy(
-                incumbentAvailableNanos = old.incumbentAvailableNanos ?: nanos)
+            PortfolioLifecycleKind.INCUMBENT_AVAILABLE -> if (old.incumbentAvailableNanos != null) old else
+                old.copy(incumbentAvailableNanos = nanos)
             PortfolioLifecycleKind.INCUMBENT_READ -> old.copy(
                 incumbentReadNanos = old.incumbentReadNanos ?: nanos, incumbentReads = old.incumbentReads + 1)
             PortfolioLifecycleKind.INCUMBENT_IMPORTED -> old.copy(

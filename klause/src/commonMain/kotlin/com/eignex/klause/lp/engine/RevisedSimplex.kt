@@ -18,11 +18,12 @@ import com.eignex.klause.util.argsortBy
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
+import com.eignex.koblas.sparse.dotColumn
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
 /**
- * Result of a [RevisedSimplex] solve: the optimal [basis] (to warm-start or exactly certify), the
+ * Result of a [RevisedSimplex] solve: the retained [basis] (to warm-start or exactly certify), the
  * float objective, and the dual vector `y` (one per row) used by the safe bound of Neumaier and
  * Shcherbina, "Safe bounds in linear and mixed-integer linear programming", Math. Program. 99 (2004),
  * https://doi.org/10.1007/s10107-003-0433-3. All values are double-precision; the authoritative bound
@@ -130,7 +131,9 @@ internal class RevisedSimplex(
 ) : TableauCutSolver,
     PersistentLpSolver,
     ResumableLpSolver,
-    LpDirectionalCostSolver {
+    LpDirectionalCostSolver,
+    LpDirectionalProbeSolver,
+    LpDirectionalValueSolver {
     private var activeSolve: LpSolveCursor<FloatLpResult?>? = null
     private var solveStarted = false
     override val currentWork: Long get() = work.ops
@@ -503,6 +506,25 @@ internal class RevisedSimplex(
     override val lastSingularRefactorizations: Int get() = observations.singularRefactorizations
     override val lastSmallPivotBails: Int get() = observations.smallPivotBails
     override val lastMetrics: LpSolveMetrics get() = observations.snapshot(work.ops)
+    override fun pausedDualProposal(cancellation: Cancellation): DoubleArray? {
+        if (activeSolve?.isAdvancing != false || cancellation()) return null
+        val proposal = DoubleArray(m)
+        var nonzero = false
+        // Row multipliers can lag the basis; exact checking against the original model supplies authority.
+        for (row in 0 until m) {
+            if (row % 256 == 0 && cancellation()) return null
+            val value = try {
+                numerical.sourceDual(row, dualValues[row])
+            } catch (_: LpScalingArithmeticException) {
+                return null
+            }
+            if (!value.isFinite()) return null
+            proposal[row] = value
+            if (value != 0.0) nonzero = true
+        }
+        return proposal.takeIf { nonzero && !cancellation() }
+    }
+
     override val trialProgress: Map<String, Long> get() {
         val samples = progressTrace?.samples ?: return emptyMap()
         return buildMap {
@@ -555,7 +577,7 @@ internal class RevisedSimplex(
 
     // Uncharged pricing reads the current owner so an unscaled fallback cannot retain a retired CSC generation.
     internal fun columnDot(y: DoubleArray, j: Int): Double = if (j < n) {
-        koblas.sparseKernels.dotColumn(columns, j, y)
+        koblas.dotColumn(columns, j, y)
     } else {
         y[j - n]
     }
@@ -818,7 +840,7 @@ internal class RevisedSimplex(
 
     private fun denseColumn(column: Int): DoubleArray = qualityRhs.also { dense ->
         dense.fill(0.0)
-        koblas.sparseKernels.scatter(
+        koblas.scatter(
             rowIdx,
             colPtr[column],
             colVal,
@@ -829,14 +851,14 @@ internal class RevisedSimplex(
     }
 
     private fun sparseAxpy(destination: DoubleArray, alpha: Double, column: Int) {
-        koblas.sparseKernels.axpy(
-            destination,
-            alpha,
+        koblas.axpy(
             rowIdx,
             colPtr[column],
             colVal,
             colPtr[column],
             columnNnz(column),
+            alpha,
+            destination,
         )
     }
 
@@ -2321,7 +2343,7 @@ internal class RevisedSimplex(
         if (changed) {
             val change = boundChange
             ftranDense(rhs, change, rhsVec, boundUpdateFtran = true)
-            koblas.vectorKernels.axpy(out, 0, 1.0, change, 0, m)
+            koblas.axpy(out, 0, 1.0, change, 0, m)
             work.add(m)
         }
         return out.all { it.isFinite() }
@@ -2786,6 +2808,133 @@ internal class RevisedSimplex(
 
     /** The structural primal `x*` at the last optimal [solve], for scoring tableau cuts by violation. */
     private var optimalPrimal: DoubleArray? = null
+
+    internal fun probeObjective(token: Cancellation): Double? {
+        val values = cachedBeta ?: return null
+        if (optimalBasis == null || cachedModel !== model || cachedPrimalOnly || cachedNumerical !== numerical) {
+            return null
+        }
+        val scale = model.exactState?.model?.objective?.scale?.approximation ?: return null
+        if (!scale.isFinite() || scale <= 0.0) return null
+        var objective = 0.0
+        for (j in 0 until numVars) {
+            if (j % 256 == 0 && token()) return null
+            if (status[j] != VarStatus.BASIC) objective += cost(j) * seat(numerical, status[j], j)
+        }
+        for (i in 0 until m) {
+            if (i % 256 == 0 && token()) return null
+            objective += cost(basicVar[i]) * values[i]
+        }
+        return (objective / scale).takeIf { it.isFinite() }
+    }
+
+    override fun directionalGains(
+        pointModel: LpModel,
+        columns: IntArray,
+        splits: LongArray,
+        allowance: Long,
+        token: Cancellation,
+        observe: (LpProbeMetrics) -> Unit,
+    ): List<LpDirectionalGain>? {
+        fun decline(reason: LpProbeDecline): List<LpDirectionalGain>? {
+            observe(LpProbeMetrics(0L, 0L, 0, reason))
+            return null
+        }
+        val state = model.exactState ?: return decline(LpProbeDecline.OWNER)
+        val basis = optimalBasis ?: return decline(LpProbeDecline.NO_OPTIMUM)
+        val point = optimalPrimal ?: return decline(LpProbeDecline.NO_OPTIMUM)
+        if (token()) return decline(LpProbeDecline.CANCELLED)
+        if (allowance <= 0L) return decline(LpProbeDecline.ALLOWANCE)
+        if (activeSolve != null || !basisLifecycle.factorized) return decline(LpProbeDecline.BUSY)
+        if (pointModel.exactState !== state) return decline(LpProbeDecline.STALE_POINT)
+        if (columns.isEmpty() || columns.size > 2 ||
+            columns.size != splits.size || columns.any { it !in 0 until n } ||
+            (columns.size == 2 && columns[0] == columns[1])
+        ) return decline(LpProbeDecline.SPLIT)
+        for (index in columns.indices) {
+            val split = splits[index]
+            if (split == Long.MAX_VALUE || !(split.toDouble() < point[columns[index]] &&
+                    point[columns[index]] < (split + 1L).toDouble())
+            ) return decline(LpProbeDecline.SPLIT)
+        }
+        val scan = 2L * numVars + m + 1L
+        if (scan >= allowance) return decline(LpProbeDecline.ALLOWANCE)
+        observe(LpProbeMetrics(scan, 0L, 0))
+        val parentObjective = probeObjective(token) ?: return decline(
+            if (token()) LpProbeDecline.CANCELLED else LpProbeDecline.NO_OPTIMUM,
+        )
+        return LpDirectionalProbes(state, basis, parentObjective) { child, work, entries ->
+            RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
+                basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
+                    basisWorkLimit = minOf(pricing.basisWorkLimit, work)), reuseRationalOrder, scalingOptions,
+                primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
+                singletonStart)
+        }.run(columns, splits, allowance - scan, token, observe)
+    }
+
+    override fun directionalValues(
+        source: LpProbeSource,
+        columns: IntArray,
+        splits: LongArray,
+        allowance: Long,
+        token: Cancellation,
+        observe: (LpProbeMetrics) -> Unit,
+    ): List<LpDirectionalValues>? {
+        fun decline(reason: LpProbeDecline): List<LpDirectionalValues>? {
+            observe(LpProbeMetrics(0L, 0L, 0, reason))
+            return null
+        }
+        val pointModel = source.model
+        val pointBasis = source.basis
+        val state = model.exactState ?: return decline(LpProbeDecline.OWNER)
+        if (token()) return decline(LpProbeDecline.CANCELLED)
+        if (allowance <= 0L) return decline(LpProbeDecline.ALLOWANCE)
+        if (activeSolve != null) return decline(LpProbeDecline.BUSY)
+        if (pointModel.exactState !== state) return decline(LpProbeDecline.STALE_POINT)
+        if (solvedExactState !== state) return decline(LpProbeDecline.NO_POINT)
+        if (columns.isEmpty() || columns.size > 2 || columns.size != splits.size ||
+            columns.any { it !in 0 until n } || splits.any { it == Long.MAX_VALUE } ||
+            (columns.size == 2 && columns[0] == columns[1]) ||
+            pointBasis.basicVars.size != m || pointBasis.status.size != numVars
+        ) return decline(LpProbeDecline.SPLIT)
+        val scan = 3L * numVars + 2L * m + 1L
+        if (scan >= allowance) return decline(LpProbeDecline.ALLOWANCE)
+        observe(LpProbeMetrics(scan, 0L, 0))
+        if (token()) return decline(LpProbeDecline.CANCELLED)
+        probeBasisDecline(source, token)?.let { return decline(it) }
+        return LpDirectionalProbes(state, pointBasis, factory = { child, work, entries ->
+            RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
+                basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
+                    basisWorkLimit = minOf(pricing.basisWorkLimit, work)), reuseRationalOrder, scalingOptions,
+                primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
+                singletonStart)
+        }).runValues(columns, splits, allowance - scan, token, observe)
+    }
+
+    private fun probeBasisDecline(source: LpProbeSource, token: Cancellation): LpProbeDecline? {
+        val basis = source.basis
+        val seen = BooleanArray(numVars)
+        for ((slot, column) in basis.basicVars.withIndex()) {
+            if (slot % 256 == 0 && token()) return LpProbeDecline.CANCELLED
+            if (column !in seen.indices || seen[column] || basis.status[column] != VarStatus.BASIC) {
+                return LpProbeDecline.SPLIT
+            }
+            seen[column] = true
+        }
+        for (column in basis.status.indices) {
+            if (column % 256 == 0 && token()) return LpProbeDecline.CANCELLED
+            val valid = when (basis.status[column]) {
+                VarStatus.BASIC -> seen[column]
+                VarStatus.AT_LOWER -> !seen[column] && source.model.hasFiniteLower(column)
+                VarStatus.AT_UPPER -> !seen[column] && source.model.hasFiniteUpper(column)
+                VarStatus.FIXED -> !seen[column] && source.model.fixed(column)
+                VarStatus.FREE -> !seen[column] && !source.model.hasFiniteLower(column) &&
+                    !source.model.hasFiniteUpper(column)
+            }
+            if (!valid) return LpProbeDecline.SPLIT
+        }
+        return null
+    }
 
     override fun directionalCosts(
         pointModel: LpModel,

@@ -232,7 +232,7 @@ internal class AggregationMirSeparator : CutSeparator {
         }
     }
 
-    private companion object {
+    internal companion object {
         /** Cap on rows mined per separation, bounding the `O(rows²)` pair sweep. */
         const val MAX_ROWS = 48
 

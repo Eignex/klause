@@ -8,6 +8,8 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincCompatibility
 import com.eignex.klause.bench.runner.MiniZincCompileFailure
 import com.eignex.klause.bench.runner.MiniZincCompilerIdentity
+import com.eignex.klause.bench.runner.MiniZincIdentityEvidence
+import com.eignex.klause.bench.runner.MiniZincIdentityFailure
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.runner.Runners
@@ -65,6 +67,8 @@ internal data class SolveRecord(
     val processTimeToBestMs: Long? = null,
     val exactObjective: String? = null,
     val compilerIdentity: MiniZincCompilerIdentity? = null,
+    /** Failed compiler discovery evidence; never an accepted compiler identity. */
+    val compilerDiscovery: MiniZincIdentityEvidence? = null,
     /** Normalized subprocess stderr, limited to 16 Ki characters; null when unavailable. */
     val stderr: String? = null,
     /** Whether [stderr] contains the whole normalized stream rather than a bounded prefix. */
@@ -86,26 +90,41 @@ internal object SolveMetric {
     /** Solve the one problem [ref] with klause-cli, writing its [SolveRecord] to `<outDir>/<problem>.json` and the
      *  raw solver output beside it, and return the record. A problem that fails to load gets a record too, its reason
      *  under `stats.unsupported` when klause declines the model and under `stats.loadError` otherwise. */
-    fun solveOne(ref: ProblemRef, budget: Budget, settings: SolverInvocation.Settings, outDir: File): SolveRecord {
-        SourcePreparationCapture.measure("cli-preflight") { SolverInvocation.klauseCliDefect() }
+    fun solveOne(
+        ref: ProblemRef,
+        budget: Budget,
+        settings: SolverInvocation.Settings,
+        outDir: File,
+        timings: HarnessTimings = HarnessTimings(),
+    ): SolveRecord {
+        val started = timings.start()
+        timings.measure("harnessCliPreflightMs") {
+            SourcePreparationCapture.measure("cli-preflight") { SolverInvocation.klauseCliDefect() }
+        }
             ?.let { error("the klause dist cannot solve: $it") }
         outDir.mkdirs()
         val timestamp = Instant.now().toString()
-        val sha = Reports.readGitSha()
+        val sha = timings.measure("harnessGitIdentityMs") { Reports.readGitSha() }
         val name = Reports.fileStem(ref.name)
         val (rec, raw) = runCatching {
-            SourcePreparationCapture.measure("model-resolve") { Runners.resolve(ref, settings.exact) }
+            timings.measure("harnessModelResolveMs") {
+                SourcePreparationCapture.measure("model-resolve") { Runners.resolve(ref, settings.exact) }
+            }
         }.fold(
             { entry ->
                 if (ref.format == Format.MINIZINC) {
                     settings.captureDirectory?.let { directory ->
                         directory.mkdirs()
                         val runner = MiniZincRunner()
-                        runner.compileFzn(ref).copyTo(directory.resolve("model.fzn"), overwrite = true)
-                        runner.compileOutput(ref).copyTo(directory.resolve("model.ozn"), overwrite = true)
+                        timings.measure("harnessFznCaptureMs") {
+                            runner.compileFzn(ref).copyTo(directory.resolve("model.fzn"), overwrite = true)
+                        }
+                        timings.measure("harnessOutputCaptureMs") {
+                            runner.compileOutput(ref).copyTo(directory.resolve("model.ozn"), overwrite = true)
+                        }
                     }
                 }
-                solve(entry, settings, budget, timestamp, sha)
+                solve(entry, settings, budget, timestamp, sha, timings = timings)
             },
             { failure ->
                 if (failure is MiniZincCompileFailure) {
@@ -116,12 +135,17 @@ internal object SolveMetric {
                         directory.resolve("compiler-command.json").writeText(command)
                     }
                 }
-                loadFailureRecord(ref, settings, budget, timestamp, sha, failure) to null
+                timings.measure("harnessLoadFailureMs") {
+                    loadFailureRecord(ref, settings, budget, timestamp, sha, failure)
+                } to null
             },
         )
         raw?.let { File(outDir, "$name.out").writeText(it) }
-        File(outDir, "$name.json").writeText(Reports.json.encodeToString(rec))
-        return rec
+        // Excludes serialization and writing of the timing record itself.
+        timings.finish("harnessSolveOneMs", started)
+        val retained = rec.copy(stats = rec.stats + timings.stats())
+        File(outDir, "$name.json").writeText(Reports.json.encodeToString(retained))
+        return retained
     }
 
     /** The record of a problem that never reached the solver: undecided, with why under `stats`. */
@@ -160,6 +184,7 @@ internal object SolveMetric {
             sourceHashes = sourceHashes ?: (failure as? MiniZincCompileFailure)?.sourceHashes
                 ?: runCatching { SolveEvidence.sourceHashes(ref) }.getOrDefault(emptyMap()),
             compilerIdentity = (failure as? MiniZincCompileFailure)?.compiler,
+            compilerDiscovery = (failure as? MiniZincIdentityFailure)?.evidence,
             gitSha = sha,
             timestamp = timestamp,
             command = "LOAD",
@@ -184,17 +209,29 @@ internal object SolveMetric {
         invoke: (ResolvedProblem, SolverInvocation.Settings, Budget, Boolean) -> SolverInvocation.Result =
             SolverInvocation::run,
         modelOutput: (ProblemRef, String) -> String = MiniZincRunner()::modelOutput,
+        timings: HarnessTimings = HarnessTimings(),
     ): Pair<SolveRecord, String?> {
-        val optimize = SourcePreparationCapture.measure("model-objective") { entry.objective != null }
+        val started = timings.start()
+        val optimize = timings.measure("harnessObjectiveMs") {
+            SourcePreparationCapture.measure("model-objective") { entry.optimizes }
+        }
         val kind = if (optimize) "optimize" else "satisfy"
         var sourceHashes: Map<String, String> = emptyMap()
         var provenance: BuildProvenance? = null
         var compiler: MiniZincCompilerIdentity? = null
-        return runCatching {
-            sourceHashes = SourcePreparationCapture.measure("source-hash") { SolveEvidence.sourceHashes(entry.ref) }
-            provenance = SourcePreparationCapture.measure("build-provenance") { installedBuild() }
-            compiler = if (entry.ref.format == Format.MINIZINC) MiniZincCompatibility.compiler else null
-            val r = invoke(entry, settings, budget, optimize)
+        val result = runCatching {
+            sourceHashes = timings.measure("harnessSourceHashMs") {
+                SourcePreparationCapture.measure("source-hash") { SolveEvidence.sourceHashes(entry.ref) }
+            }
+            provenance = timings.measure("harnessBuildProvenanceMs") {
+                SourcePreparationCapture.measure("build-provenance") { installedBuild() }
+            }
+            compiler = if (entry.ref.format == Format.MINIZINC) {
+                timings.measure("harnessCompilerIdentityMs") { MiniZincCompatibility.compiler }
+            } else {
+                null
+            }
+            val r = timings.measure("harnessInvocationMs") { invoke(entry, settings, budget, optimize) }
             // A float model Klause solves on a grid is marked, so a reader knows its claims are approximations.
             val approximation = if (entry.hasFloats) {
                 mapOf("floatApproximation" to entry.floatApproximation.toString())
@@ -202,7 +239,11 @@ internal object SolveMetric {
                 emptyMap()
             }
             val (witness, witnessStats) = if (r.feasible == true) {
-                witness(entry.ref, r.rawOutput, modelOutput)
+                timings.measure("harnessWitnessMs") {
+                    witness(entry.ref, r.rawOutput) { ref, raw ->
+                        timings.measure("harnessOutputMappingMs") { modelOutput(ref, raw) }
+                    }
+                }
             } else {
                 null to emptyMap()
             }
@@ -216,13 +257,16 @@ internal object SolveMetric {
             } to r.rawOutput
         }.getOrElse { failure ->
             val invocation = (failure as? SolverInvocation.Failure)?.result
-            val record = (
+            val failed = if (failure is MiniZincIdentityFailure) {
+                loadFailureRecord(entry.ref, settings, budget, timestamp, sha, failure, sourceHashes)
+            } else {
                 invocation?.let { record(entry, settings, budget, kind, timestamp, sha, it) }
-                ?: errorRecord(entry, settings, budget, kind, timestamp, sha)
-            )
+                    ?: errorRecord(entry, settings, budget, kind, timestamp, sha)
+            }
+            val record = failed
                 .copy(
-                    stats = invocation?.stats.orEmpty() + SolveFailure.stats(failure),
-                    compilerIdentity = compiler,
+                    stats = failed.stats + invocation?.stats.orEmpty() + SolveFailure.stats(failure),
+                    compilerIdentity = compiler.takeUnless { failure is MiniZincIdentityFailure },
                     sourceHashes = sourceHashes,
                     buildProvenance = provenance,
                     buildFingerprint = provenance?.fingerprint,
@@ -230,6 +274,8 @@ internal object SolveMetric {
             println("?? [${entry.name}] $kind ERROR: ${record.stats["errorMessage"] ?: record.stats["errorClass"]}")
             record to invocation?.rawOutput
         }
+        timings.finish("harnessSolveMs", started)
+        return result.first.copy(stats = result.first.stats + timings.stats()) to result.second
     }
 
     /** [raw]'s final witness, with how it was mapped. Klause solves a MiniZinc model's compiled FlatZinc, so its

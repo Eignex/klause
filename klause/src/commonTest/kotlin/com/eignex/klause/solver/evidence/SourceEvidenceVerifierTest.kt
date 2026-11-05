@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 class SourceEvidenceVerifierTest {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
@@ -23,6 +24,66 @@ class SourceEvidenceVerifierTest {
     private val lower = SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)
     private val premises = mapOf("lower" to SourcePremise(lower))
     private val context = SourceProofContext(scope, setOf(x), premises, mapOf(x to BigFraction.ONE))
+
+    @Test
+    fun `context should reject an undeclared inequality coordinate`() {
+        for (kind in SourceCoordinate.Kind.entries) {
+            val undeclared = SourceCoordinate(kind, 1)
+            val row = SourceInequality(mapOf(x to BigFraction.ONE, undeclared to BigFraction.ONE),
+                BigFraction.ONE)
+
+            assertFailsWith<IllegalArgumentException> {
+                SourceProofContext(scope, setOf(x), mapOf("row" to SourcePremise(row)))
+            }
+        }
+    }
+
+    @Test
+    fun `context should ignore zero coefficients outside declared coordinates`() {
+        val undeclared = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val row = SourceInequality(mapOf(x to BigFraction.ONE, undeclared to BigFraction.ZERO),
+            BigFraction.ONE)
+        val source = SourceProofContext(scope, setOf(x), mapOf("row" to SourcePremise(row)))
+
+        val checked = SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(row), SourceDerivation.Premise("row")))
+
+        assertEquals(SourceEvidenceCheck.Checked, checked)
+    }
+
+    @Test
+    fun `premise traversal should retain captured source order after external mutation`() {
+        val upper = SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(2)))
+        val original = linkedMapOf("lower" to SourcePremise(lower), "upper" to upper)
+        val source = SourceProofContext(scope, setOf(x), original)
+        val snapshot = source.premises as MutableMap<String, SourcePremise>
+
+        original.clear()
+        snapshot.clear()
+        val visited = mutableListOf<Pair<String, SourcePremise>>()
+        source.forEachPremise { name, premise -> visited += name to premise }
+
+        assertEquals(listOf("lower", "upper"), visited.map { it.first })
+        assertEquals(listOf(lower, upper.inequality), visited.map { it.second.inequality })
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower"))))
+    }
+
+    @Test
+    fun `singleton lookup should retain captured coefficients after caller mutation`() {
+        val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val original = linkedMapOf(x to BigFraction.ONE, other to BigFraction.ZERO)
+        val inequality = SourceInequality(original, BigFraction.ofLong(2))
+        val snapshot = inequality.coefficients.toMutableMap()
+
+        original.clear()
+        original[other] = BigFraction.MINUS_ONE
+        snapshot.clear()
+
+        assertEquals(x, inequality.singleCoordinate())
+        assertEquals(BigFraction.ONE, inequality.coefficient(x))
+        assertNull(inequality.coefficient(other))
+    }
 
     @Test
     fun `batched consequences should share one proof allowance`() {

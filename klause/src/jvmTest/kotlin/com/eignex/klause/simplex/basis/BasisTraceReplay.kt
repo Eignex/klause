@@ -1,6 +1,5 @@
 package com.eignex.klause.simplex.basis
 
-import com.eignex.koblas.KoblasException
 import com.eignex.koblas.SparseMatrix
 import com.sun.management.ThreadMXBean
 import java.lang.management.ManagementFactory
@@ -145,8 +144,6 @@ internal object BasisTraceReplay {
                     is BasisTraceOperation.Update -> if (active) update(index, operation)
                 }
             } catch (failure: BasisArithmeticException) {
-                fail(index, "${operationName(operation)} numerical failure: ${failure.message}")
-            } catch (failure: KoblasException) {
                 fail(index, "${operationName(operation)} numerical failure: ${failure.message}")
             }
         }

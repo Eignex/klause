@@ -40,11 +40,46 @@ class LinearAuthorityCutsTest {
         ), emptyMap())
         val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
 
-        val query = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
-            maximumCutProofSteps = 1))
+        for (checkUnselected in listOf(true, false)) {
+            val query = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
+                maximumCutProofSteps = 1, cutMask = setOf(0), checkUnselectedCuts = checkUnselected))
 
-        assertTrue(1 in query.inactive)
-        assertFalse(query.unconditionalRows)
+            assertTrue(1 in query.inactive)
+            assertFalse(query.unconditionalRows)
+        }
+    }
+
+    @Test
+    fun `retired unselected candidates should spend no proof replay work`() {
+        val source = SourceProofContext(scope, setOf(x, y), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(2)), BigFraction.ONE)),
+        ), emptyMap())
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        var ordinaryWork = 0L
+        var retiredWork = 0L
+        assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
+            cutMask = emptySet(), onCutWork = { ordinaryWork += it }))
+
+        assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
+            cutMask = emptySet(), checkUnselectedCuts = false, onCutWork = { retiredWork += it }))
+
+        assertTrue(ordinaryWork > 0L)
+        assertEquals(0L, retiredWork)
+    }
+
+    @Test
+    fun `query reuse should distinguish retired candidate proof checking`() {
+        val source = SourceProofContext(scope, setOf(x, y), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                y to BigFraction.ofLong(2)), BigFraction.ONE)),
+        ), emptyMap())
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val retired = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
+            cutMask = emptySet(), checkUnselectedCuts = false))
+
+        assertFalse(retired.matches(source, cuts = true, cutMask = emptySet()))
+        assertTrue(retired.matches(source, cuts = true, cutMask = emptySet(), checkUnselectedCuts = false))
     }
 
     @Test
