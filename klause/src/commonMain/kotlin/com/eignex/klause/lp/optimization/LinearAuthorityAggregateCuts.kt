@@ -163,7 +163,7 @@ internal object LinearAuthorityAggregateCuts {
             var unavailableBasePairs: HashSet<Long>? = null
             fun preparePairs(
                 pairMeter: AggregateMeter, pairCharge: (String, Long) -> Unit, pairExtension: PairExtension?,
-                firstOnly: Boolean = false,
+                firstOnly: Boolean = false, allocationFloor: Long = 0L,
             ): Boolean {
                 for (row in rows) {
                     pairMeter.reserve(1L)
@@ -178,6 +178,9 @@ internal object LinearAuthorityAggregateCuts {
                             if (other.hasInteger && other.term.owner <= row.term.owner) continue
                             pairMeter.reserve(1L, 64L)
                             if (!paired.add(other.term.owner)) continue
+                            if (allocationFloor > 0L && pairMeter.remainingAllocation <= allocationFloor) {
+                                stopAggregate("AllocationLimit")
+                            }
                             val unavailable = unavailableBasePairs
                             if (pairExtension != null && unavailable != null) {
                                 pairMeter.reserve(1L, 32L)
@@ -244,7 +247,8 @@ internal object LinearAuthorityAggregateCuts {
                     }
                 }
                 try {
-                    val complete = preparePairs(baseMeter, baseCharge, null, firstOnly = true)
+                    val complete = preparePairs(baseMeter, baseCharge, null, firstOnly = true,
+                        allocationFloor = baseLimits.allocation / 2L)
                     observe(if (complete) "AggregatePairBaseComplete" else "AggregatePairBaseYielded", 1L)
                 } catch (stop: AggregateStop) {
                     eligibilityKnown = false
