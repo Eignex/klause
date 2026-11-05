@@ -562,7 +562,9 @@ queries, and no consequence becomes an original premise or witness authority.
 
 Cuts aggregate exact source rows and apply their rounding rule's bound and
 integrality checks. Local cuts keep their substitutions and premises and are
-revalidated after pop or remap. Selection considers efficacy, parallelism,
+revalidated after pop or remap. A retained load reuses the checked mapping of the same
+source definition within that load; parent proof rows use the numerical owner's
+existing row-identity index. Selection considers efficacy, parallelism,
 orthogonality, age and row caps; separators check actual column integrality, so
 continuous columns decline. Root harvesting caps retained cuts at the original row
 count, and root and node separation keep their round, depth, pool and work

@@ -69,10 +69,9 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
 
     fun parentRows(state: LpExactState): Map<Int, CutProvenance> {
         if (bindings.isEmpty()) return emptyMap()
-        val indices = (0 until state.rows.size).associateBy { state.rows.row(it).id }
         return bindings.associate { binding ->
-            val row = requireNotNull(indices[binding.id])
-            check(state.rows.row(row).active)
+            val row = state.rows.index(binding.id)
+            check(row >= 0 && state.rows.row(row).active)
             row to binding.proof
         }
     }
@@ -149,9 +148,12 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
             if (!seen.add(key)) continue
             val previous = existing[key]
             val active = previous?.let { state.rows.index(it.id) }?.let { it >= 0 && state.rows.row(it).active } == true
-            val priorCut = if (previous != null && active) previous.source.toCut(map).orNull() else null
-            if (previous != null && priorCut != null && priorCut.key() == cut.key() &&
-                previous.numericKey == cut.key()
+            val priorCut = if (previous != null && active) {
+                if (previous.source === source) cut else previous.source.toCut(map).orNull()
+            } else null
+            val numericKey = if (priorCut != null) cut.key() else null
+            if (previous != null && priorCut != null &&
+                (priorCut === cut || priorCut.key() == numericKey) && previous.numericKey == numericKey
             ) {
                 val proof = requireNotNull(priorCut.provenance)
                 next.add(if (previous.proof.auxiliaryDefinitions == proof.auxiliaryDefinitions) previous else {
