@@ -664,8 +664,8 @@ class RootInprocessingTest {
         val pass = RootProbingPass()
         val params = BacktrackParams(rootProbeBatch = 1, inprocessingProbeWork = 256L)
         val stats = SearchStatsSink()
-        pass.run(session, params, stats, containingWork = 127L)
-        assertTrue(pass.hasContinuation(session))
+        pass.run(session, params, stats, containingWork = 87L)
+        assertTrue(pass.hasContinuation(session), stats.snapshot().learning.toString())
         assertEquals(0, session.learnedClauseCount)
 
         pass.releaseRetainedBuffers()
