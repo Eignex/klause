@@ -482,6 +482,81 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `a later base pair should separate within the grant spent before half discovery`() {
+        val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val continuous = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val unused = (4 until 516).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf(
+            "first left" to SourcePremise(SourceInequality(
+                mapOf(a to BigFraction.ofLong(2), continuous to BigFraction.ONE), BigFraction.ofLong(3))),
+            "first right" to SourcePremise(SourceInequality(
+                mapOf(b to BigFraction.ofLong(2), continuous to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "left" to SourcePremise(left), "right" to SourcePremise(right))
+        for ((index, coordinate) in unused.withIndex()) {
+            premises["unused bound $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        }
+        val source = SourceProofContext(scope, setOf(x, y, real, a, b, continuous) + unused, premises)
+        val point = mapOf(a to 0.0, b to 0.0, continuous to 0.0, x to 0.75, y to 0.75, real to 1.5)
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+        var work = 0L
+        var allocation = 0L
+        var beforeWork = 0L
+        var beforeAllocation = 0L
+        var stopped = false
+        LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, count ->
+                if (name == "AggregateWork") work += count
+                if (name == "AggregateAllocation") allocation += count
+                if (name == "AggregateHalfAttempts") {
+                    beforeWork = work
+                    beforeAllocation = allocation
+                    stopped = true
+                }
+            }, maximumCandidates = 1, limits = limits,
+            point = point.mapValues { 0.0 })
+        assertTrue(stopped && beforeWork > 0L && beforeAllocation > 0L)
+
+        for (limited in listOf(limits.copy(work = beforeWork), limits.copy(allocation = beforeAllocation))) {
+            val observations = mutableMapOf<String, Long>()
+
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+                maximumCandidates = 1, limits = limited, point = point).single()
+
+            assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
+                cut.inequality)
+            assertEquals(setOf(2, 3), cut.owners)
+            assertTrue((observations["AggregateWork"] ?: 0L) <= limited.work)
+            assertTrue((observations["AggregateAllocation"] ?: 0L) <= limited.allocation)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+    }
+
+    @Test
+    fun `cancelling a base pair should withhold its unfinished cut`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
+            "left" to SourcePremise(left), "right" to SourcePremise(right)))
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, count ->
+                observations[name] = (observations[name] ?: 0L) + count
+                if (name == "AggregatePairAttempts") stopped = true
+            }, limits = limits, point = mapOf(x to 0.75, y to 0.75, real to 1.5))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+        assertNull(observations["AggregatePairComplete"])
+        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+    }
+
+    @Test
     fun `point directed pair preparation should retain a later separating proposal before its pool fills`() {
         val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)

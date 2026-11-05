@@ -160,50 +160,80 @@ internal object LinearAuthorityAggregateCuts {
                     charge("AggregateInteger" + stop.reason, 1L)
                 }
             }
-            for (row in rows) {
-                meter.reserve(1L)
-                if (!row.hasInteger) continue
-                meter.reserve(1L, 128L)
-                val paired = HashSet<Int>()
-                for ((id, coefficient) in row.coefficients) {
-                    meter.reserve(1L)
-                    if (id.kind != SourceCoordinate.Kind.Real) continue
-                    for (other in incidence[id to (coefficient < BigFraction.ZERO)].orEmpty()) {
-                        meter.reserve(1L)
-                        if (other.hasInteger && other.term.owner <= row.term.owner) continue
-                        meter.reserve(1L, 64L)
-                        if (!paired.add(other.term.owner)) continue
-                        if (candidates.size >= maximumCandidates) stopAggregate("RetentionLimit")
-                        observe("AggregatePairAttempts", 1L)
-                        val pivot = other.coefficients.getValue(id)
-                        val rightWeight = meter.number(if (coefficient > BigFraction.ZERO) coefficient
-                            else coefficient.negated())
-                        val leftWeight = meter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
-                        meter.reserve(1L, 320L)
-                        val terms = listOf(row.term.copy(weight = leftWeight), other.term.copy(weight = rightWeight))
-                        val snapshots = listOf(row.coefficients, other.coefficients)
-                        var cut = deriveWithCoefficients(terms, derivedStop, charge, attemptLimits,
-                            allowMixed = true, continuousBounds = selectedBounds,
-                            coefficientSnapshots = snapshots, capture = extension?.capture)
-                        if (point != null) {
-                            val initial = cut
-                            val separating = if (initial == null) false else separates(initial, point, meter, observe)
-                            if (separating == null) {
-                                eligibilityKnown = false
-                                continue
+            fun preparePairs(
+                pairMeter: AggregateMeter, pairCharge: (String, Long) -> Unit, pairExtension: PairExtension?,
+            ) {
+                for (row in rows) {
+                    pairMeter.reserve(1L)
+                    if (!row.hasInteger) continue
+                    pairMeter.reserve(1L, 128L)
+                    val paired = HashSet<Int>()
+                    for ((id, coefficient) in row.coefficients) {
+                        pairMeter.reserve(1L)
+                        if (id.kind != SourceCoordinate.Kind.Real) continue
+                        for (other in incidence[id to (coefficient < BigFraction.ZERO)].orEmpty()) {
+                            pairMeter.reserve(1L)
+                            if (other.hasInteger && other.term.owner <= row.term.owner) continue
+                            pairMeter.reserve(1L, 64L)
+                            if (!paired.add(other.term.owner)) continue
+                            if (candidates.size >= maximumCandidates) stopAggregate("RetentionLimit")
+                            observe("AggregatePairAttempts", 1L)
+                            val pivot = other.coefficients.getValue(id)
+                            val rightWeight = pairMeter.number(if (coefficient > BigFraction.ZERO) coefficient
+                                else coefficient.negated())
+                            val leftWeight = pairMeter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
+                            pairMeter.reserve(1L, 320L)
+                            val terms = listOf(row.term.copy(weight = leftWeight), other.term.copy(weight = rightWeight))
+                            val snapshots = listOf(row.coefficients, other.coefficients)
+                            var cut = deriveWithCoefficients(terms, derivedStop, pairCharge, attemptLimits,
+                                allowMixed = true, continuousBounds = selectedBounds,
+                                coefficientSnapshots = snapshots, capture = pairExtension?.capture)
+                            if (point != null) {
+                                val initial = cut
+                                val separating = if (initial == null) false else separates(initial, point, pairMeter, observe)
+                                if (separating == null) {
+                                    eligibilityKnown = false
+                                    continue
+                                }
+                                if (!separating) {
+                                    if (pairExtension == null || candidates.isNotEmpty()) continue
+                                    cut = pairExtension.extend(terms, snapshots)
+                                    if (pairExtension.attempted) eligibilityKnown = false
+                                }
                             }
-                            if (!separating) {
-                                if (candidates.isNotEmpty()) continue
-                                cut = extension?.extend(terms, snapshots)
-                                if (extension?.attempted == true) eligibilityKnown = false
-                            }
+                            val retained = cut ?: continue
+                            pairMeter.reserve(1L, 128L + retained.inequality.supportSize * 64L)
+                            candidates += retained
                         }
-                        val retained = cut ?: continue
-                        meter.reserve(1L, 128L + retained.inequality.supportSize * 64L)
-                        candidates += retained
                     }
                 }
             }
+            if (point != null && candidates.isEmpty()) {
+                meter.reserve(1L, 128L)
+                val baseLimits = attemptLimits.copy(work = minOf(attemptLimits.work, meter.remainingWork / 2L),
+                    allocation = minOf(attemptLimits.allocation, meter.remainingAllocation / 2L))
+                val baseMeter = AggregateMeter(baseLimits, derivedStop, charge)
+                val baseCharge: (String, Long) -> Unit = { name, count ->
+                    when (name) {
+                        "AggregateWork" -> baseMeter.reserve(count)
+                        "AggregateAllocation" -> baseMeter.reserve(0L, count)
+                        else -> charge(name, count)
+                    }
+                }
+                try {
+                    preparePairs(baseMeter, baseCharge, null)
+                    observe("AggregatePairBaseComplete", 1L)
+                } catch (stop: AggregateStop) {
+                    eligibilityKnown = false
+                    observe("AggregatePairBase" + stop.reason, 1L)
+                }
+                if (candidates.isNotEmpty()) {
+                    observe("AggregatePairBaseRetained", candidates.size.toLong())
+                    observe("AggregatePairIncomplete", 1L)
+                    return candidates.toList()
+                }
+            }
+            preparePairs(meter, charge, extension)
             observe(if (eligibilityKnown) "AggregatePairComplete" else "AggregatePairIncomplete", 1L)
         } catch (stop: AggregateStop) {
             observe("AggregatePair${stop.reason}", 1L)
