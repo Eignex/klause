@@ -290,11 +290,18 @@ class LinearAuthorityInvocationTest {
                 it.run { _, _ -> }
             }
 
-            val terminal = assertNotNull(result.terminal)
-            assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
-                assertIs<SourceClaim.Optimal>(terminal.claim).value)
+            val evidence = if (pointCuts && operations == 1) {
+                assertNull(result.terminal)
+                assertNotNull(result.bound).also {
+                    assertEquals(SourceValue.Rational(BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal()),
+                        assertIs<SourceClaim.Bound>(it.claim).value)
+                }
+            } else assertNotNull(result.terminal).also {
+                assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
+                    assertIs<SourceClaim.Optimal>(it.claim).value)
+            }
             assertEquals(SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
         }
     }
 

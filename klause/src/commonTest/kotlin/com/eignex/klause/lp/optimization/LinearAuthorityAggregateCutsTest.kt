@@ -91,6 +91,46 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `point generated pairs should strengthen the completed current bound`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right)),
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+        val budget = SourceLpBudget()
+        val capture = LinearAuthorityCapture(4, 10_000L, 1_000_000L, Cancellation.Never)
+        val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            authority.capture = capture
+
+            authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, null)
+        }
+
+        assertTrue(capture.records.first().cuts.isEmpty())
+        assertEquals(2, budget.operations)
+        assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
+            assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+        assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+    }
+
+    @Test
+    fun `point generated pairs should preserve the base bound at the operation limit`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right)),
+            mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+        val budget = SourceLpBudget(maxOperations = 1)
+
+        val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, null)
+        }
+
+        assertEquals(1, budget.operations)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal()),
+            assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+    }
+
+    @Test
     fun `a checked current optimum should bypass optional pair discovery`() {
         val source = SourceProofContext(scope.copy(objective = SourceObjective("x", ObjectiveSense.MINIMIZE)),
             setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
