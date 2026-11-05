@@ -24,6 +24,10 @@ internal class LinearAuthorityPointCuts(
     val observations: Map<String, Long> get() = counts.toMap()
     private var family: List<LinearAuthorityCut>? = null
     private var cooldown = 0
+    private var emptyDiscoveryMisses = 0
+    private var emptyDiscoveryCooldown = 0
+    var selectionComplete: Boolean = false
+        private set
     private var misses = 0
     private var retired = false
     private var managedCurrent = false
@@ -44,6 +48,46 @@ internal class LinearAuthorityPointCuts(
 
     fun retainsCandidateLayout(rows: List<LinearAuthorityCut>?): Boolean =
         rows != null && family === rows && retainedLayout
+
+    fun resetDiscoveryBackoff() {
+        emptyDiscoveryMisses = 0
+        emptyDiscoveryCooldown = 0
+    }
+
+    fun admitDiscovery(cancellation: Cancellation): Boolean {
+        if (!chargeDiscoveryDecision(cancellation)) return false
+        if (emptyDiscoveryCooldown == 0) return true
+        emptyDiscoveryCooldown--
+        observe("EmptyDiscoveryCooldownQueries")
+        return false
+    }
+
+    fun observeDiscovery(selected: Boolean, cancellation: Cancellation) {
+        if (!selected && !selectionComplete) return
+        if (!chargeDiscoveryDecision(cancellation)) return
+        if (selected) {
+            resetDiscoveryBackoff()
+            return
+        }
+        emptyDiscoveryMisses++
+        observe("EmptyDiscoveryAttempts")
+        if (emptyDiscoveryMisses >= 2) {
+            emptyDiscoveryMisses = 0
+            emptyDiscoveryCooldown = 7
+            observe("EmptyDiscoveryBackoffs")
+        }
+    }
+
+    private fun chargeDiscoveryDecision(cancellation: Cancellation): Boolean {
+        val funding = budget.funding
+        if (cancellation() || funding?.paused == true ||
+            funding?.remainingAllocation?.let { it < 64L } == true) return false
+        budget.observe(preparation = 1L)
+        funding?.charge(0L, 64L)
+        observe("Work", 1L)
+        observe("Allocation", 64L)
+        return !cancellation() && funding?.paused != true
+    }
 
     fun releaseCandidates() {
         family = null
@@ -107,6 +151,7 @@ internal class LinearAuthorityPointCuts(
         trackUsefulness: Boolean = false,
     ): Set<Int> {
         adoptedCurrent = false
+        selectionComplete = false
         if (rows.isEmpty() || rows.size > maximumCuts || checked.size != rows.size) return emptySet()
         val meter = Meter(cancellation)
         val visitedFamilies = HashSet<CutFamily>()
@@ -160,7 +205,11 @@ internal class LinearAuthorityPointCuts(
         trackSelectedUsefulness: Boolean = false,
     ): Set<Int> {
         adoptedCurrent = false
-        if (rows.isEmpty()) return installed
+        selectionComplete = false
+        if (rows.isEmpty()) {
+            selectionComplete = !cancellation() && budget.funding?.paused != true
+            return installed
+        }
         if (installed.size >= maximumCuts) observe("PoolLimited")
         if (family !== rows) {
             family = rows
@@ -244,12 +293,16 @@ internal class LinearAuthorityPointCuts(
                     128L + installed.size * 128L)) return installed
             val observedInactive = HashMap<Int, Int>()
             var support = 0
+            var scoresComplete = checked.size == rows.size
             for ((id, row) in rows.withIndex()) {
                 if (retired && id !in installed) {
                     if (!meter.charge(1L)) break
                     continue
                 }
-                if (id !in checked) continue
+                if (id !in checked) {
+                    scoresComplete = false
+                    continue
+                }
                 val size = row.inequality.supportSize
                 val rowAllocation = if (retired) 64L else 128L + size * 96L
                 if (size > maximumSupport - support || !meter.charge(1L, rowAllocation)) {
@@ -281,6 +334,7 @@ internal class LinearAuthorityPointCuts(
                 val norm = sqrt(normSquared)
                 val efficacy = if (rhs == null || norm <= 0.0) Double.NaN else (activity - rhs) / norm
                 if (!usable || !norm.isFinite() || !efficacy.isFinite()) {
+                    scoresComplete = false
                     observe("ScoreUnavailable")
                     continue
                 }
@@ -288,6 +342,7 @@ internal class LinearAuthorityPointCuts(
                     abs(parallel) / (norm * objectiveNorm) else 0.0
                 val score = efficacy / sqrt(maxOf(1, size).toDouble()) + 0.01 * alignment
                 if (!score.isFinite()) {
+                    scoresComplete = false
                     observe("ScoreUnavailable")
                     continue
                 }
@@ -323,6 +378,7 @@ internal class LinearAuthorityPointCuts(
                 rows.indices.all { it in checked && (!installedPending || it in installed) }
             var retained = installed
             if (!meter.limited && !cancellation()) {
+                selectionComplete = scoresComplete
                 if (layoutCovered) {
                     if (layoutPending) {
                         retainedLayout = true

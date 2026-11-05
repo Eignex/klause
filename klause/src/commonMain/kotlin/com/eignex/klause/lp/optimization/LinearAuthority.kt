@@ -145,6 +145,7 @@ internal class LinearAuthority(
         pointListener = null
         pointRound = null
         pointPolicy?.releaseCandidates()
+        pointPolicy?.resetDiscoveryBackoff()
         pointFamily = null
         pointFallback = null
         directedFamily = null
@@ -187,7 +188,9 @@ internal class LinearAuthority(
             return advance(source, cancellation, cuts = fallbackCuts)
         }
         pointFallback = null
-        if (pointFamily !== template || template?.matches(source) != true || template?.cuts == null) {
+        val changedFamily = pointFamily !== template || template?.matches(source) != true
+        if (changedFamily) policy.resetDiscoveryBackoff()
+        if (changedFamily || template?.cuts == null) {
             pointMask = null
             pointRound = null
             pointFamily = template
@@ -260,11 +263,15 @@ internal class LinearAuthority(
                 return base.copy(paused = base.paused || budget.funding?.paused == true)
             }
             var preparedGenerated = false
+            var attemptedPointDiscovery = false
             val generatedRecipe = currentRows.isNotEmpty() && currentRows.size <= 64 &&
                 currentRows.all { it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR }
             if (!generatedRecipe && family.cuts?.pointDirected != true && directedFamily !== family &&
                 pointMask == null &&
                 (aggregateCuts || currentRows.any { it.mixed })) {
+                if (pointAggregates && !cutLifecycle.containing("POINT_SELECTION") {
+                        policy.admitDiscovery(cancellation)
+                    }) return base.copy(paused = budget.funding?.paused == true)
                 directedFamily = family
                 cutLifecycle.families = currentRows.mapTo(HashSet()) { it.family }
                 val refined = cutLifecycle.containing("POINT_SELECTION") {
@@ -272,6 +279,7 @@ internal class LinearAuthority(
                         ordinaryTried = generatedFirst || pointAggregates, pointAggregates = pointAggregates)
                 }
                 if (refined != null) {
+                    attemptedPointDiscovery = true
                     family = refined.template
                     prepared = refined.query
                     preparedGenerated = refined.generated
@@ -294,6 +302,14 @@ internal class LinearAuthority(
                 }
             }
             if (budget.funding?.exhausted == true || cancellation()) return base
+            if (pointAggregates && attemptedPointDiscovery && budget.funding?.paused != true) {
+                cutLifecycle.containing("POINT_SELECTION") {
+                    policy.observeDiscovery(selected.isNotEmpty(), cancellation)
+                }
+                if (budget.funding?.paused == true || cancellation()) {
+                    return base.copy(paused = budget.funding?.paused == true)
+                }
+            }
             if (policy.adoptedCurrent) {
                 pointMask = selected
                 return base.copy(paused = base.paused || budget.funding?.paused == true)

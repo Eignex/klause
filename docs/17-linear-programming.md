@@ -645,6 +645,14 @@ still authorize every row. The replacement shares the original generation's work
 limit and retains the source-row template; unavailable preparation leaves its prior
 candidates intact. Each retained candidate generation attempts this preparation once.
 A new scope can start another generation after a nonseparating fallback.
+The combined aggregate-and-point entry permits two completed empty discovery
+attempts before a cooldown that skips seven eligible discovery requests. Base
+queries still run under their current scope, and the first changed-scope retry
+remains eligible.
+A new immutable template or a selected cut resets this backoff. Cancelled, paused
+or incomplete selections do not advance the empty streak. Admission and feedback
+charge preparation work and modeled state storage under the containing allowance.
+Local producer-limit refusals retain their costs without asserting complete coverage.
 Point scoring admits at most one additional checked cut at each usable point.
 An addition waits for its completed selected query before enabling another scan
 at the next point. Only a strictly stronger checked bound, a checked incumbent or

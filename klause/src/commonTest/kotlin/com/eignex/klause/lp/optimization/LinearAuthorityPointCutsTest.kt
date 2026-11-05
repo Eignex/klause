@@ -54,6 +54,126 @@ class LinearAuthorityPointCutsTest {
     ), mapOf(x to BigFraction.ONE))
 
     @Test
+    fun `empty discovery should cool down while preserving checked base bounds`() {
+        val triangle = (1..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = nonseparating.premises.toMutableMap()
+        premises["coupled"] = SourcePremise(SourceInequality(
+            mapOf(x to BigFraction.ONE, mixedReal to BigFraction.ONE), BigFraction.ofLong(3)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val half = BigFraction.ofLong(2).reciprocal()
+        val quarter = BigFraction.ofLong(4).reciprocal()
+        val root = SourceProofContext(nonseparating.scope, nonseparating.coordinates + triangle, premises,
+            (triangle + x).associateWith { BigFraction.ONE } +
+                (triangle.first() to half) + (mixedReal to quarter.negated()))
+        LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            val first = authority.advanceWithPointGeneratedCuts(root, Cancellation.Never, BigFraction.ZERO)
+            val child = root.atScope(root.scope.copy(condition = SourceCondition(
+                upper = mapOf(mixedReal to BigFraction.ofLong(5)))))
+            authority.advanceWithPointGeneratedCuts(child, Cancellation.Never, BigFraction.ZERO)
+            assertEquals(2L, authority.cutObservations()["numericalCutSelectionPointPrepared"])
+
+            for (upper in 6L..12L) {
+                val context = root.atScope(root.scope.copy(condition = SourceCondition(
+                    upper = mapOf(mixedReal to BigFraction.ofLong(upper)))))
+
+                val result = authority.advanceWithPointGeneratedCuts(context, Cancellation.Never, BigFraction.ZERO)
+
+                assertEquals(assertNotNull(first.bound).claim, assertNotNull(result.bound).claim)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(context.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            }
+
+            assertEquals(2L, authority.cutObservations()["numericalCutSelectionPointPrepared"])
+            assertEquals(7L, authority.cutObservations()["numericalCutSelectionEmptyDiscoveryCooldownQueries"])
+            val resumed = root.atScope(root.scope.copy(condition = SourceCondition(
+                upper = mapOf(mixedReal to BigFraction.ofLong(13)))))
+            val result = authority.advanceWithPointGeneratedCuts(resumed, Cancellation.Never, BigFraction.ZERO)
+            assertEquals(3L, authority.cutObservations()["numericalCutSelectionPointPrepared"])
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(resumed.withLinearAuthority()).verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `a new source template should reset empty discovery backoff`() {
+        val triangle = (1..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = nonseparating.premises.toMutableMap()
+        premises["coupled"] = SourcePremise(SourceInequality(
+            mapOf(x to BigFraction.ONE, mixedReal to BigFraction.ONE), BigFraction.ofLong(3)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val half = BigFraction.ofLong(2).reciprocal()
+        val quarter = BigFraction.ofLong(4).reciprocal()
+        val root = SourceProofContext(nonseparating.scope, nonseparating.coordinates + triangle, premises,
+            (triangle + x).associateWith { BigFraction.ONE } +
+                (triangle.first() to half) + (mixedReal to quarter.negated()))
+        LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithPointGeneratedCuts(root, Cancellation.Never, BigFraction.ZERO)
+            val child = root.atScope(root.scope.copy(condition = SourceCondition(
+                upper = mapOf(mixedReal to BigFraction.ofLong(5)))))
+            authority.advanceWithPointGeneratedCuts(child, Cancellation.Never, BigFraction.ZERO)
+            val replacement = SourceProofContext(
+                root.scope.copy(revision = SourceRevision("empty-discovery-next", "exact-affine")),
+                root.coordinates, root.premises, root.objective)
+
+            val result = authority.advanceWithPointGeneratedCuts(replacement, Cancellation.Never, BigFraction.ZERO)
+
+            assertEquals(3L, authority.cutObservations()["numericalCutSelectionPointPrepared"])
+            assertNull(authority.cutObservations()["numericalCutSelectionEmptyDiscoveryCooldownQueries"])
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(replacement.withLinearAuthority()).verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `an interrupted discovery admission should preserve its backoff`() {
+        for (pause in listOf(false, true)) {
+            val funding = SourceLpFunding(10_000L, 100_000L).apply { grant(10_000L) }
+            val selection = LinearAuthorityPointCuts(SourceLpBudget(funding = funding))
+            repeat(2) {
+                assertTrue(selection.admitDiscovery(Cancellation.Never))
+                selection.select(emptyList(), emptyList(), emptyList(), emptySet(), emptyList(),
+                    emptySet(), Cancellation.Never)
+                selection.observeDiscovery(false, Cancellation.Never)
+            }
+            var cancelled = !pause
+            if (pause) funding.grant(0L)
+
+            assertFalse(selection.admitDiscovery(Cancellation { cancelled }))
+
+            cancelled = false
+            funding.grant(10_000L)
+            repeat(7) { assertFalse(selection.admitDiscovery(Cancellation.Never)) }
+            assertTrue(selection.admitDiscovery(Cancellation.Never))
+        }
+    }
+
+    @Test
+    fun `an unavailable scoring point should not advance empty discovery backoff`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO), SourceDerivation.Premise("upper")))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        repeat(2) {
+            assertTrue(selection.admitDiscovery(Cancellation.Never))
+            selection.select(rows, listOf(x), listOf(BigFraction.ZERO), setOf(0), emptyList(),
+                emptySet(), Cancellation.Never)
+
+            selection.observeDiscovery(false, Cancellation.Never)
+        }
+
+        assertTrue(selection.admitDiscovery(Cancellation.Never))
+    }
+
+    @Test
     fun `numeric scope changes should retry a nonseparating point recipe`() {
         val triangle = (1..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val premises = nonseparating.premises.toMutableMap()
