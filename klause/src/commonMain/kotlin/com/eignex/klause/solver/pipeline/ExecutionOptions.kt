@@ -329,6 +329,11 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
             "root-probe-binary-gate", ValueKind.BOOLEAN,
         )
 
+        /** Prefer learned Boolean General neighborhoods without root facts or known binaries. */
+        val rootProbeGeneralGate: ExecutionOption<Boolean> = ExecutionOption(
+            "root-probe-general-gate", ValueKind.BOOLEAN,
+        )
+
         /** Maximum propagation work per root probe. */
         val rootProbeWork: ExecutionOption<Long> = ExecutionOption("root-probe-work", ValueKind.POSITIVE_LONG)
 
@@ -606,7 +611,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch,
                 rootRebuildCaptureVisits,
                 privateRebuildWork, privateRebuildBytes,
-                rootProbeBatch, rootProbeImplications, rootProbeBinaryGate, rootProbeWork,
+                rootProbeBatch, rootProbeImplications, rootProbeBinaryGate, rootProbeGeneralGate, rootProbeWork,
                 inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingProbeInterval,
                 inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth,
                 inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,

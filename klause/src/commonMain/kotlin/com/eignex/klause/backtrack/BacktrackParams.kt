@@ -471,6 +471,8 @@ data class BacktrackParams(
     val inprocessingProbeInterval: Long = 0L,
     /** Limit Native root probes to learned binaries until a root fact or known binary permits propagation. */
     val rootProbeBinaryGate: Boolean = false,
+    /** Prefer learned neighborhoods in Boolean General states without root facts or known binaries. */
+    val rootProbeGeneralGate: Boolean = false,
 ) : SolverParams {
     init {
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }

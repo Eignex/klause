@@ -375,6 +375,7 @@ internal object PortfolioComposition {
                     rootParams.boundedRootMaintenance(
                         warmupWork = if (clausal) 4096L else 0L,
                         binaryGate = clausal,
+                        generalGate = !clausal,
                     )
                 } else {
                     rootParams
@@ -398,13 +399,18 @@ internal object PortfolioComposition {
         return base.dropLast(1) + BacktrackWorkerConfig(annotation, zeroObjectivePricing)
     }
 
-    private fun BacktrackParams.boundedRootMaintenance(warmupWork: Long, binaryGate: Boolean): BacktrackParams = copy(
+    private fun BacktrackParams.boundedRootMaintenance(
+        warmupWork: Long,
+        binaryGate: Boolean,
+        generalGate: Boolean,
+    ): BacktrackParams = copy(
         rootSimplification = true,
         rootSimplifyBatch = 256,
         rootProbeBatch = 2,
         rootProbeWork = 8192L,
         rootProbeImplications = false,
         rootProbeBinaryGate = binaryGate,
+        rootProbeGeneralGate = generalGate,
         inprocessingWork = 4096L,
         inprocessingRootWork = 256L,
         inprocessingProbeWork = 3072L,

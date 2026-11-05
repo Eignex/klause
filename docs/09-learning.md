@@ -743,6 +743,13 @@ optional buffer release or retirement. General propagation retains ordinary rota
 An exhausted unchanged neighborhood does no further scanning, and preparation alone
 does not start the optional probe interval. Scope reset clears the binary hint;
 required consequence publication retains its separate eligibility.
+`rootProbeGeneralGate` applies a separate heuristic to Boolean General states without
+root facts or known binaries: it examines new learned clauses of two to eight literals
+before admitting global probes. General constraints can propagate without a binary,
+so this admission is optional rather than a propagation impossibility test. Integer
+endpoint rotation retains its ordinary policy. A root fact or binary hint reopens
+global rotation; exhausted preparation does not delay new learned candidates by the
+probe interval. Required implication publication keeps its independent eligibility.
 Disabling it skips capture reservations and cancels a retained optional candidate under
 a funded probe visit; the scope admission count remains unchanged.
 Capture is prepaid before propagation and reads at most the final two trail entries.

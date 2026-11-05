@@ -411,13 +411,15 @@ internal class RootProbingPass : InprocessingPass {
         containingWork: Long,
     ) {
         if (!session.canSimplifyRoot || params.rootProbeWork <= 0L) return
+        val opportunityClock = params.rootProbeBinaryGate || (params.rootProbeGeneralGate &&
+            !session.usesNativeSat && session.problem.numIntVars == 0)
         spending.run(session, params, stats, containingWork = containingWork) { budget ->
             if (implications.advance(session, params, budget) && !budget.stopped()) {
                 val before = session.work
                 try {
                     probe(session, params, budget)
                 } finally {
-                    if (!params.rootProbeBinaryGate && session.work > before) lastProbeWork = offeredWork
+                    if (!opportunityClock && session.work > before) lastProbeWork = offeredWork
                 }
             }
         }
@@ -435,22 +437,32 @@ internal class RootProbingPass : InprocessingPass {
         var literalsExamined = 0L
         var endpointsExamined = 0L
         val priorCancelled = session.probeCancelled
+        val generalGate = params.rootProbeGeneralGate && !session.usesNativeSat && session.problem.numIntVars == 0
         while (attempted < params.rootProbeBatch && examined < minOf(candidates, ROOT_LITERAL_LIMIT.toLong())) {
-            val binariesOnly = params.rootProbeBinaryGate && session.usesNativeSat &&
-                session.explanationState.boolPinOrder.size == 0 &&
+            val rootPins = session.explanationState.boolPinOrder.size
+            val withoutRootSignal = rootPins == 0 &&
                 !session.explanationState.hasBinaryClauses && !learnedBinarySeen
-            if (binariesOnly && neighborhood == null && revision == session.learnedRetirementGeneration &&
+            val binariesOnly = params.rootProbeBinaryGate && session.usesNativeSat && withoutRootSignal
+            val neighborhoodOnly = binariesOnly || (generalGate && withoutRootSignal)
+            if (generalGate) {
+                budget.note(when {
+                    rootPins > 0 -> "GeneralRootFacts"
+                    withoutRootSignal -> "GeneralNeighborhoodOnly"
+                    else -> "GeneralBinaryHint"
+                })
+            }
+            if (neighborhoodOnly && neighborhood == null && revision == session.learnedRetirementGeneration &&
                 learnedCursor >= session.learnedClauseCount) {
-                budget.note("NoPropagationOpportunity")
+                budget.note(if (binariesOnly) "NoPropagationOpportunity" else "GlobalDeferred")
                 break
             }
             if (!session.canSimplifyRoot || !budget.visit()) break
-            val nearby = if (binariesOnly || preferNeighborhood) {
+            val nearby = if (neighborhoodOnly || preferNeighborhood) {
                 neighborhoodLiteral(session, budget, binariesOnly)
             } else null
             if (budget.stopped()) break
-            if (binariesOnly && nearby == null) {
-                budget.note("NoPropagationOpportunity")
+            if (neighborhoodOnly && nearby == null) {
+                budget.note(if (binariesOnly) "NoPropagationOpportunity" else "GlobalDeferred")
                 break
             }
             val endpoint = nearby == null && endpointsExamined < endpointCandidates &&
