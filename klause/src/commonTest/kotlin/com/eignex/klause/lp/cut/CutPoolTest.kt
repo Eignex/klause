@@ -27,6 +27,7 @@ class CutPoolTest {
         val premises = listOf(
             CutPremise.Bound(expression, false, BigFraction.ONE),
             CutPremise.Literal(1),
+            CutPremise.Excluded(source, BigFraction.ofLong(2)),
             CutPremise.ObjectiveCutoff(expression, BigFraction.ofLong(5)),
         )
         val cut = SourceCut(expression, Relation.LE, BigFraction.ofLong(3),
@@ -54,6 +55,24 @@ class CutPoolTest {
         }
     }
 
+
+    @Test
+    fun `small immutable inputs should keep their cuts without retained preparation`() {
+        val model = Any()
+        val x = CutSource(CutSourceKind.INTEGER, 0)
+        val expression = CutExpression(mapOf(x to BigFraction.ONE))
+        val map = CutSourceMap(model, 0, listOf(CutColumnSource(x)))
+        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(model, 0, emptyList()))
+        var work = 0L
+        val pool = CutPool(prepareSources = true, onPreparationWork = { work += it })
+        assertTrue(pool.add(source, map))
+
+        repeat(3) { pool.remap(map) }
+
+        assertEquals(1, pool.cuts().size)
+        assertEquals(0L, pool.preparationStorageUnits)
+        assertEquals(0L, work)
+    }
 
     @Test
     fun `cancelled preparation should spend capture work without retaining a prepared input`() {
