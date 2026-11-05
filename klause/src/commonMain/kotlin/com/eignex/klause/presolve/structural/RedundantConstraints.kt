@@ -23,16 +23,16 @@ import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.SubsumeState
 import com.eignex.klause.presolve.asSourceDelta
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntLongMap
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.MutableLongIntMap
-import com.eignex.klause.util.MutableLongObjectMap
 import com.eignex.klause.util.ScanMeter
-import com.eignex.klause.util.addExact
 import com.eignex.kumulant.math.splitmix64
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.collections.MutableLongIntMap
+import com.eignex.util.collections.MutableLongObjectMap
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
 
 /** Marks a bool var id into a range disjoint from int var ids in [RedundantConstraints.shallowKey]'s
  *  variable-set sum, so a bool var and an int var of the same id don't cancel or alias. */

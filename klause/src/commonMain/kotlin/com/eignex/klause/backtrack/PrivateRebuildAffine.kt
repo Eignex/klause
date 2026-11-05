@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
 
 internal class PrivateRebuildAffine(
     private val fixed: Array<Boolean?>,
@@ -52,7 +52,7 @@ internal class PrivateRebuildAffine(
     }
 
     fun preferredFreeCoordinates(cancellation: Cancellation): IntArray? {
-        if (coordinates.size * 2L > PROPAGATION_WORK_PER_NODE) return EmptyIntArray
+        if (coordinates.size * 2L > PROPAGATION_WORK_PER_NODE) return emptyIntArray()
         cancellation.charge(coordinates.size * 2L + freeColumns + 8L)
         if (cancellation()) return null
         val result = IntArray(freeColumns)

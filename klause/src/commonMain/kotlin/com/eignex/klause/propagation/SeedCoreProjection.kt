@@ -3,7 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.search.resolveSearchClauses
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.binarySearchInt
+import com.eignex.util.arrays.binarySearchInt
 
 internal fun PropagationSession.projectSeedCore(
     assumptions: Assumptions,

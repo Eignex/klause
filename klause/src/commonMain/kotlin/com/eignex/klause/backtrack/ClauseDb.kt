@@ -8,9 +8,9 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SearchStatsSink
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 /** Reduce the learned-clause database at a restart without discarding permanent or glue clauses. */
 internal fun forgetIfOverCap(

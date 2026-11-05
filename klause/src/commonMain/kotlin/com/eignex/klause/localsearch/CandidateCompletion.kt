@@ -2,7 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
 
 /**
  * Turns a proposed local-search assignment into a solution of the model, or says why it
@@ -38,7 +38,7 @@ sealed interface Completion {
 
     /** The candidate is no solution. [factors] names the model rows that show it, when the check knows them;
      *  local search raises their weights so the next descent steers away from the same failure. */
-    class Refuted(val factors: IntArray = EmptyIntArray, override val work: Long = 0L) : Completion
+    class Refuted(val factors: IntArray = emptyIntArray(), override val work: Long = 0L) : Completion
 
     /** The check could neither confirm nor refute the candidate within its budget. */
     class Undecided(override val work: Long = 0L) : Completion

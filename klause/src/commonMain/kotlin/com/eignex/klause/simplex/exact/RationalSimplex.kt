@@ -1,8 +1,8 @@
 package com.eignex.klause.simplex.exact
 
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_TWO
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_TWO
+import com.eignex.util.numbers.BigInt
 
 // Multipliers orient the equality so its RHS is below the minimum selected by the cited bounds.
 // Strict rows contribute -multiplier to the infinitesimal RHS; a negative delta breaks an exact tie.

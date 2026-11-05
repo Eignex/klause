@@ -7,10 +7,10 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
+import com.eignex.util.collections.IntIntMap
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
 
 internal class ExactPseudoBooleanInvariant(
     constants: IntegralConstants,

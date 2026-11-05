@@ -1,12 +1,12 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
 
 internal class RationalPolynomial(coefficients: List<BigFraction>) {
     private val captured = coefficients.dropLastWhile { it.isZero }

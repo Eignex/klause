@@ -4,9 +4,9 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IndexedMaxHeap
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IndexedMaxHeap
+import com.eignex.util.collections.IntArrayList
 import kotlin.random.Random
 
 /**
@@ -46,7 +46,7 @@ class Chb(
     // Combined index space: 0..numBool-1 are bool ids; numBool..numBool+numInt-1 are int ids
     // offset by numBool. Picks are O((1 + pinned-skip)·log n).
     private var heap: IndexedMaxHeap? = null
-    private var lastConflict: LongArray = EmptyLongArray
+    private var lastConflict: LongArray = emptyLongArray()
     private var numBoolCached: Int = 0
     private var numIntCached: Int = 0
     private val pickSkipBuffer = IntArrayList(16)

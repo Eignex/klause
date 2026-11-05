@@ -8,10 +8,10 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.formats.smtlib.SmtLib
-import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.simplex.exact.BigFraction
@@ -19,8 +19,8 @@ import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BIG_ONE
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.util.Base64

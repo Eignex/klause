@@ -4,8 +4,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BIG_ONE
 
 internal fun SourceProofContext.linearValue(sample: Sample, cancellation: Cancellation): BigFraction? {
     if (cancellation() || !affineObjectiveAvailable) return null

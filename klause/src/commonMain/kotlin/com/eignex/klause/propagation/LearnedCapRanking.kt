@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.collections.IntArrayList
 
 internal const val CAP_ROW_INSPECTION_WORK = 4L
 internal const val CAP_ROW_POLICY_WORK = 32L - CAP_ROW_INSPECTION_WORK

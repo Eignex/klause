@@ -14,8 +14,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.plus
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.plus
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

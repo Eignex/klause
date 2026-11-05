@@ -13,7 +13,7 @@ import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.newRetainedLpSolver
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.util.numbers.CheckedLongOverflowException
 
 internal class LpProbeSolver(
     model: LpModel,

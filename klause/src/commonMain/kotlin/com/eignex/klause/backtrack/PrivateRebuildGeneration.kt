@@ -14,8 +14,8 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.arrays.emptyIntArray
 import kotlin.time.TimeSource
 
 internal class PrivateRebuildGeneration private constructor(
@@ -202,7 +202,7 @@ internal class PrivateRebuildGeneration private constructor(
             }
             val preferred = if (rowView) {
                 checkNotNull(basis).preferredFreeCoordinates(cancellation) ?: return null
-            } else EmptyIntArray
+            } else emptyIntArray()
             if (parity != null) {
                 cancellation.charge(source.numBoolVars * 16L)
                 if (cancellation()) return null

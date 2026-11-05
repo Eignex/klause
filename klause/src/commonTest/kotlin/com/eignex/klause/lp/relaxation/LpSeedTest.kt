@@ -6,8 +6,8 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

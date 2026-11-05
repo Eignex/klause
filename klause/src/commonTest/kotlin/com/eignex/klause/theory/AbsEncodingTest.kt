@@ -37,9 +37,9 @@ import com.eignex.klause.solver.pipeline.openWitnessVerifier
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.toSample
 import com.eignex.klause.theory.qfnra.PolynomialFormula
-import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

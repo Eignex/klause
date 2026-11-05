@@ -1,9 +1,9 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.toSortedLongArray
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.collections.toSortedLongArray
 
 /** Fold successful root-propagation deductions into the finite domains this projection owns. */
 internal fun BakedProblem.foldRootDeductionsIntoDomains(result: PropagationResult) {

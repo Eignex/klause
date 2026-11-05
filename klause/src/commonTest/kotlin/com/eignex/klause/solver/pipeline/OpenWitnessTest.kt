@@ -24,12 +24,12 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.refuteOpenWitness
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.unaryMinus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

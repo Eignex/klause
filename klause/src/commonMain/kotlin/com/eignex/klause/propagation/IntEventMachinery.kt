@@ -1,9 +1,9 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 /**
  * Typed int-event wakeup machinery for [PropagationState]: the per-`(intVar, kind)` advisor index,
@@ -77,8 +77,8 @@ internal class IntEventMachinery private constructor(
             baseOffsets = offsets
             baseFlat = flat
         } else {
-            baseOffsets = EmptyIntArray
-            baseFlat = EmptyIntArray
+            baseOffsets = emptyIntArray()
+            baseFlat = emptyIntArray()
         }
     }
 
@@ -111,7 +111,7 @@ internal class IntEventMachinery private constructor(
      * Per-int-var bitmask of the [IntEvent] kinds that occurred since the variable was last
      * drained — recorded by `markIntDirty` alongside the dirty-int queue and consumed (then
      * cleared) by `enqueueForIntChange` to wake exactly the subscribed advisors. Empty (aliasing
-     * the shared [EmptyIntArray]) when no factor subscribes, so the common case allocates nothing
+     * the shared [emptyIntArray]) when no factor subscribes, so the common case allocates nothing
      * and skips the bookkeeping entirely.
      *
      * Sound to over-set (extra bit ⇒ harmless extra wake) but never under-set (a missing bit drops
@@ -119,7 +119,7 @@ internal class IntEventMachinery private constructor(
      * the driver only marks/undoes between propagation cycles — when the queue is empty and thus
      * every mask already cleared — no stale bits survive a backtrack.
      */
-    val dirtyKinds: IntArray = if (on) IntArray(problem.numIntVars) else EmptyIntArray
+    val dirtyKinds: IntArray = if (on) IntArray(problem.numIntVars) else emptyIntArray()
 
     /**
      * Per-factor dirty-variable delta accumulator: for each factor with
@@ -157,7 +157,7 @@ internal class IntEventMachinery private constructor(
             val on = projection.usesIntEventWatchers
             val deltaOn = projection.usesIntEventDeltaConsumers
             val slots = if (on) problem.numIntVars * IntEvent.COUNT else 0
-            val offsets = if (on) IntArray(slots + 1) else EmptyIntArray
+            val offsets = if (on) IntArray(slots + 1) else emptyIntArray()
             yield(null)
             var visits = 0
             if (on) {
@@ -175,9 +175,9 @@ internal class IntEventMachinery private constructor(
                     if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
                 }
             }
-            val flat = if (on) IntArray(offsets[slots]) else EmptyIntArray
+            val flat = if (on) IntArray(offsets[slots]) else emptyIntArray()
             yield(null)
-            val cursor = if (on) IntArray(offsets.size) else EmptyIntArray
+            val cursor = if (on) IntArray(offsets.size) else emptyIntArray()
             yield(null)
             for (slot in cursor.indices) {
                 cursor[slot] = offsets[slot]

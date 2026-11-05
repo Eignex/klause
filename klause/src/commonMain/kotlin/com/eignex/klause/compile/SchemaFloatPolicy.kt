@@ -11,8 +11,8 @@ import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.PresenceSpec
 import com.eignex.klause.model.SchemaEntry
-import com.eignex.klause.util.IntDisjointSet
 import com.eignex.skema.SchemaDef
+import com.eignex.util.collections.IntDisjointSet
 
 internal fun schemaFloatRepresentations(def: SchemaDef<SchemaEntry>): Map<String, FloatRepresentation> {
     val names = def.entries.filterValues { it is FloatSpec }.keys.toList()

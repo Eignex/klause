@@ -8,8 +8,8 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.binarySearchInt
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.collections.IntArrayList
 
 /** Resolve a set expression to a [SetVarLayout]. */
 internal fun FlatZincCompiler.resolveSetVar(e: FznExpr): SetVarLayout = when (e) {

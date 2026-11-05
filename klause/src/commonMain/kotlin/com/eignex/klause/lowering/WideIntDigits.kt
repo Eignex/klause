@@ -1,18 +1,18 @@
 package com.eignex.klause.lowering
 
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.rem
-import com.eignex.klause.util.shl
-import com.eignex.klause.util.signum
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.remainderOf
+import com.eignex.util.numbers.shl
+import com.eignex.util.numbers.signum
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 
 /**
  * Encode nonnegative integers as ordinary `Long` variables:
@@ -72,7 +72,7 @@ internal object WideIntDigits {
         val radix = pow2(width)
         var rest = value
         return LongArray(count) {
-            val d = rest % radix
+            val d = rest.remainderOf(radix)
             rest /= radix
             d.toLongExact()
         }

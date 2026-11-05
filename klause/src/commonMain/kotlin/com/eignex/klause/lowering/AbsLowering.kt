@@ -5,9 +5,9 @@ import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.unaryMinus
 
 internal fun absoluteValueRows(operand: Int, result: Int): List<LinearForm> = listOf(
     LinearForm.Conjunction(listOf(Linear(intArrayOf(1), intArrayOf(result), LinearOp.GE, 0))),

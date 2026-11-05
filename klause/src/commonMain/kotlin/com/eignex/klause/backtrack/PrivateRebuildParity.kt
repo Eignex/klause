@@ -7,8 +7,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
 
 internal class PrivateRebuildParity private constructor(
     val source: BakedProblem,
@@ -107,8 +107,8 @@ internal class PrivateRebuildParity private constructor(
             if (!funded(initializationWork)) return null
             onWorkspace(bytes)
             val matrix = Matrix(rowCount, source.numBoolVars, words, fixed, sourceRows != 0, funded)
-            val sourceKeys = if (sourceRows == 0) EmptyLongArray else LongArray(sourceRows)
-            val sourceRhs = if (sourceRows == 0) EmptyIntArray else IntArray(sourceRows)
+            val sourceKeys = if (sourceRows == 0) emptyLongArray() else LongArray(sourceRows)
+            val sourceRhs = if (sourceRows == 0) emptyIntArray() else IntArray(sourceRows)
             if (!table.populate(matrix, sourceKeys, sourceRhs)) return null
             val pins = matrix.derive(onDecline) ?: return null
             if (pins == 0 && matrix.basis == null) { onDecline("NoPins"); return null }

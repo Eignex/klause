@@ -4,11 +4,11 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.linearRows
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.floorBigInt
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.toDouble
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.floorBigInt
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.toDouble
 import kotlin.math.nextDown
 import kotlin.math.nextUp
 

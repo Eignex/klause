@@ -11,9 +11,9 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.result.SourceLpWorkStats
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.magnitudeBitLength
 
 /**
  * Whether `Σ coefficients(i)·x(terms(i))` descends without limit over this model, proved at [witness].

@@ -22,18 +22,18 @@ import com.eignex.klause.lowering.PolynomialRealLowering.Companion.relation
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.sum
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_TWO
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.rem as bigRemainder
-import com.eignex.klause.util.shr
-import com.eignex.klause.util.signum
-import com.eignex.klause.util.toLong
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_TWO
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.remainderOf as bigRemainder
+import com.eignex.util.numbers.shr
+import com.eignex.util.numbers.signum
+import com.eignex.util.numbers.toLong
 
 internal sealed interface PolynomialValue {
     data class Boolean(val formula: PolynomialRealFormula) : PolynomialValue {

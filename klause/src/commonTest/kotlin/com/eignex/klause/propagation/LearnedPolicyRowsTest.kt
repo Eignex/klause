@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.ClausePropagator
-import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.arrays.emptyIntArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -13,7 +13,7 @@ class LearnedPolicyRowsTest {
     @Test
     fun `queued metadata release should restore ownership beside a surviving first page`() {
         val rows = LearnedPolicyRows(6, 8, true, null)
-        val clause = ClausePropagator(intArrayOf(0, 1), EmptyIntArray, intArrayOf(0, 2))
+        val clause = ClausePropagator(intArrayOf(0, 1), emptyIntArray(), intArrayOf(0, 2))
         repeat(16) { rows.add(16, 2, true, -1, it.toLong(), clause) }
         val bytes = rows.primitiveBytes
         val references = rows.referenceCapacity

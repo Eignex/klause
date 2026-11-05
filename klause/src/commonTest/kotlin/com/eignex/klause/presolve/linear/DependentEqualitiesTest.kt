@@ -1,7 +1,7 @@
 package com.eignex.klause.presolve.linear
 
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
@@ -23,10 +23,10 @@ import com.eignex.klause.lp.lattice.LATTICE_WORK_WEIGHT
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.shl
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

@@ -3,7 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.BIG_ONE
+import com.eignex.util.numbers.BIG_ONE
 
 internal fun prepareObjectiveProposals(
     state: LocalSearchState,

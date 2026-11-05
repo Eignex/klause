@@ -6,14 +6,14 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.adjacentIntegerAbove
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.negate
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.negate
 
 internal class LinearAggregateBranches(private val budget: SourceLpBudget) {
     var work = 0L

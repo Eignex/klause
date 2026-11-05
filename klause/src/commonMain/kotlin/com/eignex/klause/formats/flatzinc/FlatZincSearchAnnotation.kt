@@ -1,6 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 /** Build [FlatZincSearchHints] from the search annotations on the `solve` item. */
 internal fun FlatZincCompiler.compileSearchAnnotation(context: FlatZincProgram? = null): FlatZincSearchHints? {

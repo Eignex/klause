@@ -8,10 +8,10 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.factorAt
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.unaryMinus
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -4,7 +4,7 @@ import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.util.BIG_ONE
+import com.eignex.util.numbers.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

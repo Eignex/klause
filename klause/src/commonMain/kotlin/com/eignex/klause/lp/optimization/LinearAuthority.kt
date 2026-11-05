@@ -17,13 +17,13 @@ import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 
 internal data class LinearAuthorityResult(
     val evidence: SourceEvidence? = null,

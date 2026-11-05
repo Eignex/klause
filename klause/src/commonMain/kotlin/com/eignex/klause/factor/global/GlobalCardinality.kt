@@ -8,8 +8,8 @@ import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.MutableLongIntMap
 
 /**
  * Global Cardinality Constraint (GCC). Covers the MiniZinc variants in one factor:
@@ -45,7 +45,7 @@ class GlobalCardinality(
     val closed: Boolean = false,
     /** Per-xs presence literals; empty for the non-opt fast path. Absent positions
      *  contribute nothing to any cover-value count and don't trip the closed check. */
-    override val presents: IntArray = EmptyIntArray,
+    override val presents: IntArray = emptyIntArray(),
 ) : Factor,
     OptionalFactor {
 

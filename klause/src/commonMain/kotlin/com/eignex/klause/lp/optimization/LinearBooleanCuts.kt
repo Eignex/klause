@@ -9,7 +9,7 @@ import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class LinearBooleanCutLimits(
     val rows: Int = 32,

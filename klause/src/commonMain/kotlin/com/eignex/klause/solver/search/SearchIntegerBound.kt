@@ -1,10 +1,10 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
 
 // Strict endpoints outside Long remain source predicates; they cannot wrap into a finite CP bound.
 @ConsistentCopyVisibility

@@ -15,9 +15,9 @@ import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.minus
+import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.minus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

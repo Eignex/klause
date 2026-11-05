@@ -4,7 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.trueLit
-import com.eignex.klause.util.binarySearchInt
+import com.eignex.util.arrays.binarySearchInt
 
 internal fun FlatZincCompiler.emitSetSelection(constraint: FznConstraint, variableArray: Boolean) {
     expectArity(constraint, 3)

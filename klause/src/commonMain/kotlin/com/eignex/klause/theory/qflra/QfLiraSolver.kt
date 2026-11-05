@@ -91,26 +91,26 @@ import com.eignex.klause.solver.snapshotValues
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.encodingSourceRealCount
 import com.eignex.klause.theory.linearTheoryModel
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_TWO
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.maxOf
-import com.eignex.klause.util.minOf
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.negate
-import com.eignex.klause.util.rem
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntIntMap
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_TWO
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.maxOf
+import com.eignex.util.numbers.minOf
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.negate
+import com.eignex.util.numbers.remainderOf
+import com.eignex.util.numbers.toLongExact
 import kotlin.time.TimeSource
 
 /** An exact integer/rational witness for an open QF_LIRA or QF_LIA model. */
@@ -1793,7 +1793,7 @@ class ExactLiraSearchComponent private constructor(
             if (value.isInteger()) continue
             if (integer in finiteIntVars) {
                 val floor = value.num / value.den -
-                    if (value.num < BIG_ZERO && value.num % value.den != BIG_ZERO) BIG_ONE else BIG_ZERO
+                    if (value.num < BIG_ZERO && value.num.remainderOf(value.den) != BIG_ZERO) BIG_ONE else BIG_ZERO
                 if (!floor.fitsLong() || floor >= bigIntOf(Long.MAX_VALUE)) return null
                 val threshold = floor.toLongExact()
                 val lower = context.intLowerBound(integer) ?: return null
@@ -2762,7 +2762,7 @@ private fun BigFraction.isInteger(): Boolean = den == BIG_ONE
 
 private fun BigFraction.floor(): BigInt {
     val quotient = num / den
-    return if (num < BIG_ZERO && num % den != BIG_ZERO) quotient - BIG_ONE else quotient
+    return if (num < BIG_ZERO && num.remainderOf(den) != BIG_ZERO) quotient - BIG_ONE else quotient
 }
 
 private fun maxOfNullable(a: BigInt?, b: BigInt?): BigInt? = if (a == null || b == null) a ?: b else maxOf(a, b)

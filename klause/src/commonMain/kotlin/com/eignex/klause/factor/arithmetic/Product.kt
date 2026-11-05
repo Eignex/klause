@@ -14,11 +14,11 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.unaryMinus
 
 /**
  * `a * b = result` over signed integer domains. Repeated operands and result aliases retain

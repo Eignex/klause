@@ -15,10 +15,11 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.io.openTextFile
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.unaryMinus
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.TimeSource
 
@@ -45,7 +46,7 @@ internal object SmtLibMode : CliMode {
             val stop = Cancellation { common.deadlineAtMs?.let { nowMillis() >= it } == true }
             val parsed = try {
                 SmtLib.parse(
-                    { openFileSource(path) },
+                    { openTextFile(path) },
                     settings = config.problemSettings(),
                     cancellation = stop,
                     semanticOverrides = overrides,

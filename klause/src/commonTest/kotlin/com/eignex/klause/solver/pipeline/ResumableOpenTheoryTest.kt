@@ -16,8 +16,8 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

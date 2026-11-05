@@ -17,9 +17,9 @@ import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedLifecycle
 import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.solver.search.resolveSearchClauses
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal class LinearRefutationReuse(
     private val source: SourceProofContext,

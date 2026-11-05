@@ -13,8 +13,8 @@ import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
 
 /** Raised when an XCSP3 construct outside the supported subset is encountered. */
 class UnsupportedXcsp3Exception(msg: String) : FormatException("XCSP3", msg)

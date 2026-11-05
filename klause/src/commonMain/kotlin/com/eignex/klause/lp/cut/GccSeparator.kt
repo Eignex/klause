@@ -5,9 +5,9 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
 
 /**
  * GlobalCardinality sum cuts — the value-multiplicity generalization of the AllDifferent

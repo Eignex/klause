@@ -11,11 +11,11 @@ import com.eignex.klause.lowering.isConstant
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.lowering.scaleByConst
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 
 internal fun Compiler.Builder.integerProduct(parts: List<IntComb>): IntComb {
     var result: IntComb = IntComb.Narrow(LinComb(emptyMap(), 1L))

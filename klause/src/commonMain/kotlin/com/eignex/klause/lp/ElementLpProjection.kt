@@ -4,8 +4,8 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 /**
  * Element's LP relaxation. A constant array gives the exact convex hull: a one-hot selector `y_p ∈ [0,1]` per

@@ -7,8 +7,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BIG_ZERO
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

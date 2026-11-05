@@ -24,7 +24,7 @@ import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BigInt
 
 /**
  * `auxBoolVar ↔ (Σ weights(i)·literals(i) ⟨op⟩ bound)`. Terms pair [constants] with [literals],

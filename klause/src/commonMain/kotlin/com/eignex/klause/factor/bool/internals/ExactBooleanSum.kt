@@ -4,14 +4,14 @@ import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.signum
-import com.eignex.klause.util.toLong
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.signum
+import com.eignex.util.numbers.toLong
+import com.eignex.util.numbers.unaryMinus
 
 internal class ExactBooleanSum(constants: IntegralConstants, literals: IntArray) {
     val vars: IntArray

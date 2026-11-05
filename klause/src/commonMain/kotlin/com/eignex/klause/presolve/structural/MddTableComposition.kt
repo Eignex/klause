@@ -3,8 +3,8 @@ package com.eignex.klause.presolve.structural
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.factor.table.internals.MddTransitionIndex
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableLongIntMap
 
 internal object MddTableComposition {
     fun intersect(

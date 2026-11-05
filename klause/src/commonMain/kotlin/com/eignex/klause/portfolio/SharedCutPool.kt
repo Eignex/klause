@@ -4,11 +4,11 @@ import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.lp.cut.CutSharing
 import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.solver.result.SharingChannel
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongHashSet
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongHashSet
 
 /**
  * An append-only, de-duplicated pool of portfolio-portable [SharedCut]s shared across the LP-bearing
@@ -47,7 +47,7 @@ internal class SharedCutPool(private val lock: Mutex = Mutex(concurrent = false)
     fun drainSince(cursor: Int): Drained = lock.withLock {
         val size = cuts.size
         if (cursor >= size) {
-            Drained(emptyList(), EmptyIntArray, size)
+            Drained(emptyList(), emptyIntArray(), size)
         } else {
             Drained(ArrayList(cuts.subList(cursor, size)), IntArray(size - cursor) { origins[cursor + it] }, size)
         }

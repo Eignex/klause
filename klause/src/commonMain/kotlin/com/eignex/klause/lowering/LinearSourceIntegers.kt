@@ -3,9 +3,9 @@ package com.eignex.klause.lowering
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.fitsLong
 
 internal fun LinearSourceProblem.integralRealBounds(
     stop: Cancellation,

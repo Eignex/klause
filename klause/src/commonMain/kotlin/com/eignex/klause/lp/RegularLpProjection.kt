@@ -3,9 +3,9 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
 
 /**
  * Layer-expanded DFA flow hull — the exact convex hull of the automaton's accepting strings. An arc
@@ -151,10 +151,9 @@ private suspend fun SequenceScope<Unit>.prepareForwardReach(
         if (++visits % 256 == 0) yield(Unit)
         val dom = domainOf(factor.seq[t])
         val current = reach[t]
-        for (slot in current.usedInternal.indices) {
+        current.forEachSlot { occupied, state ->
             if (++visits % 256 == 0) yield(Unit)
-            if (!current.usedInternal[slot]) continue
-            val state = current.keysInternal[slot]
+            if (!occupied) return@forEachSlot
             // Walk the alphabet (1..s), not the domain: only symbols in range have a transition, and
             // s is the automaton's alphabet size (bounded), never the variable's span — so a wide
             // sequence domain is tested by membership, never enumerated.

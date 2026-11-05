@@ -9,7 +9,7 @@ import com.eignex.klause.lp.engine.ExactLpObjective
 import com.eignex.klause.lp.engine.ExactLpPremises
 import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
-import com.eignex.klause.util.BIG_ONE
+import com.eignex.util.numbers.BIG_ONE
 
 // Project the exact theory source declaration without crossing through Double.
 internal fun QfLraRelaxation.toExactLpModel(): ExactLpModel = exactLpModel(sourceColumns, sourceRows)

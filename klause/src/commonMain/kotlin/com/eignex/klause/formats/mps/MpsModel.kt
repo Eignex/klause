@@ -5,8 +5,8 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.parseBigInt
 
 internal class MpsSourceNumber private constructor(
     private val rational: BigFraction?,

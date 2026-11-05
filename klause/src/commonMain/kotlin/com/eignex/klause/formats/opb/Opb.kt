@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.opb
 
 import com.eignex.klause.formats.FormatException
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
 
 /** Raised when an OPB/WBO document is malformed, so a caller can catch it via [FormatException] like
  *  the other input formats. */

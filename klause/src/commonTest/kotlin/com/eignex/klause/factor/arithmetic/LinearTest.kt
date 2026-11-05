@@ -7,9 +7,9 @@ import com.eignex.klause.ir.UnitConsts
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.ir.linearRows
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

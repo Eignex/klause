@@ -3,7 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.SemanticRational
-import com.eignex.klause.util.BIG_ONE
+import com.eignex.util.numbers.BIG_ONE
 
 internal fun OutputProtocol.sourceQualified(
     semantics: EffectiveSourceSemantics?,

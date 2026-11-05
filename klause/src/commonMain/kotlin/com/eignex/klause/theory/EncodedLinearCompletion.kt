@@ -14,8 +14,8 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BIG_ONE
 
 internal fun privateLinearCompletion(encoded: Problem, sample: Sample, cancellation: Cancellation): Boolean? {
     if (cancellation()) return null

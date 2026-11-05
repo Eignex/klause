@@ -7,8 +7,8 @@ import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.unaryMinus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

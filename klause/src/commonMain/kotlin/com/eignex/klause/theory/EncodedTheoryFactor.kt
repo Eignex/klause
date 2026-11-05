@@ -18,8 +18,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.SelectedEncoderRequest
 import com.eignex.klause.solver.pipeline.ExactSearchRow
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BigInt
 
 internal class EncodedTheoryFactor private constructor(
     val source: Factor,

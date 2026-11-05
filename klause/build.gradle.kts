@@ -34,9 +34,6 @@ val fullTargets = providers.gradleProperty("targets.full").isPresent
 val skemaPin = "0.4.0"
 
 kotlin {
-    compilerOptions {
-        freeCompilerArgs.add("-Xexpect-actual-classes")
-    }
     jvm()
     linuxX64()
     if (fullTargets) {
@@ -47,6 +44,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            api("com.eignex:util:0.0.1-20261105.212118-9")
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             api("com.eignex:skema:$skemaPin") {
@@ -57,10 +55,6 @@ kotlin {
             }
             implementation("com.eignex:kumulant:0.3.4-20261105.142345-130")
             implementation("com.eignex:kpermute:1.3.0")
-        }
-        // BigInt is java.math.BigInteger on the JVM; native has no platform big integer to map onto.
-        nativeMain.dependencies {
-            api("com.ionspin.kotlin:bignum:0.3.10")
         }
         commonTest.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")

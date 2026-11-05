@@ -4,12 +4,12 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.NonlinearIntegerProblem
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.unaryMinus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

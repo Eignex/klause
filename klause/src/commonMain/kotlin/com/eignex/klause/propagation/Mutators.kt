@@ -4,9 +4,9 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 /** Push every pin and deduced restriction in `a` as a fresh decision; return `false` (so
  *  [PropagationState.seeded] becomes `false`) on the first contradiction. */
@@ -672,6 +672,6 @@ internal fun PropagationState.recordConflictLevels(a: Int, b: Int) {
         a > 0 && b > 0 && a != b -> intArrayOf(a, b)
         a > 0 -> intArrayOf(a)
         b > 0 -> intArrayOf(b)
-        else -> EmptyIntArray
+        else -> emptyIntArray()
     }
 }

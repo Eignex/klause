@@ -60,10 +60,10 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.shl
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.shl
 
 // One factor or more per built-in codec, over 6 Booleans, 6 integers in [-10, 10] and 4 reals in [-5, 5].
 

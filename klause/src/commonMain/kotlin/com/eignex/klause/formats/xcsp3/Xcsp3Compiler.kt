@@ -36,8 +36,8 @@ import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.lowering.wideConstHolds
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableLongIntMap
 
 /** Split on runs of whitespace into non-blank tokens without allocating matcher state per call. */
 internal fun String.splitWs(): List<String> {

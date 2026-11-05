@@ -2,7 +2,7 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.solver.snapshotValues
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.parseBigInt
 import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertEquals

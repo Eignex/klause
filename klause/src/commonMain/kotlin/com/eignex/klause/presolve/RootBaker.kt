@@ -13,9 +13,9 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.binarySearchInt
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongHashSet
 import kotlin.random.Random
 
 /**

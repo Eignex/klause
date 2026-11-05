@@ -2,8 +2,8 @@ package com.eignex.klause.presolve.structural
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.plus
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.plus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

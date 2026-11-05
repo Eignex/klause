@@ -9,8 +9,8 @@ import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExactSearchRow
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 
 internal object PowerEncoders {
     private val unsupported = Encoder(EncoderSupport.UNSUPPORTED)

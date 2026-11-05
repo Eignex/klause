@@ -15,16 +15,16 @@ import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.ScanMeter
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.maxOf
-import com.eignex.klause.util.minOf
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.maxOf
+import com.eignex.util.numbers.minOf
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.toLongExact
 
 internal object DuplicateColumns {
 

@@ -6,15 +6,15 @@ import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLong
-import com.eignex.klause.util.rem as integerRemainder
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.remainderOf as integerRemainder
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLong
 
 internal data class NonlinearIntegerResidueCounts(
     val rings: Long = 0,

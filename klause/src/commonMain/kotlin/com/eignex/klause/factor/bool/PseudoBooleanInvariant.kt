@@ -11,9 +11,9 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntLongMap
-import com.eignex.klause.util.MutableLongObjectMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntLongMap
+import com.eignex.util.collections.MutableLongObjectMap
 
 internal class PseudoBooleanInvariant(
     private val boolVars: IntArray,

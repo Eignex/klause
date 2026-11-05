@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableIntObjectMap
 
 internal fun PropagationState.logBoolPin(v: Int) {
     boolPinPos[v] = undo.size

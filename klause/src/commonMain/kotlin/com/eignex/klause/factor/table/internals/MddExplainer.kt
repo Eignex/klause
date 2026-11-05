@@ -6,8 +6,8 @@ import com.eignex.klause.propagation.checkFiniteWork
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.inDomainAt
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 /**
  * Reasons for [com.eignex.klause.factor.table.Mdd] deductions as cuts of the layered diagram over the domains at a

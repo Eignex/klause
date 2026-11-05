@@ -12,9 +12,9 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.ir.WideConsts
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.times
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.times
 
 internal class ExactSearchRow private constructor(
     private val refs: IntArray,

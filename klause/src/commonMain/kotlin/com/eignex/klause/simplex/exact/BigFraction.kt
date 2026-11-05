@@ -1,23 +1,23 @@
 package com.eignex.klause.simplex.exact
 
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.isZero
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.rem
-import com.eignex.klause.util.shl
-import com.eignex.klause.util.signum
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toDouble
-import com.eignex.klause.util.toLong
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.remainderOf
+import com.eignex.util.numbers.shl
+import com.eignex.util.numbers.signum
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toDouble
+import com.eignex.util.numbers.toLong
+import com.eignex.util.numbers.unaryMinus
 
 /** Immutable rational number over the multiplatform big integer, normalized with a positive denominator. */
 class BigFraction private constructor(
@@ -39,7 +39,7 @@ class BigFraction private constructor(
     internal fun ceilInteger(): BigInt {
         if (den.isOne) return num
         val quotient = num / den
-        return if (num.signum() > 0 && !(num % den).isZero()) quotient + BIG_ONE else quotient
+        return if (num.signum() > 0 && !(num.remainderOf(den)).isZero()) quotient + BIG_ONE else quotient
     }
 
     /** Returns the nearest [Double], rounding ties to even. */
@@ -62,7 +62,7 @@ class BigFraction private constructor(
         val scaledNumerator = if (shift >= 0) magnitude shl shift else magnitude
         val scaledDenominator = if (shift >= 0) den else den shl -shift
         var significand = (scaledNumerator / scaledDenominator).toLong()
-        val remainder = (scaledNumerator % scaledDenominator) shl 1
+        val remainder = (scaledNumerator.remainderOf(scaledDenominator)) shl 1
         if (remainder > scaledDenominator || (remainder == scaledDenominator && significand and 1L != 0L)) {
             significand++
         }

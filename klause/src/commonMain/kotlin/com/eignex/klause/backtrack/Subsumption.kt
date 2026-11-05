@@ -4,9 +4,9 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SearchStatsSink
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 // Retained preparation avoids buying the same occurrence index on each short slice.
 internal class Subsumption : InprocessingPass {

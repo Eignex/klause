@@ -1,10 +1,10 @@
 package com.eignex.klause.simplex.basis
 
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntDoubleMap
 import com.eignex.klause.util.SparseSlices
 import com.eignex.koblas.SparseMatrix
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.MutableIntDoubleMap
 import kotlin.math.abs
 
 internal data class LuPivotPolicy(

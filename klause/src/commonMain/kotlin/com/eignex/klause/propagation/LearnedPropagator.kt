@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
+
 
 /**
  * A constraint learned during search and stored in the [LearnedClauseDb]: a [Propagator] that also
@@ -23,6 +24,6 @@ internal interface LearnedPropagator : Propagator {
 }
 
 internal object RetiredLearnedPropagator : LearnedPropagator {
-    override val boolVars: IntArray get() = EmptyIntArray
-    override val intVars: IntArray get() = EmptyIntArray
+    override val boolVars: IntArray get() = emptyIntArray()
+    override val intVars: IntArray get() = emptyIntArray()
 }

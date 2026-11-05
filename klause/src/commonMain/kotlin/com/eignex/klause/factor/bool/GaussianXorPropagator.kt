@@ -6,8 +6,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevLongArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.MutableIntIntMap
 
 /**
  * CP propagator for [GaussianXor]. Holds the Gaussian elimination data structures so they are only
@@ -20,7 +20,7 @@ import com.eignex.klause.util.MutableIntIntMap
  */
 internal class GaussianXorPropagator(private val constraints: List<Xor>, val boolVars: IntArray) : Propagator {
 
-    val intVars: IntArray = EmptyIntArray
+    val intVars: IntArray = emptyIntArray()
 
     private val colOfVar: MutableIntIntMap
     private val words: Int

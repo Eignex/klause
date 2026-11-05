@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

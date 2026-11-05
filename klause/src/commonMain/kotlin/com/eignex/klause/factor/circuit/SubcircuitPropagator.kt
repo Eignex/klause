@@ -10,7 +10,7 @@ import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.exclusionLiteral
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 /**
  * CP implementation for [Circuit]: propagation of the optional-cycle constraint over successor vars.

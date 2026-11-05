@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.isZero
+import com.eignex.util.numbers.isZero
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

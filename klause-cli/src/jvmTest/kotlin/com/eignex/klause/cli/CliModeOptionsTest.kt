@@ -7,6 +7,7 @@ import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.ineffectiveNumerics
+import com.eignex.util.process.processProperty
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -229,7 +230,7 @@ class CliModeOptionsTest {
     @Test
     fun `default engine should be mixed and overridable via the KLAUSE_ENGINE property`() {
         assertTrue(defaultEngine() == FiniteEngine.MIXED, defaultEngine().id)
-        // cliProp reads the system property first on the JVM, so it stands in for the env var.
+        // processProperty reads the system property first on the JVM, so it stands in for the env var.
         System.setProperty("klause.engine", "fixed")
         try {
             assertTrue(defaultEngine() == FiniteEngine.FIXED, defaultEngine().id)
@@ -252,7 +253,7 @@ class CliModeOptionsTest {
     @Test
     fun `the LP ceiling default should be overridable via the KLAUSE_LP property`() {
         assertEquals(null, defaultLp())
-        // cliProp reads the system property first on the JVM, so it stands in for the env var.
+        // processProperty reads the system property first on the JVM, so it stands in for the env var.
         System.setProperty("klause.lp", "conservative")
         try {
             assertEquals("conservative", defaultLp())

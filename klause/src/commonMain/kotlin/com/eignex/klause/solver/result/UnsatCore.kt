@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.result
 
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
+
 
 /**
  * A jointly-infeasible subset of `Problem.factors`, identified by factor id, in the sense of SMT-LIB's
@@ -32,7 +33,7 @@ data class UnsatCore(
     /** Factory for [UnsatCore]. */
     companion object {
         /** The empty core. */
-        val Empty: UnsatCore = UnsatCore(EmptyIntArray)
+        val Empty: UnsatCore = UnsatCore(emptyIntArray())
 
         /** Build a core from factor [ids], sorting and de-duplicating in one pass. */
         fun of(ids: IntArray): UnsatCore {

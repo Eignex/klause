@@ -1,6 +1,6 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 /**
  * The conflict resolvent under construction during 1UIP analysis, abstracted over the learned-constraint

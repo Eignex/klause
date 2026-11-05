@@ -38,11 +38,11 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.plus
+import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.plus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

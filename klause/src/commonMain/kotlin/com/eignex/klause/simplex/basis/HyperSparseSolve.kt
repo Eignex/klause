@@ -1,8 +1,8 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.klause.util.SparseSlices
-import com.eignex.klause.util.binarySearchInt
 import com.eignex.koblas.SparseMatrix
+import com.eignex.util.arrays.binarySearchInt
 
 internal data class TriangularSolveWork(
     val sparse: Boolean,

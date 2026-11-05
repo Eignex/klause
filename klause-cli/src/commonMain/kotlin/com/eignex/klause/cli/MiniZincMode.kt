@@ -24,6 +24,10 @@ import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.util.io.openTextFile
+import com.eignex.util.io.readTextFile
+import com.eignex.util.io.useSource
+import com.eignex.util.process.flushStandardOutput
 import kotlin.time.TimeSource
 
 /**
@@ -68,7 +72,7 @@ internal object MiniZincMode : CliMode {
             // whole source is never held as one String. Parsing only reads; the base bake runs as
             // presolve step 0, bounded by the presolve deadline.
             val overrides = common.sourceOverrides(flatZincSemantics)
-            val program = openFileSource(path).useSource { source ->
+            val program = openTextFile(path).useSource { source ->
                 parseFlatZinc(
                     settings = config.problemSettings(),
                     source = source,
@@ -222,7 +226,7 @@ internal class MiniZincOutput(
     override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
         println("% objective=${arithmeticObjectiveText(objective)}")
         print(rendered)
-        flushCliOutput()
+        flushStandardOutput()
         return true
     }
 

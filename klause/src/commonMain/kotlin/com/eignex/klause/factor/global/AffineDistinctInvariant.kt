@@ -9,10 +9,10 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.WIDE_DOMAIN_DRAWS
 import com.eignex.klause.localsearch.movesource.PairSwap
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.plus
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.plus
 
 internal class AffineDistinctInvariant(private val vars: IntArray, private val offsets: List<BigInt>) : Invariant {
     private val positions = vars.indices.groupBy { vars[it] }

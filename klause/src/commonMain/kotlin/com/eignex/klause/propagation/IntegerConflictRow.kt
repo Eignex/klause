@@ -3,9 +3,9 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
 
 internal const val INTEGER_LEARNING_TERMS = 16
 

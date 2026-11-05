@@ -11,8 +11,8 @@ import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals

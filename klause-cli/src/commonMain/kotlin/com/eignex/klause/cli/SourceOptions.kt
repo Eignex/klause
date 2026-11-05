@@ -8,11 +8,11 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.UndeclaredRealBounds
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.times
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.unaryMinus
 import kotlin.math.abs
 
 internal enum class SourceFloatMode { CONTINUOUS, GRID }

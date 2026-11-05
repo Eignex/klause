@@ -9,8 +9,8 @@ import com.eignex.klause.propagation.PbAccumulator
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.installLitWatch
 import com.eignex.klause.propagation.removeBoolWatch
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
 
 /** CP propagator for [PseudoBoolean]: bounds propagation for `Σ weights(i)·literals(i) ⟨op⟩ bound`.
  *
@@ -39,7 +39,7 @@ internal class PseudoBooleanPropagator(
     internal val byWeightDesc: IntArray = if (watched) {
         (0 until literals.size).sortedByDescending { weights[it] }.toIntArray()
     } else {
-        EmptyIntArray
+        emptyIntArray()
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
@@ -68,7 +68,7 @@ internal class PseudoBooleanPropagator(
      * when the covering target is unreachable does it fall through to full bounds propagation.
      */
     private fun propagateWatched(state: PropagationState, factorId: Int): Boolean {
-        val old = state.refPayload[factorId] as? IntArray ?: EmptyIntArray
+        val old = state.refPayload[factorId] as? IntArray ?: emptyIntArray()
         val (next, covered) = selectCover(state)
         // Reconcile watches against the new selection: drop the dropped, install the added. Safe to mutate the
         // watcher index here — propagate runs after the wakeup walk over the fired literal's list.

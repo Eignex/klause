@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 internal object OptionalPresence {
     fun isDefinitelyPresent(presents: IntArray, idx: Int, state: PropagationState): Boolean {

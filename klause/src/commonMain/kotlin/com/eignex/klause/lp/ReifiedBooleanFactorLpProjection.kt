@@ -6,8 +6,8 @@ import com.eignex.klause.factor.bool.internals.permitsLongPseudoBoolean
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.subExact
 
 internal fun ReifiedCardinality.emitLpRelaxation(builder: RelaxationBuilder) {
     val sum = BoolReifiedSum.fold(builder, literals, weights = null)

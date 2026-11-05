@@ -9,7 +9,7 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.util.IntIntMap
+import com.eignex.util.collections.IntIntMap
 
 /**
  * `inverse(f, g)` with optional offsets: over 0-based positions, `f(i) = j  ⇔  g(j - gOffset) = i + fOffset`.

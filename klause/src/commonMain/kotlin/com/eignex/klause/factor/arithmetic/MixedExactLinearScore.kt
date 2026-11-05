@@ -8,10 +8,10 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
+import com.eignex.util.collections.IntIntMap
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
 import kotlin.math.abs
 import kotlin.math.ceil
 

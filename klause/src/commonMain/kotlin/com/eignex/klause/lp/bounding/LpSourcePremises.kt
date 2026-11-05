@@ -18,7 +18,7 @@ import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
-import com.eignex.klause.util.BIG_ONE
+import com.eignex.util.numbers.BIG_ONE
 
 internal class LpSourcePremises(private val root: Any) {
     private val names = LinkedHashMap<CutPremise, SearchDecision>()

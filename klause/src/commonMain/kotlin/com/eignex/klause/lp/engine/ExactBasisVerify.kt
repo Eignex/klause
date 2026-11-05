@@ -7,16 +7,16 @@ import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
+import com.eignex.util.numbers.unaryMinus
 
 internal data class ExactBasisLimits(
     val factor: RationalBasisLimits = RationalBasisLimits(),

@@ -2,7 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 /**
  * Convex-hull LP relaxation: a selector column `y_t ∈ [0,1]` per allowed tuple with `Σ_t y_t = 1` and a

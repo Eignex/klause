@@ -1,6 +1,6 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.util.Bits
+import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

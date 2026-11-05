@@ -18,9 +18,9 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.withAppendedFactor
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntIntMap
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntIntMap
 import kotlin.math.abs
 import kotlin.math.ceil
 
@@ -88,8 +88,8 @@ internal class ObjectiveBoundFactor(
     private val objectiveIntVars: IntArray,
     internal val intCoeffs: LongArray,
     internal val bound: MutableObjectiveBound,
-    internal val realVars: IntArray = EmptyIntArray,
-    internal val realCoeffs: DoubleArray = EmptyDoubleArray,
+    internal val realVars: IntArray = emptyIntArray(),
+    internal val realCoeffs: DoubleArray = emptyDoubleArray(),
 ) : Factor {
 
     override val variables: VarList =

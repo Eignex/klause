@@ -11,9 +11,9 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ScanMeter
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.isZero
-import com.eignex.klause.util.rem
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.rem
 
 internal class ParityInputRevision(problem: Problem, private val cancellation: Cancellation) {
     private val boolColumns = HashMap<Int, Int>()

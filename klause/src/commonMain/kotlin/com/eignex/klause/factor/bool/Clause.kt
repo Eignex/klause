@@ -17,7 +17,7 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntHashSet
 import kotlin.concurrent.Volatile
 
 /**

@@ -5,7 +5,7 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntHashSet
 
 internal object RepairScope {
     fun effective(requested: FreedVars, assumptions: Assumptions, sweep: DefinitionalSweep?,

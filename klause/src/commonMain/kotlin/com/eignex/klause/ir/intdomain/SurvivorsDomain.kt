@@ -5,7 +5,7 @@ import com.eignex.klause.ir.IntConsumer
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntSpan
 import com.eignex.klause.ir.defaultDomainStorageSettings
-import com.eignex.klause.util.binarySearchLong
+import com.eignex.util.arrays.binarySearchLong
 
 /** Survivor list: the sorted present values, with `>= 1` interior gap. */
 internal class SurvivorsDomain(

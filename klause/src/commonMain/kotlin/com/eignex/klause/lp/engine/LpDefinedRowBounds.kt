@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 private fun expandDefinedRowSupports(
     state: LpExactState,

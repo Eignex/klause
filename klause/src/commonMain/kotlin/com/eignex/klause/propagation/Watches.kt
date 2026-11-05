@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 internal fun PropagationState.packWatch(fid: Int, lit: Int): Long =
     (fid.toLong() shl 32) or (lit.toLong() and 0xFFFFFFFFL)

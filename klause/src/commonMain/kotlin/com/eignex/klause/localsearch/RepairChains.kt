@@ -1,12 +1,12 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
 
-private val EMPTY_INTS = EmptyIntArray
+private val EMPTY_INTS = emptyIntArray()
 
 /**
  * **Directed ejection-chain proposal** (after F. Glover, "Ejection chains, reference structures and

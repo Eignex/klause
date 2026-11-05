@@ -2,8 +2,8 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

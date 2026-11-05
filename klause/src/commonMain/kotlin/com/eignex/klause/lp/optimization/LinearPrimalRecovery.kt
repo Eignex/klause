@@ -4,10 +4,10 @@ import com.eignex.klause.lp.engine.reconstructRational
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceCoordinate
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class LinearPrimalRecoveryLimits(
     val work: Long = 2_000_000L,

@@ -2,7 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
+import com.eignex.util.numbers.BIG_ONE
 import kotlin.math.pow
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -3,7 +3,7 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntHashSet
 
 /**
  * Clique cuts for set-packing structure. Two Boolean variables are *mutually exclusive* when at most

@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.result.HintIndexOutcome
 import com.eignex.klause.solver.result.OpenHintUsageSink
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.binarySearchInt
+import com.eignex.util.arrays.binarySearchInt
 
 // Only a completed profile gives source clause identities structural authority.
 internal class SourceClauseGuidance private constructor(

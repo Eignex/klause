@@ -22,8 +22,8 @@ import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.undoTo
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.IntHashSet
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

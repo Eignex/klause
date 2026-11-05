@@ -22,9 +22,9 @@ import com.eignex.klause.solver.search.SearchExecutionControls
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.BIG_ONE
 
 internal class AbsRealCompletion(private val source: Problem) {
     private val encoders = source.selectedFactorProjections()

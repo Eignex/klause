@@ -35,6 +35,9 @@ import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.platform.sampleHeap
+import com.eignex.util.process.printErrorLine
+import com.eignex.util.process.processProperty
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -265,14 +268,14 @@ internal object SolveCore {
         constructionBakeElapsed: Duration,
     ) {
         val passes = stats?.passes.orEmpty()
-        errPrintln("presolve dry-run:")
+        printErrorLine("presolve dry-run:")
         printPresolveDiagnostics(stats)
         // Heap after ingest, which is the quantity an OOM at `-Xmx` is about. Retained is what
         // the built problem holds; peak includes the transients the build passed through, so a large gap
         // points at a structure that is materialized and dropped rather than one that is kept.
         sampleHeap()?.let { heap ->
             val peak = heap.peakBytes?.let { "peak: ${it / MIB}MiB, " }.orEmpty()
-            errPrintln(
+            printErrorLine(
                 "  heap retained: ${heap.retainedBytes / MIB}MiB, " +
                     "$peak" +
                     "committed: ${heap.committedBytes / MIB}MiB",
@@ -285,31 +288,31 @@ internal object SolveCore {
         val stepZeroBake = stats?.bakeElapsed ?: Duration.ZERO
         val bake = constructionBakeElapsed + stepZeroBake
         loadElapsedMs?.let { load ->
-            errPrintln("  parse: ${(load - constructionBakeElapsed.inWholeMilliseconds).coerceAtLeast(0)}ms")
-            errPrintln("  bake (step 0): $bake")
+            printErrorLine("  parse: ${(load - constructionBakeElapsed.inWholeMilliseconds).coerceAtLeast(0)}ms")
+            printErrorLine("  bake (step 0): $bake")
         }
         // Presolve passes alone (the step-0 bake is broken out above; for a deferred problem it is part
         // of the pipeline's wall time, so subtract it to leave the passes' own cost).
-        errPrintln("  elapsed: ${elapsed - stepZeroBake}")
-        errPrintln("  passes fired: ${if (passes.isEmpty()) "(none)" else passes.joinToString(", ")}")
-        errPrintln("  bool vars: ${presolved.numBoolVars}, int vars: ${presolved.numIntVars}")
-        errPrintln("  factors: ${original.factors.size} -> ${presolved.factors.size}")
-        errPrintln("  int-domain span: ${spanText(original)} -> ${spanText(presolved)}")
-        errPrintln("  open columns: ${openText(original)} -> ${openText(presolved)}")
-        errPrintln("  theory-eligible columns: ${theoryText(original)} -> ${theoryText(presolved)}")
+        printErrorLine("  elapsed: ${elapsed - stepZeroBake}")
+        printErrorLine("  passes fired: ${if (passes.isEmpty()) "(none)" else passes.joinToString(", ")}")
+        printErrorLine("  bool vars: ${presolved.numBoolVars}, int vars: ${presolved.numIntVars}")
+        printErrorLine("  factors: ${original.factors.size} -> ${presolved.factors.size}")
+        printErrorLine("  int-domain span: ${spanText(original)} -> ${spanText(presolved)}")
+        printErrorLine("  open columns: ${openText(original)} -> ${openText(presolved)}")
+        printErrorLine("  theory-eligible columns: ${theoryText(original)} -> ${theoryText(presolved)}")
         val before = factorHistogram(original)
         val after = factorHistogram(presolved)
         for (kind in (before.keys + after.keys).sorted()) {
             val b = before[kind] ?: 0
             val a = after[kind] ?: 0
-            errPrintln("  $kind: $b -> $a")
+            printErrorLine("  $kind: $b -> $a")
         }
         // The LP harvest's own contribution, isolated from the combinatorial passes whose net effect the
         // counts above conflate — the point of inspecting the LP presolve specifically.
         stats?.lpHarvest?.let { lp ->
             val dims = "relaxation ${lp.relaxationCols} cols / ${lp.relaxationRows} rows / ${lp.relaxationNnz} nnz"
             if (lp.skipped) {
-                errPrintln("  lp-harvest: skipped ($dims over the size budget)")
+                printErrorLine("  lp-harvest: skipped ($dims over the size budget)")
             } else {
                 val parts = buildList {
                     if (lp.rootInfeasible) add("root-infeasible")
@@ -318,14 +321,14 @@ internal object SolveCore {
                     if (lp.constraintsRemoved > 0) add("removed ${lp.constraintsRemoved} redundant constraint(s)")
                     if (lp.equalitiesAdded > 0) add("added ${lp.equalitiesAdded} implied equality(ies)")
                 }
-                errPrintln("  lp-harvest: ${parts.joinToString(", ")} ($dims)")
+                printErrorLine("  lp-harvest: ${parts.joinToString(", ")} ($dims)")
             }
         }
         // Read the verdict presolve already reached. Asking the problem for its own `baked` instead forces
         // a lazy that a rebuilt (already-folded) problem has never run, paying a fresh root fixpoint over
         // every factor after the summary has printed.
         if (stats?.infeasible == true) {
-            errPrintln("  INFEASIBLE: presolve proved the problem unsatisfiable")
+            printErrorLine("  INFEASIBLE: presolve proved the problem unsatisfiable")
         }
     }
 
@@ -425,7 +428,7 @@ internal object SolveCore {
         fun ceiling(value: String?): LpConfig? = value?.let {
             runCatching { LpConfig.parse(it) }.getOrElse { failure -> usageError("--lp: ${failure.message}") }
         }
-        val arms = cliProp(CliKnobs.portfolioArms)?.let { value ->
+        val arms = processProperty(CliKnobs.portfolioArms)?.let { value ->
             value.toIntOrNull()?.takeIf { it > 0 }
                 ?: usageError("portfolio arm default expects a positive integer")
         }
@@ -536,8 +539,8 @@ internal object SolveCore {
 
             is FiniteSolveOutcome.DryRun -> {
                 output.begin(solvable.optimize, solvable.maximize)
-                errPrintln(outcome.heading)
-                outcome.lines.forEach(::errPrintln)
+                printErrorLine(outcome.heading)
+                outcome.lines.forEach(::printErrorLine)
             }
 
             is FiniteSolveOutcome.Completed -> {
@@ -638,7 +641,7 @@ internal fun verboseListener(verbose: Boolean): ((SearchEvent) -> Unit)? {
  * bug in that arm's configuration, which the run survives but nobody should miss.
  */
 internal fun warnPortfolioFault(fault: ArmFault) {
-    errPrintln("% WARNING: portfolio arm ${fault.workerLabel} quarantined: ${fault.reason}")
+    printErrorLine("% WARNING: portfolio arm ${fault.workerLabel} quarantined: ${fault.reason}")
 }
 
 /** Per-worker `-v` listener for the portfolio paths. Workers run concurrently; the logger

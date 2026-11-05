@@ -10,7 +10,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
+import com.eignex.util.numbers.fitsLong
 import kotlin.math.abs
 
 internal fun finiteWitnessVerifier(

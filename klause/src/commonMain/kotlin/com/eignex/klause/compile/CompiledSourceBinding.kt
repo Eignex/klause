@@ -26,10 +26,10 @@ import com.eignex.klause.solver.projection.FloatGridRequest
 import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.solver.projection.prepareFloatGrid
 import com.eignex.klause.solver.validation.verifyOpenWitness
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 
 internal class CompiledSourceBinding(
     val originalProblem: Problem,

@@ -4,7 +4,7 @@ import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 internal class AllDifferentTuplesInvariant(private val tuples: List<IntArray>) : Invariant {
     private val rowsByVariable: Map<Int, IntArray> = run {

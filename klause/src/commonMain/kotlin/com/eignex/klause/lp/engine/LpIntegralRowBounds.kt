@@ -1,10 +1,10 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Int128
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.shl
+import com.eignex.util.numbers.Int128
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.shl
 
 internal fun integralRowBounds(
     state: LpExactState,

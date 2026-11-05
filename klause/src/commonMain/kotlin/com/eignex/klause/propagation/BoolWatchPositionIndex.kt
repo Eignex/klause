@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntIndex
+import com.eignex.util.collections.IntArrayList
 
 internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
     internal interface Positions {

@@ -29,7 +29,7 @@ import com.eignex.klause.theory.qfnra.solvePolynomialObjectiveImage
 import com.eignex.klause.theory.qfnra.tryConvexPolynomialOptimum
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.bigIntOf
 
 internal sealed interface QuadraticBranchResult {
     data class Optimal(

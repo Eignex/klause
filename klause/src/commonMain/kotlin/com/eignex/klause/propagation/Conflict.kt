@@ -2,9 +2,10 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.DynamicBits
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 /** Boolean vars for factor [fid]: base factors read from `problem.factors`; tail factors
  *  (fid ≥ baseFactorCount) from `midlife.factors` in incremental mode, else from the
@@ -20,7 +21,7 @@ private fun PropagationState.factorBoolVars(fid: Int): IntArray = when {
 internal fun PropagationState.factorIntVars(fid: Int): IntArray = when {
     fid < baseFactorCount -> problem.factors[fid].intVars
     incremental -> midlife.factors[fid - baseFactorCount].intVars
-    nativeEngine != null -> EmptyIntArray
+    nativeEngine != null -> emptyIntArray()
     else -> learned.store[fid - baseFactorCount].intVars
 }
 
@@ -114,7 +115,7 @@ internal fun PropagationState.collectLevelsForVars(boolVars: IntArray, intVars: 
 /** Decode [levels] (a subset of pushed decision levels) into the bool decision vars at
  *  those levels. */
 internal fun PropagationState.extractConflictBools(levels: IntArray): IntArray {
-    if (levels.isEmpty()) return EmptyIntArray
+    if (levels.isEmpty()) return emptyIntArray()
     val out = IntHashSet(levels.size)
     for (lvl in levels) {
         if (lvl <= 0 || lvl > levelToDecisionVar.size) continue
@@ -126,7 +127,7 @@ internal fun PropagationState.extractConflictBools(levels: IntArray): IntArray {
 
 /** Decode [levels] into the int decision vars at those levels. */
 internal fun PropagationState.extractConflictInts(levels: IntArray): IntArray {
-    if (levels.isEmpty()) return EmptyIntArray
+    if (levels.isEmpty()) return emptyIntArray()
     val out = IntHashSet(levels.size)
     for (lvl in levels) {
         if (lvl <= 0 || lvl > levelToDecisionVar.size) continue
@@ -150,7 +151,7 @@ internal fun PropagationState.extractConflictInts(levels: IntArray): IntArray {
  * int var.
  */
 internal fun PropagationState.extractConflictFactors(): IntArray {
-    if (conflictSeedFactors.isEmpty()) return EmptyIntArray
+    if (conflictSeedFactors.isEmpty()) return emptyIntArray()
     val scratch = conflictFactorScratch
     scratch.clear()
     val frontier = scratch.frontier
@@ -187,7 +188,7 @@ internal fun PropagationState.extractConflictFactors(): IntArray {
 }
 
 internal class ConflictFactorScratch {
-    private var seen = BooleanArray(0)
+    private val seen = DynamicBits()
     val frontier = IntArrayList()
 
     fun clear() {
@@ -196,9 +197,8 @@ internal class ConflictFactorScratch {
     }
 
     fun add(fid: Int) {
-        if (fid >= seen.size) seen = seen.copyOf(maxOf(fid + 1, seen.size * 2))
-        if (!seen[fid]) {
-            seen[fid] = true
+        if (fid >= seen.size || !seen[fid]) {
+            seen.set(fid)
             frontier.add(fid)
         }
     }

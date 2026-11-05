@@ -4,6 +4,7 @@ import co.touchlab.kermit.LogWriter
 import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
 import co.touchlab.kermit.StaticConfig
+import com.eignex.util.process.printErrorLine
 
 /**
  * CLI logger for the `-v` (verbose) flag, backed by Kermit (KMP).
@@ -15,8 +16,8 @@ import co.touchlab.kermit.StaticConfig
  */
 private class StderrCommentWriter : LogWriter() {
     override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {
-        errPrintln("% $message")
-        throwable?.let { errPrintln("% ${it.stackTraceToString()}") }
+        printErrorLine("% $message")
+        throwable?.let { printErrorLine("% ${it.stackTraceToString()}") }
     }
 }
 

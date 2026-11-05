@@ -2,7 +2,7 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 /**
  * Boolean cardinalities hosted by the shared session, so `min ≤ #true ≤ max` is enforced on a route

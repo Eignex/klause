@@ -14,9 +14,9 @@ import com.eignex.klause.solver.evidence.sourceCondition
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 
 internal class EngineInvocation(
     val preparedPlan: PreparedSourcePlan,

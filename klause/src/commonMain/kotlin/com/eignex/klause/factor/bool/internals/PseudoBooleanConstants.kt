@@ -8,12 +8,12 @@ import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.ir.WideConsts
 import com.eignex.klause.ir.constsOf
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.subExact
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.subExact
+import com.eignex.util.numbers.toLongExact
 
 internal fun exactPbConstants(weights: Array<BigInt>, bound: BigInt): IntegralConstants =
     if (bound.fitsLong() && weights.all { it.fitsLong() }) {

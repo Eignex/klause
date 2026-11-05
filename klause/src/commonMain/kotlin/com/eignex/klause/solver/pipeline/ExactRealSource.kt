@@ -4,9 +4,9 @@ import com.eignex.klause.factor.arithmetic.ExactRealEquality
 import com.eignex.klause.ir.*
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.*
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
 
 private class ExactRealSourceUnavailable : RuntimeException()
 

@@ -2,7 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.util.numbers.CheckedLongOverflowException
 
 internal const val INTEGER_LEARNING_ROWS = 64
 private const val INTEGER_LEARNING_STEPS = 16

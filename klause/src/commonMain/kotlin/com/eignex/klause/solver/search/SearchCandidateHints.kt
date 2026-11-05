@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.util.collections.MutableIntIntMap
 
 /**
  * Unverified branch-order steering from candidate producers and live component-owned partial points.

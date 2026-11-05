@@ -11,10 +11,10 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RootWorkAccounting
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 /**
  * A pass's incremental change to the working problem: factors to drop (by stable id), factors to
@@ -26,7 +26,7 @@ import com.eignex.klause.util.IntHashSet
  * what a pass *cannot* have the propagator rediscover keeps the delta minimal and the fixpoint intact.
  */
 internal class PresolveDelta(
-    val droppedIds: IntArray = EmptyIntArray,
+    val droppedIds: IntArray = emptyIntArray(),
     val addedFactors: List<Factor> = emptyList(),
     val domains: Array<IntDomain>? = null,
 ) {
@@ -83,7 +83,7 @@ internal class PresolveSession(
 
     private var accounting = RootWorkAccounting(cancellation, state)
 
-    private fun propagate(allFactors: Boolean, initialFactors: IntArray = EmptyIntArray): IntArray? {
+    private fun propagate(allFactors: Boolean, initialFactors: IntArray = emptyIntArray()): IntArray? {
         state.cancelFloor = 0
         try {
             return state.runToFixpoint(allFactors, initialFactors = initialFactors, cancellation = accounting)
@@ -104,7 +104,7 @@ internal class PresolveSession(
 
     // Stable ids of the live factors [passInput] last returned, parallel to that view's factor list, so
     // a [PassDelta]'s droppedIndices (into that list) map back to the stable ids [apply] tombstones.
-    private var liveIds: IntArray = EmptyIntArray
+    private var liveIds: IntArray = emptyIntArray()
 
     // Int-variable occurrence index keyed by stable factor id: `intOcc(v)` holds the stable ids of every
     // live factor whose `Factor.intVars` contains `v`, in ascending-stable-id (= append) order, maintained
@@ -266,8 +266,8 @@ internal class PresolveSession(
         return PropagationResult.Implied(
             boolKeys = keys.toIntArray(),
             boolValues = BooleanArray(keys.size) { state.boolValues[keys[it]] == true },
-            intKeys = EmptyIntArray,
-            intValues = EmptyLongArray,
+            intKeys = emptyIntArray(),
+            intValues = emptyLongArray(),
         )
     }
 
@@ -313,7 +313,7 @@ internal class PresolveSession(
         // Factor rewrites can rely on the entire domain delta. If its incremental installation stops,
         // reseed from the compact target domains so no required restriction is lost with a dropped row.
         if (narrowed == null) {
-            return reseedFromDelta(EmptyIntArray, emptyList(), requireNotNull(delta.domains), interrupted = true)
+            return reseedFromDelta(emptyIntArray(), emptyList(), requireNotNull(delta.domains), interrupted = true)
         }
         var ok = narrowed
         if (ok && propagate(allFactors = false, initialFactors = addedIds.toIntArray()) != null) ok = false

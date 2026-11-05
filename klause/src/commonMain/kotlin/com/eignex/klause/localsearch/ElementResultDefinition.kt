@@ -6,12 +6,12 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
 
 internal class ElementResultDefinition(val factor: Element) : SweepNode {
     override val out: Int get() = factor.result
     override val outIsBool: Boolean get() = false
-    override val boolInputs: IntArray get() = EmptyIntArray
+    override val boolInputs: IntArray get() = emptyIntArray()
     override val intInputs: IntArray = if (factor.arrIsVars) {
         intArrayOf(factor.idx) + IntArray(factor.arr.size) { factor.arr[it].toInt() }
     } else {

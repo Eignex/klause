@@ -17,9 +17,9 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.IntIntMap
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.IntIntMap
 
 /**
  * Cumulative scheduling constraint: at every integer time point the total resource use of
@@ -73,14 +73,14 @@ class Cumulative(
      *  since an unpinned task may yet go absent. In the [unary] shape, an unpinned task whose
      *  minimum duration would overload the present tasks is ruled absent, and so is a literal shared by
      *  several tasks whose minima would overload them together. */
-    override val presents: IntArray = EmptyIntArray,
+    override val presents: IntArray = emptyIntArray(),
     /** Per-task duration variables; empty = use [durations] as constants. When set, the
      *  factor reads the current duration from `state.assignment.intValue(durationVars(i))`
      *  and propagation pulls bounds from `state.intDomains(durationVars(i))`. */
-    val durationVars: IntArray = EmptyIntArray,
+    val durationVars: IntArray = emptyIntArray(),
     /** Per-task resource variables; empty = use [resources] as constants. Same pattern as
      *  [durationVars]. */
-    val resourceVars: IntArray = EmptyIntArray,
+    val resourceVars: IntArray = emptyIntArray(),
     /** Capacity variable id; -1 = use [capacity] as a constant. */
     val capacityVar: Int = -1,
 ) : Factor,
@@ -211,7 +211,7 @@ class Cumulative(
 
     // Coordinates filling more than one slot: a write to one of them moves several footprints at once.
     internal val repeatedIntVars: IntHashSet by lazy {
-        val capacity = if (capacityVar >= 0) intArrayOf(capacityVar) else EmptyIntArray
+        val capacity = if (capacityVar >= 0) intArrayOf(capacityVar) else emptyIntArray()
         repeated(arrayOf(starts, durationVars, resourceVars, capacity))
     }
 
@@ -235,8 +235,8 @@ class Cumulative(
         fun unary(
             starts: IntArray,
             durations: LongArray,
-            presents: IntArray = EmptyIntArray,
-            durationVars: IntArray = EmptyIntArray,
+            presents: IntArray = emptyIntArray(),
+            durationVars: IntArray = emptyIntArray(),
         ): Cumulative = Cumulative(
             starts = starts,
             durations = durations,

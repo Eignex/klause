@@ -7,11 +7,11 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.addExact
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.numbers.addExact
 
 /**
  * Knapsack cover cuts for a `Σ w_i·x_i ≤ b` PseudoBoolean row with positive weights over

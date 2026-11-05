@@ -1,10 +1,12 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.formats.dimacs.wcnfSemantics
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
+import com.eignex.klause.formats.dimacs.wcnfSemantics
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.util.io.openTextFile
+import com.eignex.util.io.useSource
 
 /**
  * DIMACS **WCNF** (MaxSAT) front-end (`.wcnf`). Soft clauses are relaxed with a fresh indicator and
@@ -25,7 +27,7 @@ internal object WcnfMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(wcnfSemantics)
-            val parsed = openFileSource(path).useSource { Dimacs.parseWcnf(it) }.toProblem(
+            val parsed = openTextFile(path).useSource { Dimacs.parseWcnf(it) }.toProblem(
                 common.config.problemSettings(), semanticOverrides = overrides,
             )
             cliLogger(common.verbose).v {

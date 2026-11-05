@@ -18,10 +18,10 @@ import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.lowering.gridAbsoluteValueTable
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntIntMap
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableIntIntMap
 
 /**
  * Builds the local-search-engine view of immutable factor data. [domains], when given, are the domains the search

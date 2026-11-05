@@ -3,8 +3,8 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.values
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 /**
  * One-hot selector model for the count-variable form `counts(k) = #{i : xs(i) = cover(k)}`: a one-hot

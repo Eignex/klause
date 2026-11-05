@@ -9,12 +9,12 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.CheckedPolynomialCell
 import com.eignex.klause.theory.qfnra.PolynomialCellScope
 import com.eignex.klause.theory.qfnra.PolynomialCondition
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.unaryMinus
 
 internal data class NonlinearIntegerCellStats(
     val observed: Long = 0,

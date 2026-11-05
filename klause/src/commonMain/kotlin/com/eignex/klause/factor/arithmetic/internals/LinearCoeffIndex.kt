@@ -1,6 +1,6 @@
 package com.eignex.klause.factor.arithmetic.internals
 
-import com.eignex.klause.util.IntIntMap
+import com.eignex.util.collections.IntIntMap
 
 internal class LinearCoeffIndex(private val coeffs: LongArray, vars: IntArray) {
     private val coefficient = coeffs.firstOrNull() ?: 0L

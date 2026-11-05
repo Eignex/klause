@@ -1,15 +1,15 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableIntLongMap
-import com.eignex.klause.util.binarySearchInt
-import com.eignex.klause.util.toSortedIntArray
-import com.eignex.klause.util.toSortedLongArray
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.collections.toSortedIntArray
+import com.eignex.util.collections.toSortedLongArray
 
 /**
  * The presolve-derived narrowings that ride alongside an [Assumptions]' exact pins: non-singleton
@@ -24,26 +24,26 @@ import com.eignex.klause.util.toSortedLongArray
  */
 class DeducedRestrictions internal constructor(
     /** Int var ids with an additional `≥ minValue` lower-bound tightening (no exact pin), ascending. */
-    val intMinKeys: IntArray = EmptyIntArray,
+    val intMinKeys: IntArray = emptyIntArray(),
     /** Lower-bound values aligned with [intMinKeys]. */
-    val intMinValues: LongArray = EmptyLongArray,
+    val intMinValues: LongArray = emptyLongArray(),
     /** Int var ids with an additional `≤ maxValue` upper-bound tightening (no exact pin), ascending. */
-    val intMaxKeys: IntArray = EmptyIntArray,
+    val intMaxKeys: IntArray = emptyIntArray(),
     /** Upper-bound values aligned with [intMaxKeys]. */
-    val intMaxValues: LongArray = EmptyLongArray,
+    val intMaxValues: LongArray = emptyLongArray(),
     /** Interior holes: parallel `(varId, value)` rows, lexicographically sorted by `(varId, value)`;
      *  each row encodes `v ≠ value`. */
-    val intHoleVarIds: IntArray = EmptyIntArray,
+    val intHoleVarIds: IntArray = emptyIntArray(),
     /** Forbidden values aligned with [intHoleVarIds]. */
-    val intHoleValues: LongArray = EmptyLongArray,
+    val intHoleValues: LongArray = emptyLongArray(),
     /** Set-restrictions `v ∈ {survivors}`, var ids ascending. CSR layout: variable `intSetKeys[i]`'s
      *  ascending survivors are `intSetValues[intSetOffsets[i] until intSetOffsets[i + 1]]`.
      *  [intSetOffsets] has size `intSetKeys.size + 1` (or is empty when there are none). */
-    val intSetKeys: IntArray = EmptyIntArray,
+    val intSetKeys: IntArray = emptyIntArray(),
     /** CSR row offsets into [intSetValues]; size `intSetKeys.size + 1`, or empty when there are none. */
-    val intSetOffsets: IntArray = EmptyIntArray,
+    val intSetOffsets: IntArray = emptyIntArray(),
     /** Concatenated ascending survivor values, sliced per variable by [intSetOffsets]. */
-    val intSetValues: LongArray = EmptyLongArray,
+    val intSetValues: LongArray = emptyLongArray(),
 ) {
 
     /** True iff no bound tightening, hole, or set-restriction is recorded. */
@@ -141,7 +141,7 @@ class DeducedRestrictions internal constructor(
     fun withoutSetRestrictions(): DeducedRestrictions = if (intSetKeys.isEmpty()) {
         this
     } else {
-        copy(intSetKeys = EmptyIntArray, intSetOffsets = EmptyIntArray, intSetValues = EmptyLongArray)
+        copy(intSetKeys = emptyIntArray(), intSetOffsets = emptyIntArray(), intSetValues = emptyLongArray())
     }
 
     /** Lower bound on [id] raised to at least [value]. */
@@ -269,7 +269,7 @@ class DeducedRestrictions internal constructor(
             intHoleVarIds = holeIds,
             intHoleValues = holeVals,
             intSetKeys = setK,
-            intSetOffsets = if (setK.isEmpty()) EmptyIntArray else setOffsets,
+            intSetOffsets = if (setK.isEmpty()) emptyIntArray() else setOffsets,
             intSetValues = setVals.toLongArray(),
         )
     }

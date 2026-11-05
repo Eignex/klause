@@ -23,10 +23,10 @@ import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.solveQfNra
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
 
 internal class TranscendentalCondition(
     val rational: PolynomialCondition = PolynomialCondition(),

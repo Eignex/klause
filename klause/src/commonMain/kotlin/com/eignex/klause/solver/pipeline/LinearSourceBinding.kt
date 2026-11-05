@@ -21,8 +21,8 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 import kotlin.uuid.Uuid
 
 internal fun OpenTheoryRequest.linearAuthorityContext(cancellation: Cancellation): SourceProofContext? {

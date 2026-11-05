@@ -7,7 +7,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.forEachCandidate
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntHashSet
 
 internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArray, private val strict: Boolean) :
     Invariant {

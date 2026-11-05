@@ -17,16 +17,16 @@ import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.parseBigInt
+import java.io.File
+import java.math.BigInteger
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import java.io.File
-import java.math.BigInteger
-import kotlin.time.Duration.Companion.milliseconds
 
 /** Separate retained-node cutoff and prepared-root separator comparisons using qualified snapshots. */
 object ScopedResidualConsumer {
