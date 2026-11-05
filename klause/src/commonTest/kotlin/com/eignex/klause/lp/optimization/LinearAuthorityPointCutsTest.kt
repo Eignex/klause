@@ -596,6 +596,124 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `generated initialization should use one checked LP operation`() {
+        val budget = SourceLpBudget(maxOperations = 1)
+        val capture = LinearAuthorityCapture(2, 20_000L, 1_000_000L, Cancellation.Never)
+        val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithGeneratedCutAging(nonseparating, Cancellation.Never)
+        }
+
+        assertEquals(1, budget.operations)
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+            (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+        assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
+        assertEquals(1, capture.records.size)
+        assertTrue(capture.records.single().cuts.all { it.checked && it.installed })
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(nonseparating.withLinearAuthority())
+            .verify(assertNotNull(result.bound)))
+    }
+
+    @Test
+    fun `a nonterminal mixed query should install checked generated rows`() {
+        val capture = LinearAuthorityCapture(4, 20_000L, 1_000_000L, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithPointCuts(nonseparating, Cancellation.Never)
+        }
+
+        assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+            (assertNotNull(result.bound).claim as SourceClaim.Bound).value)
+        assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
+        assertTrue(capture.records.first().cuts.isNotEmpty())
+        assertTrue(capture.records.drop(1).any { record ->
+            record.cuts.size > capture.records.first().cuts.size && record.cuts.all { it.checked && it.installed }
+        })
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(nonseparating.withLinearAuthority())
+            .verify(assertNotNull(result.bound)))
+    }
+
+    @Test
+    fun `a checked mixed generated recipe should enter installed row aging`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("mixed"), mixed = true),
+            LinearAuthorityCut(1, SourceInequality(mapOf(mixedReal to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("aggregate"), family = CutFamily.SOURCE_AGGREGATION))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        var installed = selection.prepareGenerated(rows, setOf(0, 1), Cancellation.Never)
+        assertEquals(setOf(0, 1), installed)
+        repeat(3) {
+            installed = selection.select(rows, listOf(x, mixedReal), List(2) { BigFraction.ZERO },
+                setOf(0, 1), List(2) { BigFraction.ZERO }, installed, Cancellation.Never)
+        }
+        assertEquals(setOf(0, 1), installed)
+
+        val selected = selection.select(rows, listOf(x, mixedReal), List(2) { BigFraction.ZERO },
+            setOf(0, 1), List(2) { BigFraction.ZERO }, installed, Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+        assertEquals(2L, selection.observations["numericalCutSelectionRetiredInstalled"])
+    }
+
+    @Test
+    fun `generated recipe selection should require complete checked coverage`() {
+        val rows = List(2) { index -> LinearAuthorityCut(index,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+            SourceDerivation.Premise("aggregate $index"), family = CutFamily.SOURCE_AGGREGATION) }
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+
+        val selected = selection.prepareGenerated(rows, setOf(0), Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+        assertFalse(selection.retainsCandidateLayout(rows))
+    }
+
+    @Test
+    fun `generated recipe selection should retain the selected row limit`() {
+        val rows = List(2) { index -> LinearAuthorityCut(index,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+            SourceDerivation.Premise("aggregate $index"), family = CutFamily.SOURCE_AGGREGATION) }
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumCuts = 1)
+
+        val selected = selection.prepareGenerated(rows, setOf(0, 1), Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+        assertFalse(selection.retainsCandidateLayout(rows))
+    }
+
+    @Test
+    fun `an interrupted generated recipe selection should publish no mask`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+            SourceDerivation.Premise("aggregate"), family = CutFamily.SOURCE_AGGREGATION))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+
+        val selected = selection.prepareGenerated(rows, setOf(0), Cancellation { true })
+
+        assertTrue(selected.isEmpty())
+        assertFalse(selection.retainsCandidateLayout(rows))
+    }
+
+    @Test
+    fun `an unfunded generated recipe selection should publish no mask`() {
+        val rows = listOf(LinearAuthorityCut(0,
+            SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+            SourceDerivation.Premise("aggregate"), family = CutFamily.SOURCE_AGGREGATION))
+        for ((work, allocation) in listOf(1L to 1_000_000L, 1_000_000L to 1L)) {
+            val funding = SourceLpFunding(work, allocation).apply { grant(work) }
+            val selection = LinearAuthorityPointCuts(SourceLpBudget(funding = funding))
+
+            val selected = selection.prepareGenerated(rows, setOf(0), Cancellation.Never)
+
+            assertTrue(selected.isEmpty())
+            assertFalse(selection.retainsCandidateLayout(rows))
+            assertTrue(funding.spent <= work)
+            assertTrue(funding.allocated <= allocation)
+        }
+    }
+
+    @Test
     fun `installed half aggregation should enter aging with its checked recipe`() {
         for (family in listOf(CutFamily.SOURCE_AGGREGATION, CutFamily.AGGREGATION_MIR)) {
             val rows = listOf(LinearAuthorityCut(0,
