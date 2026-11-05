@@ -232,6 +232,12 @@ internal class SourceCut(
         ) {
             return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         }
+        if (prepared is PreparedSourceCutProjection && columnBinding?.layoutFor(map) === prepared.layout) {
+            if (original.facts.any { !it.global && !map.isActive(it.premise) }) {
+                return CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD)
+            }
+            return CutMapping.Mapped(prepared.cut(original))
+        }
         val mapping = LinkedHashMap<CutSource, CutSource>()
         for ((source, definition) in original.auxiliaryDefinitions) {
             mapping[source] = map.auxiliarySource(source, definition)
@@ -241,9 +247,6 @@ internal class SourceCut(
         val expression = this.expression.remapSources(mapping)
         if (provenance.facts.any { !it.global && !map.isActive(it.premise) }) {
             return CutMapping.Declined(CutMappingDecline.INACTIVE_GUARD)
-        }
-        if (prepared is PreparedSourceCutProjection && columnBinding?.layoutFor(map) === prepared.layout) {
-            return CutMapping.Mapped(prepared.cut(provenance))
         }
         val coefficients = LinkedHashMap<Int, BigFraction>()
         var bound = rhs - expression.constant
