@@ -1036,7 +1036,7 @@ aggressive LP; applicability, model class and LP ceilings order and filter it. R
 variable shaving and hull pruning remain explicit plan options, and curated
 satisfaction workers harvest root cuts only with an explicit `lp-root-cuts=true`.
 
-Curated backtrack-only pseudo-Boolean satisfaction pools enable bounded
+Curated backtrack-only clausal and pseudo-Boolean satisfaction pools enable bounded
 [root maintenance](09-learning.md#restarts-phases-and-inprocessing) on every complete worker.
 Each safe-root slice shares a 4,096-work grant: cheap simplification receives 256 work,
 and up to two failed-literal probes share 3,072 work with an 8,192-work per-probe

@@ -351,7 +351,8 @@ internal object PortfolioComposition {
         val zeroObjectivePricing = scenario.zeroObjectivePricing
         val edit = scenario.btEdit
         val boundedRoot = scenario.rootMaintenance && scenario.engine == EngineMix.BACKTRACK && annotationArm == null &&
-            facts.profile.problemClass == ProblemClass.PseudoBoolean && !facts.profile.optimizing
+            (facts.profile.problemClass == ProblemClass.Sat || facts.profile.problemClass == ProblemClass.PseudoBoolean) &&
+            !facts.profile.optimizing
         if (btPool != null) {
             // The `--lp` ceiling bounds the pool, and an injected pool is still the pool: capping only the
             // curated one leaves `--lp` silently ignored whenever the caller names its arms.
