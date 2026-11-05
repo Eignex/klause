@@ -317,7 +317,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val rootProbeBatch: ExecutionOption<Int> = ExecutionOption("root-probe-batch", ValueKind.INT)
 
         /** Capture conditional binaries from consistent probes without changing failed-literal probing. */
-        val rootProbeImplications: ExecutionOption<Boolean> = ExecutionOption("root-probe-implications", ValueKind.BOOL)
+        val rootProbeImplications: ExecutionOption<Boolean> = ExecutionOption("root-probe-implications", ValueKind.BOOLEAN)
 
         /** Maximum propagation work per root probe. */
         val rootProbeWork: ExecutionOption<Long> = ExecutionOption("root-probe-work", ValueKind.POSITIVE_LONG)
