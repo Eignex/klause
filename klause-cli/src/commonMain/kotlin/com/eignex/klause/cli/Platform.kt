@@ -24,5 +24,7 @@ internal fun compressionExtension(path: String): String? =
 internal fun fileExtension(path: String): String {
     val name = fileName(path)
     val last = name.substringAfterLast('.', "")
-    return if (last.lowercase() in compressionExtensions) name.substringBeforeLast('.').substringAfterLast('.', "") else last
+    return if (last.lowercase() in compressionExtensions) {
+        name.substringBeforeLast('.').substringAfterLast('.', "")
+    } else last
 }
