@@ -633,7 +633,21 @@ private class CpSatisfactionTraversalPolicy(
 
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
 
-    override fun onResume(context: SearchContext): SearchRunDisposition = simplify(context, false)
+    override fun onResume(context: SearchContext): SearchRunDisposition {
+        val visits = session.nativeCapTraversalVisits
+        if (context.decisionLevel == 0 && slice != null && session.nativeCapWindowPending) {
+            forgetIfOverCap(session, params, inprocessing?.retainsPublication == true)
+        }
+        val simplified = simplify(context, false)
+        return if (simplified == SearchRunDisposition.Continue) capContinuation(visits) else simplified
+    }
+
+    private fun capContinuation(visits: Long): SearchRunDisposition =
+        if (session.nativeCapWindowPending && session.nativeCapTraversalVisits > visits && slice?.pauses() == true) {
+            SearchRunDisposition.Pause
+        } else {
+            SearchRunDisposition.Continue
+        }
 
     private fun simplify(context: SearchContext, restart: Boolean): SearchRunDisposition {
         learnedMemory.run(session, params, inprocessing, sink?.search)
@@ -664,11 +678,12 @@ private class CpSatisfactionTraversalPolicy(
 
     override fun onRestart(context: SearchContext): SearchRunDisposition {
         params.clauseExchange?.onRestart(session)
+        val visits = session.nativeCapTraversalVisits
         forgetIfOverCap(session, params, inprocessing?.retainsPublication == true)
         val simplified = simplify(context, true)
         if (simplified != SearchRunDisposition.Continue) return simplified
         pooledIncumbents?.poll()?.let { brancher.importPooledSolution(it.assignment) }
-        return SearchRunDisposition.Continue
+        return capContinuation(visits)
     }
 
     override fun onCancellation(context: SearchContext): SearchRunDisposition {
