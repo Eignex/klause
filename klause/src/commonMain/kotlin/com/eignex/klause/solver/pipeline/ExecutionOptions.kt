@@ -317,7 +317,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val rootProbeBatch: ExecutionOption<Int> = ExecutionOption("root-probe-batch", ValueKind.INT)
 
         /** Capture conditional binaries from consistent probes without changing failed-literal probing. */
-        val rootProbeImplications: ExecutionOption<Boolean> = ExecutionOption("root-probe-implications", ValueKind.BOOLEAN)
+        val rootProbeImplications: ExecutionOption<Boolean> = ExecutionOption(
+            "root-probe-implications", ValueKind.BOOLEAN,
+        )
 
         /** Maximum propagation work per root probe. */
         val rootProbeWork: ExecutionOption<Long> = ExecutionOption("root-probe-work", ValueKind.POSITIVE_LONG)
@@ -591,7 +593,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch,
                 rootRebuildCaptureVisits,
                 privateRebuildWork,
-                rootProbeBatch, rootProbeImplications, rootProbeWork, inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
+                rootProbeBatch, rootProbeImplications, rootProbeWork,
+                inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
                 inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth,
                 inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,
                 lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,

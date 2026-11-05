@@ -14,6 +14,7 @@ import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.solver.ProblemClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
