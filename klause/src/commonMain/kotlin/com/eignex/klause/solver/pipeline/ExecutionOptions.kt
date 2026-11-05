@@ -328,6 +328,11 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val inprocessingWork: ExecutionOption<Long> = ExecutionOption("inprocessing-work", ValueKind.LONG)
         /** Cheap root scan work ceiling. */
         val inprocessingRootWork: ExecutionOption<Long> = ExecutionOption("inprocessing-root-work", ValueKind.LONG)
+        /** Non-inprocessing work between optional probing slices; zero follows the shared root trigger. */
+        val inprocessingProbeInterval: ExecutionOption<Long> = ExecutionOption(
+            "inprocessing-probe-interval", ValueKind.LONG,
+        )
+
         /** Failed-literal probe work ceiling. */
         val inprocessingProbeWork: ExecutionOption<Long> = ExecutionOption("inprocessing-probe-work", ValueKind.LONG)
         /** Subsumption preparation and matching work ceiling. */
@@ -594,7 +599,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 rootRebuildCaptureVisits,
                 privateRebuildWork,
                 rootProbeBatch, rootProbeImplications, rootProbeWork,
-                inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
+                inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingProbeInterval,
                 inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth,
                 inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,
                 lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,

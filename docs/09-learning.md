@@ -771,7 +771,12 @@ the propagation-work ledger; diagnostic probe and visit counts add no second cha
 Each of the four classes has a separate work ceiling inside the scheduled slice's
 total ceiling. Each pass receives the containing remainder after earlier passes;
 its remaining optional work is the smaller of that remainder and its class grant
-after debt repayment. Zero withholds that class. Completed atomic copying, sorting and
+after debt repayment. Zero withholds that class.
+`inprocessingProbeInterval` spaces optional probe slices by non-inprocessing work
+while cheap maintenance keeps its shared root schedule. The first eligible slice
+needs no preceding interval. Probe, maintenance, publication and cleanup work cannot
+fund the next slice; pending funded continuations resume before this optional gate.
+Buffer release preserves the interval clock, and reseeding renews its origin. Completed atomic copying, sorting and
 compaction can overspend; the class and scheduled loop repay their respective debt
 before admitting more work. Separate containing and per-class debt-added and
 debt-repaid counters retain those charges without adding work. Reseeding resets

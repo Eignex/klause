@@ -399,6 +399,7 @@ internal object PortfolioComposition {
         inprocessingWork = 4096L,
         inprocessingRootWork = 256L,
         inprocessingProbeWork = 3072L,
+        inprocessingProbeInterval = 32768L,
         inprocessingInterval = 32L,
         inprocessingGrowth = 8,
         inprocessingCooldown = 32L,

@@ -169,7 +169,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "private-rebuild-work",
     "inprocessing-work", "inprocessing-root-work", "inprocessing-probe-work", "inprocessing-subsume-work",
     "inprocessing-vivify-work", "inprocessing-interval", "inprocessing-growth", "inprocessing-cooldown",
-    "inprocessing-warmup-work",
+    "inprocessing-warmup-work", "inprocessing-probe-interval",
     "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-bound-max-pivots", "lp-adaptive-work",
     "lp-branching", "lp-directional-gains", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
@@ -224,6 +224,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val inprocessingWork = p[ExecutionOption.inprocessingWork]
     val inprocessingRootWork = p[ExecutionOption.inprocessingRootWork]
     val inprocessingProbeWork = p[ExecutionOption.inprocessingProbeWork]
+    val inprocessingProbeInterval = p[ExecutionOption.inprocessingProbeInterval]
     val inprocessingSubsumeWork = p[ExecutionOption.inprocessingSubsumeWork]
     val inprocessingVivifyWork = p[ExecutionOption.inprocessingVivifyWork]
     val inprocessingInterval = p[ExecutionOption.inprocessingInterval]
@@ -262,7 +263,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         privateRebuildWork,
         inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingSubsumeWork,
         inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth, inprocessingCooldown,
-        inprocessingWarmupWork,
+        inprocessingWarmupWork, inprocessingProbeInterval,
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
         lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
         pbObjectiveCutoff, integerRowLearning, propagationAttribution, historicalTableReasons, costAwarePropagation,
@@ -303,6 +304,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         inprocessingWork?.let { out = out.copy(inprocessingWork = it) }
         inprocessingRootWork?.let { out = out.copy(inprocessingRootWork = it) }
         inprocessingProbeWork?.let { out = out.copy(inprocessingProbeWork = it) }
+        inprocessingProbeInterval?.let { out = out.copy(inprocessingProbeInterval = it) }
         inprocessingSubsumeWork?.let { out = out.copy(inprocessingSubsumeWork = it) }
         inprocessingVivifyWork?.let { out = out.copy(inprocessingVivifyWork = it) }
         inprocessingInterval?.let { out = out.copy(inprocessingInterval = it) }

@@ -305,6 +305,8 @@ internal class RootProbingPass : InprocessingPass {
     private var neighborhoodPosition = 0
     private var preferNeighborhood = true
     private var preparationLeft = 0
+    private var offeredWork = 0L
+    private var lastProbeWork = -1L
     private val implications = RootProbeImplications()
     override val spending = InprocessingSpending(InprocessingKind.Probe)
 
@@ -320,7 +322,15 @@ internal class RootProbingPass : InprocessingPass {
         implications.releaseRetainedBuffers()
     }
 
+    override fun optionalWorkDue(nonInprocessingWork: Long, params: BacktrackParams): Boolean {
+        offeredWork = nonInprocessingWork
+        return lastProbeWork < 0L ||
+            (nonInprocessingWork - lastProbeWork).coerceAtLeast(0L) >= params.inprocessingProbeInterval
+    }
+
     private fun resetCursors() {
+        offeredWork = 0L
+        lastProbeWork = -1L
         literalCursor = 0L
         endpointCursor = 0L
         preferEndpoint = false
@@ -334,6 +344,7 @@ internal class RootProbingPass : InprocessingPass {
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
         sample.ownedReferences(this, if (neighborhood == null) 1L else 2L, protected)
+        sample.owned(this, 2L * Long.SIZE_BYTES, protected)
         implications.retainedMemory(sample, protected)
         neighborhood?.let { sample.owned(it, it.size.toLong() * Int.SIZE_BYTES, protected) }
     }
@@ -393,7 +404,12 @@ internal class RootProbingPass : InprocessingPass {
         if (!session.canSimplifyRoot || params.rootProbeWork <= 0L) return
         spending.run(session, params, stats, containingWork = containingWork) { budget ->
             if (implications.advance(session, params, budget) && !budget.stopped()) {
-                probe(session, params, budget)
+                val before = session.work
+                try {
+                    probe(session, params, budget)
+                } finally {
+                    if (session.work > before) lastProbeWork = offeredWork
+                }
             }
         }
     }

@@ -461,6 +461,8 @@ data class BacktrackParams(
     val inprocessingWarmupWork: Long = 0L,
     /** Capture conditional binaries from completed consistent root probes; failed-literal units remain enabled. */
     val rootProbeImplications: Boolean = true,
+    /** Non-inprocessing work between optional probing slices; zero follows the shared root trigger. */
+    val inprocessingProbeInterval: Long = 0L,
 ) : SolverParams {
     init {
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }
@@ -474,7 +476,7 @@ data class BacktrackParams(
         require(rootProbeWork > 0L) { "root probe work must be positive" }
         require(listOf(inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
             inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval,
-            inprocessingCooldown, inprocessingWarmupWork).all { it >= 0L }) {
+            inprocessingCooldown, inprocessingWarmupWork, inprocessingProbeInterval).all { it >= 0L }) {
             "inprocessing work limits must be nonnegative"
         }
         require(inprocessingGrowth >= 0) { "inprocessing growth must be nonnegative" }

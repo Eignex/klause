@@ -117,6 +117,7 @@ class EngineParamsTest {
             "inprocessing-work=100", "inprocessing-root-work=11", "inprocessing-probe-work=12",
             "inprocessing-subsume-work=13", "inprocessing-vivify-work=14", "inprocessing-interval=15",
             "inprocessing-growth=16", "inprocessing-cooldown=17", "inprocessing-warmup-work=18",
+            "inprocessing-probe-interval=20",
         )))
 
         assertEquals(listOf(100L, 11L, 12L, 13L, 14L, 15L, 17L, 18L), listOf(configured.inprocessingWork,
@@ -124,6 +125,7 @@ class EngineParamsTest {
             configured.inprocessingVivifyWork, configured.inprocessingInterval, configured.inprocessingCooldown,
             configured.inprocessingWarmupWork))
         assertEquals(16, configured.inprocessingGrowth)
+        assertEquals(20L, configured.inprocessingProbeInterval)
     }
 
     @Test
