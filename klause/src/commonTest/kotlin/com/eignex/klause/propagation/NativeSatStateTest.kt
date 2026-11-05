@@ -25,6 +25,35 @@ class NativeSatStateTest {
     private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
 
     @Test
+    fun `root source retirement should remain effective with no retired learned clauses`() {
+        val source = or(0, true, 1, true)
+        val session = session(4, source)
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9)
+        session.retireRootSource(0, source)
+
+        session.pinBool(0, false)
+        session.pinBool(2, false)
+
+        assertNull(session.boolValue(1))
+        assertEquals(true, session.boolValue(3))
+    }
+
+    @Test
+    fun `a learned retirement after compaction should stop its watched implication`() {
+        val session = session(6, or(4, true, 5, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        repeat(2) { session.maintainCapWindow(0, 40L, 64L, { false }) { false } }
+        session.forgetLearnedClauses { _, _ -> true }
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9)
+
+        repeat(2) { session.maintainCapWindow(0, 40L, 64L, { false }) { false } }
+        session.pinBool(2, false)
+
+        assertNull(session.boolValue(3))
+        assertEquals(0, session.activeLearnedClauseCount)
+    }
+
+    @Test
     fun `a borrowed clause array should remain independent of its native payload`() {
         val session = session(4, or(2, true, 3, true))
         val clause = Clause(or(0, true, 1, true))
