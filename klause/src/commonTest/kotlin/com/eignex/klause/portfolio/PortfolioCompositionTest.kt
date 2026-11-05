@@ -505,11 +505,17 @@ class PortfolioCompositionTest {
                     assertEquals(4096L, arm.inprocessingWork)
                     assertEquals(256L, arm.inprocessingRootWork)
                     assertEquals(3072L, arm.inprocessingProbeWork)
-                    assertEquals(32768L, arm.inprocessingProbeInterval)
+                    assertEquals(
+                        if (problemClass == ProblemClass.Sat) 8192L else 32768L,
+                        arm.inprocessingProbeInterval,
+                    )
                     assertEquals(32L, arm.inprocessingInterval)
                     assertEquals(8, arm.inprocessingGrowth)
                     assertEquals(32L, arm.inprocessingCooldown)
-                    assertEquals(0L, arm.inprocessingWarmupWork)
+                    assertEquals(
+                        if (problemClass == ProblemClass.Sat) 4096L else 0L,
+                        arm.inprocessingWarmupWork,
+                    )
                     assertSame(budget, arm.nodeBudget)
                 }
             }

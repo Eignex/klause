@@ -350,9 +350,9 @@ internal object PortfolioComposition {
         val nodeBudget = scenario.nodeBudget
         val zeroObjectivePricing = scenario.zeroObjectivePricing
         val edit = scenario.btEdit
+        val clausal = facts.profile.problemClass == ProblemClass.Sat
         val boundedRoot = scenario.rootMaintenance && scenario.engine == EngineMix.BACKTRACK && annotationArm == null &&
-            (facts.profile.problemClass == ProblemClass.Sat ||
-                facts.profile.problemClass == ProblemClass.PseudoBoolean) && !facts.profile.optimizing
+            (clausal || facts.profile.problemClass == ProblemClass.PseudoBoolean) && !facts.profile.optimizing
         if (btPool != null) {
             // The `--lp` ceiling bounds the pool, and an injected pool is still the pool: capping only the
             // curated one leaves `--lp` silently ignored whenever the caller names its arms.
@@ -371,7 +371,14 @@ internal object PortfolioComposition {
                 } else {
                     params.copy(lpPlan = params.lpPlan.copy(rootCutHarvest = false))
                 }
-                val defaults = if (boundedRoot) rootParams.boundedRootMaintenance() else rootParams
+                val defaults = if (boundedRoot) {
+                    rootParams.boundedRootMaintenance(
+                        probeInterval = if (clausal) 8192L else 32768L,
+                        warmupWork = if (clausal) 4096L else 0L,
+                    )
+                } else {
+                    rootParams
+                }
                 edit?.invoke(defaults) ?: defaults
             }
         } else {
@@ -391,7 +398,7 @@ internal object PortfolioComposition {
         return base.dropLast(1) + BacktrackWorkerConfig(annotation, zeroObjectivePricing)
     }
 
-    private fun BacktrackParams.boundedRootMaintenance(): BacktrackParams = copy(
+    private fun BacktrackParams.boundedRootMaintenance(probeInterval: Long, warmupWork: Long): BacktrackParams = copy(
         rootSimplification = true,
         rootSimplifyBatch = 256,
         rootProbeBatch = 2,
@@ -400,11 +407,11 @@ internal object PortfolioComposition {
         inprocessingWork = 4096L,
         inprocessingRootWork = 256L,
         inprocessingProbeWork = 3072L,
-        inprocessingProbeInterval = 32768L,
+        inprocessingProbeInterval = probeInterval,
         inprocessingInterval = 32L,
         inprocessingGrowth = 8,
         inprocessingCooldown = 32L,
-        inprocessingWarmupWork = 0L,
+        inprocessingWarmupWork = warmupWork,
     )
 
     private fun mixedArms(scenario: PortfolioScenario, facts: ProblemFacts): List<WorkerConfig> {
