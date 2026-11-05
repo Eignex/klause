@@ -21,7 +21,7 @@ internal class RootProbeImplications {
     val hasContinuation: Boolean get() = pending != 0L
 
     fun reserve(params: BacktrackParams, budget: InprocessingBudget): Boolean {
-        if (admissions >= ADMISSION_LIMIT) return false
+        if (!params.rootProbeImplications || admissions >= ADMISSION_LIMIT) return false
         if (!fundable(params)) {
             budget.note("ImplicationUnfundable")
             return false
@@ -63,6 +63,12 @@ internal class RootProbeImplications {
     fun advance(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget): Boolean {
         if (!hasContinuation) return true
         if (budget.stopped()) return false
+        if (!params.rootProbeImplications) {
+            if (!budget.visit()) return false
+            budget.note("ImplicationDisabled")
+            clearPending()
+            return true
+        }
         if (!fundable(params) || admissions >= ADMISSION_LIMIT) {
             if (!budget.visit()) return false
             budget.note("ImplicationUnfundable")

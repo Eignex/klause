@@ -99,7 +99,7 @@ class EngineParamsTest {
         assertEquals(0, base.rootProbeBatch)
         val configured = applyBacktrackParams(base, EngineParams(listOf(
             "root-simplification=true", "root-simplify-batch=7", "root-probe-batch=3", "root-probe-work=256",
-            "root-rebuild-capture-visits=1024",
+            "root-rebuild-capture-visits=1024", "root-probe-implications=false",
             "private-rebuild-work=65536",
         )))
         assertEquals(true, configured.rootSimplification)
@@ -108,6 +108,7 @@ class EngineParamsTest {
         assertEquals(65_536L, configured.privateRebuildWork)
         assertEquals(3, configured.rootProbeBatch)
         assertEquals(256L, configured.rootProbeWork)
+        assertEquals(false, configured.rootProbeImplications)
     }
 
     @Test

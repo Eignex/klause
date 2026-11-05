@@ -459,6 +459,8 @@ data class BacktrackParams(
     val branchObserver: SearchBranchAttemptObserver? = null,
     /** Non-inprocessing work after the first eligible complete root before optional slices; zero disables warmup. */
     val inprocessingWarmupWork: Long = 0L,
+    /** Capture conditional binaries from completed consistent root probes; failed-literal units remain enabled. */
+    val rootProbeImplications: Boolean = true,
 ) : SolverParams {
     init {
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }

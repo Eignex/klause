@@ -499,6 +499,7 @@ class PortfolioCompositionTest {
                 assertEquals(256, arm.rootSimplifyBatch)
                 assertEquals(2, arm.rootProbeBatch)
                 assertEquals(8192L, arm.rootProbeWork)
+                assertFalse(arm.rootProbeImplications)
                 assertEquals(4096L, arm.inprocessingWork)
                 assertEquals(256L, arm.inprocessingRootWork)
                 assertEquals(3072L, arm.inprocessingProbeWork)
@@ -527,6 +528,7 @@ class PortfolioCompositionTest {
             assertEquals(stock.rootSimplifyBatch, arm.rootSimplifyBatch)
             assertEquals(stock.rootProbeBatch, arm.rootProbeBatch)
             assertEquals(stock.rootProbeWork, arm.rootProbeWork)
+            assertEquals(stock.rootProbeImplications, arm.rootProbeImplications)
             assertEquals(stock.inprocessingWork, arm.inprocessingWork)
             assertEquals(stock.inprocessingRootWork, arm.inprocessingRootWork)
             assertEquals(stock.inprocessingProbeWork, arm.inprocessingProbeWork)
@@ -584,7 +586,10 @@ class PortfolioCompositionTest {
     @Test
     fun `explicit edits should override automatic root maintenance`() {
         val scenario = PortfolioScenario.sequential(Kind.CSP, engine = EngineMix.BACKTRACK).copy(
-            btEdit = { it.copy(rootSimplification = false, rootProbeBatch = 0, inprocessingWork = 17L) },
+            btEdit = {
+                it.copy(rootSimplification = false, rootProbeBatch = 0,
+                    rootProbeImplications = true, inprocessingWork = 17L)
+            },
         )
         val facts = ProblemFacts.assumed(Kind.CSP, ProblemClass.PseudoBoolean)
 
@@ -592,7 +597,10 @@ class PortfolioCompositionTest {
             .map { it.recipe.build(1L, null) }
 
         assertTrue(params.isNotEmpty())
-        assertTrue(params.all { !it.rootSimplification && it.rootProbeBatch == 0 && it.inprocessingWork == 17L })
+        assertTrue(params.all {
+            !it.rootSimplification && it.rootProbeBatch == 0 &&
+                it.rootProbeImplications && it.inprocessingWork == 17L
+        })
     }
 
     @Test

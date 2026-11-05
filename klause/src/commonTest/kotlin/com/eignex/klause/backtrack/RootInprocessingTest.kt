@@ -481,6 +481,58 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `disabled implication capture should retain consistent probes without new clauses`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(1, 4),
+                intArrayOf(3, 5, 6)).bake(), nativeSat = native)
+            val stats = SearchStatsSink()
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false), stats)
+
+            assertEquals(1L, stats.inprocessProbes)
+            assertEquals(0, session.learnedClauseCount)
+            assertEquals(0, session.decisionLevel)
+            for (variable in 0..3) assertNull(session.boolValue(variable))
+        }
+    }
+
+    @Test
+    fun `disabled implication capture should retain consumed failed literal units`() {
+        for ((native, positive) in listOf(false to false, false to true, true to false, true to true)) {
+            val literal = Lit.make(0, positive)
+            val session = PropagationSession(
+                problem(intArrayOf(literal, 2), intArrayOf(literal, 3)).bake(), nativeSat = native,
+            )
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2, rootProbeImplications = false), null)
+
+            assertEquals(positive, session.boolValue(0))
+            assertTrue(session.learnedLifecycle().getValue("learningClauseConsumed") > 0L)
+            assertIs<PropagationResult.Unsat>(session.pinBool(0, !positive))
+        }
+    }
+
+    @Test
+    fun `disabling implication capture should fund cancellation of a pending candidate`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 1, inprocessingProbeWork = 256L)
+            pass.run(session, params, null, containingWork = 63L)
+            assertTrue(pass.hasContinuation(session))
+            val disabled = params.copy(rootProbeImplications = false)
+
+            pass.continueAtRoot(session, disabled, null, containingWork = 0L)
+            assertTrue(pass.hasContinuation(session))
+            pass.releaseRetainedBuffers()
+            pass.continueAtRoot(session, disabled, null, containingWork = 1L)
+
+            assertFalse(pass.hasContinuation(session))
+            assertEquals(0, session.learnedClauseCount)
+        }
+    }
+
+    @Test
     fun `a consistent branch should not assert its implied literals at the root`() {
         for (native in listOf(false, true)) {
             val source = problem(intArrayOf(1, 2), intArrayOf(1, 4), intArrayOf(3, 5, 6))

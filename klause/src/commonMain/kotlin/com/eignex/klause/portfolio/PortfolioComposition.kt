@@ -395,6 +395,7 @@ internal object PortfolioComposition {
         rootSimplifyBatch = 256,
         rootProbeBatch = 2,
         rootProbeWork = 8192L,
+        rootProbeImplications = false,
         inprocessingWork = 4096L,
         inprocessingRootWork = 256L,
         inprocessingProbeWork = 3072L,

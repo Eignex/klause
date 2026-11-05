@@ -734,6 +734,9 @@ simplification so proved facts can refresh binaries in the same safe-root opport
 the invocation token. A completed root conflict proves the complementary unit, which is attached and
 propagated through ordinary search. A completed consistent pure-Boolean probe can retain
 one newly implied Boolean literal as a binary clause conditional on its probe literal.
+`rootProbeImplications` controls this capture independently of failed-literal units.
+Disabling it skips capture reservations and cancels a retained optional candidate under
+a funded probe visit; the scope admission count remains unchanged.
 Capture is prepaid before propagation and reads at most the final two trail entries.
 After rollback, a funded lookup skips a matching direct binary reason and the bounded
 history prevents repeated admissions. A direct or duplicate final consequence yields
