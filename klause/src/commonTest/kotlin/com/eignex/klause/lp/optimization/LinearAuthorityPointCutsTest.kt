@@ -56,7 +56,7 @@ class LinearAuthorityPointCutsTest {
     fun `a checked current optimum should bypass point generated discovery`() {
         val budget = SourceLpBudget()
         LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
-            val result = authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, null)
+            val result = authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, BigFraction.ofLong(2))
 
             assertEquals(1, budget.operations)
             assertNull(authority.cutObservations()["numericalCutAggregatePairAttempts"])
@@ -667,6 +667,64 @@ class LinearAuthorityPointCutsTest {
 
         assertTrue(selected.isEmpty())
         assertEquals(2L, selection.observations["numericalCutSelectionRetiredInstalled"])
+    }
+
+    @Test
+    fun `an unproductive partial mask should retire without installing its replacement`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("x"), family = CutFamily.SOURCE_AGGREGATION),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("y"), family = CutFamily.SOURCE_AGGREGATION))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        var installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ONE }, setOf(0, 1),
+            listOf(BigFraction.ofLong(2), BigFraction.ZERO), emptySet(), Cancellation.Never,
+            usefulnessOpportunity = true, trackSelectedUsefulness = true)
+        assertEquals(setOf(0), installed)
+        assertNull(selection.observations["numericalCutSelectionUsefulnessOpportunities"])
+        repeat(3) {
+            selection.observeRound(rows, improved = true)
+            installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ONE }, setOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.ZERO), installed, Cancellation.Never,
+                usefulnessOpportunity = true, trackSelectedUsefulness = true)
+        }
+        assertEquals(setOf(0), installed)
+        selection.observeRound(rows, improved = true)
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ONE }, setOf(0, 1),
+            listOf(BigFraction.ONE, BigFraction.ofLong(2)), installed, Cancellation.Never,
+            usefulnessOpportunity = true, trackSelectedUsefulness = true)
+
+        assertTrue(selected.isEmpty())
+        assertEquals(1L, selection.observations["numericalCutSelectionUnproductiveRecipeRetired"])
+    }
+
+    @Test
+    fun `actual use should preserve a nonclosing partial mask`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("x"), family = CutFamily.SOURCE_AGGREGATION),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("y"), family = CutFamily.SOURCE_AGGREGATION))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        var installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ONE }, setOf(0, 1),
+            listOf(BigFraction.ofLong(2), BigFraction.ZERO), emptySet(), Cancellation.Never,
+            trackSelectedUsefulness = true)
+        repeat(3) {
+            selection.observeRound(rows, improved = true)
+            installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ONE }, setOf(0, 1),
+                listOf(BigFraction.ONE, BigFraction.ZERO), installed, Cancellation.Never,
+                usefulnessOpportunity = true, trackSelectedUsefulness = true)
+        }
+
+        assertTrue(selection.observeUse(rows, CutFamily.SOURCE_AGGREGATION))
+        selection.observeRound(rows, improved = true)
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ONE }, setOf(0, 1),
+            listOf(BigFraction.ONE, BigFraction.ZERO), installed, Cancellation.Never,
+            usefulnessOpportunity = true, trackSelectedUsefulness = true)
+
+        assertEquals(setOf(0), selected)
+        assertNull(selection.observations["numericalCutSelectionUnproductiveRecipeRetired"])
     }
 
     @Test
