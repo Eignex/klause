@@ -12,6 +12,7 @@ import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.relaxation.CutColumnSource
 import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -26,15 +27,22 @@ class CutPoolTest {
         val premises = listOf(
             CutPremise.Bound(expression, false, BigFraction.ONE),
             CutPremise.Literal(1),
+            CutPremise.Excluded(source, BigFraction.ofLong(2)),
             CutPremise.ObjectiveCutoff(expression, BigFraction.ofLong(5)),
         )
         val cut = SourceCut(expression, Relation.LE, BigFraction.ofLong(3),
             CutProvenance(model, 0L, premises.map { CutProofFact(it, false) }, family = CutFamily.GOMORY))
-        for (missing in premises) {
+        for (prepared in listOf(false, true)) for (missing in premises) {
             val events = ArrayList<Triple<CutFamily, String, String>>()
-            val pool = CutPool(observe = { family, stage, outcome -> events.add(Triple(family, stage, outcome)) })
+            val pool = CutPool(prepareSources = prepared,
+                observe = { family, stage, outcome -> events.add(Triple(family, stage, outcome)) })
             val active = CutSourceMap(model, 0L, listOf(CutColumnSource(source)), activePremises = premises.toSet())
             assertTrue(pool.add(cut, active))
+            repeat(2) { pool.remap(active) }
+            pool.remap(CutSourceMap(Any(), 0L, listOf(CutColumnSource(source)),
+                activePremises = premises.toSet()))
+            assertTrue(pool.cuts().isEmpty())
+            pool.remap(active)
 
             pool.remap(CutSourceMap(model, 1L, listOf(CutColumnSource(source)),
                 activePremises = (premises - missing).toSet()))
@@ -47,6 +55,78 @@ class CutPoolTest {
         }
     }
 
+
+    @Test
+    fun `small immutable inputs should keep their cuts without retained preparation`() {
+        val model = Any()
+        val x = CutSource(CutSourceKind.INTEGER, 0)
+        val expression = CutExpression(mapOf(x to BigFraction.ONE))
+        val map = CutSourceMap(model, 0, listOf(CutColumnSource(x)))
+        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(model, 0, emptyList()))
+        var work = 0L
+        val pool = CutPool(prepareSources = true, onPreparationWork = { work += it })
+        assertTrue(pool.add(source, map))
+
+        repeat(3) { pool.remap(map) }
+
+        assertEquals(1, pool.cuts().size)
+        assertEquals(0L, pool.preparationStorageUnits)
+        assertEquals(0L, work)
+    }
+
+    @Test
+    fun `cancelled preparation should spend capture work without retaining a prepared input`() {
+        val model = Any()
+        val x = CutSource(CutSourceKind.INTEGER, 0)
+        val expression = CutExpression(mapOf(x to BigFraction.ONE))
+        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(model, 0,
+            listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true)),
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
+        val map = CutSourceMap(model, 0, listOf(CutColumnSource(x)))
+        var cancelled = false
+        var cancelOnCharge = true
+        var work = 0L
+        val pool = CutPool(prepareSources = true, cancellation = Cancellation { cancelled },
+            onPreparationWork = { work += it; if (cancelOnCharge) cancelled = true })
+        assertTrue(pool.add(source, map))
+        pool.remap(map)
+
+        pool.remap(map)
+
+        assertTrue(work > 0L)
+        assertEquals(0L, pool.preparationStorageUnits)
+        assertTrue(pool.cuts().isEmpty())
+        cancelled = false
+        cancelOnCharge = false
+        pool.remap(map)
+        assertTrue(pool.preparationStorageUnits > 0L)
+        assertEquals(1, pool.cuts().size)
+    }
+
+    @Test
+    fun `retiring pooled cuts should release their prepared input storage`() {
+        val model = Any()
+        val x = CutSource(CutSourceKind.INTEGER, 0)
+        val expression = CutExpression(mapOf(x to BigFraction.ONE))
+        val map = CutSourceMap(model, 0, listOf(CutColumnSource(x)))
+        val pool = CutPool(maxCuts = 1, maxConsecutiveInactive = 1, prepareSources = true)
+        for (rhs in listOf(5L, 6L)) {
+            assertTrue(pool.add(SourceCut(expression, Relation.LE, BigFraction.ofLong(rhs),
+                CutProvenance(model, 0,
+                    listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ofLong(rhs)), true)),
+                    conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ofLong(rhs)))), map))
+        }
+        repeat(2) { pool.remap(map) }
+        val before = pool.preparationStorageUnits
+        assertTrue(before > 0L)
+
+        pool.retainMostActive()
+        assertTrue(pool.preparationStorageUnits in 1L until before)
+        pool.observe(doubleArrayOf(0.0))
+
+        assertEquals(0L, pool.preparationStorageUnits)
+        assertEquals(0, pool.size)
+    }
 
     @Test
     fun `conditional deduplication should ignore premise order and preserve distinct guards`() {
@@ -153,11 +233,13 @@ class CutPoolTest {
         val source = CutSource(CutSourceKind.INTEGER, 0)
         val token = Any()
         val map = CutSourceMap(token, 0, listOf(CutColumnSource(source)))
+        val expression = CutExpression(mapOf(source to BigFraction.ONE))
         val portable = SourceCut(
-            CutExpression(mapOf(source to BigFraction.ONE)),
+            expression,
             Relation.LE,
             BigFraction.ofLong(5),
-            CutProvenance(token, 0, emptyList()),
+            CutProvenance(token, 0,
+                listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ofLong(5)), true))),
         )
         for (portableFirst in listOf(false, true)) {
             val pool = CutPool()
@@ -186,9 +268,11 @@ class CutPoolTest {
         )
         val root = CutPool()
         root.add(portable, map)
-        val search = CutPool()
+        val search = CutPool(prepareSources = true)
 
         assertEquals(1, search.addAll(root.cuts()))
+        repeat(2) { search.remap(map) }
+        assertTrue(search.preparationStorageUnits > 0L)
         val declines = search.remap(CutSourceMap(token, 1, listOf(null, CutColumnSource(source))))
 
         assertTrue(declines.isEmpty())
