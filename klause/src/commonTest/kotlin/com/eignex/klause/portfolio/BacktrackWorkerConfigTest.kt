@@ -2,15 +2,15 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
-import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
+import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SharingChannel
@@ -34,12 +34,14 @@ class BacktrackWorkerConfigTest {
 
     @Test
     fun `preparation policy should leave a non LP recipe unchanged`() {
-        val params = BacktrackParams()
-        val recipe = BacktrackRecipe("plain") { _, _ -> params }
+        for (mode in LpSourcePreparation.entries) {
+            val params = BacktrackParams(lpPlan = LpPlan(sourcePreparation = mode))
+            val recipe = BacktrackRecipe("plain") { _, _ -> params }
 
-        val actual = recipe.capLp(LpConfig.parse("aggressive,preparation=disabled")).build(0L, null)
+            val actual = recipe.capLp(LpConfig.parse("aggressive,preparation=disabled")).build(0L, null)
 
-        assertSame(params, actual)
+            assertSame(params, actual)
+        }
     }
 
 

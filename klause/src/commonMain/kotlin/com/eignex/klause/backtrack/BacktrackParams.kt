@@ -17,6 +17,7 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.propagation.Assumptions
@@ -508,6 +509,7 @@ data class BacktrackParams(
 
 // Additional native scheduling bounds can disrupt LP branch guidance.
 internal val BacktrackParams.useCumulativeUnarySubsets: Boolean
-    get() = lpPlan.copy(branching = true, rootCutHarvest = true) == LpPlan() && lpConfig.let { config ->
-        config == null || (config.emphasis == LpEmphasis.OFF && config.overrides.values.none { it })
-    }
+    get() = lpPlan.copy(branching = true, rootCutHarvest = true).hasDefaultNumericalSettings() &&
+        lpConfig.let { config ->
+            config == null || (config.emphasis == LpEmphasis.OFF && config.overrides.values.none { it })
+        }

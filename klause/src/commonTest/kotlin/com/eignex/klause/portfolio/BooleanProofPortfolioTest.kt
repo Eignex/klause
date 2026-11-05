@@ -1,6 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
@@ -10,6 +11,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.lp.cut.CutSharing
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ProblemProfile
@@ -37,6 +39,50 @@ class BooleanProofPortfolioTest {
     private val problem = Problem(5, 0, emptyArray(), Array(8) { mask ->
         Clause(IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
     }).bake()
+
+    @Test
+    fun `metadata only preparation should preserve deterministic native clause queries`() {
+        val base = BacktrackCatalog.byLabel("first-fail").build(1L, null)
+        for (mode in LpSourcePreparation.entries) {
+            val params = base.copy(lpPlan = base.lpPlan.copy(sourcePreparation = mode))
+            val recipe = BooleanProofRecipe(BacktrackSolver(problem), params) { _, open -> open() }
+
+            assertTrue(recipe.deterministicClauseQuery(nativeOnly = true))
+        }
+    }
+
+    @Test
+    fun `metadata only preparation should preserve conditioned clause workers`() {
+        val base = BacktrackCatalog.byLabel("first-fail").build(1L, null)
+        for (mode in LpSourcePreparation.entries) {
+            val params = base.copy(lpPlan = base.lpPlan.copy(sourcePreparation = mode))
+            val recipe = BooleanProofRecipe(BacktrackSolver(problem), params) { _, open -> open() }
+
+            assertNotNull(recipe.conditioned())
+        }
+    }
+
+    @Test
+    fun `numerical LP settings should decline deterministic native clause queries`() {
+        val base = BacktrackCatalog.byLabel("first-fail").build(1L, null)
+        for (mode in LpSourcePreparation.entries) {
+            val params = base.copy(lpPlan = base.lpPlan.copy(bounding = true, sourcePreparation = mode))
+            val recipe = BooleanProofRecipe(BacktrackSolver(problem), params) { _, open -> open() }
+
+            assertFalse(recipe.deterministicClauseQuery(nativeOnly = true))
+        }
+    }
+
+    @Test
+    fun `numerical LP settings should decline conditioned clause workers`() {
+        val base = BacktrackCatalog.byLabel("first-fail").build(1L, null)
+        for (mode in LpSourcePreparation.entries) {
+            val params = base.copy(lpPlan = base.lpPlan.copy(bounding = true, sourcePreparation = mode))
+            val recipe = BooleanProofRecipe(BacktrackSolver(problem), params) { _, open -> open() }
+
+            assertNull(recipe.conditioned())
+        }
+    }
 
     @Test
     fun `a separate baked generation should decline despite identical clause objects`() {

@@ -11,8 +11,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
-import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.harvestRootRelaxation
+import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpVerdict
@@ -253,14 +253,14 @@ internal class CpSatisfactionTraversal(
                 require(problem.numIntVars == 0 && problem.numRealVars == 0 &&
                     problem.factors.all { it is Clause } && !problem.hasSymmetryBreaking &&
                     !params.integerRowLearning && params.componentFactory == null &&
-                    params.lpConfig == null && params.lpPlan == LpPlan())
+                    params.lpConfig == null && params.lpPlan.hasDefaultNumericalSettings())
             }
             completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
             completion.lpResource?.let {
                 resources.own(it)
                 lpResources.add(it)
             }
-            val lp = if (params.lpConfig != null || params.lpPlan != LpPlan()) {
+            val lp = if (params.lpConfig != null || !params.lpPlan.hasDefaultNumericalSettings()) {
                 LpFeasibilityComponent(problem, cp, params, sink, solveContext).also {
                     resources.own(it)
                     lpResources.add(it)
