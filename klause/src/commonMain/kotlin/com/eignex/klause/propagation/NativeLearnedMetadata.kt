@@ -12,8 +12,10 @@ internal class NativeLearnedMetadata(state: PropagationState? = null) {
     val hasRetiredRows: Boolean get() = rows.hasRetiredRows
     val admissionWork: Long get() = rows.admissionWork
 
-    operator fun get(index: Int, column: Int): Int = rows[index, column]
-    operator fun set(index: Int, column: Int, value: Int) { rows[index, column] = value }
+    @Suppress("NOTHING_TO_INLINE")
+    internal inline operator fun get(index: Int, column: Int): Int = rows[index, column]
+    @Suppress("NOTHING_TO_INLINE")
+    internal inline operator fun set(index: Int, column: Int, value: Int) { rows[index, column] = value }
     fun admission(index: Int): Long = rows.admission(index)
     fun add(lbd: Int, permanent: Boolean, origin: Int, admission: Long) =
         rows.add(0, lbd, permanent, origin, admission, null)

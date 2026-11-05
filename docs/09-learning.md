@@ -326,7 +326,16 @@ tier-protected ownership. Its max-heap shares the candidate index with retained
 survivors. Funded heap steps, cursors and pending retirement survive later restarts
 and appended clauses; compaction resets them before handles change. Policy updates
 and reason-ownership checks are charged before publication. A later use protects a pending
-eviction; units, pending rechecks and current root reasons survive.
+eviction; units, pending first rechecks and current root reasons survive.
+The first funded Native row inspection fixes that pass's admission boundary.
+Later admissions remain unclassified until another pass. After ranking the captured
+cohort, funded handle copies carry later admissions behind its survivors before
+truncation; a contiguous suffix needs no copy. Copy cursors survive a short grant,
+and compaction resets the boundary before handles change. The boundary scalar
+belongs to the index's modeled primitive ownership. General windows retain their
+continuous admission traversal.
+An optional replay of a consumed clause can retire with its row. Replay queues
+charge each handle inspection and skip retired rows before accessing released payloads.
 Retired rows stop propagation and export and release their owned literal array.
 Admission, reference-array growth and release debit the containing work ledger.
 A short retirement slice suspends before publication and resumes with its stable handle.

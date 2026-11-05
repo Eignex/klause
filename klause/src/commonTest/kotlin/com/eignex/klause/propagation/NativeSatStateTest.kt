@@ -171,6 +171,28 @@ class NativeSatStateTest {
     }
 
     @Test
+    fun `a native cap pass should leave later admissions unclassified and available`() {
+        val session = session(4, or(2, true, 3, true))
+        repeat(2) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        val classified = mutableListOf<Int>()
+        session.maintainCapWindow(0, 40L, 64L, { false }) { classified.add(it); true }
+        session.addLearnedClause(Clause(or(0, true, 2, true)), 9)
+        var slices = 0
+
+        while (session.learnedLifecycle().getValue("learnedCapRankedPasses") == 0L && slices++ < 8) {
+            val before = session.work
+            session.maintainCapWindow(0, 40L, 64L, { false }) { classified.add(it); true }
+            assertTrue(session.work - before <= 40L)
+        }
+
+        assertEquals(1L, session.learnedLifecycle().getValue("learnedCapRankedPasses"))
+        assertEquals(listOf(0, 1), classified)
+        assertEquals(3, session.activeLearnedClauseCount)
+        session.pinBool(0, false)
+        assertEquals(true, session.boolValue(2))
+    }
+
+    @Test
     fun `native cap cancellation at the debit should preserve clause policy`() {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
@@ -198,6 +220,55 @@ class NativeSatStateTest {
             assertTrue(session.isLearnedClause(1))
             assertEquals(2, session.activeLearnedClauseCount)
         }
+    }
+
+    @Test
+    fun `a consumed native recheck should not prevent cap retirement`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.pinBool(0, false)
+        session.popToLevel(0)
+
+        val retired = session.maintainCapWindow(0, 256L, 64L, { false }) { false }
+
+        assertEquals(1, retired)
+    }
+
+    @Test
+    fun `a retired native recheck should not report a conflict`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.pinBool(0, false)
+        session.popToLevel(0)
+        assertEquals(1, session.maintainCapWindow(0, 256L, 64L, { false }) { false })
+
+        val result = session.pinBool(0, false)
+
+        assertIs<PropagationResult.Implied>(result)
+    }
+
+    @Test
+    fun `an unconsumed native recheck should retain its first assertion`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.explanationState.recheckRetractedLearning(session.explanationState.baseFactorCount)
+
+        val retired = session.maintainCapWindow(0, 256L, 64L, { false }) { false }
+
+        assertEquals(0, retired)
+    }
+
+    @Test
+    fun `a cancelled native cap should preserve a consumed recheck`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.pinBool(0, false)
+        session.popToLevel(0)
+
+        session.maintainCapWindow(0, 256L, 64L, { true }) { false }
+        session.pinBool(0, false)
+
+        assertEquals(true, session.boolValue(1))
     }
 
     @Test
