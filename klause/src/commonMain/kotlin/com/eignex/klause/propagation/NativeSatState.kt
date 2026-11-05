@@ -54,6 +54,7 @@ internal class NativeSatState(private val state: PropagationState) {
     private var capBoundaryDefers = 0L
     private var capPreparationDefers = 0L
     private var capPendingReplayCalls = 0L
+    private var retentionEpoch = 0L
 
     // Per-learned-clause policy columns, parallel to the learned index — the native mirror of
     // LearnedClauseDb's forgetting/three-tier metadata. Recent use shares lifecycle storage;
@@ -98,7 +99,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private fun isRetired(handle: Int): Boolean = if (handle < baseCount) {
         retiredRootSources?.contains(handle) == true
-    } else retiredOf(handle - baseCount)
+    } else retiredCount != 0 && retiredOf(handle - baseCount)
 
     fun retireRootSource(factor: Int) {
         check(factor in 0 until baseCount)
@@ -353,6 +354,9 @@ internal class NativeSatState(private val state: PropagationState) {
         state.work += metadata.admissionWork
         check(state.nextLearnedAdmissionKey < Long.MAX_VALUE)
         metadata.add(lbd, permanent, origin, state.nextLearnedAdmissionKey++)
+        state.work += 4L
+        metadata.setEpoch(i, NativeLearnedMetadata.CLASSIFIED_EPOCH, retentionEpoch)
+        metadata.setEpoch(i, NativeLearnedMetadata.USED_EPOCH, -1L)
         state.work++
         if (i == 0) state.work++
         if (permanent) {
@@ -384,7 +388,7 @@ internal class NativeSatState(private val state: PropagationState) {
         state.learned.capRanking.sharingMemory(sample, protectedRows)
         val columns = listOf(learnedUnits, rechecks, capCandidates,
             state.learned.capCandidates)
-        var metadataBytes = 56L + capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
+        var metadataBytes = 64L + capRanking.primitiveBytes + state.learned.capRanking.primitiveBytes +
             learnedPayloads.primitiveBytes + metadata.primitiveBytes
         metadata.sharingMemory(sample, protectedRows) { index ->
             metadata[index, NativeLearnedMetadata.PERMANENT] == 1 || sample.contains(protected, index)
@@ -409,7 +413,7 @@ internal class NativeSatState(private val state: PropagationState) {
         sample.ownedReferences(watchEntries, watchEntries.size.toLong(), true)
         var watchBytes = 0L
         var watchPostings = 0L
-        sample.ownedPool(this, 32L, (if (protectedRows) 12L else 0L) +
+        sample.ownedPool(this, 40L, (if (protectedRows) 20L else 0L) +
             (if (sweepingRetirements >= 0) 16L else 0L) +
             (if (metadata.hasRetiredRows) 4L else 0L))
         for (entries in watchEntries) {
@@ -475,6 +479,8 @@ internal class NativeSatState(private val state: PropagationState) {
         maxScratchBytes: Long,
         cancelled: () -> Boolean,
         canDrop: (Int) -> Boolean,
+        glueThreshold: Int,
+        midThreshold: Int,
         keep: (Int) -> Boolean,
     ): Int {
         capCalls++
@@ -492,8 +498,14 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         try {
             budget.visit(0L, 64L)
+            if (glueThreshold >= 0) {
+                budget.visit(1L)
+                budget.visit(0L)
+                retentionEpoch++
+            }
             withOwnershipBudget(budget) {
-                capRanking.advance(cap, permanentCount, budget, capPolicy(budget, canDrop, keep))
+                capRanking.advance(cap, permanentCount, budget,
+                    capPolicy(budget, canDrop, keep, glueThreshold, midThreshold))
             }
         } catch (_: ReclamationPreparation.Deferred) {
             capPreparationDefers++
@@ -506,13 +518,17 @@ internal class NativeSatState(private val state: PropagationState) {
         budget: ReclamationPreparation,
         mayDrop: (Int) -> Boolean,
         retain: (Int) -> Boolean,
+        glueThreshold: Int,
+        midThreshold: Int,
     ): LearnedCapPolicy = object : LearnedCapPolicy {
         override fun alive(index: Int): Boolean = !retiredOf(index)
         private var prepared = -1
         private var protected = false
         override fun lbd(index: Int): Int = metadata[index, NativeLearnedMetadata.LBD]
         override fun keep(index: Int): Boolean {
+            if (glueThreshold >= 0) catchUpRetention(index, glueThreshold, midThreshold, budget)
             val retained = retain(index)
+            if (glueThreshold >= 0) metadata.setEpoch(index, NativeLearnedMetadata.CLASSIFIED_EPOCH, retentionEpoch)
             return retained || protected
         }
         override fun visited() { capVisits++ }
@@ -536,11 +552,36 @@ internal class NativeSatState(private val state: PropagationState) {
         }
     }
 
+    private fun catchUpRetention(index: Int, glue: Int, mid: Int, budget: ReclamationPreparation) {
+        budget.visit(16L)
+        val classified = metadata.epoch(index, NativeLearnedMetadata.CLASSIFIED_EPOCH)
+        val stages = metadata[index, NativeLearnedMetadata.STAGES]
+        val used = if (stages and RECENT_USED != 0) {
+            metadata.epoch(index, NativeLearnedMetadata.USED_EPOCH)
+        } else Long.MIN_VALUE
+        val tier = tierOf(index)
+        val lbd = lbdOf(index)
+        val initial = if (tier != ClauseTier.UNSET) tier else when {
+            lbd <= glue -> ClauseTier.CORE
+            lbd <= mid -> ClauseTier.MID
+            else -> ClauseTier.LOCAL
+        }
+        val skipped = retentionEpoch - classified
+        val caughtUp = if (skipped != 0L && skipped != 1L && initial != ClauseTier.CORE) {
+            if (used == retentionEpoch - 2L) ClauseTier.MID else ClauseTier.LOCAL
+        } else initial
+        budget.visit(0L)
+        metadata[index, NativeLearnedMetadata.TIER] = caughtUp.ordinal
+        metadata[index, NativeLearnedMetadata.STAGES] = if (used == retentionEpoch - 1L) {
+            stages or RECENT_USED
+        } else stages and RECENT_USED.inv()
+    }
+
     private fun capProtected(index: Int, budget: ReclamationPreparation, work: Long): Boolean {
         val length = literalCountOf(index)
         budget.visit(work + 8L)
         budget.visit(0L)
-        return length <= 1 || metadata[index, NativeLearnedMetadata.STAGES] and 2 != 0 ||
+        return length <= 1 || metadata[index, NativeLearnedMetadata.STAGES] and 3 == 2 ||
             metadata[index, NativeLearnedMetadata.BOOL_REASONS] > 0
     }
 
@@ -632,6 +673,8 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         if (!usedOf(i)) importUses.note(metadata[i, NativeLearnedMetadata.ORIGIN])
         metadata[i, NativeLearnedMetadata.STAGES] = metadata[i, NativeLearnedMetadata.STAGES] or RECENT_USED
+        state.work += 2L
+        metadata.setEpoch(i, NativeLearnedMetadata.USED_EPOCH, retentionEpoch)
     }
 
     internal fun prepareReclamation(
@@ -798,6 +841,11 @@ internal class NativeSatState(private val state: PropagationState) {
                 return false
             }
             val h = rechecks[recheckHead]
+            state.work++
+            if (isRetired(h)) {
+                recheckHead++
+                continue
+            }
             var unit = -1
             var open = 0
             for (k in 0 until clauseLen(h)) {

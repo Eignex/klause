@@ -25,6 +25,35 @@ class NativeSatStateTest {
     private fun or(a: Int, aPos: Boolean, b: Int, bPos: Boolean) = intArrayOf(Lit.make(a, aPos), Lit.make(b, bPos))
 
     @Test
+    fun `root source retirement should remain effective with no retired learned clauses`() {
+        val source = or(0, true, 1, true)
+        val session = session(4, source)
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9)
+        session.retireRootSource(0, source)
+
+        session.pinBool(0, false)
+        session.pinBool(2, false)
+
+        assertNull(session.boolValue(1))
+        assertEquals(true, session.boolValue(3))
+    }
+
+    @Test
+    fun `a learned retirement after compaction should stop its watched implication`() {
+        val session = session(6, or(4, true, 5, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        repeat(2) { session.maintainCapWindow(0, 40L, 64L, { false }) { false } }
+        session.forgetLearnedClauses { _, _ -> true }
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9)
+
+        repeat(2) { session.maintainCapWindow(0, 40L, 64L, { false }) { false } }
+        session.pinBool(2, false)
+
+        assertNull(session.boolValue(3))
+        assertEquals(0, session.activeLearnedClauseCount)
+    }
+
+    @Test
     fun `a borrowed clause array should remain independent of its native payload`() {
         val session = session(4, or(2, true, 3, true))
         val clause = Clause(or(0, true, 1, true))
@@ -198,6 +227,55 @@ class NativeSatStateTest {
             assertTrue(session.isLearnedClause(1))
             assertEquals(2, session.activeLearnedClauseCount)
         }
+    }
+
+    @Test
+    fun `a consumed native recheck should not prevent cap retirement`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.pinBool(0, false)
+        session.popToLevel(0)
+
+        val retired = session.maintainCapWindow(0, 256L, 64L, { false }) { false }
+
+        assertEquals(1, retired)
+    }
+
+    @Test
+    fun `a retired native recheck should not report a conflict`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.pinBool(0, false)
+        session.popToLevel(0)
+        assertEquals(1, session.maintainCapWindow(0, 256L, 64L, { false }) { false })
+
+        val result = session.pinBool(0, false)
+
+        assertIs<PropagationResult.Implied>(result)
+    }
+
+    @Test
+    fun `an unconsumed native recheck should retain its first assertion`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.explanationState.recheckRetractedLearning(session.explanationState.baseFactorCount)
+
+        val retired = session.maintainCapWindow(0, 256L, 64L, { false }) { false }
+
+        assertEquals(0, retired)
+    }
+
+    @Test
+    fun `a cancelled native cap should preserve a consumed recheck`() {
+        val session = session(4, or(2, true, 3, true))
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+        session.pinBool(0, false)
+        session.popToLevel(0)
+
+        session.maintainCapWindow(0, 256L, 64L, { true }) { false }
+        session.pinBool(0, false)
+
+        assertEquals(true, session.boolValue(1))
     }
 
     @Test
