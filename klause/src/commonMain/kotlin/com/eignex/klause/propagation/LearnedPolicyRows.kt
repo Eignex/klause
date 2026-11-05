@@ -10,7 +10,7 @@ internal class LearnedPolicyRows(
     private val objectColumns: Boolean,
     private val state: PropagationState?,
 ) {
-    private class Page(capacity: Int, columns: Int, objectColumns: Boolean) {
+    internal class Page(capacity: Int, columns: Int, objectColumns: Boolean) {
         var values = IntArray(capacity * columns)
         var admissions = LongArray(capacity)
         var propagators: Array<LearnedPropagator?>? = if (objectColumns) arrayOfNulls(capacity) else null
@@ -64,7 +64,7 @@ internal class LearnedPolicyRows(
         return try { operation() } finally { observation = previous }
     }
 
-    private fun locate(index: Int, visit: (Long) -> Unit): Page? {
+    private inline fun locate(index: Int, visit: (Long) -> Unit): Page? {
         if (index == 0) return primary
         val cached = cachedPages[index and CACHE_MASK]
         if (cached?.slot?.key == index) return cached
@@ -85,8 +85,13 @@ internal class LearnedPolicyRows(
 
     private fun pageAt(index: Int): Page? {
         if (index == 0) return primary
-        return locate(index, ::chargeLookup)
+        val cached = cachedPages[index and CACHE_MASK]
+        if (cached?.slot?.key == index) return cached
+        return lookupPage(index)
     }
+
+    // Isolate cold traversal so JVM inlining can focus on cache hits.
+    private fun lookupPage(index: Int): Page? = locate(index, ::chargeLookup)
 
     private fun allocationWork(page: Page?, required: Int): Long = when {
         page == null -> capacityFor(required) * rowWork * 2L + 8L
@@ -137,7 +142,8 @@ internal class LearnedPolicyRows(
         allocationIdentity = Any()
     }
 
-    operator fun get(index: Int, column: Int): Int {
+    @Suppress("NOTHING_TO_INLINE")
+    internal inline operator fun get(index: Int, column: Int): Int {
         val page = pageAt(index ushr PAGE_SHIFT)
         val slot = index and PAGE_MASK
         if (page == null || page.retained and (1 shl slot) == 0) return when (column) {
@@ -148,7 +154,8 @@ internal class LearnedPolicyRows(
         return page.values[slot * columns + column]
     }
 
-    operator fun set(index: Int, column: Int, value: Int) {
+    @Suppress("NOTHING_TO_INLINE")
+    internal inline operator fun set(index: Int, column: Int, value: Int) {
         checkNotNull(pageAt(index ushr PAGE_SHIFT)).values[(index and PAGE_MASK) * columns + column] = value
     }
 
