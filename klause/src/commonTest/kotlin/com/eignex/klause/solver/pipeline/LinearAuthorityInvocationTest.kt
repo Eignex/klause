@@ -284,7 +284,7 @@ class LinearAuthorityInvocationTest {
                 BigFraction.ofLong(100))),
         ), mapOf(integer to BigFraction.MINUS_ONE, real to BigFraction.ONE))
 
-        for ((pointCuts, operations) in listOf(false to 1, true to 2)) {
+        for ((pointCuts, operations) in listOf(false to 1, true to 1, true to 2)) {
             val result = LinearAuthorityInvocation(source, TheoryParams(sourceAggregateCuts = true,
                 sourcePointCuts = pointCuts, sourceLpOperations = operations), boundOrdered = true).use {
                 it.run { _, _ -> }

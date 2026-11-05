@@ -81,6 +81,9 @@ class LinearAuthorityAggregateCutsTest {
         }
 
         assertTrue(capture.records.first().cuts.isEmpty())
+        assertTrue(capture.records.drop(1).any { record ->
+            record.cuts.isNotEmpty() && record.cuts.all { it.installed && it.checked }
+        })
         assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
             assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
         assertEquals(SourceEvidenceCheck.Checked,
@@ -100,6 +103,41 @@ class LinearAuthorityAggregateCutsTest {
             assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.evidence)))
+        }
+    }
+
+    @Test
+    fun `completed generated base points should start installed row aging`() {
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
+            "lower x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "lower y" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["nonnegative $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("triangle", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, real) + triangle, premises,
+            triangle.associateWith { BigFraction.ONE } + mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+        val capture = LinearAuthorityCapture(8, 20_000L, 1_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithGeneratedCutAging(source, Cancellation.Never)
+            val preparations = authority.preparations
+            repeat(2) { authority.advanceWithGeneratedCutAging(source, Cancellation.Never) }
+            assertNull(authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
+
+            val result = authority.advanceWithGeneratedCutAging(source, Cancellation.Never)
+
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
+            assertEquals(preparations, authority.preparations)
+            assertEquals(false, capture.records.last().cuts.single().installed)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
         }
     }
 
