@@ -432,12 +432,6 @@ Profile mains live in [bench/profile/](src/main/kotlin/com/eignex/klause/bench/p
 and run as lab profile jobs; consult the selected main for its arguments and
 retain its output through `$OUT`.
 
-For the unchanged ownership regression fixtures, build `:klause:stageRetirementProfileJvm`
-and run `com.eignex.klause.bench.profile.RetirementFixtureProfile` through the lab with
-`boolean-general|growing-integer` and a duration of 1–180 seconds. Its classpath is
-`klause/build/retirement-profile/jvm/classes:klause/build/retirement-profile/jvm/lib/*`.
-Every invocation, including startup, remains in the output.
-
 Suite measurements `jfr`, `compilation` and `compilation+log` retain the CLI recording
 and write CPU, allocation and runtime-event summaries to `cases/N/out/solve.log`.
 Summary generation runs in the bench process after CLI exit, outside the subprocess

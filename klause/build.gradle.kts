@@ -130,18 +130,6 @@ dokka {
 
 val jvmTestCompilation = kotlin.targets.getByName("jvm").compilations.getByName("test")
 
-kotlin.sourceSets.getByName("jvmTest").kotlin.srcDir(
-    rootProject.file("klause-bench/src/retirementProfileJvm/kotlin"),
-)
-
-tasks.register<Sync>("stageRetirementProfileJvm") {
-    dependsOn(jvmTestCompilation.compileTaskProvider)
-    into(layout.buildDirectory.dir("retirement-profile/jvm"))
-    from(jvmTestCompilation.output.allOutputs) { into("classes") }
-    from(kotlin.targets.getByName("jvm").compilations.getByName("main").output.allOutputs) { into("classes") }
-    from(checkNotNull(jvmTestCompilation.runtimeDependencyFiles)) { into("lib") }
-}
-
 tasks.register<JavaExec>("basisTrace") {
     group = "bench"
     description = "Capture, list, replay, or benchmark the persistent real LP basis corpus."
