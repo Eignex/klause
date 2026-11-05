@@ -1671,17 +1671,18 @@ Ordinary linear-source execution binds the same source-cut controls to its admit
 numerical companions. The containing source request owns these settings and removes
 them from finite worker recipe options; they change neither companion admission
 nor lifetime.
-A new template first runs its ordinary checked cut recipe. The combined aggregate
-and point frontier waits for a checked incumbent before preparing cuts; until then
-it retains the no-cut relaxation and ordinary search. It uses a completed current
-point to choose continuous endpoints and propose generated cuts within the existing
-producer limits. Current and generated
+Point-only selection first runs its ordinary checked cut recipe. The combined
+aggregate and point frontier first runs the no-cut relaxation, then uses its
+completed point to choose continuous endpoints and propose generated cuts within
+the existing producer limits. Point-directed definitions use the same immutable
+source rows and coordinate layout; no intermediate current-cut query is needed.
+Current and generated
 definitions together fit a 64-row cap; a larger point-directed family declines.
 Selection admits at most one newly violated checked cut before the optional query.
 The internal generated-mask entry can instead initialize a bounded generated recipe
 and start installed-row aging without replacing its numerical owner.
 A trial that admits no candidate retains
-the ordinary template, checked query and numerical owner for later queries of that
+its base template, checked query and numerical owner for later queries of that
 template. Successful selection retains its checked mask instead.
 Integer-only templates and aggregate-only cut families with at most 64 fully checked
 installed cuts adopt that mask directly from the current recipe, without another

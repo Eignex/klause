@@ -53,14 +53,15 @@ class LinearAuthorityPointCutsTest {
     ), mapOf(x to BigFraction.ONE))
 
     @Test
-    fun `a checked current optimum should bypass point generated discovery`() {
+    fun `a checked no cut optimum should bypass point generated discovery`() {
+        val current = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE))))
         val budget = SourceLpBudget()
         LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
-            val result = authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, BigFraction.ofLong(2))
+            val result = authority.advanceWithPointGeneratedCuts(current, Cancellation.Never, BigFraction.ofLong(2))
 
             assertEquals(1, budget.operations)
             assertNull(authority.cutObservations()["numericalCutAggregatePairAttempts"])
-            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(current.withLinearAuthority())
                 .verify(assertNotNull(result.evidence)))
         }
     }
