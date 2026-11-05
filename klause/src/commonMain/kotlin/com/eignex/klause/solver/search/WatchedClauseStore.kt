@@ -121,8 +121,9 @@ internal class WatchedClauseStore {
             sample.owned(list, list.backingData.size.toLong() * Int.SIZE_BYTES, protectedPosting)
         }
         sample.owned(signatures, signatures.primitiveCapacityBytes, protectedSignatures)
-        sample.ownedReferences(signatures.valueStorageIdentity, signatures.referenceCapacity.toLong(),
-            protectedSignatures)
+        sample.ownedReferences(
+            signatures.valueStorageIdentity, signatures.referenceCapacity.toLong(), protectedSignatures,
+        )
         return protected
     }
 

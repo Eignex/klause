@@ -13,6 +13,7 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.arrays.argsortBy
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongHashSet
@@ -283,17 +284,14 @@ object RootBaker {
         }
         if (cancellation()) return IntArray(0)
         val tie = IntArray(numIntVars) { rng.nextInt() }
-        val boxed = Array(numIntVars) { it }
-        boxed.sortWith(
-            Comparator { a, b ->
-                val sa = scores[a]
-                val sb = scores[b]
-                if (sa != sb) sb.compareTo(sa) else tie[a].compareTo(tie[b])
-            },
-        )
+        val order = argsortBy(numIntVars) { a, b ->
+            val sa = scores[a]
+            val sb = scores[b]
+            if (sa != sb) sb.compareTo(sa) else tie[a].compareTo(tie[b])
+        }
         cancellation.charge(numIntVars.toLong())
         if (cancellation()) return IntArray(0)
-        return IntArray(numIntVars) { boxed[it] }
+        return order
     }
 
     /** Bump every factor implicated in an Unsat conflict by 1.0, the wdeg update rule. */

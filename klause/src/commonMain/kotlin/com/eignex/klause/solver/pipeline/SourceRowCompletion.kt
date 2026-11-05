@@ -10,6 +10,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
+import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
@@ -112,7 +113,7 @@ internal class SourceRowCompletion(
         val planned = LinkedHashMap<Int, BigFraction>()
         val members = ArrayList<Member>()
         val delta = HashMap<Int, BigFraction>()
-        val queue = ArrayDeque<Int>()
+        val queue = IntArrayDeque()
         val queued = HashSet<Int>()
         fun current(index: Int): BigFraction = planned[index] ?: centerValue(center, index)
         fun move(index: Int, target: BigFraction, row: String?) {

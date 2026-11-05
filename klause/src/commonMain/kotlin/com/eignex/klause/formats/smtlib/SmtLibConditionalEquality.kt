@@ -11,6 +11,7 @@ import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
+import com.eignex.util.collections.IntArrayDeque
 
 internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
     class UnusedColumns(val ints: Set<Int>, val bools: Set<Int>)
@@ -242,7 +243,7 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
         }
         if (variable !in definitions || work >= workLimit) return null
         val pending = ArrayDeque<Frame>()
-        val literals = ArrayDeque<Int>()
+        val literals = IntArrayDeque()
         pending.addLast(Frame.Eval(LinComb(mapOf(variable to 1L), 0)))
         while (pending.isNotEmpty()) {
             when (val frame = pending.removeLast()) {
@@ -304,7 +305,8 @@ internal class SmtLibConditionalEquality(private val workLimit: Int = 65_536) {
                 }
             }
         }
-        return literals.single()
+        check(literals.size == 1)
+        return literals[0]
     }
 
     private fun hasImageDependencies(definition: Definition): Boolean =

@@ -26,5 +26,7 @@ internal fun fileExtension(path: String): String {
     val last = name.substringAfterLast('.', "")
     return if (last.lowercase() in compressionExtensions) {
         name.substringBeforeLast('.').substringAfterLast('.', "")
-    } else last
+    } else {
+        last
+    }
 }
