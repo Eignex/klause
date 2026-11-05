@@ -319,6 +319,16 @@ to its fixed maximum; full compaction trims a partial last page. Empty pages rel
 without changing live clause handles. Reductions compact their handle and reference columns without
 copying surviving literal arrays. The lane
 shares the general trail, pins, antecedents and conflict analyzer.
+When the learned retirement count is zero, watch propagation can exclude learned
+retirement without reading each row's metadata. Root-source retirement is checked
+independently. A true learned-watch blocker satisfies its wakeup without a metadata
+lookup. A dormant retired posting stays inert and owned until separately funded
+watch cleanup removes it; an unsatisfied blocker checks retirement before reading
+the clause payload.
+
+Root continuation observes row cursors, heap shape and suspended operations;
+funded sifting or cleanup can advance without inspecting another row. These views
+read the ranking's existing state without adding retained storage.
 
 A bounded window over non-permanent
 learned clauses retains the lowest LBD and stable-handle keys after permanent and
@@ -326,7 +336,9 @@ tier-protected ownership. Its max-heap shares the candidate index with retained
 survivors. Funded heap steps, cursors and pending retirement survive later restarts
 and appended clauses; compaction resets them before handles change. Policy updates
 and reason-ownership checks are charged before publication. A later use protects a pending
-eviction; units, pending rechecks and current root reasons survive.
+eviction; units, pending first rechecks and current root reasons survive.
+An optional replay of a consumed clause can retire with its row. Replay queues
+charge each handle inspection and skip retired rows before accessing released payloads.
 Retired rows stop propagation and export and release their owned literal array.
 Admission, reference-array growth and release debit the containing work ledger.
 A short retirement slice suspends before publication and resumes with its stable handle.
@@ -537,7 +549,12 @@ diagnostic invocation; an incomplete trace cannot establish exhaustive applicabi
 
 ## Learned-clause retention
 
-Native forgetting runs at restart boundaries only with a configured cap. Permanent
+Native forgetting starts at restart boundaries with a configured cap. A resumable
+root continues an unfinished window before the next branch when the prior grant
+completed a row inspection. Each continuation uses the same bounded work and scratch
+allowance and charges the containing slice; a completed pass waits for another
+restart before aging tiers again. A grant that cannot complete a row inspection
+does not hold search at the root. Permanent
 and glue clauses (default LBD at most 2) survive; remaining space favors lower LBD.
 Cap eligibility and survivor quotas use active constraints; stable retired slots do not
 consume the quota or count as newly retired in a sweep event. Below the active cap,
