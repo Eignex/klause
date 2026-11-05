@@ -19,6 +19,7 @@ internal interface LearnedCapPolicy {
 // Admissions append, while compaction resets every suspended operation before handles change.
 internal class LearnedCapRanking(private val candidates: IntArrayList) {
     private var read = 0
+    private var admissionEnd = -1
     private var write = 0
     private var heapSize = 0
     private var floor = 0L
@@ -34,12 +35,12 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
     private var afterCleanup = Stage.Collect
     var passes = 0L
         private set
-    val hasPending: Boolean get() = read > 0 || stage != Stage.Collect
-    val modeledBytes: Long get() = 100L
-    val primitiveBytes: Long get() = 68L
+    val modeledBytes: Long get() = 104L
+    val primitiveBytes: Long get() = 72L
 
     fun reset() {
         read = 0
+        admissionEnd = -1
         write = 0
         heapSize = 0
         floor = 0L
@@ -57,11 +58,17 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
     fun invalidateRetiredHandles() { retirementRevision++ }
 
     fun sharingMemory(sample: SharingMemoryObservation, protected: Boolean) {
-        sample.owned(this, 68L, protected)
+        sample.owned(this, primitiveBytes, protected)
         sample.ownedReferences(this, 4L, protected)
     }
 
-    fun advance(cap: Int, fixedFloor: Int, budget: ReclamationPreparation, policy: LearnedCapPolicy) {
+    fun advance(
+        cap: Int,
+        fixedFloor: Int,
+        budget: ReclamationPreparation,
+        policy: LearnedCapPolicy,
+        boundAdmissions: Boolean = false,
+    ) {
         prepared = -1
         while (true) {
             if ((stage == Stage.Collect || stage == Stage.Trim) && observedRetirementRevision != retirementRevision) {
@@ -75,14 +82,15 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
                 Stage.Collect -> {
                     if (heapSize > limit) {
                         stage = Stage.Trim
-                    } else if (read == candidates.size) {
-                        budget.visit(8L)
-                        budget.visit(0L)
-                        candidates.truncateTo(write)
-                        reset()
-                        passes++
-                        return
-                    } else collect(budget, policy)
+                    } else if (read == if (admissionEnd >= 0) admissionEnd else candidates.size) {
+                        if (read < candidates.size && write < read) {
+                            budget.visit(0L)
+                            stage = Stage.Carry
+                        } else {
+                            finish(budget, if (write == read) candidates.size else write)
+                            return
+                        }
+                    } else collect(budget, policy, boundAdmissions)
                 }
                 Stage.Admit -> admit(limit, budget, policy)
                 Stage.Up -> siftUp(budget, policy)
@@ -99,14 +107,35 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
                 }
                 Stage.Trim -> trim(limit, budget)
                 Stage.Clean -> clean(budget, policy)
+                Stage.Carry -> if (read == candidates.size) {
+                    finish(budget, write)
+                    return
+                } else carry(budget)
             }
         }
     }
 
-    private fun collect(budget: ReclamationPreparation, policy: LearnedCapPolicy) {
+    private fun finish(budget: ReclamationPreparation, keepThrough: Int) {
+        budget.visit(8L)
+        budget.visit(0L)
+        candidates.truncateTo(keepThrough)
+        reset()
+        passes++
+    }
+
+    private fun carry(budget: ReclamationPreparation) {
+        budget.visit(4L)
+        budget.visit(0L)
+        candidates[write] = candidates[read]
+        read++
+        write++
+    }
+
+    private fun collect(budget: ReclamationPreparation, policy: LearnedCapPolicy, boundAdmissions: Boolean) {
         val index = candidates[read]
         budget.visit(CAP_ROW_INSPECTION_WORK)
         budget.visit(0L)
+        if (boundAdmissions && admissionEnd < 0) admissionEnd = candidates.size
         val alive = policy.alive(index)
         budget.visit(0L)
         if (!alive) {
@@ -260,5 +289,5 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         candidates[right] = value
     }
 
-    private enum class Stage { Collect, Admit, Up, Down, Retire, Trim, Clean }
+    private enum class Stage { Collect, Admit, Up, Down, Retire, Trim, Clean, Carry }
 }

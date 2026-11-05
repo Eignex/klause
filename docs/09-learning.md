@@ -327,6 +327,13 @@ survivors. Funded heap steps, cursors and pending retirement survive later resta
 and appended clauses; compaction resets them before handles change. Policy updates
 and reason-ownership checks are charged before publication. A later use protects a pending
 eviction; units, pending first rechecks and current root reasons survive.
+The first funded Native row inspection fixes that pass's admission boundary.
+Later admissions remain unclassified until another pass. After ranking the captured
+cohort, funded handle copies carry later admissions behind its survivors before
+truncation; a contiguous suffix needs no copy. Copy cursors survive a short grant,
+and compaction resets the boundary before handles change. The boundary scalar
+belongs to the index's modeled primitive ownership. General windows retain their
+continuous admission traversal.
 An optional replay of a consumed clause can retire with its row. Replay queues
 charge each handle inspection and skip retired rows before accessing released payloads.
 Retired rows stop propagation and export and release their owned literal array.
@@ -539,12 +546,7 @@ diagnostic invocation; an incomplete trace cannot establish exhaustive applicabi
 
 ## Learned-clause retention
 
-Native forgetting starts at restart boundaries with a configured cap. A resumable
-root continues an unfinished window before the next branch when the prior grant
-completed a row inspection. Each continuation uses the same bounded work and scratch
-allowance and charges the containing slice; a completed pass waits for another
-restart before aging tiers again. A grant that cannot complete a row inspection
-does not hold search at the root. Permanent
+Native forgetting runs at restart boundaries only with a configured cap. Permanent
 and glue clauses (default LBD at most 2) survive; remaining space favors lower LBD.
 Cap eligibility and survivor quotas use active constraints; stable retired slots do not
 consume the quota or count as newly retired in a sweep event. Below the active cap,

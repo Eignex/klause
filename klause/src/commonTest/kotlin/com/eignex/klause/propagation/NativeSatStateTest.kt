@@ -171,6 +171,28 @@ class NativeSatStateTest {
     }
 
     @Test
+    fun `a native cap pass should leave later admissions unclassified and available`() {
+        val session = session(4, or(2, true, 3, true))
+        repeat(2) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        val classified = mutableListOf<Int>()
+        session.maintainCapWindow(0, 40L, 64L, { false }) { classified.add(it); true }
+        session.addLearnedClause(Clause(or(0, true, 2, true)), 9)
+        var slices = 0
+
+        while (session.learnedLifecycle().getValue("learnedCapRankedPasses") == 0L && slices++ < 8) {
+            val before = session.work
+            session.maintainCapWindow(0, 40L, 64L, { false }) { classified.add(it); true }
+            assertTrue(session.work - before <= 40L)
+        }
+
+        assertEquals(1L, session.learnedLifecycle().getValue("learnedCapRankedPasses"))
+        assertEquals(listOf(0, 1), classified)
+        assertEquals(3, session.activeLearnedClauseCount)
+        session.pinBool(0, false)
+        assertEquals(true, session.boolValue(2))
+    }
+
+    @Test
     fun `native cap cancellation at the debit should preserve clause policy`() {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)

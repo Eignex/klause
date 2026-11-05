@@ -14,8 +14,6 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
-import com.eignex.klause.solver.search.SearchBranchAttemptObserver
-import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.SharingMemoryStatus
 import kotlin.test.Test
@@ -28,84 +26,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ResumableSatisfactionTest {
-    @Test
-    fun `a funded native cap should finish one tier pass before branching`() {
-        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(4, 6)))).bake()
-        var native: PropagationSession? = null
-        var attempts = 0
-        val exchange = object : ClauseExchange {
-            override fun onSearchStart(session: PropagationSession) {
-                native = session
-                repeat(6) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 5) }
-                forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 1,
-                    learnedMemoryWork = 128L, learnedMemoryScratchBytes = 64L, tieredLearnedDb = true))
-                assertTrue(session.nativeCapWindowPending)
-            }
-            override fun onRestart(session: PropagationSession) = Unit
-        }
-        val params = BacktrackParams(nativeSat = true, pbLearning = false, randomSeed = 1L,
-            maxLearnedClauses = 1, learnedMemoryWork = 128L, learnedMemoryScratchBytes = 64L,
-            tieredLearnedDb = true, clauseExchange = exchange,
-            branchObserver = object : SearchBranchAttemptObserver {
-                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
-                    val session = assertNotNull(native)
-                    assertFalse(session.nativeCapWindowPending)
-                    assertEquals(1L, session.learnedLifecycle().getValue("learnedCapRankedPasses"))
-                    assertEquals(6, session.activeLearnedClauseCount)
-                    attempts++
-                }
-            })
-
-        val result = BacktrackSolver(problem).resumableSolve(params).use { search ->
-            var verdict: SolveResult? = null
-            repeat(32) { if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
-            assertNotNull(verdict)
-        }
-
-        assertIs<SolveResult.Sat>(result)
-        assertTrue(attempts > 0)
-        assertEquals(1L, result.stats.search.learning.getValue("learnedCapRankedPasses"))
-    }
-
-    @Test
-    fun `an unfunded native cap continuation should allow search to progress`() {
-        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(4, 6)))).bake()
-        var native: PropagationSession? = null
-        var attempts = 0
-        var visits = 0L
-        val exchange = object : ClauseExchange {
-            override fun onSearchStart(session: PropagationSession) {
-                native = session
-                repeat(6) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 5) }
-                forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 1,
-                    learnedMemoryWork = 128L, learnedMemoryScratchBytes = 64L, tieredLearnedDb = true))
-                assertTrue(session.nativeCapWindowPending)
-                visits = session.nativeCapTraversalVisits
-            }
-            override fun onRestart(session: PropagationSession) = Unit
-        }
-        val params = BacktrackParams(nativeSat = true, pbLearning = false, randomSeed = 1L,
-            maxLearnedClauses = 1, learnedMemoryWork = 0L, learnedMemoryScratchBytes = 64L,
-            tieredLearnedDb = true, clauseExchange = exchange,
-            branchObserver = object : SearchBranchAttemptObserver {
-                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
-                    val session = assertNotNull(native)
-                    assertTrue(session.nativeCapWindowPending)
-                    assertEquals(visits, session.nativeCapTraversalVisits)
-                    attempts++
-                }
-            })
-
-        val result = BacktrackSolver(problem).resumableSolve(params).use { search ->
-            var verdict: SolveResult? = null
-            repeat(32) { if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
-            assertNotNull(verdict)
-        }
-
-        assertIs<SolveResult.Sat>(result)
-        assertTrue(attempts > 0)
-    }
-
     @Test
     fun `ordinary and resumed reason preflight should preserve refutation with fifo propagation`() {
         val solver = BacktrackSolver(pigeonhole(3, 2).bake())
