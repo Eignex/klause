@@ -57,6 +57,67 @@ class CutPoolTest {
 
 
     @Test
+    fun `projected rows should follow layout changes and release their storage on retirement`() {
+        val model = Any()
+        val x = CutSource(CutSourceKind.INTEGER, 0)
+        val expression = CutExpression(mapOf(x to BigFraction.ONE))
+        val facts = listOf(CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
+            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true))
+        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(model, 0, facts,
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
+        val first = CutSourceMap(model, 0, listOf(null, CutColumnSource(x)))
+        val events = ArrayList<Pair<String, String>>()
+        val pool = CutPool(maxConsecutiveInactive = 1, prepareSources = true,
+            observe = { _, stage, outcome -> events.add(stage to outcome) })
+        assertTrue(pool.add(source, first))
+        repeat(4) { pool.remap(first) }
+        assertTrue("PROJECTION" to "REUSED" in events)
+        val current = CutSourceMap(model, 1, listOf(CutColumnSource(x), null))
+
+        repeat(3) { pool.remap(current) }
+
+        assertTrue("PROJECTION" to "INVALIDATED" in events)
+        assertEquals(0, pool.cuts().single().cols.single())
+        pool.observe(doubleArrayOf(0.0, 0.0))
+        assertEquals(0L, pool.preparationStorageUnits)
+    }
+
+    @Test
+    fun `cancelled projection capture should leave the input reusable without publishing a cut`() {
+        val model = Any()
+        val x = CutSource(CutSourceKind.INTEGER, 0)
+        val expression = CutExpression(mapOf(x to BigFraction.ONE))
+        val facts = listOf(CutProofFact(CutPremise.Bound(expression, false, BigFraction.ZERO), true),
+            CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true))
+        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(model, 0, facts,
+            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)))
+        val map = CutSourceMap(model, 0, listOf(CutColumnSource(x)))
+        var cancelled = false
+        var cancelProjection = false
+        var work = 0L
+        val events = ArrayList<Pair<String, String>>()
+        val pool = CutPool(prepareSources = true, cancellation = Cancellation { cancelled },
+            onPreparationWork = { work += it; if (cancelProjection && it >= source.projectedPreparationUnits) cancelled = true },
+            observe = { _, stage, outcome -> events.add(stage to outcome) })
+        assertTrue(pool.add(source, map))
+        repeat(2) { pool.remap(map) }
+        val before = work
+        cancelProjection = true
+
+        pool.remap(map)
+
+        assertTrue(work - before >= source.projectedPreparationUnits)
+        assertTrue("PROJECTION" to "CANCELLED" in events)
+        assertFalse("PROJECTION" to "RETAINED" in events)
+        assertTrue(pool.cuts().isEmpty())
+        cancelled = false
+        cancelProjection = false
+        repeat(2) { pool.remap(map) }
+        assertEquals(0, pool.cuts().single().cols.single())
+        assertTrue("PROJECTION" to "REUSED" in events)
+    }
+
+    @Test
     fun `small immutable inputs should keep their cuts without retained preparation`() {
         val model = Any()
         val x = CutSource(CutSourceKind.INTEGER, 0)
