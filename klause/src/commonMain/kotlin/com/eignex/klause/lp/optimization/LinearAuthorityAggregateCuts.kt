@@ -183,14 +183,16 @@ internal object LinearAuthorityAggregateCuts {
                                 else coefficient.negated())
                             val leftWeight = pairMeter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
                             pairMeter.reserve(1L, 320L)
-                            val terms = listOf(row.term.copy(weight = leftWeight), other.term.copy(weight = rightWeight))
+                            val terms = listOf(row.term.copy(weight = leftWeight),
+                                other.term.copy(weight = rightWeight))
                             val snapshots = listOf(row.coefficients, other.coefficients)
                             var cut = deriveWithCoefficients(terms, derivedStop, pairCharge, attemptLimits,
                                 allowMixed = true, continuousBounds = selectedBounds,
                                 coefficientSnapshots = snapshots, capture = pairExtension?.capture)
                             if (point != null) {
                                 val initial = cut
-                                val separating = if (initial == null) false else separates(initial, point, pairMeter, observe)
+                                val separating = if (initial == null) false
+                                    else separates(initial, point, pairMeter, observe)
                                 if (separating == null) {
                                     eligibilityKnown = false
                                     continue
