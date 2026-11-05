@@ -406,7 +406,7 @@ internal object PortfolioComposition {
         rootSimplifyBatch = 256,
         rootProbeBatch = 2,
         rootProbeWork = if (clausal) 8192L else 2048L,
-        rootProbeImplications = false,
+        rootProbeImplications = !clausal,
         rootProbeBinaryGate = clausal,
         rootProbeGeneralGate = !clausal,
         inprocessingWork = 4096L,

@@ -1043,9 +1043,10 @@ and up to two failed-literal probes share 3,072 work. The per-probe ceiling is 8
 work for clausal pools and 2,048 for pseudo-Boolean pools. Clausal pools give
 subsumption and vivification zero class grants; pseudo-Boolean pools retain their
 recipe's auxiliary grants inside the shared ceiling.
-Consistent-probe binary capture is disabled in this pool; explicit
-`root-probe-implications=true` enables it without changing failed-literal probes or
-cheap binary maintenance. Root scans examine at most 256 clauses per slice. Natural-root scheduling
+Pseudo-Boolean pools retain bounded binary consequences from completed consistent
+probes; clausal pools require explicit `root-probe-implications=true` for this capture.
+Capture and admission spend the existing probe and containing grants, and retain at
+most 64 admissions per worker scope. Root scans examine at most 256 clauses per slice. Natural-root scheduling
 uses a 32-work interval, eight-clause growth and a 32-work cooldown. Clausal pools
 require 4,096 non-inprocessing work before the first optional maintenance slice;
 pseudo-Boolean pools have no warmup. After the first eligible probe slice, optional
