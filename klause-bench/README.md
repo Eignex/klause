@@ -4,6 +4,10 @@ JVM problem catalog and single-case runner for
 [eignex-lab](https://github.com/Eignex/eignex-lab). Use the lab for experiments,
 revision comparisons, reference solvers, witness checks, schedules and profiling.
 
+External lab plans read committed flat DIMACS inventories from `corpus-index/` and declare
+stored inputs by SHA256. Planning cannot fetch or materialize corpus bytes; unsupported metadata
+fails before downloading. Execution verifies each declared input before invoking the CLI.
+
 ## Build and run
 
 Run from the repository root with JDK 25 or newer:

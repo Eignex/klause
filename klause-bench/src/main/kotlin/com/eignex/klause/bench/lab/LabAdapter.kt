@@ -11,6 +11,7 @@ import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
+import com.eignex.klause.bench.source.CommittedCorpusInputs
 import com.eignex.klause.bench.target.collectionOf
 import com.eignex.lab.bench.*
 import kotlinx.serialization.json.JsonObject
@@ -60,11 +61,11 @@ internal object KlauseLabSuite : BenchSuite {
         "Frozen catalog workloads and installed CLI solve records",
     )
 
-    override fun plan(request: BenchRequest): List<BenchCase> {
+    override fun plan(request: BenchRequest): List<BenchCase> = CommittedCorpusInputs.planning {
         val settings = LabSettings(request.parameters)
         val selectedProblems = settings.selections.flatMap { KlauseCli.selectProblems(it) }
             .distinctBy { it.suite to it.ref.name }
-        return selectedProblems.flatMap { selected ->
+        selectedProblems.flatMap { selected ->
             val ref = selected.ref
             require(ref.source !is ProblemSource.InCode) { "Lab subprocess solves require file-backed inputs" }
             val inputs = LabInputs.resolve(ref, settings.inputOnly)
