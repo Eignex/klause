@@ -169,8 +169,16 @@ internal class LinearAuthority(
 
     fun advanceWithPointGeneratedCuts(
         source: SourceProofContext, cancellation: Cancellation, incumbent: BigFraction?,
-    ): LinearAuthorityResult = advanceWithSelectedCuts(source, cancellation, generatedFirst = false,
-        pointAggregates = aggregateCuts && additionalCuts.isEmpty(), incumbent = incumbent)
+    ): LinearAuthorityResult {
+        if (aggregateCuts && additionalCuts.isEmpty() && incumbent == null) {
+            val key = "numericalCutSelectionIncumbentUnavailable"
+            cutEligibility[key] = (cutEligibility[key] ?: 0L) + 1L
+            return advance(source, cancellation, cuts = false)
+        }
+        return advanceWithSelectedCuts(source, cancellation, generatedFirst = false,
+            pointAggregates = aggregateCuts && additionalCuts.isEmpty(),
+            retireUnproductive = aggregateCuts && additionalCuts.isEmpty(), incumbent = incumbent)
+    }
 
     private fun advanceWithSelectedCuts(
         source: SourceProofContext, cancellation: Cancellation, generatedFirst: Boolean,
@@ -277,13 +285,14 @@ internal class LinearAuthority(
             }
             val selected = cutLifecycle.containing("POINT_SELECTION") {
                 if (preparedGenerated) {
-                    policy.prepareGenerated(checkNotNull(family.cuts).rows, prepared.checkedCuts, cancellation)
+                    policy.prepareGenerated(checkNotNull(family.cuts).rows, prepared.checkedCuts, cancellation,
+                        trackUsefulness = retireUnproductive)
                 } else {
                     policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
                         prepared.checkedCuts, observed.second, pointMask.orEmpty().intersect(prepared.checkedCuts),
                         cancellation, adoptCurrent = baselineMask == null && family === baselineFamily &&
                             prepared.activeCuts == checkNotNull(family.cuts).rows.size,
-                        usefulnessOpportunity = usefulnessOpportunity)
+                        usefulnessOpportunity = usefulnessOpportunity, trackSelectedUsefulness = retireUnproductive)
                 }
             }
             if (budget.funding?.exhausted == true || cancellation()) return base

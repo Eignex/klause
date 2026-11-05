@@ -284,9 +284,13 @@ class LinearAuthorityInvocationTest {
                 BigFraction.ofLong(100))),
         ), mapOf(integer to BigFraction.MINUS_ONE, real to BigFraction.ONE))
 
-        for ((pointCuts, operations) in listOf(false to 1, true to 1, true to 2)) {
+        val incumbent = Sample(booleanArrayOf(), longArrayOf(0), doubleArrayOf(0.0, 0.0),
+            exactReals = List(2) { BigFraction.ZERO })
+        for ((pointCuts, operations, seeded) in listOf(Triple(false, 1, false), Triple(true, 1, false),
+            Triple(true, 1, true), Triple(true, 2, true))) {
             val result = LinearAuthorityInvocation(source, TheoryParams(sourceAggregateCuts = true,
-                sourcePointCuts = pointCuts, sourceLpOperations = operations), boundOrdered = true).use {
+                sourcePointCuts = pointCuts, sourceLpOperations = operations),
+                external = { incumbent.takeIf { seeded } }, boundOrdered = true).use {
                 it.run { _, _ -> }
             }
 

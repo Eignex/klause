@@ -1672,8 +1672,10 @@ numerical companions. The containing source request owns these settings and remo
 them from finite worker recipe options; they change neither companion admission
 nor lifetime.
 A new template first runs its ordinary checked cut recipe. The combined aggregate
-and point frontier uses that completed point to choose continuous endpoints and
-propose generated cuts within the existing producer limits. Current and generated
+and point frontier waits for a checked incumbent before preparing cuts; until then
+it retains the no-cut relaxation and ordinary search. It uses a completed current
+point to choose continuous endpoints and propose generated cuts within the existing
+producer limits. Current and generated
 definitions together fit a 64-row cap; a larger point-directed family declines.
 Selection admits at most one newly violated checked cut before the optional query.
 The internal generated-mask entry can instead initialize a bounded generated recipe
@@ -1688,6 +1690,10 @@ A nonterminal current query can also seed a fully checked generated mask, includ
 current mixed rows, within the same 64-selected-ID limit. This mask is a proposal
 for the optional query; it conveys no proof or installation authority. Its completed
 points and adopted current recipes age installed rows under the same scoring limits.
+The combined frontier also retires a selected mask after four completed usable
+observations with an incumbent and no actual family-attributed use. A use of that
+family in the matching recipe resets the streak. An empty mask starts no streak;
+retirement discards newly proposed replacements as well as installed IDs.
 Complementary endpoint mode retains an adopted current template; its mask refers
 to the installed definitions. Integer-only templates also share endpoint modes
 because they add no continuous bound alternatives.
