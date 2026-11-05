@@ -6,8 +6,8 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
-import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.LpTechnique
+import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.meta.coreguided.CoreRefinementMode
 import com.eignex.klause.propagation.BakedProblem
@@ -248,7 +248,7 @@ internal fun BacktrackRecipe.capLp(ceiling: LpConfig): BacktrackRecipe = Backtra
     val p = build(seed, onEvent)
     val intended = p.lpConfig
     if (intended != null) p.copy(lpConfig = intended.cappedUnder(ceiling))
-    else if (ceiling.sourcePreparation == null || p.lpPlan == LpPlan()) p
+    else if (ceiling.sourcePreparation == null || p.lpPlan.hasDefaultNumericalSettings()) p
     else p.copy(lpPlan = p.lpPlan.copy(sourcePreparation = ceiling.sourcePreparation))
 }
 

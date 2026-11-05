@@ -426,3 +426,10 @@ data class LpPlan(
     /** Whether MIR cuts actually run, on the same terms as [gomoryEnabled]. */
     val mirEnabled: Boolean get() = cuts && mir
 }
+
+internal fun LpPlan.hasDefaultNumericalSettings(): Boolean =
+    this == DefaultNumericalPlans.byPreparation[sourcePreparation.ordinal]
+
+private object DefaultNumericalPlans {
+    val byPreparation = LpSourcePreparation.entries.map { LpPlan(sourcePreparation = it) }
+}

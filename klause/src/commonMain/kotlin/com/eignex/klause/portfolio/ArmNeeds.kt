@@ -12,6 +12,7 @@ import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.meta.coreguided.CoreGuidedSearch
 import com.eignex.klause.presolve.binaryChannelLiteral
 import com.eignex.klause.propagation.BakedProblem
@@ -134,7 +135,7 @@ internal class ProblemFacts(
                 relaxation = { emphasis ->
                     LpAutoConfig.resolve(
                         problem, LpConfig(emphasis).cappedUnder(lpCeiling), LpPlan(), objective,
-                    ) != LpPlan()
+                    ).hasDefaultNumericalSettings().not()
                 },
             )
         }

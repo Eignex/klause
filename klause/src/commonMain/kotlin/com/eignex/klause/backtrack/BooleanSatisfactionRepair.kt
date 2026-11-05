@@ -2,7 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConditionedClauseExchange
@@ -21,7 +21,7 @@ internal class BooleanSatisfactionRepair(
     init {
         require(solver.problem.numIntVars == 0 && solver.problem.numRealVars == 0 &&
             solver.problem.factors.all { it is Clause } && !solver.problem.hasSymmetryBreaking)
-        require(params.componentFactory == null && params.lpConfig == null && params.lpPlan == LpPlan() &&
+        require(params.componentFactory == null && params.lpConfig == null && params.lpPlan.hasDefaultNumericalSettings() &&
             !params.integerRowLearning)
         require(params.objectiveBoundSupplier == null && params.objectiveLowerBoundSupplier == null &&
             params.globalVarLowerSupplier == null && params.globalVarUpperSupplier == null &&

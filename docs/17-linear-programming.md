@@ -117,9 +117,11 @@ no more inspection work than those completed builds supplied. Deferred exact col
 debit the consuming LP when materialized; their potential storage remains within the
 262,144-unit ceiling. A failed attempt requires further completed construction
 before retrying; its inspection and replacement record still spend the current
-allowance. Admission work supplies no additional solver grant. Component-owned and
-admitted sparse-trial engines keep their explicit preparation route. LP harvest
-also eagerly prepares definitions for its later engine bake.
+allowance. Admission work supplies no additional solver grant. Numerical recipe and
+repair eligibility ignore the preparation choice in an otherwise unchanged default
+plan. It neither creates an LP owner nor disables an LP-free proof path.
+Component-owned and admitted sparse-trial engines keep their explicit preparation
+route. LP harvest also eagerly prepares definitions for its later engine bake.
 Admitted ordinary consumers compile unary integer bound conditions into source rows.
 The stated source root bounds and the constructed column bounds must both imply a
 condition before the row is omitted. An open required side or a widened constructed
