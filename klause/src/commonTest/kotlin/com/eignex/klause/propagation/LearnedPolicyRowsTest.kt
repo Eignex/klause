@@ -11,6 +11,26 @@ import kotlin.test.assertTrue
 
 class LearnedPolicyRowsTest {
     @Test
+    fun `an observation should carry cold lookup charges before a containing grant`() {
+        val rows = LearnedPolicyRows(9, 4, false, null)
+        repeat(20_000) { rows.add(0, it, false, -1, it.toLong() + 1L, null) }
+        val budget = ReclamationPreparation(0L, 256L, { false }, {})
+        val sample = SharingMemoryObservation(64L, 256, { false }, {})
+        var value = -1
+
+        val observed = sample.snapshot {
+            rows.usingBudget(budget) {
+                rows.usingObservation(sample) { value = rows[16, LearnedPolicyRows.LBD] }
+            }
+        }
+
+        assertNotNull(observed.completeValues)
+        assertEquals(16, value)
+        assertTrue(observed.work > 1L)
+        assertEquals(0L, budget.work)
+    }
+
+    @Test
     fun `queued metadata release should restore ownership beside a surviving first page`() {
         val rows = LearnedPolicyRows(6, 8, true, null)
         val clause = ClausePropagator(intArrayOf(0, 1), EmptyIntArray, intArrayOf(0, 2))
