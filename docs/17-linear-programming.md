@@ -659,7 +659,7 @@ replacement generation receives its own lifetime. Remaining installed cuts keep
 their ordinary source checks and scope retraction. Retirement only weakens the
 relaxation, retaining cut definitions and checked coverage. An empty selected mask
 stays distinct from the ordinary all-cut recipe and cannot reinstall expired rows.
-The combined generated-and-point frontier also tracks complete usable points while
+The internal generated-mask entry also tracks complete usable points while
 an incumbent is available. Four such points whose bound cannot close that incumbent
 retire the installed recipe. An actual cut-attributed conflict, bound or inherited-bound
 prune, attained optimum or limit closure resets this streak. Missing incumbents,
@@ -1669,11 +1669,14 @@ Ordinary linear-source execution binds the same source-cut controls to its admit
 numerical companions. The containing source request owns these settings and removes
 them from finite worker recipe options; they change neither companion admission
 nor lifetime.
-A new template first runs its ordinary checked cut recipe. With both aggregate and
-point controls enabled, that initial recipe includes generated rows within the
-64-selected-ID cap; its completed point can start installed-row aging without
-replacing the numerical owner. The current-first entry point can instead add one
-selection round after a completed current point. A trial that admits no candidate retains
+A new template first runs its ordinary checked cut recipe. The combined aggregate
+and point frontier uses that completed point to choose continuous endpoints and
+propose generated cuts within the existing producer limits. Current and generated
+definitions together fit a 64-row cap; a larger point-directed family declines.
+Selection admits at most one newly violated checked cut before the optional query.
+The internal generated-mask entry can instead initialize a bounded generated recipe
+and start installed-row aging without replacing its numerical owner.
+A trial that admits no candidate retains
 the ordinary template, checked query and numerical owner for later queries of that
 template. Successful selection retains its checked mask instead.
 Integer-only templates and aggregate-only cut families with at most 64 fully checked

@@ -53,6 +53,19 @@ class LinearAuthorityPointCutsTest {
     ), mapOf(x to BigFraction.ONE))
 
     @Test
+    fun `a checked current optimum should bypass point generated discovery`() {
+        val budget = SourceLpBudget()
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            val result = authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, null)
+
+            assertEquals(1, budget.operations)
+            assertNull(authority.cutObservations()["numericalCutAggregatePairAttempts"])
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
+                .verify(assertNotNull(result.evidence)))
+        }
+    }
+
+    @Test
     fun `point policy preparation should include scoring in its containing recipe`() {
         val budget = SourceLpBudget()
         LinearAuthority(budget, retainLp = true).use { authority ->
