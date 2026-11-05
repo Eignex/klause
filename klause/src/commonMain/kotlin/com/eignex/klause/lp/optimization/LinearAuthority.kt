@@ -167,9 +167,15 @@ internal class LinearAuthority(
         generatedFirst = aggregateCuts && additionalCuts.isEmpty(),
         retireUnproductive = aggregateCuts && additionalCuts.isEmpty(), incumbent = incumbent)
 
+    fun advanceWithPointGeneratedCuts(
+        source: SourceProofContext, cancellation: Cancellation, incumbent: BigFraction?,
+    ): LinearAuthorityResult = advanceWithSelectedCuts(source, cancellation, generatedFirst = false,
+        pointAggregates = aggregateCuts && additionalCuts.isEmpty(), incumbent = incumbent)
+
     private fun advanceWithSelectedCuts(
         source: SourceProofContext, cancellation: Cancellation, generatedFirst: Boolean,
         retireUnproductive: Boolean = false, incumbent: BigFraction? = null,
+        pointAggregates: Boolean = false,
     ): LinearAuthorityResult {
         val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe)
             .also { pointPolicy = it }
@@ -258,7 +264,7 @@ internal class LinearAuthority(
                 cutLifecycle.families = checkNotNull(family.cuts).rows.mapTo(HashSet()) { it.family }
                 val refined = cutLifecycle.containing("POINT_SELECTION") {
                     preparePointFamily(source, family, prepared, observed.second, cancellation,
-                        ordinaryTried = generatedFirst)
+                        ordinaryTried = generatedFirst || pointAggregates, pointAggregates = pointAggregates)
                 }
                 if (refined != null) {
                     family = refined.template
@@ -340,6 +346,7 @@ internal class LinearAuthority(
         source: SourceProofContext, family: LinearAuthorityTemplate, prepared: LinearAuthorityQuery,
         values: List<BigFraction>,
         cancellation: Cancellation, ordinaryTried: Boolean = false,
+        pointAggregates: Boolean = false,
     ): PointPreparation? {
         if (values.size != prepared.coordinates.size || values.size > 8192) return null
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
@@ -364,7 +371,11 @@ internal class LinearAuthority(
                 point[prepared.coordinates[index]] = value.toDouble().takeIf(Double::isFinite) ?: return null
             }
             val directed = family.atPoint(point, funded, { cutCost(it, 0L) }, ::cutCost) ?: return null
-            withAdditionalCuts(directed, funded, point) ?: return null
+            val directedCount = checkNotNull(directed.cuts).rows.size
+            if (pointAggregates && directedCount > 64) return null
+            val available = if (pointAggregates) 64 - directedCount
+                else 64 - additionalCuts.size
+            withAdditionalCuts(directed, funded, point, maximumCandidates = available) ?: return null
         }
         cutCost(1L, 64L)
         if (funded()) return null
