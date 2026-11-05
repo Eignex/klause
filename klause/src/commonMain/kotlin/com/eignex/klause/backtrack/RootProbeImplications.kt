@@ -8,7 +8,9 @@ import com.eignex.klause.util.SharingMemoryObservation
 
 internal class RootProbeImplications {
     private var pending = 0L
+    private var alternative = 0L
     private var reason = -1
+    private var alternativeReason = -1
     private var reasonGeneration = -1L
     private var reasonChecked = false
     private var lookup = 0
@@ -35,18 +37,27 @@ internal class RootProbeImplications {
             budget.note("ImplicationEmpty")
             return
         }
-        val variable = pins[pins.size - 1]
-        if (variable >= session.problem.numBoolVars || variable == Lit.variable(literal)) {
-            budget.note("ImplicationUnsupportedTail")
-            return
-        }
-        val value = session.boolValue(variable) ?: return
-        pending = key(Lit.negate(literal), Lit.make(variable, value))
-        reason = session.explanationState.boolReason[variable]
         reasonGeneration = session.learnedRetirementGeneration
+        for (offset in 1..minOf(2, pins.size - priorPins - 1)) {
+            val variable = pins[pins.size - offset]
+            if (variable >= session.problem.numBoolVars || variable == Lit.variable(literal)) {
+                budget.note("ImplicationUnsupportedTail")
+                continue
+            }
+            val value = session.boolValue(variable) ?: continue
+            val pair = key(Lit.negate(literal), Lit.make(variable, value))
+            if (pending == 0L) {
+                pending = pair
+                reason = session.explanationState.boolReason[variable]
+            } else if (pair != pending) {
+                alternative = pair
+                alternativeReason = session.explanationState.boolReason[variable]
+                budget.note("ImplicationAlternatives")
+            }
+            budget.note("ImplicationCandidates")
+        }
         reasonChecked = false
         lookup = 0
-        budget.note("ImplicationCandidates")
     }
 
     fun advance(session: PropagationSession, params: BacktrackParams, budget: InprocessingBudget): Boolean {
@@ -68,8 +79,7 @@ internal class RootProbeImplications {
             reasonChecked = true
             if (literals != null && literals.size == 2 && key(literals[0], literals[1]) == pending) {
                 budget.note("ImplicationDirect")
-                clearPending()
-                return true
+                return discardCandidate(session, params, budget)
             }
         }
         var keys = history
@@ -82,8 +92,7 @@ internal class RootProbeImplications {
             if (!budget.visit()) return false
             if (keys[lookup++] == pending) {
                 budget.note("ImplicationDuplicate")
-                clearPending()
-                return true
+                return discardCandidate(session, params, budget)
             }
         }
         if (budget.remaining < ADMISSION_WORK || !budget.visit(ADMISSION_WORK)) return false
@@ -121,27 +130,50 @@ internal class RootProbeImplications {
 
     private fun clearPending() {
         pending = 0L
+        alternative = 0L
         reason = -1
+        alternativeReason = -1
         reasonGeneration = -1L
         reasonChecked = false
         lookup = 0
+    }
+
+    private fun discardCandidate(
+        session: PropagationSession,
+        params: BacktrackParams,
+        budget: InprocessingBudget,
+    ): Boolean {
+        if (alternative == 0L) {
+            clearPending()
+            return true
+        }
+        budget.charge(1)
+        pending = alternative
+        reason = alternativeReason
+        alternative = 0L
+        alternativeReason = -1
+        reasonChecked = false
+        lookup = 0
+        budget.note("ImplicationFallbacks")
+        return advance(session, params, budget)
     }
 
     private fun fundable(params: BacktrackParams): Boolean =
         minOf(params.inprocessingWork, params.inprocessingProbeWork) >=
             ADMISSION_LIMIT + REASON_WORK + ADMISSION_WORK &&
             minOf(params.learnedMemoryScratchBytes, params.learnedMemoryBytes ?: Long.MAX_VALUE) >=
-            HISTORY_BYTES + 2L * Int.SIZE_BYTES
+            HISTORY_BYTES + 2L * Int.SIZE_BYTES + ALTERNATIVE_BYTES
 
     private fun key(a: Int, b: Int): Long =
         (minOf(a, b).toLong() shl Int.SIZE_BITS) or maxOf(a, b).toLong()
 
     companion object {
         private const val ADMISSION_LIMIT = 64
-        private const val CAPTURE_WORK = 8
+        private const val CAPTURE_WORK = 16
         private const val REASON_WORK = 5
         private const val ADMISSION_WORK = 8
         private const val HISTORY_BYTES = ADMISSION_LIMIT * Long.SIZE_BYTES * 1L
-        private const val BOOKKEEPING_BYTES = 2L * Long.SIZE_BYTES + 4L * Int.SIZE_BYTES + 1L
+        private const val ALTERNATIVE_BYTES = Long.SIZE_BYTES + Int.SIZE_BYTES
+        private const val BOOKKEEPING_BYTES = 3L * Long.SIZE_BYTES + 5L * Int.SIZE_BYTES + 1L
     }
 }

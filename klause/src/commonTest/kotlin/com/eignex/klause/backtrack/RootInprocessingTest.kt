@@ -546,6 +546,51 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `a duplicate probe tail should retain another consequence through resumed admission`() {
+        for ((native, interrupt) in listOf(false to false, false to true, true to false, true to true)) {
+            val session = PropagationSession(Problem(5, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(1, 2)), Clause(intArrayOf(1, 4)),
+                Clause(intArrayOf(3, 5, 6)), Clause(intArrayOf(3, 5, 8)),
+            )).bake(), nativeSat = native)
+            val implications = RootProbeImplications()
+            val params = BacktrackParams()
+            val stats = SearchStatsSink()
+            var other = -1
+
+            repeat(2) { attempt ->
+                val cancellation = Cancellation {
+                    attempt == 1 && interrupt &&
+                        (stats.snapshot().learning["inprocessProbeImplicationFallbacks"] ?: 0L) > 0L
+                }
+                val current = params.copy(cancellation = cancellation)
+                val budget = InprocessingBudget(session, current, stats, InprocessingKind.Probe, 4096L)
+                assertTrue(implications.reserve(current, budget))
+                val pins = session.explanationState.boolPinOrder.size
+                assertIs<PropagationResult.Implied>(session.probeRootLiteral(0))
+                implications.capture(session, 0, pins, budget)
+                session.popLast()
+                val completed = implications.advance(session, current, budget)
+                if (!completed) {
+                    assertTrue(implications.hasContinuation)
+                    implications.releaseRetainedBuffers()
+                    assertTrue(implications.advance(session, params,
+                        InprocessingBudget(session, params, stats, InprocessingKind.Probe, 4096L)))
+                }
+                if (attempt == 0) {
+                    val derived = session.learnedClauseLiterals(0).single { Lit.variable(it) != 0 }
+                    other = if (Lit.variable(derived) == 3) 4 else 3
+                    session.forgetLearnedClauses { _, _ -> false }
+                    assertEquals(0, session.learnedClauseCount)
+                }
+            }
+            session.pinBool(other, false)
+
+            assertEquals(false, session.boolValue(0))
+            assertEquals(setOf(1, Lit.make(other, true)), assertNotNull(session.boolReasonClause(0)).toSet())
+        }
+    }
+
+    @Test
     fun `optional buffer release should preserve the implication admission bound`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(problem(intArrayOf(1, 2), intArrayOf(3, 4),

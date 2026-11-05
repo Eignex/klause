@@ -734,15 +734,17 @@ simplification so proved facts can refresh binaries in the same safe-root opport
 the invocation token. A completed root conflict proves the complementary unit, which is attached and
 propagated through ordinary search. A completed consistent pure-Boolean probe can retain
 one newly implied Boolean literal as a binary clause conditional on its probe literal.
-Capture is prepaid before propagation and reads only the final trail entry. After
-rollback, a funded lookup skips a matching direct binary reason and the bounded
-history prevents repeated admissions. At most 64 binaries enter per search scope;
-the 64-key history and pending pair share the probe class and retained-memory
+Capture is prepaid before propagation and reads at most the final two trail entries.
+After rollback, a funded lookup skips a matching direct binary reason and the bounded
+history prevents repeated admissions. A direct or duplicate final consequence yields
+to the retained earlier consequence without another probe. At most one binary enters
+per completed probe and 64 enter per search scope;
+the 64-key history and pending alternatives share the probe class and retained-memory
 grants. Unfunded admission resumes at a fresh safe root without another probe.
 Optional buffer release drops history and neighborhood arrays while preserving the
-pending pair, primitive cursors and admission count. Learned remapping invalidates
+pending alternatives, primitive cursors and admission count. Learned remapping invalidates
 the direct-reason hint, without changing the proved literals. Reseeding discards
-the pending pair and resets that count. Admitted binaries use ordinary
+the pending alternatives and resets that count. Admitted binaries use ordinary
 learned ownership, forgetting and required attachment completion.
 Completed root facts are published to shared
 components before traversal resumes. Successful and interrupted probes retract to the
