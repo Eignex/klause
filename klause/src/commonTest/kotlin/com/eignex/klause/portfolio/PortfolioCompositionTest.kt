@@ -502,13 +502,11 @@ class PortfolioCompositionTest {
                     assertEquals(2, arm.rootProbeBatch)
                     assertEquals(8192L, arm.rootProbeWork)
                     assertFalse(arm.rootProbeImplications)
+                    assertEquals(problemClass == ProblemClass.Sat, arm.rootProbeBinaryGate)
                     assertEquals(4096L, arm.inprocessingWork)
                     assertEquals(256L, arm.inprocessingRootWork)
                     assertEquals(3072L, arm.inprocessingProbeWork)
-                    assertEquals(
-                        if (problemClass == ProblemClass.Sat) 8192L else 32768L,
-                        arm.inprocessingProbeInterval,
-                    )
+                    assertEquals(32768L, arm.inprocessingProbeInterval)
                     assertEquals(32L, arm.inprocessingInterval)
                     assertEquals(8, arm.inprocessingGrowth)
                     assertEquals(32L, arm.inprocessingCooldown)
@@ -540,6 +538,7 @@ class PortfolioCompositionTest {
                 assertEquals(stock.rootProbeBatch, arm.rootProbeBatch)
                 assertEquals(stock.rootProbeWork, arm.rootProbeWork)
                 assertEquals(stock.rootProbeImplications, arm.rootProbeImplications)
+                assertEquals(stock.rootProbeBinaryGate, arm.rootProbeBinaryGate)
                 assertEquals(stock.inprocessingWork, arm.inprocessingWork)
                 assertEquals(stock.inprocessingRootWork, arm.inprocessingRootWork)
                 assertEquals(stock.inprocessingProbeWork, arm.inprocessingProbeWork)

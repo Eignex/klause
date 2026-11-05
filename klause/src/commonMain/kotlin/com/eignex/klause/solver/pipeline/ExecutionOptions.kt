@@ -324,6 +324,11 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
             "root-probe-implications", ValueKind.BOOLEAN,
         )
 
+        /** Skip global Native probes without a root fact or known binary propagation opportunity. */
+        val rootProbeBinaryGate: ExecutionOption<Boolean> = ExecutionOption(
+            "root-probe-binary-gate", ValueKind.BOOLEAN,
+        )
+
         /** Maximum propagation work per root probe. */
         val rootProbeWork: ExecutionOption<Long> = ExecutionOption("root-probe-work", ValueKind.POSITIVE_LONG)
 
@@ -601,7 +606,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch,
                 rootRebuildCaptureVisits,
                 privateRebuildWork, privateRebuildBytes,
-                rootProbeBatch, rootProbeImplications, rootProbeWork,
+                rootProbeBatch, rootProbeImplications, rootProbeBinaryGate, rootProbeWork,
                 inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingProbeInterval,
                 inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth,
                 inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,

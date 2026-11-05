@@ -100,9 +100,11 @@ class EngineParamsTest {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         assertEquals(false, base.rootSimplification)
         assertEquals(0, base.rootProbeBatch)
+        assertEquals(false, base.rootProbeBinaryGate)
         val configured = applyBacktrackParams(base, EngineParams(listOf(
             "root-simplification=true", "root-simplify-batch=7", "root-probe-batch=3", "root-probe-work=256",
             "root-rebuild-capture-visits=1024", "root-probe-implications=false",
+            "root-probe-binary-gate=true",
             "private-rebuild-work=65536",
         )))
         assertEquals(true, configured.rootSimplification)
@@ -112,6 +114,7 @@ class EngineParamsTest {
         assertEquals(3, configured.rootProbeBatch)
         assertEquals(256L, configured.rootProbeWork)
         assertEquals(false, configured.rootProbeImplications)
+        assertEquals(true, configured.rootProbeBinaryGate)
     }
 
     @Test

@@ -1046,8 +1046,9 @@ cheap binary maintenance. Root scans examine at most 256 clauses per slice. Natu
 uses a 32-work interval, eight-clause growth and a 32-work cooldown. Clausal pools
 require 4,096 non-inprocessing work before the first optional maintenance slice;
 pseudo-Boolean pools have no warmup. After the first eligible probe slice, optional
-probing requires 8,192 additional non-inprocessing work in clausal pools and 32,768
-in pseudo-Boolean pools. Cheap scans and pending continuations keep their own eligibility;
+probing requires 32,768 additional non-inprocessing work. Clausal pools enable
+`root-probe-binary-gate`: Native workers without root facts or known binary clauses
+scan new learned binaries before admitting global probes. Cheap scans and pending continuations keep their own eligibility;
 `inprocessing-probe-interval=0` follows the shared root trigger instead.
 These allowances remain inside each worker's containing slice. The
 `root-maintenance=false` option retains stock root defaults without changing explicit

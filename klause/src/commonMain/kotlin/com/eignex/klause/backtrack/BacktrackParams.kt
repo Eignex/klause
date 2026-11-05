@@ -469,6 +469,8 @@ data class BacktrackParams(
     val rootProbeImplications: Boolean = true,
     /** Non-inprocessing work between optional probing slices; zero follows the shared root trigger. */
     val inprocessingProbeInterval: Long = 0L,
+    /** Limit Native root probes to learned binaries until a root fact or known binary permits propagation. */
+    val rootProbeBinaryGate: Boolean = false,
 ) : SolverParams {
     init {
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }

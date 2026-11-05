@@ -373,8 +373,8 @@ internal object PortfolioComposition {
                 }
                 val defaults = if (boundedRoot) {
                     rootParams.boundedRootMaintenance(
-                        probeInterval = if (clausal) 8192L else 32768L,
                         warmupWork = if (clausal) 4096L else 0L,
+                        binaryGate = clausal,
                     )
                 } else {
                     rootParams
@@ -398,16 +398,17 @@ internal object PortfolioComposition {
         return base.dropLast(1) + BacktrackWorkerConfig(annotation, zeroObjectivePricing)
     }
 
-    private fun BacktrackParams.boundedRootMaintenance(probeInterval: Long, warmupWork: Long): BacktrackParams = copy(
+    private fun BacktrackParams.boundedRootMaintenance(warmupWork: Long, binaryGate: Boolean): BacktrackParams = copy(
         rootSimplification = true,
         rootSimplifyBatch = 256,
         rootProbeBatch = 2,
         rootProbeWork = 8192L,
         rootProbeImplications = false,
+        rootProbeBinaryGate = binaryGate,
         inprocessingWork = 4096L,
         inprocessingRootWork = 256L,
         inprocessingProbeWork = 3072L,
-        inprocessingProbeInterval = probeInterval,
+        inprocessingProbeInterval = 32768L,
         inprocessingInterval = 32L,
         inprocessingGrowth = 8,
         inprocessingCooldown = 32L,

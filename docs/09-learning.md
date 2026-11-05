@@ -735,6 +735,14 @@ the invocation token. A completed root conflict proves the complementary unit, w
 propagated through ordinary search. A completed consistent pure-Boolean probe can retain
 one newly implied Boolean literal as a binary clause conditional on its probe literal.
 `rootProbeImplications` controls this capture independently of failed-literal units.
+`rootProbeBinaryGate` restricts Native probing without Boolean root facts or known
+binary clauses to newly examined learned binaries. With no binary clause, one Boolean
+assignment cannot start unit propagation in an unassigned clausal state. A discovered
+live binary enables ordinary rotation for the rest of the scope, including after
+optional buffer release or retirement. General propagation retains ordinary rotation.
+An exhausted unchanged neighborhood does no further scanning, and preparation alone
+does not start the optional probe interval. Scope reset clears the binary hint;
+required consequence publication retains its separate eligibility.
 Disabling it skips capture reservations and cancels a retained optional candidate under
 a funded probe visit; the scope admission count remains unchanged.
 Capture is prepaid before propagation and reads at most the final two trail entries.

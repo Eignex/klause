@@ -165,6 +165,7 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "learned-memory-bytes", "learned-memory-work", "learned-memory-scratch-bytes",
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
     "root-simplification", "root-simplify-batch", "root-probe-batch", "root-probe-work", "root-probe-implications",
+    "root-probe-binary-gate",
     "root-rebuild-capture-visits",
     "private-rebuild-work", "private-rebuild-bytes",
     "inprocessing-work", "inprocessing-root-work", "inprocessing-probe-work", "inprocessing-subsume-work",
@@ -222,6 +223,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val rootProbeBatch = p[ExecutionOption.rootProbeBatch]
     val rootProbeWork = p[ExecutionOption.rootProbeWork]
     val rootProbeImplications = p[ExecutionOption.rootProbeImplications]
+    val rootProbeBinaryGate = p[ExecutionOption.rootProbeBinaryGate]
     val inprocessingWork = p[ExecutionOption.inprocessingWork]
     val inprocessingRootWork = p[ExecutionOption.inprocessingRootWork]
     val inprocessingProbeWork = p[ExecutionOption.inprocessingProbeWork]
@@ -259,7 +261,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
         learnedMemoryBytes, learnedMemoryWork, learnedMemoryScratchBytes,
         subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch, rootProbeBatch, rootProbeWork,
-        rootProbeImplications,
+        rootProbeImplications, rootProbeBinaryGate,
         rootRebuildCaptureVisits,
         privateRebuildWork, privateRebuildBytes,
         inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingSubsumeWork,
@@ -303,6 +305,7 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         rootProbeBatch?.let { out = out.copy(rootProbeBatch = it) }
         rootProbeWork?.let { out = out.copy(rootProbeWork = it) }
         rootProbeImplications?.let { out = out.copy(rootProbeImplications = it) }
+        rootProbeBinaryGate?.let { out = out.copy(rootProbeBinaryGate = it) }
         inprocessingWork?.let { out = out.copy(inprocessingWork = it) }
         inprocessingRootWork?.let { out = out.copy(inprocessingRootWork = it) }
         inprocessingProbeWork?.let { out = out.copy(inprocessingProbeWork = it) }

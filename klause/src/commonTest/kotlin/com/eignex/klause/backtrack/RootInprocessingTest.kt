@@ -497,6 +497,85 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `binary admission should restrict only requested Native probes without propagation opportunities`() {
+        for ((native, gate) in listOf(true to true, true to false, false to true)) {
+            val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val stats = SearchStatsSink()
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1,
+                rootProbeImplications = false, rootProbeBinaryGate = gate), stats)
+
+            assertEquals(if (native && gate) 0L else 1L, stats.inprocessProbes)
+            assertEquals(0, session.decisionLevel)
+            assertEquals(0, session.learnedClauseCount)
+        }
+    }
+
+    @Test
+    fun `an exhausted binary scan should admit a newly learned failed literal without waiting for the interval`() {
+        val session = PropagationSession(problem(intArrayOf(1, 2, 4), intArrayOf(1, 2, 5)).bake(),
+            nativeSat = true)
+        val pass = RootProbingPass()
+        val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+            rootProbeBinaryGate = true, inprocessingProbeInterval = 10000L)
+        val stats = SearchStatsSink()
+        assertTrue(pass.optionalWorkDue(0L, params))
+        pass.run(session, params, stats)
+        val work = session.work
+        pass.run(session, params, stats)
+        assertEquals(work, session.work)
+        assertEquals(0L, stats.inprocessProbes)
+
+        session.addLearnedClause(Clause(intArrayOf(1, 3)), 2)
+        assertTrue(pass.optionalWorkDue(0L, params))
+        pass.run(session, params, stats)
+
+        assertEquals(1L, stats.inprocessProbes)
+        assertEquals(false, session.boolValue(0))
+        assertTrue(session.learnedLifecycle().getValue("learningClauseConsumed") > 0L)
+        assertFalse(pass.optionalWorkDue(9999L, params))
+        assertTrue(pass.optionalWorkDue(10000L, params))
+    }
+
+    @Test
+    fun `binary admission should preserve probing with source binaries or root facts`() {
+        for (clauses in listOf(
+            arrayOf(intArrayOf(0, 2)),
+            arrayOf(intArrayOf(1), intArrayOf(0, 2, 4)),
+        )) {
+            val session = PropagationSession(problem(*clauses).bake(), nativeSat = true)
+            val stats = SearchStatsSink()
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1,
+                rootProbeImplications = false, rootProbeBinaryGate = true), stats)
+
+            assertEquals(1L, stats.inprocessProbes)
+            assertEquals(0, session.decisionLevel)
+        }
+    }
+
+    @Test
+    fun `buffer release should preserve discovered binary eligibility until scope reset`() {
+        val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = true)
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+        val pass = RootProbingPass()
+        val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false, rootProbeBinaryGate = true)
+        val stats = SearchStatsSink()
+        pass.run(session, params, stats)
+        assertEquals(1L, stats.inprocessProbes)
+        session.forgetLearnedClauses { _, _ -> false }
+        assertEquals(0, session.learnedClauseCount)
+
+        pass.releaseRetainedBuffers()
+        pass.run(session, params, stats)
+        assertEquals(2L, stats.inprocessProbes)
+        pass.reset()
+        pass.run(session, params, stats)
+
+        assertEquals(2L, stats.inprocessProbes)
+    }
+
+    @Test
     fun `disabled implication capture should retain consumed failed literal units`() {
         for ((native, positive) in listOf(false to false, false to true, true to false, true to true)) {
             val literal = Lit.make(0, positive)
