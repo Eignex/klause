@@ -4,6 +4,7 @@ import com.eignex.koblas.DenseMatrix
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.dense.ger
 import com.eignex.koblas.koblas
+import com.eignex.koblas.transpose
 import kotlin.math.abs
 
 // Dense elimination publishes the same owned triangular representation as sparse LU, so reach,
@@ -145,21 +146,8 @@ internal class DenseBasisFactors(private val source: SparseMatrix) {
     }
 
     private fun transpose(source: SparseMatrix): SparseMatrix {
-        val pointers = IntArray(n + 1)
-        for (j in 0 until n) source.forEachInColumn(j) { i, _ -> pointers[i + 1]++ }
-        for (i in 0 until n) pointers[i + 1] += pointers[i]
-        val next = pointers.copyOf()
-        val rows = IntArray(source.nnz)
-        val values = DoubleArray(source.nnz)
-        for (j in 0 until n) {
-            source.forEachInColumn(j) { i, value ->
-                val at = next[i]++
-                rows[at] = j
-                values[at] = value
-            }
-        }
         visits += 3L * n + 2L * source.nnz
-        return SparseMatrix.wrap(n, n, pointers, rows, values)
+        return source.transpose()
     }
 
     private fun work(entries: Int = 0) = LuBuildWork(
