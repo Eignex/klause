@@ -95,6 +95,8 @@ controls cannot resume a stopped invocation.
 `SourceExecutionPolicy` captures both LP technique overrides and source-template
 preparation policy. Finite presolve and consuming workers receive the same captured
 choice; an application default and an explicit invocation use the same capture.
+Complete-index reuse is the default. Selective admission and retained pump assembly
+require an explicit `LpSourcePreparation.ADMITTED` policy.
 
 Linear source outcomes record their terminal policy in
 `LinearSourceOutcome.numericalClaims`: positive source tolerance permits numerical

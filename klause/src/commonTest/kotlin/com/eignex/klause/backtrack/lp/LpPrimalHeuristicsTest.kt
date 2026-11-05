@@ -1416,7 +1416,9 @@ class LpPrimalHeuristicsTest {
             val sink = SolveStatsSink("changed-pump-root")
             var offered = 0
 
-            val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
+            val sample = LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, sourcePreparation = LpSourcePreparation.ADMITTED)),
+                sink).use { engine ->
                 engine.lpFeasibilityPump(objective, Cancellation.Never) {
                     if (++offered == 1) {
                         problem.rootIntDomainsInPlace[0] = if (hole) {
@@ -1450,7 +1452,8 @@ class LpPrimalHeuristicsTest {
             override fun workMeter(): WorkMeter = meter
         }
 
-        val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
+        val sample = LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, sourcePreparation = LpSourcePreparation.ADMITTED)), sink,
             LpSolveContext(factory)).use { engine ->
             engine.lpFeasibilityPump(objective, token) {
                 armed = true

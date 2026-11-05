@@ -413,7 +413,7 @@ data class LpPlan(
     /** Retain immutable component owners for node bounds and dispatch tableau cuts within each block. */
     val componentOwnership: Boolean = false,
     /** Source-template retention and admission, independent of the enabled numerical techniques. */
-    val sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
+    val sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
 ) {
     /**
      * Whether Gomory integrality cuts actually run: [gomory] permits them, [cuts] admits the

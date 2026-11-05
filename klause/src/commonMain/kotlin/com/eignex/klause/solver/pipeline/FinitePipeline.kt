@@ -73,7 +73,7 @@ class FinitePipelineRequest(
     /** Whether the objective is the complete cost and permits exact affine substitution. */
     val transformObjective: Boolean = true,
     /** Source-template policy shared by finite presolve and the consuming LP engines. */
-    val sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
+    val sourcePreparation: LpSourcePreparation = LpSourcePreparation.INDEX,
 ) {
     /** Finite projection data selected by [preparedPlan]. */
     val componentPlan: ComponentPlan = requireNotNull(preparedPlan.execution.finiteLinear) {

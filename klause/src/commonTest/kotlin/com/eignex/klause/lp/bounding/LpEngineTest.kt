@@ -31,6 +31,7 @@ import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
+import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.propagation.CpSearchComponent
@@ -412,7 +413,8 @@ class LpEngineTest {
             override fun workMeter(): WorkMeter = meter
         }
         LpEngine(problem, LinearObjective(intCoefficients = LongArray(3) { 2L }),
-            LpParams(lpPlan = LpPlan(bounding = true), cancellation = token),
+            LpParams(lpPlan = LpPlan(bounding = true, sourcePreparation = LpSourcePreparation.ADMITTED),
+                cancellation = token),
             SolveStatsSink("cancelled-admission-charge"),
             projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
             val before = engine.totalSolveWork()

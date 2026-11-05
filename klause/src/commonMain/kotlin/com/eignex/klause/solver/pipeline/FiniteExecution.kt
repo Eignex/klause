@@ -700,7 +700,7 @@ private fun FiniteSolveRequest.preparationRequest(
     val preparationStop = if (shape.sourceInvocation == null) presolveCancellation else presolveCancellation or stop
     val sourcePreparation = (sourceControls as? SourceFiniteControls.Backtrack)?.params?.let {
         it.lpConfig?.sourcePreparation ?: it.lpPlan.sourcePreparation
-    } ?: lpConfig.sourcePreparation ?: LpSourcePreparation.ADMITTED
+    } ?: lpConfig.sourcePreparation ?: LpSourcePreparation.INDEX
     return FinitePipelineRequest(
         problem = shape.finiteProblem, componentPlan = shape.componentPlan, preparedPlan = shape.preparedPlan,
         engine = engine, objective = shape.linearObjective,

@@ -100,9 +100,10 @@ order. A failed match uses selective reconstruction; a source revision alone can
 authorize reuse. The new source binding owns no predecessor snapshot, so repeated
 compatible preparations retain no generation chain.
 
-The selective-metadata preparation mode validates row identity and exact
-bound sides before retaining the row index. Node engines select this mode and own
-their numerical component partitions. Ordinary node, primal and shaving consumers
+Complete-index reuse is the default source-preparation policy. Explicit admitted
+preparation validates row identity and exact bound sides before retaining selective
+metadata and enabling pump assembly reuse. Node engines own their numerical
+component partitions. Ordinary node, primal and shaving consumers
 carry disabled, object, complete-index and admitted controls through
 objective-specific engines and standalone sparse admission. `LpPlan.sourcePreparation`
 selects this policy, and an explicit `LpConfig.sourcePreparation` overrides it
