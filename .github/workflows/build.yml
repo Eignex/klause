@@ -57,12 +57,12 @@ jobs:
           key: ${{ runner.os }}-${{ runner.arch }}-konan-${{ hashFiles('**/*.gradle.kts', '**/gradle.properties', '**/gradle-wrapper.properties', '**/*.versions.toml') }}
           restore-keys: ${{ runner.os }}-${{ runner.arch }}-konan-
 
-      # Default target set is host-only (jvm + linuxX64); the cross-compiled native targets
-      # (linuxArm64, macosArm64) are opt-in via -Ptargets.full and build on release.
+      # The library keeps published targets declared for ABI validation.
+      # Additional CLI native executables are built with -Ptargets.full on release.
 
       # Lint runs separately. Native tests have their own job because Kover instruments JVM tests.
       - name: Run JVM tests with coverage
-        run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist :klause:stageLpProfileJvm
+        run: ./gradlew --refresh-dependencies check -x :klause:linuxX64Test -x :klause:linuxArm64Test -x :klause:macosArm64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist :klause:stageLpProfileJvm
 
       - name: Start the installed JVM CLI
         run: klause-cli/build/install/klause-cli-jvm/bin/klause-cli --version
