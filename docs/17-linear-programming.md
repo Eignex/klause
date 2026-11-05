@@ -566,7 +566,16 @@ revalidated after pop or remap. A retained load reuses the checked mapping of th
 source definition within that load; parent proof rows use the numerical owner's
 existing row-identity index. Mapping limits inspect one immutable coefficient
 snapshot per expression and recheck a derived proof when it differs from the
-validated input proof. Selection considers efficacy, parallelism,
+validated input proof. Admitted preparation can retain that immutable input's arithmetic
+validation in its owning cut pool after an earlier completed mapping. A later
+successful remapping whose immutable input extent covers the capture retains a
+16-unit record within a 262,144-unit ceiling; capture,
+lookup and retirement debit the current LP allowance, including cancelled capture.
+The record contains only its exact source identity and arithmetic limits. Every
+mapping checks the current model namespace, assumptions, guards, column geometry
+and any derived proof. Changed limits or a different immutable source reject the
+record. Eviction and replacement release it without retaining a prior generation.
+Selection considers efficacy, parallelism,
 orthogonality, age and row caps; separators check actual column integrality, so
 continuous columns decline. Root harvesting caps retained cuts at the original row
 count, and root and node separation keep their round, depth, pool and work

@@ -142,6 +142,18 @@ internal class CutMappingLimits(val terms: Int = 4096, val bits: Int = 4096) {
     }
 }
 
+internal sealed interface SourceCutPreparation {
+    val storageUnits: Long
+
+    companion object {
+        const val STORAGE_UNITS = 16L
+    }
+}
+
+private class PreparedSourceCutInput(val source: SourceCut, val terms: Int, val bits: Int) : SourceCutPreparation {
+    override val storageUnits: Long get() = SourceCutPreparation.STORAGE_UNITS
+}
+
 internal class SourceCut(
     val expression: CutExpression,
     val relation: Relation,
@@ -149,6 +161,8 @@ internal class SourceCut(
     val provenance: CutProvenance,
     val family: CutFamily = provenance.family,
 ) {
+    internal val preparationExtent: Long get() = provenance.storageUnits + expression.storageUnits + 1L
+
     val key: String by lazy(LazyThreadSafetyMode.PUBLICATION) {
         val definitions = provenance.auxiliaryDefinitions
         expression.terms.entries.map { (source, coefficient) ->
@@ -171,15 +185,23 @@ internal class SourceCut(
         }, provenance.assumptions, ordered)
     }
 
-    fun toCut(map: CutSourceMap, limits: CutMappingLimits = CutMappingLimits()): CutMapping<Cut> {
-        val original = this.provenance.retainReferencedDefinitions(expression)
+    fun toCut(
+        map: CutSourceMap,
+        limits: CutMappingLimits = CutMappingLimits(),
+        preparation: SourceCutPreparation? = null,
+        onPrepared: ((SourceCutPreparation) -> Unit)? = null,
+    ): CutMapping<Cut> {
+        val prepared = (preparation as? PreparedSourceCutInput)?.takeIf {
+            it.source === this && it.terms == limits.terms && it.bits == limits.bits
+        }
+        val original = if (prepared != null) provenance else provenance.retainReferencedDefinitions(expression)
             ?: return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
         if (original.model !== map.model || !map.assumptions.containsAll(original.assumptions)) {
             return CutMapping.Declined(CutMappingDecline.MODEL_SCOPE)
         }
-        if (expression.terms.size > limits.terms || !limits.accepts(original) ||
-            !limits.accepts(rhs) || !limits.accepts(expression.constant) ||
-            expression.terms.values.any { !limits.accepts(it) }
+        if (prepared == null && (expression.terms.size > limits.terms || !limits.accepts(original) ||
+                !limits.accepts(rhs) || !limits.accepts(expression.constant) ||
+                expression.terms.values.any { !limits.accepts(it) })
         ) {
             return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         }
@@ -255,7 +277,7 @@ internal class SourceCut(
             family,
         )
         if (proof !== original && !limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
-        return CutMapping.Mapped(
+        val result = CutMapping.Mapped(
             Cut(
                 values.keys.toIntArray(),
                 integers.dropLast(1).map { it.toLongExact() }.toLongArray(),
@@ -266,6 +288,10 @@ internal class SourceCut(
                 family = family,
             ),
         )
+        if (prepared == null && onPrepared != null && original === provenance) {
+            onPrepared(PreparedSourceCutInput(this, limits.terms, limits.bits))
+        }
+        return result
     }
 
     companion object {

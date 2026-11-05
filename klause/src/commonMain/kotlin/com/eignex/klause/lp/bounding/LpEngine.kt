@@ -845,9 +845,12 @@ internal class LpEngine(
         private set
 
     // Source premises keep local cuts dormant until their complete guards hold again.
-    val cutPool = CutPool(observe = { family, stage, outcome ->
-        sink.lp.cutLifecycle.event(family, stage, outcome)
-    })
+    val cutPool = CutPool(
+        prepareSources = sourcePreparation == LpSourcePreparation.ADMITTED,
+        cancellation = params.cancellation,
+        onPreparationWork = ::noteNodeOverhead,
+        observe = { family, stage, outcome -> sink.lp.cutLifecycle.event(family, stage, outcome) },
+    )
 
     /** The global cuts folded into every node's relaxation — the live contents of [cutPool]. */
     val lpGlobalCuts: List<Cut> get() = cutPool.cuts().filter { it.global }

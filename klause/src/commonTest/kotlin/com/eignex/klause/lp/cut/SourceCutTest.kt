@@ -237,6 +237,59 @@ class SourceCutTest {
     }
 
     @Test
+    fun `prepared input should respect a stricter proof budget`() {
+        val expression = CutExpression(mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
+        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(
+            modelToken, 0, emptyList(), conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        ))
+        val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x), CutColumnSource(y)))
+        var prepared: SourceCutPreparation? = null
+        assertNotNull(source.toCut(map, onPrepared = { prepared = it }).orNull())
+        assertNotNull(prepared)
+
+        val result = source.toCut(map, CutMappingLimits(terms = 2), prepared)
+
+        assertEquals(CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT), result)
+    }
+
+    @Test
+    fun `prepared input should reject a different immutable proof`() {
+        val expression = CutExpression(mapOf(x to BigFraction.ONE))
+        val row = CutPremise.Row(expression, Relation.LE, BigFraction.ONE)
+        val source = SourceCut(expression, Relation.LE, BigFraction.ONE,
+            CutProvenance(modelToken, 0, emptyList(), conclusion = row))
+        val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
+        val limits = CutMappingLimits(bits = 32)
+        var prepared: SourceCutPreparation? = null
+        assertNotNull(source.toCut(map, limits, onPrepared = { prepared = it }).orNull())
+        val other = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(modelToken, 0,
+            listOf(CutProofFact(CutPremise.Bound(expression, true,
+                BigFraction.of(BIG_ONE, BIG_ONE.shl(80))), true)), conclusion = row))
+
+        val result = other.toCut(map, limits, assertNotNull(prepared))
+
+        assertEquals(CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT), result)
+    }
+
+    @Test
+    fun `prepared input should still validate proof growth from fixed substitution`() {
+        val expression = CutExpression(mapOf(x to BigFraction.ONE))
+        val source = SourceCut(expression, Relation.LE, BigFraction.ONE, CutProvenance(
+            modelToken, 0, emptyList(), conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+        ))
+        val map = CutSourceMap(modelToken, 0, listOf(CutColumnSource(x)))
+        val limits = CutMappingLimits(terms = 2)
+        var prepared: SourceCutPreparation? = null
+        assertNotNull(source.toCut(map, limits, onPrepared = { prepared = it }).orNull())
+        val fixed = CutSourceMap(modelToken, 1, emptyList(), fixed = mapOf(x to BigFraction.ONE),
+            activePremises = setOf(CutPremise.Fixed(x, BigFraction.ONE)))
+
+        val result = source.toCut(fixed, limits, assertNotNull(prepared))
+
+        assertEquals(CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT), result)
+    }
+
+    @Test
     fun `synthesized conclusion should spend the proof expansion budget`() {
         val source = SourceCut(
             CutExpression(mapOf(x to BigFraction.ONE)),
