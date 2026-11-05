@@ -7,6 +7,7 @@ import com.eignex.klause.theory.qfnra.PolynomialSigns.ALL_SIGNS
 import com.eignex.klause.theory.qfnra.PolynomialSigns.POSITIVE_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.negateSigns
 import com.eignex.klause.theory.qfnra.PolynomialSigns.relationSigns
+import com.eignex.util.collections.IntArrayDeque
 
 internal class PolynomialPredicateSharing(
     private val originalNodes: List<FormulaNode>,
@@ -84,7 +85,7 @@ internal class PolynomialPredicateSharing(
 
     fun compact(root: Int): Int {
         val used = BooleanArray(nodes.size)
-        val pending = ArrayDeque<Int>()
+        val pending = IntArrayDeque()
         pending.addLast(root)
         while (pending.isNotEmpty()) {
             arithmetic.step()

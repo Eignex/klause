@@ -26,6 +26,7 @@ import com.eignex.klause.lowering.packLayeredMdd
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.tseitinOr
 import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableLongIntMap
 
@@ -537,8 +538,8 @@ private fun layerMdd(trs: InternedTransitions): LayeredMddData? {
     val layer = IntArray(q + 1) { -1 }
     layer[root] = 0
     var maxLayer = 0
-    val queue = ArrayDeque<Int>()
-    queue.add(root)
+    val queue = IntArrayDeque()
+    queue.addLast(root)
     while (queue.isNotEmpty()) {
         val s = queue.removeFirst()
         val nl = layer[s] + 1
@@ -547,7 +548,7 @@ private fun layerMdd(trs: InternedTransitions): LayeredMddData? {
             if (layer[d] == -1) {
                 layer[d] = nl
                 if (nl > maxLayer) maxLayer = nl
-                queue.add(d)
+                queue.addLast(d)
             } else if (layer[d] != nl) {
                 return null // reachable at two depths — not layered
             }

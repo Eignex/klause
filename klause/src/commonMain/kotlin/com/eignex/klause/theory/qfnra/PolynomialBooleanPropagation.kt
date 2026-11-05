@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.FALSE
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.TRUE
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.UNASSIGNED
+import com.eignex.util.collections.IntArrayDeque
 
 internal class PolynomialBooleanPropagation(
     private val nodes: List<FormulaNode>,
@@ -20,7 +21,7 @@ internal class PolynomialBooleanPropagation(
     private val leaves = ArrayList<Int>()
     private var nextLeaf = 0
     private val trail = ArrayList<Int>()
-    private val pending = ArrayDeque<Int>()
+    private val pending = IntArrayDeque()
     private val queued = BooleanArray(nodes.size)
     private val choices = ArrayList<Choice>()
     private val witnesses = if (trackWitnesses) PolynomialBooleanWitness(nodes, values, parents, arithmetic) else null

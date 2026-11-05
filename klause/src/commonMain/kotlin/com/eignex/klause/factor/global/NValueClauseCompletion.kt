@@ -11,6 +11,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Assignment
+import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongHashSet
 import com.eignex.util.collections.MutableIntObjectMap
@@ -40,7 +41,7 @@ internal class NValueClauseCompletion(
     private val pinnedBools = IntHashSet()
     private val writtenInts = IntHashSet()
     private val receivingClasses = LongHashSet()
-    private val pending = ArrayList<Int>()
+    private val pending = IntArrayList()
     private val parts = ArrayList<Move>()
     private var foldVisits = 0
     private data class Predicate(val variable: Int, val value: Long)
@@ -322,7 +323,7 @@ internal class NValueClauseCompletion(
         if (factor is Clause || factor is Xor || factor is Element ||
             (factor is ReifiedLinear && predicate(factor) != null)
         ) {
-            pending += fid
+            pending.add(fid)
         }
     }
 

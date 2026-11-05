@@ -1,10 +1,32 @@
 package com.eignex.klause.ir
 
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class StructuralKeyTest {
+
+    @Test
+    fun `key ordered pairs should retain signed ordering and source order for ties across arities`() {
+        for (size in listOf(0, 1, 31, 32, 33, 129)) {
+            val keys = IntArray(size) { index ->
+                when (index % 5) {
+                    0 -> Int.MAX_VALUE
+                    1 -> Int.MIN_VALUE
+                    else -> index % 3 - 1
+                }
+            }
+            val expectedOrder = keys.indices.sortedBy { keys[it] }
+            val expected = longArrayOf(size.toLong()) + expectedOrder.flatMap { index ->
+                listOf(keys[index].toLong(), index.toLong())
+            }.toLongArray()
+
+            val actual = StructuralKeyBuilder().apply { pairsByKey(keys) { it.toLong() } }.buildWords()
+
+            assertContentEquals(expected, actual, "size=$size")
+        }
+    }
 
     private fun key(expectedWords: Int): StructuralKey = StructuralKeyBuilder(expectedWords).apply {
         int(7)

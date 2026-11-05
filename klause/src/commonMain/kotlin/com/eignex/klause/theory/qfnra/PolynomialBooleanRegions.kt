@@ -6,6 +6,7 @@ import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.FALSE
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.TRUE
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.UNASSIGNED
+import com.eignex.util.collections.IntArrayDeque
 
 internal data class PolynomialBooleanRegion(val atoms: Map<Int, Boolean>, val bools: Map<Int, Boolean>)
 
@@ -253,7 +254,7 @@ internal class PolynomialBooleanRegions(
 
     private fun capture(): Proof {
         val visited = BooleanArray(nodes.size)
-        val pending = ArrayDeque<Int>()
+        val pending = IntArrayDeque()
         pending.addLast(root)
         while (pending.isNotEmpty()) {
             arithmetic.step()

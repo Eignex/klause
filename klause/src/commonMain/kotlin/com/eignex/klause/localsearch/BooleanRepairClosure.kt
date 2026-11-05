@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.collections.IntArrayList
 
 internal class PreparedBooleanRepairs(val closure: BooleanRepairClosure?)
 
@@ -58,24 +59,24 @@ internal class BooleanRepairClosure private constructor(
                 }
                 if ((variable + 1) % 256 == 0) yield(null)
             }
-            val edgeLists = arrayOfNulls<MutableList<Int>>(size * 2)
+            val edgeLists = arrayOfNulls<IntArrayList>(size * 2)
             yield(null)
             for (literal in edgeLists.indices) {
-                edgeLists[literal] = ArrayList()
+                edgeLists[literal] = IntArrayList()
                 if ((literal + 1) % 256 == 0) yield(null)
             }
-            val occurrenceLists = arrayOfNulls<MutableList<Int>>(size * 2)
+            val occurrenceLists = arrayOfNulls<IntArrayList>(size * 2)
             yield(null)
             for (literal in occurrenceLists.indices) {
-                occurrenceLists[literal] = ArrayList()
+                occurrenceLists[literal] = IntArrayList()
                 if ((literal + 1) % 256 == 0) yield(null)
             }
-            val units = ArrayList<Int>()
+            val units = IntArrayList()
             val clauses = ArrayList<IntArray>()
             var inconsistent = false
             var visits = 0
             for ((index, factor) in problem.factors.withIndex()) {
-                val residual = ArrayList<Int>()
+                val residual = IntArrayList()
                 var satisfied = false
                 for (literal in (factor as Clause).literals) {
                     val pinned = frozen[Lit.variable(literal)].toInt()
@@ -95,7 +96,8 @@ internal class BooleanRepairClosure private constructor(
                     else -> {
                         val row = clauses.size
                         clauses.add(residual.toIntArray())
-                        for (literal in residual) {
+                        for (position in 0 until residual.size) {
+                            val literal = residual[position]
                             checkNotNull(occurrenceLists[Lit.negate(literal)]).add(row)
                             if (++visits % 256 == 0) yield(null)
                         }
