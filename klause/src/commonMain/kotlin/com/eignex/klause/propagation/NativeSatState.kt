@@ -51,6 +51,8 @@ internal class NativeSatState(private val state: PropagationState) {
     private var capCalls = 0L
     private var capWork = 0L
     private var capVisits = 0L
+    internal val capWindowPending: Boolean get() = capRanking.hasPending
+    internal val capTraversalVisits: Long get() = capVisits
     private var capBoundaryDefers = 0L
     private var capPreparationDefers = 0L
     private var capPendingReplayCalls = 0L
