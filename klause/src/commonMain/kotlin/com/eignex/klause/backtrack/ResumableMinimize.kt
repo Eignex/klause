@@ -592,7 +592,10 @@ internal class ResumableMinimize(
                     is StepEvent.Terminal -> return e.result
 
                     StepEvent.Paused -> {
-                        if (!clauseExchangeEnded) params.clauseExchange?.onSearchPause(session)
+                        if (!clauseExchangeEnded) {
+                            if (sliceCancelled()) params.clauseExchange?.onSearchEnd(session)
+                            else params.clauseExchange?.onSearchPause(session)
+                        }
                         slice.noteOverspend()
                         // Restarts sample root fixings too, but an arm that restarts rarely would show none of its own.
                         sink.search.observeRootFixed(session.rootFixedVariableCount())
