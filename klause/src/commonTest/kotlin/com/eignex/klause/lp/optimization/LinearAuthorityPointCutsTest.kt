@@ -71,7 +71,7 @@ class LinearAuthorityPointCutsTest {
             (triangle + x).associateWith { BigFraction.ONE } +
                 (triangle.first() to half) + (mixedReal to quarter.negated()))
         LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
-            val first = authority.advanceWithPointGeneratedCuts(root, Cancellation.Never, BigFraction.ZERO)
+            authority.advanceWithPointGeneratedCuts(root, Cancellation.Never, BigFraction.ZERO)
             val child = root.atScope(root.scope.copy(condition = SourceCondition(
                 upper = mapOf(mixedReal to BigFraction.ofLong(5)))))
             authority.advanceWithPointGeneratedCuts(child, Cancellation.Never, BigFraction.ZERO)
@@ -83,7 +83,8 @@ class LinearAuthorityPointCutsTest {
 
                 val result = authority.advanceWithPointGeneratedCuts(context, Cancellation.Never, BigFraction.ZERO)
 
-                assertEquals(assertNotNull(first.bound).claim, assertNotNull(result.bound).claim)
+                val current = authority.advance(context, Cancellation.Never, cuts = false)
+                assertEquals(assertNotNull(current.bound).claim, assertNotNull(result.bound).claim)
                 assertEquals(SourceEvidenceCheck.Checked,
                     SourceEvidenceVerifier(context.withLinearAuthority()).verify(assertNotNull(result.bound)))
             }
