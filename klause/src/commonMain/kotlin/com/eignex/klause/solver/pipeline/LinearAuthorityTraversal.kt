@@ -451,7 +451,7 @@ internal class LinearAuthorityTraversal(
             }
         val queried = when {
             useGuidance && useCuts && pointCuts && aggregateCuts ->
-                authority.advanceWithGeneratedCutAging(branch, cancellation)
+                authority.advanceWithGeneratedCutUse(branch, cancellation, incumbent()?.second)
             useGuidance && useCuts && pointCuts -> authority.advanceWithPointCuts(branch, cancellation)
             useGuidance -> authority.advance(branch, cancellation, cuts = useCuts)
             else -> authority.check(branch, cancellation)
