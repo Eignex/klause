@@ -540,7 +540,7 @@ internal class NativeSatState(private val state: PropagationState) {
         val length = literalCountOf(index)
         budget.visit(work + 8L)
         budget.visit(0L)
-        return length <= 1 || metadata[index, NativeLearnedMetadata.STAGES] and 2 != 0 ||
+        return length <= 1 || metadata[index, NativeLearnedMetadata.STAGES] and 3 == 2 ||
             metadata[index, NativeLearnedMetadata.BOOL_REASONS] > 0
     }
 
@@ -798,6 +798,11 @@ internal class NativeSatState(private val state: PropagationState) {
                 return false
             }
             val h = rechecks[recheckHead]
+            state.work++
+            if (isRetired(h)) {
+                recheckHead++
+                continue
+            }
             var unit = -1
             var open = 0
             for (k in 0 until clauseLen(h)) {
