@@ -53,7 +53,15 @@ internal class LinearAuthority(
     private val additionalCuts = additionalCuts.toList()
     private val cutLifecycle = LinearCutLifecycle(budget)
     fun observeCutConsumption(families: Set<CutFamily>, outcome: String) {
-        for (family in families) cutLifecycle.observe(family, outcome)
+        for (family in families) {
+            cutLifecycle.observe(family, outcome)
+            if (outcome == "BOUND_PRUNE" || outcome == "INHERITED_BOUND_PRUNE" ||
+                outcome == "CONFLICT_PRUNE" || outcome == "ATTAINED_OPTIMUM" || outcome == "LIMIT_CLOSURE") {
+                if (pointPolicy?.observeUse(template?.cuts?.rows, family) == true) {
+                    cutLifecycle.shared("PreparationWork", 1L)
+                }
+            }
+        }
     }
     private val lp = LinearAuthorityLp(budget, onLpShape, retainLp, guidancePolicy,
         onCutMetric = { stage, count ->
@@ -153,8 +161,15 @@ internal class LinearAuthority(
     fun advanceWithGeneratedCutAging(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult =
         advanceWithSelectedCuts(source, cancellation, generatedFirst = aggregateCuts && additionalCuts.isEmpty())
 
+    fun advanceWithGeneratedCutUse(
+        source: SourceProofContext, cancellation: Cancellation, incumbent: BigFraction?,
+    ): LinearAuthorityResult = advanceWithSelectedCuts(source, cancellation,
+        generatedFirst = aggregateCuts && additionalCuts.isEmpty(),
+        retireUnproductive = aggregateCuts && additionalCuts.isEmpty(), incumbent = incumbent)
+
     private fun advanceWithSelectedCuts(
         source: SourceProofContext, cancellation: Cancellation, generatedFirst: Boolean,
+        retireUnproductive: Boolean = false, incumbent: BigFraction? = null,
     ): LinearAuthorityResult {
         val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe)
             .also { pointPolicy = it }
@@ -189,6 +204,9 @@ internal class LinearAuthority(
                 pointListener = null
             }
             if (base.paused || base.evidence != null || base.incumbent != null || cancellation()) return base
+            val value = ((base.bound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
+            val usefulnessOpportunity = retireUnproductive && incumbent != null && (value == null ||
+                if (source.scope.objective?.sense == ObjectiveSense.MAXIMIZE) value > incumbent else value < incumbent)
             val observed = point ?: run {
                 policy.observe("PointUnavailable")
                 return base
@@ -215,9 +233,11 @@ internal class LinearAuthority(
                     it.family == CutFamily.SOURCE_AGGREGATION || it.family == CutFamily.AGGREGATION_MIR
                 }) {
                 val selected = cutLifecycle.containing("POINT_SELECTION") {
-                    val installed = policy.prepareGenerated(currentRows, prepared.checkedCuts, cancellation)
+                    val installed = policy.prepareGenerated(currentRows, prepared.checkedCuts, cancellation,
+                        trackUsefulness = retireUnproductive)
                     if (installed.isEmpty()) installed else policy.select(currentRows, prepared.coordinates,
-                        prepared.costs, prepared.checkedCuts, observed.second, installed, cancellation)
+                        prepared.costs, prepared.checkedCuts, observed.second, installed, cancellation,
+                        usefulnessOpportunity = usefulnessOpportunity)
                 }
                 if (selected.size == currentRows.size) {
                     pointMask = selected
@@ -254,7 +274,8 @@ internal class LinearAuthority(
                     policy.select(checkNotNull(family.cuts).rows, prepared.coordinates, prepared.costs,
                         prepared.checkedCuts, observed.second, pointMask.orEmpty().intersect(prepared.checkedCuts),
                         cancellation, adoptCurrent = baselineMask == null && family === baselineFamily &&
-                            prepared.activeCuts == checkNotNull(family.cuts).rows.size)
+                            prepared.activeCuts == checkNotNull(family.cuts).rows.size,
+                        usefulnessOpportunity = usefulnessOpportunity)
                 }
             }
             if (budget.funding?.exhausted == true || cancellation()) return base

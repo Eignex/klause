@@ -87,7 +87,8 @@ configure [source cut selection](17-linear-programming.md#cuts) in direct numeri
 frontiers and admitted numerical companions of ordinary linear sources. Finite
 worker recipes do not interpret these controls; admission and lifetime are separate.
 Enabling both point and aggregate controls initializes a bounded generated recipe
-and ages its checked installed rows; point-only selection starts from current cuts.
+and ages its checked installed rows against point activity and downstream use;
+point-only selection starts from current cuts.
 
 `--param luby=N` requires a strictly positive integer. Zero and negative units
 produce a configuration error before worker execution, including when an adaptive
