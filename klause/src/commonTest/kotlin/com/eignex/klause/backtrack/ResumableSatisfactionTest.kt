@@ -29,6 +29,43 @@ import kotlin.test.assertTrue
 
 class ResumableSatisfactionTest {
     @Test
+    fun `a suspended native heap should finish before the next decision`() {
+        val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(4, 6)))).bake()
+        var native: PropagationSession? = null
+        var attempts = 0
+        val exchange = object : ClauseExchange {
+            override fun onSearchStart(session: PropagationSession) {
+                native = session
+                repeat(257) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
+                forgetIfOverCap(session, BacktrackParams(maxLearnedClauses = 128,
+                    learnedMemoryWork = 64L, learnedMemoryScratchBytes = 64L, tieredLearnedDb = false))
+                assertTrue(session.nativeCapWindowPending)
+            }
+            override fun onRestart(session: PropagationSession) = Unit
+        }
+        val params = BacktrackParams(nativeSat = true, pbLearning = false, randomSeed = 1L,
+            maxLearnedClauses = 128, learnedMemoryWork = 64L, learnedMemoryScratchBytes = 64L,
+            tieredLearnedDb = false, clauseExchange = exchange,
+            branchObserver = object : SearchBranchAttemptObserver {
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    val session = assertNotNull(native)
+                    assertFalse(session.nativeCapWindowPending)
+                    assertEquals(128, session.activeLearnedClauseCount)
+                    attempts++
+                }
+            })
+
+        val result = BacktrackSolver(problem).resumableSolve(params).use { search ->
+            var verdict: SolveResult? = null
+            repeat(2048) { if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+            assertNotNull(verdict)
+        }
+
+        assertIs<SolveResult.Sat>(result)
+        assertTrue(attempts > 0)
+    }
+
+    @Test
     fun `a funded native cap should finish one tier pass before branching`() {
         val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(4, 6)))).bake()
         var native: PropagationSession? = null

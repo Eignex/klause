@@ -1244,6 +1244,9 @@ class PropagationSession private constructor(
 
     internal val nativeCapWindowPending: Boolean get() = state.nativeEngine?.capWindowPending == true
     internal val nativeCapTraversalVisits: Long get() = state.nativeEngine?.capTraversalVisits ?: 0L
+    internal val nativeCapContinuationCursor: Long get() = state.nativeEngine?.capContinuationCursor ?: 0L
+    internal val nativeCapContinuationHeap: Long get() = state.nativeEngine?.capContinuationHeap ?: 0L
+    internal val nativeCapContinuationOperation: Long get() = state.nativeEngine?.capContinuationOperation ?: 0L
 
     internal fun maintainCapWindow(
         cap: Int,

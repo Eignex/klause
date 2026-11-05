@@ -35,6 +35,9 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
     var passes = 0L
         private set
     val hasPending: Boolean get() = read > 0 || stage != Stage.Collect
+    val continuationCursor: Long get() = (read.toLong() shl 32) or (cleanupRead.toLong() and 0xFFFFFFFFL)
+    val continuationHeap: Long get() = (heapSize.toLong() shl 32) or (write.toLong() and 0xFFFFFFFFL)
+    val continuationOperation: Long get() = (stage.ordinal.toLong() shl 32) or (sift.toLong() and 0xFFFFFFFFL)
     val modeledBytes: Long get() = 100L
     val primitiveBytes: Long get() = 68L
 

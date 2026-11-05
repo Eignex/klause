@@ -326,6 +326,10 @@ lookup. A dormant retired posting stays inert and owned until separately funded
 watch cleanup removes it; an unsatisfied blocker checks retirement before reading
 the clause payload.
 
+Root continuation observes row cursors, heap shape and suspended operations;
+funded sifting or cleanup can advance without inspecting another row. These views
+read the ranking's existing state without adding retained storage.
+
 A bounded window over non-permanent
 learned clauses retains the lowest LBD and stable-handle keys after permanent and
 tier-protected ownership. Its max-heap shares the candidate index with retained
