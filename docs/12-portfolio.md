@@ -1056,6 +1056,8 @@ continuations keep their own eligibility.
 Pseudo-Boolean pools enable `root-probe-general-gate`, which admits one initial
 global batch under the existing grants, then prioritizes new short learned clauses
 when Boolean General workers have no root facts or known binary hints.
+An empty completed neighborhood probe prioritizes its opposite polarity inside the
+existing batch and work grants.
 It preserves ordinary rotation after either signal and leaves integer endpoints unchanged.
 `inprocessing-probe-interval=0` follows the shared root trigger instead.
 These allowances remain inside each worker's containing slice. The

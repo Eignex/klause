@@ -748,6 +748,11 @@ root facts or known binaries. One initial global batch uses the ordinary probe a
 containing grants; later slices examine new learned clauses of two to eight literals
 before admitting global probes. An unfunded slice retains that initial opportunity,
 and optional buffer release preserves its exhaustion until scope reset.
+If a completed learned-neighborhood probe propagates no additional Boolean literal,
+its opposite polarity precedes the next neighborhood candidate under the same batch
+and work ceilings. This optional literal survives an unfunded slice and buffer release;
+scope reset or a root fact or binary hint discards it. A mirrored probe does not
+schedule another mirror.
 General constraints can propagate without a binary,
 so this admission is optional rather than a propagation impossibility test. Integer
 endpoint rotation retains its ordinary policy. A root fact or binary hint reopens

@@ -629,6 +629,55 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `an empty General neighborhood should retain its productive opposite through an unfunded slice`() {
+        for (releaseBuffers in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf<Factor>(
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(2, 4, 6), PbOp.LE, 1),
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(3, 4, 6), PbOp.GE, 2),
+            ))
+            val session = PropagationSession(source.bake(), nativeSat = false)
+            val pass = RootProbingPass()
+            val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+                rootProbeGeneralGate = true)
+            val stats = SearchStatsSink()
+            pass.run(session, params, stats)
+            session.addLearnedClause(Clause(intArrayOf(2, 4, 6)), 3)
+            pass.run(session, params, stats)
+            assertNull(session.boolValue(1))
+            assertEquals(2L, stats.inprocessProbes)
+
+            pass.run(session, params, stats, containingWork = 1L)
+            if (releaseBuffers) pass.releaseRetainedBuffers()
+            pass.run(session, params, stats)
+
+            assertEquals(false, session.boolValue(1))
+            assertEquals(3L, stats.inprocessProbes)
+            assertEquals(0, session.decisionLevel)
+            assertTrue(session.learnedLifecycle().getValue("learningClauseConsumed") > 0L)
+        }
+    }
+
+    @Test
+    fun `two empty General polarities should leave a later learned literal reachable`() {
+        val source = Problem(4, 0, emptyArray(), arrayOf<Factor>(
+            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(2, 4, 6), PbOp.LE, 1),
+            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(3, 4, 6), PbOp.GE, 2),
+        ))
+        val session = PropagationSession(source.bake(), nativeSat = false)
+        val pass = RootProbingPass()
+        val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+            rootProbeGeneralGate = true)
+        pass.run(session, params, null)
+        session.addLearnedClause(Clause(intArrayOf(0, 2, 4, 6)), 4)
+
+        repeat(5) { pass.run(session, params, null) }
+
+        assertEquals(false, session.boolValue(1))
+        assertEquals(0, session.decisionLevel)
+        assertTrue(session.learnedLifecycle().getValue("learningClauseConsumed") > 0L)
+    }
+
+    @Test
     fun `General admission should preserve useful initial probing without binary hints`() {
         val source = Problem(3, 0, emptyArray(), arrayOf<Factor>(
             PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(0, 2, 4), PbOp.LE, 1),
