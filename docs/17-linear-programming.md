@@ -681,7 +681,10 @@ same pool and preparation limits. Layout retention does not change discovery
 cooldown or authorize
 reusing point-directed definitions as the ordinary current recipe.
 Their free logical columns impose no restriction and carry zero certificate
-multiplier. This preserves a compatible numerical owner across additions and retirement.
+multiplier. This preserves a compatible numerical owner across additions and ordinary retirement.
+A point-selected recipe retired for lack of useful consumption releases its inactive
+candidate layout when its mask empties. The next query omits those rows and replaces
+the numerical owner within the same allowance. Managed current recipes retain their layout.
 Suspension maps source row IDs through equality packing; both sides of a packed
 equality must have matching activity. An incompatible mask declines retained
 guidance, keeping failed mapping and ordinary fallback costs in the containing
@@ -1694,7 +1697,9 @@ points and adopted current recipes age installed rows under the same scoring lim
 The combined frontier also retires a selected mask after four completed usable
 observations with an incumbent and no actual family-attributed use. A use of that
 family in the matching recipe resets the streak. An empty mask starts no streak;
-retirement discards newly proposed replacements as well as installed IDs.
+retirement discards newly proposed replacements as well as installed IDs and
+releases the inactive candidate layout. Compaction uses the ordinary masked-query
+builder; it retains checked base bounds across a paused or declined replacement.
 Complementary endpoint mode retains an adopted current template; its mask refers
 to the installed definitions. Integer-only templates also share endpoint modes
 because they add no continuous bound alternatives.

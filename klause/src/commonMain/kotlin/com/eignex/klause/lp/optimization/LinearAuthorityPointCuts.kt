@@ -359,6 +359,7 @@ internal class LinearAuthorityPointCuts(
                 }
                 if (unproductive) {
                     retired = true
+                    if (!managedCurrent) retainedLayout = false
                     trackUsefulness = false
                     utilityFamilies = emptySet()
                     observe("UnproductiveRecipeRetired")
