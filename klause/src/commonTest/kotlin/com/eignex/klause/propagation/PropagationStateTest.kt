@@ -279,7 +279,7 @@ class PropagationStateTest {
         s.setLearnedClauseTier(f2 - base, ClauseTier.LOCAL)
         s.noteLearnedUse(f2)
 
-        s.forgetLearnedClauses { idx, _ -> idx != 1 }
+        s.forgetLearnedClauses(keep = { idx, _ -> idx != 1 })
 
         assertEquals(2, s.learnedClauses.size)
         assertEquals(ClauseTier.CORE, s.learnedClauseTier(0))
@@ -315,7 +315,7 @@ class PropagationStateTest {
         s.intMaxReason[0] = fids[2]
         s.boolReason[2] = 0
 
-        s.forgetLearnedClauses { idx, _ -> idx == 0 || idx == 3 }
+        s.forgetLearnedClauses(keep = { idx, _ -> idx == 0 || idx == 3 })
 
         assertEquals(base + 2, s.boolReason[0])
         assertEquals(base + 1, s.boolReason[1])

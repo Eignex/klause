@@ -25,7 +25,7 @@ class ConflictTest {
         state.conflictSeedFactors.add(second)
         state.extractConflictFactors()
 
-        state.forgetLearnedClauses { index, _ -> index != 0 }
+        state.forgetLearnedClauses(keep = { index, _ -> index != 0 })
         state.conflictSeedFactors.clear()
         state.conflictSeedFactors.add(state.boolReason[2])
         val core = state.extractConflictFactors()

@@ -264,7 +264,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val learnedMemoryWork: ExecutionOption<Long> = ExecutionOption("learned-memory-work", ValueKind.LONG)
 
         /** The `learned-memory-scratch-bytes` execution setting. */
-        val learnedMemoryScratchBytes: ExecutionOption<Long> = ExecutionOption("learned-memory-scratch-bytes", ValueKind.LONG)
+        val learnedMemoryScratchBytes: ExecutionOption<Long> =
+            ExecutionOption("learned-memory-scratch-bytes", ValueKind.LONG)
 
         /** The `lbd-glue` execution setting. */
         val lbdGlue: ExecutionOption<Int> = ExecutionOption("lbd-glue", ValueKind.INT)

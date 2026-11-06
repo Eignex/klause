@@ -42,7 +42,8 @@ internal class SharingMemoryObservation(
     fun owned(identity: Any, bytes: Long, protected: Boolean = false, shared: Boolean = false) =
         own(identity, bytes, 0L, protected, shared)
 
-    fun ownedReferences(identity: Any, slots: Long, protected: Boolean = false) = own(identity, 0L, slots, protected, false)
+    fun ownedReferences(identity: Any, slots: Long, protected: Boolean = false) =
+        own(identity, 0L, slots, protected, false)
 
     private fun own(identity: Any, bytes: Long, slots: Long, protected: Boolean, shared: Boolean) {
         require(bytes >= 0L && slots >= 0L)
