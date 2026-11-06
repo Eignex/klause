@@ -145,19 +145,22 @@ class ResumableMinimizeDirectionalTest {
             }) },
         )
 
-        val objective = LinearObjective(intCoefficients = LongArray(variables) { longArrayOf(3L, 2L, 4L)[it % 3] })
+        val objective = LinearObjective(intCoefficients = longArrayOf(
+            6L, 6L, 11L, 5L, 5L, 9L, 5L, 5L, 9L, 4L, 4L, 5L,
+        ))
         ResumableMinimize(BacktrackSolver(problem), objective, params,
             rootBasisGuidance = false).use { search ->
             val consumed = Cancellation {
                 (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("VARIABLE_CONSUMED") ?: 0L) > 0L
             }
+            search.runSlice(Cancellation.Never, 1000L, 1L) {}
             var slices = 0
             while (slices++ < 128 && !search.isDone) {
                 val outcomes = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
                 if ((outcomes?.get("DOWN") ?: 0L) >= 2L && (outcomes?.get("UP") ?: 0L) >= 2L &&
                     (outcomes?.get("VARIABLE_CONSUMED") ?: 0L) > 0L
                 ) break
-                search.runSlice(consumed, 1000L, 32L) {}
+                search.runSlice(consumed, 1000L, 128L) {}
             }
 
             val observations = search.stats.lp.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
