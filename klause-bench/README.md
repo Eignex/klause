@@ -108,6 +108,14 @@ all lifecycle costs. A lack of new candidates describes only that complete
 propositional control. Unsupported/partial views need an applicability or grant
 diagnosis; these observations do not retire the rebuilding objective.
 
+CLI JFR recordings retain up to 256 frames per stack. Ordinary resource measurements
+and CLI preflight keep their runtime options. Recorded stack truncation and analysis
+depth limits remain explicit; sampled stacks do not qualify production speedups.
+Retained-capture summaries accept `stack-depth=1..256`, defaulting to 32, and keep
+their existing encoded/decoded size limits. Up to 1,024 distinct caller paths are
+retained, with the 32 most frequent paths printed at the requested depth. Dropped
+and unprinted path samples have separate counters.
+
 ## Build and run
 
 Ordinary single-core mixed clausal satisfaction admits a bounded automatic private

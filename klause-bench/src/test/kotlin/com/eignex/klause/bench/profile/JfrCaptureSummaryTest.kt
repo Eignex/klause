@@ -20,10 +20,75 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class JfrCaptureSummaryTest {
     @TempDir
     lateinit var output: Path
+
+    @Test
+    fun `caller paths preserve recursive and root context`() {
+        val samples = JfrCaptureSummary.Samples(256)
+
+        samples.record(sequenceOf("fold", "fold", "root"), false)
+        val path = samples.summary("capture", "hash").getValue("callerPaths").jsonArray.single().jsonObject
+
+        assertEquals(listOf("fold", "fold", "root"), path.getValue("frames").jsonArray.map {
+            it.jsonPrimitive.content
+        })
+        assertEquals(1L, path.getValue("samples").jsonPrimitive.long)
+    }
+
+    @Test
+    fun `bounded caller paths retain omitted sample accounting`() {
+        val samples = JfrCaptureSummary.Samples(256)
+
+        repeat(1025) { samples.record(sequenceOf("caller$it", "root"), false) }
+        repeat(2) { samples.record(sequenceOf("caller1024", "root"), false) }
+        val summary = samples.summary("capture", "hash")
+
+        assertEquals(1027L, summary.getValue("samples").jsonPrimitive.long)
+        assertEquals(1024, summary.getValue("callerPathGroups").jsonPrimitive.int)
+        assertEquals(32, summary.getValue("callerPaths").jsonArray.size)
+        assertEquals(3L, summary.getValue("callerPathDroppedSamples").jsonPrimitive.long)
+        assertEquals(992L, summary.getValue("callerPathUnreportedSamples").jsonPrimitive.long)
+    }
+
+    @Test
+    fun `deep analysis should retain callers below the default frame limit`() {
+        val samples = JfrCaptureSummary.Samples(256)
+
+        samples.record((0 until 64).asSequence().map { "frame$it" } + sequenceOf("caller"), false)
+        val summary = samples.summary("capture", "hash")
+
+        assertEquals(256, summary.getValue("stackDepth").jsonPrimitive.int)
+        assertEquals(0L, summary.getValue("depthLimitedStacks").jsonPrimitive.long)
+        assertTrue(summary.getValue("sampledMethods").jsonArray.any {
+            it.jsonObject.getValue("method").jsonPrimitive.content == "caller"
+        })
+    }
+
+    @ParameterizedTest
+    @CsvSource("false, 1", "true, 1", "false, 256", "true, 256")
+    fun `requested analysis depth bounds traversal independently of truncation`(truncated: Boolean, depth: Int) {
+        val samples = JfrCaptureSummary.Samples(depth)
+
+        samples.record(generateSequence(0) { it + 1 }.map { "frame$it" }, truncated)
+        val summary = samples.summary("capture", "hash")
+
+        assertEquals(depth, summary.getValue("sampledMethods").jsonArray.size)
+        assertEquals(1L, summary.getValue("depthLimitedStacks").jsonPrimitive.long)
+        assertEquals(if (truncated) 1L else 0L, summary.getValue("truncatedStacks").jsonPrimitive.long)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["0", "257", "invalid"])
+    fun `invalid analysis depth fails before capture decoding`(depth: String) {
+        val request = BenchRequest(mapOf("source" to "retained/capture.jfr", "sha256" to "a".repeat(64),
+            "gzip-base64" to "AAAA", "stack-depth" to depth))
+
+        assertFailsWith<IllegalArgumentException> { JfrCaptureSummary.plan(request) }
+    }
 
     @Test
     fun `a sampled method should count once per stack despite recursive frames`() {
@@ -58,13 +123,14 @@ class JfrCaptureSummaryTest {
     fun `capture payload and event selection survive the frozen case protocol`(codec: String, events: Boolean) {
         val payload = "AAAA".repeat(100_000)
         val request = BenchRequest(mapOf("source" to "retained/capture.jfr", "sha256" to "a".repeat(64),
-            codec to payload) + if (events) mapOf("events" to "true") else emptyMap())
+            codec to payload, "stack-depth" to "256") + if (events) mapOf("events" to "true") else emptyMap())
 
         val planned = JfrCaptureSummary.plan(request).single()
         val frozen = BenchProtocol.json.encodeToString(BenchCase.serializer(), planned)
         val restored = BenchProtocol.json.decodeFromString(BenchCase.serializer(), frozen)
 
         assertEquals(payload, restored.parameters.getValue(codec))
+        assertEquals("256", restored.parameters["stack-depth"])
         assertEquals(if (events) "true" else null, restored.parameters["events"])
     }
 
