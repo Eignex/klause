@@ -173,6 +173,45 @@ class NativeSatStateTest {
     }
 
     @Test
+    fun `retiring a long watched tail should preserve the captured survivor phase`() {
+        for (fillers in listOf(256, 2560)) {
+            val session = session(4, or(0, true, 2, true))
+            session.addLearnedClause(Clause(or(0, true, 3, true)), 9)
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+            repeat(fillers) { session.addLearnedClause(Clause(or(0, true, 2, true)), 9, permanent = true) }
+            session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
+            repeat(8) { session.maintainCapWindow(fillers + 2, 65_536L, 1_048_576L, { false }) { false } }
+            assertEquals(fillers + 2, session.activeLearnedClauseCount)
+            var phase: Boolean? = null
+            session.retractingListener = { if (it == 1) phase = session.boolValue(1) }
+
+            session.pinBool(0, false)
+
+            assertEquals(true, phase)
+        }
+    }
+
+    @Test
+    fun `cleaning a long retired tail should preserve the captured survivor phase`() {
+        for (fillers in listOf(256, 2560)) {
+            val session = session(4, or(0, true, 2, true))
+            session.addLearnedClause(Clause(or(0, true, 3, true)), 9)
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+            repeat(fillers) { session.addLearnedClause(Clause(or(0, true, 2, true)), 9, permanent = true) }
+            session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
+            repeat(8) { session.maintainCapWindow(fillers + 2, 65_536L, 1_048_576L, { false }) { false } }
+            assertEquals(fillers + 2, session.activeLearnedClauseCount)
+            session.reclaimLearnedMemory(Long.MAX_VALUE, 65_536L, 1_048_576L)
+            var phase: Boolean? = null
+            session.retractingListener = { if (it == 1) phase = session.boolValue(1) }
+
+            session.pinBool(0, false)
+
+            assertEquals(true, phase)
+        }
+    }
+
+    @Test
     fun `small cleanup grants should release watches when an ordered copy cannot fit`() {
         for (grant in listOf(40L, 42L, 48L)) {
             val session = session(3, or(0, true, 2, true))

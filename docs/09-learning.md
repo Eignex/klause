@@ -614,7 +614,7 @@ so permanent postings cannot delay its progress. Appended retirements extend the
 queue. Candidate-array trimming receives a separate funded copy transaction and
 retains spare capacity when its work or scratch does not fit.
 Removing a retired Native watcher preserves survivor order when its tail contains at
-most 128 entries. Each copied entry debits one read and one write before mutation.
+most 4,096 entries. Each copied entry debits one read and one write before mutation.
 Cleanup uses the allowance remaining after its entry scan to fund the complete
 copy. A tail beyond the supported bound or a copy exceeding that remainder uses
 swap-pop, preserving progress under small grants. Ordinary watch relocation uses

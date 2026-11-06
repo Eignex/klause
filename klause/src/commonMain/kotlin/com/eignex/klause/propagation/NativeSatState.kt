@@ -986,7 +986,7 @@ internal class NativeSatState(private val state: PropagationState) {
     private companion object {
         const val RETIRED = 4
         const val RECENT_USED = 8
-        const val MAX_ORDERED_WATCH_COPIES = 128
+        const val MAX_ORDERED_WATCH_COPIES = 4096
         // Poll the deadline every 4096 propagated literals.
         const val CANCEL_POLL_MASK = 0xFFF
     }
