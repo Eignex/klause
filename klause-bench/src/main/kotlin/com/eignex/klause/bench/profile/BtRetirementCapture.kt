@@ -10,9 +10,7 @@ import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.portfolio.BacktrackCatalog
-import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.SearchEvent
@@ -29,6 +27,7 @@ import com.eignex.lab.bench.BenchResources
 import com.eignex.lab.bench.BenchResult
 import com.eignex.lab.bench.BenchSuite
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -91,7 +90,6 @@ object BtRetirementCapture : BenchSuite {
             val params = base.copy(
                 nativeSat = true,
                 cancellation = stop,
-                clauseExchange = snapshots,
                 variableSelector = capture?.let { Variables(base.variableSelector, it) } ?: base.variableSelector,
                 valueSelector = capture?.let { Values(base.valueSelector, it) } ?: base.valueSelector,
                 onEvent = listener,
@@ -183,40 +181,34 @@ object BtRetirementCapture : BenchSuite {
         }
     }
 
-    private class Snapshots(val file: File) : ClauseExchange, AutoCloseable {
-        var session: PropagationSession? = null
+    private class Snapshots(val file: File) : AutoCloseable {
+        private val reader = RawNativeSnapshot()
+        private val output = file.bufferedWriter()
+        private var session: PropagationSession? = null
+        private var rootCaptured = false
+        private var quotaCaptured = false
+        private var pickCaptured = false
         var count = 0
             private set
-        private var rootCaptured = false
-        private var firstSweep = false
-        private var quotaCaptured = false
-        private val output = file.bufferedWriter()
-        private val bools = SharedClause::class.java.getDeclaredField("boolLits").apply { isAccessible = true }
-        private val atoms = SharedClause::class.java.getDeclaredField("atomQuads").apply { isAccessible = true }
-        private val lbd = SharedClause::class.java.getDeclaredField("lbd").apply { isAccessible = true }
-        private val workCounter = PropagationSession::class.java.methods.single {
-            it.name.substringBefore('$') == "getWork" && it.parameterCount == 0 &&
-                it.returnType == Long::class.javaPrimitiveType
+
+        fun picked(current: PropagationSession, selected: Boolean) {
+            session = current
+            if (selected && quotaCaptured && !pickCaptured) {
+                pickCaptured = true
+                snapshot("before-first-postquota-pick", null)
+            }
         }
 
-        private fun work(session: PropagationSession): Long = workCounter.invoke(session) as Long
-
-        override fun onSearchStart(session: PropagationSession) { this.session = session }
-
-        override fun onRestart(session: PropagationSession) {
-            this.session = session
-            if (!rootCaptured && session.learnedClauseCount > 4000) {
+        fun root() {
+            val current = session ?: return
+            if (!rootCaptured && reader.count(current) > 4000) {
                 rootCaptured = true
                 snapshot("before-first-over-cap", null)
             }
         }
 
         fun sweep(event: SearchEvent.LearnedDbSweep) {
-            if (!firstSweep) {
-                firstSweep = true
-                snapshot("after-first-retirement", event)
-                quotaCaptured = event.kept <= 4000
-            } else if (!quotaCaptured && event.kept <= 4000) {
+            if (!quotaCaptured && event.kept <= 4000) {
                 quotaCaptured = true
                 snapshot("after-first-quota", event)
             }
@@ -224,45 +216,51 @@ object BtRetirementCapture : BenchSuite {
 
         private fun snapshot(label: String, event: SearchEvent.LearnedDbSweep?) {
             val current = checkNotNull(session)
-            val slots = current.learnedClauseCount
-            val before = work(current)
+            val before = reader.work(current)
+            val image = reader.read(current)
             val record = buildJsonObject {
                 put("label", label)
-                put("retainedSlots", slots)
+                put("retainedSlots", image.header.slots)
                 put("sweepKept", event?.kept)
                 put("sweepDropped", event?.dropped)
-                put("workBeforeExport", before)
-                put("readOnlyPublicExport", true)
-                put("privateFieldsReadOnlyOnExportedCopies", true)
-                put("publicJvmWorkGetterReadOnly", true)
-                if (slots > 16384) {
-                    put("status", "unsupported-slot-bound")
-                } else {
-                    val clauses = current.exportGlueClauses(Int.MAX_VALUE, Int.MAX_VALUE, false)
-                    val total = clauses.sumOf { (bools.get(it) as IntArray).size.toLong() }
-                    require(clauses.all { (atoms.get(it) as LongArray).isEmpty() })
-                    put("activeOwnClauses", clauses.size)
-                    put("exportedLiteralCount", total)
-                    if (total > 2097152L) {
-                        put("status", "unsupported-literal-bound")
-                    } else {
-                        put("status", "captured")
-                        put("clauses", JsonArray(clauses.mapIndexed { index, clause ->
-                            buildJsonObject {
-                                put("activeOrdinal", index)
-                                put("lbd", lbd.getInt(clause))
-                                put("literals", JsonArray((bools.get(clause) as IntArray).map(::JsonPrimitive)))
-                            }
-                        }))
-                    }
-                }
-                put("workAfterExport", work(current))
-                put("observerWorkDelta", work(current) - before)
+                put("workBeforeObservation", before)
+                put("rawFieldsReadOnly", true)
+                put("noStoreAccessorInvoked", true)
+                put("solverCachesUnchanged", image.cachesUnchanged)
+                put("status", "captured")
+                put("activeOwnClauses", image.clauses.size)
+                put("exportedLiteralCount", image.clauses.sumOf { it.literals.size.toLong() })
+                put("clauses", JsonArray(image.clauses.mapIndexed { ordinal, row -> clause(ordinal, row) }))
+                put("baseClauseCount", image.header.baseCount)
+                put("arenaStarts", JsonArray(image.arena.starts.map(::JsonPrimitive)))
+                put("arenaLiterals", JsonArray(image.arena.literals.map(::JsonPrimitive)))
+                put("boolTruth", JsonArray(image.header.truth.map { JsonPrimitive(it.toInt()) }))
+                put("boolReasons", JsonArray(image.header.reasons.map(::JsonPrimitive)))
+                put("bcpHead", image.header.cursors[0])
+                put("recheckHead", image.header.cursors[1])
+                put("unitsPending", image.header.cursors[2] == 1)
+                put("watchEntries", JsonArray(image.watches.map { entries ->
+                    JsonArray(entries.map { JsonPrimitive(it.toString()) })
+                }))
+                put("workAfterObservation", reader.work(current))
+                put("observerWorkDelta", reader.work(current) - before)
                 put("performanceQualified", false)
             }
             output.append(record.toString()).append('\n')
             output.flush()
             count++
+        }
+
+        private fun clause(ordinal: Int, row: RawNativeSnapshot.Row): JsonObject = buildJsonObject {
+            put("activeOrdinal", ordinal)
+            put("nativeIndex", row.nativeIndex)
+            put("lbd", row.lbd)
+            put("literals", JsonArray(row.literals.map(::JsonPrimitive)))
+            put("permanent", row.policy.permanent)
+            put("origin", row.policy.origin)
+            put("scan", row.policy.scan)
+            put("watchFirst", row.policy.first)
+            put("watchSecond", row.policy.second)
         }
 
         override fun close() { output.close() }
@@ -278,7 +276,7 @@ object BtRetirementCapture : BenchSuite {
         val truncated: Boolean get() = events > written
 
         fun picked(variable: VarRef?, session: PropagationSession) {
-            snapshots.session = session
+            snapshots.picked(session, variable != null)
             row("P", kind(variable), variable?.varId?.toLong() ?: -1L)
             if (commits % CHECKPOINT == 0L) row("K", commits, session.learnedClauseCount.toLong())
         }
@@ -294,7 +292,10 @@ object BtRetirementCapture : BenchSuite {
 
         fun event(event: SearchEvent) {
             when (event) {
-                is SearchEvent.Restart -> row("R", event.index, event.steps)
+                is SearchEvent.Restart -> {
+                    row("R", event.index, event.steps)
+                    snapshots.root()
+                }
                 is SearchEvent.LearnedDbSweep -> {
                     row("S", event.kept.toLong(), event.dropped.toLong())
                     snapshots.sweep(event)
