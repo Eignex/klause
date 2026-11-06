@@ -589,6 +589,12 @@ growth and index insertion. Lookups debit the active maintenance or observation
 grant, or the containing propagation ledger. A fixed-size page cache avoids repeated
 lookups during ranking; its reference allocation belongs to fixed preparation and
 modeled ownership. Header unlinking clears its cache slot before releasing the page.
+Native learned payloads cache 128 page lookups, including absent pages, with fixed
+primitive index tags. Both arrays and their owner references belong to state
+preparation and ownership accounting, separately from payload-row reference capacity.
+A cold lookup funds each visited index node
+before publishing its cached result. Page installation replaces a cached absence;
+funded header unlinking clears its cached page reference before returning.
 A page queue and per-page retirement masks resume row release without scanning
 permanent rows or looking up another page. Retained import/use counters survive
 released metadata. Empty arrays release within their row transaction; empty headers

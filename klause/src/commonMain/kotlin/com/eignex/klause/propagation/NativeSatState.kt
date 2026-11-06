@@ -443,6 +443,7 @@ internal class NativeSatState(private val state: PropagationState) {
             "retainedPeerImports" to peerImports.toLong(),
             "retainedConsumedPeerImports" to consumedPeerImports.toLong(),
             "retainedConsumed" to consumed.toLong(),
+            "learnedPayloadCacheReferenceCapacity" to learnedPayloads.cacheReferenceCapacity,
         ))
         retiredRootSources?.let { sample.owned(it, it.allocatedBytes, true) }
         sample.owned(importUses, importUses.allocatedBytes)
