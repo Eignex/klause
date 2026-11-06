@@ -1036,6 +1036,37 @@ aggressive LP; applicability, model class and LP ceilings order and filter it. R
 variable shaving and hull pruning remain explicit plan options, and curated
 satisfaction workers harvest root cuts only with an explicit `lp-root-cuts=true`.
 
+Curated backtrack-only clausal and pseudo-Boolean satisfaction pools enable bounded
+[root maintenance](09-learning.md#restarts-phases-and-inprocessing) on every complete worker.
+A clausal safe-root slice shares a 4,096-work grant, with 3,072 work for probing.
+A pseudo-Boolean slice shares 16,384 work, with 12,288 work for probing.
+Cheap simplification receives 256 work in either pool. Up to two probes share the
+class grant, with an 8,192-work per-probe ceiling. Clausal pools give
+subsumption and vivification zero class grants; pseudo-Boolean pools retain their
+recipe's auxiliary grants inside the shared ceiling.
+Consistent-probe binary capture is disabled in this pool; explicit
+`root-probe-implications=true` enables it without changing failed-literal probes or
+cheap binary maintenance. Root scans examine at most 256 clauses per slice. Natural-root scheduling
+uses a 32-work interval, eight-clause growth and a 32-work cooldown. Clausal pools
+require 4,096 non-inprocessing work before the first optional maintenance slice;
+pseudo-Boolean pools have no warmup. After the first eligible probe slice, optional
+probing requires 32,768 additional non-inprocessing work. Clausal pools enable
+`root-probe-binary-gate`: Native workers without root facts or known binary clauses
+scan new learned binaries before admitting global probes. Cheap scans and pending
+continuations keep their own eligibility.
+Pseudo-Boolean pools enable `root-probe-general-gate`, which admits one initial
+global batch under the existing grants, then prioritizes new short learned clauses
+when Boolean General workers have no root facts or known binary hints.
+An empty completed neighborhood probe prioritizes its opposite polarity inside the
+existing batch and work grants.
+It preserves ordinary rotation after either signal and leaves integer endpoints unchanged.
+`inprocessing-probe-interval=0` follows the shared root trigger instead.
+These allowances remain inside each worker's containing slice. The
+`root-maintenance=false` option retains stock root defaults without changing explicit
+root or probe settings. Backtrack edits apply after the automatic defaults. Named
+pools and source annotations keep their selected parameters; native clausal proof
+admission retains its own policy.
+
 Clausal complete-search recipes use clause learning, EMA restarts and a true-first
 saved phase; their balanced and stable variants differ in VSIDS decay (0.975, 0.99)
 and database cap (4000, 2000). Pseudo-Boolean models keep their cutting-plane

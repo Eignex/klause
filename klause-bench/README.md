@@ -39,6 +39,10 @@ Committed entries take precedence over cached mirror indexes; stored-form entrie
 A collection without a committed index falls back to the mirror's index.
 Concurrent planners atomically publish complete listing skeletons and reuse the winning view.
 
+`lab/source-identity.json` accepts `cases` containing at most eight selected
+single-model corpus inputs and their packed hashes. It verifies each lab-fetched
+input and records its decoded SHA-256 and byte count without parsing or solving it.
+
 `satcomp-xor-v1` selects 17 hash-pinned graph-parity CNFs from the SAT Competition,
 including original and camouflaged encodings.
 
@@ -285,8 +289,9 @@ containing allowance. These limits do not change solver grants or source semanti
 
 For retained JFR captures, submit `lab/jfr-summary.json` through `lab run` with
 `bench.request.parameters` containing `source` (the job/artifact label), `sha256`
-and `gzip-base64` (at most 2 MiB). The SDK transports the payload in the frozen case
-file. The JDK recording reader verifies the capture hash and streams sampled stacks
+and exactly one of `gzip-base64` or `zstd-base64` (at most 2 MiB encoded). Decoding
+streams at most 16 MiB and checks the raw capture hash; Zstandard windows are limited
+to 8 MiB. The SDK transports the payload in the frozen case file. The JDK recording reader verifies the capture hash and streams sampled stacks
 on the lab worker, limiting method aggregation to 32 frames per sample and 100,000
 distinct methods. Capture truncation and the analysis depth limit are reported
 separately. Large captures must not be passed through profile arguments:
@@ -571,7 +576,7 @@ weighted model in the harness. In-process consumers build the model and its exac
 penalty objective together on first access. The CLI parses and validates its original
 source; original-source hashing and the containing source allowance still apply.
 `lab/frozen.json` executes the ordinary adapter over `cases`, a JSON array of retained
-single-model `BenchCase` templates for DIMACS, WCNF or MPS. Each template retains its
+single-model `BenchCase` templates for DIMACS, WCNF, MPS or OPB. Each template retains its
 packed corpus path/hash and declares `sourcePlainSha256` in its attributes. Planning
 expands ordinary engine/seed/repeat controls from at most eight templates into at
 most 128 cases without catalog discovery; execution

@@ -170,6 +170,8 @@ data class PortfolioScenario(
     val sharingMemoryScratch: Int = 4_096,
     /** Optional modeled byte limit per shared learned-clause pool. */
     val sharingMemoryBytes: Long? = null,
+    /** Apply bounded root defaults to eligible curated satisfaction recipes. */
+    val rootMaintenance: Boolean = true,
 ) {
     init {
         require(sharingMemoryWork >= 0L && sharingMemoryScratch >= 0) { "sharing memory limits must be nonnegative" }
@@ -348,6 +350,9 @@ internal object PortfolioComposition {
         val nodeBudget = scenario.nodeBudget
         val zeroObjectivePricing = scenario.zeroObjectivePricing
         val edit = scenario.btEdit
+        val clausal = facts.profile.problemClass == ProblemClass.Sat
+        val boundedRoot = scenario.rootMaintenance && scenario.engine == EngineMix.BACKTRACK && annotationArm == null &&
+            (clausal || facts.profile.problemClass == ProblemClass.PseudoBoolean) && !facts.profile.optimizing
         if (btPool != null) {
             // The `--lp` ceiling bounds the pool, and an injected pool is still the pool: capping only the
             // curated one leaves `--lp` silently ignored whenever the caller names its arms.
@@ -366,7 +371,15 @@ internal object PortfolioComposition {
                 } else {
                     params.copy(lpPlan = params.lpPlan.copy(rootCutHarvest = false))
                 }
-                edit?.invoke(rootParams) ?: rootParams
+                val defaults = if (boundedRoot) {
+                    rootParams.boundedRootMaintenance(
+                        warmupWork = if (clausal) 4096L else 0L,
+                        clausal = clausal,
+                    )
+                } else {
+                    rootParams
+                }
+                edit?.invoke(defaults) ?: defaults
             }
         } else {
             edit
@@ -384,6 +397,29 @@ internal object PortfolioComposition {
         val annotation = BacktrackWorkerConfig.ofParams("annotation", annotationArm.copy(nodeBudget = nodeBudget))
         return base.dropLast(1) + BacktrackWorkerConfig(annotation, zeroObjectivePricing)
     }
+
+    private fun BacktrackParams.boundedRootMaintenance(
+        warmupWork: Long,
+        clausal: Boolean,
+    ): BacktrackParams = copy(
+        rootSimplification = true,
+        rootSimplifyBatch = 256,
+        rootProbeBatch = 2,
+        rootProbeWork = 8192L,
+        rootProbeImplications = false,
+        rootProbeBinaryGate = clausal,
+        rootProbeGeneralGate = !clausal,
+        inprocessingWork = if (clausal) 4096L else 16384L,
+        inprocessingRootWork = 256L,
+        inprocessingProbeWork = if (clausal) 3072L else 12288L,
+        inprocessingSubsumeWork = if (clausal) 0L else inprocessingSubsumeWork,
+        inprocessingVivifyWork = if (clausal) 0L else inprocessingVivifyWork,
+        inprocessingProbeInterval = 32768L,
+        inprocessingInterval = 32L,
+        inprocessingGrowth = 8,
+        inprocessingCooldown = 32L,
+        inprocessingWarmupWork = warmupWork,
+    )
 
     private fun mixedArms(scenario: PortfolioScenario, facts: ProblemFacts): List<WorkerConfig> {
         // At least one of each engine once count ≥ 2; below that the single slot goes to LS (the

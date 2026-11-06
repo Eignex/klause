@@ -319,6 +319,21 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Failed-literal probes per scheduled restart; zero disables probing. */
         val rootProbeBatch: ExecutionOption<Int> = ExecutionOption("root-probe-batch", ValueKind.INT)
 
+        /** Capture conditional binaries from consistent probes without changing failed-literal probing. */
+        val rootProbeImplications: ExecutionOption<Boolean> = ExecutionOption(
+            "root-probe-implications", ValueKind.BOOLEAN,
+        )
+
+        /** Skip global Native probes without a root fact or known binary propagation opportunity. */
+        val rootProbeBinaryGate: ExecutionOption<Boolean> = ExecutionOption(
+            "root-probe-binary-gate", ValueKind.BOOLEAN,
+        )
+
+        /** Prefer learned Boolean General neighborhoods without root facts or known binaries. */
+        val rootProbeGeneralGate: ExecutionOption<Boolean> = ExecutionOption(
+            "root-probe-general-gate", ValueKind.BOOLEAN,
+        )
+
         /** Maximum propagation work per root probe. */
         val rootProbeWork: ExecutionOption<Long> = ExecutionOption("root-probe-work", ValueKind.POSITIVE_LONG)
 
@@ -326,6 +341,11 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         val inprocessingWork: ExecutionOption<Long> = ExecutionOption("inprocessing-work", ValueKind.LONG)
         /** Cheap root scan work ceiling. */
         val inprocessingRootWork: ExecutionOption<Long> = ExecutionOption("inprocessing-root-work", ValueKind.LONG)
+        /** Non-inprocessing work between optional probing slices; zero follows the shared root trigger. */
+        val inprocessingProbeInterval: ExecutionOption<Long> = ExecutionOption(
+            "inprocessing-probe-interval", ValueKind.LONG,
+        )
+
         /** Failed-literal probe work ceiling. */
         val inprocessingProbeWork: ExecutionOption<Long> = ExecutionOption("inprocessing-probe-work", ValueKind.LONG)
         /** Subsumption preparation and matching work ceiling. */
@@ -496,6 +516,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Opt-in single-lane portfolio diagnostic work allowance. */
         val portfolioWork: ExecutionOption<Long> = ExecutionOption("portfolio-work", ValueKind.LONG)
 
+        /** Apply automatic bounded root defaults in eligible curated satisfaction pools. Defaults to true. */
+        val rootMaintenance: ExecutionOption<Boolean> = ExecutionOption("root-maintenance", ValueKind.BOOLEAN)
+
         /** Enable bounded sharing-memory observations independently of scheduling. */
         val sharingMemory: ExecutionOption<Boolean> = ExecutionOption("sharing-memory", ValueKind.BOOLEAN)
 
@@ -588,7 +611,8 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch,
                 rootRebuildCaptureVisits,
                 privateRebuildWork, privateRebuildBytes,
-                rootProbeBatch, rootProbeWork, inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
+                rootProbeBatch, rootProbeImplications, rootProbeBinaryGate, rootProbeGeneralGate, rootProbeWork,
+                inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingProbeInterval,
                 inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth,
                 inprocessingCooldown, inprocessingWarmupWork, lpObjectiveCone, lpAutoOffReprobe,
                 lpKnapsackLagrangian, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
@@ -602,7 +626,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 scoring, acceptance, restart, strategy, localSearchArm, objectiveGuidance,
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
                 clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, coreEarly, companionIntegers,
-                sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
+                rootMaintenance, sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
                 coreRefinement, companionAfterIncumbent, companionActiveMillis, companionAdmission, portfolioProgress,
                 phaseRetention, portfolioReward, portfolioProofShare, portfolioProofWorkers, portfolioLpStart,
                 booleanProofTasks,
