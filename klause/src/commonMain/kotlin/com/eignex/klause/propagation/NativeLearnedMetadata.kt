@@ -16,6 +16,8 @@ internal class NativeLearnedMetadata(state: PropagationState? = null) {
     internal inline operator fun get(index: Int, column: Int): Int = rows[index, column]
     @Suppress("NOTHING_TO_INLINE")
     internal inline operator fun set(index: Int, column: Int, value: Int) { rows[index, column] = value }
+    fun setTierIfLive(index: Int, tier: Int) = rows.setIfLive(index, TIER, tier)
+    fun clearStageIfLive(index: Int, mask: Int) = rows.clearStageIfLive(index, mask)
     fun admission(index: Int): Long = rows.admission(index)
     fun add(lbd: Int, permanent: Boolean, origin: Int, admission: Long) =
         rows.add(0, lbd, permanent, origin, admission, null)

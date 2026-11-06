@@ -159,6 +159,25 @@ internal class LearnedPolicyRows(
         checkNotNull(pageAt(index ushr PAGE_SHIFT)).values[(index and PAGE_MASK) * columns + column] = value
     }
 
+    fun setIfLive(index: Int, column: Int, value: Int) {
+        val page = pageAt(index ushr PAGE_SHIFT) ?: return
+        val slot = index and PAGE_MASK
+        if (page.retained and (1 shl slot) == 0) return
+        val offset = slot * columns
+        if (page.values[offset + STAGES] and retiredFlag != 0) return
+        page.values[offset + column] = value
+    }
+
+    fun clearStageIfLive(index: Int, mask: Int) {
+        val page = pageAt(index ushr PAGE_SHIFT) ?: return
+        val slot = index and PAGE_MASK
+        if (page.retained and (1 shl slot) == 0) return
+        val offset = slot * columns + STAGES
+        val stages = page.values[offset]
+        if (stages and retiredFlag != 0) return
+        page.values[offset] = stages and mask.inv()
+    }
+
     fun admission(index: Int): Long = pageAt(index ushr PAGE_SHIFT)?.let { page ->
         val slot = index and PAGE_MASK
         if (page.retained and (1 shl slot) != 0) page.admissions[slot] else 0L

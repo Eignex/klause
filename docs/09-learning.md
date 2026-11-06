@@ -592,6 +592,9 @@ growth and index insertion. Lookups debit the active maintenance or observation
 grant, or the containing propagation ledger. A fixed-size page cache avoids repeated
 lookups during ranking; its reference allocation belongs to fixed preparation and
 modeled ownership. Header unlinking clears its cache slot before releasing the page.
+Native tier updates and recent-use clearing inspect liveness and mutate the row
+through one page lookup. Cold traversal is funded before either operation exposes
+or changes its row; retired and released rows remain unchanged.
 A page queue and per-page retirement masks resume row release without scanning
 permanent rows or looking up another page. Retained import/use counters survive
 released metadata. Empty arrays release within their row transaction; empty headers
