@@ -10,7 +10,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntHashSet
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

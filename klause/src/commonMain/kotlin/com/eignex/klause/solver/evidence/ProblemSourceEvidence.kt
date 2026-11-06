@@ -19,8 +19,8 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 
 /** Exact explicit invocation pins in original coordinates; derived restrictions need separate justifications. */
 fun Assumptions.sourceCondition(): SourceCondition {

@@ -4,7 +4,7 @@ import com.eignex.klause.factor.scheduling.internals.firstInDomainAtLeast
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.argsortBy
+import com.eignex.util.arrays.argsortBy
 import kotlin.math.max
 
 /**

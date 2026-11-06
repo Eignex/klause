@@ -3,24 +3,24 @@ package com.eignex.klause.bound
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.util.constructionIntArray
-import com.eignex.klause.util.constructionLongArray
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.MinCostAssignment
-import com.eignex.klause.util.MutableLongIntMap
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.klause.util.constructionIntArray
+import com.eignex.klause.util.constructionLongArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableLongIntMap
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
 import kotlin.math.ceil
 
 /**
@@ -88,15 +88,15 @@ internal class LagrangianBound(
             yield(Unit)
         }
         if (blocks.isEmpty()) {
-            vars = EmptyIntArray
+            vars = emptyIntArray()
             inV = BooleanArray(numInt)
             blockStart = intArrayOf(0)
             linkVars = emptyArray()
             linkCoeffs = emptyArray()
-            linkRhs = EmptyLongArray
-            linkSign = EmptyIntArray
-            intCoef = EmptyLongArray
-            boolWeight = EmptyLongArray
+            linkRhs = emptyLongArray()
+            linkSign = emptyIntArray()
+            intCoef = emptyLongArray()
+            boolWeight = emptyLongArray()
             objConstant = 0L
             applicable = false
         } else {

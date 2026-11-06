@@ -20,7 +20,7 @@ import com.eignex.klause.model.NValueExpr
 import com.eignex.klause.model.NValueMode
 import com.eignex.klause.model.Or
 import com.eignex.klause.model.VariableCumulativeExpr
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.LongArrayList
 
 /**
  * Allocate the column [spec] declares. An open side keeps the full signed-word box as its finite

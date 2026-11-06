@@ -21,13 +21,13 @@ import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.parseBigInt
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class WeightedCorePolicyTest(private val variant: String, private val automatic: Boolean) {

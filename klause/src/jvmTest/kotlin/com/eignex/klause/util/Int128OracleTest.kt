@@ -1,5 +1,10 @@
 package com.eignex.klause.util
 
+import com.eignex.util.numbers.Int128
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.shl
+import com.eignex.util.numbers.signum
+import com.eignex.util.numbers.toLong
 import java.math.BigInteger
 import kotlin.random.Random
 import kotlin.test.Test

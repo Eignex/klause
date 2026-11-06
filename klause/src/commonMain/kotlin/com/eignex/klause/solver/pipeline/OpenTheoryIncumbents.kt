@@ -3,9 +3,9 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.IncumbentSource
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.compareTo
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.compareTo
 
 /**
  * The single incumbent one open-model descent publishes through: a witness installs only when the value

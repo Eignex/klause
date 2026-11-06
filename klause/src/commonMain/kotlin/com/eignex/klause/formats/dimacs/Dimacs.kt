@@ -3,10 +3,10 @@ package com.eignex.klause.formats.dimacs
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.splitWhitespace
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.StringCharSource
-import com.eignex.klause.util.lineSequence
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
+import com.eignex.util.io.lineSequence
 import kotlin.math.abs
 
 /** Raised when a DIMACS CNF/WCNF document is malformed, so a caller can catch it via [FormatException]

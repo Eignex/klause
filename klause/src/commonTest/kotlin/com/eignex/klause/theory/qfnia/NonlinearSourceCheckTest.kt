@@ -5,8 +5,8 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.QfNraAssignment
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

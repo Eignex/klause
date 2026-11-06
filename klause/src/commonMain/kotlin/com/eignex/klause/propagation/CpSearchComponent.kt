@@ -23,9 +23,9 @@ import com.eignex.klause.solver.search.SearchModelBlocker
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.explainAtoms
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.bigIntOf
 
 /**
  * The finite-domain participant in a shared search session.

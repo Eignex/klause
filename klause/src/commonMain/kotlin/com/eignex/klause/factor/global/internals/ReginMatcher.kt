@@ -8,13 +8,13 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevRef
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableIntLongMap
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.collections.MutableLongIntMap
 
 /**
  * Shared domain-consistency filtering for the alldifferent family (`AllDifferent`, and both
@@ -49,7 +49,7 @@ internal fun reginFilter(
     filteredVars: IntArray,
     exceptSet: LongHashSet,
     cache: ReginCache? = null,
-    premises: IntArray = EmptyIntArray,
+    premises: IntArray = emptyIntArray(),
     tag: Int = 0,
 ): IntArray? {
     val n = filteredVars.size

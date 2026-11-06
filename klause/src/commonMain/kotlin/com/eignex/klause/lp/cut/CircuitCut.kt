@@ -3,9 +3,9 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongHashSet
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongHashSet
 
 /**
  * Arc-indicator model for one [com.eignex.klause.factor.circuit.Circuit]: the LP columns of the

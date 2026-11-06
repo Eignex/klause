@@ -20,10 +20,10 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.packLayeredMdd
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
     expectArity(c, 1)
@@ -189,8 +189,8 @@ internal fun FlatZincCompiler.emitDiffn(c: FznConstraint, nonStrict: Boolean) {
         Diffn(
             xs = xs,
             ys = ys,
-            widths = wConst ?: EmptyLongArray,
-            heights = hConst ?: EmptyLongArray,
+            widths = wConst ?: emptyLongArray(),
+            heights = hConst ?: emptyLongArray(),
             widthVars = wVars,
             heightVars = hVars,
             nonStrict = nonStrict,
@@ -248,7 +248,7 @@ internal fun FlatZincCompiler.emitAllDifferent(c: FznConstraint) {
     expectArity(c, 1)
     val vars = evalIntVarArray(c.args[0])
     val bc = c.annotations.any { it.name == "bounds" }
-    emitAllDifferentCore(vars, exceptSet = EmptyLongArray, boundsConsistent = bc)
+    emitAllDifferentCore(vars, exceptSet = emptyLongArray(), boundsConsistent = bc)
 }
 
 // Successor values refer to FlatZinc positions, independently of their declared bounds.
@@ -336,7 +336,7 @@ internal fun FlatZincCompiler.emitOptionalDisjunctive(c: FznConstraint) {
 
 private fun FlatZincCompiler.resolveIntArrayConstOrVars(e: FznExpr): Pair<LongArray, IntArray> {
     val asConst = tryEvalIntConstArrayLong(e)
-    if (asConst != null) return asConst to EmptyIntArray
+    if (asConst != null) return asConst to emptyIntArray()
     val vars = evalIntVarArray(e)
     val ubs = LongArray(vars.size) { intDomains[vars[it]].max }
     return ubs to vars
@@ -466,7 +466,7 @@ internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
     val xs = evalIntVarArray(c.args[1])
     val setValues = resolveSetLiteral(c.args[2])
     val cover = if (xs.isEmpty()) {
-        EmptyLongArray
+        emptyLongArray()
     } else {
         val (lo, hi) = checkNotNull(intVarUnionBounds(xs))
         setValues.filter { it in lo..hi }.map { it.toLong() }.toLongArray()

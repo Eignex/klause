@@ -2,18 +2,18 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Assignment
-import com.eignex.klause.util.Bits
+import com.eignex.util.collections.Bits
 
 // Cached evaluations belong to one state; coordinate writes invalidate direct readers, including on rollback.
 // A producer stays pending after an output write so a later cone visit can repair an inconsistent output.
 internal class DefinitionValues(private val network: InvariantNetwork) {
     private val valid = BooleanArray(network.size)
     private val values = LongArray(network.size)
-    val pending = Bits(network.size).also { it.words.fill(-1L) }
+    val pending = Bits.full(network.size)
 
     fun clear() {
         valid.fill(false)
-        pending.words.fill(-1L)
+        pending.setRange(0, pending.size)
     }
 
     fun intChanged(variable: Int) {

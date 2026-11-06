@@ -5,7 +5,7 @@ import com.eignex.klause.ir.IntConsumer
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntSpan
 import com.eignex.klause.ir.defaultDomainStorageSettings
-import com.eignex.klause.util.Bits
+import com.eignex.util.collections.Bits
 
 /** Bitset over a narrow span: bit `(value - bitsetLo)` is set iff `value` is present. The backing
  *  array keeps its construction-time length; a later bound move clears bits but never reallocates,

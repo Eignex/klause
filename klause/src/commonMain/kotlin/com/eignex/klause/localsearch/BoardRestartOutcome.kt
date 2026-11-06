@@ -2,7 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.AllDifferentInvariant
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntHashSet
 
 /** Input-change result of a retained ILS board restart after preparation and greedy repair.
  *  A changed input establishes neither feasibility nor arrival in a different basin. */

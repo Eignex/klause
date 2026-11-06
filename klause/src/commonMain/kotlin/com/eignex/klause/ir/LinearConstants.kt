@@ -1,7 +1,7 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
 
 /** Coefficients and right-hand side of a [LinearRow], at their declared exact width. */
 sealed interface LinearConstants

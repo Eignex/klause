@@ -27,7 +27,7 @@ import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.bigIntOf
 
 /**
  * Incremental difference-logic search component: consistency is a feasible potential over the active edges,

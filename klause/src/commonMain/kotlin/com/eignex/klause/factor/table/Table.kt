@@ -15,8 +15,8 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.argsortBy
+import com.eignex.util.arrays.argsortBy
+import com.eignex.util.collections.LongArrayList
 
 /**
  * `table_int(xs, tuples)` — the vector of `xs(i)` values must equal one of the rows of

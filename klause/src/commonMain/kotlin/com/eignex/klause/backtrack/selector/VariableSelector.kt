@@ -5,8 +5,8 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.VariableBranching
-import com.eignex.klause.util.IndexedMaxHeap
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IndexedMaxHeap
+import com.eignex.util.collections.IntArrayList
 import kotlin.random.Random
 
 /**

@@ -5,6 +5,10 @@ Extensions supply factors, components, objectives or theories under the same sem
 and publication contracts. [Model ownership](02-model.md) and [sessions](06-sessions.md)
 define lifetimes; this chapter identifies supported entry points and extension seams.
 
+Primitive collections, character input and `BigInt` come from `com.eignex:util`,
+which Klause exposes transitively. Import these types from `com.eignex.util.collections`,
+`com.eignex.util.io` and `com.eignex.util.numbers`, respectively.
+
 ## Supported library and extension surfaces
 
 | Surface | Contract |

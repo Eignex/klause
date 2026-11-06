@@ -1,11 +1,11 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntLongMap
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
 
 /**
  * A pseudo-Boolean constraint in signed-per-variable cutting-planes form, used as the accumulating

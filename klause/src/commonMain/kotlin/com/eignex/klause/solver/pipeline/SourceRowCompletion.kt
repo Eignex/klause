@@ -10,9 +10,10 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 
 // The planned moves only choose which inputs to free: the consuming repair enforces every row, pin and
 // definition, so a plan that overshoots or ignores the objective cutoff cannot admit an unsound candidate.
@@ -112,7 +113,7 @@ internal class SourceRowCompletion(
         val planned = LinkedHashMap<Int, BigFraction>()
         val members = ArrayList<Member>()
         val delta = HashMap<Int, BigFraction>()
-        val queue = ArrayDeque<Int>()
+        val queue = IntArrayDeque()
         val queued = HashSet<Int>()
         fun current(index: Int): BigFraction = planned[index] ?: centerValue(center, index)
         fun move(index: Int, target: BigFraction, row: String?) {

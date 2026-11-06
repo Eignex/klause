@@ -12,14 +12,14 @@ import com.eignex.klause.lp.engine.newTableauCutSolver
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.rootDomainOf
-import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationProblem
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongHashSet
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.numbers.CheckedLongOverflowException
 import kotlin.math.ceil
 import kotlin.math.floor
 

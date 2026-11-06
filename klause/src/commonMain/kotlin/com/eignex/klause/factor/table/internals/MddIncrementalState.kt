@@ -1,13 +1,13 @@
 package com.eignex.klause.factor.table.internals
 
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
-import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.ExtensionalSupportCounts
-import com.eignex.klause.propagation.checkFiniteWork
+import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevLongArray
+import com.eignex.klause.propagation.checkFiniteWork
 import com.eignex.klause.propagation.lazyReason
-import com.eignex.klause.util.binarySearchLong
+import com.eignex.util.arrays.binarySearchLong
 
 /*
  * Reversible, delta-driven layered-MDD filtering. Each layer keeps forward reachability from

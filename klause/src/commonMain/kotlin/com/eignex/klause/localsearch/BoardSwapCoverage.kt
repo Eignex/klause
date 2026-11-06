@@ -3,9 +3,9 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.global.AllDifferentInvariant
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.binarySearchInt
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 internal class BoardSwapCoverage {
     private var assumptions: Assumptions? = null

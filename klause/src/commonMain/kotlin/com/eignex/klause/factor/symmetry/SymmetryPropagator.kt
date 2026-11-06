@@ -3,10 +3,10 @@ package com.eignex.klause.factor.symmetry
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.PermutationGroup
-import com.eignex.klause.util.toSortedIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.toSortedIntArray
 
 /**
  * Dynamic symmetry handling: one global propagator for the whole automorphism group rather than an

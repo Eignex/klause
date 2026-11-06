@@ -13,18 +13,18 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BIG_ONE
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory
-import kotlinx.serialization.json.JsonObject
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import kotlin.time.Duration.Companion.milliseconds
 
 internal object MpsJointWalk {
     fun inspect(request: JsonObject, source: LinearSourceProblem, numerical: Any, context: SourceProofContext,

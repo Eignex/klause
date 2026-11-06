@@ -1,7 +1,7 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.util.isZero
-import com.eignex.klause.util.signum
+import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.signum
 
 /** Syntax owner of a source model; this identity selects no execution mechanism. */
 enum class SourceFormat {

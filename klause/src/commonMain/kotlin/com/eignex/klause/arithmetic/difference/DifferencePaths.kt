@@ -1,7 +1,7 @@
 package com.eignex.klause.arithmetic.difference
 
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 internal enum class DifferencePathCompletion { Completed, Abandoned, Declined }
 

@@ -19,14 +19,15 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.freeBooleanProbeCandidates
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.PollStride
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.collections.DynamicBits
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.subExact
 
 internal object Probing {
 
@@ -442,8 +443,8 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
     private var probeId = 0
     private val touchedLo = LongArrayList()
     private val touchedHi = LongArrayList()
-    private val touchedLoOpen = ArrayList<Boolean>()
-    private val touchedHiOpen = ArrayList<Boolean>()
+    private val touchedLoOpen = DynamicBits()
+    private val touchedHiOpen = DynamicBits()
     private val pending = IntArrayList()
     private val pendingValue = LongArrayList()
 
@@ -497,8 +498,8 @@ private class OpenRangeProbe(private val problem: Problem, private val cancellat
         probeId++
         touchedLo.clear()
         touchedHi.clear()
-        touchedLoOpen.clear()
-        touchedHiOpen.clear()
+        touchedLoOpen.reset()
+        touchedHiOpen.reset()
         for (k in mark until trail.size) {
             if (!visit()) return
             val col = trail[k] ushr 2

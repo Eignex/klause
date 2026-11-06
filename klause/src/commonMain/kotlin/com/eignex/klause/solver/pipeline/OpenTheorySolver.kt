@@ -44,12 +44,12 @@ import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.parseBigInt
-import kotlin.time.TimeSource
 import com.eignex.kumulant.stat.summary.MaxResult
 import com.eignex.kumulant.stat.summary.SumResult
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.parseBigInt
+import kotlin.time.TimeSource
 
 /** A complete witness emitted by an open-model theory route. */
 sealed interface OpenTheoryAssignment {

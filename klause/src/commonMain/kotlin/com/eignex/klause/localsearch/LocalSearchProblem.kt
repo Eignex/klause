@@ -6,7 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.PreparedFactorProjections
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
 
 private const val PROJECTION_BATCH = 256
 
@@ -125,7 +125,7 @@ class LocalSearchProblem private constructor(
             yield(null)
             for (from in counts.indices step PROJECTION_BATCH) {
                 for (v in from until minOf(from + PROJECTION_BATCH, counts.size)) {
-                    out[v] = if (counts[v] == 0) EmptyIntArray else IntArray(counts[v])
+                    out[v] = if (counts[v] == 0) emptyIntArray() else IntArray(counts[v])
                 }
                 yield(null)
             }

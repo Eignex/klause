@@ -1,5 +1,7 @@
 package com.eignex.klause.util
 
+import com.eignex.util.io.CharSource
+
 /** A [CharSource] over pre-split [chunks], for exercising a consumer across arbitrary chunk boundaries. */
 class ChunkedCharSource(chunks: List<String>) : CharSource {
     private val chunk = chunks.iterator()

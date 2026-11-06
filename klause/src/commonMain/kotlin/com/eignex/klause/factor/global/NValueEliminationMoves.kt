@@ -10,8 +10,8 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.buildRepairChain
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongHashSet
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongHashSet
 
 internal class NValueEliminationMoves(
     private val n: Int,

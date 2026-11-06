@@ -8,12 +8,12 @@ import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.randomValue
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.Bits
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 import kotlin.random.Random
 
 /**
@@ -35,7 +35,7 @@ class Assignment private constructor(
 ) {
     constructor(numBoolVars: Int, numIntVars: Int, numRealVars: Int = 0) : this(
         numBoolVars, numIntVars, numRealVars, Bits(numBoolVars), LongArray(numIntVars),
-        if (numRealVars == 0) EmptyDoubleArray else DoubleArray(numRealVars),
+        if (numRealVars == 0) emptyDoubleArray() else DoubleArray(numRealVars),
     )
 
     internal companion object {
@@ -44,7 +44,7 @@ class Assignment private constructor(
             yield(null)
             val ints = LongArray(numIntVars)
             yield(null)
-            val reals = if (numRealVars == 0) EmptyDoubleArray else DoubleArray(numRealVars)
+            val reals = if (numRealVars == 0) emptyDoubleArray() else DoubleArray(numRealVars)
             yield(Assignment(numBoolVars, numIntVars, numRealVars, bits, ints, reals))
         }
     }
@@ -88,28 +88,25 @@ class Assignment private constructor(
         }
     }
 
-    internal val boolWordCount: Int get() = bits.words.size
+    internal val boolWordCount: Int get() = bits.wordCount
 
     internal fun randomizeBoolWords(rng: Random, from: Int, end: Int) {
-        val ws = bits.words
-        for (i in from until end) ws[i] = rng.nextLong()
-        val tail = numBoolVars and 63
-        if (end == ws.size && tail != 0) ws[ws.size - 1] = ws[ws.size - 1] and ((1L shl tail) - 1L)
+        for (i in from until end) bits.setWord(i, rng.nextLong())
     }
 
     /** Capture the assignment as an immutable [Sample]. */
     fun snapshot(): Sample = Sample.fromOwned(
         bools = BooleanArray(numBoolVars) { bits.get(it) },
         ints = ints.copyOf(),
-        reals = if (numRealVars == 0) EmptyDoubleArray else reals.copyOf(),
+        reals = if (numRealVars == 0) emptyDoubleArray() else reals.copyOf(),
     )
 
     internal fun copySteps(target: Assignment, batch: Int): Sequence<Unit> = sequence {
         require(
             numBoolVars == target.numBoolVars && numIntVars == target.numIntVars && numRealVars == target.numRealVars,
         )
-        for (from in bits.words.indices step batch) {
-            bits.words.copyInto(target.bits.words, from, from, minOf(from + batch, bits.words.size))
+        for (from in 0 until bits.wordCount step batch) {
+            target.bits.copyWordsFrom(bits, from, minOf(from + batch, bits.wordCount))
             yield(Unit)
         }
         for (from in ints.indices step batch) {
@@ -151,7 +148,7 @@ class Sample private constructor(
     constructor(
         bools: BooleanArray,
         ints: LongArray,
-        reals: DoubleArray = EmptyDoubleArray,
+        reals: DoubleArray = emptyDoubleArray(),
         exactReals: List<BigFraction>? = null,
         exactInts: List<BigInt>? = null,
         algebraicReals: List<AlgebraicReal>? = null,
@@ -328,7 +325,7 @@ class Sample private constructor(
         internal fun fromOwned(
             bools: BooleanArray,
             ints: LongArray,
-            reals: DoubleArray = EmptyDoubleArray,
+            reals: DoubleArray = emptyDoubleArray(),
             exactReals: List<BigFraction>? = null,
             exactInts: List<BigInt>? = null,
             algebraicReals: List<AlgebraicReal>? = null,

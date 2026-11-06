@@ -22,11 +22,11 @@ import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.EncodedTheoryFactor
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.fitsLong
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.fitsLong
 import kotlin.coroutines.cancellation.CancellationException
 
 internal class OpenExactNeighborhood(

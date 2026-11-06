@@ -2,14 +2,14 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.propagation.OWN_ORIGIN
 import com.eignex.klause.propagation.LearnedRetirementStatus
+import com.eignex.klause.propagation.OWN_ORIGIN
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.collections.IntArrayList
 
 internal class RootSimplificationPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true

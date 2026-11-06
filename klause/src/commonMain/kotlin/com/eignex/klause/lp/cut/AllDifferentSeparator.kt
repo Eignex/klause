@@ -8,7 +8,7 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.util.addExact
+import com.eignex.util.numbers.addExact
 
 /**
  * Variable groups that are pairwise all-different, harvested from the LP-relevant globals so the

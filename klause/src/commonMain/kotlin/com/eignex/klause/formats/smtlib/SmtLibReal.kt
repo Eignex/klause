@@ -12,15 +12,15 @@ import com.eignex.klause.lowering.WideLinComb
 import com.eignex.klause.lowering.isConstant
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_TEN
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.signum
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLong
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_TEN
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.signum
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLong
+import com.eignex.util.numbers.unaryMinus
 
 // Source rows retain arbitrary-precision rational coefficients. Numerical consumers choose their
 // own representable projections; strictness and Boolean equivalence remain exact source data.

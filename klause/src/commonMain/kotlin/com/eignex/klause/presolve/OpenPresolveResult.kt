@@ -16,8 +16,8 @@ import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.Bits
 
 /** What the open-model presolve phase concluded. */
 sealed interface OpenPresolveResult {

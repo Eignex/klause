@@ -1,6 +1,6 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.subExact
+import com.eignex.util.numbers.subExact
 
 private const val INTEGER_ENDPOINT_WALK = 64
 

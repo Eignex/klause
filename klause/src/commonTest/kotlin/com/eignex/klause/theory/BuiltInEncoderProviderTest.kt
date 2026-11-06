@@ -28,8 +28,8 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
 import com.eignex.klause.theory.qfnra.PolynomialFormula
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

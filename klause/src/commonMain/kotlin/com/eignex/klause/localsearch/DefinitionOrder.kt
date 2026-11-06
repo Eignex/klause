@@ -3,9 +3,9 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntIntMap
 
 @Suppress("CyclomaticComplexMethod", "LongMethod")
 internal fun orderedDefinitions(

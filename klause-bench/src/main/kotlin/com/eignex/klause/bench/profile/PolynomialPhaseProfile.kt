@@ -27,8 +27,8 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.parseBigInt
 import com.sun.management.ThreadMXBean
 import java.io.File
 import java.lang.management.ManagementFactory

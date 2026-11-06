@@ -7,7 +7,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.excludeIntValueImpl
 import com.eignex.klause.propagation.tightenIntMaxImpl
 import com.eignex.klause.propagation.tightenIntMinImpl
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 /**
  * CP propagator for [ComparisonClause]: the disjunction `⋁ᵢ (vars(i) ⟨ops(i)⟩ consts(i))`. Each

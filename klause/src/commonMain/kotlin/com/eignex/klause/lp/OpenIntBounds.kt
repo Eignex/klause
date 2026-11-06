@@ -13,11 +13,11 @@ import com.eignex.klause.lp.engine.certifiedTightVariableBound
 import com.eignex.klause.lp.engine.columnNeighborhood
 import com.eignex.klause.lp.engine.rowIndex
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -84,8 +84,8 @@ internal fun tightenOpenIntBounds(
     constraints: List<Linear>,
     cancellation: Cancellation = Cancellation.Never,
     realConstraints: List<Linear> = emptyList(),
-    realLower: DoubleArray = EmptyDoubleArray,
-    realUpper: DoubleArray = EmptyDoubleArray,
+    realLower: DoubleArray = emptyDoubleArray(),
+    realUpper: DoubleArray = emptyDoubleArray(),
     observer: LpCertificationObserver? = null,
     context: LpSolveContext = LpSolveContext.Production,
 ): TightenedIntBounds {
@@ -306,8 +306,8 @@ private fun fbbtTightenOpenIntBounds(
     constraints: List<Linear>,
     cancellation: Cancellation,
     realRows: List<Linear> = emptyList(),
-    rLo: DoubleArray = EmptyDoubleArray,
-    rUp: DoubleArray = EmptyDoubleArray,
+    rLo: DoubleArray = emptyDoubleArray(),
+    rUp: DoubleArray = emptyDoubleArray(),
 ): TightenedIntBounds {
     val n = bounds.size
     val b = MutableIntBounds(n)

@@ -1,6 +1,6 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPreparation) {
     if (incremental || nativeEngine != null || learned.retiredCount == 0) return

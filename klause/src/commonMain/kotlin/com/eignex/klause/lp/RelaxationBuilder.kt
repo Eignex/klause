@@ -6,7 +6,7 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lp.engine.LpColumnId
 import com.eignex.klause.propagation.CpIntId
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
 
 /** An auxiliary source extension whose semantic role survives live-domain filtering. */
 class LpAuxiliaryColumn(
@@ -85,7 +85,7 @@ interface RelaxationBuilder {
         op: LinearOp,
         rhs: Double,
         strict: Boolean = false,
-        premiseLits: IntArray = EmptyIntArray,
+        premiseLits: IntArray = emptyIntArray(),
     ) {}
 
     /**

@@ -9,9 +9,9 @@ import com.eignex.klause.lp.relaxation.CutSourceMap
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.layoutFor
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.OriginCounts
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.collections.MutableIntLongMap
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -254,7 +254,7 @@ internal class CutPool(
     fun cuts(): List<Cut> = entries.mapNotNull { it.cut }
 
     fun constantContradiction(): Cut? = entries.firstNotNullOfOrNull { entry ->
-        entry.cut?.takeIf { it.cols.isEmpty() && efficacy(it, EmptyDoubleArray, 0.0) > 0.0 }
+        entry.cut?.takeIf { it.cols.isEmpty() && efficacy(it, emptyDoubleArray(), 0.0) > 0.0 }
     }
 
     /** Observe one solved LP point, update decayed tightness, and expire cuts inactive for too long. */

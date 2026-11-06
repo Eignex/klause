@@ -6,18 +6,18 @@ import com.eignex.klause.lp.lattice.hermiteNormalForm
 import com.eignex.klause.lp.lattice.sparseIntRow
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.isZero
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.rem
-import com.eignex.klause.util.times
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.remainderOf
+import com.eignex.util.numbers.times
 
 /** One exact double-bounded row over real columns followed by integer columns. */
 internal class ExactMixedBoundedRow(
@@ -157,12 +157,12 @@ private fun divideRange(
 
 private fun BigFraction.floor(): BigInt {
     val quotient = num / den
-    return if (num < BIG_ZERO && num % den != BIG_ZERO) quotient - BIG_ONE else quotient
+    return if (num < BIG_ZERO && num.remainderOf(den) != BIG_ZERO) quotient - BIG_ONE else quotient
 }
 
 private fun BigFraction.ceil(): BigInt {
     val quotient = num / den
-    return if (num > BIG_ZERO && num % den != BIG_ZERO) quotient + BIG_ONE else quotient
+    return if (num > BIG_ZERO && num.remainderOf(den) != BIG_ZERO) quotient + BIG_ONE else quotient
 }
 
 /**

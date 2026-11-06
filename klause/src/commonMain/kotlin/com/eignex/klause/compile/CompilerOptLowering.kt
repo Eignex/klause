@@ -28,7 +28,7 @@ import com.eignex.klause.model.NValueMode
 import com.eignex.klause.model.Not
 import com.eignex.klause.model.Or
 import com.eignex.klause.model.SubcircuitExpr
-import com.eignex.klause.util.LongHashSet
+import com.eignex.util.collections.LongHashSet
 
 /*
  * Reified global constraints return `b ↔ φ` by decomposing φ into [IntCompare], [And], [Or],

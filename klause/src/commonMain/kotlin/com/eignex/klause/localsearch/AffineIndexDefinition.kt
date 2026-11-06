@@ -6,8 +6,8 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
 
 internal data class AffineIndexDefinition(val variable: Int, val factor: Linear, val outputIndex: Int)
 

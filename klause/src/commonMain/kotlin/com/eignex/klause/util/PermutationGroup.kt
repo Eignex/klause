@@ -1,5 +1,10 @@
 package com.eignex.klause.util
 
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.numbers.plus
+
 /**
  * Permutations over `[0, n)` and the group they generate, for symmetry handling. A permutation is an
  * `IntArray` of length `n` mapping each point to its image; composition is `(a ∘ b)(i) = a(b(i))`.
@@ -18,7 +23,7 @@ object PermutationGroup {
     /** The orbit of [point] under [generators] (the points reachable by repeated application). */
     fun orbit(generators: List<IntArray>, point: Int): Set<Int> {
         val seen = HashSet<Int>()
-        val frontier = ArrayDeque<Int>()
+        val frontier = IntArrayDeque()
         seen.add(point)
         frontier.addLast(point)
         while (frontier.isNotEmpty()) {
@@ -97,7 +102,7 @@ object PermutationGroup {
     private fun schreierGenerators(gens: List<IntArray>, point: Int, n: Int): List<IntArray> {
         val transversal = MutableIntObjectMap<IntArray>()
         transversal.put(point, IntArray(n) { it })
-        val frontier = ArrayDeque<Int>()
+        val frontier = IntArrayDeque()
         frontier.addLast(point)
         while (frontier.isNotEmpty()) {
             val gamma = frontier.removeFirst()
@@ -111,9 +116,10 @@ object PermutationGroup {
             }
         }
         val result = ArrayList<IntArray>()
-        val orbit = ArrayList<Int>(transversal.size)
+        val orbit = IntArrayList(transversal.size)
         transversal.forEach { gamma, _ -> orbit.add(gamma) }
-        for (gamma in orbit) {
+        for (position in 0 until orbit.size) {
+            val gamma = orbit[position]
             val ug = transversal.getValue(gamma)
             for (s in gens) {
                 val sug = compose(s, ug)

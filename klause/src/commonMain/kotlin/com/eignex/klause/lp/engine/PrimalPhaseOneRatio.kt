@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.argsortBy
+import com.eignex.util.arrays.argsortBy
 import kotlin.math.abs
 
 internal data class PrimalPhaseOneStep(

@@ -19,10 +19,10 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.shl
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -297,6 +297,44 @@ class LinearAuthorityAggregateCutsTest {
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
         }
+    }
+
+    @Test
+    fun `point separation should retain a wide checked cut within its allocation grant`() {
+        val coordinates = (0 until 48).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val first = SourceInequality(coordinates.take(24).associateWith { BigFraction.ofLong(2) } +
+            (real to BigFraction.ONE), BigFraction.ofLong(24))
+        val second = SourceInequality(coordinates.drop(24).associateWith { BigFraction.ofLong(2) } +
+            (real to BigFraction.MINUS_ONE), BigFraction.ofLong(23))
+        val source = SourceProofContext(scope, (coordinates + real).toSet(),
+            linkedMapOf("left" to SourcePremise(first), "right" to SourcePremise(second)))
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(allocation = 45_500L)
+        var allocation = 0L
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            { name, count -> if (name == "AggregateAllocation") allocation += count }, maximumCandidates = 1,
+            limits = limits, point = coordinates.associateWith { 47.0 / 96.0 } + (real to 0.5)).single()
+
+        assertEquals(SourceInequality(coordinates.associateWith { BigFraction.ONE }, BigFraction.ofLong(23)),
+            cut.inequality)
+        assertTrue(allocation <= limits.allocation)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `point separation should withhold a cut when a coordinate is unavailable`() {
+        val source = SourceProofContext(scope, setOf(x, y, real),
+            linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right)))
+        val events = mutableMapOf<String, Long>()
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            { name, count -> events[name] = (events[name] ?: 0L) + count },
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.75, real to 1.5))
+
+        assertTrue(cuts.isEmpty())
+        assertEquals(1L, events["AggregatePairPointUnavailable"])
+        assertEquals(1L, events["AggregatePairIncomplete"])
     }
 
     @Test

@@ -12,9 +12,9 @@ import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.lp.statesBinary
 import com.eignex.klause.lp.statesLowerBoundAtLeast
 import com.eignex.klause.lp.statesUpperBound
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntIntMap
+import com.eignex.util.collections.MutableIntLongMap
 import kotlin.math.max
 
 /**

@@ -1,7 +1,7 @@
 package com.eignex.klause.lowering
 
 import com.eignex.klause.factor.table.Mdd
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.LongArrayList
 
 /** The sequence-independent layered structure of a plain (non-cost) [Mdd]: per-layer state counts, the
  *  transition records `(srcLocal, symbol, dstLocal)` grouped by layer, the [layerStarts] offsets into

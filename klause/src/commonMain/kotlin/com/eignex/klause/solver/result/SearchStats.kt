@@ -1,12 +1,12 @@
 package com.eignex.klause.solver.result
 
-import com.eignex.klause.util.LongHashSet
 import com.eignex.kumulant.stat.summary.CountStat
 import com.eignex.kumulant.stat.summary.MaxResult
 import com.eignex.kumulant.stat.summary.MaxStat
 import com.eignex.kumulant.stat.summary.MeanStat
 import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.kumulant.stat.summary.WeightedMeanResult
+import com.eignex.util.collections.LongHashSet
 
 /**
  * Core tree-search counters — the CDCL / DFS backbone shared by the complete backends: node and

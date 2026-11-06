@@ -15,16 +15,16 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.carvedAt
 import com.eignex.klause.propagation.checkFiniteWork
 import com.eignex.klause.propagation.domainAt
-import com.eignex.klause.propagation.excludeInteriorIntValues
 import com.eignex.klause.propagation.excludeIntValues
+import com.eignex.klause.propagation.excludeInteriorIntValues
 import com.eignex.klause.propagation.lazyReason
 import com.eignex.klause.propagation.restrictIntToSurvivors
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableLongIntMap
-import com.eignex.klause.util.binarySearchLong
+import com.eignex.util.arrays.binarySearchLong
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableLongIntMap
 
 internal class TablePropagator(
     val boolVars: IntArray,

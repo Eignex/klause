@@ -2,10 +2,12 @@ package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.factor.arithmetic.DivMod
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.FactorWeightBook
 import com.eignex.klause.localsearch.IMPLIED_FACTOR_INITIAL_WEIGHT
@@ -14,12 +16,27 @@ import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.propagation.bake
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class Xcsp3ConstraintClassesTest {
+    @Test
+    fun `implied flags retain positions across words when factors are removed`() {
+        val factor = Clause(intArrayOf(Lit.make(0, true)))
+        val factors = MutableList<Factor>(63) { factor }
+        val classes = Xcsp3ConstraintClasses(factors)
+        classes.within("redundantConstraints") { repeat(4) { factors.add(factor) } }
+        repeat(63) { factors.add(factor) }
+
+        classes.compact(setOf(0, 63, 129))
+
+        assertContentEquals(BooleanArray(127) { it in 62..64 }, classes.mask(127))
+    }
+
+
     private val adjacent = "<allDifferent>x[]</allDifferent>"
 
     private val carriers = listOf(

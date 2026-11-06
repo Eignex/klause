@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.util.CharReader
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
+import com.eignex.util.io.CharReader
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
 
 /** Minimal S-expression model for SMT-LIB scripts. */
 sealed interface SExpr {

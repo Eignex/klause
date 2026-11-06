@@ -20,7 +20,7 @@ import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.floatingOptimumAcceptance
 import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyDoubleArray
+import com.eignex.util.arrays.emptyDoubleArray
 
 internal class LeafRealSolver(
     private val problem: Problem,
@@ -48,14 +48,14 @@ internal class LeafRealSolver(
         check(!closed) { "real leaf solver is closed" }
         check(activeSolve == null) { "real leaf solver is suspended" }
         require(sample.numIntVars == problem.numIntVars && sample.numBoolVars == problem.numBoolVars)
-        if (cancellation()) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        if (cancellation()) return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         val encoded = encoders.finiteLinearModel(sample, cancellation)
-            ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         val relaxation = try {
             relaxation(sample, cancellation)
         } catch (_: LpAssemblyCancelled) {
             null
-        } ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        } ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         val certified = solvers.solve(
             relaxation.model,
             cancellation = cancellation,
@@ -80,14 +80,14 @@ internal class LeafRealSolver(
         check(!closed && activeSolve == null) { "real leaf solver is closed or suspended" }
         require(sample.numIntVars == problem.numIntVars && sample.numBoolVars == problem.numBoolVars)
         return LpSolveCursor<LeafRealResult>(completed = { activeSolve = null }) {
-            if (cancellation()) return@LpSolveCursor LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            if (cancellation()) return@LpSolveCursor LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
             val encoded = encoders.finiteLinearModel(sample, cancellation)
-                ?: return@LpSolveCursor LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+                ?: return@LpSolveCursor LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
             val relaxation = try {
                 relaxation(sample, cancellation)
             } catch (_: LpAssemblyCancelled) {
                 null
-            } ?: return@LpSolveCursor LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            } ?: return@LpSolveCursor LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
             val certified = solvers.openSolve(
                 relaxation.model,
                 cancellation = cancellation,
@@ -107,7 +107,7 @@ internal class LeafRealSolver(
             }
             val result = relaxation.leafResult(certified, problem, objective, sample, sink)
                 .checkedEncoding(encoded, sample, cancellation)
-            if (cancellation()) LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            if (cancellation()) LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
             else result.also { it.observeConsumption(sink) }
         }.also { activeSolve = it }
     }

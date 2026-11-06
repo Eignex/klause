@@ -5,14 +5,14 @@ import com.eignex.klause.propagation.ConditionedClauseExchange
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.solver.result.SharingChannel
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.SharingMemorySnapshot
 import com.eignex.klause.util.SharingMemoryStatus
-import com.eignex.klause.util.mixLongKey
-import com.eignex.klause.util.openAddressingCapacity
 import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.hashTableCapacity
+import com.eignex.util.hash.fibonacciHash
 
 /**
  * An append-only, de-duplicated pool of session-portable learned nogoods ([SharedClause]) shared
@@ -152,7 +152,7 @@ internal class SharedClausePool(
         val size = store.size
         val advanced = cursorOf(generation, size)
         if (from >= size) {
-            Drained(emptyList(), EmptyIntArray, advanced)
+            Drained(emptyList(), emptyIntArray(), advanced)
         } else {
             Drained(List(size - from) { store.clause(from + it) },
                 IntArray(size - from) { store.origins[from + it] }, advanced)
@@ -281,7 +281,7 @@ internal class SharedClausePool(
         val clauses = arrayOfNulls<SharedClause>(capacity)
         val global = BooleanArray(capacity)
         val origins = IntArray(capacity)
-        private val keyCapacity = if (capacity == 0) 0 else openAddressingCapacity(capacity)
+        private val keyCapacity = if (capacity == 0) 0 else hashTableCapacity(capacity)
         private val ownerCapacity = if (capacity == 0) 0 else payloadOwnerCapacity(capacity, booleanOnly)
         private val keys = LongArray(keyCapacity)
         private val used = BooleanArray(keyCapacity)
@@ -298,7 +298,7 @@ internal class SharedClausePool(
         fun contains(key: Long, budget: Budget): Boolean = size > 0 && used[keySlot(key, budget)]
 
         private fun keySlot(key: Long, budget: Budget): Int {
-            var index = mixLongKey(key) and (keyCapacity - 1)
+            var index = fibonacciHash(key) and (keyCapacity - 1)
             while (true) {
                 budget.step()
                 if (!used[index] || keys[index] == key) return index
@@ -359,14 +359,14 @@ internal class SharedClausePool(
 
         companion object {
             private fun payloadOwnerCapacity(capacity: Int, booleanOnly: Boolean): Int =
-                openAddressingCapacity(if (booleanOnly) capacity else capacity * 2)
+                hashTableCapacity(if (booleanOnly) capacity else capacity * 2)
 
             fun indexBytes(capacity: Int, booleanOnly: Boolean): Long = if (capacity == 0) 0L else
-                capacity.toLong() * 13L + openAddressingCapacity(capacity).toLong() * 9L +
+                capacity.toLong() * 13L + hashTableCapacity(capacity).toLong() * 9L +
                     payloadOwnerCapacity(capacity, booleanOnly).toLong() * 8L
 
             fun scratchEntries(capacity: Int, booleanOnly: Boolean): Long = if (capacity == 0) 0L else
-                capacity.toLong() * 3L + openAddressingCapacity(capacity).toLong() * 2L +
+                capacity.toLong() * 3L + hashTableCapacity(capacity).toLong() * 2L +
                     payloadOwnerCapacity(capacity, booleanOnly).toLong()
         }
     }

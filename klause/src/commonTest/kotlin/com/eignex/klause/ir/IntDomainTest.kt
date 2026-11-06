@@ -2,7 +2,7 @@ package com.eignex.klause.ir
 
 import com.eignex.klause.config.DEFAULT_BITSET_THRESHOLD
 import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.LongArrayList
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

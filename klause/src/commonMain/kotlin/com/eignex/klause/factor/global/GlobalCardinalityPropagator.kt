@@ -13,12 +13,12 @@ import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.boundLiteral
 import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.restrictIntToSurvivors
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableIntIntMap
+import com.eignex.util.collections.MutableLongIntMap
 
 /** CP propagation logic for `global_cardinality`. */
 internal class GlobalCardinalityPropagator(
@@ -144,7 +144,7 @@ internal class GlobalCardinalityPropagator(
     }
 
     private fun presencePremiseLits(state: PropagationState): IntArray {
-        if (presents.isEmpty()) return EmptyIntArray
+        if (presents.isEmpty()) return emptyIntArray()
         val out = IntArrayList()
         for (i in presents.indices) {
             when {
@@ -249,7 +249,7 @@ internal class GlobalCardinalityPropagator(
             fresh
         }
         // Plain path: the changed-variable delta drives the fast-path skip and the incremental block scan.
-        val dirty = if (presents.isEmpty()) state.drainIntEventDirtyVars(factorId) else EmptyIntArray
+        val dirty = if (presents.isEmpty()) state.drainIntEventDirtyVars(factorId) else emptyIntArray()
         if (presents.isEmpty() && intVars.isNotEmpty() && cache.cachedDoms[0] != null && dirty.isEmpty()) {
             return true
         }
@@ -269,7 +269,7 @@ internal class GlobalCardinalityPropagator(
         val n = effectiveXs.size
         val m = cover.size
         val maybeXs: IntArray = if (presents.isEmpty()) {
-            EmptyIntArray
+            emptyIntArray()
         } else {
             val acc = IntArrayList()
             for (i in xs.indices) {

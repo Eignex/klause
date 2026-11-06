@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.magnitudeBitLength
 
 private fun bounded(value: BigFraction): BigFraction {
     if (value.num.magnitudeBitLength() > 4096 || value.den.magnitudeBitLength() > 4096) throw SourceRoundingLimit()

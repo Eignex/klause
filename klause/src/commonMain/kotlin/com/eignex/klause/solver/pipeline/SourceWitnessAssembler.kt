@@ -13,7 +13,7 @@ import com.eignex.klause.solver.search.SearchExactAlgebraicRealValue
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealExpressionValue
 import com.eignex.klause.solver.search.SearchExactRealValue
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BigInt
 
 internal class SourceWitnessAssembler(
     private val source: Problem,

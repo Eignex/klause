@@ -6,14 +6,14 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLong
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLong
 
 internal fun FlatZincCompiler.collectAffineFloatImages() {
     for (variable in floatVars.values) {

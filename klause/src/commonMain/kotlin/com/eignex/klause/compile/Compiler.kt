@@ -90,9 +90,9 @@ import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.projection.FloatGridAbsentPin
 import com.eignex.klause.solver.projection.FloatGridVariable
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.skema.SchemaDef
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntObjectMap
 
 internal class Compiler(
     config: KlauseConfig,

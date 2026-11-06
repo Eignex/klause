@@ -19,9 +19,9 @@ import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.TheoryEncoding
 import com.eignex.klause.theory.TheoryRealId
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
 
 internal class FactorPolynomialProjection(
     val original: Problem,

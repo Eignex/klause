@@ -2,14 +2,14 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.DeducedRestrictions
-import com.eignex.klause.util.EmptyBooleanArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntLongMap
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.binarySearchInt
-import com.eignex.klause.util.sortedKeys
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.arrays.emptyBooleanArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.collections.sortedKeys
 
 /**
  * Result of `Problem.propagate`. Either a (possibly empty) set of
@@ -37,27 +37,27 @@ sealed interface PropagationResult {
         val intValues: LongArray,
         /** Int var ids whose lower bound was tightened (but not yet singleton). Disjoint
          *  from [intKeys]; ascending. Includes non-singleton bound-SAC deductions. */
-        val intMinKeys: IntArray = EmptyIntArray,
+        val intMinKeys: IntArray = emptyIntArray(),
         /** Lower-bound values aligned with [intMinKeys]. */
-        val intMinValues: LongArray = EmptyLongArray,
+        val intMinValues: LongArray = emptyLongArray(),
         /** Int var ids whose upper bound was tightened, ascending. */
-        val intMaxKeys: IntArray = EmptyIntArray,
+        val intMaxKeys: IntArray = emptyIntArray(),
         /** Upper-bound values aligned with [intMaxKeys]. */
-        val intMaxValues: LongArray = EmptyLongArray,
+        val intMaxValues: LongArray = emptyLongArray(),
         /** Interior holes: parallel `(varId, value)` rows in lex order. Each row
          *  encodes `v ≠ value`, with `value` strictly between v's current min and max. */
-        val intHoleVarIds: IntArray = EmptyIntArray,
+        val intHoleVarIds: IntArray = emptyIntArray(),
         /** Forbidden values aligned with [intHoleVarIds]. */
-        val intHoleValues: LongArray = EmptyLongArray,
+        val intHoleValues: LongArray = emptyLongArray(),
         /** Set-restrictions `v ∈ {survivors}` for variables reduced to a sparse survivor set — recorded
          *  instead of one interior hole per excluded value, which is O(span) for a wide-but-sparse domain.
          *  CSR: var `intSetKeys[i]`'s survivors are `intSetValues[intSetOffsets[i] until intSetOffsets[i+1]]`
          *  ([intSetOffsets] size `intSetKeys.size + 1`, or empty when there are none). Disjoint from [intKeys]. */
-        val intSetKeys: IntArray = EmptyIntArray,
+        val intSetKeys: IntArray = emptyIntArray(),
         /** CSR row offsets into [intSetValues]; size `intSetKeys.size + 1`, or empty when there are none. */
-        val intSetOffsets: IntArray = EmptyIntArray,
+        val intSetOffsets: IntArray = emptyIntArray(),
         /** Concatenated ascending survivor values, sliced per variable by [intSetOffsets]. */
-        val intSetValues: LongArray = EmptyLongArray,
+        val intSetValues: LongArray = emptyLongArray(),
     ) : PropagationResult {
 
         /** True iff nothing was forced. */
@@ -369,16 +369,16 @@ sealed interface PropagationResult {
                     intMinValues = LongArray(minK.size) { mins.getOrDefault(minK[it], 0L) },
                     intMaxKeys = maxK,
                     intMaxValues = LongArray(maxK.size) { maxes.getOrDefault(maxK[it], 0L) },
-                    intHoleVarIds = if (holeCount == 0) EmptyIntArray else holeIds,
-                    intHoleValues = if (holeCount == 0) EmptyLongArray else holeVals,
-                    intSetKeys = if (setK.isEmpty()) EmptyIntArray else setK,
-                    intSetOffsets = if (setK.isEmpty()) EmptyIntArray else setOffsets,
-                    intSetValues = if (setK.isEmpty()) EmptyLongArray else setVals,
+                    intHoleVarIds = if (holeCount == 0) emptyIntArray() else holeIds,
+                    intHoleValues = if (holeCount == 0) emptyLongArray() else holeVals,
+                    intSetKeys = if (setK.isEmpty()) emptyIntArray() else setK,
+                    intSetOffsets = if (setK.isEmpty()) emptyIntArray() else setOffsets,
+                    intSetValues = if (setK.isEmpty()) emptyLongArray() else setVals,
                 )
             }
 
             /** The empty implied set (nothing forced). */
-            val EMPTY: Implied = Implied(EmptyIntArray, EmptyBooleanArray, EmptyIntArray, EmptyLongArray)
+            val EMPTY: Implied = Implied(emptyIntArray(), emptyBooleanArray(), emptyIntArray(), emptyLongArray())
 
             /** Map-based factory. Call sites use `Implied(bools, ints)`; the constructor
              *  normalises to the primitive sorted-array form. Optional bound-tightening
@@ -386,15 +386,15 @@ sealed interface PropagationResult {
             operator fun invoke(
                 bools: Map<Int, Boolean> = emptyMap(),
                 ints: Map<Int, Long> = emptyMap(),
-                intMinKeys: IntArray = EmptyIntArray,
-                intMinValues: LongArray = EmptyLongArray,
-                intMaxKeys: IntArray = EmptyIntArray,
-                intMaxValues: LongArray = EmptyLongArray,
-                intHoleVarIds: IntArray = EmptyIntArray,
-                intHoleValues: LongArray = EmptyLongArray,
-                intSetKeys: IntArray = EmptyIntArray,
-                intSetOffsets: IntArray = EmptyIntArray,
-                intSetValues: LongArray = EmptyLongArray,
+                intMinKeys: IntArray = emptyIntArray(),
+                intMinValues: LongArray = emptyLongArray(),
+                intMaxKeys: IntArray = emptyIntArray(),
+                intMaxValues: LongArray = emptyLongArray(),
+                intHoleVarIds: IntArray = emptyIntArray(),
+                intHoleValues: LongArray = emptyLongArray(),
+                intSetKeys: IntArray = emptyIntArray(),
+                intSetOffsets: IntArray = emptyIntArray(),
+                intSetValues: LongArray = emptyLongArray(),
             ): Implied {
                 if (bools.isEmpty() && ints.isEmpty() &&
                     intMinKeys.isEmpty() && intMaxKeys.isEmpty() && intHoleVarIds.isEmpty() && intSetKeys.isEmpty()
@@ -440,10 +440,10 @@ sealed interface PropagationResult {
     // by reference under the data-class equality; no consumer compares a whole Unsat by value.
     @ConsistentCopyVisibility
     data class Unsat internal constructor(
-        val conflictBools: IntArray = EmptyIntArray,
-        val conflictInts: IntArray = EmptyIntArray,
-        val conflictLevels: IntArray = EmptyIntArray,
-        val conflictFactors: IntArray = EmptyIntArray,
+        val conflictBools: IntArray = emptyIntArray(),
+        val conflictInts: IntArray = emptyIntArray(),
+        val conflictLevels: IntArray = emptyIntArray(),
+        val conflictFactors: IntArray = emptyIntArray(),
         /**
          * First-UIP analysis result captured before state revert, or `null` when the
          * conflict happened at level 0 (no learning possible), inside an assumption

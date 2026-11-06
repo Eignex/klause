@@ -10,7 +10,7 @@ import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
+import com.eignex.util.numbers.BIG_ONE
 
 internal fun polynomialRow(
     row: LinearRow,

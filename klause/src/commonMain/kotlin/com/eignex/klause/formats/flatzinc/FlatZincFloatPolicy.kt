@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.lowering.FloatRepresentation
-import com.eignex.klause.util.IntDisjointSet
+import com.eignex.util.collections.IntDisjointSet
 
 internal const val DEFAULT_FLOAT_CHOICE_LIMIT = 4096
 

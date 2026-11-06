@@ -13,9 +13,9 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.perCharSource
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

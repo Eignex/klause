@@ -4,7 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.util.EmptyDoubleArray
+import com.eignex.util.arrays.emptyDoubleArray
 
 /**
  * The LP relaxation of a system over its **genuinely open** integer ranges, built for
@@ -37,8 +37,8 @@ internal fun openRelaxation(
     bounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
     realConstraints: List<Linear> = emptyList(),
-    realLower: DoubleArray = EmptyDoubleArray,
-    realUpper: DoubleArray = EmptyDoubleArray,
+    realLower: DoubleArray = emptyDoubleArray(),
+    realUpper: DoubleArray = emptyDoubleArray(),
 ): OpenRelaxation {
     val n = bounds.size
     val builder = LpBuilder()

@@ -1,5 +1,7 @@
 package com.eignex.klause.ir
 
+import com.eignex.util.arrays.argsortByIntKey
+
 /**
  * A canonical identity for a constraint up to variable identity: same factor type, same constants
  * (coefficients, bounds, polarities), and the same multiset of variables — independent of internal
@@ -171,8 +173,11 @@ internal class StructuralKeyBuilder(expectedWords: Int = 0) {
      *  `i` is `valueOf(i)`: length, then `key, value` per pair. */
     fun pairsByKey(keys: IntArray, valueOf: (Int) -> Long) {
         append(keys.size.toLong())
-        val order = IntArray(keys.size) { it }
-        sortIndicesByKey(order, keys)
+        val order = if (keys.size <= INDEX_SORT_INSERTION_MAX) {
+            IntArray(keys.size) { it }.also { sortIndicesByKey(it, keys) }
+        } else {
+            argsortByIntKey(keys.size) { keys[it] }
+        }
         reserve(keys.size * 2)
         for (i in order) {
             buf[size++] = keys[i].toLong()
@@ -207,30 +212,16 @@ internal class StructuralKeyBuilder(expectedWords: Int = 0) {
  *  quadratic sort would dominate presolve. */
 private const val INDEX_SORT_INSERTION_MAX = 32
 
-/** Sort [order] (a permutation of its own indices) by `keys[order[i]]` ascending, without boxing — the
- *  index counterpart of `indices.sortedBy { keys[it] }`. Short arrays use in-place insertion sort (no
- *  allocation); longer ones pack `(key, index)` into a `Long` (key high, index low so equal keys keep
- *  ascending-index order) and use the primitive `O(n log n)` sort. */
+// Small factors avoid allocating packed sort keys.
 private fun sortIndicesByKey(order: IntArray, keys: IntArray) {
-    if (order.size <= INDEX_SORT_INSERTION_MAX) {
-        for (i in 1 until order.size) {
-            val cur = order[i]
-            val key = keys[cur]
-            var j = i - 1
-            while (j >= 0 && keys[order[j]] > key) {
-                order[j + 1] = order[j]
-                j--
-            }
-            order[j + 1] = cur
+    for (i in 1 until order.size) {
+        val cur = order[i]
+        val key = keys[cur]
+        var j = i - 1
+        while (j >= 0 && keys[order[j]] > key) {
+            order[j + 1] = order[j]
+            j--
         }
-        return
+        order[j + 1] = cur
     }
-    val packed = LongArray(
-        order.size,
-    ) { (keys[order[it]].toLong() shl Int.SIZE_BITS) or (order[it].toLong() and LOW_WORD) }
-    packed.sort()
-    for (i in order.indices) order[i] = (packed[i] and LOW_WORD).toInt()
 }
-
-/** Low 32 bits mask for unpacking the index half of a `(key, index)` packed `Long`. */
-private const val LOW_WORD = 0xFFFFFFFFL

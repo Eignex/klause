@@ -3,7 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.propagatedImplicationGraph
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 /**
  * Implicit-solving setup for an ongoing solve: the elected structured globals, the scope-disjoint

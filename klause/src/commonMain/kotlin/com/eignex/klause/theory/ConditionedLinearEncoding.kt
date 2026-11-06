@@ -10,10 +10,10 @@ import com.eignex.klause.lowering.LinearFormulaLowering
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.pipeline.ExactSearchRow
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
 
 private const val MAX_CONDITIONED_LINEAR_CASES = 4096
 

@@ -4,8 +4,8 @@ import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 internal enum class RepairBlockDecline {
     NoShape, Unavailable, UnsupportedShape, InvalidFrame, BlockedPin, Oversized, WorkLimit, Cancelled, Arithmetic,

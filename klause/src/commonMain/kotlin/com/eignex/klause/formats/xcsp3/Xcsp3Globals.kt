@@ -25,9 +25,10 @@ import com.eignex.klause.lowering.LayeredMddData
 import com.eignex.klause.lowering.packLayeredMdd
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.tseitinOr
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableLongIntMap
 
 // XCSP3 global-constraint family emitters.
 
@@ -537,8 +538,8 @@ private fun layerMdd(trs: InternedTransitions): LayeredMddData? {
     val layer = IntArray(q + 1) { -1 }
     layer[root] = 0
     var maxLayer = 0
-    val queue = ArrayDeque<Int>()
-    queue.add(root)
+    val queue = IntArrayDeque()
+    queue.addLast(root)
     while (queue.isNotEmpty()) {
         val s = queue.removeFirst()
         val nl = layer[s] + 1
@@ -547,7 +548,7 @@ private fun layerMdd(trs: InternedTransitions): LayeredMddData? {
             if (layer[d] == -1) {
                 layer[d] = nl
                 if (nl > maxLayer) maxLayer = nl
-                queue.add(d)
+                queue.addLast(d)
             } else if (layer[d] != nl) {
                 return null // reachable at two depths — not layered
             }
@@ -1118,8 +1119,8 @@ internal fun Compiler.Builder.noOverlapMulti(e: XmlElement, originsText: String)
             Diffn(
                 xs = IntArray(origins.size) { origins[it][0] },
                 ys = IntArray(origins.size) { origins[it][1] },
-                widths = EmptyLongArray,
-                heights = EmptyLongArray,
+                widths = emptyLongArray(),
+                heights = emptyLongArray(),
                 widthVars = IntArray(lengths.size) { lengths[it][0] },
                 heightVars = IntArray(lengths.size) { lengths[it][1] },
                 nonStrict = true,

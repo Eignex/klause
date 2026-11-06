@@ -1,6 +1,6 @@
 package com.eignex.klause.factor.table.internals
 
-import com.eignex.klause.util.argsortBy
+import com.eignex.util.arrays.argsortBy
 
 private const val SUPPORT_TRAVERSAL_BATCH = 256
 

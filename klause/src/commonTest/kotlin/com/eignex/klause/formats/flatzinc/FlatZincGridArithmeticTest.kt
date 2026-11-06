@@ -9,9 +9,9 @@ import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

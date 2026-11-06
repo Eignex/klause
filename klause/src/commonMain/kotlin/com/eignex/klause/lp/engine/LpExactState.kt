@@ -2,9 +2,9 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.binarySearchInt
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.minus
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.minus
 
 internal data class LpMatrixProjectionStatus(val underflows: Int, val overflows: Int)
 

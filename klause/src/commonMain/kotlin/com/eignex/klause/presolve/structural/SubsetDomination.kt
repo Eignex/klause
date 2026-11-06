@@ -18,11 +18,11 @@ import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.ScanMeter
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
 
 internal class SubsetDomination {
     private data class Signature(val terms: List<Pair<Int, Long>>, val bound: Long)

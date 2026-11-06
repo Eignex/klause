@@ -3,10 +3,10 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.values
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableLongIntMap
 
 /**
  * One-hot value model: a per-value "used" column `y_v ∈ [0,1]`, a one-hot selector `z_iv ∈ [0,1]`
@@ -37,7 +37,7 @@ internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
         val col = builder.auxColumn(
             0L,
             1L,
-            presence = EmptyLongArray,
+            presence = emptyLongArray(),
             definition = LpAuxiliaryColumn(listOf(0L, v), 1L, true),
         )
         yCols.add(col)

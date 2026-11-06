@@ -1,6 +1,7 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
+
 
 /**
  * The variables one factor reads, and what it needs from them.
@@ -15,16 +16,16 @@ import com.eignex.klause.util.EmptyIntArray
  */
 sealed interface VarList {
     /** Integer columns this factor reads, whatever it needs from them. */
-    val ints: IntArray get() = EmptyIntArray
+    val ints: IntArray get() = emptyIntArray()
 
     /** Integer columns whose values this factor must be able to enumerate. */
-    val spanInts: IntArray get() = EmptyIntArray
+    val spanInts: IntArray get() = emptyIntArray()
 
     /** Boolean columns this factor reads, as raw variable ids — not `Lit`-encoded. */
-    val boolVars: IntArray get() = EmptyIntArray
+    val boolVars: IntArray get() = emptyIntArray()
 
     /** Real columns this factor reads. */
-    val reals: IntArray get() = EmptyIntArray
+    val reals: IntArray get() = emptyIntArray()
 }
 
 /** No variables at all. */
@@ -54,10 +55,10 @@ class RealVars(override val reals: IntArray) : VarList
  * The combined integer array is built once here rather than on each read.
  */
 class MixedVars(
-    spanInts: IntArray = EmptyIntArray,
-    boundInts: IntArray = EmptyIntArray,
-    override val boolVars: IntArray = EmptyIntArray,
-    override val reals: IntArray = EmptyIntArray,
+    spanInts: IntArray = emptyIntArray(),
+    boundInts: IntArray = emptyIntArray(),
+    override val boolVars: IntArray = emptyIntArray(),
+    override val reals: IntArray = emptyIntArray(),
 ) : VarList {
     override val spanInts: IntArray = spanInts
     override val ints: IntArray = if (spanInts.isEmpty()) {

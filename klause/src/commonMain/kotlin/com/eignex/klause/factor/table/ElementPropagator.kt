@@ -15,11 +15,11 @@ import com.eignex.klause.propagation.excludeIntValues
 import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.inDomainAt
 import com.eignex.klause.propagation.lazyReason
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.IntIntMap
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableIntIntMap
 
 internal class ElementPropagator(
     val boolVars: IntArray,

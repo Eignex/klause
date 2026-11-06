@@ -1,10 +1,12 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.formats.xcsp3.xcsp3Semantics
 import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.formats.xcsp3.xcsp3Semantics
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.util.io.openTextFile
+import com.eignex.util.io.useSource
 
 /**
  * XCSP3 front-end (`.xml` / `.xcsp` / `.xcsp3`). Emits the XCSP3 competition output protocol:
@@ -24,7 +26,7 @@ internal object Xcsp3Mode : CliMode {
             val overrides = common.sourceOverrides(xcsp3Semantics)
             // Parsing only reads: the base bake runs as presolve step 0, bounded by the presolve deadline.
             // The file is streamed into the parser so a huge instance is never fully resident.
-            val parsed = openFileSource(path).useSource { source ->
+            val parsed = openTextFile(path).useSource { source ->
                 Xcsp3.parse(source, common.config.problemSettings(), semanticOverrides = overrides)
             }
             cliLogger(common.verbose).v {

@@ -5,18 +5,18 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_TWO
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.isZero
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_TWO
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 
 /**
  * Anytime exact projected counting. Independent Boolean clause components multiply their
@@ -59,9 +59,9 @@ internal object AnytimeCounter {
         budget: CountCheckBudget,
     ): Sequence<ExactCountInterval> = sequence {
         val boolVars = config.samplingSet?.distinct()?.toIntArray()
-            ?: if (config.intSamplingSet == null) problem.allBoolVars() else EmptyIntArray
+            ?: if (config.intSamplingSet == null) problem.allBoolVars() else emptyIntArray()
         val intVars = config.intSamplingSet?.distinct()?.toIntArray()
-            ?: if (config.samplingSet == null) IntArray(problem.numIntVars) { it } else EmptyIntArray
+            ?: if (config.samplingSet == null) IntArray(problem.numIntVars) { it } else emptyIntArray()
         val depth = boolVars.size + intVars.size
 
         // suffix[d] = number of possible value combinations of projection vars d..depth-1.

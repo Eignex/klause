@@ -1,5 +1,7 @@
 package com.eignex.klause.util
 
+import com.eignex.util.numbers.maxOf
+
 internal class MutableLongIntIndex {
     private class Node(var key: Long, var value: Int, var left: Node? = null,
         var right: Node? = null, var height: Int = 1)

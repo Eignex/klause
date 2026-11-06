@@ -3,7 +3,7 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal class MixedPointArithmetic(private val stop: Cancellation) {
     fun admitted(value: BigFraction): Boolean {

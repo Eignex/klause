@@ -3,22 +3,22 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactSimplexDoubleView
 import com.eignex.klause.simplex.exact.ExactSimplexModel
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntDoubleMap
-import com.eignex.klause.util.MutableIntLongMap
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.binarySearchInt
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
-import com.eignex.klause.util.toLongExact
-import com.eignex.klause.util.toSortedIntArray
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableIntDoubleMap
+import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.collections.toSortedIntArray
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
+import com.eignex.util.numbers.toLongExact
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -40,7 +40,7 @@ internal class LpRowPremises(
     val thresholds: LongArray,
     /** Boolean literals that must hold for the row to be valid (a reified real atom's activation);
      *  a learned clause leaning on the row cites their negations. */
-    val boolLits: IntArray = EmptyIntArray,
+    val boolLits: IntArray = emptyIntArray(),
 )
 
 /** Optimization sense. Branch-and-bound minimizes; [MAXIMIZE] is negated at build time. */
@@ -469,11 +469,11 @@ internal class LpExactShifts(
 
     /** These shifts after every structural upper bound was replaced by an exactly stored one. */
     fun withExactUppers(): LpExactShifts =
-        if (columns.isEmpty()) this else LpExactShifts(rows, rhs, EmptyIntArray, emptyList())
+        if (columns.isEmpty()) this else LpExactShifts(rows, rhs, emptyIntArray(), emptyList())
 
     companion object {
         /** No rounded entry. */
-        val NONE: LpExactShifts = LpExactShifts(EmptyIntArray, emptyList(), EmptyIntArray, emptyList())
+        val NONE: LpExactShifts = LpExactShifts(emptyIntArray(), emptyList(), emptyIntArray(), emptyList())
     }
 }
 
@@ -631,7 +631,7 @@ internal class LpBuilder {
         rel: Relation,
         rhs: Double,
         strict: Boolean = false,
-        premiseLits: IntArray = EmptyIntArray,
+        premiseLits: IntArray = emptyIntArray(),
         validity: LpRowPremises? = null,
     ) {
         require(cols.size == vals.size) { "cols/vals length mismatch: ${cols.size} vs ${vals.size}" }
@@ -648,7 +648,7 @@ internal class LpBuilder {
                 } else if (premiseLits.isEmpty()) {
                     null
                 } else {
-                    LpRowPremises(EmptyIntArray, BooleanArray(0), EmptyLongArray, premiseLits.copyOf())
+                    LpRowPremises(emptyIntArray(), BooleanArray(0), emptyLongArray(), premiseLits.copyOf())
                 },
                 valsD = vals.copyOf(),
                 rhsD = rhs,

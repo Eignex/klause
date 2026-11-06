@@ -77,15 +77,15 @@ import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.theory.privateLinearCompletion
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.MutableIntLongMap
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableIntIntMap
+import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.subExact
 import kotlin.time.TimeSource
 
 internal class LpAssemblyCancelled : RuntimeException()
@@ -133,7 +133,7 @@ internal class LpRelaxation(
     val colPresentUpper: LongArray = LongArray(model.n),
     /** Ids of the factors that emitted at least one [Contribution.HULL] row, in factor order — the
      *  candidates the root pruner (`LpEngine.pruneIneffectiveHulls`) probes for individual removal. */
-    val hullFactorIds: IntArray = EmptyIntArray,
+    val hullFactorIds: IntArray = emptyIntArray(),
     /** Structural LP column → the LP-only continuous (real) variable id it stands for, or -1 for an
      *  integer / Boolean / auxiliary column. Lets the leaf verdict read each continuous column's solved
      *  value back onto its real variable. */
@@ -147,15 +147,15 @@ internal class LpRelaxation(
      *  model's structure and coefficients never change across nodes and a persistent simplex's LU
      *  factorization survives; a node merely tells the solver which rows are enforced
      *  ([gatedEnforcement]), and an unenforced row's slack rides free. */
-    val gatedRows: IntArray = EmptyIntArray,
+    val gatedRows: IntArray = emptyIntArray(),
     /** The aux Boolean whose pin activates gated entry k. */
-    val gatedAux: IntArray = EmptyIntArray,
+    val gatedAux: IntArray = emptyIntArray(),
     /** The pin value activating gated entry k (`true` = the atom row, `false` = its complement). */
     val gatedWhenTrue: BooleanArray = BooleanArray(0),
     val sourceMap: CutSourceMap? = null,
     val colPresence: List<CutAuxiliaryDefinition?> = List(model.n) { null },
     /** The factor each row of [model] was emitted for, or -1 for a cut or a row spanning several factors. */
-    val rowFactorIds: IntArray = EmptyIntArray,
+    val rowFactorIds: IntArray = emptyIntArray(),
     val realUpperRows: Map<Int, Int> = emptyMap(),
     val preparationTemplates: LpPreparationTemplates? = null,
 ) {
@@ -404,7 +404,7 @@ internal fun leafRealFeasibility(
     sourceEncoding: Problem? = null,
 ): LeafRealResult {
     val encoded = sourceEncoding ?: encoders.finiteLinearModel(sample, cancellation)
-        ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
     val relaxation = CpToLpRelaxation(problem, objective, projections = null).build(SampleDomains(sample))
     // Bound the residual-LP solve by the search deadline: on a continuous-heavy model a single leaf LP is a
     // large factorization, so an unbounded solve could outlast the whole budget. A solve cut short returns
@@ -437,16 +437,16 @@ internal fun LpRelaxation.leafResult(
     certified.float?.let { sink?.observeComponentSplit(it.blocks) }
     if (problem.factors.any { it is ContinuousProduct && it.finiteChoices?.hasGuards != true } &&
         certified.verdict != LpVerdict.INFEASIBLE) {
-        return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
     }
     certified.floatOptimum?.let { float ->
         if (problem.factors.any { it is ContinuousProduct }) {
-            return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         }
         return LeafRealResult(LpVerdict.TOLERANCE_OPTIMUM, floatReals(float.primal, problem))
     }
     if (certified.verdict == LpVerdict.INFEASIBLE) {
-        return LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray, refutingFactors = factorsOf(certified))
+        return LeafRealResult(LpVerdict.INFEASIBLE, emptyDoubleArray(), refutingFactors = factorsOf(certified))
     }
     val exact = exactLeafResult(certified, problem, objective, sample)
     return if (exact.verdict in setOf(LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND)) {
@@ -459,7 +459,7 @@ internal fun LpRelaxation.leafResult(
 internal fun LpRelaxation.factorsOf(certified: CertifiedLpResult): IntArray {
     val rows = certified.infeasibleRows
         ?: certified.farkasRay?.let { ray -> ray.indices.filter { ray[it] != 0L }.toIntArray() }
-        ?: return EmptyIntArray
+        ?: return emptyIntArray()
     val factors = IntArrayList()
     val seen = IntHashSet()
     for (row in rows) {
@@ -481,11 +481,11 @@ internal fun LpRelaxation.exactLeafResult(
     sample: Sample,
 ): LeafRealResult {
     if (problem.factors.any { it is ContinuousProduct && it.finiteChoices?.hasGuards != true }) {
-        return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
     }
     val unboundedness = certified.unboundedness
     val primal = unboundedness?.witness?.primal ?: certified.exactPrimal
-        ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
     val exactReals = exactReals(primal, problem)
     val reals = DoubleArray(exactReals.size) { exactReals[it].toDouble() }
     if (unboundedness == null) return LeafRealResult(certified.verdict, reals, exactReals)
@@ -563,7 +563,7 @@ internal class LeafRealResult(
     val direction: List<BigFraction>? = null,
     /** On [LpVerdict.INFEASIBLE], the factors whose rows the exact infeasibility proof combines; empty when the proof
      *  names no rows. */
-    val refutingFactors: IntArray = EmptyIntArray,
+    val refutingFactors: IntArray = emptyIntArray(),
     // A private numerical proposal; only an original-source point check may give it witness authority.
     val uncertifiedReals: DoubleArray? = null,
 )
@@ -1881,7 +1881,7 @@ internal class CpToLpRelaxation(
             if (domain.min != value || domain.max != value) return
             val validity = LpRowPremises(intArrayOf(intVar, intVar), booleanArrayOf(false, true),
                 longArrayOf(value, value))
-            emitRealRow(columns, coeffs, op, rhs, false, EmptyIntArray, validity)
+            emitRealRow(columns, coeffs, op, rhs, false, emptyIntArray(), validity)
         }
 
         private fun emitRealRow(
@@ -1968,11 +1968,11 @@ internal fun LeafRealResult.checkedEncoding(
     val point = sample.copy(reals = reals, exactReals = exactReals)
     if (encoded.encodingSourceRealCount != encoded.numRealVars) {
         return if (privateLinearCompletion(encoded, point, cancellation) == true) this
-        else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray, uncertifiedReals = reals)
+        else LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray(), uncertifiedReals = reals)
     }
     val checked = verifyRealCoordinates(encoded, point)
     return if (!cancellation() && checked is Verification.Accepted) this
-    else LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray, uncertifiedReals = reals)
+    else LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray(), uncertifiedReals = reals)
 }
 
 internal fun LeafRealResult.observeConsumption(sink: LpStatsSink?) {

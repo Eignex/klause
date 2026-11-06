@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.xcsp3
 
-import com.eignex.klause.util.CharReader
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
+import com.eignex.util.io.CharReader
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
 
 /** Minimal XML element tree for XCSP3 parsing. */
 class XmlElement(

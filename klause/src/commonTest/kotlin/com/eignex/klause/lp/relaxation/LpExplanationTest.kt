@@ -36,8 +36,8 @@ import com.eignex.klause.lp.engine.nodeDualCertificate
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

@@ -1,6 +1,6 @@
 package com.eignex.klause.factor.scheduling.internals
 
-import com.eignex.klause.util.argsortBy
+import com.eignex.util.arrays.argsortBy
 
 /**
  * The subsets Ω of the edge-finding set Θ that bound a detected task's earliest start: every est-suffix

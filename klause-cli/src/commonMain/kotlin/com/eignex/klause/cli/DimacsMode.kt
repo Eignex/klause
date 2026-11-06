@@ -1,9 +1,11 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.formats.dimacs.dimacsSemantics
 import com.eignex.klause.formats.dimacs.Dimacs
+import com.eignex.klause.formats.dimacs.dimacsSemantics
 import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.util.io.openTextFile
+import com.eignex.util.io.useSource
 
 /**
  * DIMACS **CNF** front-end (`.cnf`) for Boolean satisfiability. Emits the SAT-competition
@@ -22,7 +24,7 @@ internal object DimacsMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(dimacsSemantics)
-            val problem = openFileSource(path).useSource { Dimacs.parse(it) }.toProblem(
+            val problem = openTextFile(path).useSource { Dimacs.parse(it) }.toProblem(
                 common.config.problemSettings(), semanticOverrides = overrides,
             )
             cliLogger(common.verbose).v {

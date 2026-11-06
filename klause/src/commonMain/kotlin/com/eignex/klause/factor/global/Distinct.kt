@@ -9,8 +9,8 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
 
 /** Pairwise distinct exact affine values, optionally reified by one Boolean coordinate. */
 class Distinct(

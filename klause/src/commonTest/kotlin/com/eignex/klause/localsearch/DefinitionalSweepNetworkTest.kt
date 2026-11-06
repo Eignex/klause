@@ -11,7 +11,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

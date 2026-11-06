@@ -12,6 +12,7 @@ import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.util.process.printErrorLine
 import kotlin.time.Duration
 
 internal fun solveCapturedSource(
@@ -30,9 +31,9 @@ internal fun solveCapturedSource(
             result.originalProblem, prepared.model, prepared.stats, result.elapsed,
             loadElapsedMs = null, constructionBakeElapsed = Duration.ZERO,
         )
-        errPrintln("  open sides closed: ${prepared.closedSides}")
-        controls.presolveBudget?.let { errPrintln("  work: ${it.spent()} of ${it.allowance}") }
-        if (prepared.infeasible) errPrintln("  preparation refuted the model")
+        printErrorLine("  open sides closed: ${prepared.closedSides}")
+        controls.presolveBudget?.let { printErrorLine("  work: ${it.spent()} of ${it.allowance}") }
+        if (prepared.infeasible) printErrorLine("  preparation refuted the model")
         return
     }
     output.begin(solvable.optimize, solvable.maximize)

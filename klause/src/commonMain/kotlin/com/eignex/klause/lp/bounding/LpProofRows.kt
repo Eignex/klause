@@ -2,8 +2,8 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
 
 internal class LpProofRows private constructor(val source: LpProofRowIndex?, val transformed: LpProofRowIndex?) {
     fun unchanged(cancellation: Cancellation): Boolean {

@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntObjectMap
 
 /**
  * Assignment view and consequence sink for a clause store.
@@ -53,11 +53,11 @@ internal class WatchedClauseStore {
     internal fun memory(sample: SharingMemoryObservation, protectedClause: (Int) -> Boolean = { false }): Boolean {
         var watchBytes = 0L
         var signatureBytes = 0L
-        for (value in watchers.valuesInternal) {
+        watchers.forEachValueSlot { value ->
             sample.step()
             if (value != null) watchBytes += (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES
         }
-        for (value in signatures.valuesInternal) {
+        signatures.forEachValueSlot { value ->
             sample.step()
             if (value != null) signatureBytes += (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES
         }
@@ -87,9 +87,9 @@ internal class WatchedClauseStore {
         sample.owned(attached.backingData, attached.backingData.size.toLong() * Int.SIZE_BYTES, protected)
         sample.owned(unitClauses.backingData, unitClauses.backingData.size.toLong() * Int.SIZE_BYTES, protected)
         var protectedWatches = false
-        for (value in watchers.valuesInternal) {
+        watchers.forEachValueSlot { value ->
             sample.step()
-            if (value == null) continue
+            if (value == null) return@forEachValueSlot
             val list = value as IntArrayList
             var protectedPosting = false
             for (position in 0 until list.size) {
@@ -103,11 +103,11 @@ internal class WatchedClauseStore {
             sample.owned(list, list.backingData.size.toLong() * Int.SIZE_BYTES, protectedPosting)
         }
         sample.owned(watchers, watchers.primitiveCapacityBytes, protectedWatches)
-        sample.ownedReferences(watchers.valuesInternal, watchers.referenceCapacity.toLong(), protectedWatches)
+        sample.ownedReferences(watchers.valueStorageIdentity, watchers.referenceCapacity.toLong(), protectedWatches)
         var protectedSignatures = false
-        for (value in signatures.valuesInternal) {
+        signatures.forEachValueSlot { value ->
             sample.step()
-            if (value == null) continue
+            if (value == null) return@forEachValueSlot
             val list = value as IntArrayList
             var protectedPosting = false
             for (position in 0 until list.size) {
@@ -121,7 +121,9 @@ internal class WatchedClauseStore {
             sample.owned(list, list.backingData.size.toLong() * Int.SIZE_BYTES, protectedPosting)
         }
         sample.owned(signatures, signatures.primitiveCapacityBytes, protectedSignatures)
-        sample.ownedReferences(signatures.valuesInternal, signatures.referenceCapacity.toLong(), protectedSignatures)
+        sample.ownedReferences(
+            signatures.valueStorageIdentity, signatures.referenceCapacity.toLong(), protectedSignatures,
+        )
         return protected
     }
 

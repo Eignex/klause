@@ -2,7 +2,7 @@ package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.checkFiniteWork
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
 
 internal class HighDemandUnarySubset(
     private val starts: IntArray,
@@ -10,7 +10,7 @@ internal class HighDemandUnarySubset(
     val sourceTasks: IntArray,
 ) {
     private val unary = DisjunctivePropagator(
-        starts.distinct().toIntArray(), starts, durations, EmptyIntArray, EmptyIntArray, starts.size,
+        starts.distinct().toIntArray(), starts, durations, emptyIntArray(), emptyIntArray(), starts.size,
         reasonPrefix = REASON_TAG,
     )
 

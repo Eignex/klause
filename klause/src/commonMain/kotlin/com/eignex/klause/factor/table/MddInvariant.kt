@@ -5,7 +5,8 @@ import com.eignex.klause.localsearch.LOCAL_SEARCH_OPERATION_BATCH
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.SteppedIntInvariant
-import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntObjectMap
 
 internal class MddInvariant(
     private val seq: IntArray,
@@ -21,8 +22,8 @@ internal class MddInvariant(
     /** Positions in [seq] each variable occupies — usually one, so a single-symbol move recombines a
      *  single DP layer. A variable repeated across positions falls back to a full recompute. */
     private val positionsByVar: MutableIntObjectMap<IntArray> = run {
-        val tmp = MutableIntObjectMap<MutableList<Int>>()
-        for (i in seq.indices) tmp.getOrPut(seq[i]) { mutableListOf() }.add(i)
+        val tmp = MutableIntObjectMap<IntArrayList>()
+        for (i in seq.indices) tmp.getOrPut(seq[i]) { IntArrayList() }.add(i)
         val out = MutableIntObjectMap<IntArray>()
         tmp.forEach { v, cols -> out.put(v, cols.toIntArray()) }
         out

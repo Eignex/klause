@@ -1,7 +1,7 @@
 package com.eignex.klause.lowering
 
 import com.eignex.klause.ir.PolynomialExpression
-import com.eignex.klause.util.BIG_ONE
+import com.eignex.util.numbers.BIG_ONE
 
 /**
  * Equivalent multiplication DAG for a consumer without a native power operation.

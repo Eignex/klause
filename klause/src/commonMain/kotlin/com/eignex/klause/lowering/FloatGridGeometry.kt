@@ -1,10 +1,10 @@
 package com.eignex.klause.lowering
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.shl
-import com.eignex.klause.util.toDouble
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.shl
+import com.eignex.util.numbers.toDouble
 
 internal fun approximateGridValue(value: BigFraction): Double {
     val exponent = value.den.magnitudeBitLength() - 1

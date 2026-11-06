@@ -11,14 +11,14 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.boundAt
 import com.eignex.klause.propagation.boundLiteral
 import com.eignex.klause.propagation.lazyReasonSlots
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 
 internal class GridArrayMinMaxPropagator(private val factor: GridArrayMinMax) : Propagator {
     private val bounds = (1 until factor.coordinates.size).map {

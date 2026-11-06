@@ -18,9 +18,9 @@ import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.RunStats
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.bigIntOf
 import com.eignex.kumulant.stat.summary.SumResult
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.bigIntOf
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream

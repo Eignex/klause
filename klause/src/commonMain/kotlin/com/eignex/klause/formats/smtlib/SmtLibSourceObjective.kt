@@ -7,10 +7,10 @@ import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 
 internal fun captureSmtSourceObjective(
     commands: List<SExpr>,

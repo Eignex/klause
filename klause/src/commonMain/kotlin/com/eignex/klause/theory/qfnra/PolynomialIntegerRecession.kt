@@ -1,7 +1,7 @@
 package com.eignex.klause.theory.qfnra
 
-import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.exactInteger
 import com.eignex.klause.arithmetic.quadratic.CheckedQuadraticUnbounded
 import com.eignex.klause.arithmetic.quadratic.QuadraticCandidates
@@ -13,8 +13,8 @@ import com.eignex.klause.arithmetic.quadratic.QuadraticRowRelation
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.times
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.times
 
 internal class PolynomialIntegerRecession(
     val formula: PolynomialRealFormula,

@@ -1,16 +1,16 @@
 package com.eignex.klause.simplex.exact
 
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.shl
-import com.eignex.klause.util.shr
-import com.eignex.klause.util.toLong
-import com.eignex.klause.util.toLongExact
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.shl
+import com.eignex.util.numbers.shr
+import com.eignex.util.numbers.toLong
+import com.eignex.util.numbers.toLongExact
+import com.eignex.util.numbers.unaryMinus
 import kotlin.time.TimeSource.Monotonic
 
 internal enum class ContinuationStatus { BASIC, LOWER, UPPER, FIXED, FREE }

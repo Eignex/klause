@@ -15,8 +15,8 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
 
 /**
  * `vars(i) != vars(j)` for every pair `i < j` of present positions, except where both take a value of
@@ -38,12 +38,12 @@ class AllDifferent(
      *  only present positions are required pairwise-different, and matching-based filtering treats
      *  unpinned-presence positions as "may yet be absent" — they neither demand a matching
      *  slot nor block other positions from claiming their value. */
-    override val presents: IntArray = EmptyIntArray,
+    override val presents: IntArray = emptyIntArray(),
     /** Values exempt from the distinctness requirement: any number of variables may share a
      *  value in this set (the `alldifferent_except` / `alldifferent_except_0` family). Empty for
      *  plain all-different. Excepted values are modelled inside `reginFilter` as `n` capacity-1 value
      *  copies, so the exact Hall/matching machinery applies unchanged. */
-    val exceptSet: LongArray = EmptyLongArray,
+    val exceptSet: LongArray = emptyLongArray(),
     /** When true, the constraint carried the FlatZinc `::bounds` annotation — the modeller asked for
      *  bounds-consistency rather than full GAC. The matching/SCC machinery is then skipped in favour of
      *  a much cheaper Hall-interval filter, trading pruning strength for per-node throughput. */
@@ -56,8 +56,8 @@ class AllDifferent(
         vars: IntArray,
         @Suppress("UNUSED_PARAMETER") domainMin: Long,
         domainSize: Int,
-        presents: IntArray = EmptyIntArray,
-        exceptSet: LongArray = EmptyLongArray,
+        presents: IntArray = emptyIntArray(),
+        exceptSet: LongArray = emptyLongArray(),
         boundsConsistent: Boolean = false,
     ) : this(vars, presents, exceptSet, boundsConsistent) {
         require(domainSize >= 1) { "AllDifferent domainSize must be >= 1, got $domainSize" }
@@ -72,7 +72,7 @@ class AllDifferent(
 
     /** Canonical excepted values (deduped, sorted) for [structuralKey] / [remap]. */
     private val exceptSorted: LongArray =
-        if (exceptSet.isEmpty()) EmptyLongArray else exceptSet.distinct().sorted().toLongArray()
+        if (exceptSet.isEmpty()) emptyLongArray() else exceptSet.distinct().sorted().toLongArray()
 
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.ALL_DIFFERENT) {
         pairsByKey(vars) { presents.getOrElse(it) { -1 }.toLong() }

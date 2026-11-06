@@ -6,14 +6,14 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.toLongExact
 
 internal class DivModDefinition(private val relation: DivMod, override val out: Int) : SweepNode {
     override val outIsBool: Boolean get() = false
-    override val boolInputs: IntArray get() = EmptyIntArray
+    override val boolInputs: IntArray get() = emptyIntArray()
     override val intInputs: IntArray = relation.divisor?.let { intArrayOf(relation.dividend, it) }
         ?: intArrayOf(relation.dividend)
 

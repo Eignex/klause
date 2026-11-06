@@ -1,8 +1,8 @@
 package com.eignex.klause.count
 
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableIntObjectMap
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.ln

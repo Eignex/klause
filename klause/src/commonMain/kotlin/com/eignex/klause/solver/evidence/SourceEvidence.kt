@@ -23,6 +23,11 @@ class SourceInequality(
 
     internal fun coefficient(coordinate: SourceCoordinate): BigFraction? = captured[coordinate]
 
+    internal fun forEachCoefficient(consume: (SourceCoordinate, BigFraction) -> Boolean): Boolean {
+        for ((coordinate, value) in captured) if (!consume(coordinate, value)) return false
+        return true
+    }
+
     internal fun contradicts(): Boolean = captured.isEmpty() && (rhs < BigFraction.ZERO || (rhs.isZero && strict))
 
     internal fun entails(other: SourceInequality): Boolean = captured == other.captured &&

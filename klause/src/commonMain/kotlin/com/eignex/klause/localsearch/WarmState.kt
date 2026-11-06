@@ -1,6 +1,7 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
+
 
 /**
  * Mutable container for per-strategy state that survives a [LocalSearchSolver] call boundary. Owned
@@ -24,7 +25,7 @@ internal class WarmState {
     internal var bestCostSeen: Long = Long.MAX_VALUE
 
     /** Activity counts, or an empty array when none have been captured yet. */
-    fun activityTouches(): IntArray = activityTouches ?: EmptyIntArray
+    fun activityTouches(): IntArray = activityTouches ?: emptyIntArray()
 
     /** `Long.MAX_VALUE` until the first apply through this session. */
     fun bestCostSeen(): Long = bestCostSeen

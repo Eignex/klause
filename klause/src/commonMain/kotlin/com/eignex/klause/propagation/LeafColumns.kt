@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Bits
+import com.eignex.util.collections.Bits
 
 /**
  * Columns a traversal completes at its leaves instead of deciding them.

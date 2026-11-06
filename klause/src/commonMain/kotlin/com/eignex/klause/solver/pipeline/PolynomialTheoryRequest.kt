@@ -11,7 +11,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.bigIntOf
 
 /** A polynomial request composing exact continuous constraints with finite factors. */
 class PolynomialTheoryRequest internal constructor(

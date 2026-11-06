@@ -8,7 +8,7 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.util.numbers.CheckedLongOverflowException
 
 /**
  * Whether the relaxation of [constraints] over the genuinely open [openBounds] is certifiably infeasible.

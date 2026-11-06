@@ -1,5 +1,7 @@
 package com.eignex.klause.util
 
+import com.eignex.util.numbers.shl
+
 internal class MutableIntObjectIndex<V : Any> {
     internal interface Slot<V : Any> {
         val key: Int

@@ -2,12 +2,12 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableLongIntMap
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableLongIntMap
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 
 internal class DivModSupports(relation: DivMod, state: PropagationState, availableCells: Int) {
     private val dividend = relation.dividend
