@@ -1,6 +1,6 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.util.Bits
+import com.eignex.util.collections.Bits
 
 /**
  * The integer values a source model declares each of its columns may take.

@@ -7,9 +7,9 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntIntMap
+import com.eignex.util.collections.MutableIntObjectMap
 
 /** At-most-one cliques (each a set of Lit-encoded literals, at most one satisfied) recognised
  *  soundly from a single factor:

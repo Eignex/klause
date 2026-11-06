@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.opb
 
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BigInt
 
 /** Parsed OPB statements before lowering to a solver model. */
 data class OpbDocument(

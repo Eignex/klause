@@ -1,10 +1,10 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
 
 internal class AffineIndexRepair(
     private val state: LocalSearchState,

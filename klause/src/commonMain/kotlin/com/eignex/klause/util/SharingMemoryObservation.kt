@@ -1,5 +1,10 @@
 package com.eignex.klause.util
 
+import com.eignex.util.numbers.minOf
+import com.eignex.util.numbers.shl
+import com.eignex.util.numbers.toLong
+import com.eignex.util.platform.identityHash
+
 internal enum class SharingMemoryStatus { COMPLETE, PARTIAL, STALE }
 
 internal data class SharingMemorySnapshot(

@@ -9,9 +9,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.LongHashSet
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntIntMap
+import com.eignex.util.collections.LongHashSet
 
 /** CP propagation logic for `inverse`. */
 internal class InversePropagator(
@@ -44,7 +44,7 @@ internal class InversePropagator(
     override val consumesIntEventDelta: Boolean = true
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
-        state.propagatorFailures[this]?.let { hallReason(state, it, EmptyIntArray) }
+        state.propagatorFailures[this]?.let { hallReason(state, it, emptyIntArray()) }
             ?: collectHoleAndBoundAntecedents(
                 state,
                 (state.refPayload[factorId] as? InverseCache)?.conflictVars ?: intVars,

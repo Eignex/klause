@@ -6,9 +6,9 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.boundLiteral
 import com.eignex.klause.propagation.exclusionLiteral
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongHashSet
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongHashSet
 
 /**
  * Reason that the variables of [hall] take values only among the union of their own domains, a set no larger

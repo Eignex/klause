@@ -27,14 +27,14 @@ import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.NoPropagator
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.unaryMinus
 
 /**
  * `Σ coeffs(i)·vars(i) ⟨op⟩ bound`. Terms pair [vars] with the coefficients in [constants]; the sum is
@@ -46,12 +46,12 @@ class Linear private constructor(
     terms: CoalescedTerms,
     rawOp: LinearOp,
     rawBound: Long,
-    realVarsIn: IntArray = EmptyIntArray,
-    realCoeffsIn: DoubleArray = EmptyDoubleArray,
+    realVarsIn: IntArray = emptyIntArray(),
+    realCoeffsIn: DoubleArray = emptyDoubleArray(),
     // Double forms used only by an LP-only (real-bearing) row, where coefficients and the bound need not
     // be integral: the double coefficient of each integer term (index-aligned with [vars]) and the double
     // right-hand side. Empty / 0 for integer and wide rows.
-    intCoeffsRealIn: DoubleArray = EmptyDoubleArray,
+    intCoeffsRealIn: DoubleArray = emptyDoubleArray(),
     realBoundIn: Double = 0.0,
     strictRealIn: Boolean = false,
     // Over-64-bit integer coefficients and bound, carried exactly. Null for the integer core and for real
@@ -202,7 +202,7 @@ class Linear private constructor(
         op: LinearOp,
         bound: Long,
     ) : this(
-        CoalescedTerms(intVars.copyOf(), EmptyLongArray),
+        CoalescedTerms(intVars.copyOf(), emptyLongArray()),
         op,
         0L,
         realVars.copyOf(),
@@ -227,7 +227,7 @@ class Linear private constructor(
         bound: Double,
         strict: Boolean = false,
     ) : this(
-        CoalescedTerms(intVars.copyOf(), EmptyLongArray),
+        CoalescedTerms(intVars.copyOf(), emptyLongArray()),
         op,
         0L,
         realVars.copyOf(),
@@ -349,7 +349,7 @@ internal fun wideLinearTerms(vars: IntArray, coeffs: Array<BigInt>): CoalescedTe
     require(vars.size == coeffs.size) { "wide coeffs/vars length mismatch" }
     val seen = IntHashSet(vars.size)
     for (variable in vars) require(seen.add(variable)) { "wide linear vars must be distinct" }
-    return CoalescedTerms(vars.copyOf(), EmptyLongArray)
+    return CoalescedTerms(vars.copyOf(), emptyLongArray())
 }
 
 // Keep zero coefficients: a remap can cancel every nonzero term, but the factor stays representable.

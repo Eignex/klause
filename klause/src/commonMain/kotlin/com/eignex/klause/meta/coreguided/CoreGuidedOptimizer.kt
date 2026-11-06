@@ -18,9 +18,9 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SatisfyResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.satisfyUnderAssumptions
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.addExact
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntIntMap
+import com.eignex.util.numbers.addExact
 
 /**
  * Core-guided MaxSAT optimiser: Fu-Malik (Z. Fu and S. Malik, "On Solving the Partial MAX-SAT Problem",

@@ -13,8 +13,8 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
 import kotlin.coroutines.cancellation.CancellationException
 
 /** An SMT-LIB source decoded and lowered into klause's representation. */

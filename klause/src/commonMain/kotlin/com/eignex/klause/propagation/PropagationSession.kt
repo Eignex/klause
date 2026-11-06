@@ -10,13 +10,13 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.result.ValueOrderingStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.SharingMemorySnapshot
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.numbers.CheckedLongOverflowException
 import kotlin.math.ln
 
 /** Variable kind discriminator for [PropagationSession.popUntilUnpinned]. */
@@ -435,7 +435,7 @@ class PropagationSession private constructor(
     init {
         onPropagationWork?.invoke { work }
         val conflict = if (preparedState == null) {
-            if (!state.seeded) state.conflictLevels ?: EmptyIntArray
+            if (!state.seeded) state.conflictLevels ?: emptyIntArray()
             else state.runToFixpoint(allFactors = true, cancellation = cancellation)
         } else {
             check(
@@ -545,7 +545,7 @@ class PropagationSession private constructor(
         }
         val pinned = if (boolean) state.pinBoolAsDecision(v, value != 0L) else state.setIntAsDecision(v, value)
         if (!pinned) {
-            yield(revertAndUnsat(state.conflictLevels ?: EmptyIntArray))
+            yield(revertAndUnsat(state.conflictLevels ?: emptyIntArray()))
             return@sequence
         }
         val queue = state.beginSeedFixpoint()
@@ -749,7 +749,7 @@ class PropagationSession private constructor(
             state.lastDecisionConflictVar = -1
             apply()
         }
-        if (applied == false) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
+        if (applied == false) return revertAndUnsat(state.conflictLevels ?: emptyIntArray())
         val conflict = if (applied == null) null else {
             state.runToFixpoint(allFactors = false, cancellation = cancellation)
         }
@@ -943,7 +943,7 @@ class PropagationSession private constructor(
         val pinned = applyDecision {
             if (atMost) state.setIntMaxAsDecision(v, bound) else state.setIntMinAsDecision(v, bound)
         }
-        if (pinned == false) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
+        if (pinned == false) return revertAndUnsat(state.conflictLevels ?: emptyIntArray())
         val conflict = if (pinned == null) null else {
             state.runToFixpoint(allFactors = false, cancellation = cancellation)
         }
@@ -1118,7 +1118,7 @@ class PropagationSession private constructor(
         if (!apply()) {
             // No CP factor ran, so its last fire cannot supply this external deduction's conflict clause.
             state.lastDecisionConflictVar = -1
-            return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
+            return revertAndUnsat(state.conflictLevels ?: emptyIntArray())
         }
         val conflict = state.runToFixpoint(allFactors = false, cancellation = cancellation)
         if (conflict != null) return revertAndUnsat(conflict)
@@ -1540,7 +1540,7 @@ class PropagationSession private constructor(
             }
             val exported = literals ?: checkNotNull(native).literalsOf(i)
             out.add(if (native != null && exported.isNotEmpty()) {
-                SharedClause(exported, EmptyLongArray, lbd, key)
+                SharedClause(exported, emptyLongArray(), lbd, key)
             } else asSharedClause(exported, lbd, key))
         }
         return out.takeUnless { cancelled() }
@@ -1558,9 +1558,9 @@ class PropagationSession private constructor(
         val numBool = problem.numBoolVars
         var boolCount = 0
         for (lit in lits) if (Lit.variable(lit) < numBool) boolCount++
-        val bools = if (boolCount == 0) EmptyIntArray else IntArray(boolCount)
+        val bools = if (boolCount == 0) emptyIntArray() else IntArray(boolCount)
         val quads = if (boolCount == lits.size) {
-            EmptyLongArray
+            emptyLongArray()
         } else LongArray((lits.size - boolCount) * SharedClause.QUAD)
         var bi = 0
         var qi = 0
@@ -1630,7 +1630,7 @@ class PropagationSession private constructor(
         if (boolPinned[v] == want) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
         val pinned = applyDecision { state.pinBoolAsDecision(v, value) }
-        if (pinned == false) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
+        if (pinned == false) return revertAndUnsat(state.conflictLevels ?: emptyIntArray())
         val conflict = if (pinned == null) null else {
             state.runToFixpoint(allFactors = false, cancellation = cancellation)
         }
@@ -1645,7 +1645,7 @@ class PropagationSession private constructor(
         if (intPinnedSet[v] && intPinnedVal[v] == value) return PropagationResult.Implied.EMPTY
         val base = state.undoTop
         val pinned = applyDecision { state.setIntAsDecision(v, value) }
-        if (pinned == false) return revertAndUnsat(state.conflictLevels ?: EmptyIntArray)
+        if (pinned == false) return revertAndUnsat(state.conflictLevels ?: emptyIntArray())
         val conflict = if (pinned == null) null else {
             state.runToFixpoint(allFactors = false, cancellation = cancellation)
         }
@@ -1860,10 +1860,10 @@ class PropagationSession private constructor(
         }
         val iKeys = IntArrayList()
         val iVals = LongArrayList()
-        var minKeys = EmptyIntArray
-        var minValues = EmptyLongArray
-        var maxKeys = EmptyIntArray
-        var maxValues = EmptyLongArray
+        var minKeys = emptyIntArray()
+        var minValues = emptyLongArray()
+        var maxKeys = emptyIntArray()
+        var maxValues = emptyLongArray()
         if (iRaw.size > 0) {
             val sorted = iRaw.toIntArray()
             sorted.sort()

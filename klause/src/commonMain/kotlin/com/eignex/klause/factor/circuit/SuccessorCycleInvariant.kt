@@ -4,7 +4,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.IntIntMap
+import com.eignex.util.collections.IntIntMap
 
 /** Shared base for [CircuitInvariant] and [SubcircuitInvariant]: violation scoring over a successor
  *  array driven by a caller-supplied cost function. */

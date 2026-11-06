@@ -71,10 +71,10 @@ import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntHashSet
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -92,7 +92,7 @@ internal fun BacktrackSolver.projectTouchedToAssumptions(input: Assumptions, lev
 /** Convert a touched-seed-level set into a sorted-ascending [IntArray], or empty
  *  when there were no touches (or no seed in the first place). */
 internal fun touchedToArray(touched: IntHashSet?): IntArray {
-    if (touched == null || touched.isEmpty()) return EmptyIntArray
+    if (touched == null || touched.isEmpty()) return emptyIntArray()
     val out = touched.toIntArray()
     out.sort()
     return out
@@ -119,7 +119,7 @@ internal sealed interface SearchOutcome {
      *  projection in [com.eignex.klause.solver.result.satisfyUnderAssumptions]. */
     data class Exhausted(
         val core: UnsatCore? = null,
-        val touchedAssumptionLevels: IntArray = EmptyIntArray,
+        val touchedAssumptionLevels: IntArray = emptyIntArray(),
         /** True when a leaf was reached whose residual LP-only continuous relaxation could not be
          *  certified feasible or infeasible (see `LpEngine.leafCertify`), so the tree is not provably
          *  all-infeasible — the terminal verdict must be `unknown`, not UNSAT. */
@@ -313,7 +313,7 @@ internal class CpSatisfactionTraversal(
                 val core = (problem.baked as? PropagationResult.Unsat)?.let(::coreOf)
                 val touched = (seeded as? PropagationResult.Unsat)?.conflictLevels?.let { levels ->
                     touchedToArray(IntHashSet().also { touched -> levels.forEach(touched::add) })
-                } ?: EmptyIntArray
+                } ?: emptyIntArray()
                 SearchOutcome.Exhausted(core, touched)
             } else {
                 null

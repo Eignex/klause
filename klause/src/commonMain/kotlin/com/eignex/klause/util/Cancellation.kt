@@ -1,5 +1,6 @@
 package com.eignex.klause.util
 
+import com.eignex.util.numbers.minOf
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 import kotlin.time.TimeSource

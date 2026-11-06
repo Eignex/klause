@@ -11,7 +11,7 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.util.subExact
+import com.eignex.util.numbers.subExact
 import kotlin.math.roundToLong
 
 internal class GridArrayMinMax(

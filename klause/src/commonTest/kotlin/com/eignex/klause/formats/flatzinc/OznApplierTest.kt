@@ -2,7 +2,7 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.formats.minizinc.OznParseException
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue

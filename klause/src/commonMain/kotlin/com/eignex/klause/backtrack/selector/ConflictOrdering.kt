@@ -4,7 +4,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.EmptyLongArray
+import com.eignex.util.arrays.emptyLongArray
 import kotlin.random.Random
 
 /**
@@ -32,8 +32,8 @@ internal class ConflictOrdering(private val base: VariableSelector) : VariableSe
     override fun fresh() = ConflictOrdering(base.fresh())
 
     private var counter: Long = 0
-    private var boolStamp: LongArray = EmptyLongArray
-    private var intStamp: LongArray = EmptyLongArray
+    private var boolStamp: LongArray = emptyLongArray()
+    private var intStamp: LongArray = emptyLongArray()
 
     private fun ensureSized(numBool: Int, numInt: Int) {
         if (boolStamp.size < numBool) boolStamp = boolStamp.copyOf(numBool)

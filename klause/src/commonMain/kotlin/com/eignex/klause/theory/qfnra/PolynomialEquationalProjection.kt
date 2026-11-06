@@ -3,7 +3,8 @@ package com.eignex.klause.theory.qfnra
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.collections.MutableIntIntMap
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal class PolynomialEquationalProjection(
     val variable: Int,
@@ -17,25 +18,25 @@ internal fun equationalSection(
     arithmetic: PolynomialArithmetic,
 ): PolynomialEquationalProjection? {
     if (equations.isEmpty()) return null
-    val occurrences = HashMap<Int, Int>()
+    val occurrences = MutableIntIntMap()
     for (polynomial in family) for (variable in polynomial.variables) {
         arithmetic.step()
-        occurrences[variable] = (occurrences[variable] ?: 0) + 1
+        occurrences.addTo(variable, 1)
     }
     var best: SectionPivot? = null
     for (polynomial in equations) {
         arithmetic.step()
         val terms = polynomial.terms
-        val counts = HashMap<Int, Int>()
+        val counts = MutableIntIntMap()
         for (term in terms) for (variable in term.monomial.variables) {
             arithmetic.step()
-            counts[variable] = (counts[variable] ?: 0) + 1
+            counts.addTo(variable, 1)
         }
         for (term in terms) {
             arithmetic.step()
             val variable = term.monomial.variables.singleOrNull() ?: continue
-            if (term.monomial.exponent(variable) != 1 || counts[variable] != 1) continue
-            val fill = (terms.size - 1).toLong() * ((occurrences[variable] ?: 1) - 1)
+            if (term.monomial.exponent(variable) != 1 || counts.getOrDefault(variable, 0) != 1) continue
+            val fill = (terms.size - 1).toLong() * (occurrences.getOrDefault(variable, 1) - 1)
             val bits = term.coefficient.num.magnitudeBitLength().toLong() + term.coefficient.den.magnitudeBitLength()
             val candidate = SectionPivot(polynomial, variable, term, fill, bits)
             if (best == null || candidate.before(best)) best = candidate

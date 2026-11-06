@@ -7,7 +7,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
+import com.eignex.util.numbers.fitsLong
 import kotlin.coroutines.cancellation.CancellationException
 
 /*

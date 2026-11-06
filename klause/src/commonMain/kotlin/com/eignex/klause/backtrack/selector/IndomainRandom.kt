@@ -3,7 +3,7 @@ package com.eignex.klause.backtrack.selector
 import com.eignex.klause.ir.randomValue
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.util.collections.MutableIntIntMap
 import kotlin.random.Random
 
 /** Domains at or below this size use the eager shuffle; larger ones use the lazy Fisher-Yates so

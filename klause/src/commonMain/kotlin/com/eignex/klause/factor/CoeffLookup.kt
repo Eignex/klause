@@ -1,6 +1,6 @@
 package com.eignex.klause.factor
 
-import com.eignex.klause.util.IntIntMap
+import com.eignex.util.collections.IntIntMap
 
 // O(1) coefficient lookup; absent = 0 so callers may ask about any var.
 // Callers coalesce duplicate vars upstream (keys are distinct).

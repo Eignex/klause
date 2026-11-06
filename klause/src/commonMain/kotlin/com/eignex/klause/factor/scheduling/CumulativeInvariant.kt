@@ -25,10 +25,10 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.OptionalPresence
 import com.eignex.klause.localsearch.positiveScaledBinaryDefinition
 import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.argsortBy
+import com.eignex.util.arrays.argsortBy
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntIntMap
 import kotlin.math.max
 import kotlin.math.min
 
@@ -329,7 +329,7 @@ internal class CumulativeInvariant(
         }
         val tLow = ls.tLow
         val absT = if (peakT >= 0) peakT + tLow else 0L
-        val peakTasks = if (peakT >= 0) collectPeakTasks(state, absT) else EmptyIntArray
+        val peakTasks = if (peakT >= 0) collectPeakTasks(state, absT) else emptyIntArray()
         emitPreparedRepairs(state, ls, peakT >= 0, absT, peakTasks, sink)
     }
 

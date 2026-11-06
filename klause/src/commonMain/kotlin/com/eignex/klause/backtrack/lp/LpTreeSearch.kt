@@ -43,8 +43,8 @@ import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BIG_ONE
 
 // Only a primal candidate: exhausting the probe proves no verdict, bound or unbounded direction.
 internal class LpTreeSeed(val sample: Sample)

@@ -32,11 +32,11 @@ import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.QfNraStats
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
 import com.eignex.kumulant.stat.summary.SumResult
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 import kotlin.time.TimeSource
 
 /** A source-preserving nonlinear integer satisfaction request, including mixed real constraints. */

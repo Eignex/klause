@@ -44,10 +44,10 @@ import com.eignex.klause.theory.EncodingAffineExpression
 import com.eignex.klause.theory.EncodingLinearTerm
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.LinearEncodingFormula
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.toLongExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

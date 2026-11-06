@@ -5,8 +5,8 @@ import com.eignex.klause.simplex.basis.RationalBasisStats
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.PollStride
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.time.TimeSource
 
 internal class ExactBasisStop(val reason: ExactBasisDecline) : RuntimeException()

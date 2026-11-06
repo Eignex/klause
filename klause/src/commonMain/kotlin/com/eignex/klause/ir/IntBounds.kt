@@ -1,8 +1,8 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.Bits
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
 
 /**
  * Integer bounds that may be open on either side.

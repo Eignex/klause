@@ -5,10 +5,10 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.objective.CapturedIntegerDefinition
 import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
 
 @Suppress("CyclomaticComplexMethod", "LongMethod")
 internal fun sourceIntegerDefinition(problem: Problem, hint: DefinitionHint.Integer): SweepNode? {

@@ -4,7 +4,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntHashSet
 
 /**
  * Accumulator that [Invariant.contributeChanneling] appends to while [LocalSearchState] synthesizes a

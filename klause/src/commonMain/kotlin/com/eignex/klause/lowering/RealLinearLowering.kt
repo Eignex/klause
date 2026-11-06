@@ -3,8 +3,8 @@ package com.eignex.klause.lowering
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.arrays.emptyIntArray
 
 internal fun CnfLowering.reifyRealLinear(
     coefficients: DoubleArray,
@@ -35,7 +35,7 @@ internal fun CnfLowering.reifyRealLinear(
         LinearOp.LE, LinearOp.GE -> {
             val aux = newBool()
             factors.add(
-                ReifiedRealLinear(aux, EmptyIntArray, EmptyDoubleArray, variables, coefficients, op, bound, strict),
+                ReifiedRealLinear(aux, emptyIntArray(), emptyDoubleArray(), variables, coefficients, op, bound, strict),
             )
             Lit.make(aux, true)
         }

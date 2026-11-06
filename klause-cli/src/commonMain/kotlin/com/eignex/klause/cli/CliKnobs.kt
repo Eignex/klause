@@ -1,12 +1,13 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.propertyKnob
+import com.eignex.util.process.processProperty
 
 /**
  * The CLI-only `klause.*` env/property knobs that set defaults a flag then overrides — distinct from
  * the core [com.eignex.klause.config.KlauseConfig] knobs (declared in
  * [com.eignex.klause.config.KlauseConfigSchema]). Each key is derived from its property name via
- * [propertyKnob], so it is never spelled as a literal; read it with [cliProp].
+ * [propertyKnob], so it is never spelled as a literal; read it with [processProperty].
  */
 internal object CliKnobs {
     /** Default engine for a bare invocation: `klause.engine` / `KLAUSE_ENGINE`. */

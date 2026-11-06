@@ -19,11 +19,11 @@ import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.presolve.equivalentPseudoBoolean
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
 
 internal object CoefficientStrengthening {
 

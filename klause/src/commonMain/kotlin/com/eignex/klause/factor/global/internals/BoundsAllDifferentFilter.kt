@@ -5,11 +5,11 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.boundLiteral
 import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.lazyReason
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableLongIntMap
 
 /**
  * Bounds-consistency filtering for `all_different ::bounds`: two O(n log n) sweeps over the variable
@@ -25,7 +25,7 @@ import com.eignex.klause.util.MutableLongIntMap
 internal fun boundsAllDifferentFilter(
     state: PropagationState,
     vars: IntArray,
-    premises: IntArray = EmptyIntArray,
+    premises: IntArray = emptyIntArray(),
     tag: Int = 0,
 ): IntArray? {
     val n = vars.size

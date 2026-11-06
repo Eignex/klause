@@ -1,5 +1,6 @@
 package com.eignex.klause.util
 
+import com.eignex.util.numbers.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

@@ -10,14 +10,14 @@ import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRoundingLimit
 import com.eignex.klause.solver.evidence.mixedIntegerRounding
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.times
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.times
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -247,18 +247,20 @@ internal object LinearAuthorityAggregateCuts {
         cut: LinearAuthorityCut, point: Map<SourceCoordinate, Double>, meter: AggregateMeter,
         observe: (String, Long) -> Unit,
     ): Boolean? {
-        meter.reserve(1L, 128L + cut.inequality.supportSize * 64L)
+        meter.reserve(1L, 256L)
         var activity = 0.0
         var normSquared = 0.0
-        for ((id, value) in cut.inequality.coefficients) {
-            meter.reserve(4L)
-            val coordinate = point[id] ?: run {
-                observe("AggregatePairPointUnavailable", 1L)
-                return null
-            }
+        val complete = cut.inequality.forEachCoefficient { id, value ->
+            meter.reserve(4L, 32L)
+            val coordinate = point[id] ?: return@forEachCoefficient false
             val coefficient = value.toDouble()
             activity += coefficient * coordinate
             normSquared += coefficient * coefficient
+            true
+        }
+        if (!complete) {
+            observe("AggregatePairPointUnavailable", 1L)
+            return null
         }
         meter.reserve(1L)
         val efficacy = (activity - cut.inequality.rhs.toDouble()) / sqrt(normSquared)

@@ -4,10 +4,10 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.OriginCounts
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 /**
  * Two-watched-literal BCP (Moskewicz et al., "Chaff: engineering an efficient SAT solver", DAC 2001,

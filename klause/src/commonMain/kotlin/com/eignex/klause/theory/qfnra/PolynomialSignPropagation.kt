@@ -10,6 +10,8 @@ import com.eignex.klause.theory.qfnra.PolynomialSigns.ZERO_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.addSigns
 import com.eignex.klause.theory.qfnra.PolynomialSigns.multiplySigns
 import com.eignex.klause.theory.qfnra.PolynomialSigns.relationSigns
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
 
 internal fun preparePolynomialSignRefutation(
     atoms: List<PolynomialAtom>,
@@ -32,9 +34,9 @@ internal fun preparePolynomialSignPropagation(
 
 internal class PolynomialSignPropagation(realCount: Int, private val arithmetic: PolynomialArithmetic) {
     private val domains = IntArray(realCount) { arithmetic.step(); ALL_SIGNS }
-    private val adjacent = Array(realCount) { arithmetic.step(); ArrayList<Int>() }
+    private val adjacent = Array(realCount) { arithmetic.step(); IntArrayList() }
     private val constraints = ArrayList<SignConstraint>()
-    private val pending = ArrayDeque<Int>()
+    private val pending = IntArrayDeque()
     private var checking = false
     private var refuted = false
 
@@ -88,7 +90,9 @@ internal class PolynomialSignPropagation(realCount: Int, private val arithmetic:
                 }
                 if (restricted == previous) continue
                 domains[variable] = restricted
-                for (neighbor in adjacent[variable]) {
+                val neighbors = adjacent[variable]
+                for (position in 0 until neighbors.size) {
+                    val neighbor = neighbors[position]
                     arithmetic.step()
                     if (!constraints[neighbor].queued) {
                         pending.addLast(neighbor)

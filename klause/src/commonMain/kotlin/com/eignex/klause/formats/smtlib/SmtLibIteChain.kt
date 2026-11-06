@@ -4,6 +4,7 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.LinComb
+import com.eignex.util.collections.LongHashSet
 
 /** Fewest arms worth indexing directly by the source selector (see [IteChain]). */
 private const val MIN_CHAIN_DEPTH = 16
@@ -61,7 +62,7 @@ internal class IteChain(val result: Int, val selector: Int, val default: LinComb
 
     /** Positive-form condition literals, parallel to [keys]; `conds(i)` holds iff `selector = keys(i)`. */
     val conds = ArrayList<Int>()
-    private val distinct = HashSet<Long>()
+    private val distinct = LongHashSet()
     var allowsElement = true
         private set
 

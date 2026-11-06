@@ -5,8 +5,8 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.reifyRealLinear
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.arrays.emptyIntArray
 
 internal fun FlatZincCompiler.postExactFloatLinear(
     coefficients: DoubleArray,
@@ -19,7 +19,7 @@ internal fun FlatZincCompiler.postExactFloatLinear(
     val integerImage = postIntegerImagePredicate(coefficients, variables, op, bound, strict, reifier)
     if (integerImage && (reifier != null || op == LinearOp.NE || variables.isEmpty())) return
     if (reifier == null && op != LinearOp.NE && variables.isNotEmpty()) {
-        factors.add(Linear(EmptyIntArray, EmptyDoubleArray, variables, coefficients, op, bound, strict))
+        factors.add(Linear(emptyIntArray(), emptyDoubleArray(), variables, coefficients, op, bound, strict))
         return
     }
     val atom = reifyRealLinear(coefficients, variables, op, bound, strict)

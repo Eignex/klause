@@ -8,7 +8,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.lazyReason
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 /** CP propagation logic for `value_precede`. */
 internal class ValuePrecedePropagator(

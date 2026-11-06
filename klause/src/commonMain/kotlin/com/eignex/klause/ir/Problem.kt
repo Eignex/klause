@@ -1,7 +1,7 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.util.Bits
-import com.eignex.klause.util.EmptyDoubleArray
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.collections.Bits
 
 /**
  * Read-only logical model and the canonical source of solver projections. Variables come in three id spaces:
@@ -55,9 +55,9 @@ open class Problem(
      */
     val numRealVars: Int = 0,
     /** Lower bound of each real variable (length [numRealVars]); `Double.NEGATIVE_INFINITY` for open. */
-    val realLower: DoubleArray = EmptyDoubleArray,
+    val realLower: DoubleArray = emptyDoubleArray(),
     /** Upper bound of each real variable (length [numRealVars]); `Double.POSITIVE_INFINITY` for open. */
-    val realUpper: DoubleArray = EmptyDoubleArray,
+    val realUpper: DoubleArray = emptyDoubleArray(),
     /** Captured resource policy; independent of the logical model semantics. */
     val settings: ProblemSettings = ProblemSettings(),
     /** Declared defaults and effective caller policy captured before source lowering. */
@@ -139,8 +139,8 @@ open class Problem(
         impliedFactorMask: BooleanArray? = null,
         hasSymmetryBreaking: Boolean = false,
         numRealVars: Int = 0,
-        realLower: DoubleArray = EmptyDoubleArray,
-        realUpper: DoubleArray = EmptyDoubleArray,
+        realLower: DoubleArray = emptyDoubleArray(),
+        realUpper: DoubleArray = emptyDoubleArray(),
         settings: ProblemSettings = ProblemSettings(),
         semantics: EffectiveSourceSemantics = defaultIrSemantics,
     ) : this(
@@ -172,8 +172,8 @@ open class Problem(
         impliedFactorMask: BooleanArray? = null,
         hasSymmetryBreaking: Boolean = false,
         numRealVars: Int = 0,
-        realLower: DoubleArray = EmptyDoubleArray,
-        realUpper: DoubleArray = EmptyDoubleArray,
+        realLower: DoubleArray = emptyDoubleArray(),
+        realUpper: DoubleArray = emptyDoubleArray(),
         openIntLo: BooleanArray? = null,
         openIntHi: BooleanArray? = null,
         packedOpenIntLo: Bits? = null,
@@ -211,8 +211,8 @@ open class Problem(
         impliedFactorMask: BooleanArray? = null,
         hasSymmetryBreaking: Boolean = false,
         numRealVars: Int = 0,
-        realLower: DoubleArray = EmptyDoubleArray,
-        realUpper: DoubleArray = EmptyDoubleArray,
+        realLower: DoubleArray = emptyDoubleArray(),
+        realUpper: DoubleArray = emptyDoubleArray(),
         openIntLo: BooleanArray? = null,
         openIntHi: BooleanArray? = null,
         packedOpenIntLo: Bits? = null,

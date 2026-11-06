@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.newLpSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.util.numbers.CheckedLongOverflowException
 import kotlin.math.roundToLong
 
 /**

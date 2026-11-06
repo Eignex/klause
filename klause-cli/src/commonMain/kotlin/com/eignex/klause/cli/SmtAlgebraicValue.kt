@@ -2,10 +2,10 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.div
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.times
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.times
 
 internal fun smtAlgebraicValue(value: AlgebraicReal): String = value.rational?.let {
     smtReal(it.toString())

@@ -15,11 +15,11 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.WIDE_DOMAIN_DRAWS
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntIntMap
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableLongIntMap
 
 internal class AllDifferentInvariant(
     private val vars: IntArray,

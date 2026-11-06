@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.util.io.readTextFile
 import java.io.File
 import java.util.zip.GZIPOutputStream
 import kotlin.test.Test

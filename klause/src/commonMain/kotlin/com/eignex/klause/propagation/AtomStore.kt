@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 /**
  * Bound-atom registry for [PropagationState] (LCG with virtual int-bound literals).

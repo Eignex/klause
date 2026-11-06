@@ -5,8 +5,8 @@ import com.eignex.klause.arithmetic.difference.DifferencePathCompletion
 import com.eignex.klause.arithmetic.difference.DifferencePathEdges
 import com.eignex.klause.arithmetic.difference.DifferencePathScratch
 import com.eignex.klause.arithmetic.difference.differenceShortestPaths
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 /**
  * A difference-constraint system maintained under assertion and retraction, carrying a feasible

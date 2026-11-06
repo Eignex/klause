@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.result
 
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

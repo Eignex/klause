@@ -10,15 +10,15 @@ import com.eignex.klause.lp.relaxation.prepareMakespanLinks
 import com.eignex.klause.lp.relaxation.prepareSchedulingViews
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntLongMap
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.subExact
 
 /**
  * Strip-energy floor on a minimized objective variable `o`: the tasks proven to end by `o` need room
@@ -189,7 +189,7 @@ internal class StripEnergyMakespanBound(
         }
         if (starts.isEmpty()) return null
         return Strip(starts.toIntArray(), durations.toLongArray(), demands.toLongArray(), view.capacity,
-            EmptyIntArray, EmptyLongArray)
+            emptyIntArray(), emptyLongArray())
     }
 
     private suspend fun SequenceScope<Unit>.diffnStrip(

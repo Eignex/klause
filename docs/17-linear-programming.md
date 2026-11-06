@@ -781,6 +781,8 @@ nearest the point independently for each continuous coordinate. One-sided coordi
 retain their stated side; unavailable finite distances retain the ordinary choice.
 Aggregate proposal retention requires the same finite normalized violation used
 by point selection, so satisfied proposals leave room for later separating pairs.
+Point separation reads immutable coefficients without copying their map; callback
+and iterator setup and each visited scalar debit the generation's allowance.
 When nearest-endpoint rounding does not separate, a completed continuous residual
 can retry the same aggregate with the ordinary stated sides that retain negative
 residuals. Identical side choices require no additional derivation. Each attempt

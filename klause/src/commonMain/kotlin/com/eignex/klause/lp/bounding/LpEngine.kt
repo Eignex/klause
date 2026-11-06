@@ -84,12 +84,12 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.validation.floatingOptimumAcceptance
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.constructionLongArray
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.CheckedLongOverflowException
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
@@ -1441,7 +1441,7 @@ internal class LpEngine(
         filter.relaxation.gatedEnforcement(session, filter.enforced)
         return filter
     }
-    private var residualAuxVars: IntArray = EmptyIntArray
+    private var residualAuxVars: IntArray = emptyIntArray()
 
     /** Whether the residual real model exceeds the per-node exact row cap. */
     var residualOversized: Boolean = false
@@ -1463,11 +1463,11 @@ internal class LpEngine(
     fun leafCertify(session: PropagationSession, toleranceCheck: ((Sample) -> Boolean)? = null): LeafRealResult {
         requireOpen()
         lpBackjump = null
-        if (residualOversized) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        if (residualOversized) return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         val relaxer = selectedSourceRelaxation ?: lpRelaxer
-            ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         val relaxation = nodeRelaxation(relaxer, session)
-            ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+            ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         val model = relaxation.model
         val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
             .also { leafSolver = it }
@@ -1491,7 +1491,7 @@ internal class LpEngine(
             )
 
             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED ->
-                relaxation.exactLeafResult(certified, problem, objective, leafSample(session, EmptyDoubleArray))
+                relaxation.exactLeafResult(certified, problem, objective, leafSample(session, emptyDoubleArray()))
 
             LpVerdict.INFEASIBLE -> {
                 // Pool the theory lemma for restart-time registration: the leaf itself just rejects
@@ -1502,12 +1502,12 @@ internal class LpEngine(
                     ?: certified.infeasibleRows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
                     ?: activePremiseClause(relaxation, session)
                 if (clause != null) lpNogoods?.add(clause)
-                LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
+                LeafRealResult(LpVerdict.INFEASIBLE, emptyDoubleArray())
             }
 
             LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> LeafRealResult(
                 LpVerdict.INDETERMINATE,
-                EmptyDoubleArray,
+                emptyDoubleArray(),
             )
         }.also { it.observeConsumption(sink.lp) }
     }

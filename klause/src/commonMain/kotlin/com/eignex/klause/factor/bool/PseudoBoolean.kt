@@ -25,7 +25,7 @@ import com.eignex.klause.ir.constsOf
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BigInt
 import kotlin.concurrent.Volatile
 
 /**

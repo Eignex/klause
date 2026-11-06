@@ -14,28 +14,28 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.integralLinear
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ScanMeter
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.gcd
-import com.eignex.klause.util.maxOf
-import com.eignex.klause.util.minOf
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.rem
-import com.eignex.klause.util.subExact
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.gcd
+import com.eignex.util.numbers.maxOf
+import com.eignex.util.numbers.minOf
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.remainderOf
+import com.eignex.util.numbers.subExact
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
+import com.eignex.util.numbers.unaryMinus
 
 internal object LinearBoundFusion {
     private const val FUSION_WORK_WEIGHT = 16L
@@ -222,9 +222,9 @@ internal object LinearBoundFusion {
         if (row.strict && row.relation == LinearOp.GE) bound += BIG_ONE
         val sign = if (row.relation == LinearOp.GE) -BIG_ONE else BIG_ONE
         bound *= sign
-        if (row.relation == LinearOp.EQ && bound % gcd != BIG_ZERO) return null
+        if (row.relation == LinearOp.EQ && bound.remainderOf(gcd) != BIG_ZERO) return null
         val quotient = bound / gcd
-        val reducedBound = if (bound < BIG_ZERO && bound % gcd != BIG_ZERO) {
+        val reducedBound = if (bound < BIG_ZERO && bound.remainderOf(gcd) != BIG_ZERO) {
             quotient - BIG_ONE
         } else {
             quotient

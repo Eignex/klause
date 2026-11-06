@@ -1,17 +1,17 @@
 package com.eignex.klause.lp.lattice
 
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.div
-import com.eignex.klause.util.isZero
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.rem
-import com.eignex.klause.util.times
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.remainderOf
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.unaryMinus
 
 /**
  * E. H. Bareiss, *Sylvester's Identity and Multistep Integer-Preserving Gaussian Elimination*, Math. Comp.
@@ -236,7 +236,7 @@ private fun content(row: SparseIntRow, extra: BigInt?): BigInt {
 private fun divide(row: SparseIntRow, by: BigInt): SparseIntRow =
     SparseIntRow(row.index, Array(row.index.size) { row.value[it] / by })
 
-private tailrec fun gcdOf(a: BigInt, b: BigInt): BigInt = if (b.isZero()) a.abs() else gcdOf(b, a % b)
+private tailrec fun gcdOf(a: BigInt, b: BigInt): BigInt = if (b.isZero()) a.abs() else gcdOf(b, a.remainderOf(b))
 
 // Work units per big-integer entry an elimination step touches, against one simplex op: routing time per unit
 // over the calibration sample's models that reached the reduction (QF_LIA), ~4e-3 ms.

@@ -11,7 +11,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.OptionalPresence
 import com.eignex.klause.localsearch.positiveScaledBinaryDefinition
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 /**
  * Compaction and reorder moves for a satisfied [Cumulative]. A task moves to the earliest start that

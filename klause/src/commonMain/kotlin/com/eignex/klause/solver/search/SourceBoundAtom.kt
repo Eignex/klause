@@ -1,13 +1,13 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.rem
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.remainderOf
 
 /** One exact coefficient over an existing source integer or real variable id. */
 data class SourceBoundTerm(
@@ -91,7 +91,7 @@ class SourceBoundAtom private constructor(
             val normalized = normalize(terms, limits) ?: return null
             if (normalized.any { it.source !is SearchIntValue || it.coefficient.den != BIG_ONE }) return null
             val quotient = value.num / value.den
-            val floor = if (value.num < BIG_ZERO && value.num % value.den != BIG_ZERO) {
+            val floor = if (value.num < BIG_ZERO && value.num.remainderOf(value.den) != BIG_ZERO) {
                 quotient - BIG_ONE
             } else {
                 quotient

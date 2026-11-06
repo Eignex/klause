@@ -11,7 +11,7 @@ import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolvePreparationStats
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntHashSet
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 

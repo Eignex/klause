@@ -12,12 +12,12 @@ import com.eignex.klause.ir.floorOrNull
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.IntLongMap
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.IntLongMap
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.MutableIntIntMap
+import com.eignex.util.collections.MutableIntLongMap
 
 internal fun linearHolds(sum: Long, op: LinearOp, bound: Long): Boolean = when (op) {
     LinearOp.LE -> sum <= bound

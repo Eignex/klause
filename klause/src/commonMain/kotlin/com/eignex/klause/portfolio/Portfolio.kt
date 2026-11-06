@@ -34,6 +34,7 @@ import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.stream.Mutex
+import com.eignex.util.concurrent.parallelRun
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random

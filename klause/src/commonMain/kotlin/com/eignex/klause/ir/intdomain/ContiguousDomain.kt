@@ -5,7 +5,7 @@ import com.eignex.klause.ir.IntConsumer
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntSpan
 import com.eignex.klause.ir.defaultDomainStorageSettings
-import com.eignex.klause.util.Bits
+import com.eignex.util.collections.Bits
 
 /** Contiguous `(min..max)`, no interior holes. */
 internal class ContiguousDomain(

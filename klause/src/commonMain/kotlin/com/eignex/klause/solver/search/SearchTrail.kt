@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntIntMap
+import com.eignex.util.collections.MutableIntObjectMap
 
 internal class SearchTrail {
     private val decisions = ArrayList<SearchDecision>()
@@ -37,9 +37,9 @@ internal class SearchTrail {
     internal fun reasonMemory(sample: SharingMemoryObservation) {
         val arrays = sample.seenIdentities<IntArray>()
         var payload = 0L
-        for (value in boolReasons.valuesInternal) {
+        boolReasons.forEachValueSlot { value ->
             sample.step()
-            if (value == null) continue
+            if (value == null) return@forEachValueSlot
             val literals = (value as SearchExplanation).literals
             if (sample.retain(arrays, literals)) payload += literals.size.toLong() * Int.SIZE_BYTES
             sample.owned(literals, literals.size.toLong() * Int.SIZE_BYTES, protected = true)
@@ -50,7 +50,9 @@ internal class SearchTrail {
             "sharedReasonReferenceSlots" to boolReasons.referenceCapacity.toLong(),
         ))
         sample.owned(boolReasons, boolReasons.primitiveCapacityBytes, protected = true)
-        sample.ownedReferences(boolReasons.valuesInternal, boolReasons.referenceCapacity.toLong(), protected = true)
+        sample.ownedReferences(
+            boolReasons.valueStorageIdentity, boolReasons.referenceCapacity.toLong(), protected = true,
+        )
         sample.ownedReferences(pendingAssertions, pendingAssertions.capacity.toLong(), protected = true)
         for (assertion in pendingAssertions) {
             sample.step()

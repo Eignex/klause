@@ -4,8 +4,8 @@ import com.eignex.klause.factor.bool.CardinalityPropagator
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 // Resolves pseudo-Boolean conflicts with coefficient-carrying reasons. If a sound PB derivation is not
 // available, [failed] sends the conflict through [ClauseResolvent].

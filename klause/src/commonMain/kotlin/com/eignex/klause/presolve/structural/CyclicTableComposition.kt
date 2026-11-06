@@ -1,8 +1,8 @@
 package com.eignex.klause.presolve.structural
 
 import com.eignex.klause.factor.table.Table
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
 
 internal object CyclicTableComposition {
     private class Tuple(val values: LongArray) {

@@ -1,6 +1,6 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.util.mixIntKey
+import com.eignex.util.hash.fibonacciHash
 
 // Each walk starts with the same hash layout, including growth order: tied regressed factors
 // must be visited in the same order regardless of how wide an earlier walk was.
@@ -23,7 +23,7 @@ internal class RepairChainDegrees {
     fun record(fid: Int, degree: Int) {
         val table = tables[level]
         val mask = table.capacity - 1
-        var i = mixIntKey(fid) and mask
+        var i = fibonacciHash(fid) and mask
         while (table.keys[i] >= 0) {
             if (table.keys[i] == fid) return
             i = (i + 1) and mask
@@ -63,7 +63,7 @@ internal class RepairChainDegrees {
         for (i in old.keys.indices) {
             val fid = old.keys[i]
             if (fid < 0) continue
-            var j = mixIntKey(fid) and mask
+            var j = fibonacciHash(fid) and mask
             while (next.keys[j] >= 0) j = (j + 1) and mask
             next.keys[j] = fid
             next.degrees[j] = old.degrees[i]

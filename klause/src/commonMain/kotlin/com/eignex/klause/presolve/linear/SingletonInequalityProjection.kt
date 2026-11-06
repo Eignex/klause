@@ -12,8 +12,8 @@ import com.eignex.klause.presolve.asSampleLift
 import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.ScanMeter
+import com.eignex.util.collections.IntArrayList
 
 /**
  * Project out a variable that occurs in exactly one linear **inequality** and nowhere else (nor in the

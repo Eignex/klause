@@ -5,7 +5,7 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal class LinearIncumbentSharing {
     class Key(

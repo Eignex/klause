@@ -15,9 +15,9 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.addExact
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
 
 internal object DominatedVariables {
 

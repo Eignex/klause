@@ -10,8 +10,8 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.forEachCandidate
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableLongIntMap
 
 internal class NValueInvariant(
     private val n: Int,

@@ -1,9 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.signum
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.signum
 
 internal const val LP_CAPTURE_VERSION: Int = 2
 internal const val LP_EVENT_VERSION: Int = 1

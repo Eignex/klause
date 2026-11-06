@@ -12,9 +12,9 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.SteppedIntInvariant
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntIntMap
+import com.eignex.util.collections.MutableIntObjectMap
 
 internal class TableInvariant(
     private val xs: IntArray,

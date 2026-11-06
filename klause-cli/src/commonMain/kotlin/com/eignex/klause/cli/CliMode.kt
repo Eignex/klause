@@ -30,6 +30,8 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.process.printErrorLine
+import com.eignex.util.process.processProperty
 import kotlin.time.Duration.Companion.milliseconds
 
 /*
@@ -104,8 +106,8 @@ internal fun routingSlice(budget: PresolveBudget, solveStop: Cancellation): Canc
  */
 internal fun CommonOptions.sharedPresolveBudget(): PresolveBudget? {
     if (!presolveAllowanceInitialized) {
-        val explicit = cliProp(CliKnobs.presolveBudgetMs)?.toLongOrNull()
-        val fraction = cliProp(CliKnobs.presolveBudgetFraction)?.toDoubleOrNull()
+        val explicit = processProperty(CliKnobs.presolveBudgetMs)?.toLongOrNull()
+        val fraction = processProperty(CliKnobs.presolveBudgetFraction)?.toDoubleOrNull()
             ?: CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION
         val budgetMs = explicit ?: SolveCore.derivedPresolveBudgetMs(timeLimitMs, fraction)
         presolveBudget = when (val setting = takeAllowanceSetting(engineParams, "presolve-work-limit")) {
@@ -255,7 +257,7 @@ internal class FlagSpec(
 /** The engine for a bare invocation (no `-e`, no `-f`): the `KLAUSE_ENGINE` env var /
  *  `klause.engine` property when set — so a packaged image (e.g. a MiniZinc-Challenge-compliant
  *  Docker build) can ship a different default — else [FiniteEngine.DEFAULT]. `-e` and `-f` override it. */
-internal fun defaultEngine(): FiniteEngine = cliProp(CliKnobs.engine)
+internal fun defaultEngine(): FiniteEngine = processProperty(CliKnobs.engine)
     ?.let { parseEngine(it) ?: usageError("unknown KLAUSE_ENGINE `$it`; expected ${engineIds()}") }
     ?: FiniteEngine.DEFAULT
 
@@ -279,7 +281,7 @@ internal fun engineIds(): String = FiniteEngine.entries.joinToString(" | ") { it
 /** The `--lp` ceiling spec for a bare invocation: the `KLAUSE_LP` env var / `klause.lp` property when
  *  set — so a packaged image can ship a different LP default — else null (the per-engine built-in
  *  default applies). An explicit `--lp` overrides it. The spec is parsed by `LpConfig.parse`. */
-internal fun defaultLp(): String? = cliProp(CliKnobs.lp)
+internal fun defaultLp(): String? = processProperty(CliKnobs.lp)
 
 /** The solver-control flags every mode accepts. Mode-specific flags are appended per mode. */
 internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
@@ -479,7 +481,7 @@ private fun parseLong(token: String, args: Array<String>, i: Int, byName: Map<St
     val spec = byName[name]
     return when {
         spec == null -> {
-            errPrintln("klause-cli: ignoring unknown flag $name")
+            printErrorLine("klause-cli: ignoring unknown flag $name")
             i + 1
         }
 
@@ -509,7 +511,7 @@ private fun parseShortCluster(token: String, args: Array<String>, i: Int, byName
         val spec = byName[name]
         when {
             spec == null -> {
-                errPrintln("klause-cli: ignoring unknown flag $name")
+                printErrorLine("klause-cli: ignoring unknown flag $name")
                 j++
             }
 

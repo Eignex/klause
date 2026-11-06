@@ -4,8 +4,8 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
 
 /** Selects the next affine pivot under the run's consumer admission. */
 internal object AffinePivotOrders {

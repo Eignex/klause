@@ -6,9 +6,9 @@ import com.eignex.klause.arithmetic.difference.indexOfSorted
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayDeque
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
 
 /**
  * Maximum open heads visited per refutation sweep. Each costs at most one shortest-path search;
@@ -400,7 +400,7 @@ internal class DifferenceSystemPropagator(
             val negated = Lit.negate(g)
             if (!lits.contains(negated)) lits.add(negated)
         }
-        return if (lits.isEmpty()) EmptyIntArray else lits.toIntArray()
+        return if (lits.isEmpty()) emptyIntArray() else lits.toIntArray()
     }
 
     /**

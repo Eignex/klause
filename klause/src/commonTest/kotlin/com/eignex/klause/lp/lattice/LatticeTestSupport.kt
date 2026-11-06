@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.lattice
 
-import com.eignex.klause.util.bigIntOf
+import com.eignex.util.numbers.bigIntOf
 
 @Suppress("ArrayPrimitive")
 internal fun sparseRows(vararg rows: LongArray): List<SparseIntRow> =

@@ -3,7 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.LongArrayList
 
 /**
  * Mutable accumulator that factors push repair-move suggestions into. Optionally consults

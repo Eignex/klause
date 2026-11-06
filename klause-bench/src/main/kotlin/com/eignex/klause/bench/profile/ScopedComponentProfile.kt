@@ -18,16 +18,16 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.numbers.parseBigInt
+import java.io.File
+import java.math.BigInteger
+import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.io.File
-import java.math.BigInteger
-import kotlin.random.Random
-import kotlin.time.Duration.Companion.milliseconds
 
 internal data class ComponentResidual(
     val identity: String,

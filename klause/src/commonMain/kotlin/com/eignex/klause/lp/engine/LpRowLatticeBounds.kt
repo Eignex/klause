@@ -1,9 +1,9 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.rem
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.remainderOf
+import com.eignex.util.numbers.toLongExact
 import kotlin.math.abs
 
 internal fun rowLatticeBounds(
@@ -173,6 +173,6 @@ private fun positiveRemainder(value: Long, divisor: Long): Long {
 private fun rowResidue(coefficient: Long, value: Long, divisor: Long, meter: MixedCertificateMeter): Long {
     meter.reserve(256L)
     val product = meter.multiply(BigFraction.ofLong(coefficient), BigFraction.ofLong(value))
-    val remainder = (product.num % bigIntOf(divisor)).toLongExact()
+    val remainder = (product.num.remainderOf(bigIntOf(divisor))).toLongExact()
     return if (remainder < 0L) remainder + divisor else remainder
 }

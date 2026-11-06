@@ -15,11 +15,13 @@ import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.LinearSourceWitness
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.fitsLong
+import com.eignex.util.io.openTextFile
+import com.eignex.util.io.useSource
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.fitsLong
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.time.TimeSource
@@ -45,7 +47,7 @@ internal object MpsMode : CliMode {
             val start = TimeSource.Monotonic.markNow()
             outputState = MpsOutputState()
             val overrides = common.sourceOverrides(mpsSemantics)
-            val parsed = openFileSource(path).useSource { Mps.parse(it) }
+            val parsed = openTextFile(path).useSource { Mps.parse(it) }
             return common.routingPreparationCancellation().use { stop ->
                 val source = parsed.toLinearSourceProblem(overrides, stop) ?: return interruptedSolvable(
                     if (stop()) TerminationReason.Timeout else TerminationReason.Cancelled,

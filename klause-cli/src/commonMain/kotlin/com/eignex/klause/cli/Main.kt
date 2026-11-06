@@ -6,6 +6,10 @@ import com.eignex.klause.formats.opb.OpbLoweringException
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.PipelineConfigException
 import com.eignex.klause.solver.result.UnsoundnessException
+import com.eignex.util.platform.startHeapPeakSampler
+import com.eignex.util.process.exitProcess
+import com.eignex.util.process.printErrorLine
+import com.eignex.util.process.processProperty
 
 /*
  * CLI entry point: parse shared and mode flags, select a mode by --format or extension
@@ -20,7 +24,7 @@ internal val MODES: List<CliMode> = listOf(MiniZincMode, Xcsp3Mode, SmtLibMode, 
 /** Parse args once, select the front-end mode, load the instance and run the shared driver. */
 fun main(args: Array<String>) {
     val code = runCli(args)
-    if (code != EXIT_OK) exitCli(code)
+    if (code != EXIT_OK) exitProcess(code)
 }
 
 /** Process exit codes: success returns without touching the exit path; a boundary error uses [EXIT_ERROR], and a
@@ -37,29 +41,29 @@ internal fun runCli(args: Array<String>): Int = try {
     run(args)
     EXIT_OK
 } catch (e: CliUsageException) {
-    errPrintln("klause-cli: ${e.message}")
+    printErrorLine("klause-cli: ${e.message}")
     EXIT_ERROR
 } catch (e: PipelineConfigException) {
-    errPrintln("klause-cli: ${e.message}")
+    printErrorLine("klause-cli: ${e.message}")
     EXIT_ERROR
 } catch (e: FormatException) {
     // A parser rejecting malformed/unsupported input is a user error, not a crash: its message
     // already carries the `klause <format>: <message>` prefix, so surface it verbatim on stderr
     // and exit with the CLI error code rather than leaking a stack trace.
-    errPrintln(e.message.orEmpty())
+    printErrorLine(e.message.orEmpty())
     EXIT_ERROR
 } catch (e: MpsLoweringException) {
-    errPrintln("klause ${e.message.orEmpty()}")
+    printErrorLine("klause ${e.message.orEmpty()}")
     EXIT_ERROR
 } catch (e: OpbLoweringException) {
-    errPrintln("klause ${e.message.orEmpty()}")
+    printErrorLine("klause ${e.message.orEmpty()}")
     EXIT_ERROR
 } catch (e: UnsoundnessException) {
-    errPrintln("klause-cli: UNSOUND: ${e.message}")
-    errPrintln(e.stackTraceToString())
+    printErrorLine("klause-cli: UNSOUND: ${e.message}")
+    printErrorLine(e.stackTraceToString())
     EXIT_UNSOUND
 } catch (e: IllegalArgumentException) {
-    errPrintln("klause-cli: ${e.message}")
+    printErrorLine("klause-cli: ${e.message}")
     EXIT_ERROR
 }
 
@@ -98,7 +102,7 @@ private fun run(args: Array<String>) {
     // Anchor the `-t` budget once, before parsing/baking, so the bake and the solve share one
     // deadline instead of each restarting the clock.
     common.deadlineAtMs = common.timeLimitMs?.let { nowMillis() + it }
-    common.startDebugStatistics(cliProp("klause.debug") == "true")
+    common.startDebugStatistics(processProperty("klause.debug") == "true")
     val mode = pickMode(common, path)
     val session = sessions.getValue(mode)
     // Peak heap has to be watched from before the parse, since ingest is what the dry-run measures and

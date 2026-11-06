@@ -11,9 +11,9 @@ import com.eignex.klause.ir.defaultIrSemantics
 import com.eignex.klause.ir.withStorage
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyDoubleArray
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.collections.Bits
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
@@ -192,8 +192,8 @@ class BakedProblem private constructor(
         impliedFactorMask: BooleanArray? = null,
         hasSymmetryBreaking: Boolean = false,
         numRealVars: Int = 0,
-        realLower: DoubleArray = EmptyDoubleArray,
-        realUpper: DoubleArray = EmptyDoubleArray,
+        realLower: DoubleArray = emptyDoubleArray(),
+        realUpper: DoubleArray = emptyDoubleArray(),
         openIntLo: BooleanArray? = null,
         openIntHi: BooleanArray? = null,
         packedOpenIntLo: Bits? = null,

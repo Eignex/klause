@@ -5,8 +5,8 @@ import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Term
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 
 internal fun ExactLinear.finiteRelaxationSupported(): Boolean = relation != LinearOp.NE &&
     ((compactRelaxationSupported() && (activator == LinearRow.ALWAYS || relation != LinearOp.EQ)) ||

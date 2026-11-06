@@ -1,10 +1,12 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.formats.opb.opbSemantics
 import com.eignex.klause.formats.opb.Opb
+import com.eignex.klause.formats.opb.opbSemantics
 import com.eignex.klause.formats.opb.toProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.toLinearObjective
+import com.eignex.util.io.openTextFile
+import com.eignex.util.io.useSource
 
 /**
  * OPB/WBO pseudo-Boolean front-end (`.opb`, `.wbo`). Satisfaction (`SAT`), optimisation (`min:`),
@@ -25,7 +27,7 @@ internal object OpbMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(opbSemantics)
-            val parsed = openFileSource(path).useSource { Opb.parse(it) }.toProblem(
+            val parsed = openTextFile(path).useSource { Opb.parse(it) }.toProblem(
                 common.config.problemSettings(), semanticOverrides = overrides,
             )
             cliLogger(common.verbose).v {

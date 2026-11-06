@@ -19,12 +19,12 @@ import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
 
 /**
  * Folds the reified encoding of an intension comparison disjunction into one [ComparisonClause]. A

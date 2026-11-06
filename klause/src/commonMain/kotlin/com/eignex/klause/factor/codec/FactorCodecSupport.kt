@@ -3,7 +3,7 @@ package com.eignex.klause.factor.codec
 import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.WideConstants
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BigInt
 
 // Integral rows write 64-bit constants as numbers and wider ones as decimal strings under `wide…` fields,
 // so a document keeps the width a row was built at and a reader sees which arithmetic it needs.

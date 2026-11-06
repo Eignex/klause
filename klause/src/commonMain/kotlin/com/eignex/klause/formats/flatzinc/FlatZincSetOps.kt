@@ -7,8 +7,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.binarySearchInt
+import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.collections.IntArrayList
 
 internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Boolean) =
     emitSetSelection(c, varArray)

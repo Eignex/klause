@@ -23,7 +23,7 @@ import com.eignex.klause.ir.constsOf
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BigInt
 
 /**
  * `auxBoolVar ↔ (Σ coeff(i)·vars(i) ⟨op⟩ bound)`. Created by the compiler when a

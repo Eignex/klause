@@ -11,12 +11,12 @@ import com.eignex.klause.propagation.OptionalPresence
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.boundLiteral
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.LongHashSet
-import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableLongIntMap
 
 /** CP propagation logic for `nvalue`. */
 internal class NValuePropagator(
@@ -98,7 +98,7 @@ internal class NValuePropagator(
                 val cover = if (state.currentLevel == 0) {
                     null
                 } else {
-                    hallReason(state, kingCoverVars(matching), EmptyIntArray)
+                    hallReason(state, kingCoverVars(matching), emptyIntArray())
                 }
                 if (matching.size < state.intDomains[n].max &&
                     !state.tightenIntMax(n, matching.size.toLong(), cover)

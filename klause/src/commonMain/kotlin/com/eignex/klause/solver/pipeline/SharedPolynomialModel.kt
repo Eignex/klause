@@ -23,8 +23,8 @@ import com.eignex.klause.theory.TheoryEncoding
 import com.eignex.klause.theory.TheoryRealId
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraAssignment
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BigInt
 
 internal class SharedPolynomialModel private constructor(
     val source: Problem,

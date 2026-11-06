@@ -8,11 +8,11 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
 
 internal class LiteralIntDefinition(override val out: Int, val literal: Int) : SweepNode {
     override val outIsBool: Boolean get() = false
-    override val intInputs: IntArray get() = EmptyIntArray
+    override val intInputs: IntArray get() = emptyIntArray()
     override val boolInputs: IntArray = intArrayOf(Lit.variable(literal))
 
     override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long {
@@ -30,7 +30,7 @@ internal sealed class UnaryPredicateDefinition(
 ) : SweepNode {
     override val outIsBool: Boolean get() = true
     override val intInputs: IntArray = intArrayOf(input)
-    override val boolInputs: IntArray get() = EmptyIntArray
+    override val boolInputs: IntArray get() = emptyIntArray()
 
     fun holds(inputValue: Long): Boolean = when (op) {
         LinearOp.EQ -> inputValue == value

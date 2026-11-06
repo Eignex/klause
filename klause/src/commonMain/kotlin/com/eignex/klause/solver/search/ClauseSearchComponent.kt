@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 /**
  * Boolean clauses hosted by the shared session rather than by a frontend-specific search loop.

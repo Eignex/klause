@@ -9,8 +9,8 @@ import com.eignex.klause.lp.engine.LpProjectionStop
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntDisjointSet
-import com.eignex.klause.util.argsortBy
+import com.eignex.util.arrays.argsortBy
+import com.eignex.util.collections.IntDisjointSet
 import kotlin.math.floor
 import kotlin.time.TimeSource
 

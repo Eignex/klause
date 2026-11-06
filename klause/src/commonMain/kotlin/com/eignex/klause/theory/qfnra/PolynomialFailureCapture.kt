@@ -4,7 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal class PolynomialFailureCursorState(val operation: Map<String, String>, val context: Map<String, String>)
 

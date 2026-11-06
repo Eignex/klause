@@ -15,8 +15,8 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.exactRealSource
 import com.eignex.klause.theory.transcendental.SourceTruth
 import com.eignex.klause.theory.transcendental.TranscendentalSourceCheck
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.numbers.BIG_ONE
 
 /**
  * Check an exact sample against every native factor and declaration using complete polynomial encodings.

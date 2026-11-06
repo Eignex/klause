@@ -1,10 +1,10 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.formats.minizinc.*
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
 import kotlin.math.abs
 
 /** Evaluates `.ozn` expressions against solver bindings and renders output text. */

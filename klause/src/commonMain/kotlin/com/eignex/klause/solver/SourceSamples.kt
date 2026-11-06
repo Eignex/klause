@@ -6,9 +6,9 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TranscendentalAssignment
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.toSample
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.toLongExact
 
 /** Solve a native source and retain its typed exact witness in the ordinary [Sample] result surface. */
 fun SourceStrategy.solveSample(

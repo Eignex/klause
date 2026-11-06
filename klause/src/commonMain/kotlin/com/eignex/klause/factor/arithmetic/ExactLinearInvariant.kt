@@ -11,23 +11,23 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.Int128
-import com.eignex.klause.util.IntIntMap
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.rem
-import com.eignex.klause.util.shl
-import com.eignex.klause.util.signum
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toDouble
-import com.eignex.klause.util.toLong
+import com.eignex.util.collections.IntIntMap
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.Int128
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.remainderOf
+import com.eignex.util.numbers.shl
+import com.eignex.util.numbers.signum
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toDouble
+import com.eignex.util.numbers.toLong
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -399,7 +399,7 @@ internal class ExactLinearInvariant(
     private fun target(c: BigInt, remaining: BigInt, want: Boolean): BigInt? {
         val positive = c > BIG_ZERO
         return when (op) {
-            LinearOp.EQ -> if (remaining % c == BIG_ZERO) remaining / c else null
+            LinearOp.EQ -> if (remaining.remainderOf(c) == BIG_ZERO) remaining / c else null
 
             LinearOp.LE -> when {
                 want -> if (positive) floorDiv(remaining, c) else ceilDiv(remaining, c)

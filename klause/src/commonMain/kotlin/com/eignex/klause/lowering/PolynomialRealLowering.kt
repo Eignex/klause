@@ -7,7 +7,7 @@ import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal class PolynomialRealLowering(
     firstAuxiliaryReal: Int,

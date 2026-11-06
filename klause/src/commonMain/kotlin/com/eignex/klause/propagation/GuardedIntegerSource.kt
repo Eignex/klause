@@ -12,8 +12,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.subExact
 
 internal class IntegerSourceRow(val linear: LinearPropagator, val guard: Int = Lit.NONE) {
     fun row(useLo: Boolean): IntegerConflictRow? = IntegerConflictRow.source(linear, useLo, guard)

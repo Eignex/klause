@@ -116,7 +116,7 @@ internal class FunctionSourceLowering(
 
     fun expression(source: PolynomialExpression): TranscendentalExpression {
         val result = formula(PolynomialRealFormula.Atom(source, com.eignex.klause.ir.PolynomialRelation.EQ,
-            PolynomialExpression.Constant.of(com.eignex.klause.util.BIG_ZERO)))
+            PolynomialExpression.Constant.of(com.eignex.util.numbers.BIG_ZERO)))
         return (result as TranscendentalFormula.Atom).left
     }
 

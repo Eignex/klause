@@ -22,10 +22,10 @@ import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraAssignment
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.plus
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.plus
 
 internal sealed interface QuadraticIntegerNode {
     data class Closed(

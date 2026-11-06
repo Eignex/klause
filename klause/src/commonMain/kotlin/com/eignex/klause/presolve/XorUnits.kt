@@ -9,15 +9,15 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.ScanMeter
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.isZero
-import com.eignex.klause.util.rem
+import com.eignex.util.collections.Bits
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongHashSet
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.rem
 
 internal object XorUnits {
 

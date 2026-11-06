@@ -14,7 +14,7 @@ import com.eignex.klause.model.IntSum
 import com.eignex.klause.model.MddExpr
 import com.eignex.klause.model.Or
 import com.eignex.klause.model.TableConstraint
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.collections.IntArrayList
 
 /*
  * Layered-automaton globals (MDD, cost_mdd, cost_regular). Each posts the native [Mdd] factor when its

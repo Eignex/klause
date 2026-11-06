@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.util.process.flushStandardOutput
 
 /**
  * Shared competition output plumbing. Formats may stream finite optimization assignments;
@@ -103,7 +104,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     private fun emitWitness(rendered: String) {
         arithmeticWitnessStatus()?.let(::println)
         println(rendered)
-        flushCliOutput()
+        flushStandardOutput()
         emittedWitness = rendered
     }
 

@@ -26,10 +26,11 @@ import com.eignex.klause.solver.projection.FloatGridRequest
 import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.solver.projection.prepareFloatGrid
 import com.eignex.klause.solver.validation.verifyOpenWitness
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.toLongExact
 
 internal class CompiledSourceBinding(
     val originalProblem: Problem,
@@ -191,8 +192,8 @@ internal class CompiledSourceBinding(
                 incident.getOrPut(id) { ArrayList() } += index
             }
         }
-        val pending = ArrayDeque<Int>()
-        pending.addAll(selected)
+        val pending = IntArrayDeque()
+        for (id in selected) pending.addLast(id)
         val visited = HashSet<Int>()
         while (pending.isNotEmpty()) {
             for (factor in incident[pending.removeFirst()].orEmpty()) {
@@ -202,7 +203,7 @@ internal class CompiledSourceBinding(
                 for (id in originalProblem.factors[factor].variables.reals) {
                     cancellation.charge(1)
                     if (cancellation()) return null
-                    if (selected.add(id)) pending += id
+                    if (selected.add(id)) pending.addLast(id)
                 }
             }
         }

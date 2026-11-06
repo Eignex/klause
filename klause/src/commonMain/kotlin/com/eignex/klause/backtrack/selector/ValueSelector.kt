@@ -8,8 +8,8 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.ValueOrderingStatsSink
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.EmptyLongArray
-import com.eignex.klause.util.LongHashSet
+import com.eignex.util.arrays.emptyLongArray
+import com.eignex.util.collections.LongHashSet
 import kotlin.math.ln
 import kotlin.random.Random
 
@@ -168,7 +168,7 @@ internal fun probeAndOrder(
     }
     // Whatever the probes did not reach still has to be offered, or the search would silently skip
     // values the domain holds and could report unsat over a region it never entered.
-    val unprobed = if (probed < candidates.size) candidates.copyOfRange(probed, candidates.size) else EmptyLongArray
+    val unprobed = if (probed < candidates.size) candidates.copyOfRange(probed, candidates.size) else emptyLongArray()
     if (ascending) scored.sortBy { it.second } else scored.sortByDescending { it.second }
     if (varRef is VarRef.IntVar) {
         val d = session.intDomain(varRef.varId)

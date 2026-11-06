@@ -1,6 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.LongArrayList
 
 /** Recursive-descent FlatZinc 1.6 parser with one-token lookahead. */
 internal class FlatZincParser(private val lexer: FlatZincLexer) {

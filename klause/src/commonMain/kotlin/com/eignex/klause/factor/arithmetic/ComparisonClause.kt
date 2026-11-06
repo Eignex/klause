@@ -13,9 +13,9 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
 
 /**
  * Disjunction `⋁ᵢ (vars(i) ⟨ops(i)⟩ consts(i))` of single-variable comparisons against constants.

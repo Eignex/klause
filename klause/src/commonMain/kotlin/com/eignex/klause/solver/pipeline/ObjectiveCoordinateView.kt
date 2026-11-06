@@ -11,7 +11,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
+import com.eignex.util.numbers.fitsLong
 
 internal class ObjectiveCoordinateView private constructor(
     val problem: BakedProblem,

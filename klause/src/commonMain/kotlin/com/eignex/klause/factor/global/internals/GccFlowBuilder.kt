@@ -2,8 +2,8 @@ package com.eignex.klause.factor.global.internals
 
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevIntArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
 
 /**
  * Integer max-flow (level graph + blocking flow) over a graph stored as parallel arrays. Edges come
@@ -36,10 +36,10 @@ internal class GccFlowBuilder {
     var numNodes: Int = 0
         private set
 
-    private var parentEdge = EmptyIntArray
-    private var bfsQueue = EmptyIntArray
-    private var level = EmptyIntArray
-    private var edgeIter = EmptyIntArray
+    private var parentEdge = emptyIntArray()
+    private var bfsQueue = emptyIntArray()
+    private var level = emptyIntArray()
+    private var edgeIter = emptyIntArray()
 
     private fun isRemoved(e: Int): Boolean = (removed?.get(e) ?: 0) == 1
 
@@ -326,12 +326,12 @@ internal class GccFlowBuilder {
         return 0
     }
 
-    private var sccIndex = EmptyIntArray
-    private var sccLow = EmptyIntArray
+    private var sccIndex = emptyIntArray()
+    private var sccLow = emptyIntArray()
     private var sccOnStack = BooleanArray(0)
-    private var sccStk = EmptyIntArray
-    private var sccCall = EmptyIntArray
-    private var sccIter = EmptyIntArray
+    private var sccStk = emptyIntArray()
+    private var sccCall = emptyIntArray()
+    private var sccIter = emptyIntArray()
 
     /**
      * Residual-SCC labels over nodes `0 until limit`, written into [sccId]. An iterative index/lowlink

@@ -7,7 +7,7 @@ import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.SourceObjectivePairing
-import com.eignex.klause.util.unaryMinus
+import com.eignex.util.numbers.unaryMinus
 
 internal class CompiledObjectivePairing private constructor(
     override val owner: Any,

@@ -3,9 +3,9 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.LongArrayList
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
 
 /**
  * Layered flow hull — the exact convex hull of the diagram's accepting paths. An arc variable

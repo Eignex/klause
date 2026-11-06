@@ -4,11 +4,11 @@ import com.eignex.klause.lp.lattice.HermiteForm
 import com.eignex.klause.lp.lattice.SparseIntRow
 import com.eignex.klause.lp.lattice.hermiteNormalForm
 import com.eignex.klause.lp.lattice.sparseIntRow
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.isZero
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.isZero
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

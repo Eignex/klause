@@ -1,10 +1,10 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.EmptyBooleanArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.DynamicBits
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 
 // Classical 1UIP clause resolvent (L. Zhang, C. F. Madigan, M. W. Moskewicz, S. Malik, "Efficient Conflict
 // Driven Learning in a Boolean Satisfiability Solver", ICCAD 2001, https://doi.org/10.1109/ICCAD.2001.968634).
@@ -16,17 +16,17 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     private val minimizer = ClauseMinimizer(state, graph)
 
     // Reusable per-analysis scratch — grown once and cleared per call instead of reallocating
-    // O(numVars) BooleanArrays on every conflict. [universe] is the live var space (bool vars + atoms)
+    // O(numVars) flag arrays on every conflict. [universe] is the live var space (bool vars + atoms)
     // for the current analysis; all loops bound by it, since a buffer may be larger than the current
     // universe after a deeper earlier conflict.
     private var universe = 0
-    private var seen = EmptyBooleanArray
+    private var seen = DynamicBits()
 
     // Variables already resolved out as a pivot this analysis. The driver resolves the frontier in
     // reverse-assignment order, so a resolved variable recurs only when a reason cites a literal the trail
     // recorded late; [resolve] then skips it. Re-ingesting a resolved variable would let the 1UIP loop
     // ping-pong forever (and grow [bumpIntVars] until OOM), so the guard stays.
-    private var resolved = EmptyBooleanArray
+    private var resolved = DynamicBits()
 
     // Variables encountered (resolved through or kept) during the most recent analysis —
     // the canonical CDCL VSIDS bump set (every var seen while walking the implication
@@ -90,11 +90,9 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
         learned.clear()
     }
 
-    /** Return [arr] if already ≥ [n], else a fresh array; either way clear `[0, n)` to false. */
-    private fun scratch(arr: BooleanArray, n: Int): BooleanArray {
-        val a = if (arr.size >= n) arr else BooleanArray(n)
-        a.fill(false, 0, n)
-        return a
+    private fun scratch(bits: DynamicBits, n: Int): DynamicBits = bits.also {
+        it.resize(n)
+        it.clear()
     }
 
     override fun resolveOut(pivot: Int) {
@@ -260,7 +258,7 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
 
     /** Sorted-ascending array of distinct decision levels touched by [learned]; its size is the LBD. */
     private fun distinctLevelsOf(learned: IntArrayList): IntArray {
-        if (learned.size == 0) return EmptyIntArray
+        if (learned.size == 0) return emptyIntArray()
         val seen = IntHashSet(learned.size)
         for (i in 0 until learned.size) seen.add(graph.levelOf(Lit.variable(learned[i])))
         val out = seen.toIntArray()

@@ -12,11 +12,11 @@ import com.eignex.klause.ir.SourceIntDomains
 import com.eignex.klause.ir.defaultIrSemantics
 import com.eignex.klause.ir.intdomain.intDomainFromRuns
 import com.eignex.klause.ir.intdomain.runBounds
-import com.eignex.klause.util.Bits
-import com.eignex.klause.util.LongArrayList
 import com.eignex.skema.schemaJsonConfig
 import com.eignex.skema.serialization.JsonNodeCatalog
 import com.eignex.skema.serialization.toJsonSchema
+import com.eignex.util.collections.Bits
+import com.eignex.util.collections.LongArrayList
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json

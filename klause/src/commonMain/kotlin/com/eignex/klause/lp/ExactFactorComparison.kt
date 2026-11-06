@@ -9,8 +9,8 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.complemented
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
 
 /** Exact values of the mixed columns an [ExactComparison] states its terms over. */
 internal interface ExactColumnValues {

@@ -1,9 +1,9 @@
 package com.eignex.klause.lowering
 
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.toLongExact
 
 /**
  * Signed digit encoding `Σᵢ dᵢ·2^(width·i)`. [columns] are least significant first. All digits

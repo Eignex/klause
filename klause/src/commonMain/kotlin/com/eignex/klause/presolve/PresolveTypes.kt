@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.util.arrays.emptyIntArray
 
 /** A presolve transformation together with its solution reconstruction. */
 class Presolved(
@@ -57,7 +57,7 @@ internal class SourcePresolved(
  */
 internal class SourceDelta(
     /** Indices of input factors removed or replaced. */
-    val droppedIndices: IntArray = EmptyIntArray,
+    val droppedIndices: IntArray = emptyIntArray(),
     /** New or replacement factors to append after the retained input factors. */
     val addedFactors: List<Factor> = emptyList(),
     /** Integer ranges the pass proved, or null when it left every column's range as declared. */
@@ -134,7 +134,7 @@ private fun IntDomain.narrowedBy(bounds: IntBounds, v: Int): IntDomain? {
 /** A single pass's explicit change to its input problem. */
 class PassDelta(
     /** Indices of input factors removed or replaced. */
-    val droppedIndices: IntArray = EmptyIntArray,
+    val droppedIndices: IntArray = emptyIntArray(),
     /** New or replacement factors to append after the retained input factors. */
     val addedFactors: List<Factor> = emptyList(),
     /** Directly tightened integer domains, or `null` when unchanged. */

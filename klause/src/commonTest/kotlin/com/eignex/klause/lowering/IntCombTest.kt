@@ -1,7 +1,7 @@
 package com.eignex.klause.lowering
 
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BIG_ZERO
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_ZERO
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

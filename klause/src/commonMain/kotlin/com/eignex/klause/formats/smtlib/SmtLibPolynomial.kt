@@ -12,8 +12,8 @@ import com.eignex.klause.lowering.PolynomialConditional
 import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
 
 internal class SmtLibPolynomialProblem(
     private val capturedFormula: PolynomialRealFormula,

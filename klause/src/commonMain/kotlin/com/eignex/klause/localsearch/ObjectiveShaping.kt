@@ -3,8 +3,8 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.IntArrayList
 import kotlin.random.Random
 
 /**
@@ -49,7 +49,7 @@ class ObjectiveShaping {
      */
     val objectiveIntVars: IntArray
         get() {
-            val obj = proposalHotspots ?: objective ?: return EmptyIntArray
+            val obj = proposalHotspots ?: objective ?: return emptyIntArray()
             val cached = objIntVarsCache
             if (cached != null && objIntVarsFor === obj) return cached
             val computed = computeObjectiveIntVars(obj)
@@ -67,7 +67,7 @@ class ObjectiveShaping {
 
         is FunctionalObjective -> obj.leafVars.copyOf()
 
-        else -> EmptyIntArray
+        else -> emptyIntArray()
     }
 
     /** Sample an int decision variable biased toward the objective gradient ([objectiveIntVars]),

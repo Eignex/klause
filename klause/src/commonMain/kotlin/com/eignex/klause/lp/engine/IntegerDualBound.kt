@@ -1,17 +1,17 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.BIG_ONE
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.Int128
-import com.eignex.klause.util.abs
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.div
-import com.eignex.klause.util.magnitudeBitLength
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.shl
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.Int128
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.shl
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor

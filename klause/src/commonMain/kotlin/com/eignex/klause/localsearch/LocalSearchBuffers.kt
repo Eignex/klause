@@ -3,8 +3,8 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Assignment
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.IntSwapSet
+import com.eignex.util.arrays.emptyDoubleArray
+import com.eignex.util.collections.IntSwapSet
 
 internal const val INITIALIZATION_BATCH: Int = 256
 
@@ -45,7 +45,7 @@ internal class LocalSearchBuffers(
             yield(null)
             val refPayload = arrayOfNulls<Any>(problem.numFactors)
             yield(null)
-            val doublePayload = if (problem.numRealVars == 0) EmptyDoubleArray else DoubleArray(problem.numFactors)
+            val doublePayload = if (problem.numRealVars == 0) emptyDoubleArray() else DoubleArray(problem.numFactors)
             yield(null)
             var tabu: TabuBook? = null
             for (part in TabuBook.preparation(problem)) {

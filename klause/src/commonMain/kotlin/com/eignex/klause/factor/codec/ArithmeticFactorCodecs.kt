@@ -1,8 +1,7 @@
 package com.eignex.klause.factor.codec
 
-import com.eignex.klause.factor.arithmetic.Abs
-import com.eignex.klause.factor.arithmetic.ExactRealEquality
 import com.eignex.klause.arithmetic.real.ExactRealValue
+import com.eignex.klause.factor.arithmetic.Abs
 import com.eignex.klause.factor.arithmetic.AbsAffineValue
 import com.eignex.klause.factor.arithmetic.AffineAbs
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
@@ -10,6 +9,7 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.DivMod
 import com.eignex.klause.factor.arithmetic.DivModExpression
 import com.eignex.klause.factor.arithmetic.DivisionConvention
+import com.eignex.klause.factor.arithmetic.ExactRealEquality
 import com.eignex.klause.factor.arithmetic.GridAbs
 import com.eignex.klause.factor.arithmetic.GridArrayMinMax
 import com.eignex.klause.factor.arithmetic.GridCoordinate
@@ -24,7 +24,7 @@ import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.WideDivMod
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.util.BigInt
+import com.eignex.util.numbers.BigInt
 import kotlinx.serialization.Serializable
 
 // Integer operands are integer column ids and real operands real column ids unless a field says otherwise.

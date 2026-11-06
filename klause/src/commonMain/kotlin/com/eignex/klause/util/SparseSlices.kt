@@ -1,6 +1,9 @@
 package com.eignex.klause.util
 
 import com.eignex.koblas.DimensionMismatch
+import com.eignex.util.numbers.abs
+import com.eignex.util.numbers.maxOf
+import com.eignex.util.numbers.toLong
 import kotlin.math.abs
 
 // Every entry point validates windows, indices and buffer aliasing before its first write, then runs an

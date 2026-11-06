@@ -9,10 +9,10 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.reifyRealLinear
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.subExact
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.LongArrayList
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.subExact
 import kotlin.math.*
 
 internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean) {

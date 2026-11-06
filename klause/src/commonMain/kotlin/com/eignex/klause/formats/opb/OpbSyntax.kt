@@ -2,12 +2,12 @@ package com.eignex.klause.formats.opb
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.lineSequence
-import com.eignex.klause.util.parseBigInt
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.lineSequence
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.parseBigInt
 
 /** Syntax parser for OPB/WBO. It only validates and represents the input; [OpbDecoder] lowers it. */
 internal object OpbSyntax {

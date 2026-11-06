@@ -5,7 +5,7 @@ import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.magnitudeBitLength
+import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class ExplainedLinearBound(
     val value: BigFraction,

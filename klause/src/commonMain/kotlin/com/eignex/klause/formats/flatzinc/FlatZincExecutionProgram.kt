@@ -17,8 +17,8 @@ import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.PreparedSourceInvocation
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
 
 /** Compatibility request for native local-search views of one retained FlatZinc source program. */
 data class FlatZincExecutionProgram(

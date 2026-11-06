@@ -16,6 +16,7 @@ import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.LinearSourceWitness
+import com.eignex.util.process.printErrorLine
 
 internal fun solveLinearSource(
     solvable: Solvable,
@@ -55,8 +56,8 @@ internal fun solveLinearSource(
             }
 
             is FiniteSolveOutcome.DryRun -> {
-                errPrintln(outcome.heading)
-                outcome.lines.forEach(::errPrintln)
+                printErrorLine(outcome.heading)
+                outcome.lines.forEach(::printErrorLine)
                 return
             }
 
@@ -130,14 +131,14 @@ internal fun solveLinearSource(
 }
 
 internal fun printFiniteLinearSourcePreparation(problem: Problem) {
-    errPrintln(
+    printErrorLine(
         "source preparation: factors ${problem.numFactors}, ints ${problem.numIntVars}, " +
             "reals ${problem.numRealVars}",
     )
     val groups = problem.factors.indices.groupBy { problem.factors[it]::class.simpleName ?: "?" }
     for ((name, indices) in groups.entries.sortedBy { it.key }) {
         val implied = indices.count { problem.impliedFactorMask?.get(it) == true }
-        errPrintln("source preparation factor $name: total=${indices.size}, implied=$implied")
+        printErrorLine("source preparation factor $name: total=${indices.size}, implied=$implied")
     }
 }
 

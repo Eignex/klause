@@ -7,16 +7,16 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
-import com.eignex.klause.util.BIG_ONE
-import com.eignex.klause.util.BigInt
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.div
-import com.eignex.klause.util.minus
-import com.eignex.klause.util.times
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLongExact
 
 internal class WideDivModDefinition(
     private val relation: WideDivMod,
@@ -27,7 +27,7 @@ internal class WideDivModDefinition(
     private val radix: BigInt?,
 ) : SweepNode {
     override val outIsBool: Boolean get() = false
-    override val boolInputs: IntArray get() = EmptyIntArray
+    override val boolInputs: IntArray get() = emptyIntArray()
     override val intInputs: IntArray = relation.dividend.coefficients.keys.toIntArray()
 
     override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long {

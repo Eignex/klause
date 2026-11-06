@@ -8,8 +8,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.BigInt
-import com.eignex.klause.util.compareTo
+import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.compareTo
 
 /**
  * CP propagator for a [Linear] row whose coefficients or bound exceed the 64-bit range (the wide form).

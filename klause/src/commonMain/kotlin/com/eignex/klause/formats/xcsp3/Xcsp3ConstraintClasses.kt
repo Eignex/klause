@@ -1,7 +1,8 @@
 package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.util.collections.DynamicBits
+import com.eignex.util.collections.MutableIntLongMap
 
 /**
  * The XCSP3 constraint classes the solver reads, inherited from every enclosing `block`, `group` and
@@ -15,7 +16,7 @@ internal class Xcsp3ConstraintClasses(private val factors: List<Factor>) {
     private var scopeStart = 0
 
     // Indexed by factor; allocated by the first classified constraint.
-    private var implied: BooleanArray? = null
+    private var implied: DynamicBits? = null
 
     // Defined variable -> packed `[start, end)` factor range of a shared definition a classified
     // constraint emitted first.
@@ -78,7 +79,7 @@ internal class Xcsp3ConstraintClasses(private val factors: List<Factor>) {
         val range = definitions.getOrDefault(variable, -1L)
         if (range < 0L) return
         definitions.remove(variable)
-        implied?.fill(false, (range ushr Int.SIZE_BITS).toInt(), range.toInt())
+        implied?.clearRange((range ushr Int.SIZE_BITS).toInt(), range.toInt())
     }
 
     /** Whether factor [index] is marked implied. */
@@ -93,28 +94,19 @@ internal class Xcsp3ConstraintClasses(private val factors: List<Factor>) {
     fun compact(removed: Set<Int>) {
         val marks = implied ?: return
         var next = 0
-        for (index in marks.indices) if (index !in removed) marks[next++] = marks[index]
-        marks.fill(false, next)
+        for (index in 0 until marks.size) if (index !in removed) marks[next++] = marks[index]
+        marks.resize(next)
     }
 
     /** The per-factor implied flags over [count] factors, or null when no factor is implied. */
     fun mask(count: Int): BooleanArray? {
         val marks = implied ?: return null
-        val mask = marks.copyOf(count)
+        val mask = BooleanArray(count) { it < marks.size && marks[it] }
         return if (mask.any { it }) mask else null
     }
 
     private fun mark(start: Int, end: Int) {
-        if (start < end) withCapacity(end).fill(true, start, end)
-    }
-
-    private fun withCapacity(size: Int): BooleanArray {
-        val marks = implied
-        if (marks != null && marks.size >= size) return marks
-        val grown = BooleanArray(maxOf(size, MIN_CAPACITY, 2 * (marks?.size ?: 0)))
-        marks?.copyInto(grown)
-        implied = grown
-        return grown
+        if (start < end) (implied ?: DynamicBits().also { implied = it }).setRange(start, end)
     }
 
     // A group template's attribute value is one string shared by every row, so the last parse is reused.
@@ -135,7 +127,6 @@ internal class Xcsp3ConstraintClasses(private val factors: List<Factor>) {
     private companion object {
         const val SYMMETRY = 1
         const val REDUNDANT = 2
-        const val MIN_CAPACITY = 16
 
         // The specification's names, and the hyphenated spellings generated instances carry.
         val SYMMETRY_CLASSES = setOf("symmetryBreaking", "symmetry-breaking")

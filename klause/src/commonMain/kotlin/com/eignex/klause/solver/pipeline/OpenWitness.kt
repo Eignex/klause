@@ -8,9 +8,9 @@ import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.fitsLong
-import com.eignex.klause.util.parseBigInt
-import com.eignex.klause.util.toLongExact
+import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.toLongExact
 
 internal fun OpenTheoryAssignment.toSample(model: Problem, invocation: EngineInvocation? = null): Sample {
     require(invocation == null || ((invocation.sourceModel.sameModel(ModelIdentity.of(model)) ||

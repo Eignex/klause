@@ -7,17 +7,17 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.util.BIG_ZERO
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.MutableIntIntMap
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.bigIntOf
-import com.eignex.klause.util.compareTo
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.plus
-import com.eignex.klause.util.times
+import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.collections.MutableIntIntMap
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.CheckedLongOverflowException
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.times
 
 internal fun sourceDefinitionSweep(
     problem: Problem,
@@ -85,7 +85,7 @@ internal fun DefinitionHint.Operand.variableOrNull(): Int? =
 internal class CapturedBooleanDefinition(private val hint: DefinitionHint.Boolean) : SweepNode {
     override val out: Int get() = hint.output
     override val outIsBool: Boolean get() = true
-    override val boolInputs: IntArray get() = EmptyIntArray
+    override val boolInputs: IntArray get() = emptyIntArray()
     override val intInputs: IntArray = when (hint) {
         is DefinitionHint.Comparison -> hint.inputs.mapNotNull { it.variableOrNull() }.distinct().toIntArray()
         is DefinitionHint.Membership -> intArrayOf(hint.input)
