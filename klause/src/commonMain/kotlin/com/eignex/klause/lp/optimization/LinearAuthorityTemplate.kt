@@ -34,9 +34,11 @@ internal class LinearAuthorityTemplate private constructor(
 
     fun withAdditional(
         additional: List<LinearAuthorityCut>, cancellation: Cancellation,
+        maximumCandidates: Int = Int.MAX_VALUE,
         onCost: (Long, Long) -> Unit = { _, _ -> },
     ): LinearAuthorityTemplate? {
-        if (additional.isEmpty()) return this
+        require(maximumCandidates >= additional.size)
+        if (additional.isEmpty() && (cuts == null || cuts.rows.size <= maximumCandidates)) return this
         val prepared = cuts ?: return null
         require(additional.size <= 64)
         for (cut in additional) {
@@ -49,7 +51,8 @@ internal class LinearAuthorityTemplate private constructor(
         onCost(prepared.rows.size.toLong() + additional.size,
             64L + (prepared.rows.size.toLong() + additional.size) * 8L)
         if (cancellation()) return null
-        return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows, prepared.withAdditional(additional))
+        return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows,
+            prepared.withAdditional(additional, maximumCandidates))
     }
 
     fun matches(other: SourceProofContext): Boolean = source.scope.revision == other.scope.revision &&

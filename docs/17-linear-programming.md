@@ -718,6 +718,11 @@ checked-candidate pass. Existing candidate IDs are preserved; appending produces
 a new template identity. Full owner and coordinate indices must belong to that
 template, and copying and indexing costs debit the containing source allowance.
 The proposal producer owns and funds derivation construction separately.
+Point-directed admission reserves appended proposals within a 64-candidate family
+and retains the existing candidate prefix in the remaining slots. Source-row owners
+and derivations retain their original indices; the new family is checked before
+selection. Generation and copying costs include discarded candidates. Ordinary
+template appends retain their full existing family.
 `source-aggregate-cuts=true` enables a template policy for numerical frontier
 traversal when source separation is enabled. A sparse index pairs source rows with
 opposite signs on a shared continuous coordinate. Each pair uses its first indexed
