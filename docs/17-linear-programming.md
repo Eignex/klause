@@ -1663,8 +1663,10 @@ them from finite worker recipe options; they change neither companion admission
 nor lifetime.
 A new template first runs the ordinary checked cut recipe; a completed point can
 add one selection round at that node. A trial that admits no candidate retains
-the ordinary template, checked query and numerical owner for later queries of that
-template. Successful selection retains its checked mask instead.
+the ordinary template, checked query and numerical owner. A fully checked current
+family with at most 64 installed cuts adopts its existing mask for subsequent
+installed-row aging; incomplete families keep the ordinary fallback. Successful
+selection retains its selected checked mask.
 Integer-only templates and aggregate-only cut families with at most 64 fully checked
 installed cuts adopt that mask directly from the current recipe, without another
 LP query or a root miss.
