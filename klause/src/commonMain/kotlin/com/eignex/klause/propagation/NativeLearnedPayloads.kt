@@ -78,7 +78,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         return try { operation() } finally { budget = previous }
     }
 
-    private fun locate(index: Int, visit: (Long) -> Unit): Page? {
+    private inline fun locate(index: Int, visit: (Long) -> Unit): Page? {
         if (index == 0) return primary
         val cacheSlot = index and CACHE_MASK
         if (cachedIndices[cacheSlot] == index) return cachedPages[cacheSlot]
