@@ -533,6 +533,8 @@ The opt-in `companion-repair=adaptive` requires `source-incumbent-completion=tru
 and uses the existing adaptive width sequence after that small start. Fixed repair
 is the default. If a small checked-center trial is refuted and more integer
 coordinates are available, continuation covers its first requested larger proposal.
+That proposal adds at most one integer to the small start; later proposals retain
+the adaptive sequence's wider requests.
 The proposal still selects connected integers, with the existing thirty-two-integer
 and traversal ceilings. A disconnected component can supply fewer coordinates than
 requested. Completion or decline of that larger proposal ends the trial; cancellation,
