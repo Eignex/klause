@@ -4,7 +4,10 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 import kotlin.math.abs
 import kotlin.math.round
 
@@ -46,8 +49,8 @@ internal class JointRepairNeighborhood private constructor(
 
     private fun connected(seed: Int, count: Int): Set<Int> {
         val selected = linkedSetOf(seed)
-        val seenColumns = hashSetOf(seed)
-        val seenRows = HashSet<Int>()
+        val seenColumns = IntHashSet().also { it.add(seed) }
+        val seenRows = IntHashSet()
         val queue = IntArrayDeque().also { it.addLast(seed) }
         var visits = 0
         while (queue.isNotEmpty() && selected.size < count && visits < MAX_SELECTION_VISITS) {
@@ -85,32 +88,35 @@ internal class JointRepairNeighborhood private constructor(
                     inputs.distinct().size == inputs.size)
             }
             val rows = ArrayList<IntArray>()
-            val occurrences = Array(integers + reals) { ArrayList<Int>() }
+            val occurrences = arrayOfNulls<IntArrayList>(integers + reals)
             var entries = integers + reals
             for (premise in source.premises.values) {
                 cancellation.charge(1)
                 if (cancellation() || ++entries > MAX_INDEX_ENTRIES) return null
-                val columns = ArrayList<Int>()
+                val columns = IntArrayList()
                 for ((coordinate, coefficient) in premise.inequality.coefficients) {
                     cancellation.charge(1)
                     if (cancellation() || ++entries > MAX_INDEX_ENTRIES) return null
                     if (coefficient.isZero || coordinate.kind == SourceCoordinate.Kind.Boolean) continue
                     val column = if (coordinate.kind == SourceCoordinate.Kind.Integer) coordinate.id
                         else integers + coordinate.id
-                    columns += column
+                    columns.add(column)
                 }
                 for (coordinate in premise.integerPins.keys) {
                     cancellation.charge(1)
                     if (cancellation() || ++entries > MAX_INDEX_ENTRIES) return null
-                    if (coordinate.id !in columns) columns += coordinate.id
+                    if (coordinate.id !in columns) columns.add(coordinate.id)
                 }
                 if (columns.size < 2) continue
-                for (column in columns) occurrences[column] += rows.size
+                columns.forEach { column ->
+                    val adjacent = occurrences[column] ?: IntArrayList(1).also { occurrences[column] = it }
+                    adjacent.add(rows.size)
+                }
                 rows += columns.toIntArray()
             }
             return if (cancellation()) null else
                 JointRepairNeighborhood(integers, rows,
-                    Array(occurrences.size) { occurrences[it].toIntArray() }, inputs)
+                    Array(occurrences.size) { occurrences[it]?.toIntArray() ?: emptyIntArray() }, inputs)
         }
     }
 }

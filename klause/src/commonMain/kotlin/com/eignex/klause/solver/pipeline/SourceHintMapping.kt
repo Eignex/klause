@@ -11,6 +11,8 @@ import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.retainedCoordinates
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.Cancellation
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.mulExact
@@ -113,12 +115,12 @@ internal fun VarRemap.followedBy(next: VarRemap, cancellation: Cancellation): Va
 }
 
 private fun mappedRoles(ids: IntArray, count: Int, rename: (Int) -> Int, cancellation: Cancellation): IntArray? {
-    val result = ArrayList<Int>(ids.size)
+    val result = IntArrayList(ids.size)
     for (id in ids) {
         cancellation.charge(1)
         if (cancellation() || id !in 0 until count) return null
         val target = rename(id)
-        if (target >= 0) result += target
+        if (target >= 0) result.add(target)
     }
     return result.toIntArray()
 }
@@ -138,7 +140,7 @@ internal class AffineReconstruction(
  */
 internal fun SourceMapping.affineReconstructions(cancellation: Cancellation): Map<Int, AffineReconstruction>? {
     val retained = retainedCoordinates(cancellation) ?: return null
-    val writes = HashMap<Int, Int>()
+    val writes = MutableIntIntMap()
     val affine = HashMap<Int, RebuildStep.AffineValue>()
     for (stage in stages) {
         for (step in stage.rebuild.steps) {
@@ -151,14 +153,14 @@ internal fun SourceMapping.affineReconstructions(cancellation: Cancellation): Ma
                 is RebuildStep.QuotientValue -> step.variable
                 else -> continue
             }
-            writes[written] = (writes[written] ?: 0) + 1
+            writes.addTo(written, 1)
         }
     }
     val reconstructions = HashMap<Int, AffineReconstruction>()
     for ((variable, step) in affine) {
         cancellation.charge(1)
         if (cancellation()) return null
-        if (writes[variable] != 1) continue
+        if (writes.getOrDefault(variable, 0) != 1) continue
         if (step.termVars.any { it == variable || it !in 0 until retained.intCount || retained.int(it) < 0 }) continue
         reconstructions[variable] = AffineReconstruction(step.constTerm, step.termVars, step.termCoeffs, step.divisor)
     }
