@@ -210,7 +210,9 @@ internal class JointLinearRepair(
                 // A checked center needs no all-pinned rounded-root bootstrap.
                 val proposalRound = if (pooled != null && completion != null)
                     round.coerceAtMost(Long.MAX_VALUE - 1) + 1 else round
-                requireNotNull(selection).propose(from, pooled?.bools ?: bools, width, proposalRound, radius, limit)
+                val size = if (enlargedTrialPending && width > checkedTrialWidth)
+                    minOf(width, checkedTrialWidth + 1) else width
+                requireNotNull(selection).propose(from, pooled?.bools ?: bools, size, proposalRound, radius, limit)
                     .also { condition ->
                         if (checkedStart) {
                             checkedTrialWidth = (sourceIntegers?.size ?: model.numIntVars) - condition.lower.size

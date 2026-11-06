@@ -43,41 +43,46 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
-    fun `adaptive checked repair should change three coupled integers together`() {
-        val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
-            factors = arrayOf(
-                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
-                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
-            ))
-        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
-        val seed = Sample(BooleanArray(0), longArrayOf(1, 1, 1))
-        val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 3)
+    fun `adaptive checked repair should change coupled integer groups together`() {
+        for (size in listOf(3, 7)) {
+            val model = Problem(0,
+                intBounds = IntBounds.fromModelBounds(LongArray(size), LongArray(size) { 1 }, null, null),
+                factors = Array(size - 1) { id ->
+                    Linear(intArrayOf(1, -1), intArrayOf(id, id + 1), LinearOp.EQ, 0)
+                })
+            val objective = LinearObjective(intCoefficients = LongArray(size) { 1 })
+            val source = assertNotNull(model.linearAuthorityContext(
+                objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+            val seed = Sample(BooleanArray(0), LongArray(size) { 1 })
+            val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 3)
 
-        for (adaptive in listOf(false, true)) {
-            JointLinearRepair(model, source, objective, params, external = { seed }).use { repair ->
-                repair.search(adaptive = adaptive).use { search ->
-                    repeat(128) {
-                        if (repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures") != 1L) {
-                            search.advance(Cancellation.Never, 1)
+            for (adaptive in listOf(false, true)) {
+                JointLinearRepair(model, source, objective, params, external = { seed }).use { repair ->
+                    repair.search(adaptive = adaptive).use { search ->
+                        repeat(128) {
+                            if (repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures") != 1L) {
+                                search.advance(Cancellation.Never, 1)
+                            }
                         }
-                    }
-                    assertEquals(adaptive, repair.incumbentTrialPending)
-                    var done = false
-                    repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
+                        assertEquals(adaptive, repair.incumbentTrialPending)
+                        var done = false
+                        repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
 
-                    val result = search.minimizeResult(TerminationReason.BudgetExhausted)
-                    if (adaptive) {
-                        val point = assertIs<MinimizeResult.WithSample>(result).sample
-                        assertContentEquals(longArrayOf(0, 0, 0), LongArray(3) { point.intValue(it) })
-                        val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(
-                            SourceEvidence(source.scope, SourceClaim.Witness(point), SourceDerivation.SourceWitness))
-                        val stages = repair.stats.smt.completeSearchStages.orEmpty()
-                        assertEquals(SourceEvidenceCheck.Checked, checked)
-                        assertEquals(1L, stages["jointRepairEnlargedTrialCompletions"])
-                        assertEquals(1L, stages["jointRepairLargerNeighborhoodCheckedIncumbents"])
-                    } else assertTrue(result !is MinimizeResult.WithSample)
-                    assertFalse(repair.incumbentTrialPending)
+                        val result = search.minimizeResult(TerminationReason.BudgetExhausted)
+                        if (adaptive) {
+                            val point = assertIs<MinimizeResult.WithSample>(result).sample
+                            assertContentEquals(LongArray(size), LongArray(size) { point.intValue(it) })
+                            val evidence = SourceEvidence(source.scope, SourceClaim.Witness(point),
+                                SourceDerivation.SourceWitness)
+                            val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence)
+                            val stages = repair.stats.smt.completeSearchStages.orEmpty()
+                            assertEquals(SourceEvidenceCheck.Checked, checked)
+                            assertEquals(1L, stages["jointRepairEnlargedTrialCompletions"])
+                            assertEquals(if (size == 3) 1L else 2L, stages["jointRepairLargerNeighborhoodCompletions"])
+                            assertEquals(1L, stages["jointRepairLargerNeighborhoodCheckedIncumbents"])
+                        } else assertTrue(result !is MinimizeResult.WithSample)
+                        assertFalse(repair.incumbentTrialPending)
+                    }
                 }
             }
         }
