@@ -39,9 +39,17 @@ internal class LinearAuthorityCuts private constructor(
     val complementary: Boolean,
     val pointDirected: Boolean,
 ) {
-    fun withAdditional(additional: List<LinearAuthorityCut>): LinearAuthorityCuts =
-        if (additional.isEmpty()) this else LinearAuthorityCuts(rows + additional, work, observations,
-            complementary, pointDirected)
+    fun withAdditional(
+        additional: List<LinearAuthorityCut>, maximumCandidates: Int = Int.MAX_VALUE,
+    ): LinearAuthorityCuts {
+        require(maximumCandidates >= additional.size)
+        val retained = minOf(rows.size, maximumCandidates - additional.size)
+        if (additional.isEmpty() && retained == rows.size) return this
+        val combined = ArrayList<LinearAuthorityCut>(retained + additional.size)
+        for (index in 0 until retained) combined.add(rows[index])
+        for (cut in additional) combined.add(cut)
+        return LinearAuthorityCuts(combined, work, observations, complementary, pointDirected)
+    }
 
     companion object {
         fun prepare(

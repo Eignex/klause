@@ -7,6 +7,7 @@ import com.eignex.util.arrays.emptyBooleanArray
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.LongArrayList
+import com.eignex.util.collections.LongHashSet
 import com.eignex.util.collections.MutableIntLongMap
 import com.eignex.util.collections.MutableIntObjectMap
 import com.eignex.util.collections.sortedKeys
@@ -218,18 +219,18 @@ sealed interface PropagationResult {
             val maxes = MutableIntLongMap()
             forEachIntMax { k, v -> maxes.put(k, v) }
             other.forEachIntMax { k, v -> maxes.put(k, minOf(maxes.getOrDefault(k, Long.MAX_VALUE), v)) }
-            val holes = HashMap<Int, HashSet<Long>>()
-            forEachIntHole { id, v -> holes.getOrPut(id) { HashSet() }.add(v) }
-            other.forEachIntHole { id, v -> holes.getOrPut(id) { HashSet() }.add(v) }
+            val holes = MutableIntObjectMap<LongHashSet>()
+            forEachIntHole { id, v -> holes.getOrPut(id) { LongHashSet() }.add(v) }
+            other.forEachIntHole { id, v -> holes.getOrPut(id) { LongHashSet() }.add(v) }
             // Set-restrictions accumulate by INTERSECTION: v ∈ S and v ∈ T both hold, so v ∈ S ∩ T.
             // A var restricted on only one side keeps that side's survivors; an empty intersection is
             // left as-is (an empty survivor set signals infeasibility on apply, exactly as a crossed
             // min/max bound does).
-            val sets = HashMap<Int, LongArray>()
-            forEachIntSet { id, s -> sets[id] = s }
+            val sets = MutableIntObjectMap<LongArray>()
+            forEachIntSet { id, s -> sets.put(id, s) }
             other.forEachIntSet { id, t ->
                 val existing = sets[id]
-                sets[id] = if (existing == null) t else intersectSorted(existing, t)
+                sets.put(id, if (existing == null) t else intersectSorted(existing, t))
             }
             ints.forEach { k, _ ->
                 mins.remove(k)
@@ -267,7 +268,7 @@ sealed interface PropagationResult {
             val maxes = MutableIntLongMap()
             forEachIntMax { k, vv -> maxes.put(k, vv) }
             val holes = holeSet()
-            holes.getOrPut(v) { HashSet() }.add(value)
+            holes.getOrPut(v) { LongHashSet() }.add(value)
             return build(boolMap(), intMap(), mins, maxes, holes, setMap())
         }
 
@@ -283,17 +284,17 @@ sealed interface PropagationResult {
             return m
         }
 
-        private fun holeSet(): HashMap<Int, HashSet<Long>> {
-            val holes = HashMap<Int, HashSet<Long>>()
-            forEachIntHole { id, v -> holes.getOrPut(id) { HashSet() }.add(v) }
+        private fun holeSet(): MutableIntObjectMap<LongHashSet> {
+            val holes = MutableIntObjectMap<LongHashSet>()
+            forEachIntHole { id, v -> holes.getOrPut(id) { LongHashSet() }.add(v) }
             return holes
         }
 
         /** This set's per-variable survivor sets (var → ascending survivors), for threading through
          *  [build] unchanged in the single-set [withMin] / [withMax] / [withHole] paths. */
-        private fun setMap(): HashMap<Int, LongArray> {
-            val m = HashMap<Int, LongArray>()
-            forEachIntSet { id, survivors -> m[id] = survivors }
+        private fun setMap(): MutableIntObjectMap<LongArray> {
+            val m = MutableIntObjectMap<LongArray>()
+            forEachIntSet { id, survivors -> m.put(id, survivors) }
             return m
         }
 
@@ -330,15 +331,15 @@ sealed interface PropagationResult {
                 ints: MutableIntLongMap,
                 mins: MutableIntLongMap,
                 maxes: MutableIntLongMap,
-                holes: Map<Int, HashSet<Long>>,
-                sets: Map<Int, LongArray> = emptyMap(),
+                holes: MutableIntObjectMap<LongHashSet>,
+                sets: MutableIntObjectMap<LongArray>,
             ): Implied {
                 val bKeys = bools.sortedKeys()
                 val iKeys = ints.sortedKeys()
                 val minK = mins.sortedKeys()
                 val maxK = maxes.sortedKeys()
-                val holeK = holes.keys.filter { holes.getValue(it).isNotEmpty() }.toIntArray().also { it.sort() }
-                val setK = sets.keys.toIntArray().also { it.sort() }
+                val holeK = holes.sortedKeys()
+                val setK = sets.sortedKeys()
                 if (bKeys.isEmpty() && iKeys.isEmpty() && minK.isEmpty() &&
                     maxK.isEmpty() && holeK.isEmpty() && setK.isEmpty()
                 ) {
