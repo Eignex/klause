@@ -130,6 +130,8 @@ object BtTrajectoryCapture : BenchSuite {
                 "decisions=${result.stats.search.nodes.sum} events=${capture?.events}")
         }
         return BenchResult(case.id, artifacts = context.artifacts(), details = buildJsonObject {
+            put("revision", Reports.readGitSha())
+            put("provenanceFingerprint", InstalledBuild.reference.fingerprint)
             put("sourceSha256", sha256(bytes))
             put("seed", seed)
             put("controls", JsonArray(records.readLines().map { Reports.json.parseToJsonElement(it) }))
