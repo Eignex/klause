@@ -537,7 +537,14 @@ diagnostic invocation; an incomplete trace cannot establish exhaustive applicabi
 
 ## Learned-clause retention
 
-Native forgetting runs at restart boundaries only with a configured cap. Permanent
+Native forgetting starts at restart boundaries with a configured cap. A resumable
+root continues a pending window before branching while its row, heap or cleanup
+state advances. Each attempt keeps the same bounded work and scratch allowance and
+debits the containing slice. A completed pass waits for the next restart before
+aging tiers again; an unfunded attempt permits search to proceed. Continuation
+reads existing ranking state without adding retained storage. Reaching the active
+quota still completes the pending pass; it does not start another tier epoch.
+Permanent
 and glue clauses (default LBD at most 2) survive; remaining space favors lower LBD.
 Cap eligibility and survivor quotas use active constraints; stable retired slots do not
 consume the quota or count as newly retired in a sweep event. Below the active cap,
@@ -606,6 +613,12 @@ another learned retirement requires a scan. Metadata release precedes watch scan
 so permanent postings cannot delay its progress. Appended retirements extend the page
 queue. Candidate-array trimming receives a separate funded copy transaction and
 retains spare capacity when its work or scratch does not fit.
+Removing a retired Native watcher preserves survivor order when its tail contains at
+most 128 entries. Each copied entry debits one read and one write before mutation.
+Cleanup defers an ordered removal when the containing grant can fund it but its
+remainder cannot. A tail or complete atomic copy beyond the supported bound uses
+swap-pop, preserving progress under small grants. Ordinary watch relocation uses
+swap-pop. Both removal paths release the same tail page and retain no copy buffer.
 Capacity changes replace the disjoint metadata pool identity. A protected row retains
 its complete page allocation; sparse-index protection includes the union of its
 required branch paths. Primitive and reference pools report cumulative protected
