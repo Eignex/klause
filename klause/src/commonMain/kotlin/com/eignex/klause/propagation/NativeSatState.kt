@@ -189,9 +189,9 @@ internal class NativeSatState(private val state: PropagationState) {
         watchSizes[lit] = entries.size
     }
 
-    private fun orderedWatchCopies(lit: Int, index: Int): Int {
+    private fun orderedWatchCopies(lit: Int, index: Int, limit: Int = MAX_ORDERED_CLEANUP_COPIES): Int {
         val count = watchSizes[lit] - index - 1
-        return if (count <= MAX_ORDERED_WATCH_COPIES) count else -1
+        return if (count <= limit) count else -1
     }
 
     private fun watchRemovalWork(lit: Int, copies: Int = -1): Long =
@@ -915,7 +915,7 @@ internal class NativeSatState(private val state: PropagationState) {
             val entry = entries[wi]
             val h = entry.toInt()
             if (isRetired(h)) {
-                val copies = orderedWatchCopies(falseLit, wi)
+                val copies = orderedWatchCopies(falseLit, wi, MAX_ORDERED_PROPAGATION_COPIES)
                 state.work += watchRemovalWork(falseLit, copies)
                 removeWatchAt(falseLit, wi, copies)
                 continue
@@ -986,7 +986,8 @@ internal class NativeSatState(private val state: PropagationState) {
     private companion object {
         const val RETIRED = 4
         const val RECENT_USED = 8
-        const val MAX_ORDERED_WATCH_COPIES = 128
+        const val MAX_ORDERED_CLEANUP_COPIES = 128
+        const val MAX_ORDERED_PROPAGATION_COPIES = 4096
         // Poll the deadline every 4096 propagated literals.
         const val CANCEL_POLL_MASK = 0xFFF
     }
