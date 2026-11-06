@@ -311,7 +311,7 @@ floating conversion. This completion supplies no fresh LP point or new parent
 observation. Objective-bound pruning can supply progress; pure infeasibility cannot.
 Unsupported or overflowing bounds retain the missing-observation fallback.
 
-The `lp-default` optimization recipe enables the passive finite consumer; direct
+The `lp-default` and `lp-aggressive` optimization recipes enable the passive finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
 and branching must be enabled. The reduced-cost/fractionality scorer supplies its

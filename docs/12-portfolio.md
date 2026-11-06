@@ -985,7 +985,7 @@ for three structures, skipped when LP is unavailable, the pool is explicit or
 annotated, or execution is parallel or single-engine. See
 [ordinary tableau admission](17-linear-programming.md).
 
-The `lp-default` optimization recipe consumes scoped passive checked-bound gains.
+The `lp-default` and `lp-aggressive` optimization recipes consume scoped passive checked-bound gains.
 Two recent samples in each direction nominate a passive challenger across the bounded
 variable scan. Comparable baseline history permits a learned variable choice.
 Missing baseline history permits a bounded fresh child-value

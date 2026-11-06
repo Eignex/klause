@@ -10,9 +10,9 @@ import kotlin.test.assertIs
 
 class BacktrackCatalogTest {
     @Test
-    fun `automatic directional guidance belongs to the default LP recipe`() {
-        for ((label, enabled) in listOf("lp-default" to true, "lp-aggressive" to false,
-            "lp-conservative" to false, "satOptimized" to false)) {
+    fun `ordinary simplex recipes enable directional guidance`() {
+        for ((label, enabled) in listOf("lp-default" to true, "lp-aggressive" to true,
+            "lp-conservative" to false, "lp-lbtree" to false, "satOptimized" to false)) {
             val params = BacktrackCatalog.byLabel(label).build(3L, null)
 
             assertEquals(enabled, params.lpDirectionalGains, label)
