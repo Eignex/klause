@@ -24,6 +24,38 @@ import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
     @Test
+    fun `adaptive companion repair should reject unknown modes and missing completion`() {
+        for (settings in listOf("companion-repair=never", "companion-repair=adaptive")) {
+            val shape = FiniteSolveShape(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray()), true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy().finiteRequest(shape, FiniteEngine.MIXED,
+                presolveConfig = PresolveConfig.NONE, executionOptions = ExecutionOptions.parse(listOf(settings)),
+                nodeBudget = NodeBudget(8))
+
+            assertFailsWith<PipelineConfigException> { FinitePipeline.solve(request, FiniteSolveCallbacks({}, {})) }
+        }
+    }
+
+    @Test
+    fun `typed and parsed adaptive repair should reach completion enabled portfolios`() {
+        for (options in listOf(ExecutionOptions(ExecutionOption.companionRepair("adaptive")),
+            ExecutionOptions.parse(listOf("companion-repair=adaptive")))) {
+            val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
+            val shape = FiniteSolveShape(model, true, false, null,
+                LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
+            val request = SourceExecutionPolicy().finiteRequest(shape, FiniteEngine.MIXED,
+                presolveConfig = PresolveConfig.NONE, executionOptions = options,
+                cancellation = Cancellation.after(1.seconds), nodeBudget = NodeBudget(8))
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}),
+                TheoryParams(sourceIncumbentCompletion = true))
+
+            assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+        }
+    }
+
+    @Test
     fun `typed and parsed publication batching should execute curated integer optimization`() {
         for (options in listOf(ExecutionOptions(ExecutionOption.portfolioPublications("segment")),
             ExecutionOptions.parse(listOf("portfolio-publications=segment")))) {

@@ -33,6 +33,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
@@ -41,6 +42,98 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
+    @Test
+    fun `adaptive checked repair should change three coupled integers together`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val seed = Sample(BooleanArray(0), longArrayOf(1, 1, 1))
+
+        for (adaptive in listOf(false, true)) {
+            JointLinearRepair(model, source, objective,
+                TheoryParams(sourceIncumbentCompletion = true, maxFlips = 3), external = { seed }).use { repair ->
+                repair.search(adaptive = adaptive).use { search ->
+                    repeat(128) {
+                        if (repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures") != 1L) {
+                            search.advance(Cancellation.Never, 1)
+                        }
+                    }
+                    assertEquals(adaptive, repair.incumbentTrialPending)
+                    var done = false
+                    repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
+
+                    val result = search.minimizeResult(TerminationReason.BudgetExhausted)
+                    if (adaptive) {
+                        val point = assertIs<MinimizeResult.WithSample>(result).sample
+                        assertContentEquals(longArrayOf(0, 0, 0), LongArray(3) { point.intValue(it) })
+                        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
+                            .verify(SourceEvidence(source.scope, SourceClaim.Witness(point), SourceDerivation.SourceWitness)))
+                        assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairEnlargedTrialCompletions"))
+                    } else assertTrue(result !is MinimizeResult.WithSample)
+                    assertFalse(repair.incumbentTrialPending)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `containing cancellation should stop an enlarged checked trial before opening its query`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        var cancelled = false
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, cancellation = Cancellation { cancelled }),
+            external = { Sample(BooleanArray(0), longArrayOf(1, 1, 1)) }).use { repair ->
+            repair.search(adaptive = true).use { search ->
+                repeat(128) {
+                    if (repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures") != 1L) {
+                        search.advance(Cancellation.Never, 1)
+                    }
+                }
+                assertTrue(repair.incumbentTrialPending)
+                cancelled = true
+                search.advance(Cancellation.Never, 1)
+
+                assertFalse(repair.incumbentTrialPending)
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairCandidates"))
+                assertNull(repair.stats.smt.completeSearchStages?.get("jointRepairEnlargedTrialStarts"))
+            }
+        }
+    }
+
+    @Test
+    fun `an exhausted adaptive move allowance should not open a larger query`() {
+        val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        JointLinearRepair(model, source, objective,
+            TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
+            external = { Sample(BooleanArray(0), longArrayOf(1, 1, 1)) }).use { repair ->
+            repair.search(adaptive = true).use { search ->
+                var done = false
+                repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
+
+                assertTrue(done)
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairCandidates"))
+                assertNull(repair.stats.smt.completeSearchStages?.get("jointRepairEnlargedTrialStarts"))
+            }
+            assertFalse(repair.incumbentTrialPending)
+        }
+    }
+
     @Test
     fun `completion repair should keep an imported point out of discovery publication`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(1), null, null),

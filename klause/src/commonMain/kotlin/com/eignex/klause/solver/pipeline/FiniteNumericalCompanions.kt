@@ -91,6 +91,7 @@ internal class FiniteNumericalCompanions private constructor(
     private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?,
     private val admission: FiniteCompanionAdmission? = null,
     private val afterImprovement: Boolean = false,
+    private val adaptiveRepair: Boolean = false,
 ) {
     class Preparation(val companions: FiniteNumericalCompanions?, val elapsedNanos: Long)
 
@@ -173,7 +174,7 @@ internal class FiniteNumericalCompanions private constructor(
         return exactNeighborhoodWorker("ls/finite-joint-companion", arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
             pendingIncumbentTrial = { repair.incumbentTrialPending },
-            open = { repair.search(adaptive = false, seed = slot.seed) })
+            open = { repair.search(adaptive = adaptiveRepair, seed = slot.seed) })
     }
 
     private fun sharedIncumbent(worker: PortfolioWorker, onVersion: (Long) -> Unit) =
@@ -225,21 +226,22 @@ internal class FiniteNumericalCompanions private constructor(
         fun deferred(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: Cancellation, cost: WorkerConstructionCost, admission: FiniteCompanionAdmission,
             incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?,
-            afterImprovement: Boolean = false): FiniteNumericalCompanions =
+            afterImprovement: Boolean = false, adaptiveRepair: Boolean = false): FiniteNumericalCompanions =
             FiniteNumericalCompanions(model, objective, null, params, cancellation, cost, true,
-                incumbentCompletionCheck, admission, afterImprovement)
+                incumbentCompletionCheck, admission, afterImprovement, adaptiveRepair)
 
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: Cancellation, cost: WorkerConstructionCost,
             afterIncumbent: Boolean = false,
             incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
             clock: TimeSource = TimeSource.Monotonic,
+            adaptiveRepair: Boolean = false,
         ): Preparation {
             val started = clock.markNow()
             val context = captureContext(model, objective, cancellation)
             val companions = context?.let {
                 FiniteNumericalCompanions(model, objective, it, params, cancellation, cost, afterIncumbent,
-                    incumbentCompletionCheck)
+                    incumbentCompletionCheck, adaptiveRepair = adaptiveRepair)
             }
             return Preparation(companions, started.elapsedNow().inWholeNanoseconds)
         }

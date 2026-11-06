@@ -529,11 +529,23 @@ semantics and coordinate frame identify retained attempts; failed attempts canno
 renew their allowance.
 
 Enabled repair's first checked center frees at most two connected integers.
+The opt-in `companion-repair=adaptive` requires `source-incumbent-completion=true`
+and uses the existing adaptive width sequence after that small start. Fixed repair
+is the default. If a small checked-center trial is refuted and more integer
+coordinates are available, continuation covers its first requested larger proposal.
+The proposal still selects connected integers, with the existing thirty-two-integer
+and traversal ceilings. A disconnected component can supply fewer coordinates than
+requested. Completion or decline of that larger proposal ends the trial; cancellation,
+exhaustion and the existing active/work/allocation limits still bound continuation.
+`jointRepairMaxFreedIntegers` records actual opened-query width, and
+`jointRepairEnlargedTrialStarts`/`jointRepairEnlargedTrialCompletions` distinguish
+larger requested trials from completed ones. These counts grant no publication or
+proof authority.
 An available dimension-compatible incumbent requests continuation through root and center
 preparation and the first proposal, behind owed complete-worker coverage and within
 the existing active cap. Availability grants no import authority; the source checks
 still complete advisory coordinates and admit the center. A declined center clears
-the preparation request, and a completed or declined first proposal returns to
+the preparation request, and a completed or declined trial returns to
 ordinary selection.
 
 A numerical optimum or refutation can complete the finite
