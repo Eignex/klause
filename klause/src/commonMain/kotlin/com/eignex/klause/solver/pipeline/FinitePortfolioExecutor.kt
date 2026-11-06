@@ -85,6 +85,7 @@ internal fun FinitePipeline.portfolioExecutor(
     probePolicy: InitialProbePolicy = InitialProbePolicy.ORDINARY,
     booleanProofTasks: Boolean? = false,
     fundedCompanions: Boolean = false,
+    waitForCompanionImprovement: Boolean = false,
     privateRebuildBudgetOnly: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
@@ -119,8 +120,11 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionEligibility = numericalCompanions?.let {
         finiteNumericalCompanionEligibility(problem, scenario, objective, it)
     }
+    if (waitForCompanionImprovement && !fundedCompanions) {
+        pipelineConfigError("progress-funded companion admission requires funded construction")
+    }
     if (fundedCompanions && (!scenario.companionAfterIncumbent || cancellation.deadline() == null)) {
-        pipelineConfigError("companion-admission=funded requires companion-after-incumbent and a solve deadline")
+        pipelineConfigError("funded companion admission requires companion-after-incumbent and a solve deadline")
     }
     val companionAdmission = if (fundedCompanions && companionEligibility?.admitted == true) {
         FiniteNumericalCompanions.admission(problem, requireNotNull(objective),
@@ -135,7 +139,7 @@ internal fun FinitePipeline.portfolioExecutor(
     val companions = if (companionAdmission?.initiallyFunded == true) {
         FiniteNumericalCompanions.deferred(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, requireNotNull(companionEligibility).requirements.construction, companionAdmission,
-            incumbentCompletionCheck)
+            incumbentCompletionCheck, afterImprovement = waitForCompanionImprovement)
     } else companionPreparation?.companions
     companionEligibility?.let { eligibility ->
         val declines = if (companionAdmission?.initiallyFunded == false) listOf("companion-lifetime-unfunded")
