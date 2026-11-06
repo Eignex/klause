@@ -188,6 +188,17 @@ internal class LinearAuthority(
         }
         val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe)
             .also { pointPolicy = it }
+        if (generatedFirst && budget.funding?.paused != true && !cancellation() &&
+            template?.matches(source) == true && template?.cuts?.rows?.size?.let { it > 64 } == true) {
+            boundedCurrentDeclined = true
+            policy.observe("BoundedCurrentFamilyDeclined")
+            pointMask = null
+            pointRound = null
+            pointFallback = null
+            pointFamily = template
+            return advanceWithSelectedCuts(source, cancellation, generatedFirst = false,
+                retireUnproductive = retireUnproductive, incumbent = incumbent, pointAggregates = true)
+        }
         val fallbackCuts = !pointAggregates || template?.cuts != null
         if (pointFamily === template && template?.matches(source) == true &&
             pointFallback?.matches(source, cuts = fallbackCuts) == true) {
@@ -516,12 +527,6 @@ internal class LinearAuthority(
             return LinearAuthorityResult()
         }
         if (budget.funding?.paused == true) return LinearAuthorityResult(paused = true)
-        if (boundedAggregateRecipe && template?.matches(source) == true &&
-            template?.cuts?.rows?.size?.let { it > 64 } == true) {
-            boundedCurrentDeclined = true
-            pointPolicy?.observe("BoundedCurrentFamilyDeclined")
-            return LinearAuthorityResult()
-        }
         val result = checkSource(source, cancellation, guidance = true, cuts = cuts, cutMask = cutMask)
         if (cancellation()) {
             lp.close()
