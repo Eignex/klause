@@ -19,6 +19,34 @@ import kotlin.time.TestTimeSource
 
 class FiniteCompanionAdmissionTest {
     @Test
+    fun `cancelled queries should avoid funded construction`() {
+        val clock = TestTimeSource()
+        var calls = 0
+        val admission = FiniteCompanionAdmission(Cancellation.until(clock.markNow() + 30.seconds), 4_000, 1_000,
+            capture = { calls++; null }, clock = clock)
+
+        assertNull(admission.contextForStart(Cancellation { true }, 1_000))
+
+        assertEquals(0, calls)
+        assertEquals(0L, admission.stages()["finiteCompanionPreparationAttempts"])
+    }
+
+    @Test
+    fun `empty query grants should avoid funded construction`() {
+        for (grant in listOf(0L, -1L)) {
+            val clock = TestTimeSource()
+            var calls = 0
+            val admission = FiniteCompanionAdmission(Cancellation.until(clock.markNow() + 30.seconds), 4_000, 1_000,
+                capture = { calls++; null }, clock = clock)
+
+            assertNull(admission.contextForStart(Cancellation.Never, grant))
+
+            assertEquals(0, calls)
+            assertEquals(0L, admission.stages()["finiteCompanionPreparationAttempts"])
+        }
+    }
+
+    @Test
     fun `late first starts should decline before constructing a context`() {
         val clock = TestTimeSource()
         var captured = false

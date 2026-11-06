@@ -112,6 +112,15 @@ Each worker rechecks its own remaining lifetime before opening; a late start or
 unavailable capture retires without a source verdict. Finite recipes, indices and
 seed positions remain intact, including explicit selections.
 
+`companion-admission=progress-funded` retains funded construction and also waits for
+a strictly improving accepted pool incumbent after the first witness. Rejected
+proposals, repeated points, deductions and idle sharing credit do not open either
+companion. Workers waiting for this improvement receive no query or capture;
+remaining-lifetime checks apply when they become eligible. Their positions and
+seeds remain fixed, and ordinary complete workers retain their coverage. An
+incumbent retained before the invocation does not supply fresh progress. Cancelled
+queries and empty time grants cannot start capture.
+
 Deferred capture is attempted once for the pair and charged inside the opening
 worker's query and active lifetime. Its preparation counters are subsets of that
 query's time. `finiteCompanionAdmissionDeclined` records an unfunded initial pair;
