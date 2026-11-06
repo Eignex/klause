@@ -547,7 +547,8 @@ Scheduling changes work order, never publication authority.
 
 `portfolio-probes=heuristic-second` gives the first initially eligible local-search
 worker the probe after the leading complete worker. It applies to curated single-core
-mixed finite integer optimization with a containing deadline. Deferred, improvement-only
+mixed finite Boolean/integer optimization with a containing deadline. Source search
+annotations retain their annotation workers. Deferred, improvement-only
 and auxiliary workers keep their admission rules; early core trials keep their priority.
 The remaining probes retain their order, and all workers retain their identities, seeds,
 probe weights and work limits. Initial attempts and silent complete-worker coverage
@@ -855,8 +856,9 @@ probes, explicit minimum shares and bounded auxiliary trials retain precedence.
 Segment overruns can delay coverage.
 
 `portfolio-proof-share=S` selects a share from 0.5 through 1 for curated single-core
-finite optimization through the solve facade. The default is 0.5. Explicit recipes,
-arm counts, annotations, satisfaction and parallel execution reject this control.
+finite optimization through the solve facade. The default is 0.5. Source search
+annotation workers remain in the curated pool. Explicit recipes, arm counts,
+satisfaction and parallel execution reject this control.
 It changes only the retained proof floor after an incumbent; rewards, reseeding,
 initial probes, minimum shares and worker admission retain their own policies.
 Work diagnostics apply the same share to charged work.

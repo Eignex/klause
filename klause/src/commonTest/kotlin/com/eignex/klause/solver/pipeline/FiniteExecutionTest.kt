@@ -7,6 +7,7 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.presolve.PresolveConfig
@@ -627,8 +628,8 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `initial probe policies should reject Boolean sources`() {
-        for (policy in listOf("leader-half", "lp-transfer", "heuristic-second", "family-work", "heuristic-work",
+    fun `integer probe policies should reject Boolean sources`() {
+        for (policy in listOf("leader-half", "lp-transfer", "family-work", "heuristic-work",
             "alns-work")) {
             val shape = FiniteSolveShape(Problem(1, 0, emptyArray(), emptyArray()), true, false, null,
                 LinearObjective(longArrayOf(1)), 0, null)
@@ -642,6 +643,73 @@ class FiniteExecutionTest {
                 FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
             }
         }
+    }
+
+    @Test
+    fun `early heuristic probes should execute Boolean and mixed finite optimization`() {
+        for (intCount in listOf(0, 1)) {
+            val problem = Problem(1, intCount, Array(intCount) { IntDomain(0, 1) }, emptyArray())
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(boolWeights = longArrayOf(1), intCoefficients = LongArray(intCount) { 1L }),
+                null, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions.parse(listOf("portfolio-probes=heuristic-second")),
+                cancellation = Cancellation.after(1.seconds), nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            assertEquals(FiniteSolveVerdict.OPTIMAL, assertIs<FiniteSolveOutcome.Completed>(result.outcome).verdict)
+        }
+    }
+
+    @Test
+    fun `early heuristic probes should retain the source annotation worker`() {
+        val labels = listOf("ordinary", "heuristic-second").map { policy ->
+            val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val hints = SearchHints(listOf(SearchGroup(intArrayOf(0), intArrayOf(0))))
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(longArrayOf(1), longArrayOf(1)), null, null, searchHints = hints)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions.parse(listOf("portfolio-probes=$policy")),
+                cancellation = Cancellation.after(1.seconds), nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.OPTIMAL, completed.verdict)
+            completed.stats.portfolio.arms.map { it.label }
+        }
+
+        assertTrue("bt/annotation" in labels[0])
+        assertEquals(labels[0], labels[1])
+    }
+
+    @Test
+    fun `proof coverage controls should retain the source annotation worker`() {
+        val labels = listOf(emptyList(), listOf("portfolio-proof-workers=complete"),
+            listOf("portfolio-proof-workers=retained"), listOf("portfolio-proof-share=0.75")).map { settings ->
+            val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+            val hints = SearchHints(listOf(SearchGroup(intArrayOf(0), intArrayOf(0))))
+            val shape = FiniteSolveShape(problem, true, false, null,
+                LinearObjective(longArrayOf(1), longArrayOf(1)), null, null, searchHints = hints)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+                shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
+                executionOptions = ExecutionOptions.parse(settings), nodeBudget = NodeBudget(8),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.OPTIMAL, completed.verdict)
+            completed.stats.portfolio.arms.map { it.label }
+        }
+
+        assertTrue("bt/annotation" in labels[0])
+        labels.drop(1).forEach { assertEquals(labels[0], it) }
     }
 
     @Test
