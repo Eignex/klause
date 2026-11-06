@@ -233,11 +233,11 @@ data class BacktrackParams(
      * meaningful when at least one pass (e.g. [vivification]) is enabled. Must be positive.
      */
     val inprocessingCadence: Int = 1,
-    /** Simplify Boolean clauses against unconditional root facts at scheduled restarts. Opt-in. */
+    /** Simplify Boolean clauses against unconditional facts at safe complete roots. */
     val rootSimplification: Boolean = false,
     /** Maximum source and learned clauses examined by one root simplification slice. */
     val rootSimplifyBatch: Int = 256,
-    /** Maximum failed-literal probes per scheduled restart; zero disables probing. */
+    /** Maximum failed-literal probes per scheduled root slice; zero disables probing. */
     val rootProbeBatch: Int = 0,
     /** Propagation work ceiling per root probe, in addition to the containing invocation token. */
     val rootProbeWork: Long = 8192L,
@@ -465,6 +465,14 @@ data class BacktrackParams(
     val inprocessingWarmupWork: Long = 0L,
     /** Private modeled-byte grant; null shares [learnedMemoryScratchBytes]. */
     val privateRebuildBytes: Long? = null,
+    /** Capture conditional binaries from completed consistent root probes; failed-literal units remain enabled. */
+    val rootProbeImplications: Boolean = true,
+    /** Non-inprocessing work between optional probing slices; zero follows the shared root trigger. */
+    val inprocessingProbeInterval: Long = 0L,
+    /** Limit Native root probes to learned binaries until a root fact or known binary permits propagation. */
+    val rootProbeBinaryGate: Boolean = false,
+    /** Explore one global batch, then prefer learned neighborhoods in Boolean General states without root signals. */
+    val rootProbeGeneralGate: Boolean = false,
 ) : SolverParams {
     init {
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }
@@ -479,7 +487,7 @@ data class BacktrackParams(
         require(rootProbeWork > 0L) { "root probe work must be positive" }
         require(listOf(inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
             inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval,
-            inprocessingCooldown, inprocessingWarmupWork).all { it >= 0L }) {
+            inprocessingCooldown, inprocessingWarmupWork, inprocessingProbeInterval).all { it >= 0L }) {
             "inprocessing work limits must be nonnegative"
         }
         require(inprocessingGrowth >= 0) { "inprocessing growth must be nonnegative" }

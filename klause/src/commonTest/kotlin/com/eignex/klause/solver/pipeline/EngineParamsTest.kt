@@ -100,9 +100,13 @@ class EngineParamsTest {
         val base = com.eignex.klause.backtrack.BacktrackParams()
         assertEquals(false, base.rootSimplification)
         assertEquals(0, base.rootProbeBatch)
+        assertEquals(false, base.rootProbeBinaryGate)
+        assertEquals(false, base.rootProbeGeneralGate)
         val configured = applyBacktrackParams(base, EngineParams(listOf(
             "root-simplification=true", "root-simplify-batch=7", "root-probe-batch=3", "root-probe-work=256",
-            "root-rebuild-capture-visits=1024",
+            "root-rebuild-capture-visits=1024", "root-probe-implications=false",
+            "root-probe-binary-gate=true",
+            "root-probe-general-gate=true",
             "private-rebuild-work=65536",
         )))
         assertEquals(true, configured.rootSimplification)
@@ -111,6 +115,9 @@ class EngineParamsTest {
         assertEquals(65_536L, configured.privateRebuildWork)
         assertEquals(3, configured.rootProbeBatch)
         assertEquals(256L, configured.rootProbeWork)
+        assertEquals(false, configured.rootProbeImplications)
+        assertEquals(true, configured.rootProbeBinaryGate)
+        assertEquals(true, configured.rootProbeGeneralGate)
     }
 
     @Test
@@ -119,6 +126,7 @@ class EngineParamsTest {
             "inprocessing-work=100", "inprocessing-root-work=11", "inprocessing-probe-work=12",
             "inprocessing-subsume-work=13", "inprocessing-vivify-work=14", "inprocessing-interval=15",
             "inprocessing-growth=16", "inprocessing-cooldown=17", "inprocessing-warmup-work=18",
+            "inprocessing-probe-interval=20",
         )))
 
         assertEquals(listOf(100L, 11L, 12L, 13L, 14L, 15L, 17L, 18L), listOf(configured.inprocessingWork,
@@ -126,6 +134,7 @@ class EngineParamsTest {
             configured.inprocessingVivifyWork, configured.inprocessingInterval, configured.inprocessingCooldown,
             configured.inprocessingWarmupWork))
         assertEquals(16, configured.inprocessingGrowth)
+        assertEquals(20L, configured.inprocessingProbeInterval)
     }
 
     @Test

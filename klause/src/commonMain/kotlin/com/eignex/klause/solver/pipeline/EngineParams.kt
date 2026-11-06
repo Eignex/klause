@@ -164,12 +164,13 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
     "learned-memory-bytes", "learned-memory-work", "learned-memory-scratch-bytes",
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
-    "root-simplification", "root-simplify-batch", "root-probe-batch", "root-probe-work",
+    "root-simplification", "root-simplify-batch", "root-probe-batch", "root-probe-work", "root-probe-implications",
+    "root-probe-binary-gate", "root-probe-general-gate",
     "root-rebuild-capture-visits",
     "private-rebuild-work", "private-rebuild-bytes",
     "inprocessing-work", "inprocessing-root-work", "inprocessing-probe-work", "inprocessing-subsume-work",
     "inprocessing-vivify-work", "inprocessing-interval", "inprocessing-growth", "inprocessing-cooldown",
-    "inprocessing-warmup-work",
+    "inprocessing-warmup-work", "inprocessing-probe-interval",
     "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "lp-component-split", "lp-component-ownership", "lp-bound-max-pivots", "lp-adaptive-work",
     "lp-branching", "lp-directional-gains", "lp-variable-shaving", "lp-prune-hulls", "lp-root-cuts",
@@ -221,9 +222,13 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
     val privateRebuildBytes = p[ExecutionOption.privateRebuildBytes]
     val rootProbeBatch = p[ExecutionOption.rootProbeBatch]
     val rootProbeWork = p[ExecutionOption.rootProbeWork]
+    val rootProbeImplications = p[ExecutionOption.rootProbeImplications]
+    val rootProbeBinaryGate = p[ExecutionOption.rootProbeBinaryGate]
+    val rootProbeGeneralGate = p[ExecutionOption.rootProbeGeneralGate]
     val inprocessingWork = p[ExecutionOption.inprocessingWork]
     val inprocessingRootWork = p[ExecutionOption.inprocessingRootWork]
     val inprocessingProbeWork = p[ExecutionOption.inprocessingProbeWork]
+    val inprocessingProbeInterval = p[ExecutionOption.inprocessingProbeInterval]
     val inprocessingSubsumeWork = p[ExecutionOption.inprocessingSubsumeWork]
     val inprocessingVivifyWork = p[ExecutionOption.inprocessingVivifyWork]
     val inprocessingInterval = p[ExecutionOption.inprocessingInterval]
@@ -257,11 +262,12 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
         learnedMemoryBytes, learnedMemoryWork, learnedMemoryScratchBytes,
         subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch, rootProbeBatch, rootProbeWork,
+        rootProbeImplications, rootProbeBinaryGate, rootProbeGeneralGate,
         rootRebuildCaptureVisits,
         privateRebuildWork, privateRebuildBytes,
         inprocessingWork, inprocessingRootWork, inprocessingProbeWork, inprocessingSubsumeWork,
         inprocessingVivifyWork, inprocessingInterval, inprocessingGrowth, inprocessingCooldown,
-        inprocessingWarmupWork,
+        inprocessingWarmupWork, inprocessingProbeInterval,
         lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpComponentOwnership, lpBoundMaxPivots, lpAdaptiveWork,
         lpBranching, lpVariableShaving, lpPruneHulls, lpRootCuts, pbLearning,
         pbObjectiveCutoff, integerRowLearning, propagationAttribution, historicalTableReasons, costAwarePropagation,
@@ -299,9 +305,13 @@ internal fun backtrackOverride(p: ExecutionOptionReader, allowSelectors: Boolean
         privateRebuildBytes?.let { out = out.copy(privateRebuildBytes = it) }
         rootProbeBatch?.let { out = out.copy(rootProbeBatch = it) }
         rootProbeWork?.let { out = out.copy(rootProbeWork = it) }
+        rootProbeImplications?.let { out = out.copy(rootProbeImplications = it) }
+        rootProbeBinaryGate?.let { out = out.copy(rootProbeBinaryGate = it) }
+        rootProbeGeneralGate?.let { out = out.copy(rootProbeGeneralGate = it) }
         inprocessingWork?.let { out = out.copy(inprocessingWork = it) }
         inprocessingRootWork?.let { out = out.copy(inprocessingRootWork = it) }
         inprocessingProbeWork?.let { out = out.copy(inprocessingProbeWork = it) }
+        inprocessingProbeInterval?.let { out = out.copy(inprocessingProbeInterval = it) }
         inprocessingSubsumeWork?.let { out = out.copy(inprocessingSubsumeWork = it) }
         inprocessingVivifyWork?.let { out = out.copy(inprocessingVivifyWork = it) }
         inprocessingInterval?.let { out = out.copy(inprocessingInterval = it) }
@@ -710,6 +720,7 @@ internal fun buildPortfolioScenario(
     val maxSliceWork = p[ExecutionOption.sliceMaxWork]
     val sliceGrowth = p[ExecutionOption.sliceGrowth]
     val diagnosticWorkLimit = p[ExecutionOption.portfolioWork]
+    val rootMaintenance = p[ExecutionOption.rootMaintenance] ?: true
     val sharingMemory = p[ExecutionOption.sharingMemory] ?: false
     val sharingMemoryBytes = p[ExecutionOption.sharingMemoryBytes]
     if (sharingMemoryBytes != null && sharingMemoryBytes < 0L) pipelineConfigError("sharing memory bytes must be nonnegative")
@@ -748,7 +759,7 @@ internal fun buildPortfolioScenario(
     if (sliceGrowth != null && (!sliceGrowth.isFinite() || sliceGrowth < 1.0)) {
         pipelineConfigError("slice-growth must be finite and >= 1")
     }
-    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, sharing-memory, sharing-memory-bytes, sharing-memory-work, sharing-memory-scratch, portfolio-progress, portfolio-reward, core-early, companion-integers, companion-after-incumbent, companion-active-ms, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
+    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len, slice-work, slice-max-work, slice-growth, portfolio-work, root-maintenance, sharing-memory, sharing-memory-bytes, sharing-memory-work, sharing-memory-scratch, portfolio-progress, portfolio-reward, core-early, companion-integers, companion-after-incumbent, companion-active-ms, core-refinement, phase-retention, reseed-stale-threshold, ls-residuals, ls-phase-times")
     if (armsParam != null && (ls != null || bt != null)) {
         pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -801,6 +812,7 @@ internal fun buildPortfolioScenario(
         reportPortfolioProgress = portfolioProgress,
         rewardPolicy = rewardPolicy,
         explicitArms = armsParam != null || ls != null || bt != null,
+        rootMaintenance = rootMaintenance,
     )
     clauseShareLbd?.let { scenario = scenario.copy(clauseShareMaxLbd = it) }
     clauseShareLen?.let { scenario = scenario.copy(clauseShareMaxLen = it) }
