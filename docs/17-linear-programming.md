@@ -1301,7 +1301,9 @@ current nonbasic orientations and reduced costs, then converts column and object
 scales. The caller funds the complete bounded analysis before allocation or basis
 access. Changed models, unfinished solves, missing directions and cancellation
 retain unavailability. This read preserves the retained optimum and carries no
-bound, infeasibility or certificate authority.
+bound, infeasibility or certificate authority. A consumer can withhold follow-up
+comparison work from the analysis grant; analysis and that follow-up share the
+containing node and cumulative allowances.
 
 Explicit directional probes compare the actual floating LP objective increase at
 the two adjacent integer bounds of at most two structural columns. Each child

@@ -1283,8 +1283,16 @@ internal class LpEngine(
         return values
     }
 
-    internal fun directionalCosts(model: LpModel, columns: IntArray): List<LpDirectionalCost?>? {
-        val allowance = remainingDirectionalWork()
+    internal fun directionalCosts(model: LpModel, columns: IntArray): List<LpDirectionalCost?>? =
+        directionalCosts(model, columns, followupWork = 0L)
+
+    internal fun directionalCosts(
+        model: LpModel,
+        columns: IntArray,
+        followupWork: Long,
+    ): List<LpDirectionalCost?>? {
+        if (followupWork < 0L) return null
+        val allowance = remainingDirectionalWork() - followupWork
         branchWorkAllowance = 0L
         if (allowance <= 0L) return null
         val started = TimeSource.Monotonic.markNow()

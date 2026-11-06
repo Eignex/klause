@@ -108,7 +108,7 @@ class ResumableMinimizeDirectionalTest {
     }
 
     @Test
-    fun `finite search consumes passive advice without variable queries`() {
+    fun `finite search consumes passive advice without child solves`() {
         val blocks = 3
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
@@ -150,12 +150,15 @@ class ResumableMinimizeDirectionalTest {
         ResumableMinimize(BacktrackSolver(problem), objective, params,
             rootBasisGuidance = false).use { search ->
             val consumed = Cancellation {
-                (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("VARIABLE_CONSUMED") ?: 0L) > 0L
+                val outcomes = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
+                (outcomes?.get("VARIABLE_ESTIMATED") ?: 0L) > 0L &&
+                    (outcomes?.get("VARIABLE_CONSUMED") ?: 0L) > 0L
             }
             var slices = 0
             while (slices++ < 128 && !search.isDone) {
                 val outcomes = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
                 if ((outcomes?.get("DOWN") ?: 0L) >= 2L && (outcomes?.get("UP") ?: 0L) >= 2L &&
+                    (outcomes?.get("VARIABLE_ESTIMATED") ?: 0L) > 0L &&
                     (outcomes?.get("VARIABLE_CONSUMED") ?: 0L) > 0L
                 ) break
                 search.runSlice(consumed, 1000L, 128L) {}

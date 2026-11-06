@@ -335,7 +335,7 @@ internal class ResumableMinimize(
         if (params.lpPlan.branching) {
             LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
                 sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
-                rootBasis = rootBasisGuidance)
+                rootBasis = rootBasisGuidance, basisVariableComparisons = true)
         } else null
 
     private lateinit var cp: CpSearchComponent

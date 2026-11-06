@@ -323,9 +323,20 @@ LP allowance before visiting candidates.
 Two recent samples in each direction supply that variable's predicted child gains,
 using each direction's mean cost per unit of fractional movement. The balanced
 `min + max / 6` score ranks finite positive predictions.
-Missing baseline or challenger history retains current scoring. Ordinary finite
-construction leaves numerical variable comparisons disabled; passive predictions
-require no child query.
+When passive history cannot compare the candidates, a below-root basis consultation
+can compare the same two variables, or the reduced-cost runner-up when no distinct
+reliable challenger exists. Both predictions use current normalized directional
+basis costs and the same fractional-distance score; they are never mixed with
+reduced-cost scores or passive predictions. Missing directions, ties, changed points,
+unfinished solves and unfunded analysis retain current scoring. At most eight
+attempts belong to one search owner, including failed reservations and across history
+resets. Consecutive entries on the same retained state cannot repeat an attempt.
+The bounded runner-up scan charges its work before visiting candidates.
+Preparation reserves 20 work units before allocating the column request; analysis
+leaves 32 units for comparison and selection in the containing allowance. Basis
+predictions never train checked-bound history, start a child solve or confer pruning
+authority. Ordinary finite construction leaves numerical child-value comparisons
+disabled; passive predictions require no consultation.
 
 The hint owner supports an optional fresh child-value comparison below the root.
 When enabled, a reliable challenger with missing baseline history can request it.
