@@ -60,6 +60,7 @@ object BtTrajectoryCapture : BenchSuite {
     }
 
     override fun run(case: BenchCase, context: BenchContext): BenchResult {
+        System.setProperty("klause.workspace.root", requireNotNull(context.worktree).toString())
         val options = case.parameters
         require(options.keys == setOf("source-path", "sha256", "seed"))
         val source = requireNotNull(context.corpusDirectory).resolve(options.getValue("source-path")).toFile()

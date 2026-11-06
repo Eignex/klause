@@ -1600,7 +1600,8 @@ independent proof checking.
 `lab/bt-trajectory.json` captures ordered decisions, conflicts, restarts and learned sweeps
 for one hash-pinned DIMACS source, using one `clausal-balanced` BT worker. Supply
 `source-path`, `sha256` and up to two comma-separated `seeds`; the lab stages
-the declared corpus input before execution. Each seed pays
+the declared corpus input before execution. The capture uses the SDK worktree
+for installed-build provenance. Each seed pays
 for an unobserved control and a selector-observed solve; direct native solving omits
 presolve and portfolios. Trace output is capped at 131,072 events without stopping
 search. Compare completed control counters before interpreting prefixes; trace
