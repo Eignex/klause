@@ -44,6 +44,9 @@ bounded ownership/reclamation, compatible consuming workers and a benefit after
 all lifecycle costs. A lack of new candidates on a complete propositional control
 supports only a bounded no-go for that control. Unsupported/partial views need an
 applicability or grant diagnosis and cannot support a general no-go.
+External lab plans read committed flat DIMACS inventories from `corpus-index/` and declare
+stored inputs by SHA256. Planning cannot fetch or materialize corpus bytes; unsupported metadata
+fails before downloading. Execution verifies each declared input before invoking the CLI.
 
 ## Build and run
 

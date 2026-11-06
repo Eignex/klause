@@ -2,6 +2,8 @@ package com.eignex.klause.bench.lab
 
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.bench.catalog.ProblemSource
+import com.eignex.klause.bench.source.CommittedCorpusInputs
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchContext
@@ -17,7 +19,19 @@ import java.util.HexFormat
 internal object LabInputs {
     const val RUNTIME = "klause-bench/build/lab-runtime/minizinc"
 
-    fun resolve(ref: ProblemRef, inputOnly: Boolean = false): List<BenchInput> = buildList {
+    fun resolve(ref: ProblemRef, inputOnly: Boolean = false): List<BenchInput> {
+        val source = ref.source
+        if (CommittedCorpusInputs.isPlanning && source is ProblemSource.External) {
+            require(ref.format == Format.DIMACS && ref.data == null) { "Planning requires a single DIMACS source" }
+            val entry = CommittedCorpusInputs.entries(source.collection).singleOrNull { it.path == source.relPath }
+            requireNotNull(entry) { "Source is absent from committed corpus metadata: ${source.relPath}" }
+            return listOf(BenchInput("${source.collection.id}/${entry.path}", BenchInputRoot.CORPUS,
+                "model", entry.sha256))
+        }
+        return materialized(ref, inputOnly)
+    }
+
+    private fun materialized(ref: ProblemRef, inputOnly: Boolean): List<BenchInput> = buildList {
         val model = CorpusFetcher.resolve(ref.source).toPath()
         add(input(model, "model"))
         ref.data?.let { add(input(CorpusFetcher.resolve(it).toPath(), "data")) }
@@ -151,6 +165,7 @@ internal object LabInputs {
         compilerTrees: MutableMap<Path, String> = mutableMapOf(),
     ): Map<String, String> = buildMap {
         inputs.forEachIndexed { index, input ->
+            if (input.sha256 != null) return@forEachIndexed
             val root = if (input.root == BenchInputRoot.SOURCE) {
                 CorpusFetcher.workspaceRoot().toPath()
             } else {

@@ -29,7 +29,9 @@ internal class LearnedResidualInspection(
 
 // Store positions identify entries only within one observation, including across compaction.
 internal object LearnedResidualRestrictions {
-    private val stateField = PropagationSession::class.java.getDeclaredField("state").apply { isAccessible = true }
+    private val stateField = PropagationSession::class.java.declaredFields.single {
+        it.name == "state" || it.name == "retainedState"
+    }.apply { isAccessible = true }
     private val clauseLiterals = PropagationSession::class.java.declaredMethods.single {
         it.name.startsWith("learnedClauseLiterals") && it.parameterCount == 1
     }.apply { isAccessible = true }
