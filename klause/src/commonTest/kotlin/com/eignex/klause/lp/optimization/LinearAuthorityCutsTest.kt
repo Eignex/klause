@@ -480,7 +480,7 @@ class LinearAuthorityCutsTest {
         for (bound in listOf(null,
             SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO)),
             SourcePremise(lower, guards = mapOf(0 to true)),
-            SourcePremise(lower, integerPins = mapOf(y to BigFraction.ZERO)))) {
+            SourcePremise(lower, guards = emptyMap(), integerPins = mapOf(y to BigFraction.ZERO)))) {
             val premises = linkedMapOf(
                 "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
                     real to BigFraction.ONE), BigFraction.ofLong(2).reciprocal())),
