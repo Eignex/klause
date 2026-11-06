@@ -1094,7 +1094,8 @@ private fun executePortfolio(
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
     val admission = request.executionOptions.reader()[ExecutionOption.companionAdmission]
-    val adaptiveCompanionRepair = when (val repair = request.executionOptions.reader()[ExecutionOption.companionRepair]) {
+    val adaptiveCompanionRepair = when (val repair =
+        request.executionOptions.reader()[ExecutionOption.companionRepair]) {
         null, "fixed" -> false
         "adaptive" -> true
         else -> pipelineConfigError("companion-repair expects fixed|adaptive, got `$repair`")
