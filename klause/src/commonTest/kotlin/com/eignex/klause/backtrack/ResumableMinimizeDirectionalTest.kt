@@ -108,7 +108,7 @@ class ResumableMinimizeDirectionalTest {
     }
 
     @Test
-    fun `finite search consumes passive directional advice across cooperative slices`() {
+    fun `finite search consumes passive advice without variable queries`() {
         val blocks = 4
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
@@ -152,7 +152,6 @@ class ResumableMinimizeDirectionalTest {
             val consumed = Cancellation {
                 (search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes?.get("VARIABLE_CONSUMED") ?: 0L) > 0L
             }
-            search.runSlice(Cancellation.Never, 1000L, 1L) {}
             var slices = 0
             while (slices++ < 128 && !search.isDone) {
                 val outcomes = search.stats.lp.phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
