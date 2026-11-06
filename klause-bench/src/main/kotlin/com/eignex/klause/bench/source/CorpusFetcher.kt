@@ -125,6 +125,7 @@ internal object CorpusFetcher {
     /** The root directory of [collection] in the cache, fetching it if not already present. A fetch first
      *  evicts least recently used collections to fit the cache cap, and again once the new one has landed. */
     fun ensure(collection: ExternalCollection): File {
+        check(!CommittedCorpusInputs.isPlanning) { "Planning requires committed corpus input metadata" }
         val cache = cache()
         cache.markUsed(collection.id)
         var fetched = false
