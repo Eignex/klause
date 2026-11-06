@@ -554,7 +554,7 @@ class LinearAuthorityCutsTest {
     }
 
     @Test
-    fun `a full zero bound index should retain cuts whose sides it could not store`() {
+    fun `zero bound admission should ignore unrelated coordinates before needed bounds`() {
         val integers = (0..64).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
         val premises = linkedMapOf<String, SourcePremise>()
@@ -571,9 +571,41 @@ class LinearAuthorityCutsTest {
 
         val admitted = assertNotNull(generated.withoutZeroBoundRows(source, Cancellation.Never))
 
-        assertEquals(1, admitted.rows.size)
-        assertEquals(generated.rows, admitted.rows)
+        assertTrue(admitted.rows.isEmpty())
+        assertEquals(1L, admitted.observations["ZeroBoundOmitted"])
+        assertEquals(0L, admitted.observations["ZeroBoundIndexLimited"])
+    }
+
+    @Test
+    fun `a full zero bound index should retain cuts whose needed sides it could not store`() {
+        val integers = (0 until 128).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val premises = linkedMapOf<String, SourcePremise>()
+        for ((index, coordinate) in integers.withIndex()) {
+            premises["lower $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        }
+        for (index in 0 until 64) {
+            premises["mixed $index"] = SourcePremise(SourceInequality(mapOf(
+                integers[index * 2] to BigFraction.MINUS_ONE,
+                integers[index * 2 + 1] to BigFraction.MINUS_ONE,
+                real to BigFraction.ONE), BigFraction.ofLong(2).reciprocal()))
+        }
+        premises["real lower"] = SourcePremise(SourceInequality(
+            mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        val source = SourceProofContext(scope, (integers + real).toSet(), premises, emptyMap())
+        val generated = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never))
+        assertEquals(64, generated.rows.size)
+
+        val admitted = assertNotNull(generated.withoutZeroBoundRows(source, Cancellation.Never))
+
+        assertEquals(32, admitted.rows.size)
+        assertEquals(32L, admitted.observations["ZeroBoundOmitted"])
         assertEquals(1L, admitted.observations["ZeroBoundIndexLimited"])
+        for (cut in admitted.rows) {
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
     }
 
     @Test

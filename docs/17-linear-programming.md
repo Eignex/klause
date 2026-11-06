@@ -639,8 +639,11 @@ zero bounds on all their coordinates. Each coefficient needs the actual upper-ze
 side when positive or lower-zero side when negative. Guarded and integer-pinned
 premises supply neither side. Strict cuts, missing sides and unsupported families
 retain their definitions. Admission examines at most 64 definitions with a
-64-coordinate index and shares the generation's work allowance. Larger pools keep
-their ordinary definitions. Modeled temporary storage spends the containing
+64-coordinate index populated from eligible cut supports, then reads the supplied
+source bounds for those coordinates. Unrelated source coordinates consume no index
+entries; a cut needing an unstored coordinate retains its definition. Indexing and
+bound inspection share the generation's work allowance. Larger pools keep their
+ordinary definitions. Modeled temporary storage spends the containing
 allocation allowance within a 16 KiB local ceiling. Incomplete scans retain every
 definition, and cancellation withholds publication. Source rows and their proof
 authority stay intact; omitted construction and admission costs remain observable.

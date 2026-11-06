@@ -94,25 +94,47 @@ internal class LinearAuthorityCuts private constructor(
             return if (cancellation()) null else this
         }
         val zeroSides = HashMap<SourceCoordinate, Int>()
+        for (cut in rows) {
+            if (!charge(1L)) return if (cancellation()) null else finish(rows, complete = false)
+            val row = cut.inequality
+            if (row.strict || (cut.family != CutFamily.SOURCE_ROUNDING &&
+                    cut.family != CutFamily.SOURCE_MIXED_ROUNDING)) continue
+            val words = (row.rhs.num.magnitudeBitLength().toLong() +
+                row.rhs.den.magnitudeBitLength() + 63L) / 64L
+            if (!charge(1L + words * words)) {
+                return if (cancellation()) null else finish(rows, complete = false)
+            }
+            if (row.rhs < BigFraction.ZERO) continue
+            val indexed = row.forEachCoefficient { id, _ ->
+                if (!charge(2L)) false else when {
+                    id.kind == SourceCoordinate.Kind.Boolean || id in zeroSides -> true
+                    zeroSides.size == 64 -> {
+                        indexLimited = true
+                        true
+                    }
+                    !charge(1L, 96L) -> false
+                    else -> {
+                        zeroSides[id] = 0
+                        true
+                    }
+                }
+            }
+            if (!indexed) return if (cancellation()) null else finish(rows, complete = false)
+        }
         val sourceComplete = source.allPremises { _, premise ->
             if (!charge(1L)) return@allPremises false
             val row = premise.inequality
             if (row.supportSize != 1 || !row.rhs.isZero || premise.guardCount != 0 ||
                 premise.integerPinCount != 0) return@allPremises true
             val id = checkNotNull(row.singleCoordinate())
-            if (id.kind == SourceCoordinate.Kind.Boolean) return@allPremises true
+            val previous = zeroSides[id] ?: return@allPremises true
             val coefficient = checkNotNull(row.coefficient(id))
             val words = (coefficient.num.magnitudeBitLength().toLong() +
                 coefficient.den.magnitudeBitLength() + 63L) / 64L
             if (!charge(1L + words * words)) return@allPremises false
-            val previous = zeroSides[id]
-            if (previous == null && zeroSides.size == 64) {
-                indexLimited = true
-                return@allPremises true
-            }
-            if (!charge(1L, if (previous == null) 96L else 0L)) return@allPremises false
+            if (!charge(1L)) return@allPremises false
             val side = if (coefficient > BigFraction.ZERO) ZERO_UPPER else ZERO_LOWER
-            zeroSides[id] = (previous ?: 0) or side
+            zeroSides[id] = previous or side
             true
         }
         if (cancellation()) return null
