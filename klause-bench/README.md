@@ -1596,3 +1596,12 @@ or finish probing without a partition; require actual task observations before
 claiming task use. Probe work is a subset of worker work, while ordinary schedule
 charges retain reservations and coordinator checks. Native closures do not supply
 independent proof checking.
+
+`lab/bt-trajectory.json` captures ordered decisions, conflicts, restarts and learned sweeps
+for one hash-pinned DIMACS source, using one `clausal-balanced` BT worker. Supply
+`suite`, `problem`, `sha256` and up to two comma-separated `seeds`. Each seed pays
+for an unobserved control and a selector-observed solve; direct native solving omits
+presolve and portfolios. Trace output is capped at 131,072 events without stopping
+search. Compare completed control counters before interpreting prefixes; trace
+truncation, deadlines and native verdicts remain diagnostic rather than performance
+or independent source validation.
