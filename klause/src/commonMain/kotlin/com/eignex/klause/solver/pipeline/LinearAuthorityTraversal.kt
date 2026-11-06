@@ -408,24 +408,11 @@ internal class LinearAuthorityTraversal(
             return SearchNodeDisposition.Expand
         }
         activeRows?.release()
+        if (closeCurrentBound()) return SearchNodeDisposition.Prune
         if (inheritBounds && current.result == null && current.split == null && closeInheritedBound()) {
             return SearchNodeDisposition.Prune
         }
         current.result?.let {
-            if (it.evidence == null && current.coveredBound == null && current.split == null) {
-                val bound = it.bound
-                val value = ((bound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
-                val standing = incumbent()?.second
-                val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
-                if (value != null && standing != null && if (minimizes) value >= standing else value <= standing) {
-                    current.coveredBound = bound
-                    current.coveredCutFamilies = it.cutBoundFamilies
-                    authority.observeCutConsumption(it.cutBoundFamilies, "BOUND_PRUNE")
-                    pending--
-                    observe("numericalIncumbentBoundClosures")
-                    observe("numericalClosedLeaves")
-                }
-            }
             return when {
                 it.evidence != null || current.coveredBound != null -> SearchNodeDisposition.Prune
                 current.split != null -> SearchNodeDisposition.Expand
@@ -582,6 +569,30 @@ internal class LinearAuthorityTraversal(
         return listOf(true, false).map {
             SearchDecision.Theory(IntegerAlternative(split.coordinate, split.threshold, it))
         }
+    }
+
+    private fun closeCurrentBound(): Boolean {
+        if (current.split != null || current.coveredBound != null || current.result?.evidence != null) return false
+        val retained = current.result
+        val bound = retained?.bound ?: current.partialBound ?: return false
+        val value = ((bound.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value ?: return false
+        val standing = incumbent()?.second ?: return false
+        val minimizes = source.scope.objective?.sense == com.eignex.klause.ir.ObjectiveSense.MINIMIZE
+        if (if (minimizes) value < standing else value > standing) return false
+        val families = current.cutFamilies(bound)
+        if (retained == null) {
+            authority.invalidateGuidance()
+            current.result = LinearAuthorityResult(bound = bound, cutBoundFamilies = families)
+            observe("numericalPartialBoundClosures")
+        }
+        current.pending = false
+        current.coveredBound = bound
+        current.coveredCutFamilies = families
+        authority.observeCutConsumption(families, "BOUND_PRUNE")
+        pending--
+        observe("numericalIncumbentBoundClosures")
+        observe("numericalClosedLeaves")
+        return true
     }
 
     private fun closeInheritedBound(): Boolean {
