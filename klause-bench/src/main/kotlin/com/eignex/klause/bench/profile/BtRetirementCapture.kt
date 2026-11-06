@@ -195,133 +195,7 @@ object BtRetirementCapture : BenchSuite {
         private val atoms = SharedClause::class.java.getDeclaredField("atomQuads").apply { isAccessible = true }
         private val lbd = SharedClause::class.java.getDeclaredField("lbd").apply { isAccessible = true }
         private val workCounter = PropagationSession::class.java.methods.single {
-            it.name.substringBefore('
-
-        override fun onSearchStart(session: PropagationSession) { this.session = session }
-
-        override fun onRestart(session: PropagationSession) {
-            this.session = session
-            if (!rootCaptured && session.learnedClauseCount > 4000) {
-                rootCaptured = true
-                snapshot("before-first-over-cap", null)
-            }
-        }
-
-        fun sweep(event: SearchEvent.LearnedDbSweep) {
-            if (!firstSweep) {
-                firstSweep = true
-                snapshot("after-first-retirement", event)
-                quotaCaptured = event.kept <= 4000
-            } else if (!quotaCaptured && event.kept <= 4000) {
-                quotaCaptured = true
-                snapshot("after-first-quota", event)
-            }
-        }
-
-        private fun snapshot(label: String, event: SearchEvent.LearnedDbSweep?) {
-            val current = checkNotNull(session)
-            val slots = current.learnedClauseCount
-            val before = work(current)
-            val record = buildJsonObject {
-                put("label", label)
-                put("retainedSlots", slots)
-                put("sweepKept", event?.kept)
-                put("sweepDropped", event?.dropped)
-                put("workBeforeExport", before)
-                put("readOnlyPublicExport", true)
-                put("privateFieldsReadOnlyOnExportedCopies", true)
-                put("publicJvmWorkGetterReadOnly", true)
-                if (slots > 16384) {
-                    put("status", "unsupported-slot-bound")
-                } else {
-                    val clauses = current.exportGlueClauses(Int.MAX_VALUE, Int.MAX_VALUE, false)
-                    val total = clauses.sumOf { (bools.get(it) as IntArray).size.toLong() }
-                    require(clauses.all { (atoms.get(it) as LongArray).isEmpty() })
-                    put("activeOwnClauses", clauses.size)
-                    put("exportedLiteralCount", total)
-                    if (total > 2097152L) {
-                        put("status", "unsupported-literal-bound")
-                    } else {
-                        put("status", "captured")
-                        put("clauses", JsonArray(clauses.mapIndexed { index, clause ->
-                            buildJsonObject {
-                                put("activeOrdinal", index)
-                                put("lbd", lbd.getInt(clause))
-                                put("literals", JsonArray((bools.get(clause) as IntArray).map(::JsonPrimitive)))
-                            }
-                        }))
-                    }
-                }
-                put("workAfterExport", work(current))
-                put("observerWorkDelta", work(current) - before)
-                put("performanceQualified", false)
-            }
-            output.append(record.toString()).append('\n')
-            output.flush()
-            count++
-        }
-
-        override fun close() { output.close() }
-    }
-
-    private class Trace(val file: File, private val snapshots: Snapshots) : AutoCloseable {
-        private val output: BufferedWriter = file.bufferedWriter()
-        private var commits = 0L
-        var events = 0L
-            private set
-        var written = 0L
-            private set
-        val truncated: Boolean get() = events > written
-
-        fun picked(variable: VarRef?, session: PropagationSession) {
-            snapshots.session = session
-            row("P", kind(variable), variable?.varId?.toLong() ?: -1L)
-            if (commits % CHECKPOINT == 0L) row("K", commits, session.learnedClauseCount.toLong())
-        }
-
-        fun committed(variable: VarRef, value: Long) {
-            row("C", kind(variable), variable.varId.toLong(), value)
-            commits++
-        }
-
-        fun conflicted(variable: VarRef, value: Long) {
-            row("F", kind(variable), variable.varId.toLong(), value)
-        }
-
-        fun event(event: SearchEvent) {
-            when (event) {
-                is SearchEvent.Restart -> row("R", event.index, event.steps)
-                is SearchEvent.LearnedDbSweep -> {
-                    row("S", event.kept.toLong(), event.dropped.toLong())
-                    snapshots.sweep(event)
-                }
-                else -> Unit
-            }
-        }
-
-        private fun row(tag: String, vararg values: Long) {
-            events++
-            if (written >= MAX_TRACE_EVENTS) return
-            output.append(tag)
-            for (value in values) output.append('\t').append(value.toString())
-            output.append('\n')
-            written++
-        }
-
-        override fun close() { output.close() }
-
-        private fun kind(variable: VarRef?): Long = when (variable) {
-            null -> 0L
-            is VarRef.Bool -> 1L
-            is VarRef.IntVar -> 2L
-        }
-    }
-
-    private const val MAX_SOURCE_BYTES = 16 * 1024 * 1024
-    private const val MAX_TRACE_EVENTS = 131_072L
-    private const val CHECKPOINT = 256L
-}
-) == "getWork" && it.parameterCount == 0 &&
+            it.name.substringBefore('$') == "getWork" && it.parameterCount == 0 &&
                 it.returnType == java.lang.Long.TYPE
         }
 
@@ -360,6 +234,7 @@ object BtRetirementCapture : BenchSuite {
                 put("workBeforeExport", before)
                 put("readOnlyPublicExport", true)
                 put("privateFieldsReadOnlyOnExportedCopies", true)
+                put("publicJvmWorkGetterReadOnly", true)
                 if (slots > 16384) {
                     put("status", "unsupported-slot-bound")
                 } else {
