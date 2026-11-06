@@ -4,6 +4,7 @@
     "klause-bench/build/install/klause-bench/lib/*"
   ],
   "buildTasks": [
+    ":klause-cli:installJvmDist",
     ":klause-bench:installDist"
   ],
   "jvmArgs": [
@@ -13,7 +14,9 @@
   ],
   "runtime": {
     "java": 25,
-    "tools": [],
+    "tools": [
+      "time"
+    ],
     "environment": {}
   },
   "sourceHistory": "snapshot",
@@ -26,6 +29,7 @@
   ],
   "workspaceInputs": [
     ".git",
-    "klause-bench/build/install"
+    "klause-bench/build/install",
+    "klause-cli/build/install"
   ]
 }
