@@ -192,6 +192,24 @@ class NativeSatStateTest {
     }
 
     @Test
+    fun `moving an active watch past retired tail entries should preserve the survivor phase`() {
+        for (retired in listOf(1, 16, 256)) {
+            val session = session(4, intArrayOf(Lit.make(0, true), Lit.make(2, true), Lit.make(3, true)))
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+            session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
+            repeat(retired) { session.addLearnedClause(Clause(or(0, true, 2, true)), 9) }
+            repeat(8) { session.maintainCapWindow(2, 65_536L, 1_048_576L, { false }) { false } }
+            assertEquals(2, session.activeLearnedClauseCount)
+            var phase: Boolean? = null
+            session.retractingListener = { if (it == 1) phase = session.boolValue(1) }
+
+            session.pinBool(0, false)
+
+            assertEquals(false, phase, "retired=$retired")
+        }
+    }
+
+    @Test
     fun `small cleanup grants should release watches when an ordered copy cannot fit`() {
         for (grant in listOf(40L, 42L, 48L)) {
             val session = session(3, or(0, true, 2, true))

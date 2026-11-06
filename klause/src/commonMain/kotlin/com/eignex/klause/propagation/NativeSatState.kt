@@ -208,6 +208,18 @@ internal class NativeSatState(private val state: PropagationState) {
         if (lit == watchCleanupLiteral && idx < watchCleanupIndex) watchCleanupIndex = idx
     }
 
+    private fun trimRetiredWatchTail(lit: Int, index: Int) {
+        if (retiredCount == 0 && retiredRootSources == null) return
+        val entries = checkNotNull(watchEntries[lit])
+        while (watchSizes[lit] - 1 > index) {
+            state.work++
+            val last = watchSizes[lit] - 1
+            if (!isRetired(entries[last].toInt())) return
+            state.work += watchRemovalWork(lit)
+            removeWatchAt(lit, last)
+        }
+    }
+
     internal fun sweepRetiredWatches(budget: ReclamationPreparation) =
         metadata.usingBudget(budget) { sweepWatches(budget) }
 
@@ -943,6 +955,7 @@ internal class NativeSatState(private val state: PropagationState) {
             val scanStart = if (baseClause) 0 else metadata[h - baseCount, NativeLearnedMetadata.SCAN]
             val replacement = findNonFalse(lits, start, len, lIdx, otherIdx, scanStart)
             if (replacement >= 0) {
+                trimRetiredWatchTail(falseLit, wi)
                 if (!baseClause) {
                     metadata[h - baseCount, NativeLearnedMetadata.SCAN] =
                         if (replacement + 1 == len) 0 else replacement + 1
