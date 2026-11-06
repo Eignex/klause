@@ -140,6 +140,22 @@ class NativeSatStateTest {
     }
 
     @Test
+    fun `cached retired blockers should release their watch entries before skipping propagation`() {
+        val session = session(6, or(4, true, 5, true))
+        repeat(64) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
+        repeat(32) { session.maintainCapWindow(1, 256L, 64L, { false }) { false } }
+        session.pinBool(1, true)
+        val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+        session.pinBool(0, false)
+
+        val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+        assertTrue(after.getValue("sessionWatchCapacityBytes") < before.getValue("sessionWatchCapacityBytes"))
+        assertEquals(1, session.activeLearnedClauseCount)
+    }
+
+    @Test
     fun `native cap retirement should protect a live root reason`() {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)

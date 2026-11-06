@@ -138,6 +138,16 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         referenceSlots += page.rows.size
     }
 
+    fun isLiveCached(index: Int): Boolean {
+        val pageIndex = index ushr PAGE_SHIFT
+        val page = if (pageIndex == 0) primary else {
+            val cacheSlot = pageIndex and CACHE_MASK
+            if (cachedIndices[cacheSlot] != pageIndex) return false
+            cachedPages[cacheSlot]
+        }
+        return page?.rows?.getOrNull(index and PAGE_MASK) != null
+    }
+
     operator fun get(index: Int): IntArray = checkNotNull(checkNotNull(pageAt(index ushr PAGE_SHIFT))
         .rows[index and PAGE_MASK])
 

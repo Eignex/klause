@@ -328,6 +328,9 @@ and appended clauses; compaction resets them before handles change. Policy updat
 and reason-ownership checks are charged before publication. A later use protects a pending
 eviction; units, pending rechecks and current root reasons survive.
 Retired rows stop propagation and export and release their owned literal array.
+Watch propagation treats an already cached, non-null learned payload as a live-row witness.
+An uncached or absent payload retains the metadata status check. This probe performs no
+directory lookup or cache publication, and retired postings retain their ordinary removal order.
 Admission, reference-array growth and release debit the containing work ledger.
 A short retirement slice suspends before publication and resumes with its stable handle.
 Policy columns and watch postings retain their separately funded cleanup. Payload

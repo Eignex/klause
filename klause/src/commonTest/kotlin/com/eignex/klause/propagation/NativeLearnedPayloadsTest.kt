@@ -3,12 +3,56 @@ package com.eignex.klause.propagation
 import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class NativeLearnedPayloadsTest {
+    @Test
+    fun `cached liveness should distinguish an empty retained payload from a released row`() {
+        val payloads = NativeLearnedPayloads()
+        payloads.add(intArrayOf())
+        assertTrue(payloads.isLiveCached(0))
+
+        payloads.release(0)
+
+        assertFalse(payloads.isLiveCached(0))
+    }
+
+    @Test
+    fun `cached liveness should follow release and revival of an indexed row`() {
+        val payloads = NativeLearnedPayloads()
+        repeat(192) { payloads.add(intArrayOf(0, 2)) }
+        assertTrue(payloads.isLiveCached(64))
+
+        for (index in 64..127) payloads.release(index)
+        assertFalse(payloads.isLiveCached(64))
+        payloads.move(128, 64)
+        payloads.sweepDirectory(ReclamationPreparation(24L, 256L, { false }, {}))
+
+        assertTrue(payloads.isLiveCached(64))
+        assertFalse(payloads.isLiveCached(128))
+    }
+
+    @Test
+    fun `uncached liveness probes should preserve the lookup funding boundary`() {
+        val payloads = NativeLearnedPayloads()
+        repeat(8_320) { payloads.add(intArrayOf(0, 2)) }
+        val unfunded = ReclamationPreparation(0L, 64L, { false }, {})
+
+        assertFalse(payloads.usingBudget(unfunded) { payloads.isLiveCached(64) })
+        assertFailsWith<ReclamationPreparation.Deferred> {
+            payloads.usingBudget(unfunded) { payloads[64] }
+        }
+
+        var work = 0L
+        payloads.usingBudget(ReclamationPreparation(256L, 64L, { false }, { work += it })) { payloads[64] }
+        assertTrue(work > 0L)
+        assertTrue(payloads.usingBudget(unfunded) { payloads.isLiveCached(64) })
+    }
+
     @Test
     fun `cached nonadjacent payload pages should remain readable without a cold lookup`() {
         val payloads = NativeLearnedPayloads()
