@@ -1,0 +1,19 @@
+{
+  "main": "com.eignex.klause.bench.profile.BtTrajectoryCapture",
+  "classpath": [
+    "klause-bench/build/install/klause-bench/lib/*"
+  ],
+  "buildTasks": [
+    ":klause-bench:installDist"
+  ],
+  "jvmArgs": [
+    "-Xmx2560m",
+    "-XX:ActiveProcessorCount=1",
+    "--add-modules=jdk.incubator.vector"
+  ],
+  "runtime": {
+    "java": 25,
+    "tools": [],
+    "environment": {}
+  }
+}

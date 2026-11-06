@@ -849,3 +849,12 @@ on macOS arm64, JDK 25.0.4.1+1, with advisory one-CPU / 4,608 MiB resource recei
 The smaller magic-square source's AllDifferent-only conflicts, compressed-byte
 hash refusal, worker network failure, earlier truncated captures and preparation
 timeouts retain their costs and provenance in the external campaign ledger.
+
+`lab/bt-trajectory.json` captures ordered decisions, conflicts, restarts and learned sweeps
+for one hash-pinned DIMACS source, using one `clausal-balanced` BT worker. Supply
+`suite`, `problem`, `sha256` and up to two comma-separated `seeds`. Each seed pays
+for an unobserved control and a selector-observed solve; direct native solving omits
+presolve and portfolios. Trace output is capped at 131,072 events without stopping
+search. Compare completed control counters before interpreting prefixes; trace
+truncation, deadlines and native verdicts remain diagnostic rather than performance
+or independent source validation.
