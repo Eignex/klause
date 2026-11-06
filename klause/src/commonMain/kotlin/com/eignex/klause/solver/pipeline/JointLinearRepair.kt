@@ -81,6 +81,7 @@ internal class JointLinearRepair(
     private var query: LinearAuthorityInvocation? = null
     private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
+    private var queryFreedIntegers = 0
     private var checkedTrialWidth = 0
     private var enlargedTrialPending = false
     private var enlargedTrialProposal: ExactNeighborhoodCondition? = null
@@ -317,6 +318,13 @@ internal class JointLinearRepair(
     fun attempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
         val result = advanceAttempt(condition, cancellation)
         if (result.result != ExactNeighborhoodResult.Paused) {
+            if (queryFreedIntegers > 2 && (result.result == ExactNeighborhoodResult.Refuted ||
+                    result.result is ExactNeighborhoodResult.Witness)) {
+                observe("jointRepairLargerNeighborhoodCompletions")
+                if (result.result is ExactNeighborhoodResult.Witness) {
+                    observe("jointRepairLargerNeighborhoodCheckedIncumbents")
+                }
+            }
             val enlarged = condition === enlargedTrialProposal
             if (enlarged && (result.result == ExactNeighborhoodResult.Refuted ||
                     result.result is ExactNeighborhoodResult.Witness)) observe("jointRepairEnlargedTrialCompletions")
@@ -359,6 +367,7 @@ internal class JointLinearRepair(
                 external = { externalIncumbent() ?: anchor }, state = state, borrowedAuthority = authority,
                 boundOrdered = boundOrdered, guidance = true, funding = funding)
             val freed = (sourceIntegers?.size ?: model.numIntVars) - pinnedIntegers
+            queryFreedIntegers = freed
             stages["jointRepairMaxFreedIntegers"] = maxOf(stages["jointRepairMaxFreedIntegers"] ?: 0L, freed.toLong())
             if (condition === enlargedTrialProposal) observe("jointRepairEnlargedTrialStarts")
             observe("jointRepairCandidates")
@@ -462,6 +471,7 @@ internal class JointLinearRepair(
         incumbentTrialPending = false
         enlargedTrialPending = false
         enlargedTrialProposal = null
+        queryFreedIntegers = 0
         val resources = SearchInvocationResources()
         resources.own(authority)
         completion?.let(resources::own)

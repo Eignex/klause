@@ -540,7 +540,9 @@ exhaustion and the existing active/work/allocation limits still bound continuati
 `jointRepairMaxFreedIntegers` records actual opened-query width, and
 `jointRepairEnlargedTrialStarts`/`jointRepairEnlargedTrialCompletions` distinguish
 larger requested trials from completed ones. These counts grant no publication or
-proof authority.
+proof authority. `jointRepairLargerNeighborhoodCompletions` records completed queries
+that released more than two integers; its checked-incumbent counterpart counts only
+their accepted point publications.
 An available dimension-compatible incumbent requests continuation through root and center
 preparation and the first proposal, behind owed complete-worker coverage and within
 the existing active cap. Availability grants no import authority; the source checks

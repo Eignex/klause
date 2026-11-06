@@ -73,6 +73,8 @@ class JointLinearRepairTest {
                         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
                             .verify(SourceEvidence(source.scope, SourceClaim.Witness(point), SourceDerivation.SourceWitness)))
                         assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairEnlargedTrialCompletions"))
+                        assertEquals(1L,
+                            repair.stats.smt.completeSearchStages?.get("jointRepairLargerNeighborhoodCheckedIncumbents"))
                     } else assertTrue(result !is MinimizeResult.WithSample)
                     assertFalse(repair.incumbentTrialPending)
                 }
