@@ -1166,7 +1166,7 @@ private fun executePortfolio(
             cores = request.cores,
             executionOptions = request.executionOptions.without(
                 "portfolio-proof-share", "portfolio-proof-workers", "portfolio-lp-start", "portfolio-probes",
-                "boolean-proof-tasks", "companion-admission", "portfolio-publications",
+                "boolean-proof-tasks", "companion-admission", "companion-repair", "portfolio-publications",
             ),
             randomSeed = request.randomSeed,
             defaultArms = request.defaultArms,
