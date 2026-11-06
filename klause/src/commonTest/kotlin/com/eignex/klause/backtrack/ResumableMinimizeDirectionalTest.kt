@@ -113,10 +113,9 @@ class ResumableMinimizeDirectionalTest {
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
-            repeat(3) { edge ->
-                factors.add(Linear(longArrayOf(1L, 1L),
-                    intArrayOf(block * 3 + edge, block * 3 + (edge + 1) % 3), LinearOp.GE, 1L))
-            }
+            val first = block * 3
+            factors.add(Linear(longArrayOf(2L, 3L, 4L),
+                intArrayOf(first, first + 1, first + 2), LinearOp.GE, 5L))
         }
         val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, factors.toTypedArray()).bake()
         var completionAttempt = false
