@@ -332,6 +332,90 @@ class InprocessingTest {
     }
 
     @Test
+    fun `probe intervals should exclude maintenance while cheap passes continue`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem().bake(), nativeSat = native)
+            val cheap = CountingPass(work = 50L)
+            val stats = SearchStatsSink()
+            val loop = Inprocessing(listOf(RootProbingPass(), cheap), cadence = 1, stats = stats)
+            val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+                inprocessingProbeInterval = 100L)
+            loop.onRestart(session, params)
+
+            repeat(3) { loop.onRestart(session, params) }
+            session.chargeInprocessingWork(99L)
+            loop.onRestart(session, params)
+            assertEquals(1L, stats.inprocessProbes)
+            session.chargeInprocessingWork(1L)
+            loop.onRestart(session, params)
+
+            assertEquals(2L, stats.inprocessProbes)
+            assertEquals(6, cheap.runs)
+        }
+    }
+
+    @Test
+    fun `buffer release should preserve the optional probe interval`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem().bake(), nativeSat = native)
+            val stats = SearchStatsSink()
+            val loop = Inprocessing(listOf(RootProbingPass()), cadence = 1, stats = stats)
+            val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+                inprocessingProbeInterval = 100L)
+            loop.onRestart(session, params)
+
+            assertTrue(loop.releaseRetainedBuffers())
+            loop.onRestart(session, params)
+            assertEquals(1L, stats.inprocessProbes)
+            session.chargeInprocessingWork(100L)
+            loop.onRestart(session, params)
+
+            assertEquals(2L, stats.inprocessProbes)
+        }
+    }
+
+    @Test
+    fun `scope reset should renew the first optional probe opportunity`() {
+        val session = session()
+        val stats = SearchStatsSink()
+        val loop = Inprocessing(listOf(RootProbingPass()), cadence = 1, stats = stats)
+        val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+            inprocessingProbeInterval = 100L)
+        loop.onRestart(session, params)
+
+        loop.reset()
+        loop.onRestart(session, params)
+
+        assertEquals(2L, stats.inprocessProbes)
+    }
+
+    @Test
+    fun `deferred implications should resume before the next optional probe interval`() {
+        for (native in listOf(false, true)) {
+            val source = Problem(4, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(1, 2)), Clause(intArrayOf(3, 4)),
+            ))
+            val session = PropagationSession(source.bake(), nativeSat = native)
+            val pass = RootProbingPass()
+            val stats = SearchStatsSink()
+            val loop = Inprocessing(listOf(CountingPass(work = 193L), pass), cadence = 1, stats = stats)
+            val params = BacktrackParams(rootProbeBatch = 1, inprocessingWork = 256L,
+                inprocessingProbeWork = 256L, inprocessingProbeInterval = 10000L)
+            loop.onRestart(session, params)
+            assertTrue(pass.hasContinuation(session))
+            assertEquals(0, session.learnedClauseCount)
+            val probes = stats.inprocessProbes
+
+            assertTrue(loop.releaseRetainedBuffers())
+            loop.onRestart(session, params.copy(inprocessingWork = 1024L))
+
+            assertEquals(probes, stats.inprocessProbes)
+            assertFalse(pass.hasContinuation(session))
+            assertEquals(1, session.learnedClauseCount)
+        }
+    }
+
+    @Test
     fun `memory pressure should release optional preparation without a restart`() {
         val session = session()
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
