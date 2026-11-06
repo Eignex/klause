@@ -1,0 +1,8 @@
+{
+  "main": "com.eignex.klause.bench.lab.SourceIdentityAdapterKt",
+  "classpath": ["klause-bench/build/install/klause-bench/lib/*"],
+  "buildTasks": [":klause-bench:installDist"],
+  "jvmArgs": ["-Xmx512m", "--enable-native-access=ALL-UNNAMED"],
+  "runtime": {"java": 25, "tools": [], "environment": {}},
+  "workspaceInputs": [".git", "klause-bench/build/install", "klause-mzn-lib"]
+}
