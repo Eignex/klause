@@ -1598,11 +1598,13 @@ charges retain reservations and coordinator checks. Native closures do not suppl
 independent proof checking.
 
 `bench.profile.BtRetirementCapture` runs a hash-pinned UF250 native BT control and
-a traced control for each seed. It captures at most three learned-clause exports:
-the first over-cap root, the first retirement and the first completed active quota.
-It preserves complete ordered literal arrays and LBDs from exported copies, reading
-their JVM fields without changing solver state. The two controls have separate
-120-second lifetimes; a case has a 300-second infrastructure ceiling. Compare
-completed endpoints and work counters before interpreting clause identities.
-Observation work, allocations and cache effects are diagnostic costs, not ordinary
-solve-time evidence. A slot or literal bound reports unsupported capture.
+an observed control for each seed. Existing restart, sweep and selector hooks capture
+at most three raw native snapshots: the first over-cap restart, the first completed
+active quota and the next selected decision. The JVM reader copies pinned private
+fields without calling clause exports, paged store accessors or clause exchange.
+It retains ordered clauses, LBDs, policy/watch positions, base clauses, truth and
+reason arrays, and packed watch lists. Logical cache references and work counters
+must remain unchanged. Unknown layouts and exceeded bounds fail the diagnostic.
+The two controls have separate 120-second lifetimes; a case has a 300-second ceiling.
+Require complete endpoint and work-counter equivalence before comparing identities.
+Reflection, copying, allocation and trace costs do not qualify ordinary performance.
