@@ -196,7 +196,7 @@ object BtRetirementCapture : BenchSuite {
         private val lbd = SharedClause::class.java.getDeclaredField("lbd").apply { isAccessible = true }
         private val workCounter = PropagationSession::class.java.methods.single {
             it.name.substringBefore('$') == "getWork" && it.parameterCount == 0 &&
-                it.returnType == java.lang.Long.TYPE
+                it.returnType == Long::class.javaPrimitiveType
         }
 
         private fun work(session: PropagationSession): Long = workCounter.invoke(session) as Long
