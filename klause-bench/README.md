@@ -1596,3 +1596,13 @@ or finish probing without a partition; require actual task observations before
 claiming task use. Probe work is a subset of worker work, while ordinary schedule
 charges retain reservations and coordinator checks. Native closures do not supply
 independent proof checking.
+
+`bench.profile.BtRetirementCapture` runs a hash-pinned UF250 native BT control and
+a traced control for each seed. It captures at most three learned-clause exports:
+the first over-cap root, the first retirement and the first completed active quota.
+It preserves complete ordered literal arrays and LBDs from exported copies, reading
+their JVM fields without changing solver state. The two controls have separate
+120-second lifetimes; a case has a 300-second infrastructure ceiling. Compare
+completed endpoints and work counters before interpreting clause identities.
+Observation work, allocations and cache effects are diagnostic costs, not ordinary
+solve-time evidence. A slot or literal bound reports unsupported capture.
