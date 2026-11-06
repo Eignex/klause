@@ -29,12 +29,15 @@ internal class FiniteCompanionAdmission(
     init { require(active > Duration.ZERO && construction > Duration.ZERO) }
 
     fun contextForStart(global: Cancellation, sliceMillis: Long): SourceProofContext? {
-        if (!initiallyFunded || cancellation.isCancelled() || remaining() < active) return decline()
+        if (!initiallyFunded || cancellation.isCancelled() || global.isCancelled() || remaining() < active) {
+            return decline()
+        }
         if (!attempted) {
             val available = remaining() - pairLifetime
             if (available <= Duration.ZERO) return decline()
-            attempted = true
             val allowance = minOf(available, construction, sliceMillis.coerceAtLeast(0).milliseconds)
+            if (allowance <= Duration.ZERO) return decline()
+            attempted = true
             val localDeadline = minOf(deadline - pairLifetime, deadline - (remaining() - allowance))
             val limited = Cancellation.until(localDeadline) or cancellation or global
             val started = clock.markNow()

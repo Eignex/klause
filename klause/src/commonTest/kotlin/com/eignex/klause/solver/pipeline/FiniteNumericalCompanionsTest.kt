@@ -33,7 +33,7 @@ import kotlin.time.TestTimeSource
 class FiniteNumericalCompanionsTest {
     @Test
     fun `funded companions should avoid capture when cancellation precedes every query`() {
-        for (unavailable in listOf(false, true)) {
+        for ((afterImprovement, unavailable) in listOf(false to false, false to true, true to false, true to true)) {
             val factors = if (unavailable) arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0))
             else emptyArray()
             val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), factors, numRealVars = 1,
@@ -45,7 +45,8 @@ class FiniteNumericalCompanionsTest {
 
             val result = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
                 plan, Cancellation.until(clock.markNow() + 30.seconds), numericalCompletion = true,
-                numericalCompanions = TheoryParams(), fundedCompanions = true).use {
+                numericalCompanions = TheoryParams(), fundedCompanions = true,
+                waitForCompanionImprovement = afterImprovement).use {
                 it.minimize(Cancellation { true }, null)
             }
 
@@ -73,7 +74,7 @@ class FiniteNumericalCompanionsTest {
         val candidate = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null,
             { _, event -> if (event is SearchEvent.WorkerAdmission) events += event }, null,
             plan, lifetime, numericalCompletion = true, numericalCompanions = TheoryParams(),
-            fundedCompanions = true)
+            fundedCompanions = true, waitForCompanionImprovement = true)
 
         baseline.use { before -> candidate.use { after ->
             assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })
@@ -101,7 +102,7 @@ class FiniteNumericalCompanionsTest {
                 plan, lifetime, numericalCompletion = true)
             val candidate = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
                 plan, lifetime, numericalCompletion = true, numericalCompanions = TheoryParams(),
-                fundedCompanions = true)
+                fundedCompanions = true, waitForCompanionImprovement = true)
 
             baseline.use { before -> candidate.use { after ->
                 assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })

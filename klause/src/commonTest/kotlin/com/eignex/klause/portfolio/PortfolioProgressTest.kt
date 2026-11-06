@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -158,6 +159,33 @@ class PortfolioProgressTest {
     }
 
     @Test
+    fun `deferred queries should require an accepted global improvement`() {
+        for ((improves, rejected, perSlice) in listOf(
+            Triple(false, false, 1), Triple(true, false, 1), Triple(true, true, 1), Triple(true, false, 2),
+        )) {
+            var accepted = 0
+            var queries = 0
+            val secondProbe = improves && perSlice == 1
+            val workers = listOf(
+                trackingWorker("finder", 0,
+                    ScriptedSearch({ it == 0 || (secondProbe && it == 1) }, perSlice = perSlice) { }),
+                trackingWorker("local", 1, ScriptedSearch({ true }, start = 2_000.0) { }),
+                trackingWorker("deferred", 2, ScriptedSearch({ false }) {
+                    assertTrue(accepted >= 2)
+                    queries++
+                }).also { it.startAfterAcceptedImprovement = true },
+            )
+            Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(24),
+                witnessCheck = WitnessCheck { _, value ->
+                    if (rejected && value == 998.0) "rejected improvement" else null
+                }).use { it.minimize(Cancellation.Never) { accepted++ } }
+
+            assertEquals(improves && !rejected, queries > 0)
+        }
+    }
+
+    @Test
     fun `a deferred worker should first query after incumbent availability`() {
         val events = mutableListOf<PortfolioEvent>()
         val workers = listOf(
@@ -174,6 +202,81 @@ class PortfolioProgressTest {
         val queried = life.indexOfFirst { it.kind == PortfolioLifecycleKind.FIRST_QUERY }
         assertTrue(available >= 0 && queried > available)
         assertTrue(life.last().kind == PortfolioLifecycleKind.RETIRED)
+    }
+
+    @Test
+    fun `preexisting incumbent versions should require fresh accepted progress`() {
+        for (improves in listOf(false, true)) {
+            val incumbents = PortfolioIncumbents.floating()
+            val point = Sample(BooleanArray(0), LongArray(0))
+            for (value in listOf(1_000.0, 999.0, 998.0)) incumbents.exchange.offer(point, value)
+            var accepted = 0
+            var queries = 0
+            val workers = listOf(
+                trackingWorker("finder", 0, ScriptedSearch({ it == 0 },
+                    start = if (improves) 998.0 else 1_000.0) { }),
+                trackingWorker("deferred", 1, ScriptedSearch({ false }) {
+                    assertEquals(1, accepted)
+                    queries++
+                }).also { it.startAfterAcceptedImprovement = true },
+            )
+
+            Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(12)).use {
+                it.minimize(Cancellation.Never, { accepted++ }, incumbents)
+            }
+
+            assertEquals(improves, queries > 0)
+        }
+    }
+
+    @Test
+    fun `ties and unpublished objectives should not open progress deferred workers`() {
+        for (unpublished in listOf(false, true)) {
+            val base = ScriptedSearch({ true }) { }
+            var offers = 0
+            var queries = 0
+            val search = object : ResumableSearch by base {
+                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
+                    base.runSlice(global, sliceMillis, sliceNodes) {
+                        val value = if (offers++ > 0 && unpublished) Double.NaN else 999.0
+                        onIncumbent(MinimizeResult.BestFound(it.sample, value, TerminationReason.BudgetExhausted))
+                    }
+            }
+            val workers = listOf(
+                trackingWorker("finder", 0, search),
+                trackingWorker("deferred", 1, ScriptedSearch({ false }) { queries++ })
+                    .also { it.startAfterAcceptedImprovement = true },
+            )
+
+            Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(12)).use {
+                it.minimize(Cancellation.Never)
+            }
+
+            assertTrue(offers > 1)
+            assertEquals(0, queries)
+        }
+    }
+
+    @Test
+    fun `cancellation after accepted progress should prevent deferred queries`() {
+        var accepted = 0
+        var queries = 0
+        val workers = listOf(
+            trackingWorker("finder", 0, ScriptedSearch({ true }) { }),
+            trackingWorker("deferred", 1, ScriptedSearch({ false }) { queries++ })
+                .also { it.startAfterAcceptedImprovement = true },
+        )
+
+        Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+            reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(12)).use {
+            it.minimize(Cancellation { accepted == 2 }) { accepted++ }
+        }
+
+        assertEquals(2, accepted)
+        assertEquals(0, queries)
     }
 
     @Test

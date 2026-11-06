@@ -514,6 +514,7 @@ class Portfolio(
             }
             claim.improved = true
             if (before != null) {
+                run.recordAcceptedImprovement()
                 if (claim.hadIncumbent || run.pricesAcceptedGains) {
                     val reward = incumbents.gain(before.objective, candidate.objective)
                     run.recordAcceptedGain(claim.arm, reward)
@@ -996,7 +997,12 @@ class Portfolio(
         private val families = FamilyPolicy(bandit.random, profile?.let(FamilyPrior::of) ?: FamilyPrior.UNIFORM)
         private var improving = false
         private var feasibilityComplete = false
+        private var hasAcceptedImprovement = false
         private var incumbentElapsed: DoubleArray? = null
+
+        fun recordAcceptedImprovement() {
+            hasAcceptedImprovement = true
+        }
 
         fun endFeasibilityCoverage() {
             feasibilityComplete = true
@@ -1122,7 +1128,9 @@ class Portfolio(
                 for (arm in firstWitnessArms) if (!busy[arm]) retire(arm)
             }
             if (remaining == 0) return@locked null
-            val dedicated = diagnostics == null && lanes == workers.size && workers.none { it.startAfterIncumbent }
+            val dedicated = diagnostics == null && lanes == workers.size && workers.none {
+                it.startAfterIncumbent || it.startAfterAcceptedImprovement
+            }
             val available = eligibleArms().let { arms -> availability?.let { arms.filter(it) } ?: arms }
             val eligible = initialHeuristicEligibility(available)
             val earlyCore = if (dedicated) null else earlyCoreTrials.firstOrNull {
@@ -1206,7 +1214,10 @@ class Portfolio(
         }
 
         private fun eligibleArms(): List<Int> {
-            val available = workers.indices.filter { !workers[it].startAfterIncumbent || feasibilityComplete }
+            val available = workers.indices.filter {
+                (!workers[it].startAfterIncumbent || feasibilityComplete) &&
+                    (!workers[it].startAfterAcceptedImprovement || hasAcceptedImprovement)
+            }
             val first = available.filter { !workers[it].improvementOnly }
             val eligible = if (improving || first.all { retired[it] }) available else first
             val complete = first.filter { workers[it].family == ArmFamily.Backtrack && !workers[it].auxiliaryProof }
