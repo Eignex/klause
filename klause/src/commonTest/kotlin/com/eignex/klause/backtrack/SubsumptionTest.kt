@@ -6,8 +6,13 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.klause.util.SharingMemoryStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SubsumptionTest {
 
@@ -108,5 +113,63 @@ class SubsumptionTest {
         val resolvent = (0 until session.learnedClauseCount)
             .single { session.learnedClauseLiterals(it).toSet() == lits(0 to true, 2 to true).toSet() }
         assertEquals(4, session.learnedClauseOrigin(resolvent))
+    }
+
+    @Test
+    fun `pressure release should discard a suspended subsumption index`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(6).bake(), nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            session.addLearnedClause(Clause(intArrayOf(0, 2, 4)), 3)
+            val pass = Subsumption()
+            pass.run(session, BacktrackParams(inprocessingSubsumeWork = 1L), null)
+            val before = SharingMemoryObservation(1024L, 128, { false }, {})
+            val retained = before.snapshot { pass.retainedMemory(before, false) }
+
+            pass.releaseRetainedBuffers()
+            val after = SharingMemoryObservation(1024L, 128, { false }, {})
+            val released = after.snapshot { pass.retainedMemory(after, false) }
+
+            assertTrue(assertNotNull(retained.completeValues).getValue("ownedPrimitiveBytes") > 0L)
+            assertEquals(0L, assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes"))
+            assertEquals(2, session.learnedClauseCount)
+        }
+    }
+
+    @Test
+    fun `tiny observation should leave suspended subsumption available to resume`() {
+        val session = PropagationSession(problem(6).bake())
+        session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+        session.addLearnedClause(Clause(intArrayOf(0, 2, 4)), 3)
+        val pass = Subsumption()
+        pass.run(session, BacktrackParams(inprocessingSubsumeWork = 1L), null)
+        val sample = SharingMemoryObservation(1L, 1, { false }, {})
+
+        val interrupted = sample.snapshot { pass.retainedMemory(sample, false) }
+        pass.run(session, BacktrackParams(), null)
+
+        assertEquals(SharingMemoryStatus.PARTIAL, interrupted.status)
+        assertEquals(1L, interrupted.work)
+        assertNull(interrupted.completeValues)
+        assertEquals(setOf(setOf(0, 2)), learnedSets(session))
+    }
+
+    @Test
+    fun `an obsolete subsumption index should release when no new pass is eligible`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(6).bake(), nativeSat = native)
+            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+            session.addLearnedClause(Clause(intArrayOf(0, 2, 4)), 3)
+            val pass = Subsumption()
+            pass.run(session, BacktrackParams(inprocessingSubsumeWork = 1L), null)
+
+            session.forgetLearnedClauses { _, _ -> false }
+            pass.run(session, BacktrackParams(inprocessingSubsumeWork = 0L), null)
+            val sample = SharingMemoryObservation(1024L, 128, { false }, {})
+            val released = sample.snapshot { pass.retainedMemory(sample, false) }
+
+            assertEquals(0, session.learnedClauseCount)
+            assertEquals(0L, assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes"))
+        }
     }
 }

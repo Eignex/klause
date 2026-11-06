@@ -8,6 +8,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.SharingMemoryObservation
 
 /**
  * One scheduled in-search simplification pass over the live constraint database. Passes run
@@ -31,6 +32,10 @@ internal interface InprocessingPass {
 
     /** Drop per-search cursors; called when the engine reseeds onto a fragment. */
     fun reset()
+
+    fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean = true) = Unit
+
+    fun releaseRetainedBuffers() = reset()
 }
 
 /**
@@ -61,6 +66,22 @@ internal class Inprocessing(
     private var publication: Iterator<ComponentResult?>? = null
     private var publicationVisits = 0L
     private var needsPublication = false
+
+    fun retainedMemory(sample: SharingMemoryObservation) {
+        val protected = pendingRoot != null || publication != null || needsPublication
+        sample.ownedReferences(passes, passes.size.toLong(), true)
+        publication?.let { sample.ownedReferences(it, 1L, true) }
+        for (pass in passes) {
+            sample.step()
+            pass.retainedMemory(sample, protected)
+        }
+    }
+
+    fun releaseRetainedBuffers(): Boolean {
+        if (pendingRoot != null || publication != null || needsPublication) return false
+        for (pass in passes) pass.releaseRetainedBuffers()
+        return true
+    }
 
     private fun <T> publishRoot(session: PropagationSession, operation: () -> T): T {
         val start = session.work

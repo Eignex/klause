@@ -88,7 +88,7 @@ class PropagationSession private constructor(
         state.propagationNanos += checker.propagationNanos
     }
 
-    private val state: PropagationState =
+    private var retainedState: PropagationState? =
         preparedState ?: PropagationState(
             projection,
             initialAssumptions,
@@ -100,6 +100,25 @@ class PropagationSession private constructor(
             if (attribution) it.factorAttribution = FactorAttribution()
             it.historicalTableReasons = historicalTables
         }
+    private val state: PropagationState get() = checkNotNull(retainedState) { "propagation session is released" }
+    private var retiredWork = 0L
+    private var retiredPropagationNanos = 0L
+    private var retiredPropagationCount = 0L
+    private var retiredLifecycle: Map<String, Long> = emptyMap()
+
+    internal fun releaseRetainedState() {
+        val owner = retainedState ?: return
+        retiredWork = owner.work
+        retiredPropagationNanos = owner.propagationNanos
+        retiredPropagationCount = owner.propagations
+        retiredLifecycle = owner.learned.lifecycle.snapshot() + (owner.factorAttribution?.snapshot() ?: emptyMap())
+        retainedState = null
+        levelStates = emptyArray()
+        levelTop = 0
+        sharedLearningMemory = null
+        retainedInprocessingMemory = null
+        simplifiedRootSources = null
+    }
 
     /** Subscribe to per-variable unassign events fired by every backtrack/undo; see
      *  [PropagationState.undoTo]. Combined-index encoding: bool id `v`, int id `numBoolVars + v`. */
@@ -313,7 +332,7 @@ class PropagationSession private constructor(
 
     internal val rootWork: Long
     internal val rootPropagationNanos: Long
-    internal val work: Long get() = state.work
+    internal val work: Long get() = retainedState?.work ?: retiredWork
     internal val valueOrdering = ValueOrderingStatsSink()
     internal fun visitValueScore(): Boolean {
         if (cancellation()) {
@@ -323,7 +342,7 @@ class PropagationSession private constructor(
         state.work++
         return true
     }
-    internal val propagationNanos: Long get() = state.propagationNanos
+    internal val propagationNanos: Long get() = retainedState?.propagationNanos ?: retiredPropagationNanos
 
     private var requiredInprocessingCancellation: Cancellation? = null
 
@@ -518,7 +537,7 @@ class PropagationSession private constructor(
 
     /** Cumulative count of factor-forced assignments across this session — backs the
      *  `propagations` solve stat. Monotonic; the engine reads deltas around each pin. */
-    val propagationCount: Long get() = state.propagations
+    val propagationCount: Long get() = retainedState?.propagations ?: retiredPropagationCount
 
     /** Current bool value: pinned by decision OR forced by propagation. `null` = free. */
     fun boolValue(v: Int): Boolean? = state.boolValues[v]
@@ -1025,7 +1044,7 @@ class PropagationSession private constructor(
      *  restart hook to bound the learned-clause database. */
     fun forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
         val before = learnedClauseCount
-        state.forgetLearnedClauses(keep)
+        state.forgetLearnedClauses(keep, cancelled = { cancelRequested })
         if (learnedClauseCount != before) learnedClauseRevision++
     }
 
@@ -1063,17 +1082,60 @@ class PropagationSession private constructor(
     internal val sharingIdentity = Any()
 
     internal var sharedLearningMemory: ((SharingMemoryObservation) -> Unit)? = null
+    internal var retainedInprocessingMemory: ((SharingMemoryObservation) -> Unit)? = null
+
+    internal fun reclaimLearnedMemory(
+        softLimitBytes: Long,
+        maxWork: Long = 65_536L,
+        maxScratchBytes: Long = 1_048_576L,
+        releaseBuffers: () -> Boolean = { false },
+    ): LearnedReclamation {
+        require(softLimitBytes >= 0L && maxWork >= 0L && maxScratchBytes >= 0L)
+        val start = work
+        val scratchEntries = minOf(maxScratchBytes / 64L, Int.MAX_VALUE.toLong()).toInt()
+        fun sample() = sharingMemory((maxWork - (work - start)).coerceAtLeast(0L), scratchEntries)
+        fun bytes(values: Map<String, Long>) = values.getValue("ownedPrimitiveBytes") +
+            values.getValue("ownedReferenceSlots") * Long.SIZE_BYTES
+        val before = sample().completeValues ?: return LearnedReclamation(
+            if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED, work = work - start)
+        val beforeBytes = bytes(before)
+        val floor = before.getValue("protectedPrimitiveBytes") + before.getValue("protectedReferenceSlots") * Long.SIZE_BYTES
+        if (beforeBytes <= softLimitBytes) return LearnedReclamation(ReclamationStatus.WITHIN_LIMIT,
+            beforeBytes, beforeBytes, floor, work - start)
+        releaseBuffers()
+        val count = learnedClauseCount
+        val published = state.forgetLearnedClauses({ _, _ -> false },
+            (maxWork - (work - start)).coerceAtLeast(0L), maxScratchBytes, { cancelRequested })
+        if (learnedClauseCount != count) learnedClauseRevision++
+        if (!published) return LearnedReclamation(
+            if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED,
+            beforeBytes, protectedBytes = floor, work = work - start)
+        val after = sample().completeValues
+        val afterBytes = after?.let(::bytes)
+        val afterFloor = after?.let {
+            it.getValue("protectedPrimitiveBytes") + it.getValue("protectedReferenceSlots") * Long.SIZE_BYTES
+        }
+        return LearnedReclamation(
+            when {
+                learnedClauseCount < count || (afterBytes != null && afterBytes < beforeBytes) -> ReclamationStatus.RECLAIMED
+                afterFloor != null && afterFloor > softLimitBytes -> ReclamationStatus.PROTECTED_FLOOR
+                else -> ReclamationStatus.DEFERRED
+            }, beforeBytes, afterBytes, afterFloor ?: floor, work - start)
+    }
 
     internal fun sharingMemory(
         maxWork: Long = SharingMemoryObservation.DEFAULT_WORK,
         maxScratchEntries: Int = SharingMemoryObservation.DEFAULT_SCRATCH_ENTRIES,
     ): SharingMemorySnapshot {
+        if (retainedState == null) return SharingMemorySnapshot(
+            com.eignex.klause.util.SharingMemoryStatus.STALE, emptyMap(), 0L, 0)
         val sample = SharingMemoryObservation(
             maxWork, maxScratchEntries, { cancelRequested }, { chargeSharingWork(1L) },
         )
         return sample.snapshot {
             state.sharingMemory(sample)
             sharedLearningMemory?.invoke(sample)
+            retainedInprocessingMemory?.invoke(sample)
             sample.record(mapOf(
                 "sharedLearningObserved" to if (sharedLearningMemory == null) 0L else 1L,
                 "rootRetiredSourceReferenceSlots" to (simplifiedRootSources?.size?.toLong() ?: 0L),
@@ -1081,8 +1143,9 @@ class PropagationSession private constructor(
         }
     }
 
-    internal fun learnedLifecycle(): Map<String, Long> =
-        state.learned.lifecycle.snapshot() + (state.factorAttribution?.snapshot() ?: emptyMap())
+    internal fun learnedLifecycle(): Map<String, Long> = retainedState?.let {
+        it.learned.lifecycle.snapshot() + (it.factorAttribution?.snapshot() ?: emptyMap())
+    } ?: retiredLifecycle
 
     internal fun configureAttribution(enabled: Boolean, historicalTables: Boolean) {
         state.factorAttribution = if (enabled) state.factorAttribution ?: FactorAttribution() else null
@@ -1102,7 +1165,7 @@ class PropagationSession private constructor(
 
     /** Current learned-constraint count, including PB constraints and integer rows. Used to invoke
      *  [forgetLearnedClauses] based on `BacktrackParams.maxLearnedClauses`. */
-    val learnedClauseCount: Int get() = state.nativeEngine?.count ?: state.learnedClauses.size
+    val learnedClauseCount: Int get() = retainedState?.let { it.nativeEngine?.count ?: it.learnedClauses.size } ?: 0
 
     /** LBD of the learned clause at [learnedIndex]. */
     fun learnedClauseLbd(learnedIndex: Int): Int = state.learnedClauseLbd(learnedIndex)

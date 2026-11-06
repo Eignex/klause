@@ -257,6 +257,15 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** The `max-learned` execution setting. */
         val maxLearned: ExecutionOption<Int> = ExecutionOption("max-learned", ValueKind.INT)
 
+        /** The `learned-memory-bytes` execution setting. */
+        val learnedMemoryBytes: ExecutionOption<Long> = ExecutionOption("learned-memory-bytes", ValueKind.LONG)
+
+        /** The `learned-memory-work` execution setting. */
+        val learnedMemoryWork: ExecutionOption<Long> = ExecutionOption("learned-memory-work", ValueKind.LONG)
+
+        /** The `learned-memory-scratch-bytes` execution setting. */
+        val learnedMemoryScratchBytes: ExecutionOption<Long> = ExecutionOption("learned-memory-scratch-bytes", ValueKind.LONG)
+
         /** The `lbd-glue` execution setting. */
         val lbdGlue: ExecutionOption<Int> = ExecutionOption("lbd-glue", ValueKind.INT)
 
@@ -474,6 +483,9 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
         /** Maximum deduplication entries per sharing-memory observation. */
         val sharingMemoryScratch: ExecutionOption<Int> = ExecutionOption("sharing-memory-scratch", ValueKind.INT)
 
+        /** Optional modeled byte limit per shared learned-clause pool. */
+        val sharingMemoryBytes: ExecutionOption<Long> = ExecutionOption("sharing-memory-bytes", ValueKind.LONG)
+
         /** Allow the curated bounded core worker before the first incumbent. Default false. */
         val coreEarly: ExecutionOption<Boolean> = ExecutionOption("core-early", ValueKind.BOOLEAN)
 
@@ -523,6 +535,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 openHintFlips, openHintMinSplits,
                 maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart,
                 phaseSaving, targetPhasing, solutionPhasing, rephaseInterval, maxLearned,
+                learnedMemoryBytes, learnedMemoryWork, learnedMemoryScratchBytes,
                 lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
                 subsumption, subsumeBatch, inprocessingCadence, rootSimplification, rootSimplifyBatch,
                 rootRebuildCaptureVisits,
@@ -539,7 +552,7 @@ class ExecutionOption<T> private constructor(internal val id: String, private va
                 scoring, acceptance, restart, strategy, localSearchArm, objectiveGuidance,
                 lambda, arms, localSearchArms, backtrackArms, clauseShareLbd,
                 clauseShareLen, sliceWork, sliceMaxWork, sliceGrowth, portfolioWork, coreEarly, companionIntegers,
-                sharingMemory, sharingMemoryWork, sharingMemoryScratch,
+                sharingMemory, sharingMemoryWork, sharingMemoryScratch, sharingMemoryBytes,
                 coreRefinement, companionAfterIncumbent, companionActiveMillis, portfolioProgress,
                 phaseRetention, reseedStaleThreshold, lsResiduals, lsPhaseTimes, backtrackArmsByLabel,
             ).associateBy { it.id }

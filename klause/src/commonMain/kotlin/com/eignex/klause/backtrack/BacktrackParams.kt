@@ -169,6 +169,12 @@ data class BacktrackParams(
      * https://www.ijcai.org/Proceedings/09/Papers/074.pdf). `null` (default) disables forgetting.
      */
     val maxLearnedClauses: Int? = null,
+    /** Optional modeled retained-byte soft limit; reclamation also runs without restarts. */
+    val learnedMemoryBytes: Long? = null,
+    /** Preparation and atomic publication allowance for one retained-memory attempt. */
+    val learnedMemoryWork: Long = 65_536L,
+    /** Maximum modeled scratch bytes for retained-memory preparation and publication. */
+    val learnedMemoryScratchBytes: Long = 1_048_576L,
     /**
      * Glue threshold for [maxLearnedClauses] — clauses with LBD ≤ this are always
      * retained, since they typically capture cross-cutting "high-leverage" constraints.
@@ -448,6 +454,8 @@ data class BacktrackParams(
 ) : SolverParams {
     init {
         require(rootRebuildCaptureVisits in 0..1_048_576) { "rebuild capture visits must be in 0..1048576" }
+        require(learnedMemoryBytes == null || learnedMemoryBytes >= 0L)
+        require(learnedMemoryWork >= 0L && learnedMemoryScratchBytes >= 0L)
         require(rootSimplifyBatch > 0) { "root simplification batch must be positive" }
         require(rootProbeBatch >= 0) { "root probe batch must be nonnegative" }
         require(rootProbeWork > 0L) { "root probe work must be positive" }

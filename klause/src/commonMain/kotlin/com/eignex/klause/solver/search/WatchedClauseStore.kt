@@ -39,14 +39,63 @@ internal class WatchedClauseStore {
     /** Watch entries and retracted-implication literals inspected by propagation. */
     var watchVisits: Long = 0
         private set
-    private val clauses = ArrayList<IntArray>()
+    private val clauses = ClauseArrays()
     private val lbds = IntArrayList()
-    private val used = ArrayList<Boolean>()
+    private val used = IntArrayList()
     private val watchers = MutableIntObjectMap<IntArrayList>()
     private val signatures = MutableIntObjectMap<IntArrayList>()
     private val unitClauses = IntArrayList()
+    private val attached = IntArrayList()
 
-    internal fun memory(sample: SharingMemoryObservation) {
+    internal val literalCount: Long get() = clauses.literalCount
+
+    internal val memoryScanWork: Long get() = size.toLong() + watchers.referenceCapacity + signatures.referenceCapacity
+
+    internal val replacementWorkBound: Long
+        // Primitive hash indexes can collide; the reservation covers probing and growth as well as visits.
+        get() = literalCount * 2L + size.toLong() * size * 64L + memoryScanWork * 4L + 256L
+
+    internal val replacementScratchBound: Long get() = 4096L + size.toLong() * 512L
+
+    internal fun prepareRetained(keep: BooleanArray, step: () -> Unit): WatchedClauseStore {
+        val replacement = WatchedClauseStore()
+        replacement.watchVisits = watchVisits
+        for (index in 0 until size) {
+            step()
+            if (!keep[index]) continue
+            val literals = clauses[index]
+            var signature = 0
+            for (literal in literals) { step(); signature += avalanche(literal) }
+            signature = signature * SIGNATURE_SIZE_FACTOR + literals.size
+            val next = replacement.size
+            replacement.clauses.add(literals)
+            replacement.lbds.add(lbds[index])
+            replacement.used.add(used[index])
+            replacement.attached.add(0)
+            replacement.signatures.getOrPut(signature) { IntArrayList(1) }.add(next)
+            if (attached[index] != 0) replacement.watch(next)
+        }
+        return replacement
+    }
+
+    internal fun ownedBytes(step: () -> Unit): Long {
+        var bytes = clauses.literalCount * Int.SIZE_BYTES + clauses.capacity.toLong() * MODELED_REFERENCE_BYTES +
+            used.backingData.size.toLong() * Int.SIZE_BYTES +
+            (lbds.backingData.size.toLong() + unitClauses.backingData.size + attached.backingData.size) * Int.SIZE_BYTES
+        bytes += watchers.primitiveCapacityBytes + signatures.primitiveCapacityBytes +
+            (watchers.referenceCapacity.toLong() + signatures.referenceCapacity) * MODELED_REFERENCE_BYTES
+        for (value in watchers.valuesInternal) {
+            step()
+            if (value != null) bytes += (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES
+        }
+        for (value in signatures.valuesInternal) {
+            step()
+            if (value != null) bytes += (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES
+        }
+        return bytes
+    }
+
+    internal fun memory(sample: SharingMemoryObservation, protectedClause: (Int) -> Boolean = { false }) {
         var watchBytes = 0L
         var signatureBytes = 0L
         for (value in watchers.valuesInternal) {
@@ -64,10 +113,32 @@ internal class WatchedClauseStore {
             "sharedLearnedPayloadBytes" to payload,
             "sharedLearnedIndexCapacityBytes" to watchBytes + signatureBytes + watchers.primitiveCapacityBytes +
                 signatures.primitiveCapacityBytes + lbds.backingData.size.toLong() * Int.SIZE_BYTES +
-                unitClauses.backingData.size.toLong() * Int.SIZE_BYTES,
-            "sharedLearnedReferenceSlots" to clauses.size.toLong() * 2L + watchers.referenceCapacity +
+                unitClauses.backingData.size.toLong() * Int.SIZE_BYTES +
+                (used.backingData.size.toLong() + attached.backingData.size) * Int.SIZE_BYTES,
+            "sharedLearnedReferenceSlots" to clauses.capacity.toLong() + watchers.referenceCapacity +
                 signatures.referenceCapacity,
         ))
+        for (index in 0 until size) {
+            val clause = clauses[index]
+            sample.owned(clause, clause.size.toLong() * Int.SIZE_BYTES, protectedClause(index))
+        }
+        sample.ownedReferences(clauses, clauses.capacity.toLong())
+        sample.owned(used.backingData, used.backingData.size.toLong() * Int.SIZE_BYTES)
+        sample.owned(lbds.backingData, lbds.backingData.size.toLong() * Int.SIZE_BYTES)
+        sample.owned(attached.backingData, attached.backingData.size.toLong() * Int.SIZE_BYTES)
+        sample.owned(unitClauses.backingData, unitClauses.backingData.size.toLong() * Int.SIZE_BYTES)
+        sample.owned(watchers, watchers.primitiveCapacityBytes)
+        sample.owned(signatures, signatures.primitiveCapacityBytes)
+        sample.ownedReferences(watchers.valuesInternal, watchers.referenceCapacity.toLong())
+        sample.ownedReferences(signatures.valuesInternal, signatures.referenceCapacity.toLong())
+        for (value in watchers.valuesInternal) {
+            sample.step()
+            if (value != null) sample.owned(value, (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES)
+        }
+        for (value in signatures.valuesInternal) {
+            sample.step()
+            if (value != null) sample.owned(value, (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES)
+        }
     }
 
     /** Number of retained clauses. */
@@ -83,11 +154,11 @@ internal class WatchedClauseStore {
     fun lbdAt(index: Int): Int = lbds[index]
 
     /** Whether clause [index] has implied or conflicted since the last reduction. */
-    fun usedAt(index: Int): Boolean = used[index]
+    fun usedAt(index: Int): Boolean = used[index] != 0
 
     /** Record that clause [index] implied a literal or derived a conflict. */
     fun markUsed(index: Int) {
-        used[index] = true
+        used[index] = 1
     }
 
     /** Clauses watching [literal], or null when no clause does. */
@@ -114,12 +185,14 @@ internal class WatchedClauseStore {
         bucket.add(index)
         clauses.add(literals)
         lbds.add(lbd)
-        used.add(false)
+        used.add(0)
+        attached.add(0)
         return index
     }
 
     /** Watch clause [index] on the literals currently held at its first two positions. */
     fun watch(index: Int) {
+        attached[index] = 1
         val literals = clauses[index]
         addWatcher(literals[0], index)
         if (literals.size == 1) unitClauses.add(index) else addWatcher(literals[1], index)
@@ -127,38 +200,7 @@ internal class WatchedClauseStore {
 
     /** Clear every use flag after a reduction has selected its survivors. */
     fun clearUsed() {
-        for (index in used.indices) used[index] = false
-    }
-
-    /**
-     * Drop every clause [keep] rejects and rebuild the watch index over the survivors.
-     *
-     * Watch positions survive the move, so a rebuild neither re-examines assignments nor invalidates
-     * the invariant that a clause's watched literals are the last of it to be falsified.
-     *
-     * [keep] is called while survivors are being compacted into place, so it must decide from data it
-     * already holds rather than by reading this store.
-     */
-    fun retain(keep: (Int) -> Boolean) {
-        var target = 0
-        for (index in clauses.indices) {
-            if (!keep(index)) continue
-            clauses[target] = clauses[index]
-            lbds[target] = lbds[index]
-            used[target] = used[index]
-            target++
-        }
-        if (target == clauses.size) return
-        clauses.subList(target, clauses.size).clear()
-        used.subList(target, used.size).clear()
-        lbds.truncateTo(target)
-        watchers.clear()
-        unitClauses.clear()
-        signatures.clear()
-        for (index in clauses.indices) {
-            signatures.getOrPut(signatureOf(clauses[index])) { IntArrayList(1) }.add(index)
-            watch(index)
-        }
+        for (index in 0 until used.size) used[index] = 0
     }
 
     /**
@@ -332,6 +374,7 @@ internal class WatchedClauseStore {
     }
 
     private companion object {
+        const val MODELED_REFERENCE_BYTES = 8L
         /** Watch preference for an unassigned literal; below a satisfied one, above any level. */
         const val UNASSIGNED_WATCH_RANK = Int.MAX_VALUE - 1
 
@@ -342,5 +385,25 @@ internal class WatchedClauseStore {
         const val SHIFT_MID = 13
         const val MIX_FIRST = -2048144789
         const val MIX_SECOND = -1028477387
+    }
+
+    private class ClauseArrays : Iterable<IntArray> {
+        private var data: Array<IntArray?> = arrayOfNulls(8)
+        var size: Int = 0
+            private set
+        var literalCount: Long = 0
+            private set
+        val capacity: Int get() = data.size
+        operator fun get(index: Int): IntArray = checkNotNull(data[index])
+        fun add(value: IntArray) {
+            if (size == data.size) data = data.copyOf(data.size * 2)
+            data[size++] = value
+            literalCount += value.size
+        }
+        override fun iterator(): Iterator<IntArray> = object : Iterator<IntArray> {
+            private var position = 0
+            override fun hasNext(): Boolean = position < size
+            override fun next(): IntArray = get(position++)
+        }
     }
 }

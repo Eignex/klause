@@ -138,7 +138,7 @@ object PortfolioBuilder {
             }
             FinitePortfolioFactory(armId, family) { index, seed, budget ->
                 val observed = if (config is AlnsWorkerConfig) config.withSharingMemory(
-                    scenario.sharingMemory, scenario.sharingMemoryWork, scenario.sharingMemoryScratch,
+                    scenario.sharingMemory, scenario.sharingMemoryWork, scenario.sharingMemoryScratch, scenario.sharingMemoryBytes,
                 ) else config
                 val admitted = when {
                     config is CoreGuidedWorkerConfig && deferCore ->
@@ -329,6 +329,7 @@ object PortfolioBuilder {
                     memorySampleScratchEntries = scenario.sharingMemoryScratch,
                     shareMaxLbd = scenario.clauseShareMaxLbd,
                     shareMaxLen = scenario.clauseShareMaxLen,
+                    softLimitBytes = scenario.sharingMemoryBytes,
                 )
             } else {
                 null

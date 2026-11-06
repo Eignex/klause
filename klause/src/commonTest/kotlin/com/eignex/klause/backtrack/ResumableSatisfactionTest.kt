@@ -5,6 +5,8 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.ClauseExchange
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
@@ -22,6 +24,32 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ResumableSatisfactionTest {
+    @Test
+    fun `ordinary and resumed search should reclaim learned memory without restarts`() {
+        for (native in listOf(false, true)) for (resumed in listOf(false, true)) {
+            var injected = false
+            val exchange = object : ClauseExchange {
+                override fun onSearchStart(session: PropagationSession) {
+                    if (injected) return
+                    injected = true
+                    repeat(16) { session.addLearnedClause(Clause(intArrayOf(0, 1)), 9) }
+                }
+                override fun onRestart(session: PropagationSession) = Unit
+            }
+            val params = BacktrackParams(nativeSat = native, randomSeed = 1L, pbLearning = false,
+                clauseExchange = exchange, learnedMemoryBytes = 0L, learnedMemoryWork = 1_000_000L)
+            val solver = BacktrackSolver(pigeonhole(3, 2).bake())
+
+            val result = if (resumed) solver.resumableSolve(params).use { runToVerdict(it, 1L) }
+            else solver.solve(params)
+
+            assertIs<SolveResult.Unsat>(result)
+            assertEquals(0.0, result.stats.search.restarts.sum)
+            assertTrue(result.stats.search.learning.getValue("learnedMemoryRECLAIMED") > 0L)
+            assertTrue(result.stats.search.learning.getValue("learningClauseRetired") >= 16L)
+        }
+    }
+
     @Test
     fun `ordinary and resumed solves publish attributed first uip consumption`() {
         val solver = BacktrackSolver(pigeonhole(3, 2).bake())

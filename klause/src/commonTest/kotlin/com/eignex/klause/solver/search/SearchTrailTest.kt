@@ -1,11 +1,31 @@
 package com.eignex.klause.solver.search
 
+import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SearchTrailTest {
+    @Test
+    fun `root reseeding should release obsolete copied reason payload and index capacity`() {
+        val session = SearchSession(emptyList())
+        repeat(24) { variable ->
+            session.imply(variable * 2, SearchExplanation(intArrayOf(variable * 2)))
+        }
+        val beforeSample = SharingMemoryObservation(100_000L, 1024, { false }, {})
+        val before = requireNotNull(beforeSample.snapshot { session.retainedLearningMemory(beforeSample) }.completeValues)
+
+        session.resetRootFacts()
+
+        val afterSample = SharingMemoryObservation(100_000L, 1024, { false }, {})
+        val after = requireNotNull(afterSample.snapshot { session.retainedLearningMemory(afterSample) }.completeValues)
+        assertEquals(0L, after.getValue("sharedReasonPayloadBytes"))
+        assertTrue(after.getValue("sharedReasonIndexCapacityBytes") < before.getValue("sharedReasonIndexCapacityBytes"))
+        assertNull(session.reasonFor(0))
+    }
+
     @Test
     fun `rebuilding the root should discard facts from the previous seed`() {
         val session = SearchSession(emptyList())

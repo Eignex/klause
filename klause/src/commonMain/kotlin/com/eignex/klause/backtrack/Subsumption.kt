@@ -6,6 +6,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.SharingMemoryObservation
 
 // Retained preparation avoids buying the same occurrence index on each short slice.
 internal class Subsumption : InprocessingPass {
@@ -14,12 +15,18 @@ internal class Subsumption : InprocessingPass {
     private var cursor = 0
     private var pending: SubsumptionSlice? = null
 
+    override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
+        sample.step()
+        pending?.retainedMemory(sample, protected)
+    }
+
     override fun reset() {
         cursor = 0
         pending = null
     }
 
     override fun run(session: PropagationSession, params: BacktrackParams, stats: SearchStatsSink?) {
+        if (pending?.revision != session.learnedClauseRevision) pending = null
         if (!session.canSimplifyRoot || session.learnedClauseCount < 2) return
         spending.run(session, params, stats) { budget ->
             val slice = pending?.takeIf { it.revision == session.learnedClauseRevision }
@@ -74,6 +81,33 @@ private class SubsumptionSlice(session: PropagationSession, start: Int, batch: I
 
     init {
         session.chargeInprocessingWork(3L * size)
+    }
+
+    fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
+        sample.owned(ids, ids.size.toLong() * Int.SIZE_BYTES, protected)
+        sample.ownedReferences(literals, literals.size.toLong(), protected)
+        sample.owned(signatures, signatures.size.toLong() * Long.SIZE_BYTES, protected)
+        for (row in literals) {
+            sample.step()
+            if (row != null) sample.owned(row, row.size.toLong() * Int.SIZE_BYTES, protected)
+        }
+        sample.ownedReferences(occurrences, 2L * occurrences.size, protected)
+        for (list in occurrences.values) {
+            sample.step()
+            val data = list.backingData
+            sample.owned(data, data.size.toLong() * Int.SIZE_BYTES, protected)
+        }
+        strengthened?.let { sample.owned(it, it.size.toLong() * Int.SIZE_BYTES, protected) }
+        sample.owned(dropped, dropped.allocatedBytes, protected)
+        sample.ownedReferences(replacements, replacements.size.toLong(), protected)
+        for (row in replacements) {
+            sample.step()
+            sample.owned(row, row.size.toLong() * Int.SIZE_BYTES, protected)
+        }
+        val lbdData = lbds.backingData
+        val originData = origins.backingData
+        sample.owned(lbdData, lbdData.size.toLong() * Int.SIZE_BYTES, protected)
+        sample.owned(originData, originData.size.toLong() * Int.SIZE_BYTES, protected)
     }
 
     fun advance(session: PropagationSession, budget: InprocessingBudget): Boolean {

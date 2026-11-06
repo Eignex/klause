@@ -237,22 +237,32 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
  * (into `clause.literals`), not factor ids — they survive the compaction unchanged.
  * Cost is amortised across infrequent calls (typically once per restart).
  */
-internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
+internal fun PropagationState.forgetLearnedClauses(
+    keep: (learnedIndex: Int, lbd: Int) -> Boolean,
+    maxWork: Long = 65_536L,
+    maxScratchBytes: Long = 1_048_576L,
+    cancelled: () -> Boolean = { false },
+): Boolean {
+    val budget = ReclamationPreparation(maxWork, maxScratchBytes, cancelled) { work += it }
+    val retained = try {
+        prepareReclamation(budget, keep)
+    } catch (_: ReclamationPreparation.Deferred) {
+        return false
+    }
     nativeEngine?.let {
-        it.forget(keep)
-        return
+        it.forget(retained)
+        return true
     }
     val n = learned.size
-    if (n == 0) return
-    val referenced = referencedLearned(n)
+    if (n == 0) return true
     val remap = IntArray(n) // remap[i] = new learned index, or -1 if dropped
     work += n
     var newCount = 0
     for (i in 0 until n) {
         work++
-        remap[i] = if (learned.permanent[i] == 1 || referenced[i] || keep(i, learned.lbds[i])) newCount++ else -1
+        remap[i] = if (retained[i]) newCount++ else -1
     }
-    if (newCount == n) return // nothing dropped
+    if (newCount == n) return true
     arithmeticLearningTrace?.remap(baseFactorCount, remap)
     for (i in 0 until n) if (remap[i] < 0) {
         work++
@@ -280,6 +290,7 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
         }
     }
     while (learned.store.size > newCount) learned.store.removeAt(learned.store.size - 1)
+    learned.store = ArrayList(learned.store)
     learned.stages.truncateTo(newCount)
     learned.lbds.truncateTo(newCount)
     learned.permanent.truncateTo(newCount)
@@ -321,6 +332,8 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
         }
         list.truncateTo(wi)
         blockers.truncateTo(wi)
+        list.trim()
+        blockers.trim()
     }
 
     // Atom-literal watcher lists carry learned fids too — a learned clause watching a
@@ -340,12 +353,13 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
             }
         }
         list.truncateTo(wi)
+        list.trim()
     }
 
     // The compaction renumbered learned fids and shifted every list position, so the
     // back-pointer index is stale — rebuild it wholesale from the final lists. Cheap
     // relative to the rest of forget, which is itself infrequent (≈ once per restart).
-    watches.pos.clear()
+    watches.pos = com.eignex.klause.util.MutableLongIntMap()
     for (lit in watches.byLit.indices) {
         work++
         val list = watches.byLit[lit]
@@ -385,6 +399,9 @@ internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd
         undo.minReason[i] = remappedReason(undo.minReason[i], remap, refBase)
         undo.maxReason[i] = remappedReason(undo.maxReason[i], remap, refBase)
     }
+    for (column in listOf(learned.stages, learned.lbds, learned.permanent, learned.tier,
+        learned.usedFlags, learned.origins, learned.units, learned.pendingAttach)) column.trim()
+    return true
 }
 
 /** Rewrite learned-clause factor ids stored in a per-variable reason array through [remap]

@@ -251,6 +251,8 @@ internal class CpSatisfactionTraversal(
                     params.clauseExchange?.onSearchClose(cp.session)
                 } finally {
                     cp.session.sharedLearningMemory = null
+                    traversal.releaseRetainedState()
+                    cp.releaseRetainedState()
                 }
             })
             cp.useEnforcingPeers(components.filterIsInstance<FiniteFactorEnforcer>()
@@ -266,7 +268,9 @@ internal class CpSatisfactionTraversal(
                 learnedDb = params.sharedLearnedDb(),
                 atoms = if (params.integerRowLearning) SearchAtomRegistry(problem.numBoolVars) else null,
             )
-            if (params.clauseExchange != null) cp.session.sharedLearningMemory = session::retainedLearningMemory
+            if (params.clauseExchange != null || params.learnedMemoryBytes != null) {
+                cp.session.sharedLearningMemory = session::retainedLearningMemory
+            }
             val seed = preparedSeed ?: cp.session.seed(params.assumptions)
             val seeded = if (projectAssumptionCore && seed is PropagationResult.Unsat) {
                 cp.session.projectSeedCore(params.assumptions, seed, propagationCancellation)
@@ -415,6 +419,8 @@ internal class CpSatisfactionTraversal(
         if (closed) return
         closed = true
         initialization = null
+        run = null
+        sharedSession?.releaseLearning()
         sharedSession = null
         resources.close()
     }
@@ -424,6 +430,8 @@ internal class CpSatisfactionTraversal(
         if (closed) return
         closed = true
         initialization = null
+        run = null
+        sharedSession?.releaseLearning()
         sharedSession = null
         resources.closeAfter(failure)
     }
@@ -452,7 +460,7 @@ private fun releaseLpResources(resources: List<LpSearchResource>) {
 private class CpSatisfactionTraversalPolicy(
     private val cp: CpSearchComponent,
     private val params: BacktrackParams,
-    sink: SolveStatsSink?,
+    private val sink: SolveStatsSink?,
     private val slice: TraversalSlice?,
     leafColumns: LeafColumns?,
 ) : SearchTraversalPolicy,
@@ -502,11 +510,16 @@ private class CpSatisfactionTraversalPolicy(
 
     private val inprocessing = Inprocessing.from(params, sink?.search)
 
+    init { session.retainedInprocessingMemory = inprocessing?.let { it::retainedMemory } }
+
+    fun releaseRetainedState() { inprocessing?.reset() }
+
     private val pooledIncumbents = params.pooledIncumbents?.let { IncumbentSubscription(it) }
 
     override fun onResume(context: SearchContext): SearchRunDisposition = simplify(context, false)
 
     private fun simplify(context: SearchContext, restart: Boolean): SearchRunDisposition {
+        maintainLearnedMemory(session, params, inprocessing, sink?.search)
         if (context.decisionLevel != 0) return SearchRunDisposition.Continue
         val refresh = if (restart) inprocessing?.onRestart(session, params) else inprocessing?.onRoot(session, params)
         if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted
@@ -967,4 +980,6 @@ private class ResidualRealComponent(
 
 /** The shared learned-clause bound mirrors the CP database's own cap and glue threshold. */
 internal fun BacktrackParams.sharedLearnedDb(): SearchLearnedDbParams =
-    SearchLearnedDbParams(maxClauses = maxLearnedClauses, glueLbd = lbdGlueThreshold)
+    SearchLearnedDbParams(maxClauses = maxLearnedClauses, glueLbd = lbdGlueThreshold,
+        softLimitBytes = learnedMemoryBytes, reclamationWork = learnedMemoryWork,
+        reclamationScratchBytes = learnedMemoryScratchBytes)

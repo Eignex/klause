@@ -12,6 +12,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.forEachBinaryPartner
 import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -177,5 +178,24 @@ class RootInprocessingTest {
         assertEquals(0, session.learnedClauseCount)
         assertEquals(0, session.decisionLevel)
         assertFalse(session.fixpointCancelled)
+    }
+
+    @Test
+    fun `reset should release a root candidate retained across a tiny slice`() {
+        for (native in listOf(false, true)) {
+            val session = PropagationSession(problem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val pass = RootSimplificationPass()
+            pass.run(session, BacktrackParams(inprocessingRootWork = 1L), null)
+            val before = SharingMemoryObservation(1024L, 128, { false }, {})
+            val retained = before.snapshot { pass.retainedMemory(before, false) }
+
+            pass.reset()
+            val after = SharingMemoryObservation(1024L, 128, { false }, {})
+            val released = after.snapshot { pass.retainedMemory(after, false) }
+
+            assertTrue(assertNotNull(retained.completeValues).getValue("ownedPrimitiveBytes") >= 24L)
+            assertEquals(0L, assertNotNull(released.completeValues).getValue("ownedPrimitiveBytes"))
+            assertEquals(0, session.learnedClauseCount)
+        }
     }
 }

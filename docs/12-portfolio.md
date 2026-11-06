@@ -180,8 +180,11 @@ traffic/work/use counters remain inexpensive. Each sample has separate
 `sharing-memory-work` and `sharing-memory-scratch` limits (32,768 visits and
 4,096 deduplication entries by default; zero is permitted).
 Clause accounting is reported per worker in `ArmSchedule.sharing.clauses` and as
-`clause*` fields in the CLI arm record. Pool payload and key/origin capacities
-belong to one shared pool; repeated worker observations must not be summed.
+`clause*` fields in the CLI arm record. Pool payload belongs to one shared pool;
+primitive payload arrays are counted once by identity. Private clause-reference,
+global-flag, origin, key and payload-owner array capacities are modeled separately.
+`poolOwnedBytes` combines these modeled owners, excluding headers and allocator
+overhead. Repeated worker observations must not be summed.
 Worker `seenKeys` and `seenCapacityBytes` describe the session-spanning duplicate
 filter, including exported and evicted keys. Its lifetime is the native session,
 not the pool generation. Compaction invalidates the drain cursor but preserves
@@ -190,6 +193,20 @@ learned database. A fresh session releases its backing arrays and reimports the 
 pool; resuming the same session retains both cursor and filter. Retirement releases
 the filter without sampling. An uncancelled retirement also drains uses and exports
 remaining glue; a cancelled retirement skips those scans.
+
+The pool's optional byte limit includes payload and private capacity. Its protected
+floor is zero: eviction removes optional shares while imported reasons and a
+previously drained batch retain their own references. Pressure prepares a replacement
+store under work, scratch and cancellation limits, retaining globals before glue and
+using the existing quality order. Every rank comparison, hash probe and copy is
+charged; allocation size is admitted and charged before allocation. A cancelled or
+exhausted preparation leaves the current generation intact. Publication swaps the
+prepared store and generation without remapping consumers. Old payload-owner and
+index arrays become unreachable when the operation returns. A byte limit too small
+for a share declines publication, and unfinished preparation reports a safe defer.
+Neither requires a search restart. The entry cap and disabled byte-limit default
+retain their ordinary policy; bounded work and scratch do not promise a hard pause
+latency.
 
 `inspected` counts entries examined, including duplicates, and
 `translatedLiterals` counts imported literals. `importWork` includes drain visits,

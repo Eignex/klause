@@ -415,6 +415,9 @@ internal class ResumableMinimize(
                     params.clauseExchange?.onSearchClose(it.session)
                 } finally {
                     it.session.sharedLearningMemory = null
+                    inprocessing?.reset()
+                    if (::searchSession.isInitialized) searchSession.releaseLearning()
+                    it.releaseRetainedState()
                 }
             })
             sink.search.propagationWork = { it.session.work }
@@ -464,7 +467,9 @@ internal class ResumableMinimize(
             cancellation = params.cancellation,
             learnedDb = params.sharedLearnedDb(),
         )
-        if (params.clauseExchange != null) session.sharedLearningMemory = searchSession::retainedLearningMemory
+        if (params.clauseExchange != null || params.learnedMemoryBytes != null) {
+            session.sharedLearningMemory = searchSession::retainedLearningMemory
+        }
         yield(Unit)
         val seeded = if (deferredInstallation) {
             var result: PropagationResult? = null
@@ -1530,6 +1535,8 @@ internal class ResumableMinimize(
     }
 
     private fun simplify(context: SearchContext, restart: Boolean): SearchRunDisposition {
+        session.retainedInprocessingMemory = inprocessing?.let { it::retainedMemory }
+        maintainLearnedMemory(session, params, inprocessing, sink.search)
         if (context.decisionLevel != 0) return SearchRunDisposition.Continue
         val refresh = if (restart) inprocessing?.onRestart(session, params) else inprocessing?.onRoot(session, params)
         if (session.isUnsatAtRoot) return SearchRunDisposition.Exhausted

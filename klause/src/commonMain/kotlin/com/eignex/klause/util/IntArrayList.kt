@@ -54,6 +54,10 @@ internal class IntArrayList(initialCapacity: Int = 8) {
         size = 0
     }
 
+    internal fun trim() {
+        if (data.size > size.coerceAtLeast(1)) data = data.copyOf(size.coerceAtLeast(1))
+    }
+
     /** Truncate to [newSize], dropping the suffix. No-op if [newSize] is `>= size`. */
     fun truncateTo(newSize: Int) {
         if (newSize < size) size = newSize

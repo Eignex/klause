@@ -288,9 +288,22 @@ internal class NativeSatState(private val state: PropagationState) {
         val columns = listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier,
             learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos)
         var metadata = 0L
-        for (column in columns) { sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES }
+        for (column in columns) {
+            sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
+            sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES)
+        }
+        sample.owned(learnedLits.backingData, learnedLits.backingData.size.toLong() * Int.SIZE_BYTES)
+        sample.owned(arena.lits, arena.lits.size.toLong() * Int.SIZE_BYTES, true, shared = true)
+        sample.owned(arena.starts, arena.starts.size.toLong() * Int.SIZE_BYTES, true, shared = true)
+        sample.owned(watchSizes, watchSizes.size.toLong() * Int.SIZE_BYTES, true)
+        sample.owned(watchPos, watchPos.size.toLong() * Int.SIZE_BYTES, true)
+        sample.owned(baseUnits.backingData, baseUnits.backingData.size.toLong() * Int.SIZE_BYTES, true)
+        sample.ownedReferences(watchEntries, watchEntries.size.toLong(), true)
         var watchBytes = 0L
-        for (entries in watchEntries) { sample.step(); watchBytes += entries.size.toLong() * Long.SIZE_BYTES }
+        for (entries in watchEntries) {
+            sample.step(); watchBytes += entries.size.toLong() * Long.SIZE_BYTES
+            sample.owned(entries, entries.size.toLong() * Long.SIZE_BYTES)
+        }
         var peerImports = 0L
         var consumedPeerImports = 0L
         var consumed = 0L
@@ -298,6 +311,7 @@ internal class NativeSatState(private val state: PropagationState) {
             sample.step()
             val peer = learnedOrigin[i] >= 0
             val used = lifecycleStages[i] and 1 != 0
+            if (learnedPermanent[i] == 1) protectMemory(sample)
             if (peer) peerImports++
             if (peer && used) consumedPeerImports++
             if (used) consumed++
@@ -317,6 +331,16 @@ internal class NativeSatState(private val state: PropagationState) {
             "retainedConsumedPeerImports" to consumedPeerImports,
             "retainedConsumed" to consumed,
         ))
+        retiredRootSources?.let { sample.owned(it, it.allocatedBytes, true) }
+        sample.owned(importUses, importUses.allocatedBytes)
+        for (i in recheckHead until rechecks.size) {
+            sample.step()
+            if (lifecycleStages[rechecks[i] - baseCount] and 1 == 0) protectMemory(sample)
+        }
+    }
+
+    internal fun protectMemory(sample: SharingMemoryObservation) {
+        sample.owned(learnedLits.backingData, learnedLits.backingData.size.toLong() * Int.SIZE_BYTES, true)
     }
 
     val count: Int get() = learnedCount
@@ -370,15 +394,36 @@ internal class NativeSatState(private val state: PropagationState) {
      * clauses keep their drifted watch positions, and every watch-list entry naming a learned handle is
      * remapped or removed. Called at a restart boundary to bound the learned database.
      */
-    fun forget(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
+    internal fun prepareReclamation(budget: ReclamationPreparation, retained: BooleanArray, keep: (Int, Int) -> Boolean) {
+        for (i in 0 until learnedCount) {
+            budget.visit()
+            retained[i] = retained[i] || learnedPermanent[i] == 1 || keep(i, learnedLbd[i])
+        }
+        for (i in recheckHead until rechecks.size) {
+            budget.visit()
+            val index = rechecks[i] - baseCount
+            if (lifecycleStages[index] and 1 == 0) retained[index] = true
+        }
+        budget.atomic(learnedLits.backingData.size.toLong(), learnedLits.backingData.size.toLong() * Int.SIZE_BYTES)
+        for (column in listOf(learnedStarts, learnedLbd, learnedPermanent, learnedTier, learnedUsed,
+            lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos)) {
+            budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
+        }
+        for (entries in watchEntries) {
+            budget.visit()
+            budget.atomic(entries.size.toLong() + 1L, entries.size.toLong() * Long.SIZE_BYTES)
+        }
+        budget.ready()
+    }
+
+    fun forget(retained: BooleanArray) {
         // old learned index -> new learned index, or -1 if dropped.
-        val referenced = state.referencedLearned(learnedCount)
         val remap = IntArray(learnedCount)
         state.work += learnedCount
         var survivors = 0
         for (i in 0 until learnedCount) {
             state.work++
-            remap[i] = if (learnedPermanent[i] == 1 || referenced[i] || keep(i, learnedLbd[i])) survivors++ else -1
+            remap[i] = if (retained[i]) survivors++ else -1
         }
         if (survivors == learnedCount) return
 
@@ -409,6 +454,7 @@ internal class NativeSatState(private val state: PropagationState) {
                 entries[w++] = packWatch(newH, (entry ushr 32).toInt())
             }
             watchSizes[lit] = w
+            if (entries.size > w) watchEntries[lit] = entries.copyOf(w)
         }
 
         // A survivor's destination precedes its source, so packing forward cannot overwrite an
@@ -451,6 +497,8 @@ internal class NativeSatState(private val state: PropagationState) {
             state.work++
             if (clauseLen(baseCount + i) == 1) learnedUnits.add(baseCount + i)
         }
+        for (column in listOf(learnedLits, learnedStarts, learnedLbd, learnedPermanent, learnedTier,
+            learnedUsed, lifecycleStages, learnedUnits, rechecks, learnedOrigin, learnedScanPos, learnedWatchPos)) column.trim()
     }
 
     private fun pinUnit(h: Int, unitIdx: Int): Boolean {
