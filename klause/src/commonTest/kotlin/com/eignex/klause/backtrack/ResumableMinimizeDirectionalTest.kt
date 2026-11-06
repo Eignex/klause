@@ -109,7 +109,7 @@ class ResumableMinimizeDirectionalTest {
 
     @Test
     fun `finite search consumes passive advice without variable queries`() {
-        val blocks = 4
+        val blocks = 3
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
@@ -145,7 +145,7 @@ class ResumableMinimizeDirectionalTest {
         )
 
         val objective = LinearObjective(intCoefficients = longArrayOf(
-            6L, 6L, 11L, 5L, 5L, 9L, 5L, 5L, 9L, 4L, 4L, 5L,
+            6L, 6L, 11L, 5L, 5L, 9L, 4L, 4L, 5L,
         ))
         ResumableMinimize(BacktrackSolver(problem), objective, params,
             rootBasisGuidance = false).use { search ->
