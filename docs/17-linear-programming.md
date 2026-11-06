@@ -679,9 +679,12 @@ the numerical owner and checked source definitions without replaying retired cut
 After discovery retires, installed-row scans omit objective projection and candidate
 comparison vectors. Their point projection, activity checks and age state still
 debit the scoring and containing source allowances.
-Retired unselected candidates
-are omitted from proof replay as well as scoring. Masked-query reuse distinguishes
-whether unselected candidates are checked; installed cuts retain fresh source
+A complete usable scan of a fully installed family retires candidate discovery.
+Rows removed from that family stay retired even when a later point violates them.
+Retired unselected candidates are omitted from proof replay as well as scoring;
+remaining installed rows keep their fresh source checks and activity aging.
+Masked-query reuse distinguishes whether unselected candidates are checked;
+installed cuts retain fresh source
 verification under the current scope.
 Managed current masks and fully checked selected families retain unselected and
 retired row definitions as inactive numerical rows. A completed scoring scan with

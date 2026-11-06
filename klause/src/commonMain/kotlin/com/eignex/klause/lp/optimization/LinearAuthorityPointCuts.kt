@@ -294,7 +294,7 @@ internal class LinearAuthorityPointCuts(
                     128L + installed.size * 128L)) return installed
             val observedInactive = HashMap<Int, Int>()
             var support = 0
-            var scoresComplete = checked.size == rows.size
+            var scoresComplete = if (retired) installed.all { it in checked } else checked.size == rows.size
             for ((id, row) in rows.withIndex()) {
                 if (retired && id !in installed) {
                     if (!meter.charge(1L)) break
@@ -394,7 +394,7 @@ internal class LinearAuthorityPointCuts(
                 inactiveScans.putAll(observedInactive)
                 if (!retired) {
                     misses = if (selected.isEmpty()) misses + 1 else 0
-                    if (misses >= 4) {
+                    if (misses >= 4 || (managedInstalled && scoresComplete)) {
                         retired = true
                         observe("RetiredFamilies")
                         for (family in visitedFamilies) onCut(family, "POINT_CANDIDATES_RETIRED", 1L)

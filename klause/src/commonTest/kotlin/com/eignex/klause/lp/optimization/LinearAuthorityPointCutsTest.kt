@@ -1038,6 +1038,51 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `a retired initial row should stay retired when it separates at a later point`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("x"), family = CutFamily.SOURCE_AGGREGATION),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("y"), family = CutFamily.SOURCE_AGGREGATION))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        val installed = selection.prepareGenerated(rows, setOf(0, 1), Cancellation.Never)
+        val trimmed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ONE, BigFraction.ZERO), installed, Cancellation.Never, retireInitialSlack = true)
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ONE, BigFraction.ofLong(2)), trimmed, Cancellation.Never)
+
+        assertEquals(setOf(0), selected)
+        assertTrue(selection.selectionComplete)
+        assertTrue(selection.candidatesRetired(rows))
+    }
+
+    @Test
+    fun `remaining generated rows should age with unchecked retired definitions`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("x"), family = CutFamily.SOURCE_AGGREGATION),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("y"), family = CutFamily.SOURCE_AGGREGATION))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        var installed = selection.prepareGenerated(rows, setOf(0, 1), Cancellation.Never)
+        installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ONE, BigFraction.ZERO), installed, Cancellation.Never, retireInitialSlack = true)
+        repeat(3) {
+            installed = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0),
+                List(2) { BigFraction.ZERO }, installed, Cancellation.Never)
+        }
+        assertEquals(setOf(0), installed)
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0),
+            List(2) { BigFraction.ZERO }, installed, Cancellation.Never)
+
+        assertTrue(selected.isEmpty())
+        assertTrue(selection.selectionComplete)
+        assertEquals(2L, selection.observations["numericalCutSelectionRetiredInstalled"])
+    }
+
+    @Test
     fun `incomplete initial scoring should preserve every installed row`() {
         val rows = listOf(
             LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
@@ -1055,6 +1100,7 @@ class LinearAuthorityPointCutsTest {
             assertEquals(setOf(0, 1), selected)
             assertFalse(selection.selectionComplete)
             assertNull(selection.observations["numericalCutSelectionInitialSlackRetired"])
+            assertFalse(selection.candidatesRetired(rows))
         }
     }
 

@@ -328,7 +328,11 @@ class LinearAuthorityAggregateCutsTest {
                 assertEquals(assertNotNull(base.bound).claim, assertNotNull(result.bound).claim)
                 assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
                     assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
-                if (operations == 2) assertEquals(1, capture.records.last().cuts.count { it.installed })
+                if (operations == 2) {
+                    val cuts = capture.records.last().cuts
+                    assertEquals(1, cuts.count { it.installed })
+                    assertTrue(cuts.filter { !it.installed }.all { !it.checked })
+                }
                 assertEquals(SourceEvidenceCheck.Checked,
                     SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
             }
