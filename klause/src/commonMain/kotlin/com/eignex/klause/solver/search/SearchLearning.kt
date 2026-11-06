@@ -268,7 +268,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         }
         val started = TimeSource.Monotonic.markNow()
         try {
-            reduceOverCap(cap, ::step)
+            reduceOverCap(cap, ::step, cancelled)
         } catch (_: ReclamationStopped) {
             return
         } finally {
@@ -276,7 +276,7 @@ internal class SearchLearning(private val learnedDb: SearchLearnedDbParams) {
         }
     }
 
-    private fun reduceOverCap(cap: Int, step: () -> Unit) {
+    private fun reduceOverCap(cap: Int, step: () -> Unit, cancelled: () -> Boolean) {
         val droppable = IntArrayList(learned.size)
         val protected = BooleanArray(learned.size)
         reasons.forEach { _, index -> step(); protected[index] = true }
