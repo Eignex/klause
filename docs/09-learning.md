@@ -537,7 +537,14 @@ diagnostic invocation; an incomplete trace cannot establish exhaustive applicabi
 
 ## Learned-clause retention
 
-Native forgetting runs at restart boundaries only with a configured cap. Permanent
+Native forgetting starts at restart boundaries with a configured cap. A resumable
+root continues a pending window before branching while its row, heap or cleanup
+state advances. Each attempt keeps the same bounded work and scratch allowance and
+debits the containing slice. A completed pass waits for the next restart before
+aging tiers again; an unfunded attempt permits search to proceed. Continuation
+reads existing ranking state without adding retained storage. Reaching the active
+quota still completes the pending pass; it does not start another tier epoch.
+Permanent
 and glue clauses (default LBD at most 2) survive; remaining space favors lower LBD.
 Cap eligibility and survivor quotas use active constraints; stable retired slots do not
 consume the quota or count as newly retired in a sweep event. Below the active cap,

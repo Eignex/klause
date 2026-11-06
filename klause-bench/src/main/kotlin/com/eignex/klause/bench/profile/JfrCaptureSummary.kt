@@ -33,7 +33,7 @@ internal object JfrCaptureSummary : BenchSuite {
         Files.createDirectories(context.outputDirectory)
         val capture = context.outputDirectory.resolve("capture.jfr")
         decode(case.parameters, capture)
-        val samples = Samples()
+        val samples = Samples(case.parameters["stack-depth"]?.toInt() ?: DEFAULT_STACK_DEPTH)
         RecordingFile(capture).use { recording ->
             while (recording.hasMoreEvents()) {
                 val event = recording.readEvent()
@@ -93,39 +93,66 @@ internal object JfrCaptureSummary : BenchSuite {
         }
     }
 
-    internal class Samples {
+    internal class Samples(private val stackDepth: Int = DEFAULT_STACK_DEPTH) {
         private var sampleCount = 0L
         private var truncated = 0L
         private var depthLimited = 0L
         private var emptyStacks = 0L
         private val methods = HashMap<String, Long>()
+        private val paths = HashMap<List<String>, Long>()
+        private var droppedPaths = 0L
+
+        init { require(stackDepth in 1..MAX_STACK_DEPTH) }
 
         fun record(frames: Sequence<String>, truncatedStack: Boolean) {
             sampleCount++
             if (truncatedStack) truncated++
             val seen = HashSet<String>()
-            for ((depth, method) in frames.take(STACK_DEPTH + 1).withIndex()) {
-                if (depth == STACK_DEPTH) {
+            val path = ArrayList<String>()
+            for ((depth, method) in frames.take(stackDepth + 1).withIndex()) {
+                if (depth == stackDepth) {
                     depthLimited++
                     break
                 }
                 seen.add(method)
+                path.add(method)
             }
             if (seen.isEmpty()) emptyStacks++
+            if (path.isNotEmpty()) recordPath(path)
             for (method in seen) {
                 check(method in methods || methods.size < 100_000) { "capture exceeds 100000 sampled methods" }
                 methods[method] = (methods[method] ?: 0L) + 1L
             }
         }
 
+        private fun recordPath(path: List<String>) {
+            val count = paths[path]
+            if (count != null) paths[path] = count + 1L
+            else if (paths.size < MAX_RECORDED_PATHS) paths[path] = 1L
+            else droppedPaths++
+        }
+
         fun summary(source: String, sha256: String): JsonObject = buildJsonObject {
             put("source", source)
             put("sha256", sha256)
             put("samples", sampleCount)
-            put("stackDepth", STACK_DEPTH)
+            put("stackDepth", stackDepth)
             put("truncatedStacks", truncated)
             put("depthLimitedStacks", depthLimited)
             put("emptyStacks", emptyStacks)
+            val printed = paths.entries.sortedWith(
+                compareByDescending<Map.Entry<List<String>, Long>> { it.value }
+                    .thenBy { it.key.joinToString("\n") },
+            ).take(MAX_REPORTED_PATHS)
+            put("callerPathGroups", paths.size)
+            put("callerPathDroppedSamples", droppedPaths)
+            put("callerPathUnreportedSamples", paths.values.sum() - printed.sumOf { it.value })
+            put("callerPaths", buildJsonArray {
+                for ((frames, count) in printed) add(buildJsonObject {
+                    put("samples", count)
+                    put("frames", buildJsonArray { frames.forEach { add(it) } })
+                })
+            })
             put("sampledMethods", buildJsonArray {
                 for ((method, count) in methods.toList().sortedWith(
                     compareByDescending<Pair<String, Long>> { it.second }.thenBy { it.first },
@@ -137,13 +164,17 @@ internal object JfrCaptureSummary : BenchSuite {
         }
     }
 
-    private const val STACK_DEPTH = 32
+    private const val DEFAULT_STACK_DEPTH = 32
+    private const val MAX_STACK_DEPTH = 256
+    private const val MAX_RECORDED_PATHS = 1024
+    private const val MAX_REPORTED_PATHS = 32
     private val PAYLOAD_KEYS = setOf("gzip-base64", "zstd-base64")
 
     private fun validate(parameters: Map<String, String>) {
         val codec = requireNotNull(parameters.keys.intersect(PAYLOAD_KEYS).singleOrNull())
         val required = setOf("source", "sha256", codec)
-        require(parameters.keys == required || parameters.keys == required + "events")
+        require(parameters.keys - setOf("events", "stack-depth") == required)
+        parameters["stack-depth"]?.toInt()?.let { require(it in 1..MAX_STACK_DEPTH) }
         parameters["events"]?.toBooleanStrict()
         require(parameters.getValue("source").let { it.isNotBlank() && it.length <= 1024 })
         require(parameters.getValue("sha256").matches(Regex("[a-f0-9]{64}")))
