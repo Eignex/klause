@@ -140,6 +140,59 @@ class NativeSatStateTest {
     }
 
     @Test
+    fun `retiring a watched clause should preserve the captured survivor phase`() {
+        val session = session(4, or(0, true, 2, true))
+        session.addLearnedClause(Clause(or(0, true, 3, true)), 9)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
+        repeat(8) { session.maintainCapWindow(2, 64L, 64L, { false }) { false } }
+        assertEquals(2, session.activeLearnedClauseCount)
+        var phase: Boolean? = null
+        session.retractingListener = { if (it == 1) phase = session.boolValue(1) }
+
+        session.pinBool(0, false)
+
+        assertEquals(true, phase)
+    }
+
+    @Test
+    fun `cleaning retired watches should preserve the captured survivor phase`() {
+        val session = session(4, or(0, true, 2, true))
+        session.addLearnedClause(Clause(or(0, true, 3, true)), 9)
+        session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true)
+        session.addLearnedClause(Clause(or(0, true, 1, false)), 9, permanent = true)
+        repeat(8) { session.maintainCapWindow(2, 64L, 64L, { false }) { false } }
+        assertEquals(2, session.activeLearnedClauseCount)
+        session.reclaimLearnedMemory(Long.MAX_VALUE, 65_536L, 1_048_576L)
+        var phase: Boolean? = null
+        session.retractingListener = { if (it == 1) phase = session.boolValue(1) }
+
+        session.pinBool(0, false)
+
+        assertEquals(true, phase)
+    }
+
+    @Test
+    fun `small cleanup grants should release watches when an ordered copy cannot fit`() {
+        for (grant in listOf(40L, 42L, 48L)) {
+            val session = session(3, or(0, true, 2, true))
+            session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
+            repeat(15) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9, permanent = true) }
+            repeat(8) { session.maintainCapWindow(15, 64L, 64L, { false }) { false } }
+            val before = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+            repeat(64) {
+                val start = session.work
+                session.reclaimLearnedMemory(Long.MAX_VALUE, grant, 1_048_576L)
+                assertTrue(session.work - start <= grant)
+            }
+            val after = assertNotNull(session.sharingMemory(maxWork = 1_000_000L).completeValues)
+
+            assertTrue(after.getValue("sessionWatchCapacityBytes") < before.getValue("sessionWatchCapacityBytes"))
+        }
+    }
+
+    @Test
     fun `native cap retirement should protect a live root reason`() {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
