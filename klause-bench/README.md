@@ -849,3 +849,13 @@ on macOS arm64, JDK 25.0.4.1+1, with advisory one-CPU / 4,608 MiB resource recei
 The smaller magic-square source's AllDifferent-only conflicts, compressed-byte
 hash refusal, worker network failure, earlier truncated captures and preparation
 timeouts retain their costs and provenance in the external campaign ledger.
+
+`bench.profile.BtRetirementCapture` runs a hash-pinned UF250 native BT control and
+a traced control for each seed. It captures at most three learned-clause exports:
+the first over-cap root, the first retirement and the first completed active quota.
+It preserves complete ordered literal arrays and LBDs from exported copies, reading
+their JVM fields without changing solver state. The two controls have separate
+120-second lifetimes; a case has a 300-second infrastructure ceiling. Compare
+completed endpoints and work counters before interpreting clause identities.
+Observation work, allocations and cache effects are diagnostic costs, not ordinary
+solve-time evidence. A slot or literal bound reports unsupported capture.
