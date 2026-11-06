@@ -3,10 +3,26 @@ package com.eignex.klause.cli
 import com.eignex.util.platform.sampleHeap
 import com.eignex.util.platform.startHeapPeakSampler
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PlatformJvmTest {
+
+    @Test
+    fun `elapsed clock milliseconds should discard a fractional remainder`() {
+        assertEquals(1L, elapsedMonotonicMillis(17L, 1_000_026L))
+    }
+
+    @Test
+    fun `a short clock interval should survive a wrapped nano reading`() {
+        assertEquals(1L, elapsedMonotonicMillis(Long.MAX_VALUE - 500_000L, Long.MIN_VALUE + 499_999L))
+    }
+
+    @Test
+    fun `a negative clock interval should truncate toward zero`() {
+        assertEquals(0L, elapsedMonotonicMillis(1_000_000L, 1L))
+    }
 
     private val transientBytes = 16 * 1024 * 1024
 

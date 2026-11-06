@@ -98,7 +98,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private fun isRetired(handle: Int): Boolean = if (handle < baseCount) {
         retiredRootSources?.contains(handle) == true
-    } else retiredOf(handle - baseCount)
+    } else retiredCount != 0 && retiredOf(handle - baseCount)
 
     fun retireRootSource(factor: Int) {
         check(factor in 0 until baseCount)
@@ -443,6 +443,7 @@ internal class NativeSatState(private val state: PropagationState) {
             "retainedPeerImports" to peerImports.toLong(),
             "retainedConsumedPeerImports" to consumedPeerImports.toLong(),
             "retainedConsumed" to consumed.toLong(),
+            "learnedPayloadCacheReferenceCapacity" to learnedPayloads.cacheReferenceCapacity,
         ))
         retiredRootSources?.let { sample.owned(it, it.allocatedBytes, true) }
         sample.owned(importUses, importUses.allocatedBytes)
