@@ -95,19 +95,22 @@ class LinearAuthorityAggregateCutsTest {
                 mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
         for (pause in listOf(false, true)) {
             val funding = SourceLpFunding(1_000_000L, 16_000_000L).apply { grant(1_000_000L) }
-            val budget = SourceLpBudget(funding = funding)
-            LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
-                var interrupt = true
-                val cancellation = Cancellation {
-                    val attempted = authority.cutObservations()["numericalCutSelectionOrdinaryFallbackAttempts"]
-                    if (interrupt && attempted != null) {
-                        if (pause) funding.grant(0L)
-                        !pause
-                    } else false
+            var interrupt = true
+            var attempted = false
+            lateinit var authority: LinearAuthority
+            val budget = SourceLpBudget(funding = funding, onWork = { delta ->
+                if (interrupt && !attempted && delta.preparationWork > 0L) {
+                    attempted = authority.cutObservations()["numericalCutSelectionOrdinaryFallbackAttempts"] != null
+                    if (attempted && pause) funding.grant(0L)
                 }
+            })
+            authority = LinearAuthority(budget, retainLp = true, aggregateCuts = true)
+            authority.use {
+                val cancellation = Cancellation { interrupt && attempted && !pause }
 
                 val stopped = authority.advanceWithPointGeneratedCuts(context, cancellation, null)
 
+                assertTrue(attempted)
                 assertEquals(1, budget.operations)
                 assertEquals(pause, stopped.paused)
                 assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
