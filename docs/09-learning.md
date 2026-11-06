@@ -591,7 +591,8 @@ lookups during ranking; its reference allocation belongs to fixed preparation an
 modeled ownership. Header unlinking clears its cache slot before releasing the page.
 Native learned payloads cache 128 page lookups, including absent pages, with fixed
 primitive index tags. Both arrays and their owner references belong to state
-preparation and ownership accounting. A cold lookup funds each visited index node
+preparation and ownership accounting, separately from payload-row reference capacity.
+A cold lookup funds each visited index node
 before publishing its cached result. Page installation replaces a cached absence;
 funded header unlinking clears its cached page reference before returning.
 A page queue and per-page retirement masks resume row release without scanning

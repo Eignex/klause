@@ -94,9 +94,11 @@ class NativeLearnedPayloadsTest {
             payloads.sharingMemory(sample, true, false) { false }
         }.completeValues)
 
-        assertTrue(payloads.referenceCapacity > 0L)
+        assertEquals(0L, payloads.referenceCapacity)
+        assertTrue(payloads.cacheReferenceCapacity > 0L)
         assertEquals(payloads.primitiveBytes, values["ownedPrimitiveBytes"])
-        assertEquals(payloads.referenceCapacity + payloads.directoryCapacity + 8L, values["ownedReferenceSlots"])
+        assertEquals(payloads.referenceCapacity + payloads.cacheReferenceCapacity + payloads.directoryCapacity + 8L,
+            values["ownedReferenceSlots"])
         assertEquals(values["ownedPrimitiveBytes"], values["protectedPrimitiveBytes"])
         assertEquals(values["ownedReferenceSlots"], values["protectedReferenceSlots"])
     }
@@ -165,7 +167,6 @@ class NativeLearnedPayloadsTest {
         val payloads = NativeLearnedPayloads()
         val bytes = payloads.primitiveBytes
         val directory = payloads.directoryCapacity
-        val references = payloads.referenceCapacity
         repeat(64) { payloads.add(intArrayOf(0, 2)) }
         for (index in 1..63) payloads.release(index)
         payloads.release(0)
@@ -174,7 +175,7 @@ class NativeLearnedPayloadsTest {
         payloads.release(63)
 
         assertEquals(0L, payloads.capacityBytes)
-        assertEquals(references, payloads.referenceCapacity)
+        assertEquals(0L, payloads.referenceCapacity)
         assertEquals(queued, payloads.primitiveBytes)
         payloads.sweepDirectory(ReclamationPreparation(12L, 256L, { false }, {}))
         assertEquals(bytes, payloads.primitiveBytes)
@@ -208,7 +209,8 @@ class NativeLearnedPayloadsTest {
         }.completeValues)
 
         assertEquals(payloads.primitiveBytes + payloads.capacityBytes, values["ownedPrimitiveBytes"])
-        assertEquals(payloads.referenceCapacity + payloads.directoryCapacity + 16L, values["ownedReferenceSlots"])
+        assertEquals(payloads.referenceCapacity + payloads.cacheReferenceCapacity + payloads.directoryCapacity + 16L,
+            values["ownedReferenceSlots"])
         assertTrue(values.getValue("protectedPrimitiveBytes") < values.getValue("ownedPrimitiveBytes"))
         assertTrue(values.getValue("protectedReferenceSlots") < values.getValue("ownedReferenceSlots"))
     }

@@ -65,8 +65,9 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     private var referenceSlots = 0L
     val preparationWork: Long get() = 46L + cachedIndices.size * 2L + cachedPages.size * 2L
     val capacityBytes: Long get() = words * Int.SIZE_BYTES
+    val referenceCapacity: Long get() = referenceSlots
     // The index-array owner reference accompanies the cache's reference slots.
-    val referenceCapacity: Long get() = referenceSlots + cachedPages.size + 1L
+    val cacheReferenceCapacity: Long get() = cachedPages.size + 1L
     val directoryCapacity: Long get() = directory.referenceCapacity
     val primitiveBytes: Long get() = 24L + cachedIndices.size.toLong() * Int.SIZE_BYTES +
         pageCount * 16L + directory.primitiveCapacityBytes
