@@ -142,7 +142,12 @@ class LinearAuthorityAggregateCutsTest {
                 assertEquals(SourceValue.Rational(BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal()),
                     assertIs<SourceClaim.Bound>(assertNotNull(base.bound).claim).value)
 
-                val result = authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, incumbent)
+                var result = authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, incumbent)
+                if (incumbent == null) {
+                    assertEquals(assertNotNull(base.bound).claim, assertNotNull(result.bound).claim)
+                    assertEquals(1, authority.preparations)
+                    result = authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, incumbent)
+                }
 
                 assertEquals(2, authority.preparations)
                 assertNull(authority.cutObservations()["numericalCutLifecycleRECIPE_CURRENT_OwnerPrepared"])

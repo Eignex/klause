@@ -195,6 +195,7 @@ internal class LinearAuthority(
             pointRound = null
             pointFamily = template
         }
+        var yieldBase = false
         var pending = pointRound?.takeIf {
             it.query.matches(source, cuts = true, cutMask = it.query.cutMask,
                 checkUnselectedCuts = it.query.checkUnselectedCuts,
@@ -330,11 +331,17 @@ internal class LinearAuthority(
             pending = PointRound(prepared, base, selected, checkNotNull(family.cuts).rows)
             pointRound = pending
             policy.observe("Rounds")
+            yieldBase = pointAggregates && baselineMask == null && incumbent == null && base.split != null
             budget.funding?.charge(0L, 1024L + 64L * (base.fractional.size + base.relaxedPoint.size))
         }
         if (budget.funding?.exhausted == true || cancellation()) {
             pointRound = null
             return pending.base.copy(primalStages = if (pending.reported) emptyMap() else pending.base.primalStages)
+        }
+        if (yieldBase) {
+            pending.reported = true
+            policy.observe("InitialBaseYielded")
+            return pending.base.copy(paused = pending.base.paused || budget.funding?.paused == true)
         }
         val result = advance(source, cancellation, cuts = true, cutMask = pending.mask)
         if (!result.paused || budget.funding?.exhausted == true || cancellation()) pointRound = null

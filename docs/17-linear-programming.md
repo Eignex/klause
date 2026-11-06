@@ -1748,9 +1748,13 @@ to an adopted current family or a fully installed selected family, whose inactiv
 definitions retain its numerical layout. Changed row layouts invalidate numerical
 cursors through the ordinary compatibility checks. Changed activity invalidates completed guidance before
 reusing the owner and its basis.
-Completed base bounds survive a paused or declined separation round. Checked base
-incumbents and terminals bypass extra separation. A completed checked base bound
-that closes the supplied incumbent also returns before selection or retirement work.
+Completed base bounds survive a paused or declined separation round. Without an
+incumbent, the combined frontier returns its first completed base split and checked
+bound before the optional selected query. Its funded pending round retains the checked mask and
+resumes only in the matching numeric source scope; base work is reported once.
+A changed scope rechecks the retained definitions through the ordinary query path.
+Checked base incumbents and terminals bypass extra separation. A completed checked
+base bound that closes the supplied incumbent also returns before selection or retirement work.
 The ordinary default activates
 all accepted source cuts.
 

@@ -54,6 +54,104 @@ class LinearAuthorityPointCutsTest {
     ), mapOf(x to BigFraction.ONE))
 
     @Test
+    fun `an initial point recipe should yield its checked base before another LP operation`() {
+        val budget = SourceLpBudget()
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            val result = authority.advanceWithPointGeneratedCuts(mixedMaximum, Cancellation.Never, null)
+
+            assertEquals(1, budget.operations)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+            assertTrue(result.fractional.isNotEmpty())
+            assertTrue(result.cutBoundFamilies.isEmpty())
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionInitialBaseYielded"])
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(mixedMaximum.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `a yielded initial point recipe should resume its selected query`() {
+        val budget = SourceLpBudget()
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithPointGeneratedCuts(mixedMaximum, Cancellation.Never, null)
+
+            val result = authority.advanceWithPointGeneratedCuts(mixedMaximum, Cancellation.Never, null)
+
+            assertEquals(2, budget.operations)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+            assertTrue(result.cutBoundFamilies.isNotEmpty())
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionInitialBaseYielded"])
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(mixedMaximum.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `a changed scope should not resume the yielded root result`() {
+        val half = BigFraction.ofLong(2).reciprocal()
+        val conditions = listOf(
+            SourceCondition(upper = mapOf(mixedReal to half)),
+            SourceCondition().integerBound(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE)))
+        for (condition in conditions) {
+            LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+                val initial = authority.advanceWithPointGeneratedCuts(mixedMaximum, Cancellation.Never, null)
+                val child = mixedMaximum.atScope(mixedMaximum.scope.copy(condition = condition))
+
+                val result = authority.advanceWithPointGeneratedCuts(child, Cancellation.Never, null)
+
+                val bound = assertNotNull(result.bound)
+                assertEquals(child.scope, bound.scope)
+                assertFalse(assertNotNull(initial.bound).claim == bound.claim)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(child.withLinearAuthority()).verify(bound))
+            }
+        }
+    }
+
+    @Test
+    fun `a paused yielded query should report its base work only once`() {
+        val funding = SourceLpFunding(1_000_000L, 4_000_000L).apply { grant(1_000_000L) }
+        val budget = SourceLpBudget(funding = funding)
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            val initial = authority.advanceWithPointGeneratedCuts(mixedMaximum, Cancellation.Never, null)
+            assertEquals(1L, initial.primalStages["PrimalFractional"])
+            funding.grant(0L)
+
+            val paused = authority.advanceWithPointGeneratedCuts(mixedMaximum, Cancellation.Never, null)
+
+            assertTrue(paused.paused)
+            assertEquals(assertNotNull(initial.bound).claim, assertNotNull(paused.bound).claim)
+            assertTrue(paused.primalStages.isEmpty())
+            assertEquals(1, budget.operations)
+            funding.grant(1_000_000L)
+            val resumed = authority.advanceWithPointGeneratedCuts(mixedMaximum, Cancellation.Never, null)
+            assertFalse(resumed.paused)
+            assertNull(resumed.primalStages["PrimalFractional"])
+            assertEquals(2, budget.operations)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(mixedMaximum.withLinearAuthority())
+                .verify(assertNotNull(resumed.bound)))
+        }
+    }
+
+    @Test
+    fun `cancelling a yielded query should retain its already reported checked base`() {
+        val budget = SourceLpBudget()
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            val initial = authority.advanceWithPointGeneratedCuts(mixedMaximum, Cancellation.Never, null)
+
+            val result = authority.advanceWithPointGeneratedCuts(mixedMaximum, Cancellation { true }, null)
+
+            assertEquals(assertNotNull(initial.bound).claim, assertNotNull(result.bound).claim)
+            assertEquals(1, budget.operations)
+            assertTrue(result.primalStages.isEmpty())
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(mixedMaximum.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
     fun `empty discovery should cool down while preserving checked base bounds`() {
         val triangle = (1..3).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val premises = nonseparating.premises.toMutableMap()
