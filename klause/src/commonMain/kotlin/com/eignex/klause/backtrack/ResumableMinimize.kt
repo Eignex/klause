@@ -142,6 +142,7 @@ internal class ResumableMinimize(
     private val sink: SolveStatsSink = SolveStatsSink(backend = "backtrack"),
     private val deferredInstallation: Boolean = false,
     private val rootBasisGuidance: Boolean = false,
+    basisVariableGuidance: Boolean = true,
 ) : ResumableSearch, ReseedGuard {
     private val hasPreparation = preparationBudget != null
     override val canReseed: Boolean
@@ -335,7 +336,7 @@ internal class ResumableMinimize(
         if (params.lpPlan.branching) {
             LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
                 sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) },
-                rootBasis = rootBasisGuidance, basisVariableComparisons = true)
+                rootBasis = rootBasisGuidance, basisVariableComparisons = basisVariableGuidance)
         } else null
 
     private lateinit var cp: CpSearchComponent

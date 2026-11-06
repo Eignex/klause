@@ -61,7 +61,8 @@ class LpBranchTest {
                 for (trained in listOf(listOf(0), listOf(1), listOf(2), listOf(0, 1), listOf(0, 2))) {
                     for (stale in listOf(false, true)) for (enabled in listOf(false, true)) {
                         val bools = if (mixed) 1 else 0
-                        val problem = Problem(bools, 3 - bools, Array(3 - bools) { IntDomain(0, 2) }, emptyArray<Factor>())
+                        val problem = Problem(bools, 3 - bools, Array(3 - bools) { IntDomain(0, 2) },
+                            emptyArray<Factor>())
                         val builder = LpBuilder()
                         repeat(3) { builder.addVar(0, if (mixed && it == 0) 1 else 2, cost = 1) }
                         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -76,7 +77,9 @@ class LpBranchTest {
                         val point = doubleArrayOf(0.5, 1.25, 1.125)
                         repeat(samples) {
                             for (column in trained) {
-                                val variable = if (mixed && column == 0) VarRef.Bool(0) else VarRef.IntVar(column - bools)
+                                val variable = if (mixed && column == 0) {
+                                    VarRef.Bool(0)
+                                } else VarRef.IntVar(column - bools)
                                 val lower = if (column == 0) 0L else 1L
                                 hints.beginNode(0, 100.0)
                                 hints.record(relaxation, point, DoubleArray(0))
@@ -90,7 +93,9 @@ class LpBranchTest {
                                     } else SearchDecision.IntAtMost((variable as VarRef.IntVar).varId, lower)
                                     hints.commit(decision, 1)
                                     hints.beginNode(1, 100.0)
-                                    val child = point.copyOf().also { it[column] = (lower + if (up) 1L else 0L).toDouble() }
+                                    val child = point.copyOf().also {
+                                        it[column] = (lower + if (up) 1L else 0L).toDouble()
+                                    }
                                     hints.record(relaxation, child, DoubleArray(0))
                                     val gain = if (up) 3.0 else 1.0
                                     val scale = if (column > 0 && runnerStronger) 2 else 1
