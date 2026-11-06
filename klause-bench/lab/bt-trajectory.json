@@ -15,7 +15,8 @@
   "runtime": {
     "java": 25,
     "tools": [
-      "time"
+      "time",
+      "git"
     ],
     "environment": {}
   },
