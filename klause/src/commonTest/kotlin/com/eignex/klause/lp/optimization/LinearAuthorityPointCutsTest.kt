@@ -197,6 +197,45 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `a checked improving round should admit two further nonparallel cuts`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val w = SourceCoordinate(SourceCoordinate.Kind.Integer, 3)
+        val coordinates = listOf(x, y, z, w)
+        val rows = coordinates.mapIndexed { id, coordinate ->
+            LinearAuthorityCut(id, SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("upper $id"))
+        }
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        val installed = selection.select(rows, coordinates, List(4) { BigFraction.ZERO }, rows.indices.toSet(),
+            listOf(4L, 3L, 2L, 1L).map(BigFraction::ofLong), emptySet(), Cancellation.Never)
+        selection.observeRound(rows, improved = true)
+
+        val selected = selection.select(rows, coordinates, List(4) { BigFraction.ZERO }, rows.indices.toSet(),
+            listOf(0L, 3L, 2L, 1L).map(BigFraction::ofLong), installed, Cancellation.Never)
+
+        assertEquals(setOf(0, 1, 2), selected)
+    }
+
+    @Test
+    fun `a continuation batch should respect the remaining pool capacity`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val coordinates = listOf(x, y, z)
+        val rows = coordinates.mapIndexed { id, coordinate ->
+            LinearAuthorityCut(id, SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ZERO),
+                SourceDerivation.Premise("upper $id"))
+        }
+        val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumCuts = 2)
+        val installed = selection.select(rows, coordinates, List(3) { BigFraction.ZERO }, rows.indices.toSet(),
+            listOf(3L, 2L, 1L).map(BigFraction::ofLong), emptySet(), Cancellation.Never)
+        selection.observeRound(rows, improved = true)
+
+        val selected = selection.select(rows, coordinates, List(3) { BigFraction.ZERO }, rows.indices.toSet(),
+            listOf(0L, 2L, 1L).map(BigFraction::ofLong), installed, Cancellation.Never)
+
+        assertEquals(setOf(0, 1), selected)
+    }
+
+    @Test
     fun `checked round progress should let the next point admit a complementary cut`() {
         val rows = listOf(
             LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),

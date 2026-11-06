@@ -644,10 +644,12 @@ definitions with independently chosen nearer continuous endpoints. Exact premise
 still authorize every row. The replacement shares the original generation's work
 limit and retains the source-row template; unavailable preparation leaves its prior
 candidates intact. Each immutable template attempts this preparation once.
-Point scoring admits at most one additional checked cut at each usable point.
-An addition waits for its completed selected query before enabling another scan
-at the next point. Only a strictly stronger checked bound, a checked incumbent or
-terminal evidence enables that immediate continuation. An unchanged or unavailable
+Point scoring initially admits at most one additional checked cut. A strictly
+stronger checked bound, a checked incumbent or terminal evidence enables one
+continuation scan with at most two additional nonparallel cuts within the same
+64-cut pool and scoring allowances. The larger batch applies only to the same
+immutable candidate generation. Each addition waits for its completed selected
+query before enabling another scan at the next point. An unchanged or unavailable
 bound, an unfinished round and a scan without an addition keep a seven-query
 discovery cooldown. Feedback applies only to the same immutable candidate
 generation. An adopted current recipe or fully installed checked family

@@ -24,6 +24,7 @@ internal class LinearAuthorityPointCuts(
     val observations: Map<String, Long> get() = counts.toMap()
     private var family: List<LinearAuthorityCut>? = null
     private var cooldown = 0
+    private var additionsPerScan = 1
     private var misses = 0
     private var retired = false
     private var managedCurrent = false
@@ -53,6 +54,7 @@ internal class LinearAuthorityPointCuts(
     fun observeRound(rows: List<LinearAuthorityCut>, improved: Boolean) {
         if (family !== rows || retired || managedInstalled) return
         cooldown = if (improved) 0 else 7
+        additionsPerScan = if (improved) 2 else 1
         observe(if (improved) "ImprovedRounds" else "StalledRounds")
     }
 
@@ -104,6 +106,7 @@ internal class LinearAuthorityPointCuts(
         if (family !== rows) {
             family = rows
             cooldown = 0
+            additionsPerScan = 1
             misses = 0
             retired = false
             managedCurrent = false
@@ -239,7 +242,7 @@ internal class LinearAuthorityPointCuts(
                 }
             }
             val selected = selectNonparallelCuts(candidates.sortedWith(compareByDescending<Scored> { it.score }
-                .thenBy { it.id }), minOf(1, maximumCuts - installed.size),
+                .thenBy { it.id }), minOf(additionsPerScan, maximumCuts - installed.size),
                 1.0 - CutPool.MIN_ORTHOGONALITY, forced) { a, b ->
                 if (!meter.charge(a.values.size.toLong() + b.values.size)) Double.POSITIVE_INFINITY else {
                     var dot = 0.0
@@ -249,6 +252,7 @@ internal class LinearAuthorityPointCuts(
                 }
             }
             observe("Selected", selected.size.toLong())
+            if (selected.size > 1) observe("BatchedSelections")
             for (cut in selected) onCut(rows[cut.id].family, "POINT_SELECTED", 1L)
             val layoutPending = !retainedLayout && (installed.isNotEmpty() || selected.isNotEmpty())
             val installedPending = complete && !managedInstalled
@@ -285,6 +289,7 @@ internal class LinearAuthorityPointCuts(
                     inactiveScans.keys.removeAll(expired)
                 }
                 cooldown = if (managedInstalled) 0 else 7
+                additionsPerScan = 1
             }
             return retained + selected.map { it.id }
         } finally {
