@@ -532,8 +532,17 @@ internal class RootProbingPass : InprocessingPass {
             budget.probe()
             var emptyNeighborhood = false
             val result = probe(session, params.rootProbeWork, {
+                val propagated = (session.explanationState.boolPinOrder.size - pins - 1).coerceAtLeast(0)
+                if (generalGate) {
+                    budget.note(if (propagated == 0) "GeneralEmpty" else "GeneralProductive")
+                    budget.note("GeneralPropagatedPins", propagated.toLong())
+                }
+                if (mirrored != null) {
+                    budget.note(if (propagated == 0) "MirrorEmpty" else "MirrorProductive")
+                    budget.note("MirrorPropagatedPins", propagated.toLong())
+                }
                 if (generalGate && neighborhoodOnly && nearby != null && mirrored == null) {
-                    emptyNeighborhood = session.explanationState.boolPinOrder.size == pins + 1
+                    emptyNeighborhood = propagated == 0
                 }
                 if (capture && !params.cancellation()) implications.capture(session, literal, pins, budget)
             }) {
@@ -542,10 +551,12 @@ internal class RootProbingPass : InprocessingPass {
             when (result) {
                 null -> {
                     budget.note("Incomplete")
+                    if (mirrored != null) budget.note("MirrorIncomplete")
                     if (!params.cancellation()) session.probeCancelled = priorCancelled
                 }
                 is PropagationResult.Unsat -> {
                     budget.note("Refuted")
+                    if (mirrored != null) budget.note("MirrorRefuted")
                     if (!budget.visit(3)) break
                     val before = session.work
                     val unit = complement(session, literal, if (endpoint) variable else -1, bound, atMost)

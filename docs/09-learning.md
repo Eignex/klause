@@ -858,6 +858,10 @@ acknowledgement and retirement retain their charged work and class latency.
 Per-class attempted, eligible, shortened, unit, stopped and work counters diagnose
 applicability. Probe outcomes distinguish a consistent fixpoint, a completed
 refutation and an interrupted attempt; these counters add no second work charge.
+Completed Boolean General probes additionally report empty and productive trails
+and implied pin counts before rollback, excluding the probe decision and existing
+root facts. Mirrored attempts partition into empty, productive, refuted and
+interrupted outcomes; their pin counts are a subset of the General counts.
 Attachment, retirement and continuation work are subsets of class work, which
 overlaps containing propagation work. Root publication has a
 separate containing charge and also cannot earn the next trigger. Per-class, scheduled

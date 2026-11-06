@@ -678,6 +678,29 @@ class RootInprocessingTest {
     }
 
     @Test
+    fun `completed General probes should report speculative pins before rollback`() {
+        for (propagates in listOf(false, true)) {
+            val factor = if (propagates) {
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(0, 2, 4), PbOp.LE, 1)
+            } else {
+                Clause(intArrayOf(0, 2, 4))
+            }
+            val session = PropagationSession(Problem(3, 0, emptyArray(), arrayOf<Factor>(factor)).bake(),
+                nativeSat = false)
+            val stats = SearchStatsSink()
+
+            RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1,
+                rootProbeImplications = false, rootProbeGeneralGate = true), stats)
+
+            val learning = stats.snapshot().learning
+            assertEquals(if (propagates) 2L else 0L, learning["inprocessProbeGeneralPropagatedPins"] ?: 0L)
+            val outcome = if (propagates) "inprocessProbeGeneralProductive" else "inprocessProbeGeneralEmpty"
+            assertEquals(1L, learning.getValue(outcome))
+            for (variable in 0..2) assertNull(session.boolValue(variable))
+        }
+    }
+
+    @Test
     fun `General admission should preserve useful initial probing without binary hints`() {
         val source = Problem(3, 0, emptyArray(), arrayOf<Factor>(
             PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(0, 2, 4), PbOp.LE, 1),

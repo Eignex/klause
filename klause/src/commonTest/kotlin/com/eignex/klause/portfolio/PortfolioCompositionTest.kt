@@ -500,13 +500,13 @@ class PortfolioCompositionTest {
                     assertTrue(arm.rootSimplification)
                     assertEquals(256, arm.rootSimplifyBatch)
                     assertEquals(2, arm.rootProbeBatch)
-                    assertEquals(if (problemClass == ProblemClass.Sat) 8192L else 2048L, arm.rootProbeWork)
+                    assertEquals(8192L, arm.rootProbeWork)
                     assertFalse(arm.rootProbeImplications)
                     assertEquals(problemClass == ProblemClass.Sat, arm.rootProbeBinaryGate)
                     assertEquals(problemClass == ProblemClass.PseudoBoolean, arm.rootProbeGeneralGate)
-                    assertEquals(4096L, arm.inprocessingWork)
+                    assertEquals(if (problemClass == ProblemClass.Sat) 4096L else 16384L, arm.inprocessingWork)
                     assertEquals(256L, arm.inprocessingRootWork)
-                    assertEquals(3072L, arm.inprocessingProbeWork)
+                    assertEquals(if (problemClass == ProblemClass.Sat) 3072L else 12288L, arm.inprocessingProbeWork)
                     assertEquals(if (problemClass == ProblemClass.Sat) 0L else Long.MAX_VALUE,
                         arm.inprocessingSubsumeWork)
                     assertEquals(if (problemClass == ProblemClass.Sat) 0L else Long.MAX_VALUE,
