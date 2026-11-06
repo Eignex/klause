@@ -147,16 +147,17 @@ object BtRetirementCapture : BenchSuite {
             println("seed=$seed observed=$observed result=${result::class.simpleName} " +
                 "decisions=${result.stats.search.nodes.sum} events=${capture?.events}")
         }
-        return BenchResult(case.id, artifacts = listOf("source.cnf", "provenance.json", "request.json",
-            "records.jsonl", "$seed.trace.tsv", "$seed.retirement.jsonl").map { context.artifact(it) },
+        return BenchResult(case.id,
+            artifacts = listOf("source.cnf", "provenance.json", "request.json", "records.jsonl",
+                "$seed.trace.tsv", "$seed.retirement.jsonl").map { context.artifact(it) },
             details = buildJsonObject {
-            put("revision", Reports.readGitSha())
-            put("provenanceFingerprint", InstalledBuild.reference.fingerprint)
-            put("sourceSha256", sha256(bytes))
-            put("seed", seed)
-            put("controls", JsonArray(records.readLines().map { Reports.json.parseToJsonElement(it) }))
-            put("performanceQualified", false)
-        })
+                put("revision", Reports.readGitSha())
+                put("provenanceFingerprint", InstalledBuild.reference.fingerprint)
+                put("sourceSha256", sha256(bytes))
+                put("seed", seed)
+                put("controls", JsonArray(records.readLines().map { Reports.json.parseToJsonElement(it) }))
+                put("performanceQualified", false)
+            })
     }
 
     private class Variables(private val delegate: VariableSelector, private val trace: Trace) :
