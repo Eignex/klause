@@ -23,7 +23,8 @@ class SearchLearningTest {
         assertEquals(12L, session.learnedClauseStats().dropped)
         val sample = SharingMemoryObservation(100_000L, 1024, { false }, {})
         val values = requireNotNull(sample.snapshot { session.retainedLearningMemory(sample) }.completeValues)
-        assertEquals(result.afterBytes, values.getValue("ownedPrimitiveBytes") + values.getValue("ownedReferenceSlots") * 8L)
+        assertEquals(result.afterBytes,
+            values.getValue("ownedPrimitiveBytes") + values.getValue("ownedReferenceSlots") * 8L)
     }
 
     @Test

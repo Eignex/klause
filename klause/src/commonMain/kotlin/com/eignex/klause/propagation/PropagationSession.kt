@@ -1099,7 +1099,8 @@ class PropagationSession private constructor(
         val before = sample().completeValues ?: return LearnedReclamation(
             if (cancelRequested) ReclamationStatus.CANCELLED else ReclamationStatus.DEFERRED, work = work - start)
         val beforeBytes = bytes(before)
-        val floor = before.getValue("protectedPrimitiveBytes") + before.getValue("protectedReferenceSlots") * Long.SIZE_BYTES
+        val floor = before.getValue("protectedPrimitiveBytes") +
+            before.getValue("protectedReferenceSlots") * Long.SIZE_BYTES
         if (beforeBytes <= softLimitBytes) return LearnedReclamation(ReclamationStatus.WITHIN_LIMIT,
             beforeBytes, beforeBytes, floor, work - start)
         releaseBuffers()
@@ -1117,7 +1118,8 @@ class PropagationSession private constructor(
         }
         return LearnedReclamation(
             when {
-                learnedClauseCount < count || (afterBytes != null && afterBytes < beforeBytes) -> ReclamationStatus.RECLAIMED
+                learnedClauseCount < count || (afterBytes != null && afterBytes < beforeBytes) ->
+                    ReclamationStatus.RECLAIMED
                 afterFloor != null && afterFloor > softLimitBytes -> ReclamationStatus.PROTECTED_FLOOR
                 else -> ReclamationStatus.DEFERRED
             }, beforeBytes, afterBytes, afterFloor ?: floor, work - start)

@@ -403,7 +403,10 @@ internal class WatchedClauseStore {
         override fun iterator(): Iterator<IntArray> = object : Iterator<IntArray> {
             private var position = 0
             override fun hasNext(): Boolean = position < size
-            override fun next(): IntArray = get(position++)
+            override fun next(): IntArray {
+                if (!hasNext()) throw NoSuchElementException()
+                return get(position++)
+            }
         }
     }
 }
