@@ -6,6 +6,8 @@ import com.eignex.klause.solver.result.HintIndexOutcome
 import com.eignex.klause.solver.result.OpenHintUsageSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.arrays.binarySearchInt
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.MutableIntIntMap
 
 // Only a completed profile gives source clause identities structural authority.
 internal class SourceClauseGuidance private constructor(
@@ -224,8 +226,8 @@ internal class SourceClauseGuidance private constructor(
         if (!budget.reserve(clauses.size + 6)) return null
         val definitions = BooleanArray(clauses.size)
         val parents = HashMap<Int, MutableList<Int>>()
-        val degrees = HashMap<Int, Int>()
-        val ready = ArrayList<Int>()
+        val degrees = MutableIntIntMap()
+        val ready = IntArrayList()
         for ((variable, gate) in gates) {
             if (!budget.reserve(3)) return null
             var degree = 0
@@ -237,19 +239,19 @@ internal class SourceClauseGuidance private constructor(
                 if (input in gates) degree++
                 if (input in ambiguous) degree = LIMIT
             }
-            degrees[variable] = degree
-            if (degree == 0) ready += variable
+            degrees.put(variable, degree)
+            if (degree == 0) ready.add(variable)
         }
         val qualified = HashSet<Int>()
-        while (ready.isNotEmpty()) {
+        while (!ready.isEmpty()) {
             if (!budget.visit()) return null
-            val variable = ready.removeAt(ready.lastIndex)
+            val variable = ready.last()
+            ready.truncateTo(ready.size - 1)
             qualified += variable
             for (parent in parents[variable].orEmpty()) {
                 if (!budget.visit()) return null
-                val degree = degrees.getValue(parent) - 1
-                degrees[parent] = degree
-                if (degree == 0) ready += parent
+                val degree = degrees.addTo(parent, -1)
+                if (degree == 0) ready.add(parent)
             }
         }
         for ((id, clause) in clauses.withIndex()) {
