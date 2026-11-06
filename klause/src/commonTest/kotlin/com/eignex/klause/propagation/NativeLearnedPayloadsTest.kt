@@ -5,10 +5,40 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class NativeLearnedPayloadsTest {
+    @Test
+    fun `nullable reads should distinguish an empty live payload from a released slot`() {
+        val payloads = NativeLearnedPayloads()
+        payloads.add(intArrayOf())
+        assertTrue(assertNotNull(payloads.getOrNull(0)).isEmpty())
+
+        payloads.release(0)
+
+        assertNull(payloads.getOrNull(0))
+        assertNull(payloads.getOrNull(64))
+    }
+
+    @Test
+    fun `nullable cold reads should remain unavailable until their lookup is funded`() {
+        val payloads = NativeLearnedPayloads()
+        repeat(192) { payloads.add(intArrayOf(0, 2)) }
+        val unfunded = ReclamationPreparation(0L, 64L, { false }, {})
+
+        assertFailsWith<ReclamationPreparation.Deferred> {
+            payloads.usingBudget(unfunded) { payloads.getOrNull(64) }
+        }
+
+        var work = 0L
+        val funded = ReclamationPreparation(256L, 64L, { false }, { work += it })
+        val row = payloads.usingBudget(funded) { payloads.getOrNull(64) }
+        assertSame(payloads[64], row)
+        assertTrue(work > 0L)
+    }
+
     @Test
     fun `small cleanup slices should restore directory capacity beside surviving payloads`() {
         val payloads = NativeLearnedPayloads()

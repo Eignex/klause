@@ -328,6 +328,9 @@ and appended clauses; compaction resets them before handles change. Policy updat
 and reason-ownership checks are charged before publication. A later use protects a pending
 eviction; units, pending rechecks and current root reasons survive.
 Retired rows stop propagation and export and release their owned literal array.
+An unblocked learned watch borrows its payload once; an absent payload identifies a
+retired posting, while a live payload supplies the literals for propagation. Blocked
+watches retain their metadata status check, and source watches use root-source retirement.
 Admission, reference-array growth and release debit the containing work ledger.
 A short retirement slice suspends before publication and resumes with its stable handle.
 Policy columns and watch postings retain their separately funded cleanup. Payload
