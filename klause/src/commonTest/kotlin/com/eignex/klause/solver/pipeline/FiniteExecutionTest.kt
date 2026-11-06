@@ -37,9 +37,12 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `typed and parsed adaptive repair should reach completion enabled portfolios`() {
-        for (options in listOf(ExecutionOptions(ExecutionOption.companionRepair("adaptive")),
-            ExecutionOptions.parse(listOf("companion-repair=adaptive")))) {
+    fun `typed and parsed companion repair modes should reach completion enabled portfolios`() {
+        val variants = listOf("fixed", "adaptive").flatMap { repair ->
+            listOf(ExecutionOptions(ExecutionOption.companionRepair(repair)),
+                ExecutionOptions.parse(listOf("companion-repair=$repair")))
+        }
+        for (options in variants) {
             val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
                 realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
             val shape = FiniteSolveShape(model, true, false, null,
