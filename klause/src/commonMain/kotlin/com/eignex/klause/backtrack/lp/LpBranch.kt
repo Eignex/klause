@@ -11,7 +11,8 @@ import com.eignex.klause.solver.search.VarRef
  * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound
  * branch, so search stays complete and correct regardless. Reliable passive history compares the
  * winner and runner-up. Missing passive history permits a funded child-value comparison below the root;
- * weaker child bounds rank first, with stronger bounds breaking nondecreasing weak ties. Unavailable
+ * both corresponding child bounds must be nondecreasing. Weaker bounds rank first, with stronger
+ * bounds breaking weak ties. Unavailable
  * advice retains the score winner.
  * `O(unassigned)` per call, capped.
  *

@@ -988,7 +988,8 @@ Two recent samples in each direction of both shortlisted variables permit a lear
 variable choice. Incomplete passive history permits a bounded fresh child-value
 comparison below the root. Complete optimal children for both candidates can change
 selection by improving the weaker child bound or breaking a nondecreasing weak
-tie with a stronger other child. Numerical
+tie with a stronger other child. Both corresponding child bounds must be
+nondecreasing. Numerical
 values do not train passive history; unavailable advice keeps current scoring.
 History and child probes spend the existing LP allowance; other recipes require an
 explicit directional setting. See

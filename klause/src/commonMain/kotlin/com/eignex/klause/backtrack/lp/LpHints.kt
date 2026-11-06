@@ -371,7 +371,7 @@ internal class LpHints(
             observe("VARIABLE_PROBE_DECLINED")
             return null
         }
-        charge(14L)
+        charge(18L)
         val firstValues = values[0]
         val secondValues = values[1]
         if (!firstValues.down.isFinite() || !firstValues.up.isFinite() ||
@@ -391,6 +391,10 @@ internal class LpHints(
         val strongerTie = improvement in 0.0..1e-9 && strongImprovement > 1e-9
         if (improvement <= 1e-9 && !strongerTie) {
             observe(if (improvement < -1e-9) "VARIABLE_PROBE_BASELINE" else "VARIABLE_PROBE_TIED")
+            return null
+        }
+        if (secondValues.down < firstValues.down || secondValues.up < firstValues.up) {
+            observe("VARIABLE_PROBE_DIRECTION_TRADEOFF")
             return null
         }
         if (strongerTie) observe("VARIABLE_PROBE_STRONGER_TIE")

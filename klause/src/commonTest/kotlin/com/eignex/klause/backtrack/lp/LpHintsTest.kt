@@ -267,7 +267,7 @@ class LpHintsTest {
                 assertEquals(listOf(0, 1), cols.toList())
                 assertEquals(listOf(0L, 0L), splits.toList())
                 queries++
-                listOf(LpDirectionalValues(offset, offset + 5.0), LpDirectionalValues(offset + 1.0, offset + 2.0))
+                listOf(LpDirectionalValues(offset, offset + 5.0), LpDirectionalValues(offset + 1.0, offset + 6.0))
             }
             repeat(2) { depth ->
                 hints.beginNode(depth, 100.0)
@@ -287,17 +287,21 @@ class LpHintsTest {
     }
 
     @Test
-    fun `a stronger child breaks a weak tie without lowering the weaker value`() {
+    fun `fresh child advice preserves both corresponding child bounds`() {
         val cases = listOf(
-            LpDirectionalValues(1.0, 5.0) to true,
-            LpDirectionalValues(5.0, 1.0) to true,
-            LpDirectionalValues(1.0, 4.0) to false,
-            LpDirectionalValues(1.0, 3.0) to false,
-            LpDirectionalValues(1.0 - 1e-10, 99.0) to false,
-            LpDirectionalValues(1.0 - 1e-6, 99.0) to false,
-            LpDirectionalValues(1.0 + 1e-10, 5.0) to true,
+            Triple(LpDirectionalValues(1.0, 4.0), LpDirectionalValues(1.0, 5.0), true),
+            Triple(LpDirectionalValues(4.0, 1.0), LpDirectionalValues(5.0, 1.0), true),
+            Triple(LpDirectionalValues(1.0, 4.0), LpDirectionalValues(5.0, 1.0), false),
+            Triple(LpDirectionalValues(4.0, 1.0), LpDirectionalValues(1.0, 5.0), false),
+            Triple(LpDirectionalValues(1.0, 4.0), LpDirectionalValues(2.0, 3.0), false),
+            Triple(LpDirectionalValues(4.0, 1.0), LpDirectionalValues(3.0, 2.0), false),
+            Triple(LpDirectionalValues(1.0, 4.0), LpDirectionalValues(1.0, 4.0), false),
+            Triple(LpDirectionalValues(1.0, 4.0), LpDirectionalValues(1.0, 3.0), false),
+            Triple(LpDirectionalValues(1.0, 4.0), LpDirectionalValues(1.0 - 1e-10, 99.0), false),
+            Triple(LpDirectionalValues(1.0, 4.0), LpDirectionalValues(1.0 - 1e-6, 99.0), false),
+            Triple(LpDirectionalValues(1.0, 4.0), LpDirectionalValues(1.0 + 1e-10, 5.0), true),
         )
-        for ((candidate, stronger) in cases) for (offset in listOf(-100.0, 0.0, 100.0)) {
+        for ((baseline, candidate, stronger) in cases) for (offset in listOf(-100.0, 0.0, 100.0)) {
             val builder = LpBuilder()
             repeat(2) { builder.addVar(0, 3) }
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
@@ -313,7 +317,7 @@ class LpHintsTest {
 
             val proposal = hints.compareProbeVariables(VarRef.IntVar(0), IntDomain(0, 3),
                 VarRef.IntVar(1), IntDomain(0, 3), { true }) { _, _, _ ->
-                listOf(LpDirectionalValues(offset + 1.0, offset + 4.0),
+                listOf(LpDirectionalValues(offset + baseline.down, offset + baseline.up),
                     LpDirectionalValues(offset + candidate.down, offset + candidate.up))
             }
 
@@ -343,7 +347,7 @@ class LpHintsTest {
                 val proposal = hints.compareProbeVariables(VarRef.IntVar(0), IntDomain(0, 2),
                     VarRef.IntVar(1), IntDomain(0, 2), { funded }) { _, _, _ ->
                     queries++
-                    listOf(LpDirectionalValues(1.0, 4.0), LpDirectionalValues(2.0, 3.0))
+                    listOf(LpDirectionalValues(1.0, 4.0), LpDirectionalValues(2.0, 5.0))
                 }
 
                 assertEquals(if (enabled && funded && entry == 0) VarRef.IntVar(1) else null, proposal)
@@ -382,8 +386,8 @@ class LpHintsTest {
                 val proposal = hints.compareProbeVariables(VarRef.IntVar(0), IntDomain(0, 3),
                     VarRef.IntVar(1), IntDomain(0, 3), { true }) { _, _, _ ->
                     queries++
-                    if (node == 0) listOf(LpDirectionalValues(1.0, 4.0), LpDirectionalValues(2.0, 3.0))
-                    else listOf(LpDirectionalValues(2.0, 3.0), LpDirectionalValues(1.0, 4.0))
+                    if (node == 0) listOf(LpDirectionalValues(1.0, 4.0), LpDirectionalValues(2.0, 5.0))
+                    else listOf(LpDirectionalValues(2.0, 5.0), LpDirectionalValues(1.0, 4.0))
                 }
 
                 assertEquals(if (node == 0) VarRef.IntVar(1) else null, proposal, change)

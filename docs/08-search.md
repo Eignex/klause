@@ -327,7 +327,10 @@ Missing or unusable passive history permits a fresh child-value comparison of th
 same shortlist below the root. Both candidates require complete optimal child
 solves at their current floor and ceiling. The larger weaker-child objective ranks first. A tie within the comparison
 tolerance can instead select a strictly larger stronger-child value, provided the
-weaker value does not decrease. A complete tie keeps current scoring. The
+weaker value does not decrease. Every numerical override also requires each
+corresponding lower and upper child bound to be nondecreasing. A directional
+tradeoff keeps current scoring and records a separate decline. A complete tie
+keeps current scoring. The
 four finite values share minimized source units. Common objective offsets and an
 unknown parent optimum cancel in this comparison; signed values are valid.
 Numerical values never train passive checked-bound history or carry between points.
