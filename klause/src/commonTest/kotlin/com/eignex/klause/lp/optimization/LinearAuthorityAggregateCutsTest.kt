@@ -300,6 +300,72 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `bounded point appends should keep completed proposals and their checked authority`() {
+        val premises = (0 until 64).associateTo(linkedMapOf()) { index ->
+            "row $index" to SourcePremise(SourceInequality(
+                mapOf(x to BigFraction.ofLong(2), real to BigFraction.MINUS_ONE),
+                BigFraction.ofLong(3L + 2L * index)))
+        }
+        val upper = SourceInequality(mapOf(x to BigFraction.ONE, real to BigFraction.ONE), BigFraction.ofLong(5))
+        premises["upper"] = SourcePremise(upper)
+        premises["lower"] = SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        val source = SourceProofContext(scope, setOf(x, real), premises)
+        val ordinary = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val directed = assertNotNull(ordinary.atPoint(mapOf(x to 8.0 / 3.0, real to 7.0 / 3.0),
+            Cancellation.Never, {}, { _, _ -> }))
+        val aggregate = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
+            LinearAuthorityAggregateTerm(0, "row 0", premises.getValue("row 0").inequality),
+            LinearAuthorityAggregateTerm(64, "upper", upper)), Cancellation.Never))
+        assertEquals(64, assertNotNull(directed.cuts).rows.size)
+
+        for ((count, limit, expected) in listOf(
+            Triple(1, 64, 64), Triple(64, 64, 64),
+            Triple(1, Int.MAX_VALUE, 65), Triple(64, Int.MAX_VALUE, 128),
+        )) {
+            val template = if (limit == Int.MAX_VALUE) ordinary else directed
+            val appended = assertNotNull(template.withAdditional(List(count) { aggregate }, Cancellation.Never,
+                maximumCandidates = limit))
+
+            val checked = assertNotNull(LinearAuthorityQuery.prepare(source, appended, Cancellation.Never))
+
+            assertEquals(expected, checked.checkedCuts.size)
+            assertEquals(expected, checked.activeCuts)
+            assertTrue(checked.unconditionalRows)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(aggregate.inequality), aggregate.derivation)))
+        }
+    }
+
+    @Test
+    fun `a full mixed point family should retain a separating aggregate within its layout limit`() {
+        val premises = (0 until 64).associateTo(linkedMapOf()) { index ->
+            "row $index" to SourcePremise(SourceInequality(
+                mapOf(x to BigFraction.ofLong(2), real to BigFraction.MINUS_ONE),
+                BigFraction.ofLong(3L + 2L * index)))
+        }
+        premises["upper"] = SourcePremise(SourceInequality(
+            mapOf(x to BigFraction.ONE, real to BigFraction.ONE), BigFraction.ofLong(5)))
+        premises["lower"] = SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE)),
+            setOf(x, real), premises, mapOf(x to BigFraction.ONE))
+        val capture = LinearAuthorityCapture(4, 100_000L, 10_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.capture = capture
+
+            val result = authority.advanceWithPointCuts(source, Cancellation.Never)
+
+            assertEquals(64L, authority.cutObservations()["numericalMaxRetainedCuts"])
+            assertEquals(64L, authority.cutObservations()["numericalCutSelectionRetainedLayout"])
+            assertEquals(64, capture.records.last().cuts.size)
+            assertTrue(CutFamily.SOURCE_AGGREGATION in result.cutBoundFamilies)
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(2)),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
     fun `point separation should retain a wide checked cut within its allocation grant`() {
         val coordinates = (0 until 48).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val first = SourceInequality(coordinates.take(24).associateWith { BigFraction.ofLong(2) } +
@@ -465,7 +531,6 @@ class LinearAuthorityAggregateCutsTest {
         assertTrue(cuts.isEmpty())
         assertTrue((observations["AggregateWork"] ?: 0L) <= beforePreferred)
     }
-
 
     @Test
     fun `integer recipes should strengthen pure numerical bounds only when enabled`() {

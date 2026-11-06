@@ -469,7 +469,8 @@ internal class LinearAuthority(
         point: Map<SourceCoordinate, Double>? = null,
     ): LinearAuthorityTemplate? {
         val generateAggregates = aggregateCuts && !deferAggregatePreparation
-        if (!generateAggregates && additionalCuts.isEmpty()) return prepared
+        if (!generateAggregates && additionalCuts.isEmpty() &&
+            (point == null || prepared.cuts?.rows.orEmpty().size <= 64)) return prepared
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
         val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairs(
             prepared.numeric, funded, { name, count ->
@@ -491,7 +492,8 @@ internal class LinearAuthority(
             if (funded()) return null
             additionalCuts + generated
         }
-        return prepared.withAdditional(additional, funded, ::cutCost)
+        return prepared.withAdditional(additional, funded,
+            maximumCandidates = if (point == null) Int.MAX_VALUE else 64, onCost = ::cutCost)
     }
 
     private fun cutCost(work: Long, allocation: Long) {

@@ -24,6 +24,7 @@ import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.collections.MutableIntObjectMap
 import com.eignex.util.collections.toSortedIntArray
@@ -315,7 +316,7 @@ class DefinitionalSweep internal constructor(
                     val linRow = checkNotNull(lin.integerConstants) { "a claimed definition is an integer row" }
                     val j = defOut[v]
                     val ins = ArrayList<FunctionalObjective.Operand>(lin.vars.size - 1)
-                    val inc = ArrayList<Long>(lin.vars.size - 1)
+                    val inc = LongArrayList(lin.vars.size - 1)
                     for (k in lin.vars.indices) {
                         if (cancellation.definitionStopped()) return
                         if (k != j) {
@@ -368,17 +369,17 @@ class DefinitionalSweep internal constructor(
             cancellation.charge(1)
             if (cancellation() || coefficient != 0.0) return null
         }
-        val integers = ArrayList<Int>()
-        val booleans = ArrayList<Int>()
+        val integers = IntArrayList()
+        val booleans = IntArrayList()
         for (id in objective.intCoefficientValues.indices) {
             cancellation.charge(1)
             if (cancellation()) return null
-            if (objective.intCoefficientValues[id] != 0L) integers += id
+            if (objective.intCoefficientValues[id] != 0L) integers.add(id)
         }
         for (id in objective.boolWeightValues.indices) {
             cancellation.charge(1)
             if (cancellation()) return null
-            if (objective.boolWeightValues[id] != 0L) booleans += id
+            if (objective.boolWeightValues[id] != 0L) booleans.add(id)
         }
         return functionalObjective(
             integers.toIntArray(),

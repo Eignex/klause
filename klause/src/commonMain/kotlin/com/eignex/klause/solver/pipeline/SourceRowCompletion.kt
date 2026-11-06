@@ -11,6 +11,8 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
@@ -61,8 +63,8 @@ internal class SourceRowCompletion(
     private fun index(): Boolean {
         val premises = source.premises
         val built = ArrayList<Row>(premises.size)
-        val rowLists = Array(count) { ArrayList<Int>(2) }
-        val positionLists = Array(count) { ArrayList<Int>(2) }
+        val rowLists = Array(count) { IntArrayList(2) }
+        val positionLists = Array(count) { IntArrayList(2) }
         for ((id, premise) in premises) {
             val coefficients = premise.inequality.coefficients
             val pins = premise.integerPins
@@ -90,13 +92,13 @@ internal class SourceRowCompletion(
             built += Row(id, inputs, values.requireNoNulls(), premise.inequality.rhs, premise.inequality.strict,
                 conditions, required.requireNoNulls())
             for ((position, input) in inputs.withIndex()) {
-                rowLists[input] += row
-                positionLists[input] += position
+                rowLists[input].add(row)
+                positionLists[input].add(position)
             }
             for (condition in conditions) {
-                if (rowLists[condition].lastOrNull() != row) {
-                    rowLists[condition] += row
-                    positionLists[condition] += -1
+                if (rowLists[condition].isEmpty() || rowLists[condition].last() != row) {
+                    rowLists[condition].add(row)
+                    positionLists[condition].add(-1)
                 }
             }
         }
@@ -114,7 +116,7 @@ internal class SourceRowCompletion(
         val members = ArrayList<Member>()
         val delta = HashMap<Int, BigFraction>()
         val queue = IntArrayDeque()
-        val queued = HashSet<Int>()
+        val queued = IntHashSet()
         fun current(index: Int): BigFraction = planned[index] ?: centerValue(center, index)
         fun move(index: Int, target: BigFraction, row: String?) {
             funding.charge(1L + incidentRows[index].size, 96L)
@@ -144,7 +146,7 @@ internal class SourceRowCompletion(
         while (queue.isNotEmpty()) {
             if (stopped()) return null
             val row = queue.removeFirst()
-            queued -= row
+            queued.remove(row)
             if (excess(row) == null) continue
             val shape = rows[row]
             val candidates = (shape.inputs.toList() + shape.conditions.toList()).distinct()
