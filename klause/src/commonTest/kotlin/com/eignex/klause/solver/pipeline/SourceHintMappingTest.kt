@@ -162,6 +162,19 @@ class SourceHintMappingTest {
     }
 
     @Test
+    fun `an integer rebuilt more than once should not expose an affine reconstruction`() {
+        val source = Problem(0, 3, Array(3) { IntDomain(-10, 10) }, emptyArray())
+        val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY, SourceRebuilds(listOf(
+            RebuildStep.AffineValue(0, 0, intArrayOf(1), longArrayOf(1), 1),
+            RebuildStep.AffineValue(0, 0, intArrayOf(2), longArrayOf(1), 1),
+        )))
+
+        val reconstructions = assertNotNull(mapping.affineReconstructions(Cancellation.Never))
+
+        assertEquals(emptyMap(), reconstructions)
+    }
+
+    @Test
     fun `linear definitions should decline an output the reconstruction cancels`() {
         val source = Problem(0, 2, Array(2) { IntDomain(-10, 10) }, emptyArray())
         val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY,

@@ -55,6 +55,18 @@ class SourceRowCompletionTest {
     }
 
     @Test
+    fun `branching equality repairs should retain compensators in source order`() {
+        val count = 12
+        val problem = Problem(0, count, Array(count) { IntDomain(0, 1) }, (1 until count).map {
+            Linear(longArrayOf(1, -1), intArrayOf(0, it), LinearOp.EQ, 0L)
+        })
+
+        val packet = complete(problem, LongArray(count) { 1L }, 0 to -1)
+
+        assertEquals((0 until count).toList(), inputs(packet))
+    }
+
+    @Test
     fun `row slack should leave a seed without added inputs`() {
         val knapsack = Problem(0, 3, Array(3) { IntDomain(0, 1) },
             listOf(Linear(longArrayOf(2, 3, 4), intArrayOf(0, 1, 2), LinearOp.GE, 5L)))
