@@ -613,6 +613,12 @@ another learned retirement requires a scan. Metadata release precedes watch scan
 so permanent postings cannot delay its progress. Appended retirements extend the page
 queue. Candidate-array trimming receives a separate funded copy transaction and
 retains spare capacity when its work or scratch does not fit.
+Removing a retired Native watcher preserves survivor order when its tail contains at
+most 128 entries. Each copied entry debits one read and one write before mutation.
+Cleanup defers an ordered removal when the containing grant can fund it but its
+remainder cannot. A tail or complete atomic copy beyond the supported bound uses
+swap-pop, preserving progress under small grants. Ordinary watch relocation uses
+swap-pop. Both removal paths release the same tail page and retain no copy buffer.
 Capacity changes replace the disjoint metadata pool identity. A protected row retains
 its complete page allocation; sparse-index protection includes the union of its
 required branch paths. Primitive and reference pools report cumulative protected
