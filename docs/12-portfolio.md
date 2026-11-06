@@ -986,8 +986,9 @@ annotated, or execution is parallel or single-engine. See
 [ordinary tableau admission](17-linear-programming.md).
 
 The `lp-default` optimization recipe consumes scoped passive checked-bound gains.
-Two recent samples in each direction of both shortlisted variables permit a learned
-variable choice. Incomplete passive history permits a bounded fresh child-value
+Two recent samples in each direction nominate a passive challenger across the bounded
+variable scan. Comparable baseline history permits a learned variable choice.
+Missing baseline history permits a bounded fresh child-value
 comparison below the root. Complete optimal children for both candidates can change
 selection by improving the weaker child bound or breaking a nondecreasing weak
 tie with a stronger other child. Both corresponding child bounds must be

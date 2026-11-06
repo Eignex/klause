@@ -281,7 +281,7 @@ internal class LpHints(
 
     fun prepareVariableComparison(variables: Int): Boolean {
         if (!collect || !freshRecord || variables !in 1..8192 ||
-            (!(boundRecorded && history.mayHaveScores) && !probeVariableChoiceReady)
+            !boundRecorded || !history.mayHaveScores
         ) return false
         charge(3L * variables + 4L)
         observe("VARIABLE_COMPARISON")

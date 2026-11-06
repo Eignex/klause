@@ -10,7 +10,8 @@ import com.eignex.klause.solver.search.VarRef
  * the LP gives no fractional signal, or the residual problem is too wide to scan. Purely advisory — the
  * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound
  * branch, so search stays complete and correct regardless. Reliable passive history compares the
- * winner and runner-up. Missing passive history permits a funded child-value comparison below the root;
+ * winner with the strongest reliable passive challenger. Missing baseline history permits a
+ * funded child-value comparison with that challenger below the root;
  * both corresponding child bounds must be nondecreasing. Weaker bounds rank first, with stronger
  * bounds breaking weak ties. Unavailable
  * advice retains the score winner.
@@ -25,22 +26,20 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
     val compareHistory = hints.prepareVariableComparison(problem.numBoolVars + problem.numIntVars)
     var best: VarRef? = null
     var bestScore = LP_BRANCH_MIN_SCORE
-    var second: VarRef? = null
-    var secondScore = LP_BRANCH_MIN_SCORE
+    var challenger: VarRef? = null
+    var challengerScore = LP_BRANCH_MIN_SCORE
     for (b in 0 until problem.numBoolVars) {
         if (session.boolValue(b) != null) continue
         val variable = VarRef.Bool(b)
         val score = hints.branchScore(variable)
         if (score > bestScore) {
-            if (compareHistory) {
-                second = best
-                secondScore = bestScore
-            }
             bestScore = score
             best = variable
-        } else if (compareHistory && score > secondScore) {
-            secondScore = score
-            second = variable
+        }
+        val learned = if (compareHistory) hints.directionalScore(variable) else Double.NaN
+        if (learned > challengerScore) {
+            challengerScore = learned
+            challenger = variable
         }
     }
     for (i in 0 until problem.numIntVars) {
@@ -48,24 +47,23 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
         val variable = VarRef.IntVar(i)
         val score = hints.branchScore(variable)
         if (score > bestScore) {
-            if (compareHistory) {
-                second = best
-                secondScore = bestScore
-            }
             bestScore = score
             best = variable
-        } else if (compareHistory && score > secondScore) {
-            secondScore = score
-            second = variable
+        }
+        val learned = if (compareHistory) hints.directionalScore(variable, session.intDomain(i)) else Double.NaN
+        if (learned > challengerScore) {
+            challengerScore = learned
+            challenger = variable
         }
     }
+    if (challenger == null || challenger == best) return best
     val historyProposal = if (compareHistory) {
         hints.compareVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
-            second, (second as? VarRef.IntVar)?.let { session.intDomain(it.varId) })
+            challenger, (challenger as? VarRef.IntVar)?.let { session.intDomain(it.varId) })
     } else null
     val proposal = historyProposal ?: if (compareHistory && hints.probeVariableChoiceReady) {
         hints.compareProbeVariables(best, (best as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
-            second, (second as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
+            challenger, (challenger as? VarRef.IntVar)?.let { session.intDomain(it.varId) },
             reserve = ::reserveProbeWork, estimate = ::directionalValues)
     } else null
     return hints.applyVariableChoice(proposal, best)

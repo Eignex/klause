@@ -315,16 +315,17 @@ The `lp-default` optimization recipe enables the passive finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
 and branching must be enabled. The reduced-cost/fractionality scorer supplies its
-winning variable and runner-up. When recent history is available, reliable predicted
-gains compare only those two candidates. Both candidates require reliable predictions;
-tied predictions retain the original winner. Candidates outside that shortlist keep
-no selection priority. Shortlist tracking charges its bounded scan work to the existing
+winning variable. A bounded scan also nominates the largest reliable passive score
+among unassigned variables, including variables outside the reduced-cost leaders.
+When both candidates have reliable predictions, comparable gains select the winner;
+tied predictions retain the original winner. The scan charges its work to the existing
 LP allowance before visiting candidates.
 Two recent samples in each direction supply that variable's predicted child gains,
 using each direction's mean cost per unit of fractional movement. The balanced
-`min + max / 6` score ranks finite positive predictions in the shortlist.
-Missing or unusable passive history permits a fresh child-value comparison of the
-same shortlist below the root. Both candidates require complete optimal child
+`min + max / 6` score ranks finite positive predictions.
+A reliable challenger with missing baseline history permits a fresh child-value
+comparison below the root. Without a reliable challenger, selection retains current
+scoring without a child query. Both candidates require complete optimal child
 solves at their current floor and ceiling. The larger weaker-child objective ranks first. A tie within the comparison
 tolerance can instead select a strictly larger stronger-child value, provided the
 weaker value does not decrease. Every numerical override also requires each
