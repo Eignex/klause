@@ -329,11 +329,11 @@ internal class LpHints(
         variableBasisProposal = false
         proposal ?: return baseline
         charge(2L)
-        observe("VARIABLE_CONSUMED")
-        if (probed) observe("VARIABLE_PROBE_CONSUMED")
-        if (basis) observe("VARIABLE_BASIS_CONSUMED")
-        observe(if (proposal == baseline) "VARIABLE_BASELINE_AGREED" else "VARIABLE_BASELINE_CHANGED")
-        return proposal
+        observe("VARIABLE_WITHHELD")
+        if (probed) observe("VARIABLE_PROBE_WITHHELD")
+        if (basis) observe("VARIABLE_BASIS_WITHHELD")
+        observe(if (proposal == baseline) "VARIABLE_PROPOSAL_AGREED" else "VARIABLE_PROPOSAL_CHANGED")
+        return baseline
     }
 
     fun prepareBasisVariableComparison(variables: Int): Boolean {
