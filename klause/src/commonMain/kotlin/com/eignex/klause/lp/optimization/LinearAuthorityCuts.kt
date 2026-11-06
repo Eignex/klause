@@ -43,7 +43,125 @@ internal class LinearAuthorityCuts private constructor(
         if (additional.isEmpty()) this else LinearAuthorityCuts(rows + additional, work, observations,
             complementary, pointDirected)
 
+    fun withoutZeroBoundRows(
+        source: SourceProofContext, cancellation: Cancellation, maximumWork: Long = 65_536L,
+        onCost: (Long, Long) -> Unit = { _, _ -> },
+    ): LinearAuthorityCuts? {
+        require(maximumWork in work..65_536L)
+        if (cancellation()) return null
+        if (rows.isEmpty() || rows.size > 64 || work == maximumWork) return this
+        var spent = 0L
+        var allocated = 0L
+        var indexLimited = false
+        var workLimited = false
+        var allocationLimited = false
+        var omittedRounding = 0L
+        var omittedMixed = 0L
+        fun charge(amount: Long, bytes: Long = 0L): Boolean {
+            if (cancellation()) return false
+            if (amount > maximumWork - work - spent) {
+                workLimited = true
+                return false
+            }
+            if (bytes > 16_384L - allocated) {
+                allocationLimited = true
+                return false
+            }
+            spent += amount
+            allocated += bytes
+            onCost(amount, bytes)
+            return !cancellation()
+        }
+        fun finish(retained: List<LinearAuthorityCut>, complete: Boolean): LinearAuthorityCuts {
+            val rounding = if (complete) omittedRounding else 0L
+            val mixed = if (complete) omittedMixed else 0L
+            val extra = mapOf(
+                "ZeroBoundAdmissionWork" to spent,
+                "ZeroBoundAdmissionAllocation" to allocated,
+                "ZeroBoundAdmissionLimited" to if (complete) 0L else 1L,
+                "ZeroBoundWorkLimited" to if (workLimited) 1L else 0L,
+                "ZeroBoundAllocationLimited" to if (allocationLimited) 1L else 0L,
+                "ZeroBoundIndexLimited" to if (indexLimited) 1L else 0L,
+                "ZeroBoundOmitted" to rounding + mixed,
+                "ZeroBoundOmittedSOURCE_ROUNDING" to rounding,
+                "ZeroBoundOmittedSOURCE_MIXED_ROUNDING" to mixed,
+            )
+            return LinearAuthorityCuts(retained, work + spent, observations + extra.mapValues { (key, value) ->
+                (observations[key] ?: 0L) + value
+            }, complementary, pointDirected)
+        }
+        if (!charge(32L + observations.size * 2L, 2048L + observations.size * 64L + rows.size * 8L)) {
+            return if (cancellation()) null else this
+        }
+        val zeroSides = HashMap<SourceCoordinate, Int>()
+        val sourceComplete = source.allPremises { _, premise ->
+            if (!charge(1L)) return@allPremises false
+            val row = premise.inequality
+            if (row.supportSize != 1 || !row.rhs.isZero || premise.guardCount != 0 ||
+                premise.integerPinCount != 0) return@allPremises true
+            val id = checkNotNull(row.singleCoordinate())
+            if (id.kind == SourceCoordinate.Kind.Boolean) return@allPremises true
+            val coefficient = checkNotNull(row.coefficient(id))
+            val words = (coefficient.num.magnitudeBitLength().toLong() +
+                coefficient.den.magnitudeBitLength() + 63L) / 64L
+            if (!charge(1L + words * words)) return@allPremises false
+            val previous = zeroSides[id]
+            if (previous == null && zeroSides.size == 64) {
+                indexLimited = true
+                return@allPremises true
+            }
+            if (!charge(1L, if (previous == null) 96L else 0L)) return@allPremises false
+            val side = if (coefficient > BigFraction.ZERO) ZERO_UPPER else ZERO_LOWER
+            zeroSides[id] = (previous ?: 0) or side
+            true
+        }
+        if (cancellation()) return null
+        if (!sourceComplete) return finish(rows, complete = false)
+        val retained = ArrayList<LinearAuthorityCut>(rows.size)
+        for (cut in rows) {
+            if (!charge(1L, 64L)) return if (cancellation()) null else finish(rows, complete = false)
+            val row = cut.inequality
+            if (row.strict || (cut.family != CutFamily.SOURCE_ROUNDING &&
+                    cut.family != CutFamily.SOURCE_MIXED_ROUNDING)) {
+                retained += cut
+                continue
+            }
+            val rhsWords = (row.rhs.num.magnitudeBitLength().toLong() +
+                row.rhs.den.magnitudeBitLength() + 63L) / 64L
+            if (!charge(1L + rhsWords * rhsWords)) {
+                return if (cancellation()) null else finish(rows, complete = false)
+            }
+            if (row.rhs < BigFraction.ZERO) {
+                retained += cut
+                continue
+            }
+            var covered = true
+            val implied = row.forEachCoefficient { id, coefficient ->
+                val words = (coefficient.num.magnitudeBitLength().toLong() +
+                    coefficient.den.magnitudeBitLength() + 63L) / 64L
+                if (!charge(1L + words * words)) {
+                    covered = false
+                    false
+                } else {
+                    val side = if (coefficient > BigFraction.ZERO) ZERO_UPPER else ZERO_LOWER
+                    ((zeroSides[id] ?: 0) and side) != 0
+                }
+            }
+            if (!covered) return if (cancellation()) null else finish(rows, complete = false)
+            when {
+                !implied -> retained += cut
+                cut.family == CutFamily.SOURCE_ROUNDING -> omittedRounding++
+                else -> omittedMixed++
+            }
+        }
+        if (cancellation()) return null
+        return finish(retained, complete = true)
+    }
+
     companion object {
+        private const val ZERO_LOWER = 1
+        private const val ZERO_UPPER = 2
+
         fun prepare(
             source: SourceProofContext, cancellation: Cancellation, complementary: Boolean = false,
             onWork: (Long) -> Unit = {},

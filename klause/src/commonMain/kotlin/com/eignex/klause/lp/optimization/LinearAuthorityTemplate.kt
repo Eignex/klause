@@ -23,13 +23,15 @@ internal class LinearAuthorityTemplate private constructor(
         val directed = LinearAuthorityCuts.prepareAtPoint(numeric, cancellation, point,
             65_536L - original.work, onWork) ?: return null
         if (cancellation() || (directed.rows.isEmpty() && original.rows.isNotEmpty())) return null
-        onCost(directed.rows.size.toLong(), 128L + directed.rows.sumOf {
+        val admitted = directed.withoutZeroBoundRows(numeric, cancellation, 65_536L - original.work,
+            onCost) ?: return null
+        onCost(admitted.rows.size.toLong(), 128L + admitted.rows.sumOf {
             128L + it.owners.size * 32L + (it.inequality.coefficients.values + it.inequality.rhs).sumOf { value ->
                 64L + (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 7L) / 8L
             }
         })
         if (cancellation()) return null
-        return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows, directed)
+        return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows, admitted)
     }
 
     fun withAdditional(
@@ -60,6 +62,7 @@ internal class LinearAuthorityTemplate private constructor(
         fun prepare(
             source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false,
             complementaryCuts: Boolean = false,
+            onCost: (Long, Long) -> Unit = { _, _ -> },
             onCutWork: (Long) -> Unit = {},
         ): LinearAuthorityTemplate? {
             val numeric = source.numericContext()
@@ -71,7 +74,9 @@ internal class LinearAuthorityTemplate private constructor(
                 rows += premise.inequality.row(indices)
             }
             val separated = if (cuts) {
-                LinearAuthorityCuts.prepare(numeric, cancellation, complementaryCuts, onCutWork) ?: return null
+                val generated = LinearAuthorityCuts.prepare(numeric, cancellation, complementaryCuts,
+                    onCutWork) ?: return null
+                generated.withoutZeroBoundRows(numeric, cancellation, onCost = onCost) ?: return null
             } else null
             return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows, separated)
         }

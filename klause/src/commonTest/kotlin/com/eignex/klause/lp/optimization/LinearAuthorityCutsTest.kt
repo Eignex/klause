@@ -440,6 +440,142 @@ class LinearAuthorityCutsTest {
             SourceClaim.Consequence(cut.inequality), cut.derivation)))
     }
 
+
+    @Test
+    fun `zero bound admission should preserve the checked source objective bound`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val half = BigFraction.ofLong(2).reciprocal()
+        for (direction in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
+            val source = SourceProofContext(scope, setOf(x, real), linkedMapOf(
+                "mixed" to SourcePremise(SourceInequality(
+                    mapOf(x to direction, real to BigFraction.ONE), half)),
+                "integer bound" to SourcePremise(SourceInequality(mapOf(x to direction), BigFraction.ZERO)),
+                "real lower" to SourcePremise(SourceInequality(
+                    mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ), mapOf(x to direction.negated()))
+            val generated = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never))
+            assertEquals(1, generated.rows.size)
+            val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+            assertTrue(assertNotNull(template.cuts).rows.isEmpty())
+
+            LinearAuthority(SourceLpBudget()).use { authority ->
+                val result = authority.advance(source, Cancellation.Never, cuts = true)
+
+                assertEquals(SourceValue.Rational(BigFraction.ZERO),
+                    assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+                assertEquals(1L, authority.cutObservations()["numericalCutZeroBoundOmitted"])
+                assertEquals(1L, authority.cutObservations()[
+                    "numericalCutLifecycleSOURCE_MIXED_ROUNDING_SOURCE_BOUND_OMITTED"])
+            }
+        }
+    }
+
+    @Test
+    fun `zero bound admission should keep cuts without the unconditional required side`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val boolean = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
+        val lower = SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)
+        for (bound in listOf(null,
+            SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO)),
+            SourcePremise(lower, guards = mapOf(0 to true)),
+            SourcePremise(lower, integerPins = mapOf(y to BigFraction.ZERO)))) {
+            val premises = linkedMapOf(
+                "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                    real to BigFraction.ONE), BigFraction.ofLong(2).reciprocal())),
+                "real lower" to SourcePremise(SourceInequality(
+                    mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            )
+            if (bound != null) premises["integer bound"] = bound
+            val source = SourceProofContext(scope, setOf(x, y, real, boolean), premises, emptyMap())
+            val generated = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never))
+
+            val admitted = assertNotNull(generated.withoutZeroBoundRows(source, Cancellation.Never))
+
+            assertEquals(1, admitted.rows.size)
+            val cut = admitted.rows.single()
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+    }
+
+    @Test
+    fun `limited zero bound admission should retain the original definitions and spent costs`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val source = SourceProofContext(scope, setOf(x, real), linkedMapOf(
+            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                real to BigFraction.ONE), BigFraction.ofLong(2).reciprocal())),
+            "integer lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "real lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), emptyMap())
+        val generated = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never))
+        var work = 0L
+        var bytes = 0L
+
+        val admitted = assertNotNull(generated.withoutZeroBoundRows(source, Cancellation.Never,
+            maximumWork = generated.work + 60L, onCost = { steps, allocation ->
+                work += steps
+                bytes += allocation
+            }))
+
+        assertEquals(generated.rows, admitted.rows)
+        assertTrue(work > 0L && work <= 60L)
+        assertTrue(bytes > 0L)
+        assertEquals(generated.work + work, admitted.work)
+        assertEquals(1L, admitted.observations["ZeroBoundAdmissionLimited"])
+    }
+
+    @Test
+    fun `cancelled zero bound admission should withhold its partial selection and retain costs`() {
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val source = SourceProofContext(scope, setOf(x, real), linkedMapOf(
+            "mixed" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                real to BigFraction.ONE), BigFraction.ofLong(2).reciprocal())),
+            "integer lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "real lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), emptyMap())
+        val generated = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never))
+        var cancelled = false
+        var charges = 0
+        var work = 0L
+        var bytes = 0L
+
+        val admitted = generated.withoutZeroBoundRows(source, Cancellation { cancelled },
+            onCost = { steps, allocation ->
+                work += steps
+                bytes += allocation
+                if (++charges == 2) cancelled = true
+            })
+
+        assertNull(admitted)
+        assertTrue(work > 0L)
+        assertTrue(bytes > 0L)
+    }
+
+    @Test
+    fun `a full zero bound index should retain cuts whose sides it could not store`() {
+        val integers = (0..64).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
+        val premises = linkedMapOf<String, SourcePremise>()
+        for ((index, coordinate) in integers.withIndex()) {
+            premises["lower $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        }
+        premises["mixed"] = SourcePremise(SourceInequality(mapOf(integers.last() to BigFraction.MINUS_ONE,
+            real to BigFraction.ONE), BigFraction.ofLong(2).reciprocal()))
+        premises["real lower"] = SourcePremise(SourceInequality(
+            mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        val source = SourceProofContext(scope, (integers + real).toSet(), premises, emptyMap())
+        val generated = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never))
+
+        val admitted = assertNotNull(generated.withoutZeroBoundRows(source, Cancellation.Never))
+
+        assertEquals(1, admitted.rows.size)
+        assertEquals(generated.rows, admitted.rows)
+        assertEquals(1L, admitted.observations["ZeroBoundIndexLimited"])
+    }
+
     @Test
     fun `cancelled separation should publish no retained rows`() {
         val source = SourceProofContext(scope, setOf(x), emptyMap(), emptyMap())

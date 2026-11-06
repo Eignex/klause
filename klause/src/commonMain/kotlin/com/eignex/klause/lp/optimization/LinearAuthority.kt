@@ -312,6 +312,13 @@ internal class LinearAuthority(
     private fun adoptTemplate(prepared: LinearAuthorityTemplate) {
         template = prepared
         for (cut in prepared.cuts?.rows.orEmpty()) cutLifecycle.observe(cut.family, "CONSTRUCTED")
+        for (family in listOf(CutFamily.SOURCE_ROUNDING, CutFamily.SOURCE_MIXED_ROUNDING)) {
+            val omitted = prepared.cuts?.observations?.get("ZeroBoundOmitted" + family.name) ?: 0L
+            if (omitted > 0L) {
+                cutLifecycle.observe(family, "CONSTRUCTED", omitted)
+                cutLifecycle.observe(family, "SOURCE_BOUND_OMITTED", omitted)
+            }
+        }
         retainedCutPeak = maxOf(retainedCutPeak, prepared.cuts?.rows?.size?.toLong() ?: 0L)
         retainedMixedCutPeak = maxOf(retainedMixedCutPeak,
             prepared.cuts?.rows?.count { cut -> cut.mixed }?.toLong() ?: 0L)
@@ -444,7 +451,9 @@ internal class LinearAuthority(
                 (!cuts || it.cuts?.complementary == (cutMask != null) ||
                     pointPolicy?.managesCurrentRecipe(it.cuts?.rows) == true ||
                     it.coordinates.all { coordinate -> coordinate.kind == SourceCoordinate.Kind.Integer }) }
-                ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts, cutMask != null) { work ->
+                ?: LinearAuthorityTemplate.prepare(source,
+                    Cancellation { cancellation() || budget.funding?.paused == true },
+                    cuts, cutMask != null, onCost = ::cutCost) { work ->
                     cutPreparationWork += work
                     budget.observe(preparation = work)
                 }?.let { if (cuts) withAdditionalCuts(it, cancellation) else it }?.also(::adoptTemplate) ?: return null

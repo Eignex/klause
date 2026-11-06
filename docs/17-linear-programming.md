@@ -634,6 +634,15 @@ term, preferring the side that retains a negative residual. Exact shifting and
 complementing precede mixed rounding; missing sides and integral shifted right
 sides decline. At most 64 mixed cuts are retained per template. Eligibility and
 decline observations describe only rows visited within the preparation allowance.
+A bounded admission pass omits single-row cuts implied by explicit unconditional
+zero bounds on all their coordinates. Each coefficient needs the actual upper-zero
+side when positive or lower-zero side when negative. Guarded and integer-pinned
+premises supply neither side. Strict cuts, missing sides and unsupported families
+retain their definitions. A 64-coordinate index and at most 64 candidate definitions
+share the generation\u0027s work allowance; temporary storage spends the containing
+allocation allowance within a 16 KiB local ceiling. Incomplete scans retain every
+definition, and cancellation withholds publication. Source rows and their proof
+authority stay intact; omitted construction and admission costs remain observable.
 The explicit point-selection policy also proposes the complementary available
 continuous sides within the same row, work and scalar limits. Missing opposite
 sides retain their original premise; identical side choices produce one candidate.
