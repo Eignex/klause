@@ -155,7 +155,9 @@ internal class LinearAuthorityPointCuts(
                         row.family == CutFamily.AGGREGATION_MIR)
                 }
             }
-            if ((integerOnly || aggregateOnly) && installed.isEmpty() && rows.size <= maximumCuts &&
+            val installedCurrent = adoptCurrent && complete && installed == checked
+            if ((integerOnly || aggregateOnly || installedCurrent) &&
+                (installed.isEmpty() || installedCurrent) && rows.size <= maximumCuts &&
                 checked.size == rows.size) {
                 if (!meter.charge(rows.size.toLong(), 128L + rows.size * 64L) ||
                     rows.indices.any { it !in checked }) return installed

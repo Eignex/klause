@@ -229,8 +229,22 @@ internal class LinearAuthority(
                 pointFallback = baselineFamily
                 directedFamily = null
                 policy.releaseCandidates()
-                policy.observe("CurrentFallback")
                 cutLifecycle.families = baselineQuery.cutFamilies.values.toSet()
+                val installed = if (currentRows.isNotEmpty() && currentRows.size <= 64 &&
+                    baselineQuery.activeCuts == currentRows.size && baselineQuery.checkedCuts.size == currentRows.size) {
+                    cutLifecycle.containing("POINT_SELECTION") {
+                        policy.select(currentRows, baselineQuery.coordinates, baselineQuery.costs,
+                            baselineQuery.checkedCuts, observed.second, baselineQuery.checkedCuts, cancellation,
+                            adoptCurrent = true)
+                    }
+                } else emptySet()
+                if (policy.adoptedCurrent && budget.funding?.paused != true &&
+                    budget.funding?.exhausted != true && !cancellation()) {
+                    pointMask = installed
+                    pointFallback = null
+                    policy.observe("FallbackAdopted")
+                } else policy.releaseCandidates()
+                policy.observe("CurrentFallback")
                 return base.copy(paused = base.paused || budget.funding?.paused == true)
             }
             if (selected == pointMask) return base

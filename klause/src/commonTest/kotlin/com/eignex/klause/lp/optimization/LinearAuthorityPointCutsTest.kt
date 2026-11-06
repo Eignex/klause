@@ -138,13 +138,30 @@ class LinearAuthorityPointCutsTest {
             authority.capture = capture
             authority.advanceWithPointCuts(nonseparating, Cancellation.Never)
             val preparations = authority.preparations
-            val scoring = authority.cutObservations()["numericalCutSelectionWork"]
 
             val result = authority.advanceWithPointCuts(nonseparating, Cancellation.Never)
 
             assertEquals(listOf(true, true), capture.records.map { it.cuts.single().installed })
             assertEquals(preparations, authority.preparations)
-            assertEquals(scoring, authority.cutObservations()["numericalCutSelectionWork"])
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(nonseparating.withLinearAuthority())
+                .verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `nonseparating mixed cuts should age without replacing the numerical owner`() {
+        val capture = LinearAuthorityCapture(64, 100_000L, 10_000_000L, Cancellation.Never)
+        LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
+            authority.capture = capture
+            authority.advanceWithPointCuts(nonseparating, Cancellation.Never)
+            val preparations = authority.preparations
+            repeat(8) { authority.advanceWithPointCuts(nonseparating, Cancellation.Never) }
+
+            val result = authority.advanceWithPointCuts(nonseparating, Cancellation.Never)
+
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
+            assertTrue(capture.records.last().cuts.none { it.installed })
+            assertEquals(preparations, authority.preparations)
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(nonseparating.withLinearAuthority())
                 .verify(assertNotNull(result.bound)))
         }
@@ -611,6 +628,36 @@ class LinearAuthorityPointCutsTest {
             assertTrue(selection.retainsCandidateLayout(rows))
             assertEquals(1L, selection.observations["numericalCutSelectionAdoptedInstalled"])
         }
+    }
+
+    @Test
+    fun `fully installed mixed cuts should adopt their checked current recipe`() {
+        val rows = listOf(LinearAuthorityCut(0, SourceInequality(
+            mapOf(x to BigFraction.ONE, mixedReal to BigFraction.MINUS_ONE), BigFraction.ONE),
+            SourceDerivation.Premise("cut"), mixed = true))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+
+        val selected = selection.select(rows, listOf(x, mixedReal), List(2) { BigFraction.ZERO },
+            setOf(0), List(2) { BigFraction.ZERO }, setOf(0), Cancellation.Never, adoptCurrent = true)
+
+        assertEquals(setOf(0), selected)
+        assertTrue(selection.adoptedCurrent)
+        assertTrue(selection.managesCurrentRecipe(rows))
+        assertTrue(selection.retainsCandidateLayout(rows))
+    }
+
+    @Test
+    fun `an unchecked installed mixed cut should not adopt the current recipe`() {
+        val rows = listOf(LinearAuthorityCut(0, SourceInequality(
+            mapOf(x to BigFraction.ONE, mixedReal to BigFraction.MINUS_ONE), BigFraction.ONE),
+            SourceDerivation.Premise("cut"), mixed = true))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+
+        selection.select(rows, listOf(x, mixedReal), List(2) { BigFraction.ZERO },
+            emptySet(), List(2) { BigFraction.ZERO }, setOf(0), Cancellation.Never, adoptCurrent = true)
+
+        assertFalse(selection.adoptedCurrent)
+        assertFalse(selection.managesCurrentRecipe(rows))
     }
 
     @Test
