@@ -289,7 +289,8 @@ internal class LinearAuthority(
                 cutLifecycle.families = currentRows.mapTo(HashSet()) { it.family }
                 val refined = cutLifecycle.containing("POINT_SELECTION") {
                     preparePointFamily(source, family, prepared, observed.second, cancellation,
-                        ordinaryTried = generatedFirst || pointAggregates, pointAggregates = pointAggregates)
+                        ordinaryTried = generatedFirst || pointAggregates,
+                        pointAggregates = pointAggregates || generatedFirst)
                 }
                 if (refined != null) {
                     attemptedPointDiscovery = true

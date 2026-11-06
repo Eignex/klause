@@ -42,6 +42,41 @@ class LinearAuthorityAggregateCutsTest {
         BigFraction.ZERO)
 
     @Test
+    fun `an ordinary initial recipe should decline point refinement beyond the definition cap`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val premises = (0L..62L).associate { index ->
+            "row $index" to SourcePremise(SourceInequality(
+                mapOf(y to BigFraction.ofLong(2), z to BigFraction.ofLong(2 * index)), BigFraction.ONE))
+        } + mapOf(
+            "z upper" to SourcePremise(SourceInequality(mapOf(z to BigFraction.ONE), BigFraction.ZERO)),
+            "z lower" to SourcePremise(SourceInequality(mapOf(z to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "mixed" to SourcePremise(SourceInequality(
+                mapOf(x to BigFraction.ofLong(2), real to BigFraction.MINUS_ONE), BigFraction.ofLong(3))),
+            "real lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "real upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))))
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, z, real), premises, mapOf(x to BigFraction.ONE))
+        val budget = SourceLpBudget(maxOperations = 1)
+        val capture = LinearAuthorityCapture(2, 30_000L, 1_000_000L, Cancellation.Never)
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            authority.capture = capture
+
+            val result = authority.advanceWithGeneratedCutUse(source, Cancellation.Never, null)
+
+            assertEquals(1, budget.operations)
+            assertEquals(64L, authority.cutObservations()["numericalMaxRetainedCuts"])
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionPointPreparationUnavailable"])
+            assertEquals(64, capture.records.single().cuts.size)
+            assertTrue(capture.records.single().cuts.all { it.checked && it.installed })
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
     fun `oversized current recipes should preserve the last available no cut operation`() {
         val premises = (0L..64L).associate { index ->
             "row $index" to SourcePremise(SourceInequality(
