@@ -1,0 +1,14 @@
+{
+  "main": "com.eignex.klause.bench.lab.FrozenSourceAdapterKt",
+  "sourceHistory": "snapshot",
+  "classpath": ["klause-bench/build/install/klause-bench/lib/*"],
+  "buildTasks": [":klause-cli:installJvmDist", ":klause-bench:installDist", ":klause-bench:prepareLabRuntime"],
+  "jvmArgs": ["-Xmx512m", "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector"],
+  "runtime": {
+    "java": 25,
+    "tools": ["time"],
+    "environment": {},
+    "requiredTags": ["platform:linux", "arch:x86_64"]
+  },
+  "workspaceInputs": [".git", "klause-bench/build/install", "klause-bench/build/lab-runtime", "klause-cli/build/install", "klause-mzn-lib"]
+}
