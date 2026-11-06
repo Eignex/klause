@@ -98,7 +98,7 @@ internal class NativeSatState(private val state: PropagationState) {
 
     private fun isRetired(handle: Int): Boolean = if (handle < baseCount) {
         retiredRootSources?.contains(handle) == true
-    } else retiredOf(handle - baseCount)
+    } else retiredCount != 0 && retiredOf(handle - baseCount)
 
     fun retireRootSource(factor: Int) {
         check(factor in 0 until baseCount)
@@ -457,13 +457,11 @@ internal class NativeSatState(private val state: PropagationState) {
     fun admissionKeyOf(i: Int): Long = metadata.admission(i)
     fun tierOf(i: Int): ClauseTier = ClauseTier.entries[metadata[i, NativeLearnedMetadata.TIER]]
     fun setTierOf(i: Int, tier: ClauseTier) {
-        if (retiredOf(i)) return
-        metadata[i, NativeLearnedMetadata.TIER] = tier.ordinal
+        metadata.setTierIfLive(i, tier.ordinal)
     }
     fun usedOf(i: Int): Boolean = metadata[i, NativeLearnedMetadata.STAGES] and RECENT_USED != 0
     fun clearUsed(i: Int) {
-        if (retiredOf(i)) return
-        metadata[i, NativeLearnedMetadata.STAGES] = metadata[i, NativeLearnedMetadata.STAGES] and RECENT_USED.inv()
+        metadata.clearStageIfLive(i, RECENT_USED)
     }
 
     internal fun <T> withOwnershipBudget(budget: ReclamationPreparation, operation: () -> T): T =
