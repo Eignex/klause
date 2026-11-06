@@ -15,5 +15,17 @@
     "java": 25,
     "tools": [],
     "environment": {}
-  }
+  },
+  "sourceHistory": "snapshot",
+  "planInputs": [
+    "klause-bench",
+    "build.gradle.kts",
+    "settings.gradle.kts",
+    "gradle.properties",
+    "gradle"
+  ],
+  "workspaceInputs": [
+    ".git",
+    "klause-bench/build/install"
+  ]
 }
