@@ -669,7 +669,7 @@ clauses under stable variable ids and share the native arena read-only; variable
 elimination runs once in [presolve](07-presolve.md) instead. Seeded searches skip
 inprocessing, since derivations under assumption pins would not hold globally.
 
-Opt-in root simplification examines bounded slices of source and learned Boolean
+Root simplification examines bounded slices of source and learned Boolean
 clauses against permanent root facts. An empty Boolean pin trail withholds the scan;
 without a pinned literal it cannot satisfy or shorten a Boolean clause. Clauses
 affected by a new Boolean root fact can be reached through a source-occurrence index
@@ -713,7 +713,7 @@ historical reasons and removes obsolete watches; attaching a shortened binary in
 both implication directions and evaluates facts already assigned at the root. There
 is no separate stale binary graph or whole-graph rebuild.
 
-Opt-in failed-literal probing alternates a bounded rotating set of source Boolean
+Failed-literal probing alternates a bounded rotating set of source Boolean
 and existing integer-bound literals with coordinates from newly examined learned
 clauses of two to eight literals. The global rotation alternates existing literals
 with unfixed integer endpoints, including columns without existing atoms. Separate
@@ -726,13 +726,53 @@ decisions and discard implied-result payloads, retaining the same undo and cance
 paths. A proved bound enters as a session-local clause over its semantic atom and
 publishes through the original integer coordinate.
 Permanent source replacements supply the same bounded priorities; their clauses and
-ownership remain protected. A priority supplies no deduction without an actual probe conflict.
+ownership remain protected. A priority supplies no consequence without completed propagation.
 The learned cursor advances without replaying an exhausted unchanged neighborhood;
 compaction invalidates its indices. Preparation and retained literal storage share the
 probe class allowance and memory observation. Funded probing precedes cheap root
 simplification so proved facts can refresh binaries in the same safe-root opportunity. Each attempt has a propagation-work ceiling within
 the invocation token. A completed root conflict proves the complementary unit, which is attached and
-propagated through ordinary search. Completed root facts are published to shared
+propagated through ordinary search. A completed consistent pure-Boolean probe can retain
+one newly implied Boolean literal as a binary clause conditional on its probe literal.
+`rootProbeImplications` controls this capture independently of failed-literal units.
+`rootProbeBinaryGate` restricts Native probing without Boolean root facts or known
+binary clauses to newly examined learned binaries. With no binary clause, one Boolean
+assignment cannot start unit propagation in an unassigned clausal state. A discovered
+live binary enables ordinary rotation for the rest of the scope, including after
+optional buffer release or retirement. General propagation retains ordinary rotation.
+An exhausted unchanged neighborhood does no further scanning, and preparation alone
+does not start the optional probe interval. Scope reset clears the binary hint;
+required consequence publication retains its separate eligibility.
+`rootProbeGeneralGate` applies a separate heuristic to Boolean General states without
+root facts or known binaries. One initial global batch uses the ordinary probe and
+containing grants; later slices examine new learned clauses of two to eight literals
+before admitting global probes. An unfunded slice retains that initial opportunity,
+and optional buffer release preserves its exhaustion until scope reset.
+If a completed learned-neighborhood probe propagates no additional Boolean literal,
+its opposite polarity precedes the next neighborhood candidate under the same batch
+and work ceilings. This optional literal survives an unfunded slice and buffer release;
+scope reset or a root fact or binary hint discards it. A mirrored probe does not
+schedule another mirror.
+General constraints can propagate without a binary,
+so this admission is optional rather than a propagation impossibility test. Integer
+endpoint rotation retains its ordinary policy. A root fact or binary hint reopens
+global rotation; exhausted preparation does not delay new learned candidates by the
+probe interval. Required implication publication keeps its independent eligibility.
+Disabling it skips capture reservations and cancels a retained optional candidate under
+a funded probe visit; the scope admission count remains unchanged.
+Capture is prepaid before propagation and reads at most the final two trail entries.
+After rollback, a funded lookup skips a matching direct binary reason and the bounded
+history prevents repeated admissions. A direct or duplicate final consequence yields
+to the retained earlier consequence without another probe. At most one binary enters
+per completed probe and 64 enter per search scope;
+the 64-key history and pending alternatives share the probe class and retained-memory
+grants. Unfunded admission resumes at a fresh safe root without another probe.
+Optional buffer release drops history and neighborhood arrays while preserving the
+pending alternatives, primitive cursors and admission count. Learned remapping invalidates
+the direct-reason hint, without changing the proved literals. Reseeding discards
+the pending alternatives and resets that count. Admitted binaries use ordinary
+learned ownership, forgetting and required attachment completion.
+Completed root facts are published to shared
 components before traversal resumes. Successful and interrupted probes retract to the
 complete root; interruption supplies no deduction. Speculative retractions preserve
 the saved search phases while retaining ordinary unassignment notifications for
@@ -754,7 +794,12 @@ the propagation-work ledger; diagnostic probe and visit counts add no second cha
 Each of the four classes has a separate work ceiling inside the scheduled slice's
 total ceiling. Each pass receives the containing remainder after earlier passes;
 its remaining optional work is the smaller of that remainder and its class grant
-after debt repayment. Zero withholds that class. Completed atomic copying, sorting and
+after debt repayment. Zero withholds that class.
+`inprocessingProbeInterval` spaces optional probe slices by non-inprocessing work
+while cheap maintenance keeps its shared root schedule. The first eligible slice
+needs no preceding interval. Probe, maintenance, publication and cleanup work cannot
+fund the next slice; pending funded continuations resume before this optional gate.
+Buffer release preserves the interval clock, and reseeding renews its origin. Completed atomic copying, sorting and
 compaction can overspend; the class and scheduled loop repay their respective debt
 before admitting more work. Separate containing and per-class debt-added and
 debt-repaid counters retain those charges without adding work. Reseeding resets
@@ -813,6 +858,10 @@ acknowledgement and retirement retain their charged work and class latency.
 Per-class attempted, eligible, shortened, unit, stopped and work counters diagnose
 applicability. Probe outcomes distinguish a consistent fixpoint, a completed
 refutation and an interrupted attempt; these counters add no second work charge.
+Completed Boolean General probes additionally report empty and productive trails
+and implied pin counts before rollback, excluding the probe decision and existing
+root facts. Mirrored attempts partition into empty, productive, refuted and
+interrupted outcomes; their pin counts are a subset of the General counts.
 Attachment, retirement and continuation work are subsets of class work, which
 overlaps containing propagation work. Root publication has a
 separate containing charge and also cannot earn the next trigger. Per-class, scheduled

@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.lab.bench.*
+import com.github.luben.zstd.ZstdInputStreamNoFinalizer
 import jdk.jfr.consumer.RecordingFile
 import kotlinx.serialization.json.*
 import java.io.ByteArrayInputStream
@@ -61,20 +62,29 @@ internal object JfrCaptureSummary : BenchSuite {
             details = summary)
     }
 
-    private fun decode(parameters: Map<String, String>, capture: Path) {
-        val encoded = ByteArrayInputStream(parameters.getValue("gzip-base64").toByteArray(Charsets.US_ASCII))
+    internal fun decode(parameters: Map<String, String>, capture: Path) {
+        validate(parameters)
+        val codec = parameters.keys.single { it in PAYLOAD_KEYS }
+        val encoded = ByteArrayInputStream(parameters.getValue(codec).toByteArray(Charsets.US_ASCII))
         val digest = MessageDigest.getInstance("SHA-256")
-        GZIPInputStream(Base64.getDecoder().wrap(encoded)).use { input ->
-            Files.newOutputStream(capture).use { output ->
-                val buffer = ByteArray(8192)
-                var bytes = 0L
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read < 0) break
-                    bytes += read
-                    check(bytes <= 16_777_216) { "capture exceeds 16 MiB" }
-                    digest.update(buffer, 0, read)
-                    output.write(buffer, 0, read)
+        Base64.getDecoder().wrap(encoded).use { compressed ->
+            val decoded = when (codec) {
+                "zstd-base64" -> ZstdInputStreamNoFinalizer(compressed)
+                else -> GZIPInputStream(compressed)
+            }
+            decoded.use { input ->
+                if (input is ZstdInputStreamNoFinalizer) input.setLongMax(23)
+                Files.newOutputStream(capture).use { output ->
+                    val buffer = ByteArray(8192)
+                    var bytes = 0L
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        bytes += read
+                        check(bytes <= 16_777_216) { "capture exceeds 16 MiB" }
+                        digest.update(buffer, 0, read)
+                        output.write(buffer, 0, read)
+                    }
                 }
             }
         }
@@ -128,13 +138,15 @@ internal object JfrCaptureSummary : BenchSuite {
     }
 
     private const val STACK_DEPTH = 32
+    private val PAYLOAD_KEYS = setOf("gzip-base64", "zstd-base64")
 
     private fun validate(parameters: Map<String, String>) {
-        val required = setOf("source", "sha256", "gzip-base64")
+        val codec = requireNotNull(parameters.keys.intersect(PAYLOAD_KEYS).singleOrNull())
+        val required = setOf("source", "sha256", codec)
         require(parameters.keys == required || parameters.keys == required + "events")
         parameters["events"]?.toBooleanStrict()
         require(parameters.getValue("source").let { it.isNotBlank() && it.length <= 1024 })
         require(parameters.getValue("sha256").matches(Regex("[a-f0-9]{64}")))
-        require(parameters.getValue("gzip-base64").length in 1..2_097_152)
+        require(parameters.getValue(codec).length in 1..2_097_152)
     }
 }

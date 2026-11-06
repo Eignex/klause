@@ -305,9 +305,38 @@ internal class RootProbingPass : InprocessingPass {
     private var neighborhoodPosition = 0
     private var preferNeighborhood = true
     private var preparationLeft = 0
+    private var offeredWork = 0L
+    private var lastProbeWork = -1L
+    private var learnedBinarySeen = false
+    private var generalExplored = false
+    private var mirroredLiteral = -1
+    private val implications = RootProbeImplications()
     override val spending = InprocessingSpending(InprocessingKind.Probe)
 
     override fun reset() {
+        resetCursors()
+        implications.reset()
+    }
+
+    override fun releaseRetainedBuffers() {
+        neighborhood = null
+        neighborhoodIndex = -1
+        neighborhoodPosition = 0
+        implications.releaseRetainedBuffers()
+    }
+
+    override fun optionalWorkDue(nonInprocessingWork: Long, params: BacktrackParams): Boolean {
+        offeredWork = nonInprocessingWork
+        return lastProbeWork < 0L ||
+            (nonInprocessingWork - lastProbeWork).coerceAtLeast(0L) >= params.inprocessingProbeInterval
+    }
+
+    private fun resetCursors() {
+        offeredWork = 0L
+        lastProbeWork = -1L
+        learnedBinarySeen = false
+        generalExplored = false
+        mirroredLiteral = -1
         literalCursor = 0L
         endpointCursor = 0L
         preferEndpoint = false
@@ -320,13 +349,32 @@ internal class RootProbingPass : InprocessingPass {
     }
 
     override fun retainedMemory(sample: SharingMemoryObservation, protected: Boolean) {
-        neighborhood?.let {
-            sample.ownedReferences(this, 1L, protected)
-            sample.owned(it, it.size.toLong() * Int.SIZE_BYTES, protected)
+        sample.ownedReferences(this, if (neighborhood == null) 1L else 2L, protected)
+        sample.owned(this, 2L * Long.SIZE_BYTES + 2L + Int.SIZE_BYTES, protected)
+        implications.retainedMemory(sample, protected)
+        neighborhood?.let { sample.owned(it, it.size.toLong() * Int.SIZE_BYTES, protected) }
+    }
+
+    override fun hasContinuation(session: PropagationSession): Boolean =
+        session.canSimplifyRoot && implications.hasContinuation
+
+    override fun continueAtRoot(
+        session: PropagationSession,
+        params: BacktrackParams,
+        stats: SearchStatsSink?,
+        containingWork: Long,
+    ) {
+        if (!session.canSimplifyRoot) return
+        spending.run(session, params, stats, containingWork = containingWork) { budget ->
+            implications.advance(session, params, budget)
         }
     }
 
-    private fun neighborhoodLiteral(session: PropagationSession, budget: InprocessingBudget): Int? {
+    private fun neighborhoodLiteral(
+        session: PropagationSession,
+        budget: InprocessingBudget,
+        binariesOnly: Boolean,
+    ): Int? {
         if (revision != session.learnedRetirementGeneration) {
             learnedCursor = 0
             neighborhood = null
@@ -335,7 +383,8 @@ internal class RootProbingPass : InprocessingPass {
         }
         while (!budget.stopped()) {
             val row = neighborhood
-            if (row != null && session.isLearnedClause(neighborhoodIndex) && neighborhoodPosition < row.size) {
+            if (row != null && (!binariesOnly || row.size == 2) &&
+                session.isLearnedClause(neighborhoodIndex) && neighborhoodPosition < row.size) {
                 return Lit.negate(row[neighborhoodPosition])
             }
             neighborhood = null
@@ -344,11 +393,13 @@ internal class RootProbingPass : InprocessingPass {
             preparationLeft--
             val index = learnedCursor++
             budget.note("NeighborhoodCandidates")
-            if (session.learnedClauseLiteralCount(index) !in 2..PROBE_NEIGHBORHOOD_LITERALS) continue
+            val size = session.learnedClauseLiteralCount(index)
+            if (size !in 2..PROBE_NEIGHBORHOOD_LITERALS || (binariesOnly && size != 2)) continue
             val literals = session.rootClauseLiterals(session.problem.numFactors + index,
                 PROBE_NEIGHBORHOOD_LITERALS, includePermanent = true, includeAtoms = true) ?: continue
             if (literals.size == 2 && literals[0] == Lit.negate(literals[1])) continue
             if (literals.any { budget.truth(it) == true }) continue
+            if (literals.size == 2) learnedBinarySeen = true
             neighborhood = literals
             neighborhoodIndex = index
             neighborhoodPosition = 0
@@ -364,8 +415,17 @@ internal class RootProbingPass : InprocessingPass {
         containingWork: Long,
     ) {
         if (!session.canSimplifyRoot || params.rootProbeWork <= 0L) return
+        val opportunityClock = params.rootProbeBinaryGate || (params.rootProbeGeneralGate &&
+            !session.usesNativeSat && session.problem.numIntVars == 0)
         spending.run(session, params, stats, containingWork = containingWork) { budget ->
-            probe(session, params, budget)
+            if (implications.advance(session, params, budget) && !budget.stopped()) {
+                val before = session.work
+                try {
+                    probe(session, params, budget)
+                } finally {
+                    if (!opportunityClock && session.work > before) lastProbeWork = offeredWork
+                }
+            }
         }
     }
 
@@ -381,15 +441,44 @@ internal class RootProbingPass : InprocessingPass {
         var literalsExamined = 0L
         var endpointsExamined = 0L
         val priorCancelled = session.probeCancelled
+        val generalGate = params.rootProbeGeneralGate && !session.usesNativeSat && session.problem.numIntVars == 0
+        val exploreGeneral = generalGate && !generalExplored
         while (attempted < params.rootProbeBatch && examined < minOf(candidates, ROOT_LITERAL_LIMIT.toLong())) {
+            val rootPins = session.explanationState.boolPinOrder.size
+            val withoutRootSignal = rootPins == 0 &&
+                !session.explanationState.hasBinaryClauses && !learnedBinarySeen
+            val binariesOnly = params.rootProbeBinaryGate && session.usesNativeSat && withoutRootSignal
+            val neighborhoodOnly = binariesOnly || (generalGate && !exploreGeneral && withoutRootSignal)
+            if (!generalGate || !neighborhoodOnly) mirroredLiteral = -1
+            if (generalGate) {
+                budget.note(when {
+                    rootPins > 0 -> "GeneralRootFacts"
+                    withoutRootSignal && exploreGeneral -> "GeneralExploration"
+                    withoutRootSignal -> "GeneralNeighborhoodOnly"
+                    else -> "GeneralBinaryHint"
+                })
+            }
+            if (neighborhoodOnly && mirroredLiteral < 0 && neighborhood == null &&
+                revision == session.learnedRetirementGeneration &&
+                learnedCursor >= session.learnedClauseCount) {
+                budget.note(if (binariesOnly) "NoPropagationOpportunity" else "GlobalDeferred")
+                break
+            }
             if (!session.canSimplifyRoot || !budget.visit()) break
-            val nearby = if (preferNeighborhood) neighborhoodLiteral(session, budget) else null
+            val mirrored = mirroredLiteral.takeIf { it >= 0 }
+            val nearby = mirrored ?: if (neighborhoodOnly || preferNeighborhood) {
+                neighborhoodLiteral(session, budget, binariesOnly)
+            } else null
             if (budget.stopped()) break
+            if (neighborhoodOnly && nearby == null) {
+                budget.note(if (binariesOnly) "NoPropagationOpportunity" else "GlobalDeferred")
+                break
+            }
             val endpoint = nearby == null && endpointsExamined < endpointCandidates &&
                 (preferEndpoint || literalsExamined >= literalCandidates)
             val candidate = when {
                 nearby != null -> {
-                    neighborhoodPosition++
+                    if (mirrored == null) neighborhoodPosition++
                     nearby.toLong()
                 }
                 endpoint -> {
@@ -422,23 +511,52 @@ internal class RootProbingPass : InprocessingPass {
                 if (atMost) domain.min else domain.max
             } else {
                 if (variable < session.problem.numBoolVars) {
-                    if (session.boolValue(variable) != null) continue
+                    if (session.boolValue(variable) != null) {
+                        if (mirrored != null) mirroredLiteral = -1
+                        continue
+                    }
                 } else if (!session.canProbeRootAtom(variable) || budget.truth(literal) != null) continue
                 0L
             }
+            val capture = !endpoint && variable < session.problem.numBoolVars &&
+                implications.reserve(params, budget)
+            val pins = session.explanationState.boolPinOrder.size
             attempted++
+            if (mirrored != null) {
+                mirroredLiteral = -1
+                budget.note("NeighborhoodMirrors")
+            }
+            if (exploreGeneral && withoutRootSignal) generalExplored = true
+            lastProbeWork = offeredWork
             budget.note("Eligible")
             budget.probe()
-            val result = probe(session, params.rootProbeWork) {
+            var emptyNeighborhood = false
+            val result = probe(session, params.rootProbeWork, {
+                val propagated = (session.explanationState.boolPinOrder.size - pins - 1).coerceAtLeast(0)
+                if (generalGate) {
+                    budget.note(if (propagated == 0) "GeneralEmpty" else "GeneralProductive")
+                    budget.note("GeneralPropagatedPins", propagated.toLong())
+                }
+                if (mirrored != null) {
+                    budget.note(if (propagated == 0) "MirrorEmpty" else "MirrorProductive")
+                    budget.note("MirrorPropagatedPins", propagated.toLong())
+                }
+                if (generalGate && neighborhoodOnly && nearby != null && mirrored == null) {
+                    emptyNeighborhood = propagated == 0
+                }
+                if (capture && !params.cancellation()) implications.capture(session, literal, pins, budget)
+            }) {
                 if (endpoint) session.probeRootBound(variable, bound, atMost) else session.probeRootLiteral(literal)
             }
             when (result) {
                 null -> {
                     budget.note("Incomplete")
+                    if (mirrored != null) budget.note("MirrorIncomplete")
                     if (!params.cancellation()) session.probeCancelled = priorCancelled
                 }
                 is PropagationResult.Unsat -> {
                     budget.note("Refuted")
+                    if (mirrored != null) budget.note("MirrorRefuted")
                     if (!budget.visit(3)) break
                     val before = session.work
                     val unit = complement(session, literal, if (endpoint) variable else -1, bound, atMost)
@@ -448,7 +566,11 @@ internal class RootProbingPass : InprocessingPass {
                     if (endpoint) budget.note("EndpointUnits")
                     if (nearby != null) neighborhood = null
                 }
-                else -> budget.note("Consistent")
+                else -> {
+                    budget.note("Consistent")
+                    if (emptyNeighborhood) mirroredLiteral = Lit.negate(literal)
+                    if (!implications.advance(session, params, budget)) return
+                }
             }
         }
     }
@@ -475,6 +597,7 @@ internal class RootProbingPass : InprocessingPass {
     private inline fun probe(
         session: PropagationSession,
         limit: Long,
+        crossinline completed: () -> Unit,
         crossinline action: () -> PropagationResult?,
     ): PropagationResult? {
         val start = session.work
@@ -486,7 +609,13 @@ internal class RootProbingPass : InprocessingPass {
             session.withCancellation(token) {
                 action()
             }.also {
-                if (it != null && it !is PropagationResult.Unsat) session.popLast()
+                if (it != null && it !is PropagationResult.Unsat) {
+                    try {
+                        completed()
+                    } finally {
+                        session.popLast()
+                    }
+                }
             }
         } finally {
             session.retractingListener = retracting
