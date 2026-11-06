@@ -443,6 +443,7 @@ internal class NativeSatState(private val state: PropagationState) {
             "retainedPeerImports" to peerImports.toLong(),
             "retainedConsumedPeerImports" to consumedPeerImports.toLong(),
             "retainedConsumed" to consumed.toLong(),
+            "learnedPayloadCacheReferenceCapacity" to learnedPayloads.cacheReferenceCapacity,
         ))
         retiredRootSources?.let { sample.owned(it, it.allocatedBytes, true) }
         sample.owned(importUses, importUses.allocatedBytes)
@@ -900,7 +901,8 @@ internal class NativeSatState(private val state: PropagationState) {
             state.work++
             val entry = entries[wi]
             val h = entry.toInt()
-            if (isRetired(h)) {
+            val cachedLive = h >= baseCount && learnedPayloads.isLiveCached(h - baseCount)
+            if (!cachedLive && isRetired(h)) {
                 state.work += watchRemovalWork(falseLit)
                 removeWatchAt(falseLit, wi)
                 continue

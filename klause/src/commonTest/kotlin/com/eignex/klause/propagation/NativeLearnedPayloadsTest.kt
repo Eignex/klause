@@ -4,11 +4,149 @@ import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class NativeLearnedPayloadsTest {
+    @Test
+    fun `cached liveness should distinguish an empty retained payload from a released row`() {
+        val payloads = NativeLearnedPayloads()
+        payloads.add(intArrayOf())
+        assertTrue(payloads.isLiveCached(0))
+
+        payloads.release(0)
+
+        assertFalse(payloads.isLiveCached(0))
+    }
+
+    @Test
+    fun `cached liveness should follow release and revival of an indexed row`() {
+        val payloads = NativeLearnedPayloads()
+        repeat(192) { payloads.add(intArrayOf(0, 2)) }
+        assertTrue(payloads.isLiveCached(64))
+
+        for (index in 64..127) payloads.release(index)
+        assertFalse(payloads.isLiveCached(64))
+        payloads.move(128, 64)
+        payloads.sweepDirectory(ReclamationPreparation(24L, 256L, { false }, {}))
+
+        assertTrue(payloads.isLiveCached(64))
+        assertFalse(payloads.isLiveCached(128))
+    }
+
+    @Test
+    fun `uncached liveness probes should preserve the lookup funding boundary`() {
+        val payloads = NativeLearnedPayloads()
+        repeat(8_320) { payloads.add(intArrayOf(0, 2)) }
+        val unfunded = ReclamationPreparation(0L, 64L, { false }, {})
+
+        assertFalse(payloads.usingBudget(unfunded) { payloads.isLiveCached(64) })
+        assertFailsWith<ReclamationPreparation.Deferred> {
+            payloads.usingBudget(unfunded) { payloads[64] }
+        }
+
+        var work = 0L
+        payloads.usingBudget(ReclamationPreparation(256L, 64L, { false }, { work += it })) { payloads[64] }
+        assertTrue(work > 0L)
+        assertTrue(payloads.usingBudget(unfunded) { payloads.isLiveCached(64) })
+    }
+
+    @Test
+    fun `cached nonadjacent payload pages should remain readable without a cold lookup`() {
+        val payloads = NativeLearnedPayloads()
+        repeat(192) { payloads.add(intArrayOf(it, -it)) }
+        payloads[64]
+        payloads[128]
+        val budget = ReclamationPreparation(0L, 256L, { false }, {})
+
+        val values = payloads.usingBudget(budget) {
+            listOf(payloads[64].toList(), payloads[128].toList())
+        }
+
+        assertEquals(listOf(listOf(64, -64), listOf(128, -128)), values)
+        assertEquals(0L, budget.work)
+    }
+
+    @Test
+    fun `cached absent payload pages should remain absent without another lookup`() {
+        val payloads = NativeLearnedPayloads()
+        repeat(128) { payloads.add(intArrayOf(it)) }
+        assertEquals(0, payloads.length(128))
+        assertEquals(0, payloads.length(192))
+        val budget = ReclamationPreparation(0L, 256L, { false }, {})
+
+        val lengths = payloads.usingBudget(budget) {
+            listOf(payloads.length(128), payloads.length(192))
+        }
+
+        assertEquals(listOf(0, 0), lengths)
+        assertEquals(0L, budget.work)
+    }
+
+    @Test
+    fun `failed cold lookups should preserve the colliding cached payload page`() {
+        val payloads = NativeLearnedPayloads()
+        repeat(64 * 129 + 1) { payloads.add(intArrayOf(it)) }
+        payloads[64]
+        val colliding = payloads[64 * 129]
+        val unfunded = ReclamationPreparation(0L, 256L, { false }, {})
+        val cancelled = ReclamationPreparation(10_000L, 256L, { true }, {})
+
+        for (budget in listOf(unfunded, cancelled)) {
+            payloads.usingBudget(budget) {
+                assertFailsWith<ReclamationPreparation.Deferred> { payloads[64] }
+            }
+        }
+
+        payloads.usingBudget(unfunded) {
+            assertSame(colliding, payloads[64 * 129])
+            assertFailsWith<ReclamationPreparation.Deferred> { payloads[64] }
+        }
+        assertEquals(0L, unfunded.work)
+        assertEquals(0L, cancelled.work)
+        assertEquals(64, payloads[64][0])
+    }
+
+    @Test
+    fun `unlink and revival should replace cached payload presence and absence`() {
+        val payloads = NativeLearnedPayloads()
+        repeat(192) { payloads.add(intArrayOf(it)) }
+        payloads[64]
+        val survivor = payloads[128]
+        for (index in 64..127) payloads.release(index)
+        val unfunded = ReclamationPreparation(0L, 256L, { false }, {})
+
+        payloads.sweepDirectory(ReclamationPreparation(24L, 256L, { false }, {}))
+
+        payloads.usingBudget(unfunded) {
+            assertFailsWith<ReclamationPreparation.Deferred> { payloads.length(64) }
+        }
+        assertEquals(0, payloads.length(64))
+        payloads.move(128, 64)
+        payloads.usingBudget(unfunded) { assertSame(survivor, payloads[64]) }
+        assertEquals(0, payloads.length(128))
+    }
+
+    @Test
+    fun `an empty protected payload owner should retain its fixed cache accounting`() {
+        val payloads = NativeLearnedPayloads()
+        val sample = SharingMemoryObservation(10_000L, 4096, { false }, {})
+
+        val values = assertNotNull(sample.snapshot {
+            payloads.sharingMemory(sample, true, false) { false }
+        }.completeValues)
+
+        assertEquals(0L, payloads.referenceCapacity)
+        assertTrue(payloads.cacheReferenceCapacity > 0L)
+        assertEquals(payloads.primitiveBytes, values["ownedPrimitiveBytes"])
+        assertEquals(payloads.referenceCapacity + payloads.cacheReferenceCapacity + payloads.directoryCapacity + 8L,
+            values["ownedReferenceSlots"])
+        assertEquals(values["ownedPrimitiveBytes"], values["protectedPrimitiveBytes"])
+        assertEquals(values["ownedReferenceSlots"], values["protectedReferenceSlots"])
+    }
+
     @Test
     fun `small cleanup slices should restore directory capacity beside surviving payloads`() {
         val payloads = NativeLearnedPayloads()
@@ -115,7 +253,8 @@ class NativeLearnedPayloadsTest {
         }.completeValues)
 
         assertEquals(payloads.primitiveBytes + payloads.capacityBytes, values["ownedPrimitiveBytes"])
-        assertEquals(payloads.referenceCapacity + payloads.directoryCapacity + 16L, values["ownedReferenceSlots"])
+        assertEquals(payloads.referenceCapacity + payloads.cacheReferenceCapacity + payloads.directoryCapacity + 16L,
+            values["ownedReferenceSlots"])
         assertTrue(values.getValue("protectedPrimitiveBytes") < values.getValue("ownedPrimitiveBytes"))
         assertTrue(values.getValue("protectedReferenceSlots") < values.getValue("ownedReferenceSlots"))
     }
