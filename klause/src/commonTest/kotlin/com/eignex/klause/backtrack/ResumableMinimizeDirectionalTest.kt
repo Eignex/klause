@@ -108,7 +108,7 @@ class ResumableMinimizeDirectionalTest {
     }
 
     @Test
-    fun `finite search consumes reliable directional advice across cooperative slices`() {
+    fun `finite search consumes passive directional advice across cooperative slices`() {
         val blocks = 4
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
@@ -166,6 +166,8 @@ class ResumableMinimizeDirectionalTest {
             assertTrue((observations["DOWN"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["UP"] ?: 0L) >= 2L, diagnostic)
             assertTrue((observations["VARIABLE_CONSUMED"] ?: 0L) > 0L, diagnostic)
+            assertTrue((observations["VARIABLE_ESTIMATED"] ?: 0L) > 0L, diagnostic)
+            assertEquals(0L, observations["VARIABLE_PROBE_ATTEMPT"] ?: 0L, diagnostic)
             assertEquals(0L, observations["SIDE_CONSUMED"] ?: 0L, diagnostic)
             assertEquals(0L, observations["HISTORY_SIDE_CONSUMED"] ?: 0L, diagnostic)
             assertEquals(0L, observations["BASIS_SIDE_CONSUMED"] ?: 0L, diagnostic)

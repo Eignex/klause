@@ -323,9 +323,13 @@ LP allowance before visiting candidates.
 Two recent samples in each direction supply that variable's predicted child gains,
 using each direction's mean cost per unit of fractional movement. The balanced
 `min + max / 6` score ranks finite positive predictions.
-A reliable challenger with missing baseline history permits a fresh child-value
-comparison below the root. Without a reliable challenger, selection retains current
-scoring without a child query. Both candidates require complete optimal child
+Missing baseline or challenger history retains current scoring. Ordinary finite
+construction leaves numerical variable comparisons disabled; passive predictions
+require no child query.
+
+The hint owner supports an optional fresh child-value comparison below the root.
+When enabled, a reliable challenger with missing baseline history can request it.
+Both candidates require complete optimal child
 solves at their current floor and ceiling. The larger weaker-child objective ranks first. A tie within the comparison
 tolerance can instead select a strictly larger stronger-child value, provided the
 weaker value does not decrease. Every numerical override also requires each
@@ -355,8 +359,8 @@ Numerical estimates supply no bound or pruning
 authority. Missing, tied or unusable advice retains the original winner.
 Ordinary finite workers use value and incumbent guidance to order their children.
 
-Finite-run construction can explicitly enable a root child-order fallback in place
-of numerical variable-history initialization. In that mode the selected root variable can request
+Finite-run construction can explicitly enable a root child-order fallback.
+In that mode the selected root variable can request
 one child-order estimate from its retained optimal basis after the actual
 complementary alternatives exist. This attempt is limited to one column and
 one attempt per hint owner, including across slices, restarts and assumption reseeding.

@@ -988,13 +988,9 @@ annotated, or execution is parallel or single-engine. See
 The `lp-default` and `lp-aggressive` optimization recipes consume scoped passive checked-bound gains.
 Two recent samples in each direction nominate a passive challenger across the bounded
 variable scan. Comparable baseline history permits a learned variable choice.
-Missing baseline history permits a bounded fresh child-value
-comparison below the root. Complete optimal children for both candidates can change
-selection by improving the weaker child bound or breaking a nondecreasing weak
-tie with a stronger other child. Both corresponding child bounds must be
-nondecreasing. Numerical
-values do not train passive history; unavailable advice keeps current scoring.
-History and child probes spend the existing LP allowance; other recipes require an
+Missing baseline or challenger history keeps current scoring. Ordinary finite
+workers leave numerical variable queries disabled. Passive history spends the
+existing LP allowance; other recipes require an
 explicit directional setting. See
 [finite branching](08-search.md#finite-lp-directional-guidance).
 
