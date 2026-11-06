@@ -39,6 +39,7 @@ internal object LabRuntime {
         val recordsJfr = measurement in setOf("jfr", "compilation", "compilation+log")
         val options = runtime + buildList {
             if (recordsJfr) {
+                add("-XX:FlightRecorderOptions=stackdepth=256")
                 val compilation = if (measurement == "jfr") "" else ",jdk.Compilation#threshold=0ms"
                 add("-XX:StartFlightRecording=filename=$report/cli.jfr,settings=profile$compilation,dumponexit=true")
             }
