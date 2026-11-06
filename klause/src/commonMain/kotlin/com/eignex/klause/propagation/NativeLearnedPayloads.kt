@@ -135,6 +135,8 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     operator fun get(index: Int): IntArray = checkNotNull(checkNotNull(pageAt(index ushr PAGE_SHIFT))
         .rows[index and PAGE_MASK])
 
+    fun getOrNull(index: Int): IntArray? = pageAt(index ushr PAGE_SHIFT)?.rows?.getOrNull(index and PAGE_MASK)
+
     fun length(index: Int): Int = pageAt(index ushr PAGE_SHIFT)?.rows?.getOrNull(index and PAGE_MASK)?.size ?: 0
 
     fun release(index: Int) {

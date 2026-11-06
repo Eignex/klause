@@ -140,6 +140,22 @@ class NativeSatStateTest {
     }
 
     @Test
+    fun `learned watches should preserve a survivor beside a released payload page`() {
+        val session = session(6, or(4, true, 5, true))
+        repeat(64) { session.addLearnedClause(Clause(or(0, true, 1, true)), 9) }
+        session.addLearnedClause(Clause(or(2, true, 3, true)), 9, permanent = true)
+        repeat(32) { session.maintainCapWindow(1, 256L, 64L, { false }) { false } }
+        assertEquals(1, session.activeLearnedClauseCount)
+
+        session.pinBool(0, false)
+        session.pinBool(2, false)
+
+        assertNull(session.boolValue(1))
+        assertEquals(true, session.boolValue(3))
+        assertEquals(65, session.learnedClauseCount)
+    }
+
+    @Test
     fun `native cap retirement should protect a live root reason`() {
         val session = session(4, or(2, true, 3, true))
         session.addLearnedClause(Clause(or(0, true, 1, true)), 9)
