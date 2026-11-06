@@ -57,6 +57,22 @@ class SmtLibIteChainTest {
     private fun elementCount(text: String): Int = SmtLib.parse(text).model.factors.count { it is Element }
 
     @Test
+    fun `fixed entry variables should be reused for zero and signed endpoint constants`() {
+        val table = IteChainTable()
+        val constants = longArrayOf(0L, Long.MIN_VALUE, Long.MAX_VALUE, -1L)
+        var created = 0
+        for (i in constants.indices) {
+            assertEquals(i, table.fixedVar(constants[i]) { created++ })
+        }
+
+        for (i in constants.indices) {
+            assertEquals(i, table.fixedVar(constants[i]) { error("constant already has a variable") })
+        }
+
+        assertEquals(constants.size, created)
+    }
+
+    @Test
     fun `a chain of equality tests should collapse to one element factor and answer every selector value`() {
         val text = model(chain("s") { "${it * 10}" })
 

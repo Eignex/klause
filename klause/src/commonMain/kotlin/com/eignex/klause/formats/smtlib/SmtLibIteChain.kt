@@ -5,6 +5,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.LinComb
 import com.eignex.util.collections.LongHashSet
+import com.eignex.util.collections.MutableLongIntMap
 
 /** Fewest arms worth indexing directly by the source selector (see [IteChain]). */
 private const val MIN_CHAIN_DEPTH = 16
@@ -84,7 +85,7 @@ internal class IteChain(val result: Int, val selector: Int, val default: LinComb
 internal class IteChainTable {
     private val atoms = HashMap<Int, EqAtom>()
     private val chains = LinkedHashMap<Int, IteChain>()
-    private val fixedVars = HashMap<Long, Int>()
+    private val fixedVars = MutableLongIntMap()
 
     fun noteAtom(lit: Int, variable: Int, value: Long, allowsElement: Boolean = true) {
         atoms[lit] = EqAtom(variable, value, allowsElement)
@@ -125,7 +126,13 @@ internal class IteChainTable {
     }
 
     /** A variable pinned to [value], shared across every array that needs that constant as an entry. */
-    fun fixedVar(value: Long, fresh: (Long) -> Int): Int = fixedVars.getOrPut(value) { fresh(value) }
+    fun fixedVar(value: Long, fresh: (Long) -> Int): Int {
+        val existing = fixedVars.getOrDefault(value, -1)
+        if (existing >= 0) return existing
+        val variable = fresh(value)
+        fixedVars.put(value, variable)
+        return variable
+    }
 }
 
 /**
