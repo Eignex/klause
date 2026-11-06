@@ -189,12 +189,19 @@ internal class NativeSatState(private val state: PropagationState) {
         watchSizes[lit] = entries.size
     }
 
-    private fun watchRemovalWork(lit: Int): Long = checkNotNull(watchEntries[lit]).removalWork + 4L
+    private fun orderedWatchCopies(lit: Int, index: Int): Int {
+        val count = watchSizes[lit] - index - 1
+        return if (count <= MAX_ORDERED_WATCH_COPIES) count else -1
+    }
 
-    /** Swap-pop the watcher at [idx] in literal [lit]'s lists. The caller funds the removal. */
-    private fun removeWatchAt(lit: Int, idx: Int) {
+    private fun watchRemovalWork(lit: Int, copies: Int = -1): Long =
+        checkNotNull(watchEntries[lit]).removalWork + 4L + copies.coerceAtLeast(0) * 2L
+
+    private fun removeWatchAt(lit: Int, idx: Int, copies: Int = -1) {
         val entries = checkNotNull(watchEntries[lit])
-        entries[idx] = entries[entries.size - 1]
+        if (copies >= 0) {
+            for (offset in 0 until copies) entries[idx + offset] = entries[idx + offset + 1]
+        } else entries[idx] = entries[entries.size - 1]
         entries.removeLast()
         watchSizes[lit] = entries.size
         if (entries.size == 0) watchEntries[lit] = null
@@ -221,9 +228,11 @@ internal class NativeSatState(private val state: PropagationState) {
                 watchCleanupIndex = 0
             } else if (entries[watchCleanupIndex].toInt() >= baseCount &&
                 retiredOf(entries[watchCleanupIndex].toInt() - baseCount)) {
-                budget.visit(watchRemovalWork(watchCleanupLiteral))
+                var copies = orderedWatchCopies(watchCleanupLiteral, watchCleanupIndex)
+                if (copies >= 0 && !budget.supports(watchRemovalWork(watchCleanupLiteral, copies), 0L)) copies = -1
+                budget.visit(watchRemovalWork(watchCleanupLiteral, copies))
                 budget.visit(0L)
-                removeWatchAt(watchCleanupLiteral, watchCleanupIndex)
+                removeWatchAt(watchCleanupLiteral, watchCleanupIndex, copies)
             } else watchCleanupIndex++
             budget.advanced()
         }
@@ -906,8 +915,9 @@ internal class NativeSatState(private val state: PropagationState) {
             val entry = entries[wi]
             val h = entry.toInt()
             if (isRetired(h)) {
-                state.work += watchRemovalWork(falseLit)
-                removeWatchAt(falseLit, wi)
+                val copies = orderedWatchCopies(falseLit, wi)
+                state.work += watchRemovalWork(falseLit, copies)
+                removeWatchAt(falseLit, wi, copies)
                 continue
             }
             val blocker = (entry ushr 32).toInt()
@@ -976,6 +986,7 @@ internal class NativeSatState(private val state: PropagationState) {
     private companion object {
         const val RETIRED = 4
         const val RECENT_USED = 8
+        const val MAX_ORDERED_WATCH_COPIES = 128
         // Poll the deadline every 4096 propagated literals.
         const val CANCEL_POLL_MASK = 0xFFF
     }
