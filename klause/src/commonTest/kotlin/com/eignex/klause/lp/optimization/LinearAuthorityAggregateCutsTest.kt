@@ -172,7 +172,7 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
-    fun `an ordinary initial mask should retain its owner when an incumbent becomes available`() {
+    fun `an empty initial mask should preserve the checked bound at the operation limit`() {
         val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val premises = linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
             "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
@@ -186,6 +186,170 @@ class LinearAuthorityAggregateCutsTest {
         val source = SourceProofContext(scope.copy(objective = SourceObjective("triangle", ObjectiveSense.MAXIMIZE)),
             setOf(x, y, real) + triangle, premises, triangle.associateWith { BigFraction.ONE } +
                 mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+        for (operations in listOf(1, 2)) {
+            val budget = SourceLpBudget(maxOperations = operations)
+            val capture = LinearAuthorityCapture(4, 30_000L, 1_000_000L, Cancellation.Never)
+            LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+                authority.capture = capture
+                val base = authority.advanceWithGeneratedCutUse(source, Cancellation.Never, null)
+                assertEquals(1, budget.operations)
+                assertEquals(1L, authority.cutObservations()["numericalCutSelectionInitialSlackRetired"])
+
+                val result = authority.advanceWithGeneratedCutUse(source, Cancellation.Never, null)
+
+                assertEquals(operations, budget.operations)
+                assertEquals(assertNotNull(base.bound).claim, assertNotNull(result.bound).claim)
+                assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
+                    assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                if (operations == 2) assertTrue(capture.records.last().cuts.none { it.installed })
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            }
+        }
+    }
+
+    @Test
+    fun `interrupting a trimmed initial round should preserve its reported checked base`() {
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
+            "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["triangle lower $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["triangle edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("triangle", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, real) + triangle, premises, triangle.associateWith { BigFraction.ONE } +
+                mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+        for (pause in listOf(false, true)) {
+            val funding = SourceLpFunding(4_000_000L, 8_000_000L).apply { grant(1_000_000L) }
+            val budget = SourceLpBudget(funding = funding)
+            LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+                val base = authority.advanceWithGeneratedCutUse(source, Cancellation.Never, null)
+                assertEquals(1L, base.primalStages["PrimalFractional"])
+                if (pause) funding.grant(0L)
+
+                val result = authority.advanceWithGeneratedCutUse(source, Cancellation { !pause }, null)
+
+                assertEquals(pause, result.paused)
+                assertEquals(1, budget.operations)
+                assertEquals(assertNotNull(base.bound).claim, assertNotNull(result.bound).claim)
+                assertTrue(result.primalStages.isEmpty())
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+                if (pause) {
+                    funding.grant(1_000_000L)
+                    val resumed = authority.advanceWithGeneratedCutUse(source, Cancellation.Never, null)
+                    assertFalse(resumed.paused)
+                    assertEquals(2, budget.operations)
+                    assertEquals(1L, resumed.primalStages["PrimalFractional"])
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(resumed.bound)))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a trimmed initial mask should recheck changed numeric assumptions`() {
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
+            "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["triangle lower $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["triangle edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("triangle", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, real) + triangle, premises, triangle.associateWith { BigFraction.ONE } +
+                mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+        val conditions = listOf(SourceCondition(upper = mapOf(triangle.first() to BigFraction.ZERO)),
+            SourceCondition().integerBound(SourceInequality(
+                mapOf(triangle.first() to BigFraction.ONE), BigFraction.ZERO)))
+        for (condition in conditions) {
+            val budget = SourceLpBudget(maxOperations = 2)
+            LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+                authority.advanceWithGeneratedCutUse(source, Cancellation.Never, null)
+                val child = source.atScope(source.scope.copy(condition = condition))
+
+                val result = authority.advanceWithGeneratedCutUse(child, Cancellation.Never, null)
+
+                assertEquals(2, budget.operations)
+                assertEquals(child.scope, assertNotNull(result.bound).scope)
+                assertEquals(SourceValue.Rational(BigFraction.ONE),
+                    assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(child.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            }
+        }
+    }
+
+    @Test
+    fun `a partial initial mask should retain tight cuts and its checked base`() {
+        val a = SourceCoordinate(SourceCoordinate.Kind.Integer, 5)
+        val b = SourceCoordinate(SourceCoordinate.Kind.Integer, 6)
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
+            "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["triangle lower $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["triangle edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        premises["other left"] = SourcePremise(SourceInequality(
+            mapOf(a to BigFraction.ofLong(2), otherReal to BigFraction.ONE), BigFraction.ofLong(3)))
+        premises["other right"] = SourcePremise(SourceInequality(
+            mapOf(b to BigFraction.ofLong(2), otherReal to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        premises["a lower"] = SourcePremise(SourceInequality(mapOf(a to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        premises["b lower"] = SourcePremise(SourceInequality(mapOf(b to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("triangle", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, real, a, b, otherReal) + triangle, premises, triangle.associateWith { BigFraction.ONE } +
+                mapOf(x to BigFraction.ONE, y to BigFraction.ONE,
+                    a to BigFraction.MINUS_ONE, b to BigFraction.MINUS_ONE))
+        for (operations in listOf(1, 2)) {
+            val budget = SourceLpBudget(maxOperations = operations)
+            val capture = LinearAuthorityCapture(4, 30_000L, 1_000_000L, Cancellation.Never)
+            LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+                authority.capture = capture
+                val base = authority.advanceWithGeneratedCutUse(source, Cancellation.Never, null)
+                assertEquals(1L, authority.cutObservations()["numericalCutSelectionInitialSlackRetired"])
+                assertEquals(1L, authority.cutObservations()["numericalCutSelectionGeneratedBaseAdopted"])
+
+                val result = authority.advanceWithGeneratedCutUse(source, Cancellation.Never, null)
+
+                assertEquals(operations, budget.operations)
+                assertEquals(assertNotNull(base.bound).claim, assertNotNull(result.bound).claim)
+                assertEquals(SourceValue.Rational(BigFraction.ofLong(5) * BigFraction.ofLong(2).reciprocal()),
+                    assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                if (operations == 2) assertEquals(1, capture.records.last().cuts.count { it.installed })
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            }
+        }
+    }
+
+    @Test
+    fun `an ordinary initial mask should retain its owner when an incumbent becomes available`() {
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
+            "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["triangle lower $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["triangle edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("triangle", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, real) + triangle, premises, triangle.associateWith { BigFraction.ONE } +
+                mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
         val budget = SourceLpBudget(maxOperations = 1)
         val capture = LinearAuthorityCapture(4, 30_000L, 1_000_000L, Cancellation.Never)
         LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->

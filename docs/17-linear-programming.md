@@ -1701,9 +1701,15 @@ them from finite worker recipe options; they change neither companion admission
 nor lifetime.
 Point-only selection first runs its ordinary checked cut recipe. Before an
 incumbent, the combined aggregate and point frontier initializes a bounded ordinary
-generated recipe and checks it in its first LP query. A current family larger than
-64 definitions declines before any cut-enabled numerical query and uses the
-no-cut/point route instead. This decline is reused while the immutable source
+generated recipe and checks it in its first LP query. A complete finite scan then
+removes strictly slack installed IDs from the initial retained mask, using the
+ordinary installed-row activity tolerance. Tight IDs stay selected. Unavailable,
+limited or interrupted scoring preserves the checked recipe. A changed mask,
+including an empty mask, retains the funded checked base for a later query in the
+same numeric scope and reports base work once. Initial generation and the first
+LP remain charged; the mask guides subsequent queries and supplies no proof authority.
+A current family larger than 64 definitions declines before any cut-enabled
+numerical query and uses the no-cut/point route instead. This decline is reused while the immutable source
 layout matches and clears on authority close. With an incumbent, the frontier
 uses its retained checked mask, or starts the no-cut relaxation and uses its
 completed point to choose continuous endpoints and propose generated cuts within

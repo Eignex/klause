@@ -277,12 +277,17 @@ internal class LinearAuthority(
                         trackUsefulness = retireUnproductive)
                     if (installed.isEmpty()) installed else policy.select(currentRows, prepared.coordinates,
                         prepared.costs, prepared.checkedCuts, observed.second, installed, cancellation,
-                        usefulnessOpportunity = usefulnessOpportunity)
+                        usefulnessOpportunity = usefulnessOpportunity,
+                        retireInitialSlack = retireUnproductive && incumbent == null)
                 }
-                if (selected.size == currentRows.size) {
+                if (selected.size == currentRows.size || policy.selectionComplete) {
                     pointMask = selected
                     directedFamily = family
                     policy.observe("GeneratedBaseAdopted", selected.size.toLong())
+                    if (selected.size != currentRows.size) {
+                        pointRound = PointRound(prepared, base, selected, currentRows).also { it.reported = true }
+                        budget.funding?.charge(0L, 1024L + 64L * (base.fractional.size + base.relaxedPoint.size))
+                    }
                 }
                 return base.copy(paused = base.paused || budget.funding?.paused == true)
             }

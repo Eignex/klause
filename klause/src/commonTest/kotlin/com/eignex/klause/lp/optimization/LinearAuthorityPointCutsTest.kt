@@ -1019,6 +1019,46 @@ class LinearAuthorityPointCutsTest {
     }
 
     @Test
+    fun `initial trimming should retain tight checked rows and remove slack rows`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("x"), family = CutFamily.SOURCE_AGGREGATION),
+            LinearAuthorityCut(1, SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ONE),
+                SourceDerivation.Premise("y"), family = CutFamily.SOURCE_AGGREGATION))
+        val selection = LinearAuthorityPointCuts(SourceLpBudget())
+        val installed = selection.prepareGenerated(rows, setOf(0, 1), Cancellation.Never)
+
+        val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, setOf(0, 1),
+            listOf(BigFraction.ONE, BigFraction.ZERO), installed, Cancellation.Never, retireInitialSlack = true)
+
+        assertEquals(setOf(0), selected)
+        assertTrue(selection.selectionComplete)
+        assertTrue(selection.retainsCandidateLayout(rows))
+        assertEquals(1L, selection.observations["numericalCutSelectionInitialSlackRetired"])
+    }
+
+    @Test
+    fun `incomplete initial scoring should preserve every installed row`() {
+        val rows = listOf(
+            LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
+                BigFraction.ONE), SourceDerivation.Premise("sum"), family = CutFamily.SOURCE_AGGREGATION),
+            LinearAuthorityCut(1, SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.MINUS_ONE),
+                BigFraction.ONE), SourceDerivation.Premise("difference"), family = CutFamily.SOURCE_AGGREGATION))
+        for ((support, checked, interrupted) in listOf(Triple(2, setOf(0, 1), false),
+            Triple(4, setOf(0), false), Triple(4, setOf(0, 1), true))) {
+            val selection = LinearAuthorityPointCuts(SourceLpBudget(), maximumSupport = support)
+            val installed = selection.prepareGenerated(rows, setOf(0, 1), Cancellation.Never)
+
+            val selected = selection.select(rows, listOf(x, y), List(2) { BigFraction.ZERO }, checked,
+                List(2) { BigFraction.ZERO }, installed, Cancellation { interrupted }, retireInitialSlack = true)
+
+            assertEquals(setOf(0, 1), selected)
+            assertFalse(selection.selectionComplete)
+            assertNull(selection.observations["numericalCutSelectionInitialSlackRetired"])
+        }
+    }
+
+    @Test
     fun `generated initialization should use one checked LP operation`() {
         val budget = SourceLpBudget(maxOperations = 1)
         val capture = LinearAuthorityCapture(2, 20_000L, 1_000_000L, Cancellation.Never)

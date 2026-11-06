@@ -203,6 +203,7 @@ internal class LinearAuthorityPointCuts(
         adoptCurrent: Boolean = false,
         usefulnessOpportunity: Boolean = false,
         trackSelectedUsefulness: Boolean = false,
+        retireInitialSlack: Boolean = false,
     ): Set<Int> {
         adoptedCurrent = false
         selectionComplete = false
@@ -406,10 +407,19 @@ internal class LinearAuthorityPointCuts(
                     if (opportunity) observe("UsefulnessOpportunities")
                 }
                 val unproductive = trackUsefulness && unproductivePoints >= 4
-                val expired = if (unproductive) installed else observedInactive.filterValues { it >= 4 }.keys
+                val initialSlack = retireInitialSlack && complete && scoresComplete && layoutCovered && !unproductive
+                val expired = when {
+                    unproductive -> installed
+                    initialSlack -> observedInactive.filterValues { it > 0 }.keys
+                    else -> observedInactive.filterValues { it >= 4 }.keys
+                }
                 if (expired.isNotEmpty()) {
                     retained = installed - expired
                     observe("RetiredInstalled", expired.size.toLong())
+                    if (initialSlack) {
+                        observe("InitialSlackRetired", expired.size.toLong())
+                        for (id in expired) onCut(rows[id].family, "POINT_INITIAL_SLACK_RETIRED", 1L)
+                    }
                     for (id in expired) onCut(rows[id].family, "POINT_INSTALLED_RETIRED", 1L)
                     inactiveScans.keys.removeAll(expired)
                 }
