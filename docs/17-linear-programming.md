@@ -1709,6 +1709,15 @@ definitions together fit a 64-row cap; a larger point-directed family declines.
 Selection admits at most one newly violated checked cut before the optional query.
 The internal generated-mask entry can instead initialize a bounded generated recipe
 and start installed-row aging without replacing its numerical owner.
+After a complete empty point selection, the combined frontier can append an
+ordinary generated batch to the prepared point definitions and select its fully
+checked rows. The total family remains capped at 64 rows, including the point
+definitions. This route uses the ordinary producer's 500,000 work and 8 MiB modeled
+allocation limits inside the containing cumulative grant; point generation and
+scoring retain their separate limits. Abandoned point work and ordinary fallback
+preparation remain charged separately. An ordinary attempt that produces no new
+rows does not repeat point preparation. Interrupted preparation retains the
+completed checked base result.
 A trial that admits no candidate retains
 its base template, checked query and numerical owner for later queries in that
 exact source scope. Numeric bounds and integer-row assumptions participate in

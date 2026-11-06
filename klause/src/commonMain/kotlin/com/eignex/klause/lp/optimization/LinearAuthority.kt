@@ -289,7 +289,7 @@ internal class LinearAuthority(
                     policy.observe("PointPrepared")
                 } else policy.observe("PointPreparationUnavailable")
             }
-            val selected = cutLifecycle.containing("POINT_SELECTION") {
+            var selected = cutLifecycle.containing("POINT_SELECTION") {
                 val rows = family.cuts?.rows.orEmpty()
                 if (preparedGenerated) {
                     policy.prepareGenerated(rows, prepared.checkedCuts, cancellation,
@@ -300,6 +300,34 @@ internal class LinearAuthority(
                         cancellation, adoptCurrent = baselineMask == null && family === baselineFamily &&
                             family.cuts != null && prepared.activeCuts == rows.size,
                         usefulnessOpportunity = usefulnessOpportunity, trackSelectedUsefulness = retireUnproductive)
+                }
+            }
+            if (pointAggregates && attemptedPointDiscovery && baselineMask == null && selected.isEmpty() &&
+                policy.selectionComplete && budget.funding?.paused != true && !cancellation()) {
+                policy.observe("OrdinaryFallbackAttempts")
+                val ordinary = cutLifecycle.containing("ORDINARY_FALLBACK") {
+                    preparePointFamily(source, family, prepared, observed.second, cancellation,
+                        pointAggregates = true, ordinaryOnly = true)
+                }
+                if (ordinary != null) {
+                    family = ordinary.template
+                    prepared = ordinary.query
+                    directedFamily = family
+                    pointFamily = family
+                    policy.observe("OrdinaryFallbackPrepared")
+                    selected = cutLifecycle.containing("POINT_SELECTION") {
+                        policy.prepareGenerated(checkNotNull(family.cuts).rows, prepared.checkedCuts, cancellation,
+                            trackUsefulness = retireUnproductive)
+                    }
+                } else policy.observe("OrdinaryFallbackUnavailable")
+                if (budget.funding?.paused == true || cancellation()) {
+                    template = baselineFamily
+                    query = baselineQuery
+                    pointFamily = baselineFamily
+                    directedFamily = null
+                    policy.releaseCandidates()
+                    cutLifecycle.families = baselineQuery.cutFamilies.values.toSet()
+                    return base.copy(paused = budget.funding?.paused == true)
                 }
             }
             if (budget.funding?.exhausted == true || cancellation()) return base
@@ -376,7 +404,7 @@ internal class LinearAuthority(
         source: SourceProofContext, family: LinearAuthorityTemplate, prepared: LinearAuthorityQuery,
         values: List<BigFraction>,
         cancellation: Cancellation, ordinaryTried: Boolean = false,
-        pointAggregates: Boolean = false,
+        pointAggregates: Boolean = false, ordinaryOnly: Boolean = false,
     ): PointPreparation? {
         if (values.size != prepared.coordinates.size || values.size > 8192) return null
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }
@@ -385,6 +413,7 @@ internal class LinearAuthority(
             withAdditionalCuts(family, funded, maximumCandidates = available) ?: return null
         } else family
         val generated = ordinary !== family
+        if (ordinaryOnly && !generated) return null
         val refined = if (generated) ordinary else {
             var work = 0L
             if (budget.funding?.remainingAllocation?.let { 128L + values.size * 96L > it } == true) return null
