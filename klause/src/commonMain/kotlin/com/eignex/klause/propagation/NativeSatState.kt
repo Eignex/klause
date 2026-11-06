@@ -229,7 +229,7 @@ internal class NativeSatState(private val state: PropagationState) {
             } else if (entries[watchCleanupIndex].toInt() >= baseCount &&
                 retiredOf(entries[watchCleanupIndex].toInt() - baseCount)) {
                 var copies = orderedWatchCopies(watchCleanupLiteral, watchCleanupIndex)
-                if (copies >= 0 && !budget.supports(watchRemovalWork(watchCleanupLiteral, copies), 0L)) copies = -1
+                if (copies >= 0 && watchRemovalWork(watchCleanupLiteral, copies) > budget.remainingWork) copies = -1
                 budget.visit(watchRemovalWork(watchCleanupLiteral, copies))
                 budget.visit(0L)
                 removeWatchAt(watchCleanupLiteral, watchCleanupIndex, copies)
