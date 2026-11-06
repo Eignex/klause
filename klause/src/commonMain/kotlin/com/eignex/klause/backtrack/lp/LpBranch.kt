@@ -5,7 +5,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
 
 /**
- * Reduced-cost-average branching: shortlist the two highest unassigned LP branch scores
+ * Reduced-cost-average branching: select the highest unassigned LP branch score
  * (reduced-cost pseudo-cost × fractionality, [LpHints.branchScore]), or null when LP branching is off,
  * the LP gives no fractional signal, or the residual problem is too wide to scan. Purely advisory — the
  * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound

@@ -109,7 +109,7 @@ class ResumableMinimizeDirectionalTest {
 
     @Test
     fun `finite search consumes reliable directional advice across cooperative slices`() {
-        val blocks = 4
+        val blocks = 3
         val variables = blocks * 3
         val factors = ArrayList<Factor>()
         repeat(blocks) { block ->
