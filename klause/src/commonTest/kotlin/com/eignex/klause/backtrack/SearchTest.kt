@@ -1,6 +1,8 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.Impact
+import com.eignex.klause.backtrack.selector.IndomainMin
+import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.factor.global.AllDifferent
@@ -11,6 +13,7 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
@@ -94,6 +97,24 @@ class SearchTest {
         assertTrue(!alternatives.isNullOrEmpty())
         assertTrue(context.consumeCancellationPollRequest())
         assertTrue(!session.probeCancelled)
+    }
+
+    @Test
+    fun `branch side guidance orders the partition after imported value guidance`() {
+        val session = PropagationSession(problemOf(IntDomain(0, 1)))
+        val params = BacktrackParams(variableSelector = SmallestDomain,
+            valueSelector = SolutionGuided(IndomainMin), randomSeed = 0L)
+        val branching = object : BacktrackBranching {
+            override fun orderAlternatives(variable: VarRef, alternatives: List<SearchDecision>): List<SearchDecision> =
+                alternatives.reversed()
+        }
+        val brancher = BacktrackBrancher(session, params, null, RestartSchedule.from(params), branching)
+        brancher.importPooledSolution(Sample(BooleanArray(0), longArrayOf(1L)),
+            guideValues = true, preferValues = true)
+
+        val alternatives = brancher.nextBranch(SearchSession(emptyList()))
+
+        assertEquals(listOf(SearchDecision.IntAtMost(0, 0L), SearchDecision.IntAtLeast(0, 1L)), alternatives)
     }
 
     @Test

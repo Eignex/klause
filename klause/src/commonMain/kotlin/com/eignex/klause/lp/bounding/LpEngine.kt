@@ -42,11 +42,18 @@ import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpCertifierCost
 import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpCounterResults
+import com.eignex.klause.lp.engine.LpDirectionalCost
+import com.eignex.klause.lp.engine.LpDirectionalCostSolver
+import com.eignex.klause.lp.engine.LpDirectionalValueSolver
+import com.eignex.klause.lp.engine.LpDirectionalValues
 import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpPhaseTimer
 import com.eignex.klause.lp.engine.LpPricingOptions
 import com.eignex.klause.lp.engine.LpPrimalGuidance
+import com.eignex.klause.lp.engine.LpProbeDecline
+import com.eignex.klause.lp.engine.LpProbeMetrics
+import com.eignex.klause.lp.engine.LpProbeSource
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpSolveSession
@@ -1208,6 +1215,94 @@ internal class LpEngine(
     // The fallback node solver stays live for metrics until it is replaced or the engine closes.
     internal var nodeSimplex: PersistentLpSolver? = null
     internal var nodeUsesTrail: Boolean = false
+    private var branchWorkAllowance = 0L
+    // Scratch comparisons fund construction that a retained parent solve can avoid.
+    private val directionalWorkBudget = LpWorkBudget(
+        minOps = MIN_NODE_WORK_OPS,
+        maxOps = MAX_NODE_WORK_OPS,
+        initialOps = MIN_NODE_WORK_OPS,
+    )
+
+    private fun remainingDirectionalWork(): Long {
+        var allowance = branchWorkAllowance
+        nodeWorkAllowance()?.let { allowance = minOf(allowance, it) }
+        lpEffortGovernor.remainingWork()?.let { allowance = minOf(allowance, it) }
+        return if (allowance <= 0L || params.cancellation()) 0L else allowance
+    }
+
+    internal fun reserveDirectionalWork(work: Long): Boolean {
+        if (work <= 0L || work > remainingDirectionalWork()) return false
+        branchWorkAllowance -= work
+        noteNodeOverhead(work)
+        return true
+    }
+
+    internal fun reserveProbeWork(work: Long): Boolean {
+        if (work <= 0L) return false
+        if (!lpEffortGovernor.isDemoted) {
+            branchWorkAllowance = maxOf(branchWorkAllowance, directionalWorkBudget.ops())
+        }
+        branchWorkAllowance = minOf(branchWorkAllowance, MAX_NODE_WORK_OPS)
+        return reserveDirectionalWork(work)
+    }
+
+    internal fun directionalValues(
+        source: LpProbeSource,
+        columns: IntArray,
+        splits: LongArray,
+    ): List<LpDirectionalValues>? {
+        // Leave room for comparison and the consuming selection.
+        val allowance = remainingDirectionalWork() - 24L * columns.size
+        branchWorkAllowance = 0L
+        if (allowance <= 0L) return null
+        val started = TimeSource.Monotonic.markNow()
+        var preparation = 0L
+        var solving = 0L
+        var completed = 0
+        var decline: LpProbeDecline? = null
+        val observe: (LpProbeMetrics) -> Unit = { metrics ->
+            preparation = saturatingAdd(preparation, metrics.preparationWork)
+            solving = saturatingAdd(solving, metrics.solveWork)
+            completed += metrics.completed
+            decline = metrics.decline ?: decline
+            noteNodeOverhead(metrics.work)
+        }
+        val values = if (nodeUsesTrail) {
+            propagator.directionalValues(source, columns, splits, allowance, params.cancellation, observe)
+        } else {
+            (nodeSimplex as? LpDirectionalValueSolver)?.directionalValues(
+                source, columns, splits, allowance, params.cancellation, observe,
+            )
+        }
+        if (values == null && decline == LpProbeDecline.ALLOWANCE && !lpEffortGovernor.isDemoted) {
+            directionalWorkBudget.observeWorkStop()
+        }
+        sink.lp.observeDirectionalProbes(started.elapsedNow().inWholeNanoseconds,
+            LpProbeMetrics(preparation, solving, completed,
+                decline ?: LpProbeDecline.CHILD.takeIf { values == null }), values != null)
+        return values
+    }
+
+    internal fun directionalCosts(model: LpModel, columns: IntArray): List<LpDirectionalCost?>? {
+        val allowance = remainingDirectionalWork()
+        branchWorkAllowance = 0L
+        if (allowance <= 0L) return null
+        val started = TimeSource.Monotonic.markNow()
+        var work = 0L
+        val charge: (Long) -> Unit = { ops ->
+            work += ops
+            noteNodeOverhead(ops)
+        }
+        val costs = if (nodeUsesTrail) {
+            propagator.directionalCosts(model, columns, allowance, params.cancellation, charge)
+        } else {
+            (nodeSimplex as? LpDirectionalCostSolver)?.directionalCosts(
+                model, columns, allowance, params.cancellation, charge,
+            )
+        }
+        sink.lp.observeDirectionalBasis(started.elapsedNow().inWholeNanoseconds, work, costs != null)
+        return costs
+    }
 
     internal val cpAdapter = CpLpAdapter(this)
     internal val propagator = LpPropagator(
@@ -1544,18 +1639,52 @@ internal class LpEngine(
     ): Boolean {
         requireOpen()
         lpBackjump = null
-        for (b in bounds) {
-            if (deferSimplex && b is LpSimplexBound) continue
-            if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) return true
+        val finiteHints = lpHints?.takeIf {
+            val work = it.finiteBoundWork
+            work > 0L && finiteBoundWorkFits(work + 4L)
         }
-        return false
+        if (finiteHints != null) {
+            noteNodeOverhead(4L)
+            captureFiniteObjectiveBound = true
+            finiteObjectiveBound = Long.MIN_VALUE
+        }
+        try {
+            for (b in bounds) {
+                if (deferSimplex && b is LpSimplexBound) continue
+                if (b.applicable && b.prune(session, effectiveBound, objectiveVar, objectiveAscending)) {
+                    if (b !is LpSimplexBound) lpHints?.recordUnavailable(LpHintUnavailable.EARLIER_BOUND)
+                    if (b is LinearBound) recordFiniteObjectiveBound(finiteHints)
+                    return true
+                }
+            }
+            recordFiniteObjectiveBound(finiteHints)
+            return false
+        } finally {
+            if (finiteHints != null) captureFiniteObjectiveBound = false
+        }
     }
+
+    private fun finiteBoundWorkFits(work: Long): Boolean = !params.cancellation() &&
+        nodeWorkAllowance()?.let { it >= work } != false &&
+        lpEffortGovernor.remainingWork()?.let { it >= work } != false
+
+    private fun recordFiniteObjectiveBound(hints: LpHintSink?) {
+        if (hints == null || finiteObjectiveBound == Long.MIN_VALUE) return
+        val work = hints.finiteBoundWork
+        if (work > 0L && finiteBoundWorkFits(work)) {
+            hints.recordFiniteBound(cpAdapter.currentModel?.exactState, finiteObjectiveBound)
+        }
+    }
+
+    private var captureFiniteObjectiveBound = false
+    private var finiteObjectiveBound = Long.MIN_VALUE
 
     internal fun linearBoundDominates(session: PropagationSession, cutoff: Double): Boolean {
         if (cutoff.isNaN() || cutoff == Double.POSITIVE_INFINITY) return false
         if (cutoff == Double.NEGATIVE_INFINITY) return true
         if (abs(cutoff) < 9_007_199_254_740_992.0) {
             val lower = linearLowerBound(objective, session)
+            if (captureFiniteObjectiveBound) finiteObjectiveBound = lower
             return lower != Long.MIN_VALUE && lower >= cutoff
         }
 
@@ -1648,17 +1777,15 @@ internal class LpEngine(
             objectiveVar: Int,
             objectiveAscending: Boolean,
         ): Boolean {
-            val lpRelaxerL = lpRelaxer ?: return false
-            if (params.lpPlan.realResidual && residualOversized) return false
-            if (lpEffortGovernor.allowanceSpent) return false
+            branchWorkAllowance = 0L
+            val lpRelaxerL = lpRelaxer ?: return skip(LpHintUnavailable.MODEL)
+            if (params.lpPlan.realResidual && residualOversized) return skip(LpHintUnavailable.MODEL)
+            if (lpEffortGovernor.allowanceSpent) return skip(LpHintUnavailable.ALLOWANCE)
             lpEffortGovernor.observeNode()
-            if (!params.lpPlan.realResidual && (
-                    session.decisionLevel > params.lpPlan.boundMaxDepth ||
-                        ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
-                        !lpLadder.shouldRun()
-                    )
-            ) {
-                return false
+            if (!params.lpPlan.realResidual) {
+                if (session.decisionLevel > params.lpPlan.boundMaxDepth) return skip(LpHintUnavailable.DEPTH)
+                if (++lpCheckCounter % params.lpPlan.boundEvery != 0) return skip(LpHintUnavailable.CADENCE)
+                if (!lpLadder.shouldRun()) return skip(LpHintUnavailable.LADDER)
             }
             // The ladder's run rung decides whether during-search cuts separate at this node.
             val cutsAllowed = lpLadder.cutsEnabled
@@ -1671,6 +1798,8 @@ internal class LpEngine(
                 null
             }
             nodeWorkStoppedAfterProgress = false
+            val branchBudget = (nodeQueryWorkBudget() ?: nodeWorkBudget()).takeIf { it > 0L }
+                ?: MAX_NODE_WORK_OPS
             val outcome = lpBoundAndFix(
                 lpRelaxerL,
                 session,
@@ -1684,6 +1813,7 @@ internal class LpEngine(
                 warm = warm,
                 cutsAllowed = cutsAllowed,
             )
+            branchWorkAllowance = (branchBudget - minOf(branchBudget, pendingSolveOps)).coerceAtLeast(0L)
             // What this node's LP cost against the nodes explored; the allowance was charged as it spent.
             lpEffortGovernor.observeSolve(pendingSolveOps, outcome.prune,
                 nodeWorkStoppedAfterProgress && outcome.basis == null)
@@ -1707,6 +1837,11 @@ internal class LpEngine(
             }
             lpLadder.record(outcome.prune)
             return outcome.prune
+        }
+
+        private fun skip(reason: LpHintUnavailable): Boolean {
+            lpHints?.recordUnavailable(reason)
+            return false
         }
     }
 

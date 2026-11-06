@@ -242,11 +242,45 @@ explanations cite the selected bound witnesses and all contributing row premises
 every learned literal is false at the conflict and implied by the cited antecedents.
 One integer or disjunction leaf cannot refute its sibling branches.
 
-The model-facing bounding callback supplies pre-separation floating optima and
-checked infeasibility outcomes to finite search hints. Directional history accepts
-only compatible retained model and row scopes; it adds no certification request.
+The model-facing bounding callback supplies numeric projections of already accepted
+objective bounds and checked infeasibility outcomes to finite search hints. It reuses
+the bound obtained for ordinary pruning, including a dual bound from an unfinished
+iterate. Directional history accepts only compatible retained model and row scopes
+whose fractional coordinates came from that working model; it adds no certification request.
+A cut re-solve that returns an iterate replaces the advisory point before its
+accepted bound is recorded. The accepted result can also supply its immutable basis
+for one fresh below-root child-value consultation; it carries no parent-optimum
+claim. The search owns a bounded copy of that point for
+directional observations, basis comparisons and child probes; this refresh preserves the initial
+iterate's fallback value-order hints and reduced-cost averages. The retained row
+scope still controls compatibility with earlier gains.
+When no certificate is needed, an existing floating optimum can supply the advisory
+estimate; the search keeps that estimate kind in its history scope.
+Unavailable callbacks identify admission gates and incomplete numerical outcomes;
+they carry no optimum, bound or query authorization.
+Disabled directional guidance retains ordinary LP value and reduced-cost hints, but
+collects no gains and retains no directional model scope or refreshed point snapshot.
+The ordinary finite linear-bound check can retain its already computed integer
+lower bound for a pending child observation, including a node it prunes. Capture
+and delivery require remaining containing and cumulative LP work; actual work is
+charged at each step. Infinite cutoffs, the large exact-cutoff path and overflow
+supply no retained scalar. The callback performs no extra domain scan, numerical
+query or certification, and publishes neither a point nor a new pruning bound.
 [Finite guidance](08-search.md#finite-lp-directional-guidance) owns selection and
-history lifetime.
+history lifetime. Missing reliable passive observations can request complete child
+LP gains for up to two shortlisted columns. The floating owner stays unchanged;
+scratch solvers spend a positive grant after reserving the caller's normalization
+and history work. Numerical estimates train a separate advisory history, with two
+recent observations per direction before selection. Query work and elapsed time are
+recorded separately. Declines distinguish a missing or busy owner, a stale point,
+missing retained optimum, invalid split, exhausted construction or numerical grant,
+and other incomplete child solves. Private comparisons own their admission budget
+inside the existing LP work range and share containing and cumulative charges with
+node solves. Resource stops can increase that comparison budget without changing
+the warm parent solver's adaptive request.
+Neither history certifies a branch bound. Explicit root
+child-order mode instead permits one retained-basis consultation for its selected
+column per hint owner, including across restarts and reseeding.
 
 A node query that makes pivots but stops on its work allowance before returning a
 point grows the adaptive request within its existing ceiling and remaining
