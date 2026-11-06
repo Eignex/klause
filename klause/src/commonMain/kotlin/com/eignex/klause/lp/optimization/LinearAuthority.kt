@@ -231,7 +231,8 @@ internal class LinearAuthority(
                 policy.releaseCandidates()
                 cutLifecycle.families = baselineQuery.cutFamilies.values.toSet()
                 val installed = if (currentRows.isNotEmpty() && currentRows.size <= 64 &&
-                    baselineQuery.activeCuts == currentRows.size && baselineQuery.checkedCuts.size == currentRows.size) {
+                    baselineQuery.activeCuts == currentRows.size &&
+                    baselineQuery.checkedCuts.size == currentRows.size) {
                     cutLifecycle.containing("POINT_SELECTION") {
                         policy.select(currentRows, baselineQuery.coordinates, baselineQuery.costs,
                             baselineQuery.checkedCuts, observed.second, baselineQuery.checkedCuts, cancellation,
