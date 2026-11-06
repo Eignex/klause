@@ -585,6 +585,13 @@ verifies both identities and retains failed results. Request source validation w
 qualification. The diagnostic prehash uses 8 KiB reads; ordinary identity hashing
 uses 64 KiB reads. Both read the full plain source before the invocation timer, but
 they do not have identical IO call sizes.
+
+`lab/frozen-minizinc-linux.json` also accepts plain `.mzn` models and an optional
+plain `.dzn` data input with role `data` and attribute `sourceDataPlainSha256`.
+Both inputs use declared corpus paths and hashes; planning reads neither source.
+Compilation uses the pinned runtime during execution. Models may use its standard
+library; external include trees require the ordinary catalog adapter. Execution
+verifies the model and data identities and retains compilation and failed-route costs.
 Native CLI and public-library adapters require cache staging.
 
 `source-staging=cli` passes the original compressed path to the JVM CLI's existing

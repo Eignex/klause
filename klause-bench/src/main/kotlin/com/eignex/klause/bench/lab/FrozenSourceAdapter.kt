@@ -15,7 +15,7 @@ import com.eignex.lab.bench.BenchSuite
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-/** Ordinary installed-CLI solves over frozen single-file corpus inputs. */
+/** Ordinary installed-CLI solves over frozen corpus inputs. */
 fun main(args: Array<String>) {
     val protocolOutput = System.out
     System.setOut(System.err)
@@ -40,12 +40,23 @@ internal object FrozenSourceSuite : BenchSuite {
             val problem = attributes.getValue("problem")
             require(suite.isNotBlank() && problem.isNotBlank())
             val format = Format.valueOf(attributes.getValue("format"))
-            require(format in setOf(Format.DIMACS, Format.WCNF, Format.MPS, Format.OPB))
+            require(format in setOf(Format.DIMACS, Format.WCNF, Format.MPS, Format.OPB, Format.MINIZINC))
             Category.valueOf(attributes.getValue("category"))
             require(attributes.getValue("sourcePlainSha256").matches(Regex("[a-f0-9]{64}")))
-            val input = template.inputs.single()
-            require(input.root == BenchInputRoot.CORPUS && input.role == "model" && input.path.endsWith(".zst"))
-            require(input.sha256?.matches(Regex("[a-f0-9]{64}")) == true)
+            val model = template.inputs.single { it.role == "model" }
+            val data = template.inputs.singleOrNull { it.role == "data" }
+            require(template.inputs.size == 1 + if (data == null) 0 else 1)
+            require(template.inputs.all {
+                it.root == BenchInputRoot.CORPUS && it.sha256?.matches(Regex("[a-f0-9]{64}")) == true
+            })
+            if (format == Format.MINIZINC) {
+                require(model.path.endsWith(".mzn") && (data == null || data.path.endsWith(".dzn")))
+                if (data != null) {
+                    require(attributes["sourceDataPlainSha256"]?.matches(Regex("[a-f0-9]{64}")) == true)
+                }
+            } else {
+                require(data == null && model.path.endsWith(".zst"))
+            }
             settings.engines.flatMap { engine ->
                 settings.seeds.flatMap { seed ->
                     (0 until settings.repeats).map { repeat ->
@@ -68,8 +79,14 @@ internal object FrozenSourceSuite : BenchSuite {
 
     override fun run(case: BenchCase, context: BenchContext): BenchResult {
         val result = KlauseLabSuite.run(case, context)
-        val observed = result.details?.get("sourceHashes")?.jsonObject?.get("model")?.jsonPrimitive?.content
-        return if (observed == case.attributes.getValue("sourcePlainSha256")) result else result.copy(
+        val observed = result.details?.get("sourceHashes")?.jsonObject
+        val identities = mapOf("model" to case.attributes.getValue("sourcePlainSha256")) +
+            if (case.inputs.any { it.role == "data" }) {
+                mapOf("data" to case.attributes.getValue("sourceDataPlainSha256"))
+            } else emptyMap()
+        return if (identities.all { (role, expected) -> observed?.get(role)?.jsonPrimitive?.content == expected }) {
+            result
+        } else result.copy(
             status = BenchStatus.FAILED,
             message = listOfNotNull(result.message,
                 "Plain source identity missing or different from frozen input; original result retained")
