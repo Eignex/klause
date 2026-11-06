@@ -83,7 +83,8 @@ class FiniteNumericalCompanionsTest {
 
             val result = FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
                 plan, Cancellation.until(clock.markNow() + 30.seconds), numericalCompletion = true,
-                numericalCompanions = TheoryParams(sourceIncumbentCompletion = afterImprovement), fundedCompanions = true,
+                numericalCompanions = TheoryParams(sourceIncumbentCompletion = afterImprovement),
+                fundedCompanions = true,
                 waitForCompanionImprovement = afterImprovement, adaptiveCompanionRepair = afterImprovement).use {
                 it.minimize(Cancellation { true }, null)
             }

@@ -52,10 +52,10 @@ class JointLinearRepairTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
         val seed = Sample(BooleanArray(0), longArrayOf(1, 1, 1))
+        val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 3)
 
         for (adaptive in listOf(false, true)) {
-            JointLinearRepair(model, source, objective,
-                TheoryParams(sourceIncumbentCompletion = true, maxFlips = 3), external = { seed }).use { repair ->
+            JointLinearRepair(model, source, objective, params, external = { seed }).use { repair ->
                 repair.search(adaptive = adaptive).use { search ->
                     repeat(128) {
                         if (repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures") != 1L) {
@@ -70,11 +70,12 @@ class JointLinearRepairTest {
                     if (adaptive) {
                         val point = assertIs<MinimizeResult.WithSample>(result).sample
                         assertContentEquals(longArrayOf(0, 0, 0), LongArray(3) { point.intValue(it) })
-                        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
-                            .verify(SourceEvidence(source.scope, SourceClaim.Witness(point), SourceDerivation.SourceWitness)))
-                        assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairEnlargedTrialCompletions"))
-                        assertEquals(1L,
-                            repair.stats.smt.completeSearchStages?.get("jointRepairLargerNeighborhoodCheckedIncumbents"))
+                        val checked = SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+                            SourceEvidence(source.scope, SourceClaim.Witness(point), SourceDerivation.SourceWitness))
+                        val stages = repair.stats.smt.completeSearchStages.orEmpty()
+                        assertEquals(SourceEvidenceCheck.Checked, checked)
+                        assertEquals(1L, stages["jointRepairEnlargedTrialCompletions"])
+                        assertEquals(1L, stages["jointRepairLargerNeighborhoodCheckedIncumbents"])
                     } else assertTrue(result !is MinimizeResult.WithSample)
                     assertFalse(repair.incumbentTrialPending)
                 }
@@ -92,9 +93,9 @@ class JointLinearRepairTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
         var cancelled = false
-        JointLinearRepair(model, source, objective,
-            TheoryParams(sourceIncumbentCompletion = true, cancellation = Cancellation { cancelled }),
-            external = { Sample(BooleanArray(0), longArrayOf(1, 1, 1)) }).use { repair ->
+        val params = TheoryParams(sourceIncumbentCompletion = true, cancellation = Cancellation { cancelled })
+        val seed = Sample(BooleanArray(0), longArrayOf(1, 1, 1))
+        JointLinearRepair(model, source, objective, params, external = { seed }).use { repair ->
             repair.search(adaptive = true).use { search ->
                 repeat(128) {
                     if (repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures") != 1L) {
@@ -121,9 +122,9 @@ class JointLinearRepairTest {
             ))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
-        JointLinearRepair(model, source, objective,
-            TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
-            external = { Sample(BooleanArray(0), longArrayOf(1, 1, 1)) }).use { repair ->
+        val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1)
+        val seed = Sample(BooleanArray(0), longArrayOf(1, 1, 1))
+        JointLinearRepair(model, source, objective, params, external = { seed }).use { repair ->
             repair.search(adaptive = true).use { search ->
                 var done = false
                 repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
