@@ -298,7 +298,7 @@ class LinearAuthorityInvocationTest {
                 it.run { _, _ -> }
             }
 
-            val evidence = if (pointCuts && operations == 1) {
+            val evidence = if (pointCuts && operations == 1 && seeded) {
                 assertNull(result.terminal)
                 assertNotNull(result.bound).also {
                     assertEquals(SourceValue.Rational(BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal()),

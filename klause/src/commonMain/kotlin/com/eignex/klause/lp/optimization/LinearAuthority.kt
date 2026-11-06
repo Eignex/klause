@@ -94,6 +94,7 @@ internal class LinearAuthority(
     private var pointMask: Set<Int>? = null
     private var deferAggregatePreparation = false
     private var boundedAggregateRecipe = false
+    private var boundedCurrentDeclined = false
     private class PointPreparation(
         val template: LinearAuthorityTemplate, val query: LinearAuthorityQuery, val generated: Boolean,
     )
@@ -152,6 +153,7 @@ internal class LinearAuthority(
         pointMask = null
         deferAggregatePreparation = false
         boundedAggregateRecipe = false
+        boundedCurrentDeclined = false
         primalAttempt = null
         cutLifecycle.containing("RETIREMENT") { lp.close() }
     }
@@ -179,6 +181,11 @@ internal class LinearAuthority(
         retireUnproductive: Boolean = false, incumbent: BigFraction? = null,
         pointAggregates: Boolean = false,
     ): LinearAuthorityResult {
+        if (generatedFirst && boundedCurrentDeclined && pointFamily === template &&
+            template?.matches(source) == true) {
+            return advanceWithSelectedCuts(source, cancellation, generatedFirst = false,
+                retireUnproductive = retireUnproductive, incumbent = incumbent, pointAggregates = true)
+        }
         val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe)
             .also { pointPolicy = it }
         val fallbackCuts = !pointAggregates || template?.cuts != null
@@ -211,12 +218,17 @@ internal class LinearAuthority(
             if (!baselineCuts) policy.observe("NoCutBaseQueries")
             deferAggregatePreparation = baselineMask == null && !generatedFirst
             boundedAggregateRecipe = baselineMask == null && generatedFirst
+            if (boundedAggregateRecipe) boundedCurrentDeclined = false
             val base = try {
                 advance(source, cancellation, cuts = baselineCuts, cutMask = baselineMask)
             } finally {
                 deferAggregatePreparation = false
                 boundedAggregateRecipe = false
                 pointListener = null
+            }
+            if (generatedFirst && boundedCurrentDeclined) {
+                return advanceWithSelectedCuts(source, cancellation, generatedFirst = false,
+                    retireUnproductive = retireUnproductive, incumbent = incumbent, pointAggregates = true)
             }
             if (base.paused || base.evidence != null || base.incumbent != null || cancellation()) return base
             val value = ((base.bound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
@@ -503,6 +515,12 @@ internal class LinearAuthority(
             return LinearAuthorityResult()
         }
         if (budget.funding?.paused == true) return LinearAuthorityResult(paused = true)
+        if (boundedAggregateRecipe && template?.matches(source) == true &&
+            template?.cuts?.rows?.size?.let { it > 64 } == true) {
+            boundedCurrentDeclined = true
+            pointPolicy?.observe("BoundedCurrentFamilyDeclined")
+            return LinearAuthorityResult()
+        }
         val result = checkSource(source, cancellation, guidance = true, cuts = cuts, cutMask = cutMask)
         if (cancellation()) {
             lp.close()
@@ -611,6 +629,11 @@ internal class LinearAuthority(
         point: Map<SourceCoordinate, Double>? = null,
         maximumCandidates: Int = 64 - additionalCuts.size,
     ): LinearAuthorityTemplate? {
+        if (boundedAggregateRecipe && prepared.cuts?.rows?.size?.let { it > 64 } == true) {
+            boundedCurrentDeclined = true
+            pointPolicy?.observe("BoundedCurrentFamilyDeclined")
+            return null
+        }
         val generateAggregates = aggregateCuts && !deferAggregatePreparation
         if (!generateAggregates && additionalCuts.isEmpty()) return prepared
         val funded = Cancellation { cancellation() || budget.funding?.paused == true }

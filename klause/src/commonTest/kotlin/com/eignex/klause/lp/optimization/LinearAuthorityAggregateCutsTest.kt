@@ -42,6 +42,134 @@ class LinearAuthorityAggregateCutsTest {
         BigFraction.ZERO)
 
     @Test
+    fun `oversized current recipes should preserve the last available no cut operation`() {
+        val premises = (0L..64L).associate { index ->
+            "row $index" to SourcePremise(SourceInequality(
+                mapOf(x to BigFraction.ofLong(2), y to BigFraction.ofLong(2 * index)), BigFraction.ONE))
+        } + mapOf(
+            "y upper" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO)),
+            "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y), premises, mapOf(x to BigFraction.ONE))
+        for (primed in listOf(false, true)) {
+            val operations = if (primed) 2 else 1
+            val budget = SourceLpBudget(maxOperations = operations)
+            val capture = LinearAuthorityCapture(4, 30_000L, 1_000_000L, Cancellation.Never)
+            LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+                if (primed) {
+                    authority.advance(source, Cancellation.Never, cuts = true)
+                    assertEquals(65L, authority.cutObservations()["numericalMaxRetainedCuts"])
+                }
+                authority.capture = capture
+
+                repeat(2) {
+                    val result = authority.advanceWithGeneratedCutUse(source, Cancellation.Never, null)
+
+                    assertEquals(operations, budget.operations)
+                    assertEquals(1L, authority.cutObservations()["numericalCutSelectionBoundedCurrentFamilyDeclined"])
+                    assertTrue(capture.records.last().cuts.isEmpty())
+                    assertEquals(SourceValue.Rational(BigFraction.ofLong(2).reciprocal()),
+                        assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a declined current family should recheck bounds in a changed numeric scope`() {
+        val premises = (0L..64L).associate { index ->
+            "row $index" to SourcePremise(SourceInequality(
+                mapOf(x to BigFraction.ofLong(2), y to BigFraction.ofLong(2 * index)), BigFraction.ONE))
+        } + mapOf(
+            "y upper" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO)),
+            "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y), premises, mapOf(x to BigFraction.ONE))
+        val child = source.atScope(source.scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO))))
+        val budget = SourceLpBudget(maxOperations = 2)
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithGeneratedCutUse(source, Cancellation.Never, null)
+
+            val result = authority.advanceWithGeneratedCutUse(child, Cancellation.Never, null)
+
+            assertEquals(2, budget.operations)
+            assertEquals(1L, authority.cutObservations()["numericalCutSelectionBoundedCurrentFamilyDeclined"])
+            assertEquals(child.scope, assertNotNull(result.bound).scope)
+            assertEquals(SourceValue.Rational(BigFraction.ZERO),
+                assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(child.withLinearAuthority()).verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
+    fun `a source change or close should clear the current family decline`() {
+        val premises = (0L..64L).associate { index ->
+            "row $index" to SourcePremise(SourceInequality(
+                mapOf(x to BigFraction.ofLong(2), y to BigFraction.ofLong(2 * index)), BigFraction.ONE))
+        } + mapOf(
+            "y upper" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ONE), BigFraction.ZERO)),
+            "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y), premises, mapOf(x to BigFraction.ONE))
+        for (close in listOf(false, true)) {
+            val budget = SourceLpBudget(maxOperations = 2)
+            LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+                authority.advanceWithGeneratedCutUse(source, Cancellation.Never, null)
+                if (close) authority.close()
+                val next = if (close) source else SourceProofContext(
+                    source.scope.copy(revision = SourceRevision("other aggregation", "exact-affine")),
+                    source.coordinates, source.premises, mapOf(x to BigFraction.ONE))
+
+                val result = authority.advanceWithGeneratedCutUse(next, Cancellation.Never, null)
+
+                assertEquals(2, budget.operations)
+                assertEquals(2L, authority.cutObservations()["numericalCutSelectionBoundedCurrentFamilyDeclined"])
+                assertEquals(next.scope, assertNotNull(result.bound).scope)
+                assertEquals(SourceValue.Rational(BigFraction.ofLong(2).reciprocal()),
+                    assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(next.withLinearAuthority()).verify(assertNotNull(result.bound)))
+            }
+        }
+    }
+
+    @Test
+    fun `an ordinary initial mask should retain its owner when an incumbent becomes available`() {
+        val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
+        val premises = linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),
+            "x lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)))
+        for ((index, coordinate) in triangle.withIndex()) {
+            premises["triangle lower $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
+            premises["triangle edge $index"] = SourcePremise(SourceInequality(
+                mapOf(coordinate to BigFraction.ONE, triangle[(index + 1) % 3] to BigFraction.ONE), BigFraction.ONE))
+        }
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("triangle", ObjectiveSense.MAXIMIZE)),
+            setOf(x, y, real) + triangle, premises, triangle.associateWith { BigFraction.ONE } +
+                mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+        val budget = SourceLpBudget(maxOperations = 1)
+        val capture = LinearAuthorityCapture(4, 30_000L, 1_000_000L, Cancellation.Never)
+        LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
+            authority.capture = capture
+            val base = authority.advanceWithGeneratedCutUse(source, Cancellation.Never, null)
+
+            val result = authority.advanceWithPointGeneratedCuts(source, Cancellation.Never, BigFraction.ZERO)
+
+            assertEquals(1, budget.operations)
+            assertEquals(1L, authority.preparations)
+            assertEquals(assertNotNull(base.bound).claim, assertNotNull(result.bound).claim)
+            assertTrue(capture.records.last().cuts.isNotEmpty())
+            assertTrue(capture.records.last().cuts.all { it.checked && it.installed })
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+        }
+    }
+
+    @Test
     fun `empty point selection should install a checked ordinary batch`() {
         val triangle = (2..4).map { SourceCoordinate(SourceCoordinate.Kind.Integer, it) }
         val premises = linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right),

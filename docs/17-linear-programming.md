@@ -1699,8 +1699,13 @@ Ordinary linear-source execution binds the same source-cut controls to its admit
 numerical companions. The containing source request owns these settings and removes
 them from finite worker recipe options; they change neither companion admission
 nor lifetime.
-Point-only selection first runs its ordinary checked cut recipe. The combined
-aggregate and point frontier first runs the no-cut relaxation, then uses its
+Point-only selection first runs its ordinary checked cut recipe. Before an
+incumbent, the combined aggregate and point frontier initializes a bounded ordinary
+generated recipe and checks it in its first LP query. A current family larger than
+64 definitions declines before any cut-enabled numerical query and uses the
+no-cut/point route instead. This decline is reused while the immutable source
+layout matches and clears on authority close. With an incumbent, the frontier
+uses its retained checked mask, or starts the no-cut relaxation and uses its
 completed point to choose continuous endpoints and propose generated cuts within
 the existing producer limits. Point-directed definitions use the same immutable
 source rows and coordinate layout; no intermediate current-cut query is needed.
