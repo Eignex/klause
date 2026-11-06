@@ -1094,6 +1094,11 @@ private fun executePortfolio(
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
     val admission = request.executionOptions.reader()[ExecutionOption.companionAdmission]
+    val adaptiveCompanionRepair = when (val repair = request.executionOptions.reader()[ExecutionOption.companionRepair]) {
+        null, "fixed" -> false
+        "adaptive" -> true
+        else -> pipelineConfigError("companion-repair expects fixed|adaptive, got `$repair`")
+    }
     val bufferedPublications = when (val publications =
         request.executionOptions.reader()[ExecutionOption.portfolioPublications]) {
         null, "immediate" -> false
@@ -1253,6 +1258,7 @@ private fun executePortfolio(
         booleanProofTasks = booleanProofTasks,
         fundedCompanions = fundedCompanions,
         waitForCompanionImprovement = admission == "progress-funded",
+        adaptiveCompanionRepair = adaptiveCompanionRepair,
         bufferedPublications = bufferedPublications,
         privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly ||
             privateScenario !== baseScenario,

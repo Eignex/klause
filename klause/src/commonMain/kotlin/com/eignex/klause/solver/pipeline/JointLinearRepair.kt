@@ -81,6 +81,9 @@ internal class JointLinearRepair(
     private var query: LinearAuthorityInvocation? = null
     private var anchor: Sample? = null
     private var pending: ExactNeighborhoodCondition? = null
+    private var checkedTrialWidth = 0
+    private var enlargedTrialPending = false
+    private var enlargedTrialProposal: ExactNeighborhoodCondition? = null
     var incumbentTrialPending = false
         private set
     private var closed = false
@@ -207,6 +210,14 @@ internal class JointLinearRepair(
                 val proposalRound = if (pooled != null && completion != null)
                     round.coerceAtMost(Long.MAX_VALUE - 1) + 1 else round
                 requireNotNull(selection).propose(from, pooled?.bools ?: bools, width, proposalRound, radius, limit)
+                    .also { condition ->
+                        if (checkedStart) {
+                            checkedTrialWidth = (sourceIntegers?.size ?: model.numIntVars) - condition.lower.size
+                            enlargedTrialPending = adaptive &&
+                                (sourceIntegers?.size ?: model.numIntVars) > checkedTrialWidth
+                        }
+                        if (enlargedTrialPending && width > checkedTrialWidth) enlargedTrialProposal = condition
+                    }
             },
         )
     }
@@ -305,7 +316,19 @@ internal class JointLinearRepair(
 
     fun attempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
         val result = advanceAttempt(condition, cancellation)
-        if (result.result != ExactNeighborhoodResult.Paused) incumbentTrialPending = false
+        if (result.result != ExactNeighborhoodResult.Paused) {
+            val enlarged = condition === enlargedTrialProposal
+            if (enlarged && (result.result == ExactNeighborhoodResult.Refuted ||
+                    result.result is ExactNeighborhoodResult.Witness)) observe("jointRepairEnlargedTrialCompletions")
+            val continuing = result.result == ExactNeighborhoodResult.Refuted && enlargedTrialPending &&
+                !enlarged && !exhausted && !stop()
+            if (continuing) observe("jointRepairEnlargedTrialContinuations")
+            else {
+                enlargedTrialPending = false
+                enlargedTrialProposal = null
+            }
+            incumbentTrialPending = continuing
+        }
         return result
     }
 
@@ -320,9 +343,11 @@ internal class JointLinearRepair(
         if (pending != condition) {
             retire()
             var bounds = source.scope.condition
+            var pinnedIntegers = 0
             for ((id, value) in condition.bools) bounds = bounds.pin(id, value)
             for ((upper, entries) in listOf(false to condition.lower, true to condition.upper)) {
                 for ((id, value) in entries) {
+                    if (!upper && id < model.numIntVars && condition.upper[id] == value) pinnedIntegers++
                     val coordinate = if (id < model.numIntVars) SourceCoordinate(SourceCoordinate.Kind.Integer, id)
                         else SourceCoordinate(SourceCoordinate.Kind.Real, id - model.numIntVars)
                     bounds = bounds.bound(coordinate, value, upper)
@@ -333,6 +358,9 @@ internal class JointLinearRepair(
                 params.copy(sourceIncumbentCompletion = false),
                 external = { externalIncumbent() ?: anchor }, state = state, borrowedAuthority = authority,
                 boundOrdered = boundOrdered, guidance = true, funding = funding)
+            val freed = (sourceIntegers?.size ?: model.numIntVars) - pinnedIntegers
+            stages["jointRepairMaxFreedIntegers"] = maxOf(stages["jointRepairMaxFreedIntegers"] ?: 0L, freed.toLong())
+            if (condition === enlargedTrialProposal) observe("jointRepairEnlargedTrialStarts")
             observe("jointRepairCandidates")
         }
         val active = requireNotNull(query)
@@ -432,6 +460,8 @@ internal class JointLinearRepair(
         if (closed) return
         closed = true
         incumbentTrialPending = false
+        enlargedTrialPending = false
+        enlargedTrialProposal = null
         val resources = SearchInvocationResources()
         resources.own(authority)
         completion?.let(resources::own)
