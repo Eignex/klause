@@ -8,6 +8,10 @@ External lab plans read committed flat DIMACS inventories from `corpus-index/` a
 stored inputs by SHA256. Planning cannot fetch or materialize corpus bytes; unsupported metadata
 fails before downloading. Execution verifies each declared input before invoking the CLI.
 
+CLI JFR recordings retain up to 256 frames per stack. Ordinary resource measurements
+and CLI preflight keep their runtime options. Recorded stack truncation and analysis
+depth limits remain explicit; sampled stacks do not qualify production speedups.
+
 ## Build and run
 
 Run from the repository root with JDK 25 or newer:
