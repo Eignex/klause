@@ -682,27 +682,31 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
-    fun `scoped integer cuts should retract and reactivate with their endpoint assumption`() {
-        val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+    fun `scoped integer cuts should retract and reactivate across numerical queries`() {
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
+            setOf(x, y), linkedMapOf(
             "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
                 y to BigFraction.ofLong(2)), BigFraction.ofLong(4))),
-            "endpoint" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        ))
-        val scoped = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE))))
+            "x-lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y-lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+        val scoped = source.atScope(source.scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE))))
         val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(scoped, Cancellation.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 1.0, y to 0.5)).single()
-        val template = assertNotNull(assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never,
-            cuts = true)).withAdditional(listOf(cut), Cancellation.Never))
-        val id = assertNotNull(template.cuts).rows.lastIndex
+        val weaker = source.atScope(source.scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO))))
 
-        val weaker = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO))))
-        val installed = listOf(scoped, weaker, source, scoped).map { current ->
-            assertNotNull(LinearAuthorityQuery.prepare(current, template, Cancellation.Never,
-                cutMask = setOf(id))).installedCuts.contains(id)
+        val bounds = LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = listOf(cut)).use { authority ->
+            listOf(scoped, weaker, source, scoped).map { current ->
+                val result = authority.advance(current, Cancellation.Never, cuts = true)
+                val bound = assertNotNull(result.bound)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(current.withLinearAuthority()).verify(bound))
+                assertIs<SourceClaim.Bound>(bound.claim).value
+            }
         }
 
-        assertEquals(listOf(true, false, false, true), installed)
+        assertEquals(listOf(-1L, -2L, -2L, -1L).map { SourceValue.Rational(BigFraction.ofLong(it)) }, bounds)
     }
 
     @Test
