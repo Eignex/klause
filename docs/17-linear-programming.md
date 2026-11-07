@@ -769,6 +769,11 @@ allocation, capped at 16,384 work and 256 KiB, leaving capacity for continuous-r
 aggregation. Its scans, scalar normalization, failed attempts, proof references and
 retained rows debit the same containing generation and source funding. A shared
 immutable-generation index supplies stated integer endpoints to both recipe kinds.
+An established invocation bound can replace a missing or weaker stated endpoint.
+It contributes a typed bound assumption rather than an original-source premise or
+row owner. Every cut verification resolves that assumption in the current scope;
+retracting the bound withholds the cut. Scoped endpoint comparison, storage and
+publication spend the same generation allowance.
 It traverses the same consumer-owned premises and retains endpoints only for coordinates
 requested by completed aggregates. A fully funded scan records both present and
 missing sides; interrupted scans publish no partial cache. Singleton coordinate

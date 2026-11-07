@@ -642,6 +642,107 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `scoped integer endpoints should strengthen half rounding with checked assumptions`() {
+        for (upper in listOf(false, true)) {
+            val sign = if (upper) BigFraction.MINUS_ONE else BigFraction.ONE
+            val condition = if (upper) SourceCondition(upper = mapOf(x to sign))
+                else SourceCondition(lower = mapOf(x to sign))
+            val source = SourceProofContext(scope.copy(condition = condition), setOf(x, y), linkedMapOf(
+                "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3) * sign,
+                    y to BigFraction.ofLong(2)), BigFraction.ofLong(4))),
+                "endpoint" to SourcePremise(SourceInequality(mapOf(x to sign.negated()), BigFraction.ZERO)),
+            ))
+
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+                limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
+                point = mapOf(x to sign.toDouble(), y to 0.5)).single()
+
+            assertEquals(SourceInequality(mapOf(x to sign, y to BigFraction.ONE), BigFraction.ONE), cut.inequality)
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
+    }
+
+    @Test
+    fun `weaker scoped integer endpoints should preserve the stated bound authority`() {
+        val source = SourceProofContext(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO))),
+            setOf(x, y), linkedMapOf(
+                "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                    y to BigFraction.ofLong(2)), BigFraction.ofLong(4))),
+                "endpoint" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE),
+                    BigFraction.MINUS_ONE)),
+            ))
+
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            point = mapOf(x to 1.0, y to 0.5)).single()
+
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.atScope(scope)).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `scoped integer cuts should retract and reactivate with their endpoint assumption`() {
+        val source = SourceProofContext(scope, setOf(x, y), linkedMapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                y to BigFraction.ofLong(2)), BigFraction.ofLong(4))),
+            "endpoint" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val scoped = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE))))
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(scoped, Cancellation.Never,
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            point = mapOf(x to 1.0, y to 0.5)).single()
+        val template = assertNotNull(assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never,
+            cuts = true)).withAdditional(listOf(cut), Cancellation.Never))
+        val id = assertNotNull(template.cuts).rows.lastIndex
+
+        val weaker = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO))))
+        val installed = listOf(scoped, weaker, source, scoped).map { current ->
+            assertNotNull(LinearAuthorityQuery.prepare(current, template, Cancellation.Never,
+                cutMask = setOf(id))).installedCuts.contains(id)
+        }
+
+        assertEquals(listOf(true, false, false, true), installed)
+    }
+
+    @Test
+    fun `cancelled scoped endpoint publication should withhold its half rounding proposal`() {
+        val source = SourceProofContext(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE))),
+            setOf(x, y), mapOf("row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                y to BigFraction.ofLong(2)), BigFraction.ofLong(4)))))
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, _ -> if (name == "AggregateIntegerBoundScopedRetained") stopped = true },
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            point = mapOf(x to 1.0, y to 0.5))
+
+        assertTrue(stopped)
+        assertTrue(cuts.isEmpty())
+    }
+
+    @Test
+    fun `scoped integer rounding should strengthen the checked numerical bound`() {
+        val source = SourceProofContext(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE)),
+            objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)), setOf(x, y), linkedMapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                y to BigFraction.ofLong(2)), BigFraction.ofLong(4))),
+            "x-lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y-lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+
+        val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
+            authority.advanceWithPointCuts(source, Cancellation.Never)
+        }
+
+        assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
+            assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
+        assertTrue(CutFamily.AGGREGATION_MIR in result.cutBoundFamilies)
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.bound)))
+    }
+
+    @Test
     fun `integer endpoint lookup should ignore unrelated bounds within the production allowance`() {
         for (unrelatedCount in listOf(700, 1800)) {
             val premises = linkedMapOf(
@@ -1731,9 +1832,8 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
-    fun `half aggregation should decline an odd coefficient without a stated integer bound`() {
-        val source = SourceProofContext(scope.copy(condition = SourceCondition(lower = mapOf(y to BigFraction.ZERO))),
-            setOf(x, y, real), linkedMapOf(
+    fun `half aggregation should decline an odd coefficient without a source or scoped integer bound`() {
+        val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
                 "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
                     real to BigFraction.ONE), BigFraction.ONE)),
                 "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
