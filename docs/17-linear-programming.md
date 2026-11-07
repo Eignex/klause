@@ -742,8 +742,10 @@ per-attempt limits shared with explicit aggregation. Stopped or limited
 preparation reports its decline and leaves only completed proposals available.
 Point selection queries the current recipe before preparing optional aggregate
 pairs. A checked current incumbent or terminal bypasses discovery.
-Point-directed mixed-row pairs
-visit rows and incidence partners by increasing normalized absolute slack at the
+Point-directed mixed-row pairs skip ranking when only one pair is possible.
+Larger row sets admit ranking only when its bounded projection and sorting estimate
+uses at most half the remaining generation work and allocation; declined ranking
+retains source order. Admitted discovery visits rows and incidence partners by increasing normalized absolute slack at the
 relaxation point, with original source ordinals breaking ties. Unavailable or
 nonfinite projections follow scored rows in source order. Projection, sorting and
 temporary index storage debit the existing generation allowance. Source owners,
