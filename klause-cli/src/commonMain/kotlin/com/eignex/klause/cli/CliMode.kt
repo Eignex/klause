@@ -636,6 +636,10 @@ internal interface OutputProtocol {
         val continuous = continuousObjective?.takeIf(Double::isFinite)?.let { " continuousObjective=$it" }.orEmpty()
         println("%%%klause-arm: label=$arm objective=$objective$continuous time=$elapsedMs")
     }
+
+    fun onImprovement(arm: String, objective: BigFraction, elapsedMs: Long) {
+        println("%%%klause-arm: label=$arm objective=$objective time=$elapsedMs")
+    }
 }
 
 /** Per-invocation parsing + loading + output for one front-end. Created fresh per run via

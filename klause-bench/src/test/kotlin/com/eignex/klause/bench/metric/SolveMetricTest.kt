@@ -59,6 +59,20 @@ class SolveMetricTest {
         assertEquals(if (maximize) attribution.last() else attribution.first(), best)
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = [false, true])
+    fun `rational attribution should retain the best source timing beyond double precision`(maximize: Boolean) {
+        val smaller = Attribution("smaller", exactObjective = "27021597764222977/3", elapsedMs = 20, processElapsedMs = 120)
+        val larger = Attribution("larger", exactObjective = "27021597764222978/3", elapsedMs = 10, processElapsedMs = 110)
+        val result = SolverInvocation.Result(
+            true, null, null, proven = false, stats = emptyMap(), rawOutput = "", command = "cli",
+            attribution = listOf(larger, smaller),
+        )
+
+        assertEquals(10L to if (maximize) 10L else 20L, SolveMetric.timings(result, maximize))
+        assertEquals(110L to if (maximize) 110L else 120L, SolveMetric.processTimings(result, maximize))
+    }
+
     private fun stats(failure: Throwable) = SolveMetric.loadFailureRecord(
         ref,
         SolverInvocation.Settings(),
