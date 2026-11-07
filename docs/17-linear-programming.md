@@ -1144,7 +1144,9 @@ and logical column retain identical exact values and metadata. Equality-packing 
 fall back to replacement. Compatibility and layout setup use at most 65,536 modeled work
 and one MiB, debiting the containing source allowance. Append construction and basis work,
 including failed attempts, remain charged there. Source sides rebind and inactive masks
-retract through the same scoped trail. Cancellation publishes no changed guidance.
+retract through the same scoped trail. A grant pause retains completed sparse admission
+and append state for the same query, without another operation reservation. Guidance
+waits for renewed funding; cancellation publishes no changed guidance.
 Each query lifts multipliers through its own
 source-side mapping and checks the resulting derivation in its source scope.
 Auxiliary multiplier searches own separate temporary solvers. Neighborhood
