@@ -104,14 +104,16 @@ internal data class SourceNumericalAcquisition(
 // Exact-valued relaxation coordinates are guidance, including when a bound was certified.
 // Latest delivery reads the journal's delivered query, so archive retention never withholds a later query.
 // Prefix delivery reads only the archive and reports every query after its retention limit as unavailable.
-// The request names the projection this consumer reads; a query delivered after the archive stops holds only that.
+// The request names the delivered projection; inspection requires a prefix reader or an external observer.
 internal class SourceNumericalFeedback(
     private val funding: SourceLpFunding,
     private val cancellation: Cancellation,
     private val latest: Boolean = true,
     val request: LinearAuthorityFeedbackRequest = LinearAuthorityFeedbackRequest.Full,
 ) {
-    private var journal = LinearAuthorityCapture(64, 250_000L, 8L * 1024 * 1024, cancellation)
+    // A private prefix would construct full inspection records that latest delivery never reads.
+    private var journal = LinearAuthorityCapture(if (latest) 0 else 64, 250_000L,
+        8L * 1024 * 1024, cancellation)
     private val owned = journal
     private var chargedEntries = 0L
     private var chargedBytes = 0L

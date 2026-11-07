@@ -104,4 +104,5 @@ class NumericalFrontierSnapshotTest {
 
         assertFailsWith<IllegalStateException> { snapshot.bound(foreign) }
     }
+
 }

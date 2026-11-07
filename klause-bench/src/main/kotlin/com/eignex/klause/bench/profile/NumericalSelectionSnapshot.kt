@@ -33,8 +33,7 @@ internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
     }
 
     fun attach(invocation: Any): Any {
-        val feedback = field(checkNotNull(field(invocation, "component")), "feedback")
-        val journal = feedback?.let { checkNotNull(field(it, "journal")) } ?: journal()
+        val journal = journal()
         invocation.javaClass.getDeclaredMethod("captureTo", journal.javaClass).invoke(invocation, journal)
         return journal
     }
