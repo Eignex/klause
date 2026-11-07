@@ -186,25 +186,28 @@ internal class JointLinearRepair(
         return CheckedCenter(sample, value)
     }
 
-    private fun refreshedCutoff(cutoff: BigFraction?): BigFraction? {
-        if (cutoff == null || completion == null || stop()) return cutoff
-        val sample = external() ?: return cutoff
+    private fun refreshedCenter(center: CheckedCenter): CheckedCenter {
+        val cutoff = center.value ?: return center
+        if (completion == null || stop()) return center
+        val sample = external() ?: return center
         if (sample.algebraicReals != null || sample.symbolicReals != null ||
             (model.numRealVars != 0 && sample.exactReals?.size != model.numRealVars)
-        ) return cutoff
+        ) return center
         budget.observe(boundCertification = 1L + model.numBoolVars + model.numIntVars + model.numRealVars)
         val checking = completion.checking(stop)
-        if (checking()) return cutoff
+        if (checking()) return center
         val evidence = SourceEvidence(source.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
         if (SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence, checking) !=
             SourceEvidenceCheck.Checked
-        ) return cutoff
-        val value = objective?.evaluateExact(sample) ?: return cutoff
-        if (value >= cutoff) return cutoff
-        if (incumbentCompletionCheck?.invoke(sample, value, checking) == false || checking()) return cutoff
+        ) return center
+        val value = objective?.evaluateExact(sample) ?: return center
+        if (value >= cutoff) return center
+        if (incumbentCompletionCheck?.invoke(sample, value, checking) == false || checking()) return center
         observe("jointRepairCheckedCutoffRefreshes")
         compare("cutoff", "refreshed", completed = value, cutoff = cutoff)
-        return value
+        observe("jointRepairCheckedCenterRefreshes")
+        compare("center", "refreshed", completed = value, cutoff = cutoff)
+        return CheckedCenter(sample, value)
     }
 
     private fun queryObservations(authorityCuts: Set<String>): Map<String, Long> =
@@ -248,9 +251,17 @@ internal class JointLinearRepair(
                 val checked = preparedCenter?.takeIf { round == 0L &&
                     (cutoff == null || it.value?.let { value -> value < cutoff } == true)
                 } ?: checkedExternalCenter(cutoff)
-                val pooled = checked?.sample
-                val from = pooled?.let { sample ->
+                checked?.sample?.let { sample ->
                     observe("jointRepairImportedCenters")
+                    if (sample !== importedCenter) {
+                        importedCenter = sample
+                        onIncumbentImport?.invoke()
+                    }
+                }
+                val current = if (round == 0L && checked != null && checked === preparedCenter)
+                    refreshedCenter(checked) else checked
+                val pooled = current?.sample
+                val from = pooled?.let { sample ->
                     if (sample !== importedCenter) {
                         importedCenter = sample
                         onIncumbentImport?.invoke()
@@ -258,9 +269,7 @@ internal class JointLinearRepair(
                     List(model.numIntVars) { BigFraction.of(sample.exactIntValue(it), BIG_ONE) } +
                         sample.exactReals.orEmpty()
                 } ?: centers
-                val priorLimit = checked?.value ?: cutoff
-                val limit = if (round == 0L && checked != null && checked === preparedCenter)
-                    refreshedCutoff(priorLimit) else priorLimit
+                val limit = current?.value ?: cutoff
                 if (sourceInputPass && !adaptive && limit != null && limit != focusedCutoff) {
                     focusedCutoff = limit
                     focusedRemaining = sourceIntegers?.size ?: model.numIntVars

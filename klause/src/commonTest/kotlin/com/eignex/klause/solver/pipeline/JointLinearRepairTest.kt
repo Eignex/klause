@@ -43,7 +43,69 @@ import kotlin.test.assertTrue
 
 class JointLinearRepairTest {
     @Test
-    fun `a delayed prepared center should use a newer checked cutoff without changing its neighborhood`() {
+    fun `a delayed first neighborhood should improve from the newer checked center`() {
+        for (sign in listOf(1L, -1L)) {
+            val model = Problem(0,
+                intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+                factors = arrayOf(
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                    Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+                ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+            val objective = LinearObjective(intCoefficients = LongArray(3) { sign },
+                realCoefficients = doubleArrayOf(sign.toDouble()))
+            val source = assertNotNull(model.linearAuthorityContext(
+                objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+            val oldValue = if (sign > 0) 1L else 0L
+            var offered = Sample(BooleanArray(0), LongArray(3) { oldValue }, doubleArrayOf(oldValue.toDouble()),
+                exactReals = listOf(BigFraction.ofLong(oldValue)))
+            var offeredVersion = 1
+            var readVersion = 0
+            var importedVersion = 0
+            val imports = mutableListOf<Int>()
+            val uses = mutableListOf<Int>()
+            val events = mutableListOf<JointRepairComparison>()
+
+            JointLinearRepair(model, source, objective,
+                TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1), external = {
+                    readVersion = offeredVersion
+                    offered
+                }, onIncumbentImport = {
+                    importedVersion = readVersion
+                    imports += importedVersion
+                },
+                onIncumbentUse = { uses += importedVersion },
+                incumbentCompletionCheck = { _, _, _ -> true }, onComparison = { events += it }).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    search.advance(Cancellation.Never, 1)
+                    assertEquals(BigFraction.ofLong(4 * sign * oldValue),
+                        events.first { it.phase == "center" }.completedValue)
+                    offered = Sample(BooleanArray(0), LongArray(3) { 1 - oldValue },
+                        doubleArrayOf(oldValue.toDouble()), exactReals = listOf(BigFraction.ofLong(oldValue)))
+                    offeredVersion = 2
+                    var done = false
+                    repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+
+                    assertEquals(listOf(BigFraction.ofLong(sign * (3 - 2 * oldValue))),
+                        events.filter { it.phase == "query" }.map { it.cutoff })
+                    val result = assertIs<MinimizeResult.WithSample>(
+                        search.minimizeResult(TerminationReason.BudgetExhausted))
+                    assertEquals(BigFraction.ofLong(if (sign > 0) 0 else -4), objective.evaluateExact(result.sample))
+                    val evidence = SourceEvidence(source.scope, SourceClaim.Witness(result.sample),
+                        SourceDerivation.SourceWitness)
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
+                    assertEquals(listOf(1, 2), imports)
+                    assertEquals(listOf(2), uses)
+                    assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairCheckedCenterRefreshes"))
+                    assertEquals(0L, repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures") ?: 0L)
+                    assertTrue(done)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `a fresh point with unchanged discrete coordinates should preserve the neighborhood pins`() {
         for (sign in listOf(1L, -1L)) {
             val model = Problem(0,
                 intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
@@ -59,24 +121,62 @@ class JointLinearRepairTest {
             var offered = Sample(BooleanArray(0), LongArray(3) { oldValue }, doubleArrayOf(oldValue.toDouble()),
                 exactReals = listOf(BigFraction.ofLong(oldValue)))
             val events = mutableListOf<JointRepairComparison>()
-
             JointLinearRepair(model, source, objective,
                 TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1), external = { offered },
                 incumbentCompletionCheck = { _, _, _ -> true }, onComparison = { events += it }).use { repair ->
                 repair.search(adaptive = false).use { search ->
                     search.advance(Cancellation.Never, 1)
-                    assertEquals(BigFraction.ofLong(4 * sign * oldValue),
-                        events.first { it.phase == "center" }.completedValue)
-                    offered = Sample(BooleanArray(0), LongArray(3) { 1 - oldValue },
-                        doubleArrayOf(oldValue.toDouble()), exactReals = listOf(BigFraction.ofLong(oldValue)))
+                    offered = offered.copy(reals = doubleArrayOf((1 - oldValue).toDouble()),
+                        exactReals = listOf(BigFraction.ofLong(1 - oldValue)))
                     var done = false
                     repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
 
-                    assertEquals(listOf(BigFraction.ofLong(sign * (3 - 2 * oldValue))),
-                        events.filter { it.phase == "query" }.map { it.cutoff })
                     assertIs<MinimizeResult.Unknown>(search.minimizeResult(TerminationReason.BudgetExhausted))
+                    assertEquals(listOf(BigFraction.ofLong(sign * (1 + 2 * oldValue))),
+                        events.filter { it.phase == "query" }.map { it.cutoff })
+                    assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairCheckedCenterRefreshes"))
                     assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures"))
                     assertTrue(done)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `expired checking should withhold a refreshed center before its query opens`() {
+        for (limit in listOf("cancellation", "funding")) {
+            val model = Problem(0,
+                intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(2), null, null),
+                factors = emptyArray(), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+            val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(1.0))
+            val source = assertNotNull(model.linearAuthorityContext(
+                objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+            var offered = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(1.0),
+                exactReals = listOf(BigFraction.ONE))
+            var cancelled = false
+            var originalChecked = false
+            val events = mutableListOf<JointRepairComparison>()
+            val params = TheoryParams(sourceIncumbentCompletion = true, sourceLpWorkLimit = 1_000_000,
+                maxFlips = 1, cancellation = Cancellation { cancelled })
+            JointLinearRepair(model, source, objective, params, external = { offered },
+                incumbentCompletionCheck = { _, _, token ->
+                    originalChecked = true
+                    token.charge(if (limit == "funding") params.sourceLpWorkLimit else 1L)
+                    cancelled = limit == "cancellation"
+                    true
+                }, onComparison = { events += it }).use { repair ->
+                repair.search(adaptive = false).use { search ->
+                    search.advance(Cancellation.Never, 1)
+                    offered = offered.copy(ints = longArrayOf(0))
+                    var done = false
+                    repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+
+                    assertTrue(originalChecked)
+                    assertTrue(events.none { it.phase == "query" })
+                    assertEquals(0L,
+                        repair.stats.smt.completeSearchStages?.get("jointRepairCheckedCenterRefreshes") ?: 0L)
+                    assertIs<MinimizeResult.Unknown>(search.minimizeResult(TerminationReason.BudgetExhausted))
                 }
             }
         }
@@ -114,6 +214,8 @@ class JointLinearRepairTest {
                         events.filter { it.phase == "query" }.map { it.cutoff })
                     assertEquals(0L,
                         repair.stats.smt.completeSearchStages?.get("jointRepairExternalCompletionAttempts") ?: 0L)
+                    assertEquals(0L,
+                        repair.stats.smt.completeSearchStages?.get("jointRepairCheckedCenterRefreshes") ?: 0L)
                 }
             }
         }
