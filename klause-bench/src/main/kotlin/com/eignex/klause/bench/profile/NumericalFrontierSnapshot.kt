@@ -317,6 +317,7 @@ internal class NumericalFrontierSnapshot(
             ).newInstance(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
             val requestType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest")
             val sharingType = Class.forName("com.eignex.klause.solver.pipeline.LinearIncumbentSharing")
+            val guidanceType = Class.forName("com.eignex.klause.solver.pipeline.LinearRepairGuidance")
             val request = if (fullFeedback) requestType.getField("Companion").get(null).let { companion ->
                 companion.javaClass.getMethod("getFull").invoke(companion)
             } else null
@@ -326,10 +327,10 @@ internal class NumericalFrontierSnapshot(
                 Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType, Boolean::class.javaPrimitiveType,
                 Function1::class.java, Boolean::class.javaPrimitiveType, requestType, Boolean::class.javaPrimitiveType,
                 Function0::class.java, Function0::class.java, Boolean::class.javaPrimitiveType, sharingType,
-                Function3::class.java)
+                Function3::class.java, guidanceType)
                 .newInstance(context, params, { null }, state, history, null, frontier, false,
                     funding, frontier && params.sourceCuts, activeRows, supportBranching, null, latestFeedback,
-                    request, aggregateBranching, null, null, false, null, null)
+                    request, aggregateBranching, null, null, false, null, null, null)
         }
 
         fun run(
