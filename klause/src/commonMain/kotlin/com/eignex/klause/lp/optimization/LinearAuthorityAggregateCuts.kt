@@ -799,7 +799,7 @@ internal object LinearAuthorityAggregateCuts {
             meter.reserve(1L, 128L)
             val selected = linkedSetOf<SourceCoordinate>()
             val half = meter.number(BigFraction.ofLong(2).reciprocal())
-            fun distance(bound: LinearAuthorityAggregateTerm, coordinate: Double): Double {
+            fun distance(bound: IntegerBound, coordinate: Double): Double {
                 meter.reserve(4L, 128L)
                 val coefficient = meter.number(bound.inequality.coefficients.values.single())
                 meter.arithmetic(BigFraction.ONE, coefficient)
@@ -845,7 +845,7 @@ internal object LinearAuthorityAggregateCuts {
             val half = meter.number(BigFraction.ofLong(2).reciprocal())
             var selected: SourceCoordinate? = null
             var best = CutPool.MIN_EFFICACY
-            fun contribution(term: LinearAuthorityAggregateTerm, delta: BigFraction): BigFraction {
+            fun contribution(term: IntegerBound, delta: BigFraction): BigFraction {
                 meter.reserve(1L, 128L)
                 val coefficient = meter.number(term.inequality.coefficients.values.single())
                 meter.arithmetic(BigFraction.ONE, coefficient)
