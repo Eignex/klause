@@ -502,10 +502,12 @@ class Portfolio(
             val worker = workers[claim.arm]
             if (incumbent.offer(r.sample, candidate.objective) !is Publication.Installed) return
             val projectedProgress = if (needsProjectedProgress) {
-                val current = incumbents.progressValue(candidate.objective)
+                val sourceProgress = incumbents.sourceProgress
+                val current = if (sourceProgress == null) incumbents.progressValue(candidate.objective)
+                    else sourceProgress(r.sample)
                 val first = initialProgressValue
                 if (first == null) initialProgressValue = current
-                first != null && first.isFinite() && current.isFinite() && current < first
+                first != null && current != null && first.isFinite() && current.isFinite() && current < first
             } else false
             claim.acceptedIncumbents++
             run.endFeasibilityCoverage()

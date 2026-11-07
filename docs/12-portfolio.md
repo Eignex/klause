@@ -122,12 +122,16 @@ incumbent retained before the invocation does not supply fresh progress. Cancell
 queries and empty time grants cannot start capture.
 
 `companion-admission=value-funded` also requires a strict reduction in the projected
-canonical objective after removing its constant term. The first freshly accepted
-point supplies the invocation's baseline; retained incumbents do not supply it.
+checked original-source objective in original units after removing its original
+constant and restoring minimization direction. A model without a source objective
+uses its canonical value and constant. The first freshly accepted point supplies the invocation's baseline;
+retained incumbents do not supply it. Source scoring reconstructs and checks the
+point inside its publishing query and containing cancellation/time allowance.
 Exact improvements that project to the same value remain accepted and shared but
-do not start these workers. A non-finite projection supplies no start signal. This
-projection controls only construction and query eligibility, with the same paid
-capture, remaining-lifetime checks, worker coverage and exact publication authority.
+do not start these workers. An unavailable check or non-finite projection supplies
+no start signal. This projection controls only construction and query eligibility,
+with the same paid capture, remaining-lifetime checks, worker coverage and exact
+publication authority.
 
 Deferred capture is attempted once for the pair and charged inside the opening
 worker's query and active lifetime. Its preparation counters are subsets of that

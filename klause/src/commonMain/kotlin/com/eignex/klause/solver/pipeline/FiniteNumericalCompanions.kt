@@ -93,10 +93,11 @@ internal class FiniteNumericalCompanions private constructor(
     private val afterImprovement: Boolean = false,
     private val adaptiveRepair: Boolean = false,
     private val afterProjectedImprovement: Boolean = false,
+    sourceProgress: ((Sample) -> BigFraction?)? = null,
 ) {
     class Preparation(val companions: FiniteNumericalCompanions?, val elapsedNanos: Long)
 
-    val incumbents = PortfolioIncumbents.exact(objective)
+    val incumbents = PortfolioIncumbents.exact(objective, sourceProgress)
     private val completionSharing = if (params.sourceIncumbentCompletion && incumbentCompletionCheck != null)
         LinearIncumbentSharing() else null
 
@@ -230,9 +231,11 @@ internal class FiniteNumericalCompanions private constructor(
             cancellation: Cancellation, cost: WorkerConstructionCost, admission: FiniteCompanionAdmission,
             incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?,
             afterImprovement: Boolean = false, adaptiveRepair: Boolean = false,
-            afterProjectedImprovement: Boolean = false): FiniteNumericalCompanions =
+            afterProjectedImprovement: Boolean = false,
+            sourceProgress: ((Sample) -> BigFraction?)? = null): FiniteNumericalCompanions =
             FiniteNumericalCompanions(model, objective, null, params, cancellation, cost, true,
-                incumbentCompletionCheck, admission, afterImprovement, adaptiveRepair, afterProjectedImprovement)
+                incumbentCompletionCheck, admission, afterImprovement, adaptiveRepair, afterProjectedImprovement,
+                sourceProgress)
 
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
             cancellation: Cancellation, cost: WorkerConstructionCost,

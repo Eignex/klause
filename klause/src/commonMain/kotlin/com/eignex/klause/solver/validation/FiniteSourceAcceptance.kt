@@ -8,6 +8,8 @@ internal class FiniteSourceAcceptance(
     val permitsToleranceOptimum: Boolean,
     // Source objectives can differ from a rounded working auxiliary even when their displays tie.
     val objective: ((Sample) -> BigFraction?)? = null,
+    // Startup progress can use a different constant and scale from the canonical cutoff.
+    val progressObjective: ((Sample) -> BigFraction?)? = objective,
 ) : (Sample) -> Boolean {
     override fun invoke(sample: Sample): Boolean = accepts(sample)
 }

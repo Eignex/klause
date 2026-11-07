@@ -1,17 +1,26 @@
 package com.eignex.klause.portfolio
 
+import com.eignex.klause.ir.LinearSourceObjective
+import com.eignex.klause.ir.LinearSourceProblem
+import com.eignex.klause.ir.LinearSourceTerm
+import com.eignex.klause.ir.LinearSourceVariable
+import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.validation.LinearSourceCheck
+import com.eignex.klause.solver.validation.checkLinearSourceWitness
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.TestTimeSource
@@ -242,6 +251,78 @@ class PortfolioProgressTest {
             assertEquals(visible, queries > 0)
             assertTrue(proofQueries > 0)
         }
+    }
+
+    @Test
+    fun `deferred queries should follow checked source progress instead of working auxiliary progress`() {
+        for (maximize in listOf(false, true)) for (visible in listOf(false, true)) {
+            val offset = BigFraction.ofLong(Long.MAX_VALUE)
+            val source = LinearSourceProblem(
+                listOf(LinearSourceVariable("x", false, SemanticRational.ZERO, SemanticRational.ofLong(3))),
+                emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                    SemanticRational.ofLong(Long.MAX_VALUE),
+                    if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE))
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(0.0, 1.0))
+            val incumbents = PortfolioIncumbents.exact(objective) { sample ->
+                val checked = assertIs<LinearSourceCheck.Accepted>(checkLinearSourceWitness(
+                    source, listOf(requireNotNull(sample.exactReals).first()), Cancellation.Never))
+                val value = requireNotNull(checked.witness.objective) - offset
+                if (maximize) value.negated() else value
+            }
+            val epsilon = BigFraction.of(bigIntOf(1), parseBigInt("100000000000000000000"))
+            val first = BigFraction.ofLong(if (maximize) 1 else 2)
+            val near = if (maximize) first + epsilon else first - epsilon
+            val last = if (visible) BigFraction.ofLong(if (maximize) 2 else 1) else near
+            val values = listOf(first, near, last)
+            var offered = 0
+            var accepted = 0
+            var queries = 0
+            val base = ScriptedSearch({ true }) { }
+            val finder = object : ResumableSearch by base {
+                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
+                    base.runSlice(global, sliceMillis, sliceNodes) {
+                        val step = minOf(offered++, values.lastIndex)
+                        val cost = BigFraction.ofLong(3L - step)
+                        val sample = it.sample.copy(reals = doubleArrayOf(values[step].toDouble(), cost.toDouble()),
+                            exactReals = listOf(values[step], cost))
+                        onIncumbent(MinimizeResult.BestFound(sample, cost.toDouble(),
+                            TerminationReason.BudgetExhausted))
+                    }
+            }
+            val workers = listOf(trackingWorker("finder", 0, finder),
+                trackingWorker("deferred", 1, ScriptedSearch({ false }) {
+                    assertEquals(3, accepted)
+                    queries++
+                }).also { it.startAfterProjectedImprovement = true })
+
+            Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(16)).use {
+                it.minimize(Cancellation.Never, { accepted++ }, incumbents)
+            }
+
+            assertEquals(3, accepted)
+            assertEquals(visible, queries > 0)
+        }
+    }
+
+    @Test
+    fun `an unavailable source score should not fall back to working progress`() {
+        val incumbents = PortfolioIncumbents<Double>(valueOf = { it.objective },
+            improves = { candidate, standing -> candidate < standing }, approximateValue = { it },
+            gain = { standing, candidate -> standing - candidate }, sourceProgress = { null })
+        var queries = 0
+        val workers = listOf(trackingWorker("finder", 0, ScriptedSearch({ true }) { }),
+            trackingWorker("deferred", 1, ScriptedSearch({ false }) { queries++ })
+                .also { it.startAfterProjectedImprovement = true })
+
+        Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
+            reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(12)).use {
+            it.minimize(Cancellation.Never, null, incumbents)
+        }
+
+        assertTrue(requireNotNull(incumbents.exchange.current()).version > 1)
+        assertEquals(0, queries)
     }
 
     @Test

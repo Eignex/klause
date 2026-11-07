@@ -20,6 +20,7 @@ internal class PortfolioIncumbents<V>(
     val gain: (V, V) -> Double,
     private val upperBound: (V) -> Double = approximateValue,
     val progressValue: (V) -> Double = approximateValue,
+    val sourceProgress: ((Sample) -> Double?)? = null,
 ) {
     val exchange = IncumbentExchange<Sample, V>(improves)
 
@@ -36,13 +37,17 @@ internal class PortfolioIncumbents<V>(
     }
 
     companion object {
-        fun exact(objective: LinearObjective): PortfolioIncumbents<BigFraction> = PortfolioIncumbents(
+        fun exact(
+            objective: LinearObjective,
+            sourceProgress: ((Sample) -> BigFraction?)? = null,
+        ): PortfolioIncumbents<BigFraction> = PortfolioIncumbents(
             valueOf = { objective.evaluateExact(it.sample) },
             improves = { candidate, standing -> candidate < standing },
             approximateValue = { it.toDouble() },
             gain = { standing, candidate -> (standing - candidate).toDouble() },
             upperBound = ::roundedUpperBound,
             progressValue = { (it - BigFraction.ofLong(objective.constant)).toDouble() },
+            sourceProgress = sourceProgress?.let { score -> { sample -> score(sample)?.toDouble() } },
         )
 
         fun algebraic(

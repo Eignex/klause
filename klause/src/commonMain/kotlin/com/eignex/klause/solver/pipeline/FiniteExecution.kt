@@ -599,9 +599,20 @@ internal fun FinitePipeline.solve(
     val sourceCheck: ((Sample) -> Boolean)? = if (linearSource == null) {
         request.toleranceCheck?.let { check ->
             FiniteSourceAcceptance(check, permitsToleranceOptimum && check.permitsToleranceOptimum(),
-                (check as? FiniteSourceAcceptance)?.objective)
+                (check as? FiniteSourceAcceptance)?.objective, (check as? FiniteSourceAcceptance)?.progressObjective)
         }
     } else {
+        val sourceObjective = linearSource.view.source.objective
+        fun checkedValue(sample: Sample, progress: Boolean): BigFraction? {
+            val checked = linearSource.check(sample, stop) as? LinearSourceCheck.Accepted ?: return null
+            var value = checked.witness.objective ?: return null
+            if (progress) {
+                val constant = requireNotNull(sourceObjective).constant
+                value -= BigFraction.of(constant.numerator, constant.denominator)
+            }
+            val directed = if (sourceObjective?.sense == ObjectiveSense.MAXIMIZE) value.negated() else value
+            return if (progress) directed else directed * linearSource.view.objectiveScale
+        }
         FiniteSourceAcceptance(
             { sample ->
                 linearSource.check(sample, stop) is LinearSourceCheck.Accepted &&
@@ -610,14 +621,8 @@ internal fun FinitePipeline.solve(
             permitsToleranceOptimum =
                 permitsToleranceOptimum &&
                     (request.toleranceCheck == null || request.toleranceCheck.permitsToleranceOptimum()),
-            objective = if (linearSource.view.source.objective == null) null else { sample ->
-                val checked = linearSource.check(sample, stop) as? LinearSourceCheck.Accepted
-                checked?.witness?.objective?.let { value ->
-                    val scaled = value * linearSource.view.objectiveScale
-                    if (linearSource.view.source.objective.sense == ObjectiveSense.MAXIMIZE)
-                        scaled.negated() else scaled
-                }
-            },
+            objective = if (sourceObjective == null) null else { sample -> checkedValue(sample, false) },
+            progressObjective = if (sourceObjective == null) null else { sample -> checkedValue(sample, true) },
         )
     }
     val execution = execute(
@@ -652,6 +657,9 @@ internal fun FinitePipeline.solve(
                 sourceCheck?.let { check ->
                     FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum(),
                         (check as? FiniteSourceAcceptance)?.objective?.let { score ->
+                            { sample -> score(preparation.reconstruct(sample)) }
+                        },
+                        (check as? FiniteSourceAcceptance)?.progressObjective?.let { score ->
                             { sample -> score(preparation.reconstruct(sample)) }
                         })
                 }

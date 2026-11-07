@@ -30,6 +30,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.Cancellation
 
@@ -148,7 +149,8 @@ internal fun FinitePipeline.portfolioExecutor(
         FiniteNumericalCompanions.deferred(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, requireNotNull(companionEligibility).requirements.construction, companionAdmission,
             incumbentCompletionCheck, afterImprovement = waitForCompanionImprovement,
-            adaptiveRepair = adaptiveCompanionRepair, afterProjectedImprovement = waitForProjectedCompanionImprovement)
+            adaptiveRepair = adaptiveCompanionRepair, afterProjectedImprovement = waitForProjectedCompanionImprovement,
+            sourceProgress = (scenario.toleranceCheck as? FiniteSourceAcceptance)?.progressObjective)
     } else companionPreparation?.companions
     companionEligibility?.let { eligibility ->
         val declines = if (companionAdmission?.initiallyFunded == false) listOf("companion-lifetime-unfunded")
