@@ -1603,3 +1603,8 @@ or finish probing without a partition; require actual task observations before
 claiming task use. Probe work is a subset of worker work, while ordinary schedule
 charges retain reservations and coordinator checks. Native closures do not supply
 independent proof checking.
+
+`lab profile` with `klause-bench/lab/bt-retirement.json` accepts `source-path`,
+`sha256` and `seeds`. It records bounded raw native policy and watch snapshots
+beside unobserved and observed resumable controls. Native verdicts in these
+diagnostic records require separate original-source validation.

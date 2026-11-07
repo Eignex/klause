@@ -51,6 +51,11 @@ internal class NativeSatState(private val state: PropagationState) {
     private var capCalls = 0L
     private var capWork = 0L
     private var capVisits = 0L
+    internal val capWindowPending: Boolean get() = capRanking.hasPending
+    internal val capTraversalVisits: Long get() = capVisits
+    internal val capContinuationCursor: Long get() = capRanking.continuationCursor
+    internal val capContinuationHeap: Long get() = capRanking.continuationHeap
+    internal val capContinuationOperation: Long get() = capRanking.continuationOperation
     private var capBoundaryDefers = 0L
     private var capPreparationDefers = 0L
     private var capPendingReplayCalls = 0L
@@ -184,16 +189,46 @@ internal class NativeSatState(private val state: PropagationState) {
         watchSizes[lit] = entries.size
     }
 
-    private fun watchRemovalWork(lit: Int): Long = checkNotNull(watchEntries[lit]).removalWork + 4L
+    private fun orderedWatchCopies(lit: Int, index: Int): Int {
+        val count = watchSizes[lit] - index - 1
+        return if (count <= MAX_ORDERED_CLEANUP_COPIES) count else -1
+    }
 
-    /** Swap-pop the watcher at [idx] in literal [lit]'s lists. The caller funds the removal. */
-    private fun removeWatchAt(lit: Int, idx: Int) {
+    private fun watchRemovalWork(lit: Int, copies: Int = -1): Long =
+        checkNotNull(watchEntries[lit]).removalWork + 4L + copies.coerceAtLeast(0) * 2L
+
+    private fun removeWatchAt(lit: Int, idx: Int, copies: Int = -1) {
         val entries = checkNotNull(watchEntries[lit])
-        entries[idx] = entries[entries.size - 1]
+        if (copies >= 0) {
+            for (offset in 0 until copies) entries[idx + offset] = entries[idx + offset + 1]
+        } else entries[idx] = entries[entries.size - 1]
         entries.removeLast()
         watchSizes[lit] = entries.size
         if (entries.size == 0) watchEntries[lit] = null
         if (lit == watchCleanupLiteral && idx < watchCleanupIndex) watchCleanupIndex = idx
+    }
+
+    private fun nextLiveWatch(lit: Int, start: Int): Int {
+        val entries = checkNotNull(watchEntries[lit])
+        var index = start
+        while (index < watchSizes[lit]) {
+            state.work++
+            if (!isRetired(entries[index].toInt())) return index
+            index++
+        }
+        return index
+    }
+
+    private fun trimRetiredWatchTail(lit: Int, index: Int) {
+        if (retiredCount == 0 && retiredRootSources == null) return
+        val entries = checkNotNull(watchEntries[lit])
+        while (watchSizes[lit] - 1 > index) {
+            state.work++
+            val last = watchSizes[lit] - 1
+            if (!isRetired(entries[last].toInt())) return
+            state.work += watchRemovalWork(lit)
+            removeWatchAt(lit, last)
+        }
     }
 
     internal fun sweepRetiredWatches(budget: ReclamationPreparation) =
@@ -216,9 +251,11 @@ internal class NativeSatState(private val state: PropagationState) {
                 watchCleanupIndex = 0
             } else if (entries[watchCleanupIndex].toInt() >= baseCount &&
                 retiredOf(entries[watchCleanupIndex].toInt() - baseCount)) {
-                budget.visit(watchRemovalWork(watchCleanupLiteral))
+                var copies = orderedWatchCopies(watchCleanupLiteral, watchCleanupIndex)
+                if (copies >= 0 && watchRemovalWork(watchCleanupLiteral, copies) > budget.remainingWork) copies = -1
+                budget.visit(watchRemovalWork(watchCleanupLiteral, copies))
                 budget.visit(0L)
-                removeWatchAt(watchCleanupLiteral, watchCleanupIndex)
+                removeWatchAt(watchCleanupLiteral, watchCleanupIndex, copies)
             } else watchCleanupIndex++
             budget.advanced()
         }
@@ -896,13 +933,27 @@ internal class NativeSatState(private val state: PropagationState) {
     private fun propagateFalse(falseLit: Int): Boolean {
         val entries = watchEntries[falseLit] ?: return true
         var wi = 0
+        var liveScan = 0
         while (wi < watchSizes[falseLit]) {
             state.work++
             val entry = entries[wi]
             val h = entry.toInt()
             if (isRetired(h)) {
-                state.work += watchRemovalWork(falseLit)
-                removeWatchAt(falseLit, wi)
+                // Unprocessed slots before the scan cursor contain only retired postings.
+                val next = nextLiveWatch(falseLit, maxOf(wi + 1, liveScan))
+                liveScan = next + 1
+                if (next < watchSizes[falseLit]) {
+                    val rewind = falseLit == watchCleanupLiteral && wi < watchCleanupIndex
+                    state.work += if (rewind) 4L else 3L
+                    entries[wi] = entries[next]
+                    entries[next] = entry
+                    if (rewind) watchCleanupIndex = wi
+                } else {
+                    while (watchSizes[falseLit] > wi) {
+                        state.work += watchRemovalWork(falseLit)
+                        removeWatchAt(falseLit, watchSizes[falseLit] - 1)
+                    }
+                }
                 continue
             }
             val blocker = (entry ushr 32).toInt()
@@ -928,6 +979,7 @@ internal class NativeSatState(private val state: PropagationState) {
             val scanStart = if (baseClause) 0 else metadata[h - baseCount, NativeLearnedMetadata.SCAN]
             val replacement = findNonFalse(lits, start, len, lIdx, otherIdx, scanStart)
             if (replacement >= 0) {
+                trimRetiredWatchTail(falseLit, wi)
                 if (!baseClause) {
                     metadata[h - baseCount, NativeLearnedMetadata.SCAN] =
                         if (replacement + 1 == len) 0 else replacement + 1
@@ -971,6 +1023,7 @@ internal class NativeSatState(private val state: PropagationState) {
     private companion object {
         const val RETIRED = 4
         const val RECENT_USED = 8
+        const val MAX_ORDERED_CLEANUP_COPIES = 128
         // Poll the deadline every 4096 propagated literals.
         const val CANCEL_POLL_MASK = 0xFFF
     }
