@@ -741,7 +741,11 @@ proposals under 500,000 preparation work and 8 MiB modeled allocation, with
 per-attempt limits shared with explicit aggregation. Stopped or limited
 preparation reports its decline and leaves only completed proposals available.
 Point selection queries the current recipe before preparing optional aggregate
-pairs. A checked current incumbent or terminal bypasses discovery. A completed
+pairs. A checked current incumbent or terminal bypasses discovery. When a funded
+exact comparison finds the same ordered cut families, owners and inequalities as
+the fully checked active current recipe, preparation keeps its query and proofs
+without another proof pass or scoring scan. Comparison work and allocation share
+the containing point allowance; an incomplete comparison supplies no reuse claim. A completed
 nonterminal point can prepare aggregates alongside point-directed row alternatives
 under 65,536 work and 1 MiB modeled allocation. Ordinary aggregate-only queries keep
 their 500,000-work and 8 MiB limits. An installed aggregate recipe with at most 64
