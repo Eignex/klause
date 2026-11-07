@@ -314,7 +314,9 @@ Unsupported or overflowing bounds retain the missing-observation fallback.
 The `lp-default` and `lp-aggressive` optimization recipes enable the passive finite consumer; direct
 `BacktrackParams` and other recipes opt in through `lpDirectionalGains` or
 `lp-directional-gains=true`. The execution setting can also disable it. LP bounding
-and branching must be enabled. The reduced-cost/fractionality scorer supplies its
+and branching must be enabled. Disabled directional gains collect no history or
+retained model scope and charge no history bookkeeping. Ordinary LP value preferences
+and reduced-cost scores remain available. The reduced-cost/fractionality scorer supplies its
 winning variable. A bounded scan also nominates the largest reliable passive score
 among unassigned variables, including variables outside the reduced-cost leaders.
 When both candidates have reliable predictions, comparable gains select the winner;
