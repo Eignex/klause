@@ -385,7 +385,7 @@ class LpHintsTest {
             }
         }
 
-        assertEquals(listOf(null, VarRef.IntVar(1), null, null, null), proposals)
+        assertEquals(listOf<VarRef?>(null, VarRef.IntVar(1), null, null, null), proposals)
         assertEquals(4, queries)
     }
 
