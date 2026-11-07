@@ -543,10 +543,12 @@ semantics and coordinate frame identify retained attempts; failed attempts canno
 renew their allowance.
 
 Enabled repair's first checked center frees at most two connected integers.
-Before its first proposal, a prepared center can retain its neighborhood while a
-newer exact pooled point tightens the cutoff. The point must pass working-model and
-original-source checks within the existing funding. Advisory points cannot supply
-this refresh, and it performs no additional residual completion.
+Before its first proposal, a newer exact pooled point can replace the prepared
+center and tighten the cutoff. Working-model and original-source checks use the
+existing funding. The connected-integer selection rule stays fixed; unchanged
+discrete coordinates preserve the pins. Advisory points cannot supply this refresh,
+and it performs no additional residual completion. Imports retain their read/use
+identity and supply no discovery reward. A paused query retains its condition.
 The opt-in `companion-repair=adaptive` requires `source-incumbent-completion=true`
 and uses the existing adaptive width sequence after that small start. Fixed repair
 is the default. If a small checked-center trial is refuted or its checked improvement
