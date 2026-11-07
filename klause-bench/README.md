@@ -1603,3 +1603,16 @@ or finish probing without a partition; require actual task observations before
 claiming task use. Probe work is a subset of worker work, while ordinary schedule
 charges retain reservations and coordinator checks. Native closures do not supply
 independent proof checking.
+
+
+`lab/bt-trajectory.json` captures ordered decisions, conflicts, restarts and learned sweeps
+for one hash-pinned DIMACS source and up to two seeds. Each seed runs a fresh plain
+control and a selector-observed native `clausal-balanced` search through the public
+resumable handle. The global diagnostic deadline is 60 seconds; each call uses
+`sliceMillis=Long.MAX_VALUE` and `sliceNodes=-1`, allowing the engine's maintenance
+pauses to resume without another scheduler or work allowance override. The SDK
+worktree supplies installed-build provenance and the adapter registers every
+produced source, provenance, request, record and trace file. Compare completed
+control counters before interpreting trace prefixes. The 131,072-event output cap
+does not stop search; native verdicts and diagnostic timings do not qualify
+independent source validation or ordinary completion performance.
