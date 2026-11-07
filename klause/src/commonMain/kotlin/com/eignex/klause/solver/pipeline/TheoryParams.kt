@@ -105,8 +105,6 @@ data class TheoryParams(
     val sourceCuts: Boolean = true,
     /** Select checked source cuts at completed numerical frontier points. */
     val sourcePointCuts: Boolean = false,
-    /** Rank numerical frontier integer splits by installed checked cut supports without proof authority. */
-    val sourceCutBranching: Boolean = false,
     /** Enable bounded source-bound aggregation for numerical frontier traversal. */
     val sourceAggregateCuts: Boolean = false,
     /** Reuse checked refutations within one numerical traversal under their proved source restrictions. */
@@ -119,6 +117,8 @@ data class TheoryParams(
     val sourceIncumbentCompletion: Boolean = false,
     /** Schedule touched linear rows and deliver explained interval consequences before numerical checks. */
     val openLinearIncremental: Boolean = true,
+    /** Rank numerical frontier integer splits by installed checked cut supports without proof authority. */
+    val sourceCutBranching: Boolean = false,
 ) {
     init {
         require(sourceLpWorkLimit >= 0 && sourceLpAllocationLimit >= 0 && sourceLpOperations >= 0)
