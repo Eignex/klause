@@ -51,7 +51,7 @@ internal class LinearAuthorityRowAppend(
             same(left.bounds.upper, right.bounds.upper)
 
     fun append(owner: LpScopedSolver, after: ExactLpModel): Boolean {
-        val before = owner.state.model
+        val before = owner.state.baseModel
         if (owner.floatPaused || before.n != after.n || after.m <= before.m ||
             after.m - before.m > 64 || !charge(1L, 256L)) return false
         val first = before.objective
