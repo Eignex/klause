@@ -690,11 +690,15 @@ class LinearAuthorityAggregateCutsTest {
             "x-lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
             "y-lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
         ), mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
-        val scoped = source.atScope(source.scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ONE))))
+        val scoped = source.atScope(source.scope.copy(
+            condition = SourceCondition(lower = mapOf(x to BigFraction.ONE)),
+        ))
         val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(scoped, Cancellation.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 1.0, y to 0.5)).single()
-        val weaker = source.atScope(source.scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO))))
+        val weaker = source.atScope(source.scope.copy(
+            condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO)),
+        ))
 
         val bounds = LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = listOf(cut)).use { authority ->
             listOf(scoped, weaker, source, scoped).map { current ->
@@ -1200,16 +1204,26 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
-    fun `integer row recipes should decline a domain-only endpoint`() {
+    fun `integer row recipes should retain scoped endpoint authority`() {
         val source = SourceProofContext(scope.copy(condition = SourceCondition(lower = mapOf(y to BigFraction.ZERO))),
             setOf(x, y), mapOf("row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
                 y to BigFraction.ofLong(3)), BigFraction.ofLong(3)))))
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
-            point = mapOf(x to 0.75, y to 0.5))
+            point = mapOf(x to 0.75, y to 0.5)).single()
 
-        assertTrue(cuts.isEmpty())
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
+            cut.inequality)
+        assertEquals(setOf(0), cut.owners)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        val unscoped = source.atScope(scope)
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(unscoped).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        assertTrue(LinearAuthorityAggregateCuts.prepareSourcePairs(unscoped, Cancellation.Never,
+            limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            point = mapOf(x to 0.75, y to 0.5)).isEmpty())
     }
 
     @Test
@@ -1767,7 +1781,7 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
-    fun `integer point sides should require each selected upper endpoint as a source premise`() {
+    fun `integer point sides should retain scoped upper endpoint authority`() {
         val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
         val source = SourceProofContext(scope.copy(condition = SourceCondition(upper = mapOf(y to BigFraction.ONE))),
             setOf(x, y, z, real), linkedMapOf(
@@ -1781,9 +1795,18 @@ class LinearAuthorityAggregateCutsTest {
             ))
         val point = mapOf(x to 0.75, y to 0.75, z to 0.25, real to -0.75)
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never, point = point)
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never, point = point).single()
 
-        assertTrue(cuts.isEmpty())
+        assertEquals(SourceInequality(mapOf(x to BigFraction.ofLong(2), y to BigFraction.ofLong(2),
+            z to BigFraction.ONE), BigFraction.ofLong(3)), cut.inequality)
+        assertEquals(setOf(0, 1, 3), cut.owners)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        val unscoped = source.atScope(scope)
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(unscoped).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        assertTrue(LinearAuthorityAggregateCuts.prepareSourcePairs(unscoped, Cancellation.Never,
+            point = point).isEmpty())
     }
 
     @Test
