@@ -504,6 +504,7 @@ internal class LpHints(
         domain: IntDomain?,
         alternatives: List<SearchDecision>,
         reserve: (Long) -> Boolean,
+        admit: (LpModel) -> Boolean = { true },
         estimate: (LpProbeSource, IntArray, LongArray) -> List<LpDirectionalValues>?,
     ): List<SearchDecision> {
         if (!selectedVariableProbeMode || !probeChildOrder || !collect || basisVerificationAttempted ||
@@ -522,6 +523,12 @@ internal class LpHints(
         if (!(firstUp && alternatives[1].matchesSide(variable, split, up = false)) &&
             !(firstDown && alternatives[1].matchesSide(variable, split, up = true))
         ) return alternatives
+        charge(8L)
+        observe("SELECTED_SIDE_PROBE_ADMISSION_CHECK")
+        if (!admit(relaxation.model)) {
+            observe("SELECTED_SIDE_PROBE_DEFERRED")
+            return alternatives
+        }
         basisVerificationAttempted = true
         pointProbed = true
         lastProbeState = relaxation.model.exactState

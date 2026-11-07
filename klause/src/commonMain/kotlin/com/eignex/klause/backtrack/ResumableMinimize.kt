@@ -1389,6 +1389,9 @@ internal class ResumableMinimize(
                     return hints.selectProbedAlternatives(variable,
                         (variable as? VarRef.IntVar)?.let { session.intDomain(it.varId) }, alternatives,
                         reserve = lpEngine::reserveProbeWork,
+                        admit = { model ->
+                            lpEngine.canPrepareDirectionalChildren(model, hints.probeComparisonFollowupWork)
+                        },
                         estimate = { source, columns, splits ->
                             lpEngine.directionalValues(source, columns, splits, hints.probeComparisonFollowupWork)
                         })

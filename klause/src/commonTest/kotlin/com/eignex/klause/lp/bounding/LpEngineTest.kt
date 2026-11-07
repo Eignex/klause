@@ -14,6 +14,7 @@ import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.EngineConstruction
 import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpCertifier
 import com.eignex.klause.lp.engine.LpEngineFactory
@@ -29,6 +30,7 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.lp.engine.PersistentLpSolver
 import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.RecordingLpEngineFactory
+import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpAssemblyCancelled
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
@@ -54,6 +56,67 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LpEngineTest {
+    @Test
+    fun `directional preparation admission preserves its grant without numerical queries`() {
+        for (variables in listOf(2, 4096)) {
+            val problem = Problem(0, variables, Array(variables) { IntDomain(0, 1) }, emptyArray())
+            val builder = LpBuilder()
+            repeat(variables) { builder.addVar(0, 1, cost = 1) }
+            val model = builder.build(Sense.MINIMIZE)
+            val factory = RecordingLpEngineFactory()
+            var allowance = 0L
+            LpEngine(problem, LinearObjective(intCoefficients = LongArray(variables) { 1L }),
+                LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("directional-preparation"),
+                LpSolveContext(factory), nodeWorkAllowance = { allowance }).use { engine ->
+                val work = engine.totalSolveWork()
+                assertFalse(engine.canPrepareDirectionalChildren(model, 80L))
+
+                allowance = 10_000L
+                repeat(2) {
+                    assertEquals(variables == 2, engine.canPrepareDirectionalChildren(model, 80L))
+                }
+
+                assertEquals(work, engine.totalSolveWork())
+                assertTrue(factory.floatAllowances.isEmpty())
+                assertTrue(engine.reserveProbeWork(10_000L))
+                assertFalse(engine.reserveDirectionalWork(1L))
+            }
+        }
+    }
+
+    @Test
+    fun `directional preparation admission respects the held followup allowance`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val builder = LpBuilder()
+        builder.addVar(0, 1, cost = 1)
+        val model = builder.build(Sense.MINIMIZE)
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink("directional-followup")).use { engine ->
+            for ((followup, funded) in listOf(80L to true, 10_000L to false, Long.MAX_VALUE to false)) {
+                assertEquals(funded, engine.canPrepareDirectionalChildren(model, followup))
+            }
+        }
+    }
+
+    @Test
+    fun `directional preparation admission declines after cancellation`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
+        val builder = LpBuilder()
+        builder.addVar(0, 1, cost = 1)
+        val model = builder.build(Sense.MINIMIZE)
+        var cancelled = false
+        LpEngine(problem, LinearObjective(intCoefficients = longArrayOf(1)),
+            LpParams(lpPlan = LpPlan(bounding = true), cancellation = Cancellation { cancelled }),
+            SolveStatsSink("directional-cancelled-preparation")).use { engine ->
+            assertTrue(engine.canPrepareDirectionalChildren(model, 80L))
+
+            cancelled = true
+
+            assertFalse(engine.canPrepareDirectionalChildren(model, 80L))
+            assertFalse(engine.reserveProbeWork(20L))
+        }
+    }
+
     @Test
     fun `linear bound should release branch costs when first read after a backtrack`() {
         val problem = Problem(2, 1, arrayOf(IntDomain(0, 1)), emptyArray())

@@ -9,6 +9,11 @@ internal data class LpDirectionalValues(val down: Double, val up: Double)
 
 internal data class LpProbeSource(val model: LpModel, val basis: Basis)
 
+internal fun directionalChildPreparationBound(model: LpModel): Long =
+    probeWorkspaceWork(model) + LpScalingView.constructionWorkBound(model) + 2L * model.numVars + model.m + 1L
+
+private fun probeWorkspaceWork(model: LpModel): Long = 16L * model.numVars + 40L * model.m + 64L
+
 internal enum class LpProbeDecline {
     CANCELLED, ALLOWANCE, OWNER, BUSY, STALE_POINT, NO_OPTIMUM, NO_POINT, SPLIT, CHILD,
 }
@@ -146,7 +151,7 @@ internal class LpDirectionalProbes(
             budget.prepare(projection.work)
         }
         child ?: return budget.stop(LpProbeDecline.CHILD)
-        val workspace = 16L * child.numVars + 40L * child.m + 64L
+        val workspace = probeWorkspaceWork(child)
         val scaling = LpScalingView.constructionWorkBound(child)
         if (workspace >= budget.remaining() || scaling >= budget.remaining() - workspace) {
             budget.decline = LpProbeDecline.ALLOWANCE

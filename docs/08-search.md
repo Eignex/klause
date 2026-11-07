@@ -326,8 +326,15 @@ querying. The smaller minimized child objective is visited first. Both alternati
 remain unchanged, including their cuts. A tie within `1e-9`, nonfinite value,
 unfinished comparison or changed source retains the original order.
 
-One selected-column attempt belongs to each search owner. The opportunity is spent
-before its 20-unit reservation, including an unfunded or cancelled attempt; history
+Admission first prices the current layout's workspace, scaling construction bound and
+objective scan for two children, plus request preparation and the held follow-up work.
+It reads the existing offered allowance without reserving or increasing it. An
+insufficient allowance retains the opportunity for a later compatible point;
+`SELECTED_SIDE_PROBE_DEFERRED` distinguishes that state from an admitted attempt.
+Each admission check charges eight work units. The estimate excludes bound projection
+and numerical solving, so an admitted query can still stop before completion.
+One selected-column attempt belongs to each search owner. Its opportunity is spent
+after admission and before its 20-unit reservation, including an unfunded or cancelled attempt; history
 resets, restarts and slices do not replenish it. The query uses the existing private
 probe and containing LP allowance, holding 80 units for completion and application.
 The two finite child values are used immediately and are not retained as history or

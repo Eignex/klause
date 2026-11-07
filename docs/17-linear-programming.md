@@ -1353,6 +1353,11 @@ Decline diagnostics distinguish exhausted work, cancellation, unavailable owners
 unfinished solves, stale points, missing optima and invalid splits. A declined
 comparison retains its completed-child count without supplying partial advice.
 The caller owns probe admission and cadence.
+Selected-child admission reads the current layout's two workspace/scaling/scan
+construction bounds before requesting scratch work. The model-facing owner compares
+that price and the completion hold with its existing offered numerical allowance;
+the check reserves no work and grows no grant. Projection and solving still use their
+ordinary metered limits, so admission alone supplies no completed-query promise.
 
 A retained numerical owner can expose a private solve cursor. It suspends between
 iterations, retaining the current phase, factors, artificial seats, pricing state

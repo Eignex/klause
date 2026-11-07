@@ -791,6 +791,50 @@ class LpHintsTest {
     }
 
     @Test
+    fun `deferred selected variable probes retain a funded lifetime opportunity`() {
+        val charged = ArrayList<Long>()
+        for (applyAdvice in listOf(false, true)) {
+            val builder = LpBuilder()
+            builder.addVar(0, 3)
+            val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                BooleanArray(1), 0L, intArrayOf(0), IntArray(0))
+            val events = ArrayList<String>()
+            var work = 0L
+            val hints = LpHints(1, 0, directionalGains = true, selectedVariableProbeMode = true,
+                probeChildOrder = true, applyAdvice = applyAdvice, observe = events::add, charge = { work += it })
+            val alternatives = listOf(SearchDecision.IntAtMost(0, 0), SearchDecision.IntAtLeast(0, 1))
+            var admissions = 0
+            var reservations = 0
+            var queries = 0
+            repeat(3) { iteration ->
+                if (iteration != 1) {
+                    hints.resetHistory()
+                    hints.beginNode(1, 100.0)
+                    hints.record(relaxation, doubleArrayOf(0.5), DoubleArray(0))
+                    hints.recordBound(relaxation, 10.0)
+                    hints.recordProbeBasis(relaxation, Basis(IntArray(0), arrayOf(VarStatus.AT_LOWER)))
+                }
+
+                val ordered = hints.selectProbedAlternatives(VarRef.IntVar(0), IntDomain(0, 3), alternatives,
+                    reserve = { reservations++; true },
+                    admit = { admissions++; iteration > 0 },
+                    estimate = { _, _, _ -> queries++; listOf(LpDirectionalValues(14.0, 11.0)) })
+
+                assertEquals(if (iteration == 1 && applyAdvice) alternatives.reversed() else alternatives, ordered)
+                assertEquals(if (iteration == 0) 0 else 1, queries)
+                assertEquals(if (iteration == 0) 0 else 1, reservations)
+            }
+            assertEquals(2, admissions)
+            assertEquals(2, events.count { it == "SELECTED_SIDE_PROBE_ADMISSION_CHECK" })
+            assertEquals(1, events.count { it == "SELECTED_SIDE_PROBE_DEFERRED" })
+            assertEquals(1, events.count { it == "SELECTED_SIDE_PROBE_ATTEMPT" })
+            charged += work
+        }
+        assertEquals(charged[0], charged[1])
+    }
+
+    @Test
     fun `selected variable probe attempts stay spent across history resets`() {
         for (funded in listOf(false, true)) {
             val builder = LpBuilder()

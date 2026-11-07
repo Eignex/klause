@@ -60,6 +60,7 @@ import com.eignex.klause.lp.engine.LpSolveSession
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.PersistentLpSolver
+import com.eignex.klause.lp.engine.directionalChildPreparationBound
 import com.eignex.klause.lp.engine.newPersistentLpSolver
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.lpHullFamily
@@ -1223,8 +1224,8 @@ internal class LpEngine(
         initialOps = MIN_NODE_WORK_OPS,
     )
 
-    private fun remainingDirectionalWork(): Long {
-        var allowance = branchWorkAllowance
+    private fun remainingDirectionalWork(offered: Long = branchWorkAllowance): Long {
+        var allowance = offered
         nodeWorkAllowance()?.let { allowance = minOf(allowance, it) }
         lpEffortGovernor.remainingWork()?.let { allowance = minOf(allowance, it) }
         return if (allowance <= 0L || params.cancellation()) 0L else allowance
@@ -1239,11 +1240,21 @@ internal class LpEngine(
 
     internal fun reserveProbeWork(work: Long): Boolean {
         if (work <= 0L) return false
-        if (!lpEffortGovernor.isDemoted) {
-            branchWorkAllowance = maxOf(branchWorkAllowance, directionalWorkBudget.ops())
-        }
-        branchWorkAllowance = minOf(branchWorkAllowance, MAX_NODE_WORK_OPS)
+        branchWorkAllowance = offeredProbeWork()
         return reserveDirectionalWork(work)
+    }
+
+    private fun offeredProbeWork(): Long =
+        (if (lpEffortGovernor.isDemoted) branchWorkAllowance
+        else maxOf(branchWorkAllowance, directionalWorkBudget.ops())).coerceAtMost(MAX_NODE_WORK_OPS)
+
+    internal fun canPrepareDirectionalChildren(model: LpModel, followupWork: Long): Boolean {
+        if (followupWork < 0L) return false
+        val available = remainingDirectionalWork(offeredProbeWork())
+        if (available <= 0L) return false
+        val preparation = directionalChildPreparationBound(model)
+        val required = saturatingAdd(saturatingAdd(preparation, preparation), saturatingAdd(22L, followupWork))
+        return available >= required
     }
 
     internal fun directionalValues(
