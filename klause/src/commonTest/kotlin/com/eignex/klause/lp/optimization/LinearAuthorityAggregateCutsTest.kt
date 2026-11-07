@@ -2183,6 +2183,109 @@ class LinearAuthorityAggregateCutsTest {
     }
 
     @Test
+    fun `a retained pair should leave one continuation for another source combination`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val firstReal = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
+        val source = SourceProofContext(scope, setOf(x, y, z, real, otherReal, firstReal), linkedMapOf(
+            "first" to SourcePremise(SourceInequality(mapOf(firstReal to BigFraction.ONE,
+                z to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "first demand" to SourcePremise(SourceInequality(mapOf(firstReal to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE)),
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "demand" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                otherReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+        ))
+        val observations = mutableMapOf<String, Long>()
+        val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            limits = limits, point = mapOf(x to 0.75, y to 0.75, z to 0.5,
+                real to 1.5, otherReal to 1.5, firstReal to 1.0))
+
+        assertEquals(listOf(
+            SourceInequality(mapOf(z to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+            SourceInequality(mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE), BigFraction.ofLong(-2)),
+        ), cuts.map { it.inequality })
+        assertEquals(listOf(setOf(0, 1), setOf(2, 3, 4)), cuts.map { it.owners })
+        assertEquals(1L, observations["AggregateRetainedContinuation"])
+        assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
+        assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
+        for (cut in cuts) assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `cancelling a later continuation should retain the completed source cut`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val firstReal = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
+        val source = SourceProofContext(scope, setOf(x, y, z, real, otherReal, firstReal), linkedMapOf(
+            "first" to SourcePremise(SourceInequality(mapOf(firstReal to BigFraction.ONE,
+                z to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "first demand" to SourcePremise(SourceInequality(mapOf(firstReal to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE)),
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "demand" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                otherReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+        ))
+        val observations = mutableMapOf<String, Long>()
+        var stopped = false
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+            observe = { name, count ->
+                observations[name] = (observations[name] ?: 0L) + count
+                if (name == "AggregateContinuationScored") stopped = true
+            }, point = mapOf(x to 0.75, y to 0.75, z to 0.5,
+                real to 1.5, otherReal to 1.5, firstReal to 1.0))
+
+        assertTrue(stopped)
+        val cut = cuts.single()
+        assertEquals(SourceInequality(mapOf(z to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE), cut.inequality)
+        assertEquals(setOf(0, 1), cut.owners)
+        assertTrue((observations["AggregateWork"] ?: 0L) > 0L)
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+    }
+
+    @Test
+    fun `a full candidate pool should bypass retained pair continuation`() {
+        val z = SourceCoordinate(SourceCoordinate.Kind.Integer, 2)
+        val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
+        val firstReal = SourceCoordinate(SourceCoordinate.Kind.Real, 2)
+        val source = SourceProofContext(scope, setOf(x, y, z, real, otherReal, firstReal), linkedMapOf(
+            "first" to SourcePremise(SourceInequality(mapOf(firstReal to BigFraction.ONE,
+                z to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "first demand" to SourcePremise(SourceInequality(mapOf(firstReal to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE)),
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                x to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(otherReal to BigFraction.ONE,
+                y to BigFraction.ofLong(-2)), BigFraction.ZERO)),
+            "demand" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                otherReal to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+        ))
+        val observations = mutableMapOf<String, Long>()
+
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
+            maximumCandidates = 1, point = mapOf(x to 0.75, y to 0.75, z to 0.5,
+                real to 1.5, otherReal to 1.5, firstReal to 1.0))
+
+        assertEquals(SourceInequality(mapOf(z to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
+            cuts.single().inequality)
+        assertNull(observations["AggregateRetainedContinuation"])
+        assertNull(observations["AggregateContinuationScored"])
+    }
+
+    @Test
     fun `a tight continuation should separate before loose rows exhaust the production allowance`() {
         val otherReal = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val premises = linkedMapOf(

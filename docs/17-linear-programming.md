@@ -842,7 +842,10 @@ coefficient cites its selected singleton premise, and the complete proof require
 source verification before admission. The singleton index, side scoring,
 exact arithmetic and nested proofs share the same generation allowance. A nonseparating seed or continuation tries these alternatives before
 following one opposite-sign continuous incidence path through
-at most four distinct original source rows. For the next residual coordinate,
+at most four distinct original source rows. After retaining a separating proposal,
+at most one later nonseparating seed can continue under the remaining generation
+allowance. Cancellation or exhaustion preserves earlier completed proposals.
+For the next residual coordinate,
 continuation ranks unvisited rows by finite source slack divided by the absolute
 pivot coefficient at the current point. Ties retain source order. If no score is
 available, the first eligible row is the fallback. The full scoring scan and scalar
