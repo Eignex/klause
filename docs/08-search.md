@@ -331,6 +331,12 @@ reduced-cost scores or passive predictions. Missing directions, ties, changed po
 unfinished solves and unfunded analysis retain current scoring. At most eight
 attempts belong to one search owner, including failed reservations and across history
 resets. Consecutive entries on the same retained state cannot repeat an attempt.
+Two consecutive unfunded, declined, incomplete or baseline-preserving attempts stop
+basis consultations for that owner. A computed improving proposal clears that streak,
+including when an advice-withheld consumer retains its baseline. History resets do
+not reopen the attempt budget or the unproductive streak. Passive comparisons remain
+available when basis consultations stop. `VARIABLE_BASIS_STOPPED` records that owner's
+admission stop once.
 The bounded runner-up scan charges its work before visiting candidates.
 Preparation reserves 20 work units before allocating the column request; analysis
 leaves 32 units for comparison and selection in the containing allowance. Basis
