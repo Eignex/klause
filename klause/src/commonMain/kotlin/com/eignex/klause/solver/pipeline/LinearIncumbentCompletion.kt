@@ -114,9 +114,14 @@ internal class LinearIncumbentCompletion(
         }
         val query = requireNotNull(attempt.query)
         val values = recoverLinearPrimal(query.coordinates, requireNotNull(attempt.point), query.rows,
-            query.inactive, token, complete = { rows, columns, active ->
+            query.inactive, token, complete = recovery@{ rows, columns, active ->
+                val allocation = 32L * columns.size
+                if (active() || budget.funding?.remainingAllocation?.let { allocation > it } == true) {
+                    return@recovery null
+                }
                 budget.observe(preparation = columns.size.toLong())
-                budget.funding?.charge(0L, 32L * columns.size)
+                budget.funding?.charge(0L, allocation)
+                if (budget.funding?.exhausted == true) return@recovery null
                 val costs = columns.map { query.costs[it] }
                 val objective = costs.takeIf { it.any { cost -> !cost.isZero } }
                 val residual = attempt.residual ?: LinearResidualCompletion(budget, SparseSourceLpPolicy())
