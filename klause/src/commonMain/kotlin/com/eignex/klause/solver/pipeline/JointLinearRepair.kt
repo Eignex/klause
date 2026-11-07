@@ -84,7 +84,9 @@ internal class JointLinearRepair(
     private var pending: ExactNeighborhoodCondition? = null
     private var queryFreedIntegers = 0
     private var checkedTrialWidth = 0
+    private var checkedTrialCenter: Sample? = null
     private var enlargedTrialPending = false
+    private var enlargedTrialAfterWitness = false
     private var enlargedTrialProposal: ExactNeighborhoodCondition? = null
     var incumbentTrialPending = false
         private set
@@ -199,7 +201,7 @@ internal class JointLinearRepair(
                 }
                 val checkedStart = pooled != null && completion != null && round == 0L
                 if (round == 0L && completion != null) incumbentTrialPending = checkedStart
-                val width = if (checkedStart) {
+                val width = if (enlargedTrialAfterWitness) checkedTrialWidth + 1 else if (checkedStart) {
                     observe("jointRepairCheckedCenterStarts")
                     minOf(count, 2)
                 } else if (sourceInputPass && !adaptive && round > 0L && focusedRemaining > 0) {
@@ -216,6 +218,7 @@ internal class JointLinearRepair(
                 requireNotNull(selection).propose(from, pooled?.bools ?: bools, size, proposalRound, radius, limit)
                     .also { condition ->
                         if (checkedStart) {
+                            checkedTrialCenter = pooled
                             checkedTrialWidth = (sourceIntegers?.size ?: model.numIntVars) - condition.lower.size
                             enlargedTrialPending = adaptive &&
                                 (sourceIntegers?.size ?: model.numIntVars) > checkedTrialWidth
@@ -333,16 +336,31 @@ internal class JointLinearRepair(
             val enlarged = condition === enlargedTrialProposal
             if (enlarged && (result.result == ExactNeighborhoodResult.Refuted ||
                     result.result is ExactNeighborhoodResult.Witness)) observe("jointRepairEnlargedTrialCompletions")
-            val continuing = result.result == ExactNeighborhoodResult.Refuted && enlargedTrialPending &&
-                !enlarged && !exhausted && !stop()
+            val continuing = enlargedTrialPending && !enlarged && !exhausted && !stop() &&
+                when (val outcome = result.result) {
+                    ExactNeighborhoodResult.Refuted -> true
+                    is ExactNeighborhoodResult.Witness -> sameDiscreteCenter(outcome.sample).also {
+                        enlargedTrialAfterWitness = it
+                    }
+                    else -> false
+                }
             if (continuing) observe("jointRepairEnlargedTrialContinuations")
             else {
                 enlargedTrialPending = false
+                enlargedTrialAfterWitness = false
                 enlargedTrialProposal = null
+                checkedTrialCenter = null
             }
             incumbentTrialPending = continuing
         }
         return result
+    }
+
+    private fun sameDiscreteCenter(sample: Sample): Boolean {
+        val center = checkedTrialCenter ?: return false
+        budget.observe(boundCertification = 1L + model.numBoolVars + model.numIntVars)
+        return !stop() && !funding.exhausted && sample.bools.contentEquals(center.bools) &&
+            (0 until model.numIntVars).all { sample.exactIntValue(it) == center.exactIntValue(it) }
     }
 
     private fun advanceAttempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
@@ -475,7 +493,9 @@ internal class JointLinearRepair(
         closed = true
         incumbentTrialPending = false
         enlargedTrialPending = false
+        enlargedTrialAfterWitness = false
         enlargedTrialProposal = null
+        checkedTrialCenter = null
         queryFreedIntegers = 0
         val resources = SearchInvocationResources()
         resources.own(authority)

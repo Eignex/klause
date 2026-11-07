@@ -153,6 +153,100 @@ class JointLinearRepairTest {
     }
 
     @Test
+    fun `adaptive checked repair should widen after continuous progress leaves integers unchanged`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1), realCoefficients = doubleArrayOf(1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val seed = Sample(BooleanArray(0), LongArray(3) { 1 }, doubleArrayOf(1.0),
+            exactReals = listOf(BigFraction.ONE))
+        val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 2)
+
+        for (adaptive in listOf(false, true)) {
+            JointLinearRepair(model, source, objective, params, external = { seed },
+                sourceIntegers = intArrayOf(0, 1, 2)).use { repair ->
+                repair.search(adaptive = adaptive).use { search ->
+                    val points = ArrayList<Sample>()
+                    repeat(128) {
+                        if (points.isEmpty()) search.advance(Cancellation.Never, 1) { sample, _ -> points += sample }
+                    }
+                    val first = points.single()
+                    assertContentEquals(LongArray(3) { 1 }, LongArray(3) { first.intValue(it) })
+                    assertEquals(listOf(BigFraction.ZERO), first.exactReals)
+                    assertEquals(adaptive, repair.incumbentTrialPending)
+                    var done = false
+                    repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
+
+                    val result = assertIs<MinimizeResult.WithSample>(
+                        search.minimizeResult(TerminationReason.BudgetExhausted))
+                    val expected = if (adaptive) 0L else 1L
+                    assertContentEquals(LongArray(3) { expected }, LongArray(3) { result.sample.intValue(it) })
+                    val evidence = SourceEvidence(source.scope, SourceClaim.Witness(result.sample),
+                        SourceDerivation.SourceWitness)
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
+                    assertTrue(done)
+                    assertFalse(repair.incumbentTrialPending)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `integer progress should end the small checked repair trial`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val seed = Sample(BooleanArray(0), LongArray(3) { 1 })
+        val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1)
+        JointLinearRepair(model, source, objective, params, external = { seed }).use { repair ->
+            repair.search(adaptive = true).use { search ->
+                var done = false
+                repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
+
+                val result = assertIs<MinimizeResult.WithSample>(
+                    search.minimizeResult(TerminationReason.BudgetExhausted))
+                assertContentEquals(longArrayOf(0, 0, 1), LongArray(3) { result.sample.intValue(it) })
+                assertFalse(repair.incumbentTrialPending)
+            }
+        }
+    }
+
+    @Test
+    fun `containing cancellation should stop widening after continuous progress`() {
+        val model = Problem(0,
+            intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+        val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1), realCoefficients = doubleArrayOf(1.0))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        var cancelled = false
+        val params = TheoryParams(sourceIncumbentCompletion = true, cancellation = Cancellation { cancelled })
+        val seed = Sample(BooleanArray(0), LongArray(3) { 1 }, doubleArrayOf(1.0),
+            exactReals = listOf(BigFraction.ONE))
+        JointLinearRepair(model, source, objective, params, external = { seed }).use { repair ->
+            repair.search(adaptive = true).use { search ->
+                repeat(128) {
+                    if (!cancelled) search.advance(Cancellation.Never, 1) { _, _ -> cancelled = true }
+                }
+                search.advance(Cancellation.Never, 1)
+
+                assertTrue(cancelled)
+                assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairCandidates"))
+                assertNull(repair.stats.smt.completeSearchStages?.get("jointRepairEnlargedTrialStarts"))
+            }
+        }
+    }
+
+    @Test
     fun `containing cancellation should stop an enlarged checked trial before opening its query`() {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
             factors = arrayOf(
