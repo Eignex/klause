@@ -36,6 +36,120 @@ class LinearAuthoritySessionTest {
     }
     private val scope = SourceScope(SourceRevision("session-fixture", "exact-affine"))
 
+
+    @Test
+    fun `appending a checked source row should strengthen the bound without replacing the owner`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val extended = rows + ExactRationalInequality(intArrayOf(0, 1),
+            List(2) { BigFraction.MINUS_ONE }, BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal())
+        val costs = List(2) { BigFraction.ONE }
+        LinearAuthoritySession(SourceLpBudget()).use { session ->
+            val first = assertNotNull(session.advance(
+                assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never)), costs, BigFraction.ZERO,
+                scope, Cancellation.Never, SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance })
+
+            val changed = assertNotNull(session.advance(
+                assertNotNull(LinearAuthorityModel.prepare(extended, 2, Cancellation.Never)), costs, BigFraction.ZERO,
+                scope, Cancellation.Never, SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance })
+
+            assertEquals(BigFraction.ONE, assertNotNull(first.bound).value)
+            assertEquals(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal(), assertNotNull(changed.bound).value)
+            assertEquals(1L, session.preparations)
+        }
+    }
+
+    @Test
+    fun `an appended source row should retract and restore within the retained owner`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val extended = rows + ExactRationalInequality(intArrayOf(0, 1),
+            List(2) { BigFraction.MINUS_ONE }, BigFraction.ofLong(-2))
+        val costs = List(2) { BigFraction.ONE }
+        LinearAuthoritySession(SourceLpBudget()).use { session ->
+            for ((input, inactive, expected) in listOf(
+                Triple(rows, emptySet(), BigFraction.ONE),
+                Triple(extended, emptySet(), BigFraction.ofLong(2)),
+                Triple(extended, setOf(3), BigFraction.ONE),
+                Triple(extended, emptySet(), BigFraction.ofLong(2)),
+            )) {
+                val result = assertNotNull(session.advance(
+                    assertNotNull(LinearAuthorityModel.prepare(input, 2, Cancellation.Never, inactive)),
+                    costs, BigFraction.ZERO, scope, Cancellation.Never, SparseSourceLpPolicy(), observer,
+                ) { guidance, _, _ -> guidance })
+                assertEquals(expected, assertNotNull(result.bound).value)
+            }
+            assertEquals(1L, session.preparations)
+        }
+    }
+
+    @Test
+    fun `changed equality packing should rebuild instead of appending an incompatible logical row`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ONE }, BigFraction.ofLong(2)),
+        )
+        val extended = rows + ExactRationalInequality(intArrayOf(0, 1),
+            List(2) { BigFraction.MINUS_ONE }, BigFraction.ofLong(-2))
+        val policy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES)
+        val costs = List(2) { BigFraction.MINUS_ONE }
+        LinearAuthoritySession(SourceLpBudget()).use { session ->
+            session.advance(assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never)),
+                costs, BigFraction.ZERO, scope, Cancellation.Never, policy, observer) { guidance, _, _ -> guidance }
+
+            val changed = assertNotNull(session.advance(
+                assertNotNull(LinearAuthorityModel.prepare(extended, 2, Cancellation.Never)),
+                costs, BigFraction.ZERO, scope, Cancellation.Never, policy, observer,
+            ) { guidance, _, _ -> guidance })
+
+            assertEquals(BigFraction.ofLong(-2), assertNotNull(changed.bound).value)
+            assertEquals(2L, session.preparations)
+        }
+    }
+
+    @Test
+    fun `cancelled append inspection should retain charged work without publishing changed guidance`() {
+        val rows = listOf(
+            ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(1), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
+            ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
+        )
+        val extended = rows + ExactRationalInequality(intArrayOf(0, 1),
+            List(2) { BigFraction.MINUS_ONE }, BigFraction.ofLong(-2))
+        val costs = List(2) { BigFraction.ONE }
+        val budget = SourceLpBudget()
+        var stopped = false
+        LinearAuthoritySession(budget, { name, _ -> if (name == "OwnerAppendInspectionWork") stopped = true })
+            .use { session ->
+                session.advance(assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never)),
+                    costs, BigFraction.ZERO, scope, Cancellation.Never, SparseSourceLpPolicy(), observer,
+                ) { guidance, _, _ -> guidance }
+                val before = budget.measuredPreparationWork
+
+                val cancelled = session.advance(
+                    assertNotNull(LinearAuthorityModel.prepare(extended, 2, Cancellation.Never)),
+                    costs, BigFraction.ZERO, scope, Cancellation { stopped }, SparseSourceLpPolicy(), observer,
+                ) { guidance, _, _ -> guidance }
+
+                assertNull(cancelled)
+                assertTrue(stopped)
+                assertTrue(budget.measuredPreparationWork > before)
+                stopped = false
+                val restored = assertNotNull(session.advance(
+                    assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never)),
+                    costs, BigFraction.ZERO, scope, Cancellation.Never, SparseSourceLpPolicy(), observer,
+                ) { guidance, _, _ -> guidance })
+                assertEquals(BigFraction.ONE, assertNotNull(restored.bound).value)
+            }
+    }
+
     @Test
     fun `suspending a row after a packed equality should preserve scoped bounds and the numerical owner`() {
         val rows = listOf(

@@ -1138,7 +1138,14 @@ Source row templates and numeric coordinate addresses are
 prepared once per Boolean substitution. Conditional rows remain in the matrix;
 their logical sides are suspended while their pins are unestablished and restored
 on retraction. Objective edits invalidate dependent certificates; changed
-structural authority replaces the owner. Each query lifts multipliers through its own
+structural authority replaces the owner. A completed owner in the same source scope can append
+up to 64 checked cut rows when structural columns, objective, every existing emitted row
+and logical column retain identical exact values and metadata. Equality-packing changes
+fall back to replacement. Compatibility and layout setup use at most 65,536 modeled work
+and one MiB, debiting the containing source allowance. Append construction and basis work,
+including failed attempts, remain charged there. Source sides rebind and inactive masks
+retract through the same scoped trail. Cancellation publishes no changed guidance.
+Each query lifts multipliers through its own
 source-side mapping and checks the resulting derivation in its source scope.
 Auxiliary multiplier searches own separate temporary solvers. Neighborhood
 invocations can borrow a retained authority, leaving its cleanup to the caller.
