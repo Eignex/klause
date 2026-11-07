@@ -34,16 +34,21 @@ internal class BacktrackWorkerConfig(
     internal val zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
     private val toleranceCheck: ((Sample) -> Boolean)? = null,
     private val coreRefinement: CoreRefinementMode = CoreRefinementMode.NONE,
+    private val lpDirectionalAdvice: Boolean? = null,
 ) : WorkerConfig {
 
     fun withToleranceCheck(check: (Sample) -> Boolean): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, check, coreRefinement, lpDirectionalAdvice)
 
     override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
-        BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck, coreRefinement)
+        BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck, coreRefinement,
+            lpDirectionalAdvice)
 
     override fun withCoreRefinement(mode: CoreRefinementMode): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode)
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode, lpDirectionalAdvice)
+
+    fun withDirectionalAdvice(enabled: Boolean): BacktrackWorkerConfig =
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, enabled)
 
     override val label: String get() = recipe.label
 
@@ -71,7 +76,8 @@ internal class BacktrackWorkerConfig(
         val workerLabel = "bt/${recipe.label}"
         val workerEvent = onEvent?.let { sink -> { e: SearchEvent -> sink(workerLabel, e) } }
         var params = recipe.build(seed + 1000L + index, workerEvent)
-        params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
+        params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck,
+            lpDirectionalAdvice = lpDirectionalAdvice ?: params.lpDirectionalAdvice)
         if (recipe.label == BacktrackArm.CoreGuided.label) {
             val coreParams = params
             val core = CoreGuidedWorkerConfig(params.nodeBudget, coreRefinement = coreRefinement) { coreParams }

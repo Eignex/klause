@@ -11,10 +11,16 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.portfolioExecutor
+import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -337,9 +343,7 @@ class ResumableMinimizeDirectionalTest {
     @Test
     fun `finite search applies or withholds confirmed advice at the actual branch`() {
         val queryWork = ArrayList<Long>()
-        for (applyAdvice in listOf(false, true)) {
-            val sink = SolveStatsSink("probe-child-order-consumer")
-            var observed = false
+        for ((requested, applyAdvice) in listOf(null to false, false to false, true to true)) {
             val blocks = 3
             val variables = blocks * 3
             val factors = ArrayList<Factor>()
@@ -365,15 +369,12 @@ class ResumableMinimizeDirectionalTest {
                 branchObserver = object : SearchBranchAttemptObserver {
                     override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                         attempted.add(decision)
-                        val outcomes = sink.lp.snapshot().phases["DIRECTIONAL_BRANCH_NODE"]?.outcomes
-                        val event = if (applyAdvice) "PROBE_SIDE_CONSUMED" else "PROBE_SIDE_WITHHELD"
-                        observed = (outcomes?.get(event) ?: 0L) > 0L
                     }
                 },
                 lpPlan = LpPlan(bounding = true, rootBudgetMillis = 0L, rootCutHarvest = false,
                     boundMaxOpsPerNode = 0L, componentSplit = false),
                 lpDirectionalGains = true,
-                lpDirectionalAdvice = applyAdvice,
+                lpDirectionalAdvice = requested != null,
                 componentFactory = { listOf(object : SearchComponent {
                     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
                         if (!completionAttempt) return ComponentResult.Consistent
@@ -387,18 +388,17 @@ class ResumableMinimizeDirectionalTest {
             val objective = LinearObjective(intCoefficients = longArrayOf(
                 6L, 6L, 11L, 5L, 5L, 9L, 40L, 40L, 50L,
             ))
-            ResumableMinimize(BacktrackSolver(problem), objective, params,
-                rootBasisGuidance = false, sink = sink).use { search ->
-                val stopAfterConsumption = Cancellation { observed }
-                var slices = 0
-                while (slices++ < 16 && !search.isDone && !observed) {
-                    search.runSlice(stopAfterConsumption, 1000L, 128L) {}
-                }
+            val scenario = PortfolioScenario(1, 1, Kind.COP, EngineMix.BACKTRACK, seed = 3L,
+                btPool = listOf { BacktrackRecipe("probe-child-order") { _, _ -> params } })
+            val prepared = problem.prepareExecutionPlan(objective, preferFinite = true)
+            val cancellation = Cancellation { attempted.size >= 2 }
+            FinitePipeline.portfolioExecutor(problem, scenario, objective, null, null, null, null,
+                prepared, cancellation, numericalCompletion = false, lpDirectionalAdvice = requested).use { invocation ->
+                val result = invocation.minimize(cancellation, null)
 
-                val stats = search.stats.lp
+                val stats = result.stats.lp
                 val observations = stats.phases.getValue("DIRECTIONAL_BRANCH_NODE").outcomes
                 val diagnostic = "$observations; probes=${stats.phases["DIRECTIONAL_PROBES_NODE"]}"
-                assertTrue(observed, diagnostic)
                 val second = if (applyAdvice) SearchDecision.IntAtLeast(7, 1) else SearchDecision.IntAtMost(5, 0)
                 assertEquals(listOf(SearchDecision.IntAtMost(2, 0), second), attempted.take(2), diagnostic)
                 assertEquals(1L, observations["VARIABLE_BASIS_VERIFICATION_ATTEMPT"], diagnostic)
@@ -417,7 +417,7 @@ class ResumableMinimizeDirectionalTest {
                 queryWork += probes.work
             }
         }
-        assertEquals(queryWork[0], queryWork[1])
+        assertEquals(listOf(queryWork[0], queryWork[0], queryWork[0]), queryWork)
     }
 
     @Test

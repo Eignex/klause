@@ -100,6 +100,7 @@ object PortfolioBuilder {
         sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
         objectiveCoordinates: ObjectiveCoordinateView? = null,
         bufferedPublications: Boolean = false,
+        lpDirectionalAdvice: Boolean? = null,
     ): List<FinitePortfolioFactory> {
         val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling, objective) { recipe, eligibility ->
             onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(recipe, eligibility.admitted,
@@ -161,8 +162,11 @@ object PortfolioBuilder {
                 } else {
                     admitted
                 }
-                val bounded = (budget?.let(completion::withNodeBudget) ?: completion)
+                val refined = (budget?.let(completion::withNodeBudget) ?: completion)
                     .withCoreRefinement(scenario.coreRefinement)
+                val bounded = if (refined is BacktrackWorkerConfig && lpDirectionalAdvice != null) {
+                    refined.withDirectionalAdvice(lpDirectionalAdvice)
+                } else refined
                 val privateCoordinates = objectiveCoordinates != null && bounded is LocalSearchWorkerConfig &&
                     config.label == LocalSearchArm.CblsPlateauIlsBasin.label &&
                     scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&

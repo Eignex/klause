@@ -23,6 +23,42 @@ import kotlin.test.assertTrue
 
 class PortfolioPlanTest {
     @Test
+    fun `directional application controls preserve the ordinary portfolio scenario`() {
+        for (engine in listOf(FiniteEngine.MIXED, FiniteEngine.BACKTRACK)) {
+            for (optimize in listOf(false, true)) {
+                val request = PortfolioPlanRequest(engine, optimize, 1, emptyList<String>(), 17L,
+                    autoArms(1), LpConfig.AGGRESSIVE, LpZeroObjectivePricing.MIN_BOUND_SUPPORT, null, null)
+                val ordinary = assertIs<PortfolioPlan.Execute>(FinitePipeline.planPortfolio(request))
+                for (enabled in listOf(false, true)) {
+                    val configured = assertIs<PortfolioPlan.Execute>(FinitePipeline.planPortfolio(
+                        PortfolioPlanRequest(engine, optimize, 1, listOf("lp-directional-advice=$enabled"), 17L,
+                            autoArms(1), LpConfig.AGGRESSIVE, LpZeroObjectivePricing.MIN_BOUND_SUPPORT, null, null)))
+
+                    assertEquals(ordinary.scenario, configured.scenario)
+                    assertEquals(null, configured.scenario.btEdit)
+                    assertEquals(enabled, configured.lpDirectionalAdvice)
+                }
+                assertEquals(null, ordinary.lpDirectionalAdvice)
+            }
+        }
+    }
+
+    @Test
+    fun `directional application controls retain explicit backtrack tuning`() {
+        for (enabled in listOf(false, true)) {
+            val configured = assertIs<PortfolioPlan.Execute>(FinitePipeline.planPortfolio(PortfolioPlanRequest(
+                FiniteEngine.BACKTRACK, true, 1,
+                listOf("lp-directional-advice=$enabled", "max-decisions=4"), 17L,
+                autoArms(1), LpConfig.AGGRESSIVE, LpZeroObjectivePricing.MIN_BOUND_SUPPORT, null, null)))
+
+            val params = requireNotNull(configured.scenario.btEdit).invoke(BacktrackParams())
+
+            assertEquals(4L, params.maxDecisions)
+            assertEquals(enabled, configured.lpDirectionalAdvice)
+        }
+    }
+
+    @Test
     fun `root maintenance policy should resolve without editing backtrack recipes`() {
         for (requested in listOf(null, false, true)) {
             val settings = requested?.let { listOf("root-maintenance=$it") }.orEmpty()

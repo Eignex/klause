@@ -22,6 +22,11 @@ construction; explicit `arms`, `ls` or `bt` settings take precedence. Native
 arithmetic routes reject finite-only explicit policy instead of ignoring it. Recipe
 defaults carry no witness or proof authority.
 
+Directional advice application is an execution setting separate from recipe tuning.
+`lp-directional-advice` preserves the composed scenario, automatic companion admission,
+worker labels, seeds and allowances. Finite worker materialization carries the setting
+into its private search parameters after composition and admission.
+
 Named recipe pools retain the selected worker count and repeat their recipes across
 the slots. `bt-arm=X` selects the backtrack recipe; `arms=1` with the `cp` engine
 selects one worker. An explicit pool with one recipe can therefore have several

@@ -1263,6 +1263,7 @@ private fun executePortfolio(
         bufferedPublications = bufferedPublications,
         privateRebuildBudgetOnly = request.executionOptions.privateRebuildBudgetOnly ||
             privateScenario !== baseScenario,
+        lpDirectionalAdvice = plan.lpDirectionalAdvice,
     )
     val start = TimeSource.Monotonic.markNow()
     executor.use {

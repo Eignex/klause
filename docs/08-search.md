@@ -369,6 +369,8 @@ retaining collection, comparison admission, numerical queries and their work cha
 It preserves the original selected variable and complementary alternatives. Withheld
 variable proposals and child preferences have separate observations from consumption.
 The application setting defaults to enabled and does not enable directional collection.
+It changes no recipe tuning or automatic portfolio admission; worker materialization
+carries it separately from the composed scenario.
 
 The hint owner supports a fresh child-value comparison below the root for confirmation.
 An explicit numerical mode can also request it for a reliable challenger with missing
