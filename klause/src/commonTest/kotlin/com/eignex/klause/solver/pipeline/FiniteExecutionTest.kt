@@ -212,7 +212,9 @@ class FiniteExecutionTest {
         for (settings in listOf(listOf("companion-admission=never"), listOf("companion-admission=funded"),
             listOf("companion-admission=funded", "companion-after-incumbent=true"),
             listOf("companion-admission=progress-funded"),
-            listOf("companion-admission=progress-funded", "companion-after-incumbent=true"))) {
+            listOf("companion-admission=progress-funded", "companion-after-incumbent=true"),
+            listOf("companion-admission=value-funded"),
+            listOf("companion-admission=value-funded", "companion-after-incumbent=true"))) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
             val shape = FiniteSolveShape(problem, true, false, null,
                 LinearObjective(intCoefficients = longArrayOf(1)), 0, null)
@@ -227,7 +229,7 @@ class FiniteExecutionTest {
 
     @Test
     fun `typed and parsed funded admission should reach the source portfolio`() {
-        val variants = listOf("funded", "progress-funded").flatMap { admission ->
+        val variants = listOf("funded", "progress-funded", "value-funded").flatMap { admission ->
             listOf(ExecutionOptions(ExecutionOption.companionAdmission(admission),
                 ExecutionOption.companionAfterIncumbent(true)), ExecutionOptions.parse(listOf(
                 "companion-admission=$admission", "companion-after-incumbent=true")))

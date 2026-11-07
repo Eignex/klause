@@ -271,7 +271,7 @@ internal class BooleanProofPortfolio private constructor(
             if (cancellation()) return decline("source-admission-cancelled")
             if (workers.size != 2 || workers.any { !it.permitsSourceProofs || it.improvementOnly ||
                     it.auxiliaryProof || it.startAfterIncumbent || it.startAfterAcceptedImprovement ||
-                    it.firstWitnessOnly })
+                    it.startAfterProjectedImprovement || it.firstWitnessOnly })
                 return decline("workers-not-two-canonical-complete")
             val recipes = workers.map { it.booleanProofRecipe ?: return decline("builder-ownership-unavailable") }
             val problem = recipes.first().problem

@@ -211,17 +211,20 @@ class BooleanProofPortfolioTest {
 
     @Test
     fun `a worker awaiting improvement should decline Boolean proof tasks`() {
-        val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
-            btPool = listOf { BacktrackCatalog.byLabel("first-fail") })
-        val workers = PortfolioBuilder.build(problem, scenario)
-        workers[0].startAfterAcceptedImprovement = true
-        try {
-            var decline: String? = null
-            assertNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true) { decline = it })
+        for (projected in listOf(false, true)) {
+            val scenario = PortfolioScenario(1, 2, Kind.CSP, EngineMix.BACKTRACK,
+                btPool = listOf { BacktrackCatalog.byLabel("first-fail") })
+            val workers = PortfolioBuilder.build(problem, scenario)
+            workers[0].startAfterAcceptedImprovement = !projected
+            workers[0].startAfterProjectedImprovement = projected
+            try {
+                var decline: String? = null
+                assertNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true) { decline = it })
 
-            assertEquals("workers-not-two-canonical-complete", decline)
-        } finally {
-            workers.forEach { it.close() }
+                assertEquals("workers-not-two-canonical-complete", decline)
+            } finally {
+                workers.forEach { it.close() }
+            }
         }
     }
 

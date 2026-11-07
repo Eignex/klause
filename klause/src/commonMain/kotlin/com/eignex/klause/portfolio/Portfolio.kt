@@ -489,6 +489,8 @@ class Portfolio(
         var exhausted = false
         var terminalPublished = false
         var acceptedVersion = 0L
+        val needsProjectedProgress = workers.any { it.startAfterProjectedImprovement }
+        var initialProgressValue: Double? = null
 
         // Install a strictly-improving incumbent and credit it to [claim]'s arm. Called under the run's lock, so the
         // check, the callback and the install are one step: concurrent lanes report improvements in the order they
@@ -499,6 +501,14 @@ class Portfolio(
             if (!incumbents.isImproving(candidate.objective)) return
             val worker = workers[claim.arm]
             if (incumbent.offer(r.sample, candidate.objective) !is Publication.Installed) return
+            val projectedProgress = if (needsProjectedProgress) {
+                val sourceProgress = incumbents.sourceProgress
+                val current = if (sourceProgress == null) incumbents.progressValue(candidate.objective)
+                    else sourceProgress(r.sample)
+                val first = initialProgressValue
+                if (first == null) initialProgressValue = current
+                first != null && current != null && first.isFinite() && current.isFinite() && current < first
+            } else false
             claim.acceptedIncumbents++
             run.endFeasibilityCoverage()
             run.incumbentImproved()
@@ -514,7 +524,7 @@ class Portfolio(
             }
             claim.improved = true
             if (before != null) {
-                run.recordAcceptedImprovement()
+                run.recordAcceptedImprovement(projectedProgress)
                 if (claim.hadIncumbent || run.pricesAcceptedGains) {
                     val reward = incumbents.gain(before.objective, candidate.objective)
                     run.recordAcceptedGain(claim.arm, reward)
@@ -998,10 +1008,12 @@ class Portfolio(
         private var improving = false
         private var feasibilityComplete = false
         private var hasAcceptedImprovement = false
+        private var hasProjectedImprovement = false
         private var incumbentElapsed: DoubleArray? = null
 
-        fun recordAcceptedImprovement() {
+        fun recordAcceptedImprovement(projected: Boolean = false) {
             hasAcceptedImprovement = true
+            hasProjectedImprovement = hasProjectedImprovement || projected
         }
 
         fun endFeasibilityCoverage() {
@@ -1129,7 +1141,7 @@ class Portfolio(
             }
             if (remaining == 0) return@locked null
             val dedicated = diagnostics == null && lanes == workers.size && workers.none {
-                it.startAfterIncumbent || it.startAfterAcceptedImprovement
+                it.startAfterIncumbent || it.startAfterAcceptedImprovement || it.startAfterProjectedImprovement
             }
             val available = eligibleArms().let { arms -> availability?.let { arms.filter(it) } ?: arms }
             val eligible = initialHeuristicEligibility(available)
@@ -1216,7 +1228,8 @@ class Portfolio(
         private fun eligibleArms(): List<Int> {
             val available = workers.indices.filter {
                 (!workers[it].startAfterIncumbent || feasibilityComplete) &&
-                    (!workers[it].startAfterAcceptedImprovement || hasAcceptedImprovement)
+                    (!workers[it].startAfterAcceptedImprovement || hasAcceptedImprovement) &&
+                    (!workers[it].startAfterProjectedImprovement || hasProjectedImprovement)
             }
             val first = available.filter { !workers[it].improvementOnly }
             val eligible = if (improving || first.all { retired[it] }) available else first
