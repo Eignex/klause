@@ -502,7 +502,10 @@ retain their order and seed positions.
 Each appended worker keeps four seconds of active search by default. The opt-in
 `companion-active-ms` sets a positive lifetime of at most 60,000 milliseconds inside
 the unchanged containing solve deadline. `companion-after-incumbent=true` defers both
-companions' queries until the pool accepts a source incumbent. Factory construction
+companions' queries until the pool accepts a source incumbent. The opt-in
+`companion-admission=joint-after-incumbent` defers only joint repair, retaining the
+frontier's ordinary admission. It requires admitted finite numerical companions;
+an explicit `companion-after-incumbent=true` still defers both workers. Factory construction
 still belongs to the invocation. These controls change neither fragment admission
 nor the finite recipes, coverage floors, work/allocation ceilings or reseeding rules.
 Numerical segments

@@ -24,6 +24,7 @@ import com.eignex.klause.solver.withRealDifferenceSystem
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -32,6 +33,50 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TestTimeSource
 
 class FiniteNumericalCompanionsTest {
+    @Test
+    fun `joint incumbent admission should preserve the frontier admission choice`() {
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val params = TheoryParams()
+        val cost = finiteNumericalCompanionEligibility(model, PortfolioScenario.sequential(Kind.COP),
+            objective, params).requirements.construction
+        for ((afterIncumbent, jointAfterIncumbent) in
+            listOf(false to false, false to true, true to false, true to true)) {
+            val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
+                Cancellation.Never, cost, afterIncumbent = afterIncumbent,
+                jointAfterIncumbent = jointAfterIncumbent).companions)
+            val factories = companions.factories(plan, 0)
+
+            PortfolioInvocationResources(2, 1, 0, Cancellation.Never, null).use { resources ->
+                factories.first().materialize(plan, resources.slots[0]).use { frontier ->
+                    factories.last().materialize(plan, resources.slots[1]).use { repair ->
+                        assertEquals(afterIncumbent, frontier.startAfterIncumbent)
+                        assertEquals(afterIncumbent || jointAfterIncumbent, repair.startAfterIncumbent)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `joint incumbent admission should reject an explicit finite recipe`() {
+        val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
+        val objective = LinearObjective(intCoefficients = longArrayOf(1))
+        val plan = model.prepareExecutionPlan(objective, preferFinite = true)
+        val scenario = PortfolioScenario.sequential(Kind.COP).copy(explicitArms = true)
+
+        val failure = assertFailsWith<PipelineConfigException> {
+            FinitePipeline.portfolioExecutor(model, scenario, objective, null, null, null, null,
+                plan, Cancellation.Never, numericalCompletion = true, numericalCompanions = TheoryParams(),
+                jointAfterIncumbent = true).close()
+        }
+
+        assertTrue("requires admitted finite numerical companions" in assertNotNull(failure.message))
+    }
+
     @Test
     fun `opt in companion repair should publish a coupled three integer improvement`() {
         val model = Problem(0, 3, Array(3) { IntDomain(0, 1) }, arrayOf(

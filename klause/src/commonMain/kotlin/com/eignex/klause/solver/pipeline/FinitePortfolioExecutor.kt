@@ -88,6 +88,7 @@ internal fun FinitePipeline.portfolioExecutor(
     waitForCompanionImprovement: Boolean = false,
     privateRebuildBudgetOnly: Boolean = false,
     adaptiveCompanionRepair: Boolean = false,
+    jointAfterIncumbent: Boolean = false,
 ): PortfolioInvocation {
     require(scenario.diagnosticWorkLimit == null || problem.numRealVars == 0) {
         "portfolio-work requires a finite Boolean/integer source without numerical companions"
@@ -121,6 +122,9 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionEligibility = numericalCompanions?.let {
         finiteNumericalCompanionEligibility(problem, scenario, objective, it)
     }
+    if (jointAfterIncumbent && companionEligibility?.admitted != true) {
+        pipelineConfigError("companion-admission=joint-after-incumbent requires admitted finite numerical companions")
+    }
     if (adaptiveCompanionRepair && numericalCompanions?.sourceIncumbentCompletion != true) {
         pipelineConfigError("companion-repair=adaptive requires source-incumbent-completion for numerical companions")
     }
@@ -138,7 +142,8 @@ internal fun FinitePipeline.portfolioExecutor(
     val companionPreparation = if (!fundedCompanions && companionEligibility?.admitted == true) {
         FiniteNumericalCompanions.prepare(problem, requireNotNull(objective), requireNotNull(numericalCompanions),
             cancellation, companionEligibility.requirements.construction, scenario.companionAfterIncumbent,
-            incumbentCompletionCheck, adaptiveRepair = adaptiveCompanionRepair)
+            incumbentCompletionCheck, adaptiveRepair = adaptiveCompanionRepair,
+            jointAfterIncumbent = jointAfterIncumbent)
     } else null
     val companions = if (companionAdmission?.initiallyFunded == true) {
         FiniteNumericalCompanions.deferred(problem, requireNotNull(objective), requireNotNull(numericalCompanions),

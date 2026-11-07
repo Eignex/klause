@@ -92,6 +92,7 @@ internal class FiniteNumericalCompanions private constructor(
     private val admission: FiniteCompanionAdmission? = null,
     private val afterImprovement: Boolean = false,
     private val adaptiveRepair: Boolean = false,
+    private val jointAfterIncumbent: Boolean = false,
 ) {
     class Preparation(val companions: FiniteNumericalCompanions?, val elapsedNanos: Long)
 
@@ -149,7 +150,7 @@ internal class FiniteNumericalCompanions private constructor(
                     }) { _, _, _, _ -> error("joint companion runs only by slice") }
                     .bindEvidence(identity, provesResults = false)
                 companion.also {
-                    it.startAfterIncumbent = afterIncumbent
+                    it.startAfterIncumbent = afterIncumbent || jointAfterIncumbent
                     it.startAfterAcceptedImprovement = afterImprovement
                 }
             },
@@ -236,12 +237,14 @@ internal class FiniteNumericalCompanions private constructor(
             incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
             clock: TimeSource = TimeSource.Monotonic,
             adaptiveRepair: Boolean = false,
+            jointAfterIncumbent: Boolean = false,
         ): Preparation {
             val started = clock.markNow()
             val context = captureContext(model, objective, cancellation)
             val companions = context?.let {
                 FiniteNumericalCompanions(model, objective, it, params, cancellation, cost, afterIncumbent,
-                    incumbentCompletionCheck, adaptiveRepair = adaptiveRepair)
+                    incumbentCompletionCheck, adaptiveRepair = adaptiveRepair,
+                    jointAfterIncumbent = jointAfterIncumbent)
             }
             return Preparation(companions, started.elapsedNow().inWholeNanoseconds)
         }
